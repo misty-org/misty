@@ -6,6 +6,7 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 (() => {
   const shortcutToken = __MISTY_SHORTCUT_TOKEN_PLACEHOLDER__;
   __MISTY_CONTEXT_MENU_PLACEHOLDER__
+  __MISTY_BACKGROUND_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
 
   // External pages own their layout, scrollbars, and scrolling behavior.
@@ -172,6 +173,7 @@ pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bo
                 "window.location.href = `misty-focus:event?${new URLSearchParams({ token: shortcutToken })}`;"
             },
         )
+        .replace("__MISTY_BACKGROUND_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_background.js") } else { "" })
         .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_context_menu.js") } else { "" })
         .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", include_str!("browser_semantic_snapshot.js"))
         .replace(

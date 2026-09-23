@@ -1,7 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
 import { readActiveSavedAccountSession } from "@/features/auth";
 import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
-import { useWorkspaceStore } from "@/features/workspace/core";
 import {
   connectedDevicesListDirectory,
   connectedDevicesMediaUrl,
@@ -11,7 +9,7 @@ import type { PeerEntry } from "@/native/contracts";
 import { mobileCacheRead, mobileCacheWrite } from "@/native/mobile-cache";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { ChevronLeft, Eye, FilePlus2, Files, Folder, Library, Monitor, Share } from "lucide-react";
+import { ChevronLeft, Eye, FilePlus2, Files, Folder, Monitor, Share } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/shared/ui";
 import { useMobileSurfaceChrome } from "@/shared/mobile";
@@ -57,11 +55,8 @@ const recentFilesKey = "mobile-files-recent";
 export function MobileFilesPage() {
   useMobileSurfaceChrome({ title: "Files", level: "root" });
   const accountId = readActiveSavedAccountSession()?.id ?? "";
-  const scopeKey = useWorkspaceStore((state) => state.activeScopeKey);
   const connected = useConnectedDevices();
-  const spaceId = scopeKey.startsWith("space:") ? scopeKey.slice("space:".length) : "";
   const [recent, setRecent] = useState<RecentMobileFile[]>([]);
-  const [busyPath, setBusyPath] = useState("");
   const [status, setStatus] = useState("");
   const [remote, setRemote] = useState<{
     deviceId: string;
@@ -96,27 +91,6 @@ export function MobileFilesPage() {
     ].slice(0, 20);
     setRecent(next);
     if (accountId) await mobileCacheWrite(accountId, recentFilesKey, next);
-  };
-
-  const addToLibrary = async (file: RecentMobileFile) => {
-    if (!spaceId) {
-      setStatus("Choose a Space before adding a file to its Library.");
-      return;
-    }
-    if (!navigator.onLine) {
-      setStatus("Adding files is unavailable offline. The file was not queued.");
-      return;
-    }
-    setBusyPath(file.path);
-    setStatus("");
-    try {
-      await spacesApi.uploadLibraryPath(spaceId, file.path, "library");
-      setStatus(`${file.name} was added to the Space Library.`);
-    } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : "The file could not be added.");
-    } finally {
-      setBusyPath("");
-    }
   };
 
   const onlinePeers = connected.peers.filter((peer) => {
@@ -165,7 +139,7 @@ export function MobileFilesPage() {
       <div className="border-b border-charcoal-border px-4 py-4">
         <h1 className="text-lg font-semibold tracking-[-0.02em] text-cream-bright">Files</h1>
         <p className="mt-1 text-sm leading-5 text-cream-muted">
-          Import with Apple Files, then add selected items to the active Space Library.
+          Choose files on this device or browse folders shared by a paired device.
         </p>
         <button
           type="button"
@@ -173,7 +147,7 @@ export function MobileFilesPage() {
           onClick={() => void chooseFiles()}
         >
           <FilePlus2 size={18} aria-hidden="true" />
-          Import from Files
+          Choose files
         </button>
       </div>
       {status ? (
@@ -256,7 +230,7 @@ export function MobileFilesPage() {
         ) : (
           <p className="mb-5 px-2 text-sm text-cream-muted">No paired device is online.</p>
         )}
-        <h2 className="px-2 pb-2 text-xs font-semibold text-cream-muted">Recent imports</h2>
+        <h2 className="px-2 pb-2 text-xs font-semibold text-cream-muted">Recent files</h2>
         {sorted.length ? (
           <ul className="m-0 grid list-none gap-1 p-0">
             {sorted.map((file) => (
@@ -274,15 +248,6 @@ export function MobileFilesPage() {
                     onClick={() => void openPath(file.path)}
                   >
                     <Eye size={18} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Add ${file.name} to Library`}
-                    className="grid size-11 place-items-center rounded-lg text-cream-muted active:bg-charcoal-active active:text-cream-bright disabled:opacity-50"
-                    disabled={Boolean(busyPath)}
-                    onClick={() => void addToLibrary(file)}
-                  >
-                    <Library size={18} aria-hidden="true" />
                   </button>
                 </span>
               </li>

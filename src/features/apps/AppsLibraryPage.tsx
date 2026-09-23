@@ -56,10 +56,12 @@ export function AppsLibraryPage() {
               <div key={app.id}>
                 {index ? <Separator /> : null}
                 <div className="flex min-h-16 items-center gap-1 px-1.5 py-1">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="none"
+                    justify="start"
                     className={cn(
-                      "flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-md px-1.5",
+                      "flex min-h-14 w-full min-w-0 flex-1 items-center justify-start gap-3 rounded-md border-0 px-1.5 py-1",
                       "text-left transition-colors hover:bg-charcoal-hover active:bg-charcoal-active",
                     )}
                     onClick={() => navigate(officialAppRoute(app.id, undefined, user?.id ?? ""))}
@@ -74,11 +76,11 @@ export function AppsLibraryPage() {
                       </span>
                     </span>
                     <ChevronRight
-                      className="shrink-0 text-cream-muted"
+                      className="size-[17px] shrink-0 text-cream-muted"
                       size={17}
                       aria-hidden="true"
                     />
-                  </button>
+                  </Button>
                   <Button
                     type="button"
                     size="icon"
@@ -118,9 +120,11 @@ export function AppsLibraryPage() {
               {desktopOnly.map(({ app }, index) => (
                 <div key={app.id}>
                   {index ? <Separator /> : null}
-                  <button
-                    type="button"
-                    className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left active:bg-charcoal-active"
+                  <Button
+                    variant="ghost"
+                    size="none"
+                    justify="start"
+                    className="flex min-h-14 w-full items-center justify-start gap-3 border-0 px-3 py-2 text-left active:bg-charcoal-active"
                     onClick={() => navigate(desktopHandoffRoute(app.id))}
                   >
                     <OfficialAppIcon appId={app.id} size={34} />
@@ -128,8 +132,8 @@ export function AppsLibraryPage() {
                       {app.name}
                     </span>
                     <span className="text-xs text-cream-muted">Open on desktop</span>
-                    <ChevronRight size={16} className="text-cream-muted" aria-hidden="true" />
-                  </button>
+                    <ChevronRight size={16} className="size-4 text-cream-muted" aria-hidden="true" />
+                  </Button>
                 </div>
               ))}
             </div>

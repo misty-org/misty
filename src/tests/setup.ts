@@ -6,6 +6,17 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   } as typeof globalThis.ResizeObserver;
 }
 
+if (typeof (globalThis as Record<string, unknown>).CSS === "undefined") {
+  (globalThis as Record<string, unknown>).CSS = {};
+}
+if (typeof (globalThis as { CSS?: { escape?: (value: string) => string } }).CSS?.escape !== "function") {
+  (globalThis as { CSS: { escape: (value: string) => string } }).CSS.escape = (value: string) =>
+    value.replace(/([^\w-])/g, "\\$1");
+}
+if (typeof window !== "undefined" && !window.CSS) {
+  (window as unknown as { CSS: unknown }).CSS = (globalThis as Record<string, unknown>).CSS;
+}
+
 if (typeof Element !== "undefined" && typeof Element.prototype.scrollTo !== "function") {
   Element.prototype.scrollTo = function scrollTo() {};
 }

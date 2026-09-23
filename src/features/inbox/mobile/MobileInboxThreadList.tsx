@@ -1,5 +1,5 @@
 import type { MailAccount } from "@/api/mail";
-import { cn, Input, Spinner } from "@/shared/ui";
+import { Button, cn, Input, Spinner } from "@/shared/ui";
 import { MailOpen, Menu, Paperclip, PenLine, RefreshCw, Search, Star, X } from "lucide-react";
 import { useMemo, useState, type Ref } from "react";
 import { decodeHtmlEntities, type InboxThread } from "../model";
@@ -83,17 +83,14 @@ export function MobileInboxThreadList(props: {
             onBlur={submitSearch}
           />
           {query ? (
-            <button
-              type="button"
-              aria-label="Clear search"
-              className="absolute right-0 top-0 grid size-11 place-items-center text-cream-muted"
+            <Button variant="ghost" size="icon-sm" aria-label="Clear search" className="absolute right-0 top-0 grid size-11 place-items-center text-cream-muted"
               onClick={() => {
                 setQuery("");
                 props.onSearch("");
               }}
             >
               <X size={16} aria-hidden="true" />
-            </button>
+            </Button>
           ) : null}
         </form>
         <MobileAction label="Refresh Inbox" onPress={props.onRefresh} disabled={props.loading}>
@@ -106,18 +103,14 @@ export function MobileInboxThreadList(props: {
 
       <div className="flex min-h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-charcoal-border px-3 py-1.5">
         {(["all", "unread", "starred", "attachments"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={filter === value}
-            className={cn(
+          <Button key={value} variant="pill" size="pill" aria-pressed={filter === value} className={cn(
               "min-h-9 shrink-0 rounded-full px-3 text-sm capitalize text-cream-muted",
               filter === value && "bg-charcoal-active text-cream-bright",
             )}
             onClick={() => setFilter(value)}
           >
             {value}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -151,15 +144,13 @@ export function MobileInboxThreadList(props: {
           </div>
         )}
         {props.canLoadMore ? (
-          <button
-            type="button"
-            className="mx-auto my-4 flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium text-cream-bright active:bg-charcoal-card"
+          <Button variant="secondary" className="mx-auto my-4 flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium text-cream-bright active:bg-charcoal-card"
             disabled={props.loadingMore}
             onClick={props.onLoadMore}
           >
             {props.loadingMore ? <Spinner className="size-4" /> : null}
             Load more
-          </button>
+          </Button>
         ) : null}
       </div>
       <p className="shrink-0 border-t border-charcoal-border px-4 py-2 text-center text-xs tabular-nums text-cream-muted">
@@ -194,9 +185,7 @@ function MobileThreadRow(props: {
         props.active && "bg-charcoal-card",
       )}
     >
-      <button
-        type="button"
-        className="min-w-0 px-4 py-3 text-left active:bg-charcoal-card"
+      <Button variant="ghost" className="h-auto min-w-0 px-4 py-3 text-left active:bg-charcoal-card"
         onClick={() => props.onOpen(thread)}
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -229,11 +218,8 @@ function MobileThreadRow(props: {
         <span className="mt-0.5 block truncate text-sm text-cream-muted">
           {decodeHtmlEntities(thread.snippet)}
         </span>
-      </button>
-      <button
-        type="button"
-        aria-label={thread.starred ? "Unstar message" : "Star message"}
-        className="grid size-11 place-items-center self-center rounded-lg text-cream-muted active:bg-charcoal-active active:text-cream-bright"
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label={thread.starred ? "Unstar message" : "Star message"} className="grid size-11 place-items-center self-center rounded-lg text-cream-muted active:bg-charcoal-active active:text-cream-bright"
         onClick={() => props.onAction(thread, { starred: !thread.starred })}
       >
         <Star
@@ -241,7 +227,7 @@ function MobileThreadRow(props: {
           className={thread.starred ? "fill-sage-fg text-sage-fg" : undefined}
           aria-hidden="true"
         />
-      </button>
+      </Button>
     </li>
   );
 }
@@ -253,16 +239,11 @@ function MobileAction(props: {
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={props.label}
-      title={props.label}
-      disabled={props.disabled}
-      className="grid size-11 place-items-center rounded-lg text-cream-muted active:bg-charcoal-card active:text-cream-bright disabled:opacity-50"
+    <Button variant="ghost" size="icon-sm" aria-label={props.label} title={props.label} disabled={props.disabled} className="grid size-11 place-items-center rounded-lg text-cream-muted active:bg-charcoal-card active:text-cream-bright disabled:opacity-50"
       onClick={props.onPress}
     >
       {props.children}
-    </button>
+    </Button>
   );
 }
 

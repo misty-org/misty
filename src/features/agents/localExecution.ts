@@ -1,15 +1,16 @@
+import { visibleAutopilotAvailable } from "./betaModes";
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { personalAgentsApi } from "@/api/agents/native";
-import { apiRequest, resolveRequiredApiBase } from "@/api/client";
-import { browserProfileId } from "@/features/apps/rpc/browserIdentity";
-import { assignedIntegrationDestinations } from "./integrationDestinations";
+import { apiRequest } from "@/api/client";
+import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
+import { useUserStore } from "@/features/auth/core";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import type { AiInvocationDeviceContext } from "@/features/ai-surface";
 import type { GlobalAiContextRef } from "@/features/global-search/types";
+import { browserHomeUrl } from "@/features/workspace/browserHome";
 
 export const agentWorkerParameters = new URLSearchParams(
   typeof location === "undefined" ? "" : location.search,
@@ -24,6 +25,8 @@ export interface Execution {
   mode: "agent" | "team";
   state: "running" | "paused" | "finished";
   views: string[];
+  autopilot?: boolean;
+  ready?: boolean;
   context: GlobalAiContextRef[];
   deviceContexts: AiInvocationDeviceContext[];
 }
@@ -63,12 +66,24 @@ export async function startLocalExecution(
   spaceId: string,
   mode: "agent" | "team",
 ) {
+  if (visibleAutopilotAvailable() && mode !== "agent")
+    throw new Error("Only Agent mode is available in this beta.");
   if (!hasTauriInternals() || !/Mac|Win/.test(navigator.platform))
     throw new Error("Agent execution requires Misty on macOS or Windows.");
+  const accountGeneration = readApiSessionGeneration();
+  const assertAccount = () => {
+    if (
+      isApiSessionTransitioning() ||
+      readApiSessionGeneration() !== accountGeneration ||
+      useUserStore.getState().me?.id !== accountId
+    )
+      throw new Error("The active account changed.");
+  };
+  assertAccount();
   let previous = useLocalExecution.getState().execution;
   if (
     previous?.state === "finished" &&
-    (previous.agentId !== agentId || previous.spaceId !== spaceId)
+    (previous.agentId !== agentId || previous.spaceId !== spaceId || previous.mode !== mode)
   ) {
     await finishLocalExecution();
     previous = null;
@@ -77,9 +92,12 @@ export async function startLocalExecution(
     previous &&
     (previous.accountId !== accountId ||
       previous.agentId !== agentId ||
-      previous.spaceId !== spaceId)
+      previous.spaceId !== spaceId ||
+      previous.mode !== mode)
   )
-    throw new Error("Stop the current task before changing its agent or Space.");
+    throw new Error(
+      "Stop the current task before changing its agent, mode, or conversation scope.",
+    );
   if (previous?.state === "running")
     throw new Error("Pause the active task before starting another request.");
   const epoch = ++generation;
@@ -89,22 +107,43 @@ export async function startLocalExecution(
     agentId,
     spaceId,
     mode,
+    autopilot:
+      mode === "agent" && visibleAutopilotAvailable() && getCurrentWindow().label === "main",
     state: "running",
-    views: [...(previous?.views ?? [])],
-    context: [...(previous?.context ?? [])],
-    deviceContexts: [...(previous?.deviceContexts ?? [])],
+    views: [...(previous?.ready ? previous.views : [])],
+    context: [...(previous?.ready ? previous.context : [])],
+    deviceContexts: [...(previous?.ready ? previous.deviceContexts : [])],
   };
   const assertCurrent = () => {
+    assertAccount();
     if (generation !== epoch || useLocalExecution.getState().execution?.taskId !== execution.taskId)
       throw new Error("Task paused before its next action.");
   };
+  let createdView: string | undefined;
   useLocalExecution.setState({ execution: { ...execution } });
   try {
-    if (previous) await releaseLease(previous);
+    if (previous) {
+      await releaseLease(previous);
+      // A paused startup has no complete view/context pairing to resume. Its
+      // late callbacks are fenced by generation; dispose any already-created views.
+      if (!previous.ready) {
+        for (const id of previous.views) {
+          assertCurrent();
+          await invoke("browser_webview_close", { request: { id } });
+        }
+      }
+    }
     assertCurrent();
     await remoteLease(execution);
     assertCurrent();
     await invoke("agent_workspace_acquire", { request: lease(execution) });
+    assertCurrent();
+    if (execution.autopilot) {
+      await getCurrentWindow().setFocus();
+      await (
+        await import("./workspaceAutopilot")
+      ).startWorkspaceAutopilot(execution.taskId, accountId, spaceId);
+    }
     assertCurrent();
     clearInterval(heartbeat);
     let lastTick = Date.now();
@@ -115,22 +154,30 @@ export async function startLocalExecution(
         return;
       }
       lastTick = now;
-      void remoteLease(execution, true)
-        .then(() =>
-          invoke("agent_workspace_acquire", { request: { ...lease(execution), renew: true } }),
-        )
+      void Promise.resolve()
+        .then(() => {
+          assertCurrent();
+          return remoteLease(execution, true);
+        })
+        .then(() => {
+          assertCurrent();
+          return invoke("agent_workspace_acquire", {
+            request: { ...lease(execution), renew: true },
+          });
+        })
         .catch(() => void pauseLocalExecution(execution.taskId));
     }, 10000);
     await (await import("./taskArtifacts")).trackTaskArtifacts(accountId);
     assertCurrent();
-    const assigned = await personalAgentsApi.apps(agentId, spaceId);
-    assertCurrent();
     if (previous) {
-      const valid = new Set(assigned.app_ids);
       const discarded = execution.deviceContexts.filter(
-        (ref) => !valid.has(String(ref.metadata?.app_id ?? "")),
+        (ref) =>
+          ref.metadata?.app_id !== "browser" ||
+          Boolean(ref.metadata?.provider_id) ||
+          Boolean(ref.metadata?.profile_id),
       );
       for (const ref of discarded) {
+        assertCurrent();
         const index = execution.deviceContexts.indexOf(ref);
         await invoke("browser_webview_close", { request: { id: execution.views[index] } });
         execution.views.splice(index, 1);
@@ -142,70 +189,67 @@ export async function startLocalExecution(
         await invoke("agent_workspace_bind_scope", {
           taskId: execution.taskId,
           scopeId: ref.opaqueRef,
+          previousTaskId: previous.state === "paused" ? previous.taskId : undefined,
         });
       }
     }
-    if (!previous) {
-      const destinations = await assignedIntegrationDestinations(
-        accountId,
+    // Agents use the same native default profile as BrowserWorkspace. Logical
+    // encrypted profile ownership will be resolved by the native host, not an
+    // installed-app/provider hash selected by the renderer.
+    if (!execution.deviceContexts.length) {
+      const snapshot = await agentsDeviceSnapshot();
+      assertCurrent();
+      if (!snapshot.device) throw new Error("This device is unavailable for agent execution.");
+      const device = await ensureServerAgentDevice(snapshot.device);
+      assertCurrent();
+      const id = `agent-${crypto.randomUUID()}`;
+      const scopeId = `agent-scope-${crypto.randomUUID()}`;
+      await invoke("browser_webview_create", {
+        request: {
+          id,
+          scopeId,
+          url: browserHomeUrl(),
+          originSpaceId: spaceId,
+          x: 0,
+          y: 64,
+          width: Math.max(200, window.innerWidth - 440),
+          height: Math.max(300, window.innerHeight - 128),
+          theme: "dark",
+        },
+      });
+      // A native create can finish after cancellation/account switching. Close
+      // that exact view before propagating the stale-start error.
+      try {
+        assertCurrent();
+      } catch (error) {
+        await invoke("browser_webview_close", { request: { id } });
+        throw error;
+      }
+      createdView = id;
+      execution.views.push(id);
+      await invoke("agent_workspace_bind_scope", { taskId: execution.taskId, scopeId });
+      assertCurrent();
+      await invoke("browser_webview_hide", { request: { id } });
+      assertCurrent();
+      execution.context.push({
+        kind: "browser-tab",
+        id: "browser:workspace",
+        title: "Browser",
+        source: "current",
+        privacy: "device",
         spaceId,
-        assigned.app_ids,
-      );
-      if (destinations.length > 50)
-        throw new Error("This task has more than 50 website accounts. Reduce its assigned apps.");
-      if (destinations.length) {
-        const snapshot = await agentsDeviceSnapshot();
-        if (!snapshot.device) throw new Error("This device is unavailable for agent execution.");
-        const device = await ensureServerAgentDevice(snapshot.device);
-        const base = await resolveRequiredApiBase();
-        for (const destination of destinations) {
-          assertCurrent();
-          const id = `agent-${crypto.randomUUID()}`,
-            scopeId = `agent-scope-${crypto.randomUUID()}`;
-          const profileId = await browserProfileId(base, accountId, destination.appId, {
-            id: destination.providerId,
-            accountId: destination.accountId,
-          });
-          await invoke("browser_webview_create", {
-            request: {
-              id,
-              scopeId,
-              url: destination.url,
-              profileId,
-              providerId: destination.providerId,
-              profileProviderId: destination.providerId,
-              originSpaceId: spaceId,
-              x: 0,
-              y: 64,
-              width: Math.max(200, window.innerWidth - 440),
-              height: Math.max(300, window.innerHeight - 128),
-              theme: "dark",
-            },
-          });
-          execution.views.push(id);
-          if (generation !== epoch) {
-            await invoke("browser_webview_close", { request: { id } });
-            assertCurrent();
-          }
-          await invoke("agent_workspace_bind_scope", { taskId: execution.taskId, scopeId });
-          await invoke("browser_webview_hide", { request: { id } });
-          execution.context.push({
-            kind: "browser-tab",
-            id: destination.id,
-            title: destination.label,
-            source: "current",
-            privacy: "device",
-            spaceId,
-            opaqueScopeId: scopeId,
-            attached: true,
-            metadata: { app_id: destination.appId },
-          });
-          execution.deviceContexts.push({
-            deviceId: device.id,
-            kind: "browser_tab",
-            opaqueRef: scopeId,
-            displayName: `${destination.label} (${destination.appId})`,
-            capabilities: [
+        opaqueScopeId: scopeId,
+        attached: true,
+        metadata: { app_id: "browser" },
+      });
+      execution.deviceContexts.push({
+        deviceId: device.id,
+        kind: "browser_tab",
+        opaqueRef: scopeId,
+        displayName: "Browser workspace",
+        capabilities: execution.autopilot
+          ? ["browser.workspace.visual", "browser.workspace.interact"]
+          : [
               "browser.inspect",
               "browser.visual",
               "browser.navigate",
@@ -214,20 +258,31 @@ export async function startLocalExecution(
               "browser.downloads.list",
               "browser.upload",
             ],
-            metadata: {
-              app_id: destination.appId,
-              provider_id: destination.providerId,
-              profile_id: profileId,
-              window_label: getCurrentWindow().label,
-            },
-          });
-        }
-      }
+        metadata: {
+          ...(execution.autopilot ? { workspace_control: true } : {}),
+          app_id: "browser",
+          window_label: getCurrentWindow().label,
+        },
+      });
     }
     assertCurrent();
+    if (execution.autopilot) await getCurrentWindow().setFocus();
+    assertCurrent();
+    execution.ready = true;
     useLocalExecution.setState({ execution: { ...execution } });
     return execution;
   } catch (error) {
+    if (createdView) {
+      await invoke("browser_webview_close", { request: { id: createdView } }).catch(
+        () => undefined,
+      );
+      const index = execution.views.indexOf(createdView);
+      if (index >= 0) {
+        execution.views.splice(index, 1);
+        execution.context.splice(index, 1);
+        execution.deviceContexts.splice(index, 1);
+      }
+    }
     await releaseLease(execution);
     if (generation === epoch) await settleLocalExecution("paused", execution.taskId);
     throw error;
@@ -288,7 +343,11 @@ export async function steerLocalExecution(prompt: string) {
     working: false,
     selectedSpaceId: useLocalExecution.getState().execution?.spaceId ?? before.selectedSpaceId,
   });
-  await useMistyStore.getState().submitAnswer(prompt);
+  if (useLocalExecution.getState().execution?.autopilot) {
+    await useMistyStore.getState().submitAnswer(prompt, undefined, undefined, "workspace");
+  } else {
+    await useMistyStore.getState().submitAnswer(prompt);
+  }
 }
 
 export async function routeLocalFollowup(prompt: string): Promise<string> {

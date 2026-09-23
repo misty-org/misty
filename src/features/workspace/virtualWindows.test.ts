@@ -58,7 +58,7 @@ describe("workspace virtual windows", () => {
 
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
     expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "space", title: "New Tab", route: "/home", placeholder: true },
+      { surfaceId: "space", title: "New Tab", route: "/spaces/family/new", placeholder: true },
     ]);
     expect(useWorkspaceStore.getState().switchVirtualWindow(firstWindowId)).toBe(true);
     expect(useWorkspaceStore.getState().switchVirtualWindow(second.id)).toBe(true);

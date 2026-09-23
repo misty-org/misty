@@ -1,13 +1,12 @@
-import { useGlobalSearchStore } from "@/features/global-search";
-import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { useShortcutTitle } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
-import { Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
+import { PanelsTopLeft, Search } from "lucide-react";
 import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
-const { home: House, marketplace: Compass, agents: AgentIcon } = appIcons;
+const { home: House, agents: AgentIcon, files: FilesIcon } = appIcons;
 import { Link } from "react-router-dom";
-import { navigationMenuLinkClass, navigationMenuActionClass } from "@/shared/ui";
+import { navigationMenuLinkClass } from "@/shared/ui";
 import { navigatorFocusRingClass } from "./styles";
 
 const navigatorHeaderActionClass = `${navigationMenuLinkClass} w-full`;
@@ -45,44 +44,6 @@ export function NavigatorHeaderHomeButton(props: { path: string; active: boolean
           </Link>
         </TooltipTrigger>
         <TooltipContent>Home</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-export function NavigatorHeaderDiscoverButton(props: { path: string; active: boolean }) {
-  return (
-    <TooltipProvider delayDuration={450}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            to={props.path}
-            className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
-            onClick={(event) => {
-              const surface = workspaceSurfaceFromRoute(props.path);
-              if (
-                surface &&
-                useWorkspaceStore.getState().openSurface(surface).route !== surface.route
-              )
-                event.preventDefault();
-            }}
-            data-reorder-handle="true"
-            data-reorder-header="true"
-            title="Drag to reorder · Alt+Shift+↑/↓"
-            aria-label="Discover"
-            aria-current={props.active ? "page" : undefined}
-            data-misty-window-drag-block="true"
-          >
-            <Compass
-              className="shrink-0 justify-self-center"
-              size={18}
-              strokeWidth={appIconStrokeWidth}
-              aria-hidden="true"
-            />
-            <span>Discover</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent>Discover</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
@@ -126,38 +87,85 @@ export function NavigatorHeaderAgentsButton(props: { path: string; active: boole
   );
 }
 
+export function NavigatorHeaderFilesButton(props: { path: string; active: boolean }) {
+  return (
+    <TooltipProvider delayDuration={450}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            to={props.path}
+            className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
+            onClick={(event) => {
+              const surface = workspaceSurfaceFromRoute(props.path);
+              if (
+                surface &&
+                useWorkspaceStore.getState().openSurface(surface).route !== surface.route
+              )
+                event.preventDefault();
+            }}
+            data-reorder-handle="true"
+            data-reorder-header="true"
+            title="Drag to reorder · Alt+Shift+↑/↓"
+            aria-label="Files"
+            aria-current={props.active ? "page" : undefined}
+            data-misty-window-drag-block="true"
+          >
+            <FilesIcon
+              className="shrink-0 justify-self-center"
+              size={18}
+              strokeWidth={appIconStrokeWidth}
+              aria-hidden="true"
+            />
+            <span>Files</span>
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent>Files</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function NavigatorHeaderSearchButton(props?: { className?: string }) {
   const searchShortcutTitle = useShortcutTitle("Search", "search.toggle");
 
-  const openSearchPanel = async () => {
-    try {
-      if (await toggleDesktopMistyPanel()) return;
-    } catch {
-      // If the companion window is unavailable, the in-app panel is equivalent.
-    }
-    useGlobalSearchStore.getState().openPanel();
-    window.setTimeout(
-      () => document.querySelector<HTMLInputElement>("[data-global-misty-launcher-input]")?.focus(),
-      0,
-    );
-  };
+  const openSearchPanel = () => useBrowserSearchStore.getState().show();
 
   return (
     <TooltipProvider delayDuration={450}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
-            className={cn(navigationMenuActionClass, navigatorFocusRingClass, props?.className)}
-            onClick={() => void openSearchPanel()}
+          <Button
+            variant="nav-action"
+            size="icon-sm"
+            className={cn(navigatorFocusRingClass, props?.className)}
+            onClick={openSearchPanel}
             aria-label="Search"
             data-misty-window-drag-block="true"
           >
             <Search className="shrink-0" size={18} strokeWidth={1.85} aria-hidden="true" />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>{searchShortcutTitle}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  );
+}
+
+export function NavigatorHeaderSpacesButton({ active }: { active: boolean }) {
+  return (
+    <Link
+      to="/spaces"
+      onClick={() => {
+        const surface = workspaceSurfaceFromRoute("/spaces");
+        if (surface) useWorkspaceStore.getState().openSurface(surface);
+      }}
+      aria-label="Spaces"
+      aria-current={active ? "page" : undefined}
+      className={cn(navigatorHeaderActionClass, active && "text-cream-bright")}
+      data-misty-window-drag-block="true"
+    >
+      <PanelsTopLeft size={18} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
+      <span>Spaces</span>
+    </Link>
   );
 }

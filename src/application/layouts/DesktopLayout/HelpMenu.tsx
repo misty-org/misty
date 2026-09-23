@@ -1,5 +1,5 @@
 import { SupportRecoverySection } from "@/features/support";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/shared/ui";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger, Button } from "@/shared/ui";
 import { CircleHelp } from "lucide-react";
 import { useState } from "react";
 
@@ -9,9 +9,15 @@ export function HelpMenu({ className }: { className: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className={className} aria-label="Help" title="Help">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={className}
+          aria-label="Help"
+          title="Help"
+        >
           <CircleHelp size={18} strokeWidth={1.75} aria-hidden="true" />
-        </button>
+        </Button>
       </DialogTrigger>
       <DialogContent
         aria-describedby={undefined}

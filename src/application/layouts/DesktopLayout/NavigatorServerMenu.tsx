@@ -18,6 +18,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Button,
 } from "@/shared/ui";
 import { Cloud, Plus, Server } from "lucide-react";
 import { useState } from "react";
@@ -62,8 +63,8 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
       }}
     >
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           className={`${navigatorHierarchyTriggerClass} w-fit max-w-full`}
           aria-label={`Misty server menu, current server: ${currentName}`}
           data-misty-window-drag-block="true"
@@ -80,7 +81,7 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
             <span className="text-sm font-semibold tracking-[-0.015em] text-inherit">Misty</span>
             <NavigationChevron open={open} />
           </span>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[240px]" aria-label="Misty servers">
         <DropdownMenuLabel>Server · {currentName}</DropdownMenuLabel>

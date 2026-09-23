@@ -200,8 +200,6 @@ async function validateOfficialApps(catalog) {
     "agents",
     "files",
     "browser",
-    "code",
-    "terminal",
     "music",
     "media",
   ];
@@ -266,14 +264,6 @@ async function validateOfficialApps(catalog) {
       fail(`${app.id} has an invalid mobile Host runtime.`);
     if (Object.keys(app.mobile).length !== 1)
       fail(`${app.id} mobile runtime must not advertise package assets.`);
-  }
-  for (const id of ["code", "terminal"]) {
-    if (
-      catalog.apps.find((app) => app.id === id)?.mobile.runtime !==
-      "unsupported"
-    ) {
-      fail(`${id} must remain desktop only.`);
-    }
   }
 }
 

@@ -5,6 +5,15 @@ const mocks = vi.hoisted(() => ({
   conversations: vi.fn(),
   run: vi.fn(),
   decideApproval: vi.fn(),
+  event: undefined as undefined | ((event: { topic: string; id?: string }) => void),
+  unsubscribe: vi.fn(),
+}));
+
+vi.mock("@/api/accountEvents", () => ({
+  subscribeAccountEvents: (_account: string, callback: typeof mocks.event) => {
+    mocks.event = callback;
+    return mocks.unsubscribe;
+  },
 }));
 
 vi.mock("./globalMistyApi", () => ({
@@ -15,7 +24,6 @@ vi.mock("./globalMistyApi", () => ({
 
 vi.mock("@/features/misty/availability", () => ({
   assertMistyAvailable: vi.fn(async () => {}),
-  currentMistySpace: () => "space-1",
 }));
 
 vi.mock("@/api/agents/api", () => ({
@@ -67,11 +75,12 @@ describe("Global Misty durable Agent progress", () => {
   });
 
   afterEach(() => {
+    useGlobalSearchStore.getState().setAccount("");
     vi.useRealTimers();
     vi.clearAllMocks();
   });
 
-  it("resumes polling a running task restored from conversation history", async () => {
+  it("reconciles a running task restored from conversation history", async () => {
     await useGlobalSearchStore.getState().loadConversations();
     await vi.advanceTimersByTimeAsync(1_250);
 
@@ -79,6 +88,27 @@ describe("Global Misty durable Agent progress", () => {
     expect(mocks.run).toHaveBeenCalledWith("run-1");
     expect(message?.action?.state).toBe("completed");
     expect(message?.content).toContain("finished");
+  });
+
+  it("does not poll idle runs, coalesces notifications, and stops at completion", async () => {
+    mocks.run.mockResolvedValue({ summary: { state: "running" } });
+    await useGlobalSearchStore.getState().loadConversations();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(mocks.run).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mocks.run).toHaveBeenCalledTimes(1);
+    mocks.event?.({ topic: "runs", id: "another-run" });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(mocks.run).toHaveBeenCalledTimes(1);
+    mocks.run.mockResolvedValue({ summary: { state: "completed" } });
+    mocks.event?.({ topic: "runs", id: "run-1" });
+    mocks.event?.({ topic: "runs", id: "run-1" });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(mocks.run).toHaveBeenCalledTimes(2);
+    expect(mocks.unsubscribe).toHaveBeenCalled();
+    expect(useGlobalSearchStore.getState().conversations[0]?.messages[0]?.action?.state).toBe(
+      "completed",
+    );
   });
 
   it("confirms and rejects personal agent run approvals via agentsApi.decideApproval", async () => {

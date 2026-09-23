@@ -10,7 +10,7 @@ export interface ButtonProps
 import { cn } from "./utils";
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-charcoal-active focus-visible:ring-3 focus-visible:ring-charcoal-active/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-charcoal-active aria-invalid:ring-3 aria-invalid:ring-charcoal-active/20 aria-invalid:border-charcoal-active/50 aria-invalid:ring-charcoal-active/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:border-charcoal-active focus-visible:ring-3 focus-visible:ring-charcoal-active/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-charcoal-active aria-invalid:ring-3 aria-invalid:ring-charcoal-active/20 aria-invalid:border-charcoal-active/50 aria-invalid:ring-charcoal-active/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -44,6 +44,14 @@ const buttonVariants = cva(
         "icon-sm": "size-8 rounded-md in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-10",
         pill: "h-[22px] min-w-0 max-w-[50%] px-2 text-[13px] gap-1 [&_svg]:!size-3.5 [&_img]:!size-3.5",
+        none: "",
+      },
+      justify: {
+        center: "justify-center",
+        start: "justify-start",
+        end: "justify-end",
+        between: "justify-between",
+        none: "",
       },
       reveal: {
         always: "",
@@ -56,21 +64,23 @@ const buttonVariants = cva(
     defaultVariants: {
       variant: "default",
       size: "default",
+      justify: "center",
       reveal: "always",
     },
   },
 );
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, reveal, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, justify, reveal, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
         data-slot="button"
         data-variant={variant ?? "default"}
         data-size={size ?? "default"}
+        data-justify={justify ?? "center"}
         data-reveal={reveal ?? "always"}
-        className={cn(buttonVariants({ variant, size, reveal, className }))}
+        className={cn(buttonVariants({ variant, size, justify, reveal, className }))}
         ref={ref}
         {...props}
       />

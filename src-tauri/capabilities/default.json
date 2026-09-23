@@ -31,6 +31,7 @@
     "core:window:allow-set-position",
     "core:window:allow-set-max-size",
     "core:window:allow-set-size",
+    "core:window:allow-set-background-color",
     "core:window:allow-show",
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",

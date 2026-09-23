@@ -1,4 +1,8 @@
-import { captureAgentActivityReporter, runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
+import { subscribeAccountEvents } from "@/api/accountEvents";
+import {
+  captureAgentActivityReporter,
+  runtimeAgentsApi as agentsApi,
+} from "@/features/agents/agentsRuntime";
 
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId, normalizeActionState } from "./globalMistyActions";
@@ -24,7 +28,12 @@ export type GlobalSearchSet = (
 export type GlobalSearchGet = () => GlobalSearchState;
 
 let activeGlobalInvocationStream: (() => void) | undefined;
-const activeGlobalAgentPolls = new Set<string>();
+const activeGlobalAgentWatches = new Map<string, () => void>();
+
+export function stopGlobalAgentWatches() {
+  for (const stop of activeGlobalAgentWatches.values()) stop();
+  activeGlobalAgentWatches.clear();
+}
 
 export function replaceActiveGlobalInvocationStream(next?: () => void) {
   activeGlobalInvocationStream?.();
@@ -175,7 +184,7 @@ function dedupeGlobalCitations(citations: AiCitation[]) {
   );
 }
 
-async function pollGlobalAgentTask(
+async function refreshGlobalAgentTask(
   set: GlobalSearchSet,
   get: GlobalSearchGet,
   conversationId: string,
@@ -184,9 +193,8 @@ async function pollGlobalAgentTask(
 ) {
   const accountId = get().accountId;
   const reportActivity = captureAgentActivityReporter();
-  for (let attempt = 0; attempt < 240; attempt += 1) {
-    if (get().accountId !== accountId) return;
-    await new Promise((resolve) => window.setTimeout(resolve, 1_250));
+  {
+    if (!accountId) return;
     try {
       const detail = await agentsApi.run<{
         summary?: { state?: string; progress?: number; error_message?: string };
@@ -218,43 +226,111 @@ async function pollGlobalAgentTask(
         retryable: state === "failed",
       });
       if (isTerminalAgentState(state)) {
-        reportActivity?.({ operationId: runId, revision: state === "completed" ? 3 : state === "failed" ? 2 : 4,
-          status: state === "completed" ? "completed" : state === "failed" ? "blocked" : "resolved",
-          title: state === "completed" ? "Misty finished your task" : state === "failed" ? "Agent task needs attention" : "Agent task canceled",
-          body: "Open Agents to review the task and its result.", route: `/apps/agents?run=${encodeURIComponent(runId)}`,
-        }, accountId);
+        activeGlobalAgentWatches.get(runId)?.();
+        activeGlobalAgentWatches.delete(runId);
+        reportActivity?.(
+          {
+            operationId: runId,
+            revision: state === "completed" ? 3 : state === "failed" ? 2 : 4,
+            status:
+              state === "completed" ? "completed" : state === "failed" ? "blocked" : "resolved",
+            title:
+              state === "completed"
+                ? "Misty finished your task"
+                : state === "failed"
+                  ? "Agent task needs attention"
+                  : "Agent task canceled",
+            body: "Open Agents to review the task and its result.",
+            route: `/apps/agents?run=${encodeURIComponent(runId)}`,
+          },
+          accountId,
+        );
         return;
       }
     } catch {
-      // The durable run remains available in Agents history if projection polling is interrupted.
+      // Retain durable state on transport failure; reconnect invalidation retries observation.
     }
   }
 }
 
-export function startGlobalAgentTaskPoll(
+export function watchGlobalAgentTask(
   set: GlobalSearchSet,
   get: GlobalSearchGet,
   conversationId: string,
   messageId: string,
   runId: string,
 ) {
-  if (activeGlobalAgentPolls.has(runId)) return;
-  activeGlobalAgentPolls.add(runId);
-  void pollGlobalAgentTask(set, get, conversationId, messageId, runId).finally(() => {
-    activeGlobalAgentPolls.delete(runId);
+  if (activeGlobalAgentWatches.has(runId)) return;
+  const accountId = get().accountId;
+  let busy = false,
+    dirty = false,
+    disposed = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const refresh = async () => {
+    if (disposed || get().accountId !== accountId || busy) return;
+    busy = true;
+    dirty = false;
+    try {
+      await refreshGlobalAgentTask(set, get, conversationId, messageId, runId);
+    } finally {
+      busy = false;
+      if (dirty) schedule();
+    }
+  };
+  const schedule = () => {
+    if (disposed) return;
+    dirty = true;
+    if (!busy && !timer)
+      timer = setTimeout(() => {
+        timer = undefined;
+        void refresh();
+      }, 250);
+  };
+  const remove = subscribeAccountEvents(accountId, (event) => {
+    if (
+      event.topic === "reset" ||
+      (event.topic === "runs" && event.id === runId) ||
+      event.topic === "approvals"
+    )
+      schedule();
   });
+  window.addEventListener("online", schedule);
+  window.addEventListener("focus", schedule);
+  activeGlobalAgentWatches.set(runId, () => {
+    disposed = true;
+    clearTimeout(timer);
+    window.removeEventListener("online", schedule);
+    window.removeEventListener("focus", schedule);
+    remove();
+  });
+  schedule();
 }
 
-export function resumeGlobalAgentPolls(
+export function resumeGlobalAgentWatches(
   set: GlobalSearchSet,
   get: GlobalSearchGet,
   conversations: GlobalAiConversation[],
 ) {
+  const retained = new Set(
+    conversations.flatMap((conversation) =>
+      conversation.messages.flatMap((message) =>
+        message.action?.runId && !isTerminalAgentState(message.action.state)
+          ? [message.action.runId]
+          : [],
+      ),
+    ),
+  );
+  for (const [runId, stop] of activeGlobalAgentWatches) {
+    if (!retained.has(runId)) {
+      stop();
+      activeGlobalAgentWatches.delete(runId);
+    }
+  }
   for (const conversation of conversations) {
     for (const message of conversation.messages) {
       const action = message.action;
       if (!action?.runId || isTerminalAgentState(action.state)) continue;
-      startGlobalAgentTaskPoll(set, get, conversation.id, message.id, action.runId);
+      watchGlobalAgentTask(set, get, conversation.id, message.id, action.runId);
     }
   }
 }

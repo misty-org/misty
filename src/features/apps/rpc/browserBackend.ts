@@ -1,4 +1,3 @@
-import {integrationDestinationKey} from "@/features/agents/integrationDestinations";
 import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import {
   browserProviders,
@@ -158,14 +157,9 @@ export function createBrowserRpcBackend(
     }
   };
   return {
-    async setDestinations(destinations){
+    async setDestinations() {
       scope.assert("browser.navigate");
-      if(!scope.identity.spaceId)throw new AppRpcError("space_required","Select a Space before registering integrations.");
-      const entries=destinations.map(({provider,label,url})=>{
-        if(!providerBelongsToApp(scope.identity.appId,provider.id)||!providerUrlAllowed(provider.id,url))throw new AppRpcError("provider_denied","The destination must belong to this app.");
-        return {id:`${scope.identity.appId}:${provider.id}:${provider.accountId}`,appId:scope.identity.appId,providerId:provider.id,accountId:provider.accountId,label,url};
-      });
-      localStorage.setItem(integrationDestinationKey(serverBase,scope.identity.accountId,scope.identity.spaceId,scope.identity.appId),JSON.stringify(entries));
+      throw new AppRpcError("unsupported", "App integration destinations have been retired. Use the browser workspace.");
     },
     async availability() {
       scope.assert();

@@ -4,7 +4,7 @@ import {
   type WorkspaceTabProjection,
   type WorkspaceWindowProjection,
 } from "@/features/workspace/core";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn } from "@/shared/ui";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn, Button } from "@/shared/ui";
 import { Layers3, Plus, X } from "lucide-react";
 
 export function MobileTabOverview(props: {
@@ -75,21 +75,21 @@ export function MobileTabOverview(props: {
         </div>
 
         <footer className="absolute inset-x-0 bottom-0 grid min-h-16 grid-cols-[1fr_auto] items-center border-t border-charcoal-border bg-charcoal-workspace px-3 pb-[env(safe-area-inset-bottom)]">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             className="flex min-h-11 w-fit items-center gap-2 rounded-lg px-3 text-sm font-medium text-cream-bright active:bg-charcoal-card"
             onClick={props.onCreateWindow}
           >
             <Plus size={20} aria-hidden="true" />
             New window
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             className="min-h-11 rounded-lg px-3 text-sm font-semibold text-cream-bright active:bg-charcoal-card"
             onClick={() => props.onOpenChange(false)}
           >
             Done
-          </button>
+          </Button>
         </footer>
       </SheetContent>
     </Sheet>
@@ -110,8 +110,8 @@ function TabPreview(props: {
         props.active ? "border-cream-muted" : "border-charcoal-border",
       )}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         aria-label={`Close ${props.entry.tab.title}`}
         className="absolute right-1 top-1 z-10 grid size-11 place-items-center rounded-lg text-cream-muted active:bg-charcoal-active active:text-cream-bright"
         onClick={() => props.onClose(props.entry)}
@@ -119,9 +119,9 @@ function TabPreview(props: {
         <span className="grid size-7 place-items-center rounded-full bg-charcoal-bg">
           <X size={16} aria-hidden="true" />
         </span>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
         aria-current={props.active ? "page" : undefined}
         className="block w-full text-left"
         onClick={() => props.onSelect(props.entry)}
@@ -150,7 +150,7 @@ function TabPreview(props: {
             </span>
           </span>
         </span>
-      </button>
+      </Button>
     </article>
   );
 }

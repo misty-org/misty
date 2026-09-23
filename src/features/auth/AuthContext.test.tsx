@@ -320,7 +320,9 @@ describe("AuthProvider account switching", () => {
       await Promise.resolve();
     });
 
-    act(() => auth!.setUser(null));
+    await act(async () => {
+      await auth!.setUser(null);
+    });
 
     expect(auth?.user).toBeNull();
     expect(mocks.userStore.clear).toHaveBeenCalled();
@@ -582,7 +584,7 @@ describe("AuthProvider account switching", () => {
             <Routes>
               <Route element={<AccountOutlet />}>
                 <Route path="/signin" element={<SignIn />} />
-                <Route path="/spaces" element={<Workspace />} />
+                <Route path="/browser" element={<Workspace />} />
               </Route>
             </Routes>
           </AuthProvider>
@@ -627,7 +629,7 @@ describe("AuthProvider account switching", () => {
     );
   });
 
-  it("swaps over active account identity and force-reloads spaces on successful switch", async () => {
+  it("swaps verified account identity without reloading retired Spaces", async () => {
     mocks.updateSavedAccountSession.mockReset().mockResolvedValue(undefined);
 
     function Probe() {
@@ -658,6 +660,6 @@ describe("AuthProvider account switching", () => {
       expect.objectContaining({ id: mocks.accountB.id }),
       expect.anything(),
     );
-    expect(mocks.spacesLoad).toHaveBeenCalledWith({ force: true, accountId: mocks.accountB.id });
+    expect(mocks.spacesLoad).not.toHaveBeenCalled();
   });
 });

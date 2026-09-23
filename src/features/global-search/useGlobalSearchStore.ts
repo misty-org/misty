@@ -1,3 +1,4 @@
+import { isAgentModeActive } from "./searchAvailability";
 import { create } from "zustand";
 import { createGlobalSearchPanelState } from "./globalSearchPanelState";
 import { executeGlobalSearch, executeGlobalVisualSearch } from "./globalSearchExecution";
@@ -14,8 +15,19 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => {
     await openMisty({ prompt, context: get().context });
     get().closePanel();
   };
+  const panelState = createGlobalSearchPanelState(set, get);
   return {
-    ...createGlobalSearchPanelState(set, get),
+    ...panelState,
+    openPanel: (context) => {
+      if (!isAgentModeActive()) panelState.openPanel(context);
+    },
+    activateLauncher: () => {
+      if (!isAgentModeActive()) panelState.activateLauncher();
+    },
+    togglePanel: () => {
+      if (get().panel !== "closed") panelState.closePanel();
+      else if (!isAgentModeActive()) panelState.togglePanel();
+    },
     setMode: () => set({ mode: "search" }),
     setAccount: (accountId) => {
       if (accountId === get().accountId) return;

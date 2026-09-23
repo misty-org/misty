@@ -3,7 +3,7 @@ import type {
   AiContextReference,
   AiSelectionSnapshot,
 } from "@/features/ai-surface";
-import { cn } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 import {
   Bot,
   Camera,
@@ -61,9 +61,9 @@ export function SearchAskToggle(props: {
           const Icon = option.icon;
           const active = activeMode === option.mode;
           return (
-            <button
+            <Button
+              variant="ghost"
               key={option.mode}
-              type="button"
               data-misty-mode={option.mode}
               aria-pressed={active}
               onClick={() => props.onChange(option.mode)}
@@ -77,7 +77,7 @@ export function SearchAskToggle(props: {
             >
               <Icon className="size-3.5" strokeWidth={1.9} />
               {option.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -117,8 +117,8 @@ export function CandidateList(props: {
             )}
             onMouseEnter={() => props.onSelect(candidate.id)}
           >
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className="contents text-left"
               onClick={() => props.onActivate(candidate)}
             >
@@ -133,15 +133,15 @@ export function CandidateList(props: {
                   {candidate.description}
                 </span>
               </span>
-            </button>
+            </Button>
             {result ? (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 className="rounded-md px-2 py-1 text-[11px] text-cream-muted opacity-0 hover:text-cream group-hover:opacity-100 focus:opacity-100"
                 onClick={() => props.onAddContext(result)}
               >
                 + Context
-              </button>
+              </Button>
             ) : null}
           </div>
         );
@@ -180,25 +180,27 @@ export function ContextReceipt(props: {
         >
           {item.title}
           {item.localPath && !item.attached ? " · device only" : ""}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label={`Remove ${item.title} context`}
             onClick={() => props.onRemove(item.id)}
           >
             <X className="size-3" />
-          </button>
+          </Button>
         </span>
       ))}
       {props.capture ? (
         <span className="flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-charcoal-border bg-charcoal-bg px-2 text-[11px] text-cream-muted">
           <Camera className="size-3" /> Region capture
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             aria-label="Remove region capture"
             onClick={() => props.onRemoveCapture?.()}
           >
             <X className="size-3" />
-          </button>
+          </Button>
         </span>
       ) : null}
       {props.selection ? (
@@ -293,9 +295,9 @@ export function FilterBar(props: {
       aria-label="Search filters"
     >
       {buttons.map((button) => (
-        <button
+        <Button
+          variant="ghost"
           key={button.label}
-          type="button"
           onClick={button.run}
           className={cn(
             "h-6 shrink-0 rounded-full border px-2.5 text-[11px] transition-colors",
@@ -306,7 +308,7 @@ export function FilterBar(props: {
         >
           {button.label}
           {button.active ? " ×" : ""}
-        </button>
+        </Button>
       ))}
     </div>
   );

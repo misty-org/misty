@@ -84,7 +84,7 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("does not open Search while typing in Agent chat", () => {
+  it("opens global browser search from Agent chat", () => {
     const agentChat = document.createElement("main");
     agentChat.dataset.mistyAgentChat = "";
     const textarea = document.createElement("textarea");
@@ -100,9 +100,9 @@ describe("shortcut dispatcher", () => {
     });
     Object.defineProperty(event, "target", { value: textarea });
 
-    expect(dispatchShortcutEvent(event)).toBe(false);
-    expect(invokeShortcutCommand("search.toggle")).toBe(false);
-    expect(handler).not.toHaveBeenCalled();
+    expect(dispatchShortcutEvent(event)).toBe(true);
+    expect(invokeShortcutCommand("search.toggle")).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(2);
 
     remove();
     agentChat.remove();

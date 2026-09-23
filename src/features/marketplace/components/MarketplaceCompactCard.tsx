@@ -53,6 +53,7 @@ export function MarketplaceCompactCard({
         onClick={onOpenDetails}
         type="button"
         variant="ghost"
+        size="none"
       >
         <span className="sr-only">View {plugin.name} details</span>
       </Button>

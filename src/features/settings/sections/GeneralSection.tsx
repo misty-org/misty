@@ -1,5 +1,4 @@
 import { startupViewOptions } from "@/features/app-shell";
-import { workspaceDefaultTabOptions } from "@/features/workspace/workspaceDefaultTab";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -59,18 +58,11 @@ export function GeneralSection(props: SettingsContentProps) {
         </SettingsRow>
         {!isNativeMobileBuild ? (
           <SettingsRow
-            label="Default tab"
-            description="The starting page in a new virtual window. New tabs and splits start with the app grid."
+            label="New tabs and windows"
+            description="Open Google to search or enter a web address."
             last
           >
-            <SelectControl
-              value={numberSetting(props.document, "general", "workspace_default_tab_index", 0)}
-              options={[...workspaceDefaultTabOptions]}
-              disabled={props.working}
-              onChange={(value) =>
-                props.onSettingChange("general", "workspace_default_tab_index", value)
-              }
-            />
+            <span className="text-sm text-cream-muted">Google</span>
           </SettingsRow>
         ) : null}
       </SettingsSectionBlock>

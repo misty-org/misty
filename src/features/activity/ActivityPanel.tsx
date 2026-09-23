@@ -4,7 +4,7 @@ import { defaultActivityView, selectActivityView } from "./activityView";
 import { useActivityStore } from "./useActivityStore";
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
 import { CapabilityApprovalDetail } from "@/features/capability-approvals/CapabilityApprovals";
 import { AgentInterventions } from "@/features/agent-interventions/AgentInterventions";
@@ -59,13 +59,14 @@ export function ActivityPanel() {
         )}
         {panel.approvalId || panel.interventionId ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-            <button
-              type="button"
-              className="min-h-11 text-sm text-cream-muted hover:text-cream-bright"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-11 text-cream-muted hover:text-cream-bright"
               onClick={() => openActivityPanel()}
             >
               Back to Activity
-            </button>
+            </Button>
             {user?.id && panel.approvalId ? (
               <CapabilityApprovalDetail
                 key={`${user.id}:${panel.approvalId}`}

@@ -1,139 +1,55 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as AppShell from "@/features/app-shell";
+import { beforeEach, describe, expect, it } from "vitest";
+import { isRememberableAppRoute, useAppRouteMemoryStore } from "./store/useAppRouteMemoryStore";
 
-let useAppRouteMemoryStore: (typeof AppShell)["useAppRouteMemoryStore"];
-
-beforeAll(async () => {
-  const values = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    clear: () => values.clear(),
-    getItem: (key: string) => values.get(key) ?? null,
-    removeItem: (key: string) => {
-      values.delete(key);
-    },
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
+describe("browser workspace route memory", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAppRouteMemoryStore.getState().resetAppRoute();
   });
-  useAppRouteMemoryStore = (await import("@/features/app-shell")).useAppRouteMemoryStore;
+
+  it("starts in the browser and keeps agent conversation destinations", () => {
+    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/browser");
+    useAppRouteMemoryStore.getState().rememberAppRoute("/agents?conversation=thread-1");
+    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/agents?conversation=thread-1");
+    useAppRouteMemoryStore.getState().rememberAppRoute("/browser?url=https%3A%2F%2Fexample.com");
+    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/browser");
+  });
+
+  it("does not remember retired tools, overlays, or external URLs", () => {
+    useAppRouteMemoryStore.getState().rememberAppRoute("/files");
+    for (const route of [
+      "/code",
+      "/store",
+      "/discover",
+      "/settings",
+      "/account",
+      "https://example.com",
+      "//example.com",
+      "/browser-evil",
+    ]) {
+      expect(isRememberableAppRoute(route)).toBe(false);
+      useAppRouteMemoryStore.getState().rememberAppRoute(route);
+    }
+    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/files");
+  });
+
+  it.each(["/code", "/marketplace", "/home"])(
+    "recovers an old %s startup into the browser",
+    async (lastAppRoute) => {
+      localStorage.setItem(
+        "misty:app-route-memory",
+        JSON.stringify({ state: { lastAppRoute, lastSpacesRoute: "/spaces/old" }, version: 0 }),
+      );
+      await useAppRouteMemoryStore.persist.rehydrate();
+      expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/browser");
+      expect(useAppRouteMemoryStore.getState()).not.toHaveProperty("lastSpacesRoute");
+    },
+  );
 });
 
-afterAll(() => vi.unstubAllGlobals());
-
-describe("app route memory", () => {
-  beforeEach(() => useAppRouteMemoryStore.getState().resetAppRoute());
-
-  it("defaults to Home while preserving the Spaces workspace route", () => {
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/home",
-      lastSpacesRoute: "/spaces",
-    });
-  });
-
-  it("remembers the exact Spaces destination separately from the current app route", () => {
-    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-2/chat?conversation=group-4");
-    useAppRouteMemoryStore.getState().rememberAppRoute("/files");
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/files",
-      lastSpacesRoute: "/spaces/space-2/social/misty?conversation=group-4",
-    });
-  });
-
-  it("remembers global navbar pages without changing the last Space", () => {
-    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-2/library");
-    for (const route of ["/files", "/agents", "/store", "/code", "/transfers"])
-      useAppRouteMemoryStore.getState().rememberAppRoute(route);
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/code",
-      lastSpacesRoute: "/spaces/space-2/library",
-    });
-  });
-
-  it("migrates the legacy catalog route to Store", () => {
-    useAppRouteMemoryStore.getState().rememberAppRoute("/marketplace");
-
-    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/store");
-  });
-
-  it("updates valid Spaces subsections and discards non-route fragments", () => {
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute("/spaces/space-7/settings/integrations#permissions");
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/settings/connections",
-      lastSpacesRoute: "/spaces/space-7/settings/connections",
-    });
-  });
-
-  it("migrates removed Space surfaces to the Space root and strips stale query data", () => {
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute(
-        "/spaces/space-7/agents/studio/workflows?workflowId=old&runId=old#activity",
-      );
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7",
-      lastSpacesRoute: "/spaces/space-7",
-    });
-  });
-
-  it("keeps only query parameters used by the remembered Space surface", () => {
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute(
-        "/spaces/space-7/chat?conversation=group-4&message=message-2&path=%2Fprivate",
-      );
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/social/misty",
-      lastSpacesRoute: "/spaces/space-7/social/misty?conversation=group-4&message=message-2",
-    });
-  });
-
-  it("remembers every external provider as a distinct Social page", () => {
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute("/spaces/space-7/social?provider=discord&conversation=group-4");
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/social/discord",
-      lastSpacesRoute: "/spaces/space-7/social/discord?conversation=group-4",
-    });
-
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute("/spaces/space-7/social/x?conversation=direct-2");
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/social/x",
-      lastSpacesRoute: "/spaces/space-7/social/x?conversation=direct-2",
-    });
-  });
-
-  it("remembers restored Space surfaces including Assistant and Planner", () => {
-    useAppRouteMemoryStore
-      .getState()
-      .rememberAppRoute("/spaces/space-7/planner/calendar?priority=high");
-    expect(useAppRouteMemoryStore.getState().lastSpacesRoute).toBe(
-      "/spaces/space-7/planner/calendar?priority=high",
-    );
-
-    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-7/assistant");
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/assistant",
-      lastSpacesRoute: "/spaces/space-7/assistant",
-    });
-  });
-
-  it("migrates legacy Tasks routes to Planner", () => {
-    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-7/tasks/list?mine=1");
-
-    expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/planner/list",
-      lastSpacesRoute: "/spaces/space-7/planner/list?mine=1",
-    });
-  });
+it("remembers Space tool routes across reloads", async () => {
+  const route = "/spaces/project/planner/tasks/list";
+  useAppRouteMemoryStore.getState().rememberAppRoute(route);
+  await useAppRouteMemoryStore.persist.rehydrate();
+  expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe(route);
 });

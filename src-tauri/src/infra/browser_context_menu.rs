@@ -49,7 +49,7 @@ pub(super) fn publish_availability(webview: Webview, state: State<'_, BrowserSes
     }
     let mut sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?;
     let session = sessions.get_mut(&request.id).ok_or("Browser view is closed.")?;
-    if session.scope_id != request.scope_id || session.profile_id.as_deref() != Some(&request.profile_id) ||
+    if session.scope_id != request.scope_id || session.context_profile_id() != Some(&request.profile_id) ||
         session.origin_space_id.as_deref() != Some(&request.space_id) || session.profile_provider.as_deref() != Some(&request.provider_id) {
         return Err("Browser context changed.".into());
     }
@@ -100,7 +100,7 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
         let Some(session) = sessions.get(id) else { return true };
         AskContext {
             id: id.to_owned(), scope_id: session.scope_id.clone(), space_id: session.origin_space_id.clone(),
-            profile_id: session.profile_id.clone(), provider_id: session.profile_provider.clone(),
+            profile_id: session.context_profile_id().map(str::to_owned), provider_id: session.profile_provider.clone(),
             revision: page.document_revision.clone(),
             content_hash: format!("{:x}", Sha256::digest(page.content.as_bytes())), page,
             intent: "ask".into(),
@@ -181,7 +181,7 @@ pub(super) fn select(app: &AppHandle, webview: &Webview, key: &str, action: &str
     {
         let sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable")?;
         let session = sessions.get(&context.id).ok_or("The browser view has closed.")?;
-        if session.scope_id != context.scope_id || session.profile_id != context.profile_id || session.origin_space_id != context.space_id {
+        if session.scope_id != context.scope_id || session.context_profile_id() != context.profile_id.as_deref() || session.origin_space_id != context.space_id {
             return Err("The browser context changed. Open the menu again.".into());
         }
     }

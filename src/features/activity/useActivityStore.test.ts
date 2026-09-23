@@ -2,19 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActivityItem } from "./types";
 
 const mocks = vi.hoisted(() => ({
-  markInboxSeen: vi.fn(async () => undefined),
-  loadInbox: vi.fn(async () => undefined),
   publishNativeActivity: vi.fn(async () => true),
   syncNativeBadge: vi.fn(async () => undefined),
-}));
-
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({
-      markInboxSeen: mocks.markInboxSeen,
-      loadInbox: mocks.loadInbox,
-    }),
-  },
 }));
 
 vi.mock("./nativeNotifications", () => ({
@@ -42,8 +31,6 @@ describe("useActivityStore", () => {
       offline: false,
       error: null,
     });
-    mocks.markInboxSeen.mockClear();
-    mocks.loadInbox.mockClear();
     mocks.publishNativeActivity.mockClear();
     mocks.syncNativeBadge.mockClear();
   });
@@ -80,7 +67,7 @@ describe("useActivityStore", () => {
     expect(useActivityStore.getState().allItems[0].readAt).toBeTruthy();
   });
 
-  it("marks every visible item read and uses the existing server endpoint", async () => {
+  it("marks retained history read locally without changing server request decisions", async () => {
     useActivityStore.getState().setAccount("account-1");
     useActivityStore
       .getState()
@@ -90,7 +77,6 @@ describe("useActivityStore", () => {
 
     expect(useActivityStore.getState().attentionCount).toBe(0);
     expect(useActivityStore.getState().allItems.every((item) => item.readAt)).toBe(true);
-    expect(mocks.markInboxSeen).toHaveBeenCalledTimes(1);
     expect(mocks.syncNativeBadge).toHaveBeenLastCalledWith(0);
   });
 

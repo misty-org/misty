@@ -39,10 +39,10 @@ export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boole
         <ul className="m-0 list-none p-0">
           {items.map((item) => (
             <li key={item.id} className="border-t border-charcoal-border/70">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 aria-expanded={selected === item.id}
-                className="flex min-h-11 w-full items-start justify-between gap-3 rounded-md px-2 py-3 text-start text-sm text-cream hover:bg-charcoal-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream-muted"
+                className="flex min-h-11 w-full items-start justify-between gap-3 rounded-md px-2 py-3 text-start text-sm text-cream hover:bg-charcoal-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream-muted font-normal h-auto"
                 onClick={() =>
                   setParams((current) => {
                     const next = new URLSearchParams(current);
@@ -53,7 +53,7 @@ export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boole
               >
                 <span className="min-w-0 break-words [overflow-wrap:anywhere]">{item.summary}</span>
                 <span className="shrink-0 text-cream-muted">Review</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

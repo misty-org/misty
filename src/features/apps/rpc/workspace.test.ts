@@ -16,9 +16,9 @@ function fixture(grants = ["navigation.write"]) {
   useWorkspaceStore.getState().reset();
   const tab = useWorkspaceStore
     .getState()
-    .openSurface(workspaceSurfaceFromRoute("/apps/planner?space=space-a")!);
+    .openSurface(workspaceSurfaceFromRoute("/apps/code?space=space-a")!);
   const scope = createAppRpcScope({
-    identity: { appId: "planner", accountId: "fixture", spaceId: "space-a", instanceId: tab.id },
+    identity: { appId: "code", accountId: "fixture", spaceId: "space-a", instanceId: tab.id },
     scopes: grants,
     expiresAt: "2099-01-01T00:00:00Z",
     isCurrentAccount: () => true,
@@ -34,17 +34,17 @@ function fixture(grants = ["navigation.write"]) {
 }
 it("opens a separate own-App tab and split panels through the SDK without replacing the caller", async () => {
   const { sdk, tab } = fixture();
-  const next = await sdk.workspace.open({ route: "/apps/planner?view=agenda" });
+  const next = await sdk.workspace.open({ route: "/apps/code?view=agenda" });
   const pane = allLayoutPanes(useWorkspaceStore.getState().layout).find((item) =>
     item.tabs.some((item) => item.id === tab.id),
   )!;
   expect(
     allLayoutViews(useWorkspaceStore.getState().layout).find((item) => item.id === next.viewId)
       ?.route,
-  ).toBe("/apps/planner?view=agenda&space=space-a");
+  ).toBe("/apps/code?view=agenda&space=space-a");
   expect(pane.tabs.find((item) => item.id === tab.id)?.route).toBe(tab.route);
   const right = await sdk.workspace.open({
-    route: "/apps/planner?view=roadmaps",
+    route: "/apps/code?view=roadmaps",
     placement: "right",
   });
   const panes = dockLeaves(useWorkspaceStore.getState().layout.root);
@@ -52,11 +52,11 @@ it("opens a separate own-App tab and split panels through the SDK without replac
   expect(panes.find((item) => item.tabs.some((item) => item.id === right.viewId))?.id).not.toBe(
     pane.id,
   );
-  await sdk.workspace.open({ route: "/apps/planner", placement: "down" });
-  await sdk.workspace.open({ route: "/apps/planner", placement: "right" });
+  await sdk.workspace.open({ route: "/apps/code", placement: "down" });
+  await sdk.workspace.open({ route: "/apps/code", placement: "right" });
   const before = useWorkspaceStore.getState().layout;
   await expect(
-    sdk.workspace.open({ route: "/apps/planner", placement: "right" }),
+    sdk.workspace.open({ route: "/apps/code", placement: "right" }),
   ).rejects.toMatchObject({ code: "panel_limit" });
   expect(useWorkspaceStore.getState().layout).toBe(before);
 });
@@ -64,10 +64,10 @@ it("rejects foreign routes, foreign Spaces, missing grants and a removed caller 
   const { sdk, tab } = fixture();
   const before = useWorkspaceStore.getState().layout;
   for (const route of [
-    "/apps/journal",
-    "/apps/planner?space=space-b",
-    "/apps/planner?space=space-a&space=space-b",
-    "/apps/planner/../../settings",
+    "/apps/terminal",
+    "/apps/code?space=space-b",
+    "/apps/code?space=space-a&space=space-b",
+    "/apps/code/../../settings",
   ]) {
     await expect(sdk.workspace.open({ route })).rejects.toMatchObject({
       code: "invalid_navigation",
@@ -75,11 +75,11 @@ it("rejects foreign routes, foreign Spaces, missing grants and a removed caller 
     expect(useWorkspaceStore.getState().layout).toBe(before);
   }
   useWorkspaceStore.getState().closeTab(tab.id);
-  await expect(sdk.workspace.open({ route: "/apps/planner" })).rejects.toMatchObject({
+  await expect(sdk.workspace.open({ route: "/apps/code" })).rejects.toMatchObject({
     code: "view_closed",
   });
   const denied = fixture([]);
-  await expect(denied.sdk.workspace.open({ route: "/apps/planner" })).rejects.toMatchObject({
+  await expect(denied.sdk.workspace.open({ route: "/apps/code" })).rejects.toMatchObject({
     code: "capability_denied",
   });
 });
@@ -113,13 +113,13 @@ it("stores bounded app state separately from host metadata and returns detached 
 it("opens restored state to the left/above, focuses, places and closes only owned views", async () => {
   const { sdk, tab } = fixture();
   const left = await sdk.workspace.open({
-    route: "/apps/planner",
+    route: "/apps/code",
     placement: "left",
     state: { mode: "calendar" },
     title: "Calendar",
     sidebarVisible: false,
   });
-  const up = await sdk.workspace.open({ route: "/apps/planner", placement: "up" });
+  const up = await sdk.workspace.open({ route: "/apps/code", placement: "up" });
   expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(3);
   expect(
     (await sdk.workspace.snapshot()).views.find((view) => view.viewId === left.viewId),
@@ -145,11 +145,12 @@ it("rejects foreign views, foreign Spaces and host fields without changing the w
   const { sdk, tab } = fixture();
   const foreign = useWorkspaceStore
     .getState()
-    .addSurface(workspaceSurfaceFromRoute("/apps/journal?space=space-a")!);
-  const otherSpaceRequest = workspaceSurfaceFromRoute("/apps/planner?space=space-b")!;
+    .addSurface(workspaceSurfaceFromRoute("/apps/terminal?space=space-a")!);
+  const otherSpaceRequest = workspaceSurfaceFromRoute("/apps/code?space=space-b")!;
   const otherSpace = useWorkspaceStore
     .getState()
     .addSurface({ ...otherSpaceRequest, scopeKey: undefined, forceNew: true });
+  useWorkspaceStore.getState().setScope("space:space-a");
   const before = useWorkspaceStore.getState().layout;
   for (const viewId of [foreign.id, otherSpace.id, "missing"]) {
     await expect(sdk.workspace.focus(viewId)).rejects.toMatchObject({ code: "view_not_owned" });
@@ -210,7 +211,7 @@ it("denies missing navigation grants and control after the caller closes", async
     denied.sdk.workspace.update({ viewId: denied.tab.id, title: "No" }),
   ).rejects.toMatchObject({ code: "capability_denied" });
   const { sdk, tab } = fixture();
-  const peer = await sdk.workspace.open({ route: "/apps/planner" });
+  const peer = await sdk.workspace.open({ route: "/apps/code" });
   await sdk.workspace.close(tab.id);
   await expect(sdk.workspace.snapshot()).rejects.toMatchObject({ code: "view_closed" });
   await expect(sdk.workspace.focus(peer.viewId)).rejects.toMatchObject({ code: "view_closed" });
@@ -232,9 +233,9 @@ it("suppresses queued workspace events and control after leaving the calling Spa
 
 it("refuses additional split placement at the host's panel limit without changing layout", async () => {
   const { sdk, tab } = fixture();
-  const next = await sdk.workspace.open({ route: "/apps/planner", placement: "left" });
-  await sdk.workspace.open({ route: "/apps/planner", placement: "up" });
-  await sdk.workspace.open({ route: "/apps/planner", placement: "down" });
+  const next = await sdk.workspace.open({ route: "/apps/code", placement: "left" });
+  await sdk.workspace.open({ route: "/apps/code", placement: "up" });
+  await sdk.workspace.open({ route: "/apps/code", placement: "down" });
   const before = useWorkspaceStore.getState().layout;
   await expect(
     sdk.workspace.place({ viewId: next.viewId, targetViewId: tab.id, placement: "right" }),
@@ -245,7 +246,7 @@ it("refuses additional split placement at the host's panel limit without changin
 it("shares monotonic snapshot revisions across live views of the same app", async () => {
   const { sdk, scope } = fixture();
   const initial = await sdk.workspace.snapshot();
-  const opened = await sdk.workspace.open({ route: "/apps/planner" });
+  const opened = await sdk.workspace.open({ route: "/apps/code" });
   const peerScope = createAppRpcScope({
     identity: { ...scope.identity, instanceId: opened.viewId },
     scopes: ["navigation.write"],

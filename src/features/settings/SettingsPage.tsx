@@ -16,6 +16,7 @@ import {
   UserRound,
   Server,
   Settings2,
+  RefreshCw,
 } from "lucide-react";
 import { memo, type ComponentType } from "react";
 import { ComingSoonSurface } from "@/shared/ui";
@@ -31,6 +32,7 @@ import { PrivacySection } from "./sections/PrivacySection";
 import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
+import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import type { LucideIcon } from "lucide-react";
 
@@ -90,6 +92,13 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     icon: UserRound,
     group: "preferences",
     Component: AccountSection,
+  },
+  {
+    id: "sync",
+    label: "Device sync",
+    icon: RefreshCw,
+    group: "preferences",
+    Component: BrowserSyncSettings,
   },
   {
     id: "appearance",

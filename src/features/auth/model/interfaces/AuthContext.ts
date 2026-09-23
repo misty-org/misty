@@ -12,7 +12,7 @@ export interface AuthUser {
 
 export interface AuthContextValue {
   user: AuthUser | null;
-  setUser: (user: AuthUser | null) => void;
+  setUser: (user: AuthUser | null) => Promise<void>;
   accounts: SavedAccountSession[];
   transitioning: boolean;
   refreshUser: () => Promise<AuthUser | null>;

@@ -1,11 +1,9 @@
+import { SpaceInvitationRedemption } from "@/features/spaces/components/SpaceInvitationRedemption";
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { ActivityPage } from "@/features/activity";
 import { MobileProfilePage, RegisterPage, SignInPage, useAuth } from "@/features/auth";
-import { DiscoverPage } from "@/features/marketplace";
 import { SettingsPage } from "@/features/settings";
-import { SpaceInvitationRedemption } from "@/features/spaces";
-import SpacesShell, { SpaceDetail, SpacesIndexRedirect } from "@/features/spaces";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";
@@ -24,8 +22,13 @@ function StartupRedirect() {
   if (!user) {
     return <Navigate to={routes.signIn} replace />;
   }
-  const fallback = routes.spaces;
+  const fallback = routes.home;
   return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
+}
+
+function LegacyToolRedirect({ to }: { to: string }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${to}${search}${hash}`} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -47,29 +50,21 @@ export const router = createBrowserRouter([
             element: <AppPagesLayout />,
             children: [
               { path: "home", element: null },
-              { path: "apps", element: <Navigate to={routes.discover} replace /> },
+              { path: "new", element: null },
+              { path: "apps", element: <Navigate to={routes.home} replace /> },
               {
                 path: "activity",
                 element: <ActivityPage />,
               },
-              { path: "apps/:appId", element: null },
-              { path: "discover", element: <DiscoverPage /> },
-              {
-                path: "spaces",
-                element: <SpacesShell />,
-                children: [
-                  { index: true, element: <SpacesIndexRedirect /> },
-                  { path: "personal", element: <Navigate to={routes.spaces} replace /> },
-                  {
-                    path: ":spaceId",
-                    element: <Navigate to="home" replace />,
-                  },
-                  { path: ":spaceId/home", element: <SpaceDetail /> },
-                  { path: ":spaceId/settings/:studioKind", element: <SpaceDetail /> },
-                  { path: ":spaceId/:section/*", element: <SpaceDetail /> },
-                ],
-              },
-              { path: "changelog", element: <Navigate to={routes.spaces} replace /> },
+              { path: "browser", element: null },
+              { path: "agents", element: null },
+              { path: "files", element: null },
+              { path: "apps/files", element: <LegacyToolRedirect to="/files" /> },
+              { path: "apps/agents", element: <LegacyToolRedirect to="/agents" /> },
+              { path: "apps/*", element: <Navigate to="/browser" replace /> },
+              { path: "discover", element: <Navigate to="/browser" replace /> },
+              { path: "spaces/*", element: null },
+              { path: "changelog", element: <Navigate to={routes.home} replace /> },
               { path: "signin", element: <SignInPage /> },
               { path: "register", element: <RegisterPage /> },
               {
@@ -87,7 +82,7 @@ export const router = createBrowserRouter([
                 element: isNativeMobileBuild ? (
                   <Navigate to={routes.profile} replace />
                 ) : (
-                  <Navigate to={routes.spaces} replace />
+                  <Navigate to={routes.home} replace />
                 ),
               },
               { path: "account/signin", element: <Navigate to={routes.signIn} replace /> },
@@ -103,8 +98,8 @@ export const router = createBrowserRouter([
             ],
           },
           { path: "settings", element: null },
-          { path: "diagnostics", element: <Navigate to={routes.spaces} replace /> },
-          { path: "*", element: <Navigate to={routes.spaces} replace /> },
+          { path: "diagnostics", element: <Navigate to={routes.home} replace /> },
+          { path: "*", element: <Navigate to={routes.home} replace /> },
         ],
       },
     ],

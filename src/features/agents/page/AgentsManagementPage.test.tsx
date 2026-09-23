@@ -7,6 +7,7 @@ import DesktopAgentsPage from "../AgentsPage";
 vi.mock("../mcp/McpConnectionsSheet", () => ({
   McpConnectionsSheet: ({ open }: { open: boolean }) =>
     open ? <aside aria-label="Tool connections sheet">Connections</aside> : null,
+  McpConnectionsView: () => <aside aria-label="Tool connections sheet">Connections</aside>,
 }));
 
 vi.mock("../components/MistyDashboard", () => ({
@@ -94,7 +95,7 @@ describe("Agents conversation page", () => {
       button.textContent?.includes("Tool connections"),
     );
     await act(async () => connectionButton?.click());
-    expect(container.querySelector('[aria-label="Tool connections sheet"]')).not.toBeNull();
+    expect(document.body.querySelector('[aria-label="Tool connections sheet"]')).not.toBeNull();
 
     await act(async () => root.unmount());
   });

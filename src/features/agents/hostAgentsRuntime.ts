@@ -6,7 +6,6 @@ import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api
 import { automationsApi } from "./automations/api";
 import { mcpConnectionsApi } from "./mcp/api";
 import { useAuth, useAccountAvatarUrl } from "@/features/auth";
-import { useSpacesStore } from "@/features/spaces";
 import { useWorkspaceStore } from "@/features/workspace";
 import { SystemErrorActivity } from "@/features/activity";
 import {
@@ -41,7 +40,7 @@ export function initializeHostAgentsRuntime() {
         body: event.body,
         target: {
           kind: "route",
-          href: `/apps/agents?run=${encodeURIComponent(event.operationId)}`,
+          href: `/agents?run=${encodeURIComponent(event.operationId)}`,
         },
       });
     },
@@ -53,7 +52,6 @@ export function initializeHostAgentsRuntime() {
     subscribeToAiInvocation,
     useAuth,
     useAccountAvatarUrl,
-    useSpacesStore,
     useWorkspaceStore,
     Error: SystemErrorActivity,
     executeGlobalSearch,

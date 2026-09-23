@@ -7,34 +7,7 @@ function source(path: string) {
 }
 
 describe("Mini App shell boundary", () => {
-  it("does not import retired built-in screens from desktop routing", () => {
-    const routing = source("src/application/routing/routeConfig.tsx");
-    const surface = source("src/application/layouts/DesktopLayout/WorkspaceSurface.tsx");
-    const combined = `${routing}\n${surface}`;
-
-    for (const retired of [
-      "AgentsPage",
-      "BrowserWorkspace",
-      "DeveloperWorkspace",
-      "FilesPage",
-      "InboxWorkspace",
-      "TerminalWorkspace",
-      "TransfersWorkspace",
-    ]) {
-      expect(combined).not.toContain(retired);
-    }
-    expect(surface).toContain("OfficialAppRuntimePage");
-  });
-
-  it("routes mobile App tabs through the shared runtime", () => {
-    const surface = source("src/application/layouts/MobileLayout/MobileWorkspaceSurface.tsx");
-    expect(surface).toContain("OfficialAppRuntimePage");
-    expect(surface).not.toContain("BrowserWorkspace");
-    expect(surface).not.toContain("InboxWorkspace");
-    expect(surface).not.toContain("MobileFilesPage");
-  });
-
-  it("keeps untrusted apps in native views and uses an SDK component host for signed apps", () => {
+  it("keeps remaining plugin surfaces in isolated native views", () => {
     for (const path of [
       "src/features/apps/OfficialAppPackageHost.tsx",
       "src/features/apps/NativeAppView.tsx",
@@ -43,16 +16,13 @@ describe("Mini App shell boundary", () => {
       expect(source(path)).not.toContain("<iframe");
       expect(source(path)).not.toContain("srcDoc=");
     }
-    expect(source("src/features/apps/OfficialAppRuntimePage.tsx")).toContain("TrustedAppSurface");
-    expect(source("src/features/apps/OfficialAppRuntimePage.tsx")).toContain(
-      "DownloadedAppSurface",
-    );
-    expect(source("src/features/apps/DownloadedAppSurface.tsx")).not.toContain("<iframe");
     const native = source("src-tauri/src/platform/mini_app.rs");
     expect(native).toContain(".incognito(true)");
     expect(native).toContain("context.webview_label()");
     expect(native).toContain("frame-src 'none'");
-    expect(source("src-tauri/capabilities/default.json")).toContain('"webviews": ["main"]');
+    const capability = JSON.parse(source("src-tauri/capabilities/default.json"));
+    // Both labels host local application pages; embedded websites must remain excluded.
+    expect(capability.webviews).toEqual(["main", "misty-agent-*"]);
   });
 
   it("permits verified local package imports without remote script origins or a website iframe", () => {

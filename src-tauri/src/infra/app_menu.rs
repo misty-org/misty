@@ -41,7 +41,7 @@ fn build_menu<R: Runtime, M: Manager<R>>(
                 Some(AboutMetadata::default()),
             )?,
             &PredefinedMenuItem::separator(manager)?,
-            &command_item(manager, snapshot, "search.toggle", "Open Misty", "Cmd+K")?,
+            &command_item(manager, snapshot, "search.toggle", "Search or Enter URL", "Cmd+K")?,
             &command_item(
                 manager,
                 snapshot,

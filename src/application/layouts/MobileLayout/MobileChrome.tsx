@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Button,
 } from "@/shared/ui";
 import { ArrowLeft, Bell, MoreHorizontal, Search } from "lucide-react";
 import type { ReactNode } from "react";
@@ -42,7 +43,7 @@ export function MobileTopBar(props: {
           {primaryAction.badge ? <ActionBadge count={primaryAction.badge} /> : null}
         </TopBarButton>
       ) : (
-        <TopBarButton label="Search and ask Misty" onClick={props.onSearch}>
+        <TopBarButton label="Search or enter a URL" onClick={props.onSearch}>
           <Search size={19} />
         </TopBarButton>
       )}
@@ -57,13 +58,13 @@ export function MobileTopBar(props: {
       {detail && overflowActions.length ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               aria-label="More actions"
               className="relative grid size-11 shrink-0 place-items-center rounded-lg text-cream-muted active:bg-charcoal-card active:text-cream-bright"
             >
               <MoreHorizontal size={20} aria-hidden="true" />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {overflowActions.map((action) => {
@@ -119,14 +120,14 @@ function ActionBadge(props: { count: number; neutral?: boolean }) {
 
 function TopBarButton(props: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       aria-label={props.label}
       title={props.label}
       className="relative grid size-11 shrink-0 place-items-center rounded-lg text-cream-muted active:bg-charcoal-card active:text-cream-bright"
       onClick={props.onClick}
     >
       {props.children}
-    </button>
+    </Button>
   );
 }

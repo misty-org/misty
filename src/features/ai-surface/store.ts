@@ -245,13 +245,13 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
 
   decideArtifact: async (accountId, paneId, adapter, artifact, decision) => {
     if (decision === "accept") {
-      const { assertMistyAvailable, currentMistySpace } =
+      const { assertMistyAvailable } =
         await import("@/features/misty/availability");
       await assertMistyAvailable(
         accountId,
         artifact.target?.spaceId ||
           adapter.getContext().find((ref) => ref.spaceId)?.spaceId ||
-          currentMistySpace(),
+          "",
       );
     }
     analytics.track("ai_companion_artifact_decided", {

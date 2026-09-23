@@ -22,9 +22,11 @@ fn main() {
         println!("cargo:rustc-link-search=native={}", runtime_dir.trim());
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
         println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyAutopilot.m");
         println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
+            .file("native/macos/MistyAutopilot.m")
             .file("native/macos/MistyFolderBookmarks.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")

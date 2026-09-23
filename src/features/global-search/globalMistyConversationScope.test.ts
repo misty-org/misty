@@ -1,59 +1,43 @@
-import { describe, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { GlobalSearchState } from "./globalSearchState";
 import { conversationForGlobalPrompt } from "./globalMistyConversationScope";
-
-vi.mock("@/features/agents/agentsRuntime", () => ({
-  useAgentsSpaces: { getState: () => ({ spaces: [
-    { id: "work", name: "Work" }, { id: "family", name: "Family" },
-  ] }) },
+vi.mock("@/features/agents/personalAgentsStore", () => ({
+  usePersonalAgentsStore: { getState: () => ({ agents: [] }) },
 }));
-
-function fixture(spaceId?: string, contextSpace?: string) {
+function fixture() {
   const newConversation = vi.fn(async () => "new");
-  const bindConversationSpace = vi.fn(async () => undefined);
   const state = {
-    activeConversationId: spaceId ? "existing" : undefined,
-    conversations: spaceId ? [{ id: "existing", spaceId, messages: [] }] : [],
-    context: contextSpace ? [{ kind: "route", spaceId: contextSpace }] : [],
-    newConversation, bindConversationSpace,
+    activeConversationId: "",
+    conversations: [],
+    context: [],
+    newConversation,
   } as unknown as GlobalSearchState;
-  return { state, newConversation, bindConversationSpace };
+  return { state, newConversation };
 }
-
-describe("global Ask Space capture", () => {
-  it("does not pick the first accessible Space when context is absent", async () => {
-    const f = fixture();
-    await conversationForGlobalPrompt(() => f.state, "Help me plan");
-    expect(f.newConversation).toHaveBeenCalledWith(undefined);
-  });
-  it("starts separate work when the originating Space differs from the old conversation", async () => {
-    const f = fixture("work", "family");
-    await conversationForGlobalPrompt(() => f.state, "Create a task");
-    expect(f.newConversation).toHaveBeenCalledWith("family");
-  });
-  it("resolves an explicitly requested accessible Space", async () => {
-    const f = fixture("work", "work");
-    await conversationForGlobalPrompt(() => f.state, "Work in Family Space");
-    expect(f.newConversation).toHaveBeenCalledWith("family");
-  });
-  it("does not interpret an incidental name as permission to retarget", async () => {
-    const f = fixture("work", "work");
-    expect(await conversationForGlobalPrompt(() => f.state, "Email my family")).toBe("existing");
-    expect(f.newConversation).not.toHaveBeenCalled();
-  });
-  it("rejects mixed originating Spaces", async () => {
-    const f = fixture("work", "work");
-    f.state.context.push({ kind: "route", id: "family", title: "Family", spaceId: "family", source: "current" });
-    await expect(conversationForGlobalPrompt(() => f.state, "Create a task")).rejects.toThrow("Choose one Space");
-  });
-  it("captures the origin before asynchronous conversation creation", async () => {
-    const f = fixture(undefined, "work");
-    let finish!: (id: string) => void;
-    f.newConversation.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-    const pending = conversationForGlobalPrompt(() => f.state, "Create a task");
-    f.state.context[0].spaceId = "family";
-    finish("created-in-work");
-    expect(await pending).toBe("created-in-work");
-    expect(f.newConversation).toHaveBeenCalledWith("work");
-  });
+it("starts personal work regardless of Space names mentioned in the prompt", async () => {
+  const f = fixture();
+  await conversationForGlobalPrompt(() => f.state, "Work in Family Space");
+  expect(f.newConversation).toHaveBeenCalledExactlyOnceWith();
+});
+it("preserves an explicitly reopened historical conversation without retargeting it", async () => {
+  const f = fixture();
+  f.state.activeConversationId = "old";
+  f.state.conversations = [
+    { id: "old", spaceId: "history", agentId: "agent" },
+  ] as GlobalSearchState["conversations"];
+  expect(await conversationForGlobalPrompt(() => f.state, "Switch to Work Space")).toBe("old");
+  expect(f.newConversation).not.toHaveBeenCalled();
+  f.state.selectedAgentId = "another-agent";
+  expect(await conversationForGlobalPrompt(() => f.state, "Continue")).toBe("new");
+});
+it("rejects historical content from a different conversation", async () => {
+  const f = fixture();
+  f.state.activeConversationId = "old";
+  f.state.conversations = [{ id: "old", spaceId: "history" }] as GlobalSearchState["conversations"];
+  f.state.context = [
+    { id: "doc", kind: "note", title: "Note", source: "current", spaceId: "other" },
+  ];
+  await expect(conversationForGlobalPrompt(() => f.state, "Summarize")).rejects.toThrow(
+    /another conversation/,
+  );
 });

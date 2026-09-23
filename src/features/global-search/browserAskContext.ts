@@ -1,10 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { providerBelongsToApp, browserProviders } from "@/features/webviews/browserProviders";
-import { useAppsStore } from "@/features/apps/useAppsStore";
+import { useUserStore } from "@/features/auth/core";
+import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "@/features/ai-surface";
 import { ensureServerAgentDevice, agentsDeviceSnapshot } from "@/features/agents";
-import type { BrowserAskTarget } from "./browserAskTargets";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { GlobalAiContextRef } from "./types";
 
@@ -35,8 +34,6 @@ export interface BrowserAskRequest {
   context: GlobalAiContextRef[];
   selection: AiSelectionSnapshot;
   deviceContexts: AiInvocationDeviceContext[];
-  targetId?: string;
-  capabilities?: string[];
   notice?: string;
 }
 
@@ -59,7 +56,6 @@ export function browserAskSource(snapshot: BrowserAskSnapshot): GlobalAiContextR
     source: "current",
     attached: true,
     privacy: "device",
-    spaceId: snapshot.spaceId || undefined,
     revision: snapshot.revision,
     opaqueScopeId: snapshot.scopeId,
     metadata: {
@@ -76,90 +72,57 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
   const state = useMistyStore.getState();
   if (state.working)
     throw new Error("Wait for the current Ask request or cancel it before starting another.");
-  const accountId = useAppsStore.getState().accountId;
+  const accountId = useUserStore.getState().me?.id;
+  if (!accountId || state.accountId !== accountId || isApiSessionTransitioning())
+    throw new Error("Sign in to the current Misty account before using Ask.");
+  const generation = readApiSessionGeneration();
+  const stillCurrent = () =>
+    !isApiSessionTransitioning() &&
+    readApiSessionGeneration() === generation &&
+    useUserStore.getState().me?.id === accountId &&
+    useMistyStore.getState().accountId === accountId;
   const source = browserAskSource(snapshot);
-  const ownerApp = useAppsStore
-    .getState()
-    .catalog?.find(
-      (app) =>
-        snapshot.providerId &&
-        providerBelongsToApp(app.id, snapshot.providerId as keyof typeof browserProviders),
-    )?.id;
-  source.metadata = { ...source.metadata, app_id: ownerApp ?? "" };
+  source.metadata = { ...source.metadata, app_id: "browser" };
   const deviceContexts: AiInvocationDeviceContext[] = [];
-  let target: BrowserAskTarget | undefined;
-  let notice: string | undefined = !snapshot.spaceId
-    ? "This page has no originating Space. Open it in a Space to enable browser actions."
-    : !snapshot.providerId
-      ? "Automation has not been verified for this website."
-      : undefined;
-  if (snapshot.spaceId) {
+  let notice: string | undefined;
+  if (hasTauriInternals()) {
     const local = await agentsDeviceSnapshot();
+    if (!stillCurrent()) return;
     if (!local.device || local.device.status === "revoked")
-      throw new Error("Connect this Misty device before using browser actions.");
-    const device = await ensureServerAgentDevice(local.device);
-    if (snapshot.providerId) {
-      try {
-        const { bindBrowserAskTarget } = await import("./browserAskTargets");
-        target = await bindBrowserAskTarget(snapshot, accountId, device.id, () => {
-          if (useAppsStore.getState().accountId !== accountId)
-            throw new Error("The Misty account changed.");
-        });
-        if (!target) notice = "Automation has not been verified for this website.";
-      } catch (error) {
-        notice =
-          error instanceof Error
-            ? error.message
-            : "Browser actions are unavailable. You can still ask about the attached content.";
-      }
+      notice = "Connect this Misty device to let an agent interact with the page.";
+    else {
+      const device = await ensureServerAgentDevice(local.device);
+      if (!stillCurrent()) return;
+      deviceContexts.push({
+        deviceId: device.id,
+        kind: "browser_tab",
+        opaqueRef: snapshot.scopeId,
+        displayName: source.title,
+        // A native menu supplies the source. Execution still requires the user's
+        // submitted task and the existing run-bound native action checks.
+        capabilities: [
+          "browser.inspect",
+          "browser.navigate",
+          "browser.click",
+          "browser.type",
+          "browser.interact",
+        ],
+        metadata: {
+          origin: new URL(source.href!).origin,
+          label: source.title,
+          source: "browser-context-menu",
+          app_id: "browser",
+          window_label: getCurrentWindow().label,
+        },
+      });
     }
-    if (target) {
-      if (!source.title.includes(target.account))
-        source.title = `${source.title} · ${target.account}`;
-      source.metadata = {
-        ...source.metadata,
-        targetId: target.target.id,
-        account: target.account,
-        capabilities: target.capabilities.join(", "),
-        ...(target.threadReference ? { threadReference: target.threadReference } : {}),
-      };
-    }
-    deviceContexts.push({
-      deviceId: device.id,
-      kind: "browser_tab",
-      opaqueRef: snapshot.scopeId,
-      displayName: source.title,
-      // The existing semantic executor uses these run-bound primitives. A
-      // provider/account binding grants no standing approval for a commit.
-      capabilities: target?.capabilities.some((name) => name !== "inbox.read")
-        ? [
-            "browser.inspect",
-            "browser.navigate",
-            "browser.click",
-            "browser.type",
-            "browser.interact",
-          ]
-        : target?.capabilities.includes("inbox.read")
-          ? ["browser.inspect", "browser.navigate"]
-          : ["browser.inspect"],
-      metadata: {
-        origin: new URL(source.href!).origin,
-        label: source.title,
-        source: "browser-context-menu",
-        app_id: ownerApp ?? "",
-        window_label: hasTauriInternals() ? getCurrentWindow().label : "",
-      },
-    });
   }
-  if (useAppsStore.getState().accountId !== accountId) return;
+  if (!stillCurrent()) return;
   const conversationId = "";
-  if (useAppsStore.getState().accountId !== accountId) return;
   const request: BrowserAskRequest = {
     conversationId,
     context: [source],
     deviceContexts,
-    targetId: target?.target.id,
-    capabilities: target?.capabilities,
     notice,
     selection: {
       kind: "text",
@@ -167,28 +130,27 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
       object: {
         kind: "browser-tab",
         id: snapshot.id,
-        spaceId: snapshot.spaceId || undefined,
         revision: snapshot.revision,
       },
       anchors: {
         sourceURL: snapshot.page.url,
         documentRevision: snapshot.page.documentRevision,
-        ...(target?.threadReference ? { threadReference: target.threadReference } : {}),
       },
       contentHash: snapshot.contentHash,
     },
   };
   const prompts = {
     ask: "",
-    "create-task": "Create a task from this email in this Space's Planner.",
+    "create-task":
+      "Create a task from this page. Ask which website to use if no destination is specified.",
     "prepare-reply": "Prepare a reply to this email for my review.",
     "task-and-reply":
-      "Create a task from this email in this Space's Planner and prepare a reply for my review.",
+      "Create a task from this page and prepare a reply for my review. Ask which website to use if no destination is specified.",
   };
   const { openMisty } = await import("@/features/misty/handoff");
+  if (!stillCurrent()) return;
   await openMisty({
     accountId,
-    spaceId: snapshot.spaceId || undefined,
     context: request.context,
     selection: request.selection,
     deviceContexts: request.deviceContexts,

@@ -58,6 +58,15 @@ impl AccountClient {
             account_id: Mutex::new(None),
         }))
     }
+    pub(super) fn require_account(&self, url: &url::Url, expected: &str) -> Result<(), String> {
+        let saved = self
+            .snapshot(url)?
+            .ok_or("Sign in before connecting browser sync")?;
+        if saved.account_id != expected {
+            return Err("The native account does not match this workspace".into());
+        }
+        Ok(())
+    }
     fn snapshot(&self, url: &url::Url) -> Result<Option<SavedCookies>, String> {
         let header = self.jar.cookies(url);
         let text = header.as_ref().and_then(|h| h.to_str().ok()).unwrap_or("");
@@ -218,29 +227,51 @@ pub async fn auth_cookie_capture(
 }
 #[tauri::command]
 pub async fn auth_cookie_restore(
+    app: tauri::AppHandle,
     api_base: String,
     account_id: Option<String>,
 ) -> Result<bool, String> {
     let url = server(&api_base)?;
-    activate(&url, AccountClient::new()?)?;
-    let Some(account_id) = account_id.filter(|id| !id.is_empty()) else {
-        return Ok(false);
-    };
-    let Some(value) = misty_credential_store::load(SERVICE, &key(&url, &account_id))
-        .map_err(|e| e.to_string())?
-    else {
-        return Ok(false);
-    };
-    let Some(client) = AccountClient::restore(&url, &account_id, &value)? else {
-        return Ok(false);
-    };
-    activate(&url, client)?;
-    Ok(true)
+    super::browser_sync::change_account(Some(&app), || {
+        activate(&url, AccountClient::new()?)?;
+        let Some(account_id) = account_id.filter(|id| !id.is_empty()) else {
+            return Ok(false);
+        };
+        let Some(value) = misty_credential_store::load(SERVICE, &key(&url, &account_id))
+            .map_err(|e| e.to_string())?
+        else {
+            return Ok(false);
+        };
+        let Some(client) = AccountClient::restore(&url, &account_id, &value)? else {
+            return Ok(false);
+        };
+        activate(&url, client)?;
+        Ok(true)
+    })
+    .await
 }
 #[tauri::command]
-pub async fn auth_cookie_forget(api_base: String, account_id: String) -> Result<(), String> {
+pub async fn auth_cookie_forget(
+    app: tauri::AppHandle,
+    api_base: String,
+    account_id: String,
+) -> Result<(), String> {
     let url = server(&api_base)?;
-    misty_credential_store::delete(SERVICE, &key(&url, &account_id)).map_err(|e| e.to_string())
+    super::browser_sync::change_account_if(
+        Some(&app),
+        |scope| {
+            scope.is_some_and(|scope| {
+                scope.account_id == account_id
+                    && scope.deployment == url.as_str().trim_end_matches('/')
+            }) || current(&url)
+                .is_ok_and(|client| client.require_account(&url, &account_id).is_ok())
+        },
+        || {
+            misty_credential_store::delete(SERVICE, &key(&url, &account_id))
+                .map_err(|e| e.to_string())
+        },
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -268,6 +299,8 @@ mod tests {
         let raw = serde_json::to_string(&saved).unwrap();
         let client = AccountClient::restore(&url, "ada", &raw).unwrap().unwrap();
         let snapshot = client.snapshot(&url).unwrap().unwrap();
+        assert!(client.require_account(&url, "ada").is_ok());
+        assert!(client.require_account(&url, "grace").is_err());
         assert!(snapshot.access.is_none());
         assert_eq!(snapshot.account_id, "ada");
         assert!(client

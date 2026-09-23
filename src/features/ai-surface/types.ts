@@ -201,8 +201,9 @@ export interface AiInvocationRequest {
   capture?: AiCaptureAttachment;
   attachmentIds?: string[];
   deviceContexts?: AiInvocationDeviceContext[];
+  thinkingMode?: "normal" | "deep";
   modelId?: string;
-  reasoningEffort?: "" | "low" | "medium" | "high";
+  reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   requestedArtifactKind?: AiArtifactKind;
   conversationId?: string;
   idempotencyKey: string;

@@ -313,6 +313,7 @@ function toServerInvocation(input: AiInvocationRequest) {
       capabilities: context.capabilities,
       metadata: context.metadata,
     })),
+    thinking_mode: input.thinkingMode,
     model_id: input.modelId,
     reasoning_effort: input.reasoningEffort,
     requested_artifact_kind: input.requestedArtifactKind,

@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, Button } from "@/shared/ui";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { Trash2, UserPlus } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -12,7 +11,6 @@ import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
-import { clearAccountCreating } from "@/features/onboarding";
 import { accountSignIn } from "./store/useAccountStore";
 
 export default function SignIn() {
@@ -25,9 +23,7 @@ export default function SignIn() {
   const from =
     rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
       ? rawFrom
-      : isNativeMobileBuild
-        ? "/home"
-        : "/spaces";
+      : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount);
   const [mode, setMode] = useState<"chooser" | "login">(
     accounts.length > 0 && !addingAccount ? "chooser" : "login",
@@ -44,8 +40,7 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      const user = await authenticateAccount(() => accountSignIn(email, password));
-      if (user?.id) clearAccountCreating(user.id);
+      await authenticateAccount(() => accountSignIn(email, password));
       navigate(from, { replace: true });
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : "Could not sign in.");
@@ -60,7 +55,6 @@ export default function SignIn() {
     setBusyAccountId(account.id);
     try {
       await resumeAccount(account.id);
-      clearAccountCreating(account.id);
       navigate(from, { replace: true });
     } catch (resumeError) {
       if (resumeError instanceof SavedAccountSessionUnavailableError) {

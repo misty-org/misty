@@ -1,3 +1,4 @@
+import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/ui";
 import { Blocks, Download, LayoutGrid, SquareStar, Store } from "lucide-react";
 
@@ -41,11 +42,14 @@ export function MarketplaceStoreNav(props: {
         {storeSections.map(({ id, label, icon: Icon }) => {
           const active = props.active === id;
           return (
-            <button
+            <Button
+              variant="ghost"
+              size="none"
+              justify="start"
               aria-current={active ? "page" : undefined}
               aria-label={`Browse ${label.toLowerCase()}`}
               className={cn(
-                "flex h-9 min-w-0 items-center gap-2 rounded-md px-2.5 text-left text-sm outline-none transition-colors",
+                "flex h-9 min-w-0 items-center justify-start gap-2 rounded-md border-0 px-2.5 text-left text-sm outline-none transition-colors",
                 "max-[860px]:h-11",
                 "focus-visible:border focus-visible:border-charcoal-active",
                 active
@@ -55,16 +59,15 @@ export function MarketplaceStoreNav(props: {
               )}
               key={id}
               onClick={() => props.onChange(id)}
-              type="button"
             >
-              <Icon aria-hidden="true" className="shrink-0" size={17} strokeWidth={1.9} />
+              <Icon aria-hidden="true" className="size-[17px] shrink-0" size={17} strokeWidth={1.9} />
               <span className="truncate max-[560px]:sr-only">{label}</span>
               {id === "installed" && props.installedCount > 0 ? (
                 <span className="ml-auto text-[11px] tabular-nums text-cream-muted max-[560px]:hidden">
                   {props.installedCount}
                 </span>
               ) : null}
-            </button>
+            </Button>
           );
         })}
       </nav>

@@ -5,6 +5,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex, OnceLock},
 };
+use tauri::Manager;
 use tokio::sync::{Mutex as AsyncMutex, Notify};
 
 struct RequestSlot {
@@ -49,6 +50,7 @@ pub async fn auth_http_start(
     webview: tauri::Webview,
     request: tauri::ipc::Request<'_>,
 ) -> Result<ResponseHead, String> {
+    let app = webview.app_handle().clone();
     let meta = request
         .headers()
         .get("x-misty-request")
@@ -144,8 +146,14 @@ pub async fn auth_http_start(
         };
         if response.headers().contains_key(reqwest::header::SET_COOKIE) {
             let account = client.persist(&url)?;
-            if login && response.status().is_success() && account.is_some() {
-                auth_cookies::activate(&url, client.clone())?;
+            if account.is_none() || (login && response.status().is_success()) {
+                super::browser_sync::change_account(Some(&app), || {
+                    if login && response.status().is_success() && account.is_some() {
+                        auth_cookies::activate(&url, client.clone())?;
+                    }
+                    Ok(())
+                })
+                .await?;
             }
         }
         let head = ResponseHead {

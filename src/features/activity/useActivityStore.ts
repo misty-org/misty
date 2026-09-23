@@ -1,4 +1,5 @@
-import { useSpacesStore } from "@/features/spaces";
+import { useCapabilityApprovals } from "@/features/capability-approvals/store";
+import { useAgentInterventions } from "@/features/agent-interventions/store";
 import { readDeploymentScope } from "@/api/deployment/api";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -84,9 +85,22 @@ export const useActivityStore = create<ActivityStore>()(
         }
         set({ loading: true, offline: false, error: null });
         try {
-          await useSpacesStore.getState().loadInbox();
-          if (account === activityAccountKey(get()))
-            set({ loading: false, error: useSpacesStore.getState().inboxError ?? null });
+          const accountId = get().accountId;
+          const sources = [useCapabilityApprovals, useAgentInterventions];
+          await Promise.all(
+            sources.map((source) => {
+              const current = source.getState();
+              return current.accountId === accountId ? current.refresh() : undefined;
+            }),
+          );
+          if (account === activityAccountKey(get())) {
+            const errors = sources
+              .map((source) => source.getState())
+              .filter((source) => source.accountId === accountId)
+              .map((source) => source.error)
+              .filter(Boolean);
+            set({ loading: false, error: errors.join(" ") || null });
+          }
         } catch (error) {
           if (account === activityAccountKey(get()))
             set({ loading: false, error: errorMessage(error) });
@@ -116,7 +130,7 @@ export const useActivityStore = create<ActivityStore>()(
           update({ accountId: accountId.trim(), deploymentScope: readDeploymentScope() });
           set({ error: null, loading: false });
         },
-        syncSources(accountId, items, completeSources = [], observedSources = ["spaces"]) {
+        syncSources(accountId, items, completeSources = [], observedSources = []) {
           if (!accountId || accountId !== get().accountId) return;
           const state = get();
           const key = activityAccountKey(state);
@@ -302,13 +316,6 @@ export const useActivityStore = create<ActivityStore>()(
             readAtByKey[activityReadKey(state, item)] = new Date().toISOString();
           }
           update({ readAtByKey });
-          // Server inbox read semantics do not resolve approvals or invitations.
-          try {
-            if (!ids && state.accountId) await useSpacesStore.getState().markInboxSeen();
-          } catch (error) {
-            if (activityAccountKey(state) === activityAccountKey(get()))
-              set({ error: errorMessage(error) });
-          }
         },
         markHistoryChecked() {
           const state = get();

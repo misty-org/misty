@@ -1,50 +1,60 @@
+import { betaExecutionMode, visibleAutopilotAvailable } from "./betaModes";
 import { useSearchParams } from "react-router-dom";
+import { observeAccountChanges } from "@/api/accountEvents";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Button,
+  NavigationChevron,
+  TreeBranch,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  cn,
 } from "@/shared/ui";
-import { AgentSearchDialog } from "./components/AgentSearchDialog";
+import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { finishLocalExecution } from "./localExecution";
 import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import {
   Activity,
   ArrowLeft,
-  ChevronRight,
   MessageSquare,
-  ChevronsRight,
-  History,
-  Monitor,
   MoreHorizontal,
-  Settings,
+  Pencil,
   Plus,
-  Search,
+  SlidersHorizontal,
   Trash2,
-  Unplug,
   X,
 } from "lucide-react";
 import type { AgentProfile, AgentProfileInput } from "@misty/contracts";
 import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
-import { assistantApi } from "@/api/assistant/api";
-import type { FrontierModel } from "@/api/assistant/api-core";
 import { useAuth } from "@/features/auth";
-import { useAppsStore } from "@/features/apps/useAppsStore";
-import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
-import { useWorkspaceStore } from "@/features/workspace";
 import { openMisty } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { MistyDashboard } from "./components/MistyDashboard";
-import { McpConnectionsSheet } from "./mcp/McpConnectionsSheet";
 import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
 import { AgentAvatar, AgentCloudImage } from "./components/AgentAvatar";
 import { agentCloudAvatar, agentCloudVariants } from "./components/agentCloudAvatars";
 import "./agentsWorkspace.css";
+
+function relativeTime(value: string | number | undefined): string {
+  if (!value) return "";
+  const timestamp = typeof value === "string" ? Date.parse(value) : value;
+  if (Number.isNaN(timestamp)) return "";
+  const elapsed = Date.now() - timestamp;
+  if (elapsed < 60_000) return "just now";
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m`;
+  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h`;
+  if (elapsed < 7 * 86_400_000) return `${Math.floor(elapsed / 86_400_000)}d`;
+  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 const field =
   "w-full rounded-md border border-charcoal-border bg-charcoal-bg px-3 py-2 text-sm text-cream";
@@ -63,28 +73,24 @@ const emptyProfile: AgentProfileInput = {
   enabled: true,
 };
 
-export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceId?: string } = {}) {
+export default function NativeAgentsPage() {
   const { user } = useAuth();
-  const scope = useWorkspaceStore((s) => s.activeScopeKey);
-  const spaces = useSpacesStore((s) => s.spaces);
-  const [assignedSpaceId, setAssignedSpaceId] = useState(
-    () => requestedSpaceId || (scope.startsWith("space:") ? scope.slice(6) : ""),
-  );
-  const space = spaces.find((item) => item.id === assignedSpaceId) ?? preferredDefaultSpace(spaces);
-  const spaceId = space?.id ?? "";
+  // New work is personal. Historical conversations retain their saved scope when reopened.
+  const spaceId = "";
   const { agents, loading, error, load } = usePersonalAgentsStore();
   const [selected, setSelected] = useState<string>();
-  const [searchOpen, setSearchOpen] = useState(false);
   const [newChat, setNewChat] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
-  const [details, setDetails] = useState(false);
-  const [history, setHistory] = useState(false);
   const [params] = useSearchParams();
   const [activity, setActivity] = useState(
     () => params.get("view") === "automations" || params.has("run"),
   );
-  const [connections, setConnections] = useState(false);
-  const [settings, setSettings] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
+  const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
+  const [activeDropdownAgentId, setActiveDropdownAgentId] = useState<string | null>(null);
+  const [expandedAgents, setExpandedAgents] = useState<Record<string, boolean>>({});
+  const isExpanded = (id: string) => expandedAgents[id] ?? true;
   const [mobileList, setMobileList] = useState(false);
   const [editorStatus, setEditorStatus] = useState({ dirty: false, busy: false });
   const [chatRevision, setChatRevision] = useState(0);
@@ -92,15 +98,21 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
   const [pendingChange, setPendingChange] = useState<() => void>();
   const working = useMistyStore((s) => s.working);
   const conversations = useMistyStore((s) => s.conversations);
-  const conversationsLoading = useMistyStore((s) => s.conversationsLoading);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
+  const conversationSpaceId =
+    conversations.find((c) => c.id === activeConversationId)?.spaceId ?? "";
   const executionMode = useMistyStore((s) => s.executionMode);
-  const scopedConversations = conversations.filter((c) => (c.spaceId || "") === spaceId);
+  const executionModeByAgent = useMistyStore((s) => s.executionModeByAgent);
+  const scopedConversations = conversations;
 
   useEffect(() => {
-    void load(user?.id ?? "");
     setSelected(undefined);
-    setSettings(false);
+    setSettingsModalOpen(false);
+    if (!user?.id) {
+      void load("");
+      return;
+    }
+    return observeAccountChanges(user.id, ["agents"], () => load(user.id));
   }, [user?.id, load]);
   const profile =
     agents.find((a) => a.id === selected) ??
@@ -110,30 +122,14 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
       c.id === activeConversationId &&
       (c.agentId === profile?.id || (!c.agentId && profile?.system_managed)),
   );
-  const panelOpen = settings || details || history;
-  const closePanel = () =>
+  const openSettingsModal = (tab: AgentSettingsTab = "settings") =>
     change(() => {
-      setSettings(false);
-      setDetails(false);
-      setHistory(false);
-      if (selected === "new") setSelected(undefined);
-    }, selected === "new");
-  const showSettings = () =>
-    change(() => {
-      setSettings(true);
-      setDetails(false);
-      setHistory(false);
-      setActivity(false);
-      setNewChat(false);
-    }, false);
-  const showActivity = () =>
-    change(() => {
-      setActivity(true);
-      setSettings(false);
-      setDetails(false);
-      setHistory(false);
+      setSettingsModalMode("edit");
+      setSettingsModalTab(tab);
+      setSettingsModalOpen(true);
       setMobileList(false);
-    });
+    }, false);
+  const showSettings = () => openSettingsModal("settings");
   const change = (action: () => void, replacesConversation = true) => {
     if (editorStatus.busy || (replacesConversation && conversationStatus.busy)) return;
     if (editorStatus.dirty || (replacesConversation && conversationStatus.dirty))
@@ -145,10 +141,15 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
       setChatRevision((n) => n + 1);
       setSelected(id);
       setNewChat(false);
-      setSettings(false);
       setActivity(false);
       setMobileList(false);
+      if (startNew) {
+        setExpandedAgents((prev) => ({ ...prev, [id]: true }));
+      }
+      const agentMode = useMistyStore.getState().executionModeByAgent?.[id] ?? "user";
       useMistyStore.setState({
+        selectedAgentId: id,
+        executionMode: agentMode,
         activeConversationId: startNew
           ? ""
           : (scopedConversations.find(
@@ -163,66 +164,230 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
   const create = () =>
     change(() => {
       setNewChat(false);
-      setDetails(false);
-      setHistory(false);
-      setSelected("new");
-      setSettings(true);
+      setSettingsModalMode("create");
+      setSettingsModalTab("settings");
+      setSettingsModalOpen(true);
       setActivity(false);
       setMobileList(false);
     });
   return (
-    <main
-      className={`agents-workspace${mobileList ? " agents-workspace--list" : ""}${panelOpen ? " agents-workspace--settings" : ""}`}
-    >
+    <main className={`agents-workspace${mobileList ? " agents-workspace--list" : ""}`}>
       <aside className="agents-roster" aria-label="Your agents">
         <header
           className="agents-roster-heading"
           data-tauri-drag-region
           data-misty-window-titlebar-region="true"
         >
-          <h1 className="sr-only">Agents</h1>
-          <Button variant="ghost" size="icon-sm"
-            className="agent-icon-button"
-            aria-label="New chat"
-            title="New chat"
-            disabled={working || editorStatus.busy}
-            onClick={() =>
-              change(() => {
-                setNewChat(true);
-                setRecipientSearch("");
-                setActivity(false);
-                setMobileList(false);
-                setSettings(false);
-                setDetails(false);
-                setHistory(false);
-              })
-            }
-          >
-            <Plus size={20} />
-          </Button>
+          <span className="text-xs font-semibold uppercase tracking-wider text-cream-muted px-1">
+            Agents
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="agent-icon-button"
+              onClick={showSettings}
+              aria-label="Agent settings"
+              title="Agent settings"
+            >
+              <SlidersHorizontal className="size-4 shrink-0" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="agent-icon-button"
+              onClick={() =>
+                change(() => {
+                  setNewChat(true);
+                  setRecipientSearch("");
+                  setActivity(false);
+                  setMobileList(false);
+                  setSettingsModalOpen(false);
+                })
+              }
+              aria-label="New chat"
+              title="New chat"
+              disabled={working || editorStatus.busy}
+            >
+              <Plus className="size-4 shrink-0" />
+            </Button>
+          </div>
         </header>
-        <Button variant="ghost" className="agents-search" onClick={() => setSearchOpen(true)} aria-label="Search">
-          <Search size={17} />
-          <span>Search</span>
-        </Button>
         <div className="agents-roster-list">
           {loading && !agents.length ? (
             <p className="agents-list-note" role="status">
               Loading agents…
             </p>
           ) : (
-            agents.map((agent) => (
-              <Button variant="ghost"
-                key={agent.id}
-                className="agent-roster-row"
-                aria-pressed={profile?.id === agent.id && selected !== "new" && !newChat}
-                disabled={working || editorStatus.busy}
-                onClick={() => select(agent.id)}
-              >
-                <AgentAvatar agent={agent} />
-                <span className="agent-roster-copy">{agent.name}</span>
-              </Button>
-            ))
+            agents.map((agent) => {
+              const expanded = isExpanded(agent.id);
+              const isAgentSelected = profile?.id === agent.id && selected !== "new" && !newChat;
+              const isDropdownOpen = activeDropdownAgentId === agent.id;
+              const agentConversations = scopedConversations.filter(
+                (c) => c.agentId === agent.id || (!c.agentId && agent.system_managed),
+              );
+
+              return (
+                <div key={agent.id} className="mb-0.5 w-full">
+                  <div
+                    className={cn(
+                      "group/agent-row relative flex items-center h-[38px] w-full px-2 rounded-lg transition-colors gap-2 box-border select-none",
+                      isAgentSelected
+                        ? "bg-charcoal-active/80 text-cream-bright shadow-xs"
+                        : isDropdownOpen
+                          ? "bg-charcoal-card text-cream-bright"
+                          : "hover:bg-charcoal-card text-cream",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 flex-1 min-w-0 h-full py-0.5 text-left border-none bg-transparent outline-none cursor-pointer text-inherit"
+                      aria-pressed={isAgentSelected}
+                      disabled={working || editorStatus.busy}
+                      onClick={() => {
+                        setExpandedAgents((prev) => ({ ...prev, [agent.id]: !expanded }));
+                        select(agent.id);
+                      }}
+                    >
+                      <div className="size-7 shrink-0 flex items-center justify-center">
+                        <AgentAvatar agent={agent} />
+                      </div>
+                      <div className="flex min-w-0 items-center gap-1.5 flex-1">
+                        <span className="agent-roster-copy font-medium text-[13px] truncate">
+                          {agent.name}
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className="grid size-4 shrink-0 place-items-center text-cream-muted transition-opacity opacity-0 group-hover/agent-row:opacity-100"
+                        >
+                          <NavigationChevron open={expanded} />
+                        </span>
+                      </div>
+                    </button>
+
+                    <div
+                      className={cn(
+                        "flex items-center gap-0.5 shrink-0 w-[52px] justify-end transition-opacity",
+                        isDropdownOpen
+                          ? "opacity-100"
+                          : "opacity-0 group-hover/agent-row:opacity-100 focus-within:opacity-100",
+                      )}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="size-6 text-cream-muted hover:text-cream-bright p-0"
+                        aria-label="New conversation"
+                        title="New conversation"
+                        disabled={working || editorStatus.busy}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          select(agent.id, true);
+                        }}
+                      >
+                        <Plus className="size-3.5 shrink-0" />
+                      </Button>
+                      <DropdownMenu
+                        open={isDropdownOpen}
+                        onOpenChange={(open) => setActiveDropdownAgentId(open ? agent.id : null)}
+                      >
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className={cn(
+                              "size-6 text-cream-muted hover:text-cream-bright p-0",
+                              isDropdownOpen && "text-cream-bright",
+                            )}
+                            aria-label="Agent options"
+                          >
+                            <MoreHorizontal className="size-3.5 shrink-0" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="agent-options-menu">
+                          <DropdownMenuItem onSelect={() => select(agent.id, true)}>
+                            <Plus className="size-3.5 shrink-0" />
+                            New conversation
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setSelected(agent.id);
+                              openSettingsModal("settings");
+                            }}
+                          >
+                            <SlidersHorizontal className="size-3.5 shrink-0" />
+                            Agent settings
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={create}>
+                            <Plus className="size-3.5 shrink-0" />
+                            Create new agent
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {expanded && (
+                    <div
+                      className="agent-conversations-branch max-h-60 overflow-y-auto pl-3 pr-1 py-0.5 space-y-0.5 misty-transient-scrollbar"
+                      data-agent-branch={agent.id}
+                    >
+                      {agentConversations.length === 0 ? (
+                        <div className="relative flex items-center h-6 pl-5 text-[11px] text-cream-muted/60 italic">
+                          <TreeBranch className="left-2" last={true} />
+                          <span>No conversations yet</span>
+                        </div>
+                      ) : (
+                        agentConversations.map((c, idx) => {
+                          const isLast = idx === agentConversations.length - 1;
+                          const isActiveConvo =
+                            activeConversationId === c.id && isAgentSelected && !activity;
+                          return (
+                            <div
+                              key={c.id}
+                              className="relative flex items-center h-7 pl-5 pr-1 text-[12px] group/branch-row"
+                            >
+                              <TreeBranch className="left-2" last={isLast} />
+                              <button
+                                type="button"
+                                className={cn(
+                                  "flex items-center gap-1.5 w-full h-full rounded-md px-2 text-left transition-colors truncate",
+                                  isActiveConvo
+                                    ? "bg-charcoal-active text-cream-bright font-medium"
+                                    : "text-cream-muted hover:text-cream-bright hover:bg-charcoal-card",
+                                )}
+                                onClick={() => {
+                                  change(() => {
+                                    setChatRevision((n) => n + 1);
+                                    setSelected(agent.id);
+                                    setNewChat(false);
+                                    setActivity(false);
+                                    setMobileList(false);
+                                    useMistyStore.getState().selectConversation(c.id);
+                                  });
+                                }}
+                              >
+                                {isActiveConvo ? (
+                                  <span className="size-1.5 rounded-full bg-blue-400 shrink-0" />
+                                ) : (
+                                  <MessageSquare className="size-3 text-cream-muted/60 shrink-0" />
+                                )}
+                                <span className="truncate flex-1">
+                                  {c.title || "Untitled Conversation"}
+                                </span>
+                                <span className="text-[10px] text-cream-muted/50 tabular-nums shrink-0 ml-1">
+                                  {relativeTime(c.updatedAt)}
+                                </span>
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
           {!loading && !agents.length && !error && (
             <Button variant="ghost" className="agents-list-note" onClick={create}>
@@ -230,44 +395,9 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
             </Button>
           )}
         </div>
-        <footer className="agents-roster-footer">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="agent-account" aria-label="Account and agent options">
-                <span className="agent-account-avatar">
-                  {(user?.name || "M")
-                    .split(" ")
-                    .map((part) => part[0])
-                    .slice(0, 2)
-                    .join("")}
-                </span>
-                <span>{user?.name || "My account"}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="agent-options-menu">
-              <DropdownMenuItem onSelect={showActivity}>
-                <Activity size={16} />
-                Activity
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setConnections(true)}>
-                <Unplug size={16} />
-                Connections
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={showSettings}>
-                <Settings size={16} />
-                Agent settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={working} onSelect={create}>
-                <Plus size={16} />
-                Create agent
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </footer>
       </aside>
       <div className="agents-main">
-        {pendingChange && (
+        {pendingChange && !settingsModalOpen && (
           <div className="agents-notice" role="alert">
             <p>
               You have unsaved changes or an unsent message. Keep editing, or discard them to
@@ -276,7 +406,8 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
             <Button variant="ghost" className={button} onClick={() => setPendingChange(undefined)}>
               Keep editing
             </Button>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               className={button}
               onClick={() => {
                 pendingChange();
@@ -301,7 +432,9 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
           data-tauri-drag-region
           data-misty-window-titlebar-region="true"
         >
-          <Button variant="ghost" size="icon-sm"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             className="agent-icon-button agents-mobile-back"
             aria-label="Show agents"
             onClick={() => setMobileList(true)}
@@ -320,7 +453,9 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                   onChange={(e) => setRecipientSearch(e.target.value)}
                 />
               </label>
-              <Button variant="ghost" size="icon-sm"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 className="agent-icon-button"
                 aria-label="Close new chat"
                 onClick={() => setNewChat(false)}
@@ -330,16 +465,11 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
             </>
           ) : (
             <>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 className="agent-heading-identity"
-                aria-label="View conversation details"
-                onClick={() =>
-                  change(() => {
-                    setDetails(true);
-                    setSettings(false);
-                    setHistory(false);
-                  }, false)
-                }
+                aria-label="Agent details"
+                onClick={() => openSettingsModal("settings")}
               >
                 <AgentAvatar agent={profile} />
                 <h2>
@@ -350,64 +480,26 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                       : profile?.name || "Misty"}
                 </h2>
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" className="agent-icon-button" aria-label="Conversation actions">
-                    <MoreHorizontal size={19} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="agent-options-menu">
-                  <DropdownMenuItem
-                    disabled={working}
-                    onSelect={() => profile && select(profile.id, true)}
-                  >
-                    <Plus size={16} />
-                    New conversation
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={working}
-                    onSelect={() =>
-                      change(() => {
-                        setHistory(true);
-                        setSettings(false);
-                        setDetails(false);
-                      }, false)
-                    }
-                  >
-                    <History size={16} />
-                    History
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={showSettings}>
-                    <Settings size={16} />
-                    Agent settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setConnections(true)}>
-                    <Unplug size={16} />
-                    Connections
-                  </DropdownMenuItem>
-                  {activity && (
-                    <DropdownMenuItem onSelect={() => setActivity(false)}>
-                      <MessageSquare size={16} />
-                      Conversation
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button variant="ghost" size="icon-sm"
-                className="agent-icon-button"
-                aria-label={panelOpen ? "Close details" : "Agent details"}
-                title="Agent details"
-                aria-expanded={panelOpen}
-                onClick={() => (panelOpen ? closePanel() : change(() => setDetails(true), false))}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={cn(
+                  "agent-icon-button",
+                  activity && "bg-charcoal-active text-cream-bright",
+                )}
+                aria-label={activity ? "Hide activity" : "View agent activity"}
+                title={activity ? "Hide activity" : "Agent activity and details"}
+                aria-pressed={activity}
+                onClick={() => setActivity((prev) => !prev)}
               >
-                <Monitor size={19} />
+                <Activity size={18} />
               </Button>
             </>
           )}
         </header>
         {newChat ? (
           <div className="agent-new-chat">
-            <div className="agent-recipient-results">
+            <div className="agent-recipient-results" role="group" aria-label="Choose an agent">
               <Button variant="ghost" onClick={create}>
                 <Plus size={20} />
                 Create new agent
@@ -424,17 +516,11 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                 ))}
             </div>
           </div>
-        ) : activity ? (
-          <MistyDashboard
-            spaceId={spaceId}
-            agentId={profile?.id}
-            onManageConnections={() => setConnections(true)}
-          />
         ) : (
           <AgentWorkspaceConversation
-            key={`${user?.id}:${profile?.id}:${spaceId}:${chatRevision}`}
+            key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
             agent={profile}
-            spaceId={spaceId}
+            spaceId={conversationSpaceId}
             accountId={user?.id ?? ""}
             userName={user?.name}
             onDraftStateChange={setConversationStatus}
@@ -442,226 +528,162 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
           />
         )}
       </div>
-      {panelOpen && (
-        <aside
-          className="agent-settings-panel"
-          aria-label={
-            settings ? "Agent settings" : history ? "Conversation history" : "Conversation details"
-          }
+
+      <Sheet open={activity} onOpenChange={setActivity} modal={false}>
+        <SheetContent
+          side="right"
+          portal={false}
+          overlay={false}
+          className="flex w-[min(560px,94vw)] flex-col overflow-hidden border-l border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl sm:max-w-[560px]"
         >
-          <header>
-            {settings || history ? (
-              <Button variant="ghost" size="icon-sm"
-                className="agent-icon-button"
-                aria-label="Back to details"
-                onClick={() =>
-                  change(() => {
-                    setSettings(false);
-                    setHistory(false);
-                    setDetails(true);
-                  }, false)
-                }
-              >
-                <ArrowLeft size={18} />
-              </Button>
-            ) : (
-              <Button variant="ghost" size="icon-sm"
-                className="agent-icon-button"
-                aria-label="Agent settings"
-                onClick={showSettings}
-              >
-                <Settings size={18} />
-              </Button>
-            )}
-            <h3>
-              {settings
-                ? selected === "new"
-                  ? "New agent"
-                  : "Settings"
-                : history
-                  ? "History"
-                  : ""}
-            </h3>
-            <Button variant="ghost" size="icon-sm"
-              className="agent-icon-button"
-              aria-label="Close settings"
-              disabled={editorStatus.busy}
-              onClick={closePanel}
-            >
-              <ChevronsRight size={20} />
+          <SheetHeader className="sr-only">
+            <SheetTitle>Agent activity</SheetTitle>
+            <SheetDescription>Your private tasks, delegated work, and approvals.</SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <MistyDashboard
+              spaceId={spaceId}
+              agentId={profile?.id}
+              onManageConnections={() => openSettingsModal("connections")}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AgentSettingsModal
+        open={settingsModalOpen}
+        onOpenChange={setSettingsModalOpen}
+        activeTab={settingsModalTab}
+        onTabChange={setSettingsModalTab}
+        mode={settingsModalMode}
+        disabled={working || editorStatus.busy}
+        onCreateAgent={create}
+        onNewConversation={() => {
+          if (profile) select(profile.id, true);
+          setSettingsModalOpen(false);
+        }}
+      >
+        {pendingChange && (
+          <div role="alert" className="agents-notice mb-4">
+            <p>
+              You have unsaved changes or an unsent message. Keep editing, or discard them to
+              switch.
+            </p>
+            <Button variant="ghost" className={button} onClick={() => setPendingChange(undefined)}>
+              Keep editing
             </Button>
-          </header>
-          {settings ? (
-            <div className="agent-settings-content">
-              {(selected === "new" || profile) && (
-                <AgentEditor
-                  key={`${user?.id}:${selected}:${profile?.id}:${spaceId}`}
-                  profile={profile}
-                  onStatusChange={setEditorStatus}
-                  onTalk={closePanel}
-                  spaceId={spaceId}
-                  onSaved={async (id) => {
-                    await load(user?.id ?? "");
-                    setSelected(id);
-                    setPendingChange(undefined);
+            <Button
+              variant="ghost"
+              className={button}
+              onClick={() => {
+                pendingChange();
+                setPendingChange(undefined);
+              }}
+            >
+              Discard and switch
+            </Button>
+          </div>
+        )}
+        <div className="space-y-6">
+          {(settingsModalMode === "create" || profile) && (
+            <AgentEditor
+              key={`${user?.id}:${settingsModalMode}:${profile?.id}:${spaceId}`}
+              profile={settingsModalMode === "create" ? undefined : profile}
+              onStatusChange={setEditorStatus}
+              onTalk={() => setSettingsModalOpen(false)}
+              spaceId={spaceId}
+              onSaved={async (id) => {
+                await load(user?.id ?? "");
+                setSelected(id);
+                setSettingsModalOpen(false);
+                setPendingChange(undefined);
+              }}
+              onRemoved={async () => {
+                setSelected(undefined);
+                setSettingsModalOpen(false);
+                await load(user?.id ?? "");
+              }}
+            />
+          )}
+          {settingsModalMode === "edit" && (
+            <section className="agent-conversation-settings">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-cream-bright">Conversation</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(button, "h-7 text-xs gap-1.5")}
+                  disabled={working}
+                  onClick={() => {
+                    if (profile) select(profile.id, true);
+                    setSettingsModalOpen(false);
                   }}
-                  onRemoved={async () => {
-                    setSelected(undefined);
-                    setSettings(false);
-                    await load(user?.id ?? "");
-                  }}
-                />
-              )}
-              <section className="agent-conversation-settings">
-                <h4>Conversation</h4>
-                <label className="agents-space-label">
-                  <span>Work context</span>
-                  <select
-                    aria-label="Agent work Space"
-                    value={spaceId}
-                    disabled={working || editorStatus.busy}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      change(() => {
-                        setAssignedSpaceId(id);
-                        useMistyStore.setState({
-                          activeConversationId: "",
-                          context: [],
-                          handoff: undefined,
-                          browserRequest: undefined,
-                        });
-                      });
-                    }}
-                  >
-                    {!spaces.length && <option value="">Personal</option>}
-                    {spaces.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {hasTauriInternals() && /Mac|Win/.test(navigator.platform) && (
-                  <label className="agents-space-label">
-                    <span>Work mode</span>
-                    <select
-                      aria-label="Agent execution mode"
-                      disabled={working}
-                      value={executionMode ?? "user"}
-                      onChange={(e) => {
-                        const mode = e.target.value as "user" | "agent" | "team";
-                        void finishLocalExecution()
-                          .then(() => useMistyStore.setState({ executionMode: mode }))
-                          .catch((reason) => useMistyStore.setState({ error: String(reason) }));
-                      }}
-                    >
-                      <option value="user">Discuss and draft</option>
-                      <option value="agent">Work in this window</option>
-                      <option value="team">Work in a separate window</option>
-                    </select>
-                  </label>
-                )}
-                {conversation && (
-                  <MistyModelPicker
-                    conversationId={conversation.id}
-                    modelId={conversation.modelId}
-                    reasoningEffort={conversation.reasoningEffort}
-                    disabled={working}
-                    onChange={(changes) =>
-                      useMistyStore.setState((s) => ({
-                        conversations: s.conversations.map((c) =>
-                          c.id === conversation.id ? { ...c, ...changes } : c,
-                        ),
-                      }))
-                    }
-                  />
-                )}
-              </section>
-            </div>
-          ) : history ? (
-            <div className="agent-history">
-              {conversationsLoading ? (
-                <p role="status">Loading conversations…</p>
-              ) : !scopedConversations.some(
-                  (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
-                ) ? (
-                <p>No conversations yet.</p>
-              ) : (
-                scopedConversations
-                  .filter(
-                    (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
-                  )
-                  .map((c) => (
-                    <Button variant="ghost"
-                      key={c.id}
-                      aria-pressed={c.id === activeConversationId}
-                      disabled={working}
-                      onClick={() =>
-                        change(() => {
-                          setChatRevision((n) => n + 1);
-                          useMistyStore.getState().selectConversation(c.id);
-                          setHistory(false);
-                        })
-                      }
-                    >
-                      <span>{c.title}</span>
-                      <time>
-                        {new Date(c.updatedAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </time>
-                    </Button>
-                  ))
-              )}
-            </div>
-          ) : (
-            <div className="agent-details-content">
-              <Button variant="ghost"
-                className="agent-workspace-preview"
-                onClick={showActivity}
-                aria-label="View agent activity"
-              >
-                <Monitor size={25} />
-              </Button>
-              <p className="agent-preview-caption">{profile?.name || "Misty"}'s activity</p>
-              <div className="agent-details-routines">
-                <p>View ongoing work, scheduled tasks, and approvals.</p>
-                <Button variant="ghost" onClick={showActivity}>
-                  Open activity
-                  <ChevronRight size={16} />
+                >
+                  <Plus size={14} />
+                  <span>New conversation</span>
                 </Button>
               </div>
-            </div>
+              {hasTauriInternals() && /Mac|Win/.test(navigator.platform) && (
+                <label className="agents-space-label block text-sm mb-2">
+                  <span className="block text-cream-muted text-xs mb-1">Work mode</span>
+                  <select
+                    aria-label="Agent execution mode"
+                    className={field}
+                    disabled={working}
+                    value={betaExecutionMode(
+                      (profile?.id ? executionModeByAgent?.[profile.id] : undefined) ??
+                        executionMode ??
+                        "user",
+                    )}
+                    onChange={(e) => {
+                      const mode = betaExecutionMode(e.target.value as "user" | "agent" | "team");
+                      const agentId = profile?.id ?? "misty";
+                      void finishLocalExecution()
+                        .then(() =>
+                          useMistyStore.setState((prev) => ({
+                            executionMode: mode,
+                            executionModeByAgent: {
+                              ...prev.executionModeByAgent,
+                              [agentId]: mode,
+                            },
+                          })),
+                        )
+                        .catch((reason) => useMistyStore.setState({ error: String(reason) }));
+                    }}
+                  >
+                    <option value="user" disabled={visibleAutopilotAvailable()}>
+                      {visibleAutopilotAvailable()
+                        ? "User — unavailable in beta"
+                        : "Discuss and draft"}
+                    </option>
+                    <option value="agent">Work in this window</option>
+                    <option value="team" disabled={visibleAutopilotAvailable()}>
+                      {visibleAutopilotAvailable()
+                        ? "Team — unavailable in beta"
+                        : "Work in a separate window"}
+                    </option>
+                  </select>
+                </label>
+              )}
+              {conversation && (
+                <MistyModelPicker
+                  conversationId={conversation.id}
+                  modelId={conversation.modelId}
+                  reasoningEffort={conversation.reasoningEffort}
+                  disabled={working}
+                  onChange={(changes) =>
+                    useMistyStore.setState((s) => ({
+                      conversations: s.conversations.map((c) =>
+                        c.id === conversation.id ? { ...c, ...changes } : c,
+                      ),
+                    }))
+                  }
+                />
+              )}
+            </section>
           )}
-        </aside>
-      )}
-      <AgentSearchDialog
-        open={searchOpen}
-        onOpenChange={setSearchOpen}
-        agents={agents}
-        conversations={scopedConversations}
-        disabled={working || editorStatus.busy}
-        onAgent={select}
-        onConversation={(c) =>
-          change(() => {
-            setSelected(c.agentId || agents.find((a) => a.system_managed)?.id);
-            setNewChat(false);
-            setSettings(false);
-            setDetails(false);
-            setHistory(false);
-            setActivity(false);
-            setMobileList(false);
-            setChatRevision((n) => n + 1);
-            useMistyStore.getState().selectConversation(c.id);
-          })
-        }
-        onCreate={create}
-        onSettings={showSettings}
-        onActivity={showActivity}
-        onConnections={() => setConnections(true)}
-      />
-      <McpConnectionsSheet open={connections} onOpenChange={setConnections} />
+        </div>
+      </AgentSettingsModal>
     </main>
   );
 }
@@ -683,21 +705,16 @@ function AgentEditor({
 }) {
   const [draft, setDraft] = useState<AgentProfileInput>(profile ?? emptyProfile);
   const [baselineDraft, setBaselineDraft] = useState(draft);
-  const [baselineAssigned, setBaselineAssigned] = useState<string[]>([]);
-  const [assigned, setAssigned] = useState<string[]>([]);
   const profileId = profile?.id;
-  const [ready, setReady] = useState(!profile);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [memories, setMemories] = useState<AgentMemory[]>([]);
-  const [models, setModels] = useState<FrontierModel[]>([]);
   const [editingMemory, setEditingMemory] = useState<string>();
   const [memoryDraft, setMemoryDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [avatarEditing, setAvatarEditing] = useState(false);
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(baselineDraft) ||
-    JSON.stringify([...assigned].sort()) !== JSON.stringify([...baselineAssigned].sort()) ||
     Boolean(
       editingMemory &&
       memoryDraft !== memories.find((memory) => memory.id === editingMemory)?.content,
@@ -706,40 +723,9 @@ function AgentEditor({
     onStatusChange({ dirty, busy });
     return () => onStatusChange({ dirty: false, busy: false });
   }, [dirty, busy, onStatusChange]);
-  const catalog = useAppsStore((s) => s.catalog);
-  const installations = useAppsStore((s) => s.installations);
-  const loadApps = useAppsStore((s) => s.load);
-  const { user } = useAuth();
-  useEffect(() => {
-    if (user?.id) void loadApps(user.id);
-  }, [user?.id, loadApps]);
-  useEffect(() => {
-    let canceled = false;
-    void assistantApi
-      .frontierModels()
-      .then((result) => {
-        if (!canceled) setModels(result.models);
-      })
-      .catch(() => {});
-    return () => {
-      canceled = true;
-    };
-  }, []);
   useEffect(() => {
     let canceled = false;
     if (!profileId) return;
-    void personalAgentsApi
-      .apps(profileId, spaceId)
-      .then((result) => {
-        if (!canceled) {
-          setAssigned(result.app_ids);
-          setBaselineAssigned(result.app_ids);
-          setReady(true);
-        }
-      })
-      .catch((reason) => {
-        if (!canceled) setError(String(reason));
-      });
     void personalAgentsApi
       .memories(profileId, spaceId)
       .then((result) => {
@@ -783,13 +769,11 @@ function AgentEditor({
           reasoning_effort,
           enabled,
           version: profile?.version,
-          assignment: { space_id: "", app_ids: assigned },
         },
         profile?.id,
       );
       await onSaved(saved.id);
       setBaselineDraft(draft);
-      setBaselineAssigned(assigned);
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -816,11 +800,12 @@ function AgentEditor({
         void save();
       }}
     >
-      <div className="agent-settings-avatar">
-        <Button variant="ghost"
+      <div className="flex items-center gap-4 pb-1">
+        <button
           type="button"
           aria-label="Edit agent avatar"
           onClick={() => setAvatarEditing(!avatarEditing)}
+          className="group relative flex size-14 items-center justify-center rounded-xl border border-charcoal-border bg-charcoal-bg hover:border-cream-muted/60 transition-colors cursor-pointer overflow-hidden p-1 shrink-0"
         >
           <AgentAvatar
             agent={
@@ -828,13 +813,30 @@ function AgentEditor({
             }
             large
           />
-        </Button>
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
+            <Pencil className="size-3.5 text-cream-bright" />
+          </div>
+        </button>
+        <div className="flex-1 min-w-0">
+          <button
+            type="button"
+            onClick={() => setAvatarEditing(!avatarEditing)}
+            className="text-sm font-medium text-cream-bright hover:underline cursor-pointer flex items-center gap-1.5"
+          >
+            <span>{avatarEditing ? "Hide avatar options" : "Change avatar"}</span>
+          </button>
+          <p className="text-xs text-cream-muted mt-0.5">
+            Pick a companion style or enter an emoji.
+          </p>
+        </div>
       </div>
       {avatarEditing && (
-        <div className="agent-avatar-picker">
-          <fieldset>
-            <legend>Cloud avatar</legend>
-            <div className="agent-cloud-options">
+        <div className="rounded-xl border border-charcoal-border/70 bg-charcoal-bg/50 p-4 space-y-4">
+          <div>
+            <div className="text-xs font-medium text-cream-muted mb-2 uppercase tracking-wider">
+              Cloud mascot
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {agentCloudVariants.map((variant) => {
                 const chosen =
                   !draft.avatar?.emoji &&
@@ -845,7 +847,7 @@ function AgentEditor({
                     system_managed: profile?.system_managed ?? false,
                   }).id === variant.id;
                 return (
-                  <Button variant="ghost"
+                  <button
                     key={variant.id}
                     type="button"
                     aria-label={`${variant.name}, ${variant.expression}`}
@@ -854,19 +856,37 @@ function AgentEditor({
                     onClick={() =>
                       update("avatar", { ...draft.avatar, emoji: "", cloudVariant: variant.id })
                     }
+                    className={cn(
+                      "flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all text-center gap-1 cursor-pointer",
+                      chosen
+                        ? "border-cream-bright/80 bg-charcoal-active text-cream-bright shadow-xs ring-1 ring-cream-bright/30"
+                        : "border-charcoal-border bg-charcoal-card/60 text-cream-muted hover:border-charcoal-border hover:bg-charcoal-active/40 hover:text-cream",
+                    )}
                   >
-                    <AgentCloudImage variant={variant} />
-                    <span>{variant.name}</span>
-                    <small>{variant.expression}</small>
-                  </Button>
+                    <div className="size-10 shrink-0 flex items-center justify-center">
+                      <AgentCloudImage variant={variant} />
+                    </div>
+                    <span className="text-xs font-medium text-cream leading-none">
+                      {variant.name}
+                    </span>
+                    <span className="text-[10px] text-cream-muted leading-tight">
+                      {variant.expression}
+                    </span>
+                  </button>
                 );
               })}
             </div>
-          </fieldset>
-          <label className="block space-y-2 text-sm">
-            <span>Custom emoji</span>
+          </div>
+          <div className="flex items-center gap-3 pt-2 border-t border-charcoal-border/60">
+            <label
+              htmlFor="agent-custom-emoji"
+              className="text-xs font-medium text-cream-muted shrink-0"
+            >
+              Custom emoji
+            </label>
             <input
-              className={`${field} max-w-28`}
+              id="agent-custom-emoji"
+              className={cn(field, "w-24 text-center text-base py-1 px-2")}
               aria-label="Avatar emoji"
               maxLength={12}
               value={typeof draft.avatar?.emoji === "string" ? draft.avatar.emoji : ""}
@@ -874,11 +894,12 @@ function AgentEditor({
               disabled={busy}
               onChange={(e) => update("avatar", { ...draft.avatar, emoji: e.target.value })}
             />
-          </label>
+            <span className="text-xs text-cream-muted/70">Replaces cloud avatar when set</span>
+          </div>
         </div>
       )}
-      <label className="block space-y-2 text-sm">
-        <span>Name</span>
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-cream-muted text-xs font-medium uppercase tracking-wider">Name</span>
         <input
           className={field}
           required
@@ -888,8 +909,10 @@ function AgentEditor({
           onChange={(e) => update("name", e.target.value)}
         />
       </label>
-      <label className="block space-y-2 text-sm">
-        <span>Label (optional)</span>
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-cream-muted text-xs font-medium uppercase tracking-wider">
+          Label (optional)
+        </span>
         <input
           className={field}
           maxLength={160}
@@ -898,8 +921,10 @@ function AgentEditor({
           onChange={(e) => update("role", e.target.value)}
         />
       </label>
-      <label className="block space-y-2 text-sm">
-        <span>Description</span>
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-cream-muted text-xs font-medium uppercase tracking-wider">
+          Description
+        </span>
         <textarea
           className={`${field} min-h-20 resize-y`}
           maxLength={2000}
@@ -909,7 +934,7 @@ function AgentEditor({
         />
       </label>
       <details className="agent-advanced-settings">
-        <summary>Instructions, model, and apps</summary>
+        <summary>Instructions and memory</summary>
         <div>
           <label className="block space-y-2 text-sm">
             <span>Instructions</span>
@@ -921,74 +946,6 @@ function AgentEditor({
               onChange={(e) => update("instructions", e.target.value)}
             />
           </label>
-          <label className="block space-y-2 text-sm">
-            <span>Model</span>
-            <select
-              className={field}
-              value={draft.model_mode === "automatic" ? "" : draft.model_id}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  model_mode: e.target.value ? "pinned" : "automatic",
-                  model_id: e.target.value,
-                  reasoning_effort: "",
-                })
-              }
-            >
-              <option value="">Misty default</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className="border-t border-charcoal-border pt-5">
-            <legend className="pr-3 text-sm font-medium">Personal apps</legend>
-            <p className="mb-3 text-sm text-cream-muted">
-              An assigned app includes its configured integrations.
-            </p>
-            {!installations ? (
-              <p role="status" className="text-sm">
-                Loading installed apps…
-              </p>
-            ) : (
-              installations
-                .filter(
-                  (app) =>
-                    app.state === "installed" && !app.consent_required && app.app_id !== "agents",
-                )
-                .map((app) => (
-                  <label
-                    key={app.app_id}
-                    className="flex items-center gap-3 rounded-md py-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-cream focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-cream-muted"
-                      disabled={!ready || busy}
-                      checked={assigned.includes(app.app_id)}
-                      onChange={(e) =>
-                        setAssigned(
-                          e.target.checked
-                            ? [...assigned, app.app_id]
-                            : assigned.filter((id) => id !== app.app_id),
-                        )
-                      }
-                    />
-                    {catalog.find((item) => item.id === app.app_id)?.name ?? app.app_id}
-                  </label>
-                ))
-            )}
-            {installations?.filter(
-              (app) =>
-                app.state === "installed" && !app.consent_required && app.app_id !== "agents",
-            ).length === 0 && (
-              <p className="text-sm text-cream-muted">
-                Install and review personal apps in Discover to assign them.
-              </p>
-            )}
-          </fieldset>
           {!!memories.length && (
             <section className="border-t border-charcoal-border pt-5">
               <h3 className="mb-2 text-sm font-medium">Remembered preferences</h3>
@@ -1005,7 +962,8 @@ function AgentEditor({
                           onChange={(e) => setMemoryDraft(e.target.value)}
                         />
                         <div className="mt-2 flex gap-2">
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             type="button"
                             className={button}
                             disabled={!memoryDraft.trim()}
@@ -1027,7 +985,8 @@ function AgentEditor({
                           >
                             Save preference
                           </Button>
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             type="button"
                             className={button}
                             onClick={() => setEditingMemory(undefined)}
@@ -1040,10 +999,11 @@ function AgentEditor({
                       memory.content
                     )}
                     <span className="mt-1 block text-xs text-cream-muted">
-                      {memory.space_id ? "This Space" : "All Spaces"}
+                      {memory.space_id ? "Saved conversation scope" : "Personal"}
                     </span>
                   </div>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     className={button}
                     onClick={() => {
@@ -1053,7 +1013,8 @@ function AgentEditor({
                   >
                     Edit
                   </Button>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     className={button}
                     onClick={() => {
@@ -1069,7 +1030,12 @@ function AgentEditor({
                   </Button>
                 </div>
               ))}
-              <Button variant="ghost" type="button" className="text-sm underline" onClick={() => void talk()}>
+              <Button
+                variant="ghost"
+                type="button"
+                className="text-sm underline"
+                onClick={() => void talk()}
+              >
                 Ask this agent to change a preference
               </Button>
             </section>
@@ -1082,15 +1048,17 @@ function AgentEditor({
         </p>
       )}
       <div className="flex flex-wrap gap-3 border-t border-charcoal-border pt-4">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           className={`${button} bg-charcoal-active`}
-          disabled={busy || !ready || !draft.name.trim()}
+          disabled={busy || !draft.name.trim()}
           type="submit"
         >
           {busy ? "Saving…" : profile ? "Save changes" : "Create agent"}
         </Button>
         {profile && !profile.system_managed && (
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             className={`${button} ml-auto`}
             disabled={busy}
@@ -1107,10 +1075,16 @@ function AgentEditor({
             Delete {profile?.name}? Active work will stop. Existing conversation history is
             retained.
           </p>
-          <Button variant="ghost" type="button" className={button} onClick={() => setConfirmDelete(false)}>
+          <Button
+            variant="ghost"
+            type="button"
+            className={button}
+            onClick={() => setConfirmDelete(false)}
+          >
             Keep agent
           </Button>{" "}
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             className={button}
             disabled={busy}

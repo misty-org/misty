@@ -38,6 +38,10 @@ export interface BrowserTabState {
   url: string;
   faviconUrl: string | null;
   agentOwned?: boolean;
+  /** Native browser profile identity; preserved across navigation. */
+  profileId?: string;
+  /** Saved website used to open this tab, independent of its current URL. */
+  websiteId?: string;
 }
 
 export type CodeMultibufferKind =
@@ -212,6 +216,15 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
         ? candidate.faviconUrl
         : browserFaviconUrl(url),
     agentOwned: candidate.agentOwned === true || undefined,
+    profileId:
+      typeof candidate.profileId === "string" && /^[a-f0-9]{64}$/.test(candidate.profileId)
+        ? candidate.profileId
+        : undefined,
+    websiteId:
+      typeof candidate.websiteId === "string" &&
+      /^[A-Za-z0-9:_.-]{1,200}$/.test(candidate.websiteId)
+        ? candidate.websiteId
+        : undefined,
   };
 }
 

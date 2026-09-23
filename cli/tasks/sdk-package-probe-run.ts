@@ -84,6 +84,12 @@ try {
           response.end(JSON.stringify({ accountToken, userId, spaceId, noteId, drawingId }));
           return;
         }
+        if (request.url === "/cli/tasks/sdk-browser-download.pdf") {
+          response.setHeader("Content-Type", "application/pdf");
+          response.setHeader("Content-Disposition", 'attachment; filename="attachment-catalog.pdf"');
+          response.end("%PDF-1.7\n% Native attachment transfer fixture\n%%EOF");
+          return;
+        }
         if (request.url !== "/cli/tasks/sdk-browser-download.txt") return next();
         response.setHeader("Content-Type", "text/plain");
         response.setHeader("Content-Disposition", 'attachment; filename="misty-sdk-probe.txt"');

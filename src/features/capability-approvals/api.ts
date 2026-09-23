@@ -33,7 +33,7 @@ const reviewSchema = z.object({
       runId,
       effectId: z.string().uuid(),
       callId: z.string().min(1).max(200),
-      operation: z.enum(["browser.click", "browser.interact"]),
+      operation: z.enum(["browser.click", "browser.interact", "browser.workspace.interact"]),
       input: z.unknown(),
       target: z.object({
         contextId: z.string(),

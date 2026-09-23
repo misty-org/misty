@@ -1,9 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/shared/ui";
 
-export function TourCompleteModal(props: {
-  onFinish: () => void;
-}) {
+export function TourCompleteModal(props: { onFinish: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-150"
@@ -16,15 +14,12 @@ export function TourCompleteModal(props: {
           <CheckCircle2 size={24} />
         </div>
 
-        <h2
-          id="tour-complete-title"
-          className="mt-5 text-base font-semibold text-cream-bright"
-        >
+        <h2 id="tour-complete-title" className="mt-5 text-base font-semibold text-cream-bright">
           You're all set!
         </h2>
 
         <p className="mt-2 text-sm leading-relaxed text-cream-muted">
-          Your workspace is ready. You can reopen this tour at any time from your Profile or from Settings &gt; Help.
+          You can reopen this walkthrough from your profile menu.
         </p>
 
         <div className="mt-7">

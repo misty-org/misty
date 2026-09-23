@@ -1,9 +1,9 @@
+import { useBrowserSyncStore } from "@/features/browser-workspace/store";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { mapAllVirtualWorkspaceLayouts } from "@/features/workspace/virtualWindows";
 import { allLayoutViews, layoutTabs, layoutTabLabel } from "@/features/workspace/layoutTabs";
 import { WorkspaceLayoutTabs } from "./WorkspaceLayoutTabs";
 import { openMisty } from "@/features/misty/handoff";
-import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
   canCloseWorkspaceTab,
@@ -14,24 +14,18 @@ import {
   dockWidgetRegistry,
   findDockLeaf,
   maxWorkspacePanels,
-  nextTabTitle,
   paneBoundsFromDocument,
   paneIdInDirection,
-  parseCodeTabState,
-  toolIdFromSurfaceId,
   toolIdFromTab,
   useRecentToolsStore,
   useWorkspaceStore,
   releaseWorkspaceTabRouteHistory,
-  workspaceSurfaceFromRoute,
-  type WorkspaceGroupKey,
   type WorkspaceTab,
 } from "@/features/workspace";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DockSplitDirection } from "@/features/workspace/model";
 import { minimumForWorkspaceTabs, WorkspaceDockTree } from "./WorkspaceDockTree";
-import type { NewTabOption } from "./WorkspaceNewTabMenu";
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
 export function WorkspaceCanvas(props: {
@@ -58,7 +52,6 @@ export function WorkspaceCanvas(props: {
   }, [legacyNames, legacyNamesReady]);
   const location = useLocation();
   const navigate = useNavigate();
-  const spaces = useSpacesStore((state) => state.spaces);
   const layout = useWorkspaceStore((state) => state.layout);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
   const activeVirtualWindowId = useWorkspaceStore((state) => state.activeVirtualWindowId);
@@ -72,8 +65,6 @@ export function WorkspaceCanvas(props: {
   const lastUsedTabByGroup = useWorkspaceStore((state) => state.lastUsedTabByGroup);
   const focusTab = useWorkspaceStore((state) => state.focusTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
-  const openBrowserTab = useWorkspaceStore((state) => state.openBrowserTab);
-  const openSurface = useWorkspaceStore((state) => state.openSurface);
   const splitPane = useWorkspaceStore((state) => state.splitPane);
   const moveTab = useWorkspaceStore((state) => state.moveTab);
   const dockTab = useWorkspaceStore((state) => state.dockTab);
@@ -94,30 +85,21 @@ export function WorkspaceCanvas(props: {
   }, []);
 
   useEffect(() => {
-    if (tabCount > 0 || spaces.length === 0) return;
+    if (tabCount > 0 || useBrowserSyncStore.getState().session) return;
 
-    // Give route synchronization a chance to open the requested app first.
-    // If the workspace is still empty, Home becomes the single fallback tab.
+    // Let route synchronization open the requested surface before creating a Google tab.
     const timer = window.setTimeout(() => {
       const workspace = useWorkspaceStore.getState();
-      if (dockTabs(workspace.layout.root).length > 0) return;
-      const scopedSpaceId = workspace.activeScopeKey.startsWith("space:")
-        ? workspace.activeScopeKey.slice(6)
-        : "";
-      const homeSpace =
-        spaces.find((space) => space.id === scopedSpaceId) ?? preferredDefaultSpace(spaces);
-      if (!homeSpace) return;
-      const route = `/spaces/${encodeURIComponent(homeSpace.id)}/home`;
-      const request = workspaceSurfaceFromRoute(route);
-      if (!request) return;
-      const homeTab = workspace.openSurface(request);
-      if (`${location.pathname}${location.search}` !== homeTab.route) {
-        navigate(homeTab.route, { replace: true });
+      if (dockTabs(workspace.layout.root).length > 0 || useBrowserSyncStore.getState().session)
+        return;
+      const fallbackTab = workspace.newLayoutTab();
+      if (`${location.pathname}${location.search}` !== fallbackTab.route) {
+        navigate(fallbackTab.route, { replace: true });
       }
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [activeScopeKey, location.pathname, location.search, navigate, spaces, tabCount]);
+  }, [activeScopeKey, location.pathname, location.search, navigate, tabCount]);
 
   const navigateToActiveLayoutTab = useCallback(() => {
     const state = useWorkspaceStore.getState();
@@ -127,6 +109,12 @@ export function WorkspaceCanvas(props: {
     const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
     if (tab && `${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
   }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    window.addEventListener("misty:workspace-projection-applied", navigateToActiveLayoutTab);
+    return () =>
+      window.removeEventListener("misty:workspace-projection-applied", navigateToActiveLayoutTab);
+  }, [navigateToActiveLayoutTab]);
 
   const splitWorkspacePane = useCallback(
     (paneId: string, direction: DockSplitDirection, tabId?: string) => {
@@ -170,7 +158,9 @@ export function WorkspaceCanvas(props: {
   const openTab = useCallback(
     (tab: WorkspaceTab) => {
       focusTab(tab.id);
-      useRecentToolsStore.getState().recordToolUsage(toolIdFromTab(tab));
+      if (!tab.placeholder) {
+        useRecentToolsStore.getState().recordToolUsage(toolIdFromTab(tab));
+      }
       if (`${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
     },
     [focusTab, location.pathname, location.search, navigate],
@@ -190,66 +180,6 @@ export function WorkspaceCanvas(props: {
       }
     },
     [closeTab, location.pathname, location.search, navigate],
-  );
-
-  const openNewTab = useCallback(
-    (option: NewTabOption, paneId: string) => {
-      useRecentToolsStore
-        .getState()
-        .recordToolUsage(toolIdFromSurfaceId(option.surfaceId, option.label));
-      if (option.surfaceId === "browser") return openTab(openBrowserTab({ paneId }));
-      const state = useWorkspaceStore.getState();
-      const targetPane =
-        findDockLeaf(state.layout.root, paneId) ??
-        findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-      const tabTitle = nextTabTitle(targetPane?.tabs, option.surfaceId, option.label);
-      if (option.surfaceId === "space") {
-        const surfaceReq = workspaceSurfaceFromRoute(option.route);
-        if (surfaceReq) {
-          return openTab(
-            openSurface({
-              ...surfaceReq,
-              title: tabTitle,
-              forceNew: true,
-              instancePolicy: "multiple",
-              paneId,
-              state: dockWidgetRegistry.get("space").create(),
-            }),
-          );
-        }
-      }
-      if (option.surfaceId === "code") {
-        const currentCode = targetPane?.tabs.find(
-          (tab) => tab.id === targetPane.activeTabId && tab.surfaceId === "code",
-        );
-        const currentState = parseCodeTabState(currentCode?.state);
-        return openTab(
-          openSurface({
-            surfaceId: "code",
-            groupKey: "tool:code",
-            title: tabTitle,
-            route: option.route,
-            instancePolicy: "multiple",
-            forceNew: true,
-            paneId,
-            state: { ...currentState, viewport: { kind: "file", activeFilePath: null } },
-          }),
-        );
-      }
-      openTab(
-        openSurface({
-          surfaceId: option.surfaceId,
-          groupKey: option.groupKey ?? (`tool:${option.surfaceId}` as WorkspaceGroupKey),
-          title: tabTitle,
-          route: option.route,
-          instancePolicy: option.instancePolicy ?? "multiple",
-          forceNew: true,
-          paneId,
-          state: dockWidgetRegistry.get(option.surfaceId).create(),
-        }),
-      );
-    },
-    [openBrowserTab, openSurface, openTab],
   );
 
   const closeActiveTab = useCallback(() => {
@@ -517,7 +447,6 @@ export function WorkspaceCanvas(props: {
           lastUsedTabByGroup={lastUsedTabByGroup}
           onOpen={openTab}
           onClose={closeWorkspaceTab}
-          onOpenNewTab={openNewTab}
           onNewTab={() => openTab(useWorkspaceStore.getState().newLayoutTab())}
           onCloseLayoutTab={(id) => {
             if (useWorkspaceStore.getState().closeLayoutTab(id)) navigateToActiveLayoutTab();
@@ -557,7 +486,6 @@ export function WorkspaceCanvas(props: {
               lastUsedTabByGroup={lastUsedTabByGroup}
               onOpen={openTab}
               onClose={closeWorkspaceTab}
-              onOpenNewTab={openNewTab}
               onMoveTab={moveTab}
               onDockTab={dockTab}
               onSplitPane={splitWorkspacePane}

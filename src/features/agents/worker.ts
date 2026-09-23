@@ -1,3 +1,4 @@
+import { subscribeAccountEvents } from "@/api/accountEvents";
 import { apiBlobRequest } from "@/api/client";
 import { mistyDeviceJobsEnabled } from "./flags";
 import { devicesApi } from "@/api/devices/api";
@@ -13,9 +14,6 @@ const browserRuntimeIdForScope = (scopeId: string) =>
   invoke<string>("browser_runtime_for_scope", { scopeId });
 
 const leaseHeartbeatMs = 20_000;
-const activePollMs = 750;
-const idlePollMs = 4_000;
-const hiddenPollMs = 15_000;
 const nodeExecutionTimeoutMs = 5 * 60_000;
 
 export class DesktopAgentJobWorker {
@@ -23,41 +21,89 @@ export class DesktopAgentJobWorker {
   private running = false;
   private active = new Set<AbortController>();
 
-  start(): void {
+  private unsubscribe?: () => void;
+  private retry?: ReturnType<typeof setTimeout>;
+  private busy = false;
+  private dirty = false;
+  private failures = 0;
+  private presence?: ReturnType<typeof setInterval>;
+  private refreshPresence?: () => Promise<unknown>;
+  private presenceBusy = false;
+
+  start(accountId: string): void {
     if (this.running || !mistyDeviceJobsEnabled()) return;
     this.running = true;
-    void this.loop(++this.generation);
+    this.generation++;
+    this.unsubscribe = subscribeAccountEvents(accountId, (event) => {
+      if (event.topic === "reset" || event.topic === "jobs") this.wake();
+    });
+    this.wake();
+    // Presence keeps this device eligible for queued work; it is a liveness
+    // heartbeat, not a request to discover jobs or inspect their status.
+    this.presence = setInterval(() => {
+      if (this.presenceBusy || !this.refreshPresence) return;
+      this.presenceBusy = true;
+      void this.refreshPresence()
+        .catch(() => {})
+        .finally(() => {
+          this.presenceBusy = false;
+        });
+    }, 30_000);
   }
 
   stop(): void {
     this.running = false;
     this.generation++;
+    this.unsubscribe?.();
+    clearTimeout(this.retry);
+    this.retry = undefined;
+    clearInterval(this.presence);
+    this.refreshPresence = undefined;
     for (const controller of this.active) controller.abort(new Error("device_execution_stopped"));
   }
 
-  private async loop(generation: number): Promise<void> {
+  private wake(): void {
+    if (!this.running) return;
+    this.dirty = true;
+    if (!this.busy && !this.retry) void this.drain(this.generation);
+  }
+
+  private async drain(generation: number): Promise<void> {
     const current = () => this.running && this.generation === generation;
-    while (current()) {
-      let waitMs = document.visibilityState === "hidden" ? hiddenPollMs : idlePollMs;
-      try {
-        const localDevice = await loadLocalAgentDevice();
-        if (!current()) return;
-        const serverDevice = await ensureServerAgentDevice(localDevice);
-        if (!current()) return;
-        if (this.active.size >= 8) {
-          await wait(activePollMs);
-          continue;
-        }
+    this.busy = true;
+    this.dirty = false;
+    try {
+      const localDevice = await loadLocalAgentDevice();
+      if (!current()) return;
+      const serverDevice = await ensureServerAgentDevice(localDevice);
+      if (!current()) return;
+      this.refreshPresence = () => heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
+      while (current() && this.active.size < 8) {
         const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id);
-        if (!current()) return; // An unstarted lease may safely expire.
-        if (claim) {
-          waitMs = activePollMs;
-          void this.runWorkflowNodeClaim(claim, localDevice.id, serverDevice.id);
-        }
-      } catch {
-        waitMs = hiddenPollMs;
+        if (!current()) return;
+        this.failures = 0;
+        if (!claim) break;
+        void this.runWorkflowNodeClaim(claim, localDevice.id, serverDevice.id).finally(() =>
+          this.wake(),
+        );
       }
-      if (current()) await wait(waitMs);
+    } catch (error) {
+      if (current()) {
+        const retryAfter =
+          error && typeof error === "object" && "retryAfterSeconds" in error
+            ? Number(error.retryAfterSeconds) * 1000
+            : 0;
+        const delay =
+          Math.max(retryAfter || 0, Math.min(60_000, 5_000 * 2 ** Math.min(this.failures++, 4))) +
+          Math.random() * 1000;
+        this.retry = setTimeout(() => {
+          this.retry = undefined;
+          this.wake();
+        }, delay);
+      }
+    } finally {
+      this.busy = false;
+      if (current() && this.dirty && this.active.size < 8 && !this.retry) this.wake();
     }
   }
 
@@ -170,8 +216,12 @@ export class DesktopAgentJobWorker {
       try {
         await report();
         return;
-      } catch {
-        if (attempt < 2) await wait(500 * (attempt + 1));
+      } catch (error) {
+        const retryAfter =
+          error && typeof error === "object" && "retryAfterSeconds" in error
+            ? Number(error.retryAfterSeconds) * 1000
+            : 0;
+        if (attempt < 2) await wait(Math.max(retryAfter || 0, 500 * (attempt + 1)));
       }
     }
   }
@@ -243,6 +293,10 @@ async function executeWorkflowNodeOnDevice(
         },
       });
     } catch (error) {
+      if (job.operation.startsWith("browser.workspace.")) {
+        window.dispatchEvent(new CustomEvent("misty:autopilot-error", {detail: {taskId: browserAgentExecutionRequest(job).input.__mistyTaskId, message: String(error)}}));
+        if (job.operation === "browser.workspace.visual") throw new DeviceOperationNotAttempted(error);
+      }
       if (String(error).startsWith("browser_snapshot_stale:"))
         throw new DeviceOperationNotAttempted(error);
       throw error;
@@ -465,12 +519,36 @@ export interface ClaimedWorkflowNodeJob {
   leaseExpiresAt?: string | null;
 }
 
-async function browserDeviceRequest(job: ClaimedWorkflowNodeJob["job"]) {
+export async function browserDeviceRequest(job: ClaimedWorkflowNodeJob["job"]) {
   const request = browserAgentExecutionRequest(job);
   if (job.operation !== "browser.upload") return request;
   const config = job.config as {
     upload?: { id: string; name: string; mimeType: string; byteSize: number; sha256: string };
+    taskId?: string;
+    downloadUpload?: { downloadId: string; sourceScopeId: string };
   };
+  const input = job.input as {
+    attachmentId?: string;
+    downloadId?: string;
+    sourceScopeId?: string;
+  };
+  if (input.downloadId || input.sourceScopeId || config.downloadUpload) {
+    const source = config.downloadUpload;
+    if (
+      !config.taskId ||
+      !source ||
+      input.attachmentId ||
+      config.upload ||
+      !source.downloadId ||
+      !source.sourceScopeId ||
+      source.downloadId !== input.downloadId ||
+      source.sourceScopeId !== input.sourceScopeId
+    )
+      throw new DeviceOperationNotAttempted("invalid_task_download");
+    // Native resolves the opaque receipt, verifies task ownership and checks
+    // its pinned hash. Never accept a model-supplied local path or file bytes.
+    return request;
+  }
   const file = config.upload;
   if (
     !file ||

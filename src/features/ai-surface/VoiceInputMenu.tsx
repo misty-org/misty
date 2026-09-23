@@ -14,6 +14,7 @@ export function VoiceInputMenu(props: {
   selectedDeviceId: string;
   disabled?: boolean;
   compact?: boolean;
+  labeled?: boolean;
   onRefresh: () => void;
   onSelect: (deviceId: string) => void;
 }) {
@@ -26,15 +27,17 @@ export function VoiceInputMenu(props: {
         <Button
           type="button"
           variant="ghost"
-          size="icon"
+          size={props.labeled ? "sm" : "icon"}
           disabled={props.disabled}
           className={cn(
             "h-8 w-6 shrink-0 rounded-lg text-cream-muted hover:bg-white/[0.06] hover:text-cream",
             props.compact && "h-7 w-5 rounded-full",
+            props.labeled && "w-auto max-w-52 gap-2 px-2 text-xs",
           )}
           aria-label={`Choose microphone. Current input: ${selectedLabel}`}
           title={`Microphone: ${selectedLabel}`}
         >
+          {props.labeled && <span className="truncate">{selectedLabel}</span>}
           <ChevronDown className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>

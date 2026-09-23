@@ -94,8 +94,8 @@ export function GlobalMistyLauncher(props: {
       onClick={() => props.inputRef.current?.focus()}
     >
       <div className="flex min-h-12 items-center gap-3">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           className="grid size-10 shrink-0 place-items-center rounded-xl bg-charcoal-hover text-cream transition hover:bg-charcoal-active"
           aria-label="Search"
           title="Search"
@@ -112,7 +112,7 @@ export function GlobalMistyLauncher(props: {
           ) : (
             <ModeIcon mode={props.mode} className="size-[18px] text-cream-bright" />
           )}
-        </button>
+        </Button>
         <input
           ref={props.inputRef}
           data-global-misty-launcher-input
@@ -176,12 +176,12 @@ export function GlobalMistyLauncher(props: {
           className="mt-2 max-h-[360px] overflow-y-auto border-t border-charcoal-border/70 pt-2"
         >
           {results.map((result, index) => (
-            <button
+            <Button
+              variant="ghost"
               id={`misty-result-${index}`}
               role="option"
               aria-selected={selectedIndex === index}
               key={result.id}
-              type="button"
               className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition ${
                 selectedIndex === index ? "bg-charcoal-hover text-cream" : "text-cream-muted"
               }`}
@@ -199,7 +199,7 @@ export function GlobalMistyLauncher(props: {
               {result.commandId ? (
                 <ShortcutHint commandId={result.commandId} includeAlternate />
               ) : null}
-            </button>
+            </Button>
           ))}
         </div>
       ) : commandOnly ? (

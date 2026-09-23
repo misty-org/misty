@@ -17,21 +17,21 @@ export function AiSelectionMenu({
     <Popover>
       <PopoverTrigger asChild>
         {trigger ?? (
-          <Button type="button" size="sm" variant="secondary" className="h-7 gap-1.5 text-xs">
+          <Button size="sm" variant="secondary" className="h-7 gap-1.5 text-xs">
             <MessageCircle className="size-3.5" /> Ask Misty
           </Button>
         )}
       </PopoverTrigger>
       <PopoverContent className="w-56 p-1" align="start">
         {actions.map((action) => (
-          <button
+          <Button
+            variant="ghost"
             key={action.id}
-            type="button"
             className="flex w-full rounded-md px-2.5 py-2 text-left text-xs hover:bg-charcoal-hover"
             onClick={() => onAction(action)}
           >
             {action.label}
-          </button>
+          </Button>
         ))}
       </PopoverContent>
     </Popover>

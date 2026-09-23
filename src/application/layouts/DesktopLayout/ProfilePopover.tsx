@@ -302,7 +302,7 @@ export function ProfilePopover(props: {
                 }}
               >
                 <Compass size={18} strokeWidth={2} />
-                <span>Take app tour</span>
+                <span>Take workspace tour</span>
               </Button>
               <Button
                 ref={switchAccountsRef}

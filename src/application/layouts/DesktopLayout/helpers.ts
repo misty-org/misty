@@ -30,12 +30,12 @@ export function emailName(email: string): string | null {
 }
 
 export function settingsFallbackRoute(previousRoute: string, rememberedRoute: string): string {
-  const candidates = [previousRoute, rememberedRoute, "/spaces"];
+  const candidates = [previousRoute, rememberedRoute, "/browser"];
   return (
     candidates.find((route) => {
       if (!route || route.startsWith("/settings")) return false;
       if (route === "/account" || route.startsWith("/providers")) return false;
       return isRememberableAppRoute(route);
-    }) ?? "/spaces"
+    }) ?? "/browser"
   );
 }

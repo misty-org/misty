@@ -16,17 +16,6 @@ vi.mock("@/features/auth", () => ({
   }),
 }));
 
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: (selector: (state: { spaces: unknown[]; snapshotReady: boolean }) => unknown) =>
-    selector({ spaces: [], snapshotReady: true }),
-  preferredDefaultSpace: () => null,
-  canonicalSpaceRoute: (id: string) => `/spaces/${id}`,
-  defaultSpaceRoute: () => "/spaces",
-  rememberedJournalRoute: () => "/spaces/journal",
-  rememberedPlannerRoute: () => "/spaces/planner",
-  socialProviderPath: () => "/spaces/social",
-}));
-
 vi.mock("@/features/workspace", () => ({
   useWorkspaceStore: (
     selector: (state: {
@@ -76,8 +65,8 @@ vi.mock("./useDesktopBootstrap", () => ({
       activePaneId: "",
       activePanePath: "",
       activeWorkspacePaneId: "",
-      lastAppRoute: "/spaces",
-      lastNonSettingsRouteRef: { current: "/spaces" },
+      lastAppRoute: "/browser",
+      lastNonSettingsRouteRef: { current: "/browser" },
       routeId: location.pathname.slice(1),
     };
   },
@@ -135,7 +124,6 @@ vi.mock("@/features/browser", () => ({
   setBrowserWebviewsSuspended: vi.fn(),
 }));
 vi.mock("@/features/files/explorer", () => ({ MediaSearchViewer: () => null }));
-vi.mock("@/features/spaces/SpacesRealtimeBridge", () => ({ SpacesRealtimeBridge: () => null }));
 vi.mock("@/features/activity", () => ({ ActivityBridge: () => null }));
 vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
 
@@ -224,7 +212,7 @@ describe("DesktopLayout on Auth Routes", () => {
             <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
               <Route path="/signin" element={<SignIn />} />
             </Route>
-            <Route path="/spaces" element={<div>Account workspace</div>} />
+            <Route path="/browser" element={<div>Account workspace</div>} />
           </Routes>
         </MemoryRouter>,
       );

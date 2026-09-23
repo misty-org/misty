@@ -1,4 +1,4 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
 import { Settings } from "lucide-react";
 import type { RefObject } from "react";
 import { HelpMenu } from "./HelpMenu";
@@ -40,8 +40,9 @@ export function NavigatorProfileBar(props: {
         <TooltipProvider delayDuration={450}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 className={cn(
                   navigatorIslandActionClass,
                   props.settingsOpen && "bg-charcoal-active text-cream-bright",
@@ -50,7 +51,7 @@ export function NavigatorProfileBar(props: {
                 onClick={props.onSettingsClick}
               >
                 <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>

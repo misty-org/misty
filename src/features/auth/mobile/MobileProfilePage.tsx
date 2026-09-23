@@ -1,5 +1,5 @@
 import { openAccountSettingsInBrowser } from "@/features/account";
-import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button } from "@/shared/ui";
 import { ArrowUpRight, ChevronRight, LogIn, LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useMobileSurfaceChrome } from "@/shared/mobile";
@@ -31,21 +31,21 @@ export default function MobileProfilePage() {
             <p className="mt-2 text-sm leading-6 text-cream-muted">
               Access your Spaces, conversations, plans, and profile on this device.
             </p>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className="mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-charcoal-active px-4 text-base font-semibold text-cream-bright active:bg-charcoal-card"
               onClick={() => navigate("/signin", { state: { from: "/profile" } })}
             >
               <LogIn size={19} aria-hidden="true" />
               Sign in
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               className="mt-2 min-h-11 w-full rounded-lg px-4 text-sm font-medium text-cream-muted active:bg-charcoal-card active:text-cream-bright"
               onClick={() => navigate("/register", { state: { from: "/profile" } })}
             >
               Create an account
-            </button>
+            </Button>
           </div>
         </div>
       </ProfileScroll>
@@ -133,8 +133,8 @@ export default function MobileProfilePage() {
             Account
           </h2>
           <div className="overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               className="flex min-h-14 w-full items-center gap-3 border-b border-charcoal-border px-4 text-left text-sm text-cream-bright disabled:opacity-50"
               disabled={Boolean(working) || transitioning}
               onClick={() => void manageAccount()}
@@ -147,16 +147,16 @@ export default function MobileProfilePage() {
                 <span className="mt-0.5 block text-xs text-cream-muted">Opens in your browser</span>
               </span>
               <ChevronRight size={17} className="shrink-0 text-cream-muted" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
               className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm font-medium text-cream-bright disabled:opacity-50"
               disabled={Boolean(working) || transitioning}
               onClick={() => void signOut()}
             >
               <LogOut size={19} className="shrink-0 text-cream-muted" aria-hidden="true" />
               {working === "signout" || transitioning ? "Signing out…" : "Sign out"}
-            </button>
+            </Button>
           </div>
         </section>
 

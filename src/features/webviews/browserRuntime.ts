@@ -120,6 +120,20 @@ let browserPointerTrackingQueue = Promise.resolve();
 
 export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
+/** Native handoff has closed the previous physical profile. Settle old runtime
+ * work before invalidating cached handles; visible panes then reopen normally. */
+export async function browserProfileChanged(
+  stillCurrent: () => boolean = () => true,
+): Promise<void> {
+  await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
+  if (!stillCurrent()) return;
+  createdRuntimeIds.clear();
+  visibleRuntimeIds.clear();
+  lastBounds.clear();
+  useBrowserRuntimeStore.setState({ grants: {}, errors: {}, loading: {} });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+}
+
 type BrowserRuntimeTab = Pick<WorkspaceTab, "id" | "instanceKey">;
 type BrowserSyncInput = {
   originSpaceId?: string;
@@ -282,6 +296,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     await invoke("browser_webview_create", {
       request: {
         id,
+        workspaceTabId: input.tab.id,
         url: input.url,
         scopeId: input.scopeId ?? browserScopeId(input.tab),
         originSpaceId: input.originSpaceId,

@@ -9,6 +9,7 @@ import {
   ShortcutRuntime,
 } from "@/features/shortcuts";
 import { createCodeTabState, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useCodingWorkspaceStore } from "./store/useCodingWorkspaceStore";
 import { CodingWorkspace } from "./CodingWorkspace";
 
@@ -149,7 +150,7 @@ describe("CodingWorkspace shortcut integration", () => {
 
     fireEvent.keyDown(commandCenter, shortcutEvent("k", "KeyK", { metaKey: true }));
 
-    expect(await screen.findByPlaceholderText(/Rewrite this/)).toBeTruthy();
+    await waitFor(() => expect(useMistyStore.getState().panel).toBe("answer"));
   });
 
   it("opens document symbols instead of the general command list", async () => {

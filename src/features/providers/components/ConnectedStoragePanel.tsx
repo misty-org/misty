@@ -136,9 +136,9 @@ export function ConnectedStoragePanel({ onClose }: { onClose(): void }) {
           {error && (
             <p role="alert" className="text-sm text-cream-muted">
               {error}{" "}
-              <button className="underline" onClick={() => void load(true)}>
+              <Button variant="link" className="p-0 h-auto" onClick={() => void load(true)}>
                 Retry
-              </button>
+              </Button>
             </p>
           )}
           {accounts.length ? (

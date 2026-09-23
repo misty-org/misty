@@ -128,12 +128,16 @@ pub fn enable_modern_window_style<R: Runtime>(
     #[cfg(target_os = "macos")]
     {
         let _ = (radius, offset_x, offset_y);
+        // AppKit owns main-renderer geometry during its live-resize loop.
+        // Disable Tauri's queued proportional frame writes before opting in.
+        window.set_auto_resize(false).map_err(|e| e.to_string())?;
 
         window
             .with_webview(move |webview| {
                 #[cfg(target_os = "macos")]
                 unsafe {
                     let ns_window = webview.ns_window() as id;
+                    configure_main_renderer_resize(webview.inner() as id);
                     apply_modern_window_style(
                         ns_window,
                         offset_x.unwrap_or(-4.0),
@@ -173,13 +177,44 @@ unsafe fn apply_modern_window_style(ns_window: id, offset_x: f64, offset_y: f64)
         .insert(NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenPrimary);
     ns_window.setCollectionBehavior_(collection_behavior);
 
-    // Wry owns the main WKWebView's parent, frame, and native
-    // autoresizing mask. Reapplying them here creates a second
-    // resize owner and can stall its live-resize paint cycle.
-
     let ox = offset_x;
     let oy = offset_y;
     position_traffic_lights(ns_window, ox, oy);
+}
+
+/// With Tauri's `unstable` multi-webview feature, Wry builds the main view
+/// as a child with only NSViewMinYMargin. Use native sizing instead of waiting
+/// for Tao resize events to write its frame, especially when dragging left.
+#[cfg(target_os = "macos")]
+unsafe fn configure_main_renderer_resize(webview: id) {
+    use objc2_app_kit::{NSAutoresizingMaskOptions, NSView};
+    let view: &NSView = &*webview.cast();
+    configure_continuous_live_resize(view);
+    if let Some(window) = view.window() {
+        window.setPreservesContentDuringLiveResize(false);
+    }
+    if let Some(parent) = view.superview() {
+        parent.setAutoresizesSubviews(true);
+        view.setFrame(parent.bounds());
+        view.setAutoresizingMask(
+            NSAutoresizingMaskOptions::ViewWidthSizable
+                | NSAutoresizingMaskOptions::ViewHeightSizable,
+        );
+    }
+}
+
+/// Keep both the shell and embedded pages on the same live-redraw policy.
+/// Configure at setup, not on every resize: repeated invalidation can itself
+/// introduce paint work and jitter during AppKit's tracking loop.
+#[cfg(target_os = "macos")]
+pub(crate) unsafe fn configure_continuous_live_resize(view: &objc2_app_kit::NSView) {
+    use objc2_app_kit::NSViewLayerContentsRedrawPolicy;
+
+    view.setLayerContentsRedrawPolicy(NSViewLayerContentsRedrawPolicy::DuringViewResize);
+    view.setNeedsDisplay(true);
+    for child in view.subviews().iter() {
+        configure_continuous_live_resize(&child);
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -193,7 +228,7 @@ pub fn main_window_ready() -> bool {
 }
 
 /// Completes window preparation after React, fonts, and saved zoom are ready.
-/// Native startup already shows the window independently of this callback.
+/// The macOS window starts hidden so its first frame has positioned traffic lights.
 #[tauri::command]
 pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
     // The main window can already contain embedded provider views on reload.
@@ -203,11 +238,15 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
     }
     #[cfg(target_os = "macos")]
     {
+        webview
+            .set_auto_resize(false)
+            .map_err(|error| error.to_string())?;
         let (send, receive) = tokio::sync::oneshot::channel();
         webview
             .with_webview(move |webview| unsafe {
                 if !main_window_ready() {
                     let ns_window = webview.ns_window() as id;
+                    configure_main_renderer_resize(webview.inner() as id);
                     apply_modern_window_style(ns_window, -4.0, 0.0);
                     let _: () = msg_send![ns_window, displayIfNeeded];
                     MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);

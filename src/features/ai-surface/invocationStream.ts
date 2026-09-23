@@ -1,4 +1,5 @@
 import type { AiInvocationEvent } from "./types";
+import { parseRetryAfter } from "@/api/client/errors";
 
 type StreamHandlers = { onEvent(event: AiInvocationEvent): void };
 const terminalEvents = new Set([
@@ -19,9 +20,11 @@ export async function readInvocationStream(
   for (let attempt = 0; attempt < 3 && !signal.aborted; attempt++) {
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let retryable = true;
+    let serverDelay = 0;
     try {
       const response = await connect(lastEventId);
       if (!response.ok || !response.body) {
+        serverDelay = parseRetryAfter(response.headers.get("Retry-After")) ?? 0;
         retryable = response.status === 429 || response.status >= 500;
         await response.body?.cancel();
         throw new Error(`Misty could not open the response stream (${response.status}).`);
@@ -96,7 +99,7 @@ export async function readInvocationStream(
         signal.removeEventListener("abort", finish);
         resolve();
       };
-      const timer = setTimeout(finish, retryDelay * (attempt + 1));
+      const timer = setTimeout(finish, Math.max(serverDelay, retryDelay * (attempt + 1)));
       signal.addEventListener("abort", finish, { once: true });
     });
   }

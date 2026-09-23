@@ -35,14 +35,14 @@ export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => 
         set({ loading: false, error: error instanceof Error ? error.message : String(error) });
     }
   },
-  select(spaceId, agentId) {
-    set({ selected: { ...get().selected, [spaceId]: agentId } });
+  select(_spaceId, agentId) {
+    set({ selected: { global: agentId } });
   },
 }));
-export function selectedPersonalAgent(spaceId: string) {
+export function selectedPersonalAgent(_spaceId: string) {
   const state = usePersonalAgentsStore.getState();
   return (
-    state.agents.find((a) => a.id === state.selected[spaceId] && a.enabled) ??
+    state.agents.find((a) => a.id === state.selected.global && a.enabled) ??
     state.agents.find((a) => a.system_managed)
   );
 }

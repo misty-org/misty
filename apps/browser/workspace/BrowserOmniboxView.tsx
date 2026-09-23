@@ -1,5 +1,5 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
-import { cn } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { ArrowUpRight, Globe2, History, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +8,9 @@ import { useBrowserOverlay } from "./useBrowserOverlay";
 
 export function BrowserOmniboxView(props: {
   currentUrl: string;
+  compact?: boolean;
+  pageTitle?: string;
+  focusRequest?: number;
   historyEntries: string[];
   lightChrome: boolean;
   suspensionReason: string;
@@ -28,6 +31,13 @@ export function BrowserOmniboxView(props: {
     if (!focused) setDraft(displayBrowserAddress(props.currentUrl));
   }, [focused, props.currentUrl]);
 
+  useEffect(() => {
+    if (!props.focusRequest) return;
+    setFocused(true);
+    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [props.focusRequest]);
+
   const choose = (suggestion?: BrowserSuggestion) => {
     props.onNavigate(suggestion?.destination ?? draft);
     setFocused(false);
@@ -43,7 +53,24 @@ export function BrowserOmniboxView(props: {
         choose(suggestions[selectedIndex]);
       }}
     >
+      {props.compact && !focused && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-center overflow-hidden text-xs text-cream-muted"
+          aria-label="Show current address"
+          title="Show current address"
+          onClick={() => {
+            setFocused(true);
+            window.requestAnimationFrame(() => inputRef.current?.focus());
+          }}
+        >
+          <span className="min-w-0 truncate">{props.pageTitle || "Website"}</span>
+        </Button>
+      )}
       <input
+        hidden={props.compact && !focused}
         ref={inputRef}
         value={focused ? draft : toolbarAddress(props.currentUrl)}
         onChange={(event) => {

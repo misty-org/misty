@@ -8,7 +8,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Button,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -20,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   cn,
+  Button,
 } from "@/shared/ui";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
 import { Cable, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
@@ -124,8 +124,8 @@ export function MistyConversationSidebar(props: {
                       )}
                     />
                   ) : (
-                    <button
-                      type="button"
+                    <Button variant="ghost"
+                     
                       className="min-w-0 flex-1 px-2.5 py-2 text-left"
                       onClick={() => props.onSelect(conversation.id)}
                     >
@@ -135,7 +135,7 @@ export function MistyConversationSidebar(props: {
                       <span className="mt-0.5 block text-[10px] text-cream-muted">
                         {relativeTime(conversation.updatedAt)}
                       </span>
-                    </button>
+                    </Button>
                   )}
                   {renamingId !== conversation.id ? (
                     <DropdownMenu>

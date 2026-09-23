@@ -32,8 +32,6 @@ pub mod connected_devices;
 pub mod credential_store;
 #[cfg(desktop)]
 mod declarative_panel;
-#[cfg(desktop)]
-pub mod desktop_pet;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
@@ -117,3 +115,24 @@ pub mod auth_http;
 
 #[cfg(windows)]
 mod browser_capture_windows;
+
+pub mod workspace_autopilot;
+
+pub mod browser_sync;
+pub mod workspace_recovery;
+
+#[cfg(target_os = "macos")]
+pub(crate) mod browser_cookie_store;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_cookie_restore;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_website_storage;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_storage_restore;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_session_storage;
+#[cfg(any(windows, test))]
+mod browser_cookie_cdp;
+#[cfg(windows)]
+#[path = "browser_cookie_store_windows.rs"]
+pub(crate) mod browser_cookie_store;

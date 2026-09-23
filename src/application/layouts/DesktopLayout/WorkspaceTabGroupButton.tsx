@@ -11,7 +11,7 @@ import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import type { ReactNode } from "react";
 import { BrandIcon } from "../../../.././apps/shared/BrandIcon";
 import { brandIconAsset } from "../../../.././apps/shared/brandIcons";
-import { DestinationIcon } from "./DownloadedAppNavigator";
+import { DestinationIcon } from "./NavigatorDestinationIcon";
 import type { NavigatorAppId } from "@/features/workspace";
 import { ProviderBrandIcon } from "../../../.././apps/shared/ProviderBrandIcon";
 import {
@@ -36,6 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   cn,
+  Button
 } from "@/shared/ui";
 import { Blocks, ChevronDown, LoaderCircle, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -262,10 +263,12 @@ export function WorkspaceTabGroupButton({
             : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
         )}
       >
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
+          justify="start"
           className={cn(
-            "flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden pl-2 pr-1",
+            "flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden border-0 pl-2 pr-1",
             "text-left outline-none focus:outline-none focus-visible:ring-1",
             "focus-visible:ring-inset focus-visible:ring-cream-muted",
           )}
@@ -290,21 +293,22 @@ export function WorkspaceTabGroupButton({
               ({group.tabs.length})
             </span>
           ) : null}
-        </button>
+        </Button>
         {showChevron ? (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="none"
                 className={cn(
-                  "mr-1 grid size-6 shrink-0 place-items-center rounded text-cream-muted outline-none",
+                  "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted outline-none",
                   "hover:bg-charcoal-active hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
                 )}
                 aria-label={`Show ${displayLabel} tabs`}
                 onClick={(event) => event.stopPropagation()}
               >
-                <ChevronDown aria-hidden size={12} />
-              </button>
+                <ChevronDown aria-hidden size={12} className="size-3" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"
@@ -338,10 +342,11 @@ export function WorkspaceTabGroupButton({
                         <TabIcon tab={tab} icon={Icon} size={13} isActive={isActive} />
                         <span className="min-w-0 flex-1 truncate">{tabTitle}</span>
                         {canClose && (!canCloseTab || canCloseTab(tab)) ? (
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="none"
                             className={cn(
-                              "grid size-5 shrink-0 place-items-center rounded text-cream-muted/70",
+                              "grid size-5 shrink-0 place-items-center rounded border-0 text-cream-muted/70",
                               "hover:bg-charcoal-active hover:text-cream focus-visible:outline-none",
                               "focus-visible:ring-1 focus-visible:ring-cream-muted",
                             )}
@@ -353,8 +358,8 @@ export function WorkspaceTabGroupButton({
                               onClose(tab);
                             }}
                           >
-                            <X size={11} />
-                          </button>
+                            <X className="size-[11px]" size={11} />
+                          </Button>
                         ) : null}
                       </DropdownMenuItem>
                     </Renameable>
@@ -365,11 +370,12 @@ export function WorkspaceTabGroupButton({
           </DropdownMenu>
         ) : null}
         {!showChevron && canCloseDisplayedTab ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="none"
             aria-label={`Close ${displayTab ? workspaceTabDisplayTitle(displayTab, group) : displayLabel}`}
             className={cn(
-              "mr-1 grid size-6 shrink-0 place-items-center rounded text-cream-muted opacity-0 outline-none",
+              "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0 outline-none",
               "hover:bg-charcoal-active hover:text-cream focus:outline-none focus-visible:opacity-100",
               "focus-visible:ring-1 focus-visible:ring-cream-muted group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100",
             )}
@@ -378,8 +384,8 @@ export function WorkspaceTabGroupButton({
               if (displayTab) onClose(displayTab);
             }}
           >
-            <X size={12} />
-          </button>
+            <X className="size-3" size={12} />
+          </Button>
         ) : null}
       </div>
     </Renameable>

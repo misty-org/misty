@@ -1,7 +1,11 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import type { ReactNode } from "react";
+import { cleanup, fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MobileNavigation, mobileNavigationIcons } from "./MobileNavigation";
+
+const render = (node: ReactNode) => rtlRender(<MemoryRouter>{node}</MemoryRouter>);
 
 const baseProps = {
   activePath: "/home",
@@ -27,7 +31,7 @@ describe("MobileNavigation account entry", () => {
     render(<MobileNavigation {...baseProps} account={null} onAccount={onAccount} />);
 
     expect(screen.getAllByText("Sign in to Misty").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Sync your Spaces and conversations").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Your browser workspace across devices").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getAllByRole("button", { name: /sign in to misty/i })[0]);
     expect(onAccount).toHaveBeenCalledOnce();
@@ -47,14 +51,14 @@ describe("MobileNavigation account entry", () => {
     expect(screen.getAllByText("AL").length).toBeGreaterThan(0);
   });
 
-  it("keeps the phone navigation fixed to Home, Apps, and Store", () => {
+  it("keeps the phone navigation fixed to Home, Files, Agents, and a navigation menu", () => {
     render(
       <MobileNavigation
         {...baseProps}
         core={[
           { id: "home", label: "Home", path: "/home", icon: mobileNavigationIcons.home },
-          { id: "apps", label: "Apps", path: "/apps", icon: mobileNavigationIcons.apps },
-          { id: "store", label: "Store", path: "/store", icon: mobileNavigationIcons.store },
+          { id: "files", label: "Files", path: "/files", icon: mobileNavigationIcons.files },
+          { id: "agents", label: "Agents", path: "/agents", icon: mobileNavigationIcons.agents },
         ]}
         account={null}
         onAccount={vi.fn()}
@@ -62,7 +66,13 @@ describe("MobileNavigation account entry", () => {
     );
 
     const phoneNav = screen.getByRole("navigation", { name: "Mobile primary" });
-    expect(phoneNav.textContent).toBe("HomeAppsStore");
-    expect(phoneNav.textContent).not.toContain("More");
+    expect(phoneNav.textContent).toBe("HomeFilesAgentsMenu");
+    fireEvent.click(within(phoneNav).getByRole("button", { name: "Files" }));
+    expect(baseProps.onNavigate).toHaveBeenCalledWith("/files");
+    fireEvent.click(within(phoneNav).getByRole("button", { name: "Menu" }));
+    const menu = screen.getByRole("dialog", { name: "Workspace navigation" });
+    expect(within(menu).getByRole("button", { name: "Inbox" })).toBeTruthy();
+    expect(within(menu).queryByText("Spaces")).toBeNull();
+    expect(within(menu).getByRole("button", { name: /sign in to misty/i })).toBeTruthy();
   });
 });

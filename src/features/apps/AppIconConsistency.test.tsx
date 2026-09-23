@@ -16,8 +16,12 @@ function glyph(markup: string) {
 }
 
 describe("app icon consistency", () => {
-  it.each(Object.values(WORKSPACE_TOOLS_META))(
-    "shares $label's glyph across Discover, navbar, picker, and migrated tabs",
+  it.each(
+    Object.values(WORKSPACE_TOOLS_META).filter(({ id }) =>
+      ["browser", "files", "agents"].includes(id),
+    ),
+  )(
+    "shares $label's glyph across the navbar, picker, and migrated tabs",
     ({ id, label, icon: Icon }) => {
       const catalogId = id === "social" ? "chat" : id;
       const discover = glyph(renderToStaticMarkup(<OfficialAppIcon appId={catalogId} />));
@@ -64,7 +68,7 @@ describe("app icon consistency", () => {
 
   it("uses the same app identities in mobile and desktop navigation", () => {
     for (const [id, Icon] of Object.entries(mobileNavigationIcons)) {
-      if (id === "apps" || id === "settings") continue;
+      if (id === "activity" || id === "settings") continue;
       expect(Icon).toBe(workspaceAppIcon(id === "store" ? "marketplace" : id));
     }
     for (const item of desktopNavItems) {

@@ -32,6 +32,39 @@ const FEATURE_INTERNALS = [
   "Import a feature through its public entrypoint, not its internals.",
 ];
 
+const forbidRawButtonRule = {
+  meta: {
+    type: "suggestion",
+    docs: {
+      description:
+        "Forbid raw <button> elements in favor of @/shared/ui Button, IconButton, or CVA primitives",
+    },
+    schema: [],
+    messages: {
+      noRawButton:
+        "Do not use raw <button>. Use <Button>, <IconButton>, or a CVA primitive from '@/shared/ui'.",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (node.name && node.name.type === "JSXIdentifier" && node.name.name === "button") {
+          context.report({
+            node,
+            messageId: "noRawButton",
+          });
+        }
+      },
+    };
+  },
+};
+
+const sharedUiPlugin = {
+  rules: {
+    "no-raw-button": forbidRawButtonRule,
+  },
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -39,6 +72,7 @@ export default tseslint.config(
       "dist/**",
 	  "dist-*/**",
       "build/**",
+      "apps/.build/**",
 	  "vendor/**",
       "src-tauri/**",
       // Tooling and scratch trees that are not application source.
@@ -73,7 +107,10 @@ export default tseslint.config(
       sourceType: "module",
       globals: { ...globals.browser, ...globals.es2021 },
     },
-    plugins: { "react-hooks": reactHooks },
+    plugins: {
+      "react-hooks": reactHooks,
+      "shared-ui": sharedUiPlugin,
+    },
     rules: {
       ...reactHooks.configs.recommended.rules,
 
@@ -97,6 +134,15 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: true }],
 
       "no-restricted-imports": restrict([MODELS_BAN]),
+      "shared-ui/no-raw-button": "warn",
+    },
+  },
+
+  // UI component design system boundary: shared/ui owns raw button elements and primitives.
+  {
+    files: ["src/shared/ui/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "src/tests/**/*.{ts,tsx}"],
+    rules: {
+      "shared-ui/no-raw-button": "off",
     },
   },
 

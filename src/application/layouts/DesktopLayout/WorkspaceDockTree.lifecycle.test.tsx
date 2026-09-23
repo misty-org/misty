@@ -40,7 +40,6 @@ describe("WorkspaceDockTree tab lifecycle", () => {
       lastUsedTabByGroup: {},
       onOpen: vi.fn(),
       onClose: vi.fn(),
-      onOpenNewTab: vi.fn(),
       onMoveTab: vi.fn(() => true),
       onDockTab: vi.fn(() => true),
       onSplitPane: vi.fn(() => null),

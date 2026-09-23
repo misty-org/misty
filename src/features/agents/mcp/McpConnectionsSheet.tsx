@@ -40,11 +40,11 @@ export function McpConnectionsSheet(props: {
   );
 }
 
-function McpConnectionsManager(props: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  showCustomConnections: boolean;
+export function McpConnectionsView(props: {
+  showCustomConnections?: boolean;
 }) {
+  const showCustomConnections =
+    props.showCustomConnections ?? publicBetaFeatureEnabled("mcpConnections");
   const { user } = useAuth();
   const store = useMcpConnectionsStore();
   const { load } = store;
@@ -54,61 +54,73 @@ function McpConnectionsManager(props: {
   );
 
   useEffect(() => {
-    if (props.open && user?.id) void load(user.id, true);
-  }, [load, props.open, user?.id]);
+    if (user?.id) void load(user.id, true);
+  }, [load, user?.id]);
 
+  return (
+    <div aria-label="Tool connections sheet" className="space-y-6">
+      <header className="pr-8 text-left">
+        <h2 className="text-base font-semibold text-cream-bright">Tool connections</h2>
+        <p className="mt-1 text-xs text-cream-muted">
+          Add custom tool servers for Misty agents. The built-in automation engine is managed by
+          your Misty server.
+        </p>
+      </header>
+
+      {showCustomConnections ? (
+        <section className="mt-6">
+          <header className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="m-0 text-sm font-medium text-cream-bright">Custom tool servers</h3>
+              <p className="mt-1 text-xs text-cream-muted">
+                Valid tools become available to Misty. Sensitive calls still ask for approval.
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setAdding((current) => !current)}>
+              <Plus className="size-4" /> Add connection
+            </Button>
+          </header>
+          {adding ? <AddConnectionForm onDone={() => setAdding(false)} /> : null}
+          {store.loading ? (
+            <div className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
+              <LoaderCircle className="size-4 animate-spin" /> Loading connections…
+            </div>
+          ) : !customConnections.length ? (
+            <p className="mt-3 rounded-lg border border-dashed border-charcoal-border p-4 text-sm text-cream-muted">
+              No custom tool servers are connected yet.
+            </p>
+          ) : (
+            <div className="mt-3 grid gap-3">
+              {customConnections.map((connection) => (
+                <ConnectionCard key={connection.id} connection={connection} />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {store.error ? (
+        <SystemErrorActivity
+          accountId={user?.id}
+          error={store.error}
+          scope="agents:mcp-connections"
+          title="Tool connections need attention"
+          target={{ kind: "workspace-tool", tool: "agents" }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function McpConnectionsManager(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  showCustomConnections: boolean;
+}) {
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
       <SheetContent className="w-[min(720px,96vw)] overflow-y-auto bg-charcoal-bg sm:max-w-[720px]">
-        <SheetHeader className="pr-8 text-left">
-          <SheetTitle>Tool connections</SheetTitle>
-          <SheetDescription>
-            Add custom tool servers for Misty agents. The built-in automation engine is managed by
-            your Misty server.
-          </SheetDescription>
-        </SheetHeader>
-
-        {props.showCustomConnections ? (
-          <section className="mt-6">
-            <header className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="m-0 text-sm font-medium text-cream-bright">Custom tool servers</h3>
-                <p className="mt-1 text-xs text-cream-muted">
-                  Valid tools become available to Misty. Sensitive calls still ask for approval.
-                </p>
-              </div>
-              <Button size="sm" onClick={() => setAdding((current) => !current)}>
-                <Plus className="size-4" /> Add connection
-              </Button>
-            </header>
-            {adding ? <AddConnectionForm onDone={() => setAdding(false)} /> : null}
-            {store.loading ? (
-              <div className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
-                <LoaderCircle className="size-4 animate-spin" /> Loading connections…
-              </div>
-            ) : !customConnections.length ? (
-              <p className="mt-3 rounded-lg border border-dashed border-charcoal-border p-4 text-sm text-cream-muted">
-                No custom tool servers are connected yet.
-              </p>
-            ) : (
-              <div className="mt-3 grid gap-3">
-                {customConnections.map((connection) => (
-                  <ConnectionCard key={connection.id} connection={connection} />
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        {store.error ? (
-          <SystemErrorActivity
-            accountId={user?.id}
-            error={store.error}
-            scope="agents:mcp-connections"
-            title="Tool connections need attention"
-            target={{ kind: "workspace-tool", tool: "agents" }}
-          />
-        ) : null}
+        <McpConnectionsView showCustomConnections={props.showCustomConnections} />
       </SheetContent>
     </Sheet>
   );

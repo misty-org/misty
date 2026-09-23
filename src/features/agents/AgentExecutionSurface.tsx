@@ -11,6 +11,7 @@ import {
   steerLocalExecution,
   useLocalExecution,
 } from "./localExecution";
+import { Button } from "@/shared/ui";
 
 import { TaskArtifacts } from "./TaskArtifactList";
 
@@ -45,7 +46,7 @@ export function AgentExecutionSurface() {
     };
   }, [execution]);
   useEffect(() => {
-    if (!execution) return;
+    if (!execution || execution.autopilot) return;
     let disposed = false;
     const layout = async () => {
       const rect = viewport.current?.getBoundingClientRect();
@@ -80,6 +81,7 @@ export function AgentExecutionSurface() {
     return () => window.removeEventListener("pagehide", close);
   }, [execution?.taskId]);
   if (!execution) return null;
+  if (execution.autopilot) return null;
   const action = (task: () => Promise<unknown>) => {
     setError("");
     void task().catch((e) => setError(String(e)));
@@ -98,15 +100,20 @@ export function AgentExecutionSurface() {
               ? "Paused — you can use this page"
               : "Task finished — review the result"}
         </strong>
-        <button className={control} onClick={() => useMistyStore.getState().openPanel()}>
+        <Button
+          variant="ghost"
+          className={control}
+          onClick={() => useMistyStore.getState().openPanel()}
+        >
           Chat
-        </button>
+        </Button>
         {execution.state === "running" ? (
-          <button className={control} onClick={() => action(pauseLocalExecution)}>
+          <Button variant="ghost" className={control} onClick={() => action(pauseLocalExecution)}>
             Pause
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
+            variant="ghost"
             className={control}
             onClick={() =>
               action(() =>
@@ -117,9 +124,10 @@ export function AgentExecutionSurface() {
             }
           >
             Resume
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="ghost"
           className={control}
           onClick={() =>
             action(async () => {
@@ -129,11 +137,11 @@ export function AgentExecutionSurface() {
           }
         >
           Stop
-        </button>
+        </Button>
         {execution.state !== "running" && (
-          <button className={control} onClick={() => action(finishLocalExecution)}>
+          <Button variant="ghost" className={control} onClick={() => action(finishLocalExecution)}>
             Close workspace
-          </button>
+          </Button>
         )}
       </header>
       <div className="flex min-h-0 flex-1">
@@ -151,14 +159,15 @@ export function AgentExecutionSurface() {
             aria-label="Task integrations"
           >
             {execution.context.map((view, index) => (
-              <button
+              <Button
                 key={view.id}
+                variant="ghost"
                 className={control}
                 aria-pressed={active === index}
                 onClick={() => setActive(index)}
               >
                 {view.title}
-              </button>
+              </Button>
             ))}
           </nav>
         </div>
@@ -192,9 +201,9 @@ export function AgentExecutionSurface() {
           onChange={(e) => setSteering(e.target.value)}
           placeholder="Message this agent…"
         />
-        <button className={control} disabled={routing || !steering.trim()}>
+        <Button variant="ghost" className={control} disabled={routing || !steering.trim()}>
           {routing ? "Interpreting…" : "Send"}
-        </button>
+        </Button>
       </form>
       {error && (
         <p role="alert" className="px-4 pb-3 text-sm text-red-300">

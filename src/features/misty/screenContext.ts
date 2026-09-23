@@ -13,6 +13,11 @@ export async function screenStatus(request = false): Promise<MistyScreenStatus> 
   return invoke("misty_screen_status", { request });
 }
 export async function captureMistyScreen() {
+  const status = await screenStatus(true);
+  if (!status.allowed)
+    throw new Error(
+      "Allow screen recording in macOS Settings so Misty can read the current window.",
+    );
   const result = await invoke<{
     error?: string;
     dataUrl: string;

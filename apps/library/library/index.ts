@@ -8,3 +8,4 @@ export * from "./store/useSmartLibraryStore";
 export * from "./useSpaceLibraryCollectionActions";
 export * from "./useSpaceLibraryData";
 export * from "./useSpaceLibraryItemActions";
+export { initializeHostLibraryRuntime } from "./hostLibraryRuntime";

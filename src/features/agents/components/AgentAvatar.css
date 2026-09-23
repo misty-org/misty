@@ -1,0 +1,39 @@
+.agent-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #3c3c3c;
+  color: #eee;
+  font-size: 18px;
+  font-weight: 500;
+  overflow: hidden;
+}
+.agent-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.agent-avatar:has(img) {
+  background: transparent;
+}
+.agent-avatar--large {
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
+}
+
+.agent-cloud-image {
+  display: block;
+  flex-shrink: 0;
+}
+.agent-avatar > .agent-cloud-image {
+  width: 100%;
+  height: 100%;
+}
+.agent-cloud-image > img {
+  display: block;
+}

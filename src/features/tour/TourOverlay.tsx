@@ -7,11 +7,7 @@ export interface SpotlightRect {
   height: number;
 }
 
-export function TourOverlay(props: {
-  targetSelector?: string;
-  padding?: number;
-  radius?: number;
-}) {
+export function TourOverlay(props: { targetSelector?: string; padding?: number; radius?: number }) {
   const { targetSelector, padding = 6, radius = 10 } = props;
   const [targetRect, setTargetRect] = useState<SpotlightRect | null>(null);
 

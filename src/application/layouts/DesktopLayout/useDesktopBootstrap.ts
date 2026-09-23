@@ -37,7 +37,7 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const appLoadStarted = useRef(false);
   const searchMaintenanceRunningRef = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
-  const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/spaces", lastAppRoute));
+  const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/browser", lastAppRoute));
   const routeId = params.getRouteId(location.pathname);
 
   useEffect(() => {

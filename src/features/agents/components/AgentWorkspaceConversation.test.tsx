@@ -58,7 +58,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Agents workspace conversations", () => {
-  it("switches execution mode when mode selector pills are clicked", async () => {
+  it("keeps all mode labels but only permits Agent in the Mac beta", async () => {
     renderWorkspace();
     const userRadio = screen.getByRole("radio", { name: "User" });
     const agentRadio = screen.getByRole("radio", { name: "Agent" });
@@ -67,6 +67,8 @@ describe("Agents workspace conversations", () => {
     expect(userRadio).toBeDefined();
     expect(agentRadio).toBeDefined();
     expect(teamRadio).toBeDefined();
+    expect((userRadio as HTMLButtonElement).disabled).toBe(true);
+    expect((teamRadio as HTMLButtonElement).disabled).toBe(true);
     expect(useMistyStore.getState().executionMode).toBe("user");
 
     fireEvent.click(agentRadio);
@@ -74,7 +76,7 @@ describe("Agents workspace conversations", () => {
     expect(finishExecutionMock).toHaveBeenCalled();
 
     fireEvent.click(teamRadio);
-    await waitFor(() => expect(useMistyStore.getState().executionMode).toBe("team"));
+    expect(useMistyStore.getState().executionMode).toBe("agent");
   });
 
   it("submits to the displayed agent and Space without opening another panel", async () => {

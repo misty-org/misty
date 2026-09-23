@@ -28,6 +28,8 @@ struct Lease {
 }
 struct Scope {
     agent: String,
+    account: String,
+    space: String,
     window: String,
     task: String,
 }
@@ -36,6 +38,7 @@ struct Scope {
 pub struct WindowRequest {
     account_id: String,
     agent_id: String,
+    #[serde(default)]
     space_id: String,
     name: String,
     task: Value,
@@ -45,6 +48,7 @@ pub struct WindowRequest {
 pub struct LeaseRequest {
     account_id: String,
     agent_id: String,
+    #[serde(default)]
     space_id: String,
     task_id: String,
     #[serde(default)]
@@ -65,7 +69,9 @@ pub async fn agent_window_open(
 ) -> Result<String, String> {
     if request.agent_id.is_empty()
         || request.account_id.is_empty()
-        || request.space_id.is_empty()
+        || request.account_id.len() > 256
+        || request.agent_id.len() > 256
+        || request.space_id.len() > 256
         || request.name.len() > 320
         || request.task.to_string().len() > 1_000_000
     {
@@ -206,22 +212,27 @@ pub fn agent_workspace_acquire(
     state: State<'_, AgentWorkspaceState>,
     request: LeaseRequest,
 ) -> Result<LeaseResult, String> {
-    if [
-        &request.account_id,
-        &request.agent_id,
-        &request.space_id,
-        &request.task_id,
-    ]
-    .iter()
-    .any(|s| s.is_empty() || s.len() > 256)
+    let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
+    acquire_lease(&mut inner, webview.window().label(), request)
+}
+
+fn acquire_lease(
+    inner: &mut WorkspaceState,
+    window: &str,
+    request: LeaseRequest,
+) -> Result<LeaseResult, String> {
+    // Empty Space is the personal browser workspace. Historical scopes retain
+    // exact matching on renewal; they cannot be used to retarget a live task.
+    if [&request.account_id, &request.agent_id, &request.task_id]
+        .iter().any(|s| s.is_empty() || s.len() > 256)
+        || request.space_id.len() > 256
     {
         return Err("invalid_agent_task".into());
     }
-    let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
     inner
         .leases
         .retain(|_, lease| lease.expires > Instant::now());
-    let window = webview.window().label().to_owned();
+    let window = window.to_owned();
     if request.renew && !inner.leases.contains_key(&request.task_id) {
         return Err("agent_task_paused".into());
     }
@@ -271,14 +282,18 @@ pub fn agent_workspace_release(
         return Err("agent_task_mismatch".into());
     }
     inner.leases.remove(&task_id);
+    drop(inner);
+    super::workspace_autopilot::stop(&task_id);
     Ok(())
 }
 #[tauri::command]
 pub fn agent_workspace_bind_scope(
     webview: Webview,
+    app: AppHandle,
     state: State<'_, AgentWorkspaceState>,
     task_id: String,
     scope_id: String,
+    previous_task_id: Option<String>,
 ) -> Result<(), String> {
     let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
     let lease = inner
@@ -288,9 +303,21 @@ pub fn agent_workspace_bind_scope(
         .ok_or("agent_task_paused")?;
     let scope = Scope {
         agent: lease.agent.clone(),
+        account: lease.account.clone(),
+        space: lease.space.clone(),
         window: lease.window.clone(),
         task: task_id.clone(),
     };
+    if let Some(previous) = previous_task_id {
+        let old = inner.scopes.get(&scope_id).ok_or("agent_task_mismatch")?;
+        if old.task != previous || old.agent != scope.agent || old.account != scope.account ||
+            old.space != scope.space || old.window != scope.window {
+            return Err("agent_task_mismatch".into());
+        }
+        // Resume rotates execution authority, but verified files from the
+        // paused task remain usable in its explicitly rebound browser scopes.
+        super::browser::resume_task_downloads(&app, &scope_id, &scope.agent, &previous, &task_id)?;
+    }
     inner.scopes.insert(scope_id, scope);
     Ok(())
 }
@@ -317,6 +344,8 @@ fn authorize_scope_state(
             || !inner.leases.get(&scope.task).is_some_and(|lease| {
                 lease.window == scope.window
                     && lease.agent == scope.agent
+                    && lease.account == scope.account
+                    && lease.space == scope.space
                     && lease.expires > Instant::now()
             })
         {
@@ -364,6 +393,8 @@ mod tests {
             "notion".into(),
             Scope {
                 agent: "one".into(),
+                account: "owner".into(),
+                space: "launch".into(),
                 window: "worker-one".into(),
                 task: "task-one".into(),
             },
@@ -372,12 +403,67 @@ mod tests {
             "instagram".into(),
             Scope {
                 agent: "two".into(),
+                account: "owner".into(),
+                space: "launch".into(),
                 window: "worker-two".into(),
                 task: "task-two".into(),
             },
         );
         state
     }
+    fn personal_request(task: &str, renew: bool) -> LeaseRequest {
+        LeaseRequest { account_id: "owner".into(), agent_id: "one".into(),
+            space_id: String::new(), task_id: task.into(), renew }
+    }
+    #[test]
+    fn personal_tasks_acquire_and_renew_without_space() {
+        let mut state = WorkspaceState::default();
+        assert!(acquire_lease(&mut state, "main", personal_request("task", false)).is_ok());
+        assert!(acquire_lease(&mut state, "main", personal_request("task", true)).is_ok());
+        assert!(acquire_lease(&mut state, "worker", personal_request("other", false)).is_err());
+        assert!(acquire_lease(&mut state, "worker", personal_request("task", true)).is_err());
+        let mut retarget = personal_request("task", true);
+        retarget.space_id = "historical".into();
+        assert!(acquire_lease(&mut state, "main", retarget).is_err());
+        let mut retarget = personal_request("task", true);
+        retarget.account_id = "other".into();
+        assert!(acquire_lease(&mut state, "main", retarget).is_err());
+        state.leases.get_mut("task").unwrap().expires = Instant::now() - Duration::from_secs(1);
+        assert!(acquire_lease(&mut state, "main", personal_request("task", true)).is_err());
+        assert!(acquire_lease(&mut state, "main", personal_request("new", false)).is_ok());
+    }
+    #[test]
+    fn personal_task_still_requires_account_agent_and_task_identity() {
+        let mut state = WorkspaceState::default();
+        for field in 0..3 {
+            let mut request = personal_request("task", false);
+            match field {
+                0 => request.account_id.clear(),
+                1 => request.agent_id.clear(),
+                _ => request.task_id.clear(),
+            }
+            assert!(acquire_lease(&mut state, "main", request).is_err());
+        }
+        assert!(state.leases.is_empty());
+    }
+    #[test]
+    fn rebound_leases_cannot_exchange_accounts_or_historical_scopes() {
+        let mut state = fixture();
+        state.leases.get_mut("task-one").unwrap().account = "other".into();
+        assert!(authorize_scope_state(&state, "notion", "one", "task-one").is_err());
+        state.leases.get_mut("task-two").unwrap().space.clear();
+        assert!(authorize_scope_state(&state, "instagram", "two", "task-two").is_err());
+    }
+    #[test]
+    fn account_switch_revokes_tasks_without_reviving_legacy_scope_authority() {
+        let mut state = fixture();
+        assert_eq!(invalidate_account_leases(&mut state).len(), 2);
+        assert!(state.leases.is_empty());
+        assert!(state.scopes.contains_key("notion"));
+        assert!(authorize_scope_state(&state, "notion", "one", "task-one").is_err());
+        assert!(authorize_scope_state(&state, "instagram", "two", "task-two").is_err());
+    }
+
     #[test]
     fn acknowledging_a_correction_preserves_independent_queued_tasks() {
         let mut queue = VecDeque::from([
@@ -412,4 +498,28 @@ mod tests {
         state.scopes.get_mut("notion").unwrap().task = "replacement".into();
         assert!(authorize_scope_state(&state, "notion", "one", "task-one").is_err());
     }
+}
+
+// Keep scope tombstones when changing accounts: removing them would enable the
+// legacy unbound-scope fallback for an action already in flight.
+fn invalidate_account_leases(inner: &mut WorkspaceState) -> Vec<String> {
+    inner.leases.drain().map(|(task, _)| task).collect()
+}
+
+pub(super) fn stop_account_tasks(app: &AppHandle) -> Result<(), String> {
+    let Some(state) = app.try_state::<AgentWorkspaceState>() else { return Ok(()); };
+    let tasks = {
+        let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
+        invalidate_account_leases(&mut inner)
+    };
+    for task in tasks { super::workspace_autopilot::stop(&task); }
+    Ok(())
+}
+
+/// Full-window control always requires a live foreground lease; no legacy fallback.
+pub fn authorize_window_task(app:&AppHandle, task:&str, account:&str, space:&str)->Result<(),String> {
+    let state=app.state::<AgentWorkspaceState>();
+    let inner=state.0.lock().map_err(|_|"agent_workspace_unavailable")?;
+    if inner.leases.get(task).is_some_and(|lease|lease.window=="main" && lease.account==account && lease.space==space && lease.expires>Instant::now()) { Ok(()) }
+    else { Err("agent_task_paused".into()) }
 }
