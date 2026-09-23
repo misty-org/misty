@@ -33,6 +33,7 @@ const MAX_FRAME_BYTES: usize = 6 << 20;
 pub struct SyncApi {
     base: Url,
     http: reqwest::Client,
+    refreshed: Option<Arc<dyn Fn() -> Result<()> + Send + Sync>>,
 }
 
 impl SyncApi {
@@ -53,7 +54,21 @@ impl SyncApi {
         {
             return Err(Error::Invalid);
         }
-        Ok(Self { base, http })
+        Ok(Self {
+            base,
+            http,
+            refreshed: None,
+        })
+    }
+
+    /// Runs after the shared cookie jar accepts a rotated session. Hosts use
+    /// this to persist the new refresh cookie in OS-protected storage.
+    pub fn with_refresh_hook(
+        mut self,
+        refreshed: impl Fn() -> Result<()> + Send + Sync + 'static,
+    ) -> Self {
+        self.refreshed = Some(Arc::new(refreshed));
+        self
     }
 
     pub fn deployment(&self) -> String {
@@ -76,15 +91,11 @@ impl SyncApi {
         body: Option<&impl Serialize>,
     ) -> Result<T> {
         let endpoint = self.endpoint(path);
-        let mut request = self
-            .http
-            .request(method, endpoint.clone())
-            .timeout(REQUEST_TIMEOUT)
-            .header("X-Misty-CSRF", "1");
-        if let Some(body) = body {
-            request = request.json(body);
+        let mut response = self.request_once(method.clone(), &endpoint, body).await?;
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            self.refresh_session().await?;
+            response = self.request_once(method, &endpoint, body).await?;
         }
-        let response = request.send().await.map_err(|_| Error::Network)?;
         if response.url() != &endpoint {
             return Err(Error::Identity);
         }
@@ -95,6 +106,52 @@ impl SyncApi {
             _ => return Err(Error::Network),
         }
         decode_response(response).await
+    }
+
+    async fn request_once(
+        &self,
+        method: reqwest::Method,
+        endpoint: &Url,
+        body: Option<&impl Serialize>,
+    ) -> Result<reqwest::Response> {
+        let mut request = self
+            .http
+            .request(method, endpoint.clone())
+            .timeout(REQUEST_TIMEOUT)
+            .header("X-Misty-CSRF", "1");
+        if let Some(body) = body {
+            request = request.json(body);
+        }
+        request.send().await.map_err(|_| Error::Network)
+    }
+
+    async fn refresh_session(&self) -> Result<()> {
+        let mut endpoint = self.base.clone();
+        endpoint.set_path(&format!(
+            "{}/auth/refresh",
+            self.base.path().trim_end_matches('/')
+        ));
+        let response = self
+            .http
+            .post(endpoint.clone())
+            .timeout(REQUEST_TIMEOUT)
+            .header("X-Misty-CSRF", "1")
+            .send()
+            .await
+            .map_err(|_| Error::Network)?;
+        if response.url() != &endpoint {
+            return Err(Error::Identity);
+        }
+        match response.status().as_u16() {
+            200 | 204 => {
+                if let Some(refreshed) = &self.refreshed {
+                    refreshed()?;
+                }
+                Ok(())
+            }
+            401 | 403 => Err(Error::Authentication),
+            _ => Err(Error::Network),
+        }
     }
 
     pub async fn workspace(&self) -> Result<Option<Workspace>> {

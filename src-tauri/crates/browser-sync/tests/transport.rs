@@ -4,8 +4,18 @@ use misty_browser_sync::{
     transport::SyncApi,
     worker::{Phase, Worker},
 };
-use std::time::Duration;
-use tokio::{net::TcpListener, time::timeout};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+    time::timeout,
+};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
@@ -15,6 +25,49 @@ fn client() -> reqwest::Client {
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap()
+}
+
+#[tokio::test]
+async fn authenticated_requests_refresh_once_retry_and_persist_rotated_cookies() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}/v1", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        for (expected, status, body) in [
+            (
+                "GET /v1/sync/workspace ",
+                "401 Unauthorized",
+                r#"{"code":"not_authenticated"}"#,
+            ),
+            ("POST /v1/auth/refresh ", "204 No Content", ""),
+            ("GET /v1/sync/workspace ", "200 OK", r#"{"workspace":null}"#),
+        ] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = vec![0; 8192];
+            let read = stream.read(&mut request).await.unwrap();
+            assert!(String::from_utf8_lossy(&request[..read]).starts_with(expected));
+            stream
+                .write_all(
+                    format!(
+                        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+        }
+    });
+    let persisted = Arc::new(AtomicUsize::new(0));
+    let called = persisted.clone();
+    let api = SyncApi::new(&base, client())
+        .unwrap()
+        .with_refresh_hook(move || {
+            called.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        });
+    assert!(api.workspace().await.unwrap().is_none());
+    assert_eq!(persisted.load(Ordering::SeqCst), 1);
+    server.await.unwrap();
 }
 
 #[test]
