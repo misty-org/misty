@@ -13,6 +13,7 @@ import (
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
+	"github.com/kannachi323/misty/server/internal/browseractions"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -224,7 +225,7 @@ func aiInvocationMCPDescriptors(allowedNames []string) []agenttools.Descriptor {
 	}
 	registrations := canonicalAgentToolRegistrations(handler)
 	registrations = append(registrations, agenttools.Registration{Descriptor: weatherCurrentToolDescriptor(), Handler: handler})
-	for _, descriptor := range nativeAgentToolDescriptors() {
+	for _, descriptor := range append(nativeAgentToolDescriptors(), globalAgentSpaceDescriptors()...) {
 		registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: handler})
 	}
 	for _, descriptor := range browserToolDescriptors() {
@@ -360,6 +361,9 @@ func mcpToolError(err error) *mcp.CallToolResult {
 	if errors.Is(err, db.ErrAgentToolboxActionUnknown) {
 		return mcpStructuredResult(json.RawMessage(`{"status":"uncertain","reason":"The action may have completed. Reconcile its outcome before retrying."}`))
 	}
+	if errors.Is(err, browseractions.ErrStale) {
+		return mcpStructuredResult(json.RawMessage(`{"status":"failure","reason":"browser_snapshot_stale","attempted":false,"message":"The page changed or the inspection was already consumed. No action was dispatched. Call browser.inspect again and use its new references before deciding the next action."}`))
+	}
 	message := "Misty could not complete this tool call."
 	if errors.Is(err, db.ErrAgentExecutionTimeLimit) {
 		message = "agent_execution_time_limit: This run used its execution-time allowance. Review completed work before starting another request."
@@ -409,7 +413,7 @@ func (s *SpacesService) executeAIInvocationMCPTool(ctx context.Context, access *
 		}
 	}
 	browserApproved := false
-	if call.Name == "browser.click" || call.Name == "browser.interact" {
+	if call.Name == "browser.click" || call.Name == "browser.interact" || call.Name == "browser.workspace.interact" {
 		approval, allowed, err := s.requireAIInvocationBrowserApproval(ctx, access, call)
 		if err != nil {
 			return nil, err

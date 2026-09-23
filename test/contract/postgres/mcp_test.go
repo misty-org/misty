@@ -92,19 +92,20 @@ func setupMCPPostgres(t *testing.T) mcpPostgresFixture {
 func TestMCPBindingsEnforceOwnershipRLSAndCompositeToolProvenance(t *testing.T) {
 	fixture := setupMCPPostgres(t)
 	ctx := context.Background()
-	bindings, err := fixture.database.SetPersonalAgentMCPTools(ctx, fixture.owner.ID, fixture.agent.ID, []MCPAgentToolSelection{{
-		ConnectionID: fixture.connection.ID, RemoteName: fixture.tool.RemoteName, Enabled: true,
-	}})
+	bindings, err := fixture.database.EnabledPersonalAgentMCPTools(ctx, fixture.owner.ID, fixture.agent.ID)
 	if err != nil || len(bindings) != 1 || !bindings[0].Enabled {
 		t.Fatalf("owner bindings=%#v err=%v", bindings, err)
 	}
-	if _, err := fixture.database.SetPersonalAgentMCPTools(ctx, fixture.attacker.ID, fixture.agent.ID, nil); !errors.Is(err, ErrSpaceForbidden) {
+	if _, err := fixture.database.SetPersonalAgentMCPTools(ctx, fixture.attacker.ID, fixture.agent.ID, nil); err == nil {
 		t.Fatalf("attacker changed owner agent bindings: %v", err)
 	}
-	if _, err := fixture.database.SetPersonalAgentMCPTools(ctx, fixture.attacker.ID, fixture.attackerAgent.ID, []MCPAgentToolSelection{{
-		ConnectionID: fixture.connection.ID, RemoteName: fixture.tool.RemoteName, Enabled: true,
-	}}); !errors.Is(err, ErrSpaceForbidden) {
-		t.Fatalf("attacker bound owner connection: %v", err)
+	// Obsolete selection writes cannot expose another account's connection.
+	automatic, err := fixture.database.SetPersonalAgentMCPTools(ctx, fixture.attacker.ID, fixture.attackerAgent.ID, []MCPAgentToolSelection{{ConnectionID: fixture.connection.ID, RemoteName: fixture.tool.RemoteName, Enabled: true}})
+	if err != nil || len(automatic) != 1 || automatic[0].ConnectionID != fixture.attackerConn.ID {
+		t.Fatalf("cross-account connection: %+v %v", automatic, err)
+	}
+	if _, err := fixture.database.PersonalAgentMCPToolForExecution(ctx, fixture.attacker.ID, fixture.attackerAgent.ID, fixture.tool.StableName); !errors.Is(err, ErrSpaceNotFound) {
+		t.Fatalf("foreign tool executable: %v", err)
 	}
 
 	err = fixture.database.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
@@ -162,8 +163,8 @@ func TestMCPBindingsEnforceOwnershipRLSAndCompositeToolProvenance(t *testing.T) 
 	}, changedTools); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fixture.database.PersonalAgentMCPToolForExecution(ctx, fixture.owner.ID, fixture.agent.ID, fixture.tool.StableName); !errors.Is(err, ErrSpaceNotFound) {
-		t.Fatalf("schema-changed MCP tool remained executable: %v", err)
+	if _, err := fixture.database.PersonalAgentMCPToolForExecution(ctx, fixture.owner.ID, fixture.agent.ID, fixture.tool.StableName); err != nil {
+		t.Fatalf("valid refreshed tool should be automatic: %v", err)
 	}
 }
 

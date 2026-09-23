@@ -2,16 +2,13 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 	"strings"
-
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const (
-	FrontierModelCatalogVersion = "misty-frontier-v1"
-	DefaultFrontierModelID      = "openai/gpt-5.6-terra"
+	FrontierModelCatalogVersion = "misty-gpt-v2"
+	DefaultFrontierModelID      = "openai/gpt-6-astra"
 )
 
 // FrontierGatewayModel is the deliberately small, paid model catalog exposed
@@ -25,37 +22,18 @@ type FrontierGatewayModel struct {
 	ReasoningLevels []string `json:"reasoning_levels"`
 }
 
-var defaultFrontierModelIDs = []string{
-	"openai/gpt-5.6-sol",
-	"openai/gpt-5.6-terra",
-	"openai/gpt-5.6-luna",
-	"anthropic/claude-opus-5",
-	"anthropic/claude-sonnet-5",
-	"anthropic/claude-fable-5",
-	"google/gemini-3.7-flash",
-	"google/gemini-3.1-pro-preview",
-	"spacexai/grok-4.5",
-	"deepseek/deepseek-v4-flash-vision-exp",
-	"alibaba/qwen3.8-max",
-}
+// Model selection is a server release policy. Legacy client model IDs and catalog
+// overrides cannot change the model used by a personal agent.
+func FrontierDefaultModelID() string { return DefaultFrontierModelID }
 
-func FrontierDefaultModelID() string {
-	if value := strings.TrimSpace(envconfig.Getenv("MISTY_FRONTIER_DEFAULT_MODEL")); value != "" {
-		return value
-	}
-	return DefaultFrontierModelID
-}
+func configuredFrontierModelIDs() []string { return []string{FrontierDefaultModelID()} }
 
-func configuredFrontierModelIDs() []string {
-	raw := strings.TrimSpace(envconfig.Getenv("MISTY_FRONTIER_MODEL_IDS_JSON"))
-	if raw == "" {
-		return append([]string(nil), defaultFrontierModelIDs...)
+// ManagedReasoning migrates legacy settings to the two supported presets.
+func ManagedReasoning(mode, legacyEffort string) string {
+	if mode == "deep" || (mode == "" && strings.TrimSpace(legacyEffort) == "xhigh") {
+		return "xhigh"
 	}
-	var values []string
-	if json.Unmarshal([]byte(raw), &values) != nil || len(values) == 0 {
-		return append([]string(nil), defaultFrontierModelIDs...)
-	}
-	return values
+	return "high"
 }
 
 func FrontierGatewayModels(ctx context.Context) ([]FrontierGatewayModel, error) {
@@ -77,10 +55,7 @@ func FrontierGatewayModels(ctx context.Context) ([]FrontierGatewayModel, error) 
 		}
 		seen[id] = true
 		providerID, providerName := frontierProvider(id)
-		levels := []string{"default"}
-		if gatewayCapabilitiesInclude(model.Capabilities, "reasoning", "thinking", "reasoning-effort") {
-			levels = []string{"default", "low", "medium", "high"}
-		}
+		levels := []string{"high", "xhigh"}
 		frontier = append(frontier, FrontierGatewayModel{
 			ID: id, Name: model.Name, ProviderID: providerID, ProviderName: providerName,
 			Capabilities: append([]string(nil), model.Capabilities...), ReasoningLevels: levels,

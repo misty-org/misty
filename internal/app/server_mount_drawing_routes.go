@@ -307,8 +307,6 @@ func (s *Server) mountMistyRoutes(prefix string, aiService *api.AIService) {
 	s.Router.Post(prefix+"/misty/agents", aiService.PersonalAgents())
 	s.Router.Put(prefix+"/misty/agents/{agentID}", aiService.PersonalAgent())
 	s.Router.Delete(prefix+"/misty/agents/{agentID}", aiService.PersonalAgent())
-	s.Router.Get(prefix+"/misty/agents/{agentID}/apps", aiService.AgentAppAssignments())
-	s.Router.Put(prefix+"/misty/agents/{agentID}/apps", aiService.AgentAppAssignments())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/misty/conversations", aiService.MistyConversations())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/misty/conversations", aiService.MistyConversations())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/misty/conversations/{conversationID}", aiService.MistyConversation())

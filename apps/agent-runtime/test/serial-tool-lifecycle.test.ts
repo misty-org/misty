@@ -1,6 +1,28 @@
 import { expect, it } from "vitest";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 
+it("blocks the current batch after a pre-dispatch rejection and can start a fresh inspection turn", async () => {
+  const order = serialToolLifecycle();
+  await order.start("stale-click", async () => {});
+  const queued = expect(order.start("dependent-write", async () => { throw new Error("must not execute"); })).rejects.toThrow("browser_reinspection_required");
+  order.requestReinspection();
+  expect(order.resumeForReinspection()).toBe(false);
+  await order.finish("stale-click", async () => {});
+  await queued;
+  expect(order.resumeForReinspection()).toBe(true);
+  await order.start("fresh-inspection", async () => {});
+  await order.finish("fresh-inspection", async () => {});
+});
+
+it("never recovers when the rejection checkpoint itself is uncertain", async () => {
+  const order = serialToolLifecycle();
+  await order.start("stale-click", async () => {});
+  order.requestReinspection();
+  await expect(order.finish("stale-click", async () => { throw new Error("checkpoint failed"); })).rejects.toThrow();
+  expect(order.resumeForReinspection()).toBe(false);
+  await expect(order.start("next", async () => {})).rejects.toThrow("tool_sequence_stopped");
+});
+
 it("holds later tool starts behind a durable approval/device wait and its end checkpoint", async () => {
   const order = serialToolLifecycle();
   const events: string[] = [];

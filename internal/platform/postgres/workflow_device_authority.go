@@ -119,6 +119,30 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 			if !valid {
 				return ErrSpaceForbidden
 			}
+			if job.Operation == "browser.upload" {
+				var upload struct {
+					DownloadID    string `json:"downloadId"`
+					SourceScopeID string `json:"sourceScopeId"`
+				}
+				if err := json.Unmarshal(job.Input, &upload); err != nil {
+					return err
+				}
+				if upload.DownloadID != "" {
+					// Recheck the source as well as the destination on claim/begin/
+					// lease renewal. Revoking either app or context stops the transfer.
+					err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c
+ JOIN misty_agent_app_assignments a ON a.owner_user_id=c.user_id AND a.app_id=c.metadata->>'app_id'
+ JOIN user_app_installations sa ON sa.user_id=a.owner_user_id AND sa.app_id=a.app_id AND sa.state='installed' AND NOT sa.consent_required
+ WHERE c.invocation_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.device_id=$4 AND c.state='attached' AND c.expires_at>NOW()
+ AND c.capabilities ? 'browser.downloads.list' AND a.agent_id=$5 AND c.metadata->>'window_label'=$6)`, job.RunID, job.UserID, upload.SourceScopeID, deviceID, input.AgentID, input.WindowLabel).Scan(&valid)
+					if err != nil {
+						return err
+					}
+					if !valid {
+						return ErrSpaceForbidden
+					}
+				}
+			}
 		}
 	}
 	return nil

@@ -8,26 +8,21 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 )
 
-type AgentAppAssignmentInput struct {
-	SpaceID string   `json:"space_id"`
-	AppIDs  []string `json:"app_ids"`
-}
-
 type AgentProfileInput struct {
-	Assignment      *AgentAppAssignmentInput `json:"assignment,omitempty"`
-	Name            string                   `json:"name"`
-	Role            string                   `json:"role"`
-	Description     string                   `json:"description"`
-	Instructions    string                   `json:"instructions"`
-	Icon            string                   `json:"icon"`
-	Avatar          json.RawMessage          `json:"avatar"`
-	ModelMode       string                   `json:"model_mode"`
-	ModelID         string                   `json:"model_id"`
-	ReasoningEffort string                   `json:"reasoning_effort"`
-	Enabled         bool                     `json:"enabled"`
-	Version         int64                    `json:"version,omitempty"`
+	Name            string          `json:"name"`
+	Role            string          `json:"role"`
+	Description     string          `json:"description"`
+	Instructions    string          `json:"instructions"`
+	Icon            string          `json:"icon"`
+	Avatar          json.RawMessage `json:"avatar"`
+	ModelMode       string          `json:"model_mode"`
+	ModelID         string          `json:"model_id"`
+	ReasoningEffort string          `json:"reasoning_effort"`
+	Enabled         bool            `json:"enabled"`
+	Version         int64           `json:"version,omitempty"`
 }
 
 func (db *Database) PersonalAgents(ctx context.Context, userID string) ([]AskIdentity, error) {
@@ -56,12 +51,10 @@ func (db *Database) SavePersonalAgent(ctx context.Context, userID, id string, in
 	if input.Name == "" || len([]rune(input.Name)) > 80 || len([]rune(input.Role)) > 160 || len(input.Description) > 8000 || len(input.Instructions) > 64000 || len(input.Icon) > 128 || len(input.ModelID) > 200 || len(input.ReasoningEffort) > 32 {
 		return nil, ErrSpaceInvalid
 	}
-	if input.ModelMode == "" {
-		input.ModelMode = "automatic"
-	}
-	if input.ModelMode != "automatic" && input.ModelMode != "pinned" || input.ModelMode == "pinned" && input.ModelID == "" {
-		return nil, ErrSpaceInvalid
-	}
+	input.ModelMode = "automatic"
+	input.ModelID = serveragent.FrontierDefaultModelID()
+	input.ReasoningEffort = "high"
+
 	if len(input.Avatar) == 0 {
 		input.Avatar = json.RawMessage(`{}`)
 	}
@@ -101,9 +94,6 @@ func (db *Database) SavePersonalAgent(ctx context.Context, userID, id string, in
 		if _, err := insertPersonalAgentVersionTx(ctx, tx, *out, userID); err != nil {
 			return err
 		}
-		if input.Assignment != nil {
-			return setAgentAppAssignmentsTx(ctx, tx, userID, id, input.Assignment.SpaceID, input.Assignment.AppIDs)
-		}
 		return nil
 	})
 	return out, err
@@ -126,74 +116,26 @@ func (db *Database) DeletePersonalAgent(ctx context.Context, userID, id string) 
 	})
 }
 
-func (db *Database) AgentAppAssignments(ctx context.Context, userID, agentID, spaceID string) ([]string, error) {
-	items := []string{}
+// AgentWorkspaceTools describes built-in tool families, not grants to a website,
+// device, file root, or action. Those authorities are checked at dispatch.
+func (db *Database) AgentWorkspaceTools(ctx context.Context, userID, agentID string) ([]string, error) {
+	if userID == "" || agentID == "" {
+		return nil, ErrPersonalAgentNotFound
+	}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		if err := requirePersonalAgentSpaceTx(ctx, tx, userID, "", agentID); err != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND enabled AND deleted_at IS NULL)`, agentID, userID).Scan(&exists); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT a.app_id FROM misty_agent_app_assignments a JOIN user_app_installations i ON i.user_id=a.owner_user_id AND i.app_id=a.app_id AND i.state='installed' AND NOT i.consent_required WHERE a.agent_id=$1 AND a.owner_user_id=$2 ORDER BY a.app_id`, agentID, userID)
-		if err != nil {
-			return err
+		if !exists {
+			return ErrPersonalAgentNotFound
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				return err
-			}
-			items = append(items, id)
-		}
-		return rows.Err()
+		return nil
 	})
-	return items, err
-}
-
-func requirePersonalAgentSpaceTx(ctx context.Context, tx *sql.Tx, userID, spaceID, agentID string) error {
-	if spaceID != "" {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-			return err
-		}
+	if err != nil {
+		return nil, err
 	}
-	var exists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL)`, agentID, userID).Scan(&exists); err != nil {
-		return err
-	}
-	if !exists {
-		return ErrPersonalAgentNotFound
-	}
-	return nil
-}
-func (db *Database) SetAgentAppAssignments(ctx context.Context, userID, agentID, spaceID string, appIDs []string) error {
-	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error { return setAgentAppAssignmentsTx(ctx, tx, userID, agentID, spaceID, appIDs) })
-}
-func setAgentAppAssignmentsTx(ctx context.Context, tx *sql.Tx, userID, agentID, spaceID string, appIDs []string) error {
-	if len(appIDs) > 200 {
-		return ErrSpaceInvalid
-	}
-	if err := requirePersonalAgentSpaceTx(ctx, tx, userID, "", agentID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "agent-apps:"+userID+":"+agentID); err != nil {
-		return err
-	}
-	for _, id := range appIDs {
-		if id == "agents" || len(id) > 128 {
-			return ErrSpaceInvalid
-		}
-		if err := requireUserAppTx(ctx, tx, userID, id); err != nil {
-			return err
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM misty_agent_app_assignments WHERE agent_id=$1 AND owner_user_id=$2 `, agentID, userID); err != nil {
-		return err
-	}
-	for _, id := range appIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO misty_agent_app_assignments(agent_id,owner_user_id,space_id,app_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, agentID, userID, "", id); err != nil {
-			return err
-		}
-	}
-	return nil
+	return []string{"browser", "files"}, nil
 }
 
 // Binding is immutable. A legacy NULL identity can only be claimed by default Misty.

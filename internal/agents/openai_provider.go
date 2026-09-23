@@ -57,7 +57,7 @@ func NewOpenAIProvider(config OpenAIProviderConfig) *OpenAIProvider {
 // anything else (including empty) yields "" so no reasoning field is sent.
 func normalizeReasoningEffort(effort string) string {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
-	case "low", "medium", "high":
+	case "low", "medium", "high", "xhigh":
 		return strings.ToLower(strings.TrimSpace(effort))
 	default:
 		return ""

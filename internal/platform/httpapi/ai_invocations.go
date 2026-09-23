@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -48,6 +49,7 @@ type aiInvocationDeviceContext struct {
 }
 
 type aiInvocationInput struct {
+	ThinkingMode          string                      `json:"thinking_mode,omitempty"`
 	TaskID                string                      `json:"task_id,omitempty"`
 	AgentID               string                      `json:"agent_id,omitempty"`
 	ExecutionMode         string                      `json:"execution_mode,omitempty"`
@@ -202,15 +204,8 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		conversationID := strings.TrimSpace(body.ConversationID)
 		var err error
 		modelFallbackNotice := false
-		modelID := strings.TrimSpace(body.ModelID)
-		if modelID == "" && identity.ModelMode == "pinned" {
-			modelID = identity.ModelID
-			body.ReasoningEffort = identity.ReasoningEffort
-		}
-		if modelID == "" {
-			modelID = agent.FrontierDefaultModelID()
-		}
-		reasoning := strings.ToLower(strings.TrimSpace(body.ReasoningEffort))
+		modelID := agent.FrontierDefaultModelID()
+		reasoning := agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
 		spaceID := firstAIContextSpace(body.Context)
 		if spaceID != "" {
 			if _, spaceErr := s.database.SpaceByID(r.Context(), userID, spaceID); spaceErr != nil {
@@ -220,7 +215,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		}
 		if conversationID != "" {
 			bound, boundErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
-			if boundErr != nil || conversationSpaceChanged(bound.SpaceID, spaceID) || (bound.AgentID != "" && bound.AgentID != body.AgentID) {
+			if boundErr != nil || (db.AppAuthorityFromContext(r.Context()) != nil && conversationSpaceChanged(bound.SpaceID, spaceID)) || (bound.AgentID != "" && bound.AgentID != body.AgentID) {
 				writeJSON(w, http.StatusConflict, map[string]any{"code": "conversation_context_changed", "message": "Start a new Misty task for this Space."})
 				return
 			}
@@ -236,15 +231,18 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 				writePersonalAgentError(w, bindErr)
 				return
 			}
-			modelID, reasoning = bound.ModelID, bound.ReasoningEffort
-			if !agent.FrontierModelAvailable(r.Context(), modelID) {
-				modelID, reasoning = agent.FrontierDefaultModelID(), ""
-				_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion)
-				modelFallbackNotice = true
+			if body.ThinkingMode == "" && body.ReasoningEffort == "" {
+				reasoning = agent.ManagedReasoning("", bound.ReasoningEffort)
+			}
+			if bound.ModelID != modelID || bound.ReasoningEffort != reasoning {
+				if err := s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion); err != nil {
+					TestingWriteAIError(w, err)
+					return
+				}
 			}
 		}
 		if spaceID == "" {
-			writeJSON(w, http.StatusForbidden, map[string]any{"code": "agents_space_required", "message": "Select a Space to use Misty."})
+			writeJSON(w, http.StatusForbidden, map[string]any{"code": "agents_space_required", "message": "Which space should I work in?"})
 			return
 		}
 		if _, err := s.database.SpaceByID(r.Context(), userID, spaceID); err != nil {
@@ -279,7 +277,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion)
 		}
 		if !agent.FrontierModelAvailable(r.Context(), modelID) || !agent.FrontierModelReasoningAvailable(r.Context(), modelID, reasoning) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "That model or reasoning level is no longer available. Choose another frontier model."})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "Misty’s model is temporarily unavailable. Please try again."})
 			return
 		}
 		available, err := s.database.AIActionAvailable(r.Context(), userID, body.SurfaceID, actionID, modelID)
@@ -395,7 +393,7 @@ func (s *AIService) InvocationEvents() http.HandlerFunc {
 				s.invocations.fail(record.ID, "Misty was interrupted before finishing. Please retry the request.")
 			}
 		}
-		flusher, ok := w.(http.Flusher)
+		_, ok = w.(http.Flusher)
 		if !ok {
 			http.Error(w, "streaming unavailable", http.StatusInternalServerError)
 			return
@@ -420,12 +418,15 @@ func (s *AIService) InvocationEvents() http.HandlerFunc {
 				http.Error(w, "invocation not found", http.StatusNotFound)
 				return
 			}
+			var frame strings.Builder
 			for _, event := range events {
 				payload, _ := json.Marshal(event)
-				fmt.Fprintf(w, "id: %s\ndata: %s\n\n", event.ID, payload)
+				fmt.Fprintf(&frame, "id: %s\ndata: %s\n\n", event.ID, payload)
 				cursor, _ = strconv.Atoi(event.ID)
 			}
-			flusher.Flush()
+			if err := writeAIInvocationSSE(w, frame.String()); err != nil {
+				return
+			}
 			if aiInvocationTerminal(state) {
 				return
 			}
@@ -434,8 +435,9 @@ func (s *AIService) InvocationEvents() http.HandlerFunc {
 				return
 			case <-notify:
 			case <-time.After(15 * time.Second):
-				fmt.Fprint(w, ": keep-alive\n\n")
-				flusher.Flush()
+				if err := writeAIInvocationSSE(w, ": keep-alive\n\n"); err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -487,4 +489,17 @@ func (s *AIService) CancelInvocation() http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"state": state, "runtime_cancel_pending": !aiInvocationTerminal(stored.State) && stored.RuntimeRunID != "", "message": "Stop requested. Previously completed or uncertain actions remain in history."})
 	}
+}
+
+// Each SSE write is bounded, but a healthy event stream must outlive the JSON
+// middleware's original 60-second deadline. Heartbeats refresh this deadline.
+func writeAIInvocationSSE(w http.ResponseWriter, frame string) error {
+	controller := http.NewResponseController(w)
+	if err := controller.SetWriteDeadline(time.Now().Add(30 * time.Second)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		return err
+	}
+	if _, err := fmt.Fprint(w, frame); err != nil {
+		return err
+	}
+	return controller.Flush()
 }

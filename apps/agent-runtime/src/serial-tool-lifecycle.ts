@@ -4,7 +4,8 @@
 export function serialToolLifecycle() {
   let tail: Promise<void> = Promise.resolve();
   let stoppedReason = "";
-  const stop = (reason: string) => { stoppedReason ||= reason; };
+  let reinspectionRequested = false;
+  const stop = (reason: string) => { stoppedReason ||= reason; reinspectionRequested = false; };
   const releases = new Map<string, () => void>();
   const release = (id: string) => {
     const resolve = releases.get(id);
@@ -13,6 +14,19 @@ export function serialToolLifecycle() {
   };
   return {
     stop,
+    requestReinspection() {
+      if (!stoppedReason) {
+        stoppedReason = "The browser action was not attempted. Inspect the page again.";
+        reinspectionRequested = true;
+      }
+    },
+    get reinspectionRequested() { return reinspectionRequested; },
+    resumeForReinspection() {
+      if (!reinspectionRequested || releases.size !== 0) return false;
+      stoppedReason = "";
+      reinspectionRequested = false;
+      return true;
+    },
     get stoppedReason() { return stoppedReason; },
     async start(id: string, checkpoint: () => Promise<void>) {
       if (releases.has(id)) throw new Error("duplicate_tool_call_id");
@@ -20,10 +34,11 @@ export function serialToolLifecycle() {
       tail = new Promise<void>((resolve) => releases.set(id, resolve));
       try {
         await previous;
-        if (stoppedReason) throw new Error(`tool_sequence_stopped: ${stoppedReason}`);
+        if (stoppedReason) throw new Error(reinspectionRequested ? "browser_reinspection_required" : `tool_sequence_stopped: ${stoppedReason}`);
         await checkpoint();
       } catch (error) {
-        stop("The preceding action or its checkpoint did not complete.");
+        if (!(reinspectionRequested && error instanceof Error && error.message === "browser_reinspection_required"))
+          stop("The preceding action or its checkpoint did not complete.");
         release(id);
         throw error;
       }

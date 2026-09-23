@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
@@ -59,20 +60,48 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 		}
 		var body aiInvocationInput
 		_ = json.Unmarshal(record.RequestPayload, &body)
+		if strings.HasPrefix(tool.Name, "browser.workspace.") {
+			if body.ExecutionMode != "agent" || body.WindowLabel != "main" || body.TaskID == "" {
+				return nil, db.ErrSpaceForbidden
+			}
+			matched := false
+			for _, target := range body.DeviceContexts {
+				var metadata map[string]any
+				_ = json.Unmarshal(target.Metadata, &metadata)
+				if target.OpaqueRef == input.ScopeID && metadata["workspace_control"] == true {
+					matched = true
+				}
+			}
+			if !matched {
+				return nil, db.ErrSpaceForbidden
+			}
+		}
 		configData["taskId"] = body.TaskID
 		if body.AgentID != "" {
 			configData["agentId"] = body.AgentID
 		}
 		if tool.Name == "browser.upload" {
-			var upload struct {
-				AttachmentID string `json:"attachmentId"`
+			upload, err := parseBrowserUploadSource(tool.Arguments)
+			if err != nil {
+				return nil, err
 			}
-			_ = json.Unmarshal(tool.Arguments, &upload)
-			file, lookupErr := s.database.AIConversationAttachment(ctx, invocation.UserID, upload.AttachmentID)
-			if lookupErr != nil || file.LifecycleState != "ready" || file.ConversationID != record.ConversationID || file.InvocationID == "" {
-				return nil, db.ErrSpaceForbidden
+			if upload.DownloadID != "" {
+				// Download reuse is restricted to a live personal-agent task. The
+				// native boundary also verifies task ownership and pinned bytes.
+				if body.AgentID == "" || body.TaskID == "" {
+					return nil, db.ErrSpaceForbidden
+				}
+				if err := authorizeNativeAgentBrowserScope(ctx, s.database, invocation, upload.SourceScopeID); err != nil {
+					return nil, err
+				}
+				configData["downloadUpload"] = upload
+			} else {
+				file, lookupErr := s.database.AIConversationAttachment(ctx, invocation.UserID, upload.AttachmentID)
+				if lookupErr != nil || file.LifecycleState != "ready" || file.ConversationID != record.ConversationID || file.InvocationID == "" {
+					return nil, db.ErrSpaceForbidden
+				}
+				configData["upload"] = map[string]any{"id": file.ID, "name": file.DisplayName, "mimeType": file.MIMEType, "byteSize": file.ByteSize, "sha256": file.SHA256}
 			}
-			configData["upload"] = map[string]any{"id": file.ID, "name": file.DisplayName, "mimeType": file.MIMEType, "byteSize": file.ByteSize, "sha256": file.SHA256}
 		}
 	} else if tool.Name == "browser.upload" {
 		return nil, db.ErrSpaceForbidden
@@ -128,16 +157,41 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 			case "canceled":
 				return nil, errors.Join(db.ErrAgentToolboxNotAttempted, workflowv2.ErrDeviceUnavailable)
 			case "failed":
-				if current.ErrorCode == "browser_snapshot_stale" {
-					return nil, browseractions.ErrStale
-				}
-				if current.ErrorCode == "device_unavailable" || current.ErrorCode == "browser_tab_closed" {
-					return nil, workflowv2.ErrDeviceUnavailable
-				}
-				return nil, errors.New("browser device tool failed: " + current.ErrorCode)
+				return nil, browserDeviceFailure(current.ErrorCode)
 			}
 		}
 	}
+}
+
+func browserDeviceFailure(code string) error {
+	if code == "browser_snapshot_stale" {
+		// Native code emits this only before dispatch. Preserve that evidence
+		// through the write journal so it does not become an uncertain effect.
+		return errors.Join(db.ErrAgentToolboxNotAttempted, browseractions.ErrStale)
+	}
+	if code == "device_unavailable" || code == "browser_tab_closed" {
+		return workflowv2.ErrDeviceUnavailable
+	}
+	return errors.New("browser device tool failed: " + code)
+}
+
+type browserUploadSource struct {
+	AttachmentID  string `json:"attachmentId,omitempty"`
+	DownloadID    string `json:"downloadId,omitempty"`
+	SourceScopeID string `json:"sourceScopeId,omitempty"`
+}
+
+func parseBrowserUploadSource(raw json.RawMessage) (browserUploadSource, error) {
+	var source browserUploadSource
+	if json.Unmarshal(raw, &source) != nil {
+		return source, db.ErrSpaceInvalid
+	}
+	attachment := source.AttachmentID != "" && len(source.AttachmentID) <= 200 && source.DownloadID == "" && source.SourceScopeID == ""
+	download := source.AttachmentID == "" && source.DownloadID != "" && len(source.DownloadID) <= 200 && len(source.SourceScopeID) >= 8 && len(source.SourceScopeID) <= 256
+	if !attachment && !download {
+		return source, db.ErrSpaceInvalid
+	}
+	return source, nil
 }
 
 func (s *SpacesService) stopBrowserDeviceTool(userID, jobID string) (json.RawMessage, error) {
@@ -151,7 +205,7 @@ func (s *SpacesService) stopBrowserDeviceTool(userID, jobID string) (json.RawMes
 	case "canceled":
 		return nil, errors.Join(db.ErrAgentToolboxNotAttempted, workflowv2.ErrDeviceUnavailable)
 	case "failed":
-		return nil, errors.New("browser device tool failed: " + job.ErrorCode)
+		return nil, browserDeviceFailure(job.ErrorCode)
 	default:
 		return nil, db.ErrAgentToolboxActionUnknown
 	}

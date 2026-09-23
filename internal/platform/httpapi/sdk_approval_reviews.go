@@ -68,7 +68,7 @@ func (s *SpacesService) SDKCapabilityApprovalReview() http.HandlerFunc {
 			writeSDKError(w, db.ErrSpaceConflict)
 			return
 		}
-		if approval.ToolName == "browser.click" || approval.ToolName == "browser.interact" {
+		if approval.ToolName == "browser.click" || approval.ToolName == "browser.interact" || approval.ToolName == "browser.workspace.interact" {
 			var review browserApprovalReview
 			if json.Unmarshal(raw, &review) != nil || review.Kind != "browser" || review.EffectID != protected.EffectID || review.RunID != approval.RunID || review.CallID != approval.ToolCallID || review.Operation != approval.ToolName {
 				writeSDKError(w, db.ErrSpaceConflict)

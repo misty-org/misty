@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/kannachi323/misty/server/internal/browseractions"
+
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
@@ -136,8 +138,10 @@ func TestAgentToolboxActionJournalResumesUndispatchedDeviceAction(t *testing.T) 
 		t.Fatal(err)
 	}
 	action := AgentToolboxAction{IdempotencyKey: "device-action", UserID: user.ID, ToolName: "browser.click", AuditEvent: "browser.click", Risk: "write", Source: "contract", Request: json.RawMessage(`{}`)}
-	if _, err := database.JournalAgentToolboxAction(ctx, action, func() (json.RawMessage, error) { return nil, ErrAgentToolboxNotAttempted }); !errors.Is(err, ErrAgentToolboxNotAttempted) {
-		t.Fatal(err)
+	if _, err := database.JournalAgentToolboxAction(ctx, action, func() (json.RawMessage, error) {
+		return nil, errors.Join(ErrAgentToolboxNotAttempted, browseractions.ErrStale)
+	}); !errors.Is(err, ErrAgentToolboxNotAttempted) || !errors.Is(err, browseractions.ErrStale) || errors.Is(err, ErrAgentToolboxActionUnknown) {
+		t.Fatalf("stale pre-dispatch rejection was lost: %v", err)
 	}
 	result, err := database.JournalAgentToolboxAction(ctx, action, func() (json.RawMessage, error) { return json.RawMessage(`{"attempted":true}`), nil })
 	if err != nil || len(result) == 0 {

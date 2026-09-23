@@ -40,8 +40,14 @@ func (db *Database) GetDSN() string {
 
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, name, sslmode,
+		quoteDSNValue(host), quoteDSNValue(port), quoteDSNValue(user), quoteDSNValue(password), quoteDSNValue(name), sslmode,
 	)
+}
+
+// Empty or whitespace-containing credentials must not consume the following
+// connection option. This also handles quotes and backslashes in passwords.
+func quoteDSNValue(value string) string {
+	return "'" + strings.NewReplacer("\\", "\\\\", "'", "\\'").Replace(value) + "'"
 }
 
 func TestingDatabaseSSLMode(host string) string {

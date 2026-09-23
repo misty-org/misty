@@ -84,3 +84,29 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		return err
 	})
 }
+
+// Foreground personal agents need multiple inspection/action turns per UI step.
+// Pin this allowance at admission; retries never rewrite an existing budget.
+func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvocationRecord) (int, error) {
+	const ordinaryLimit = 20
+	var input struct {
+		Mode        string `json:"execution_mode"`
+		AgentID     string `json:"agent_id"`
+		TaskID      string `json:"task_id"`
+		WindowLabel string `json:"window_label"`
+	}
+	if err := json.Unmarshal(record.RequestPayload, &input); err != nil {
+		return 0, err
+	}
+	authority, err := AppAuthorityFromPayload(record.RequestPayload)
+	if err != nil {
+		return 0, err
+	}
+	if record.SurfaceID == "sdk" || record.SurfaceID == "routine" || authority != nil || AppAuthorityFromContext(ctx) != nil || input.Mode != "agent" || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" || record.SpaceID == "" {
+		return ordinaryLimit, nil
+	}
+	if err := validateNativeAgentExecutionTx(ctx, tx, record.UserID, record.SpaceID, record.RequestPayload); err != nil {
+		return 0, err
+	}
+	return 120, nil
+}

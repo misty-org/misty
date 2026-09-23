@@ -86,15 +86,11 @@ func authorizeAgentSDKTool(ctx context.Context, database *db.Database, invocatio
 	if invocation.AgentID == "" {
 		return false, nil
 	}
-	agent, err := database.AskIdentityByID(ctx, invocation.UserID, invocation.AgentID)
-	if err != nil {
+	identity, err := database.AskIdentityByID(ctx, invocation.UserID, invocation.AgentID)
+	if err != nil || !identity.Enabled {
 		return false, err
 	}
-	// Custom agents need explicit dynamic capability policy controls before they
-	// can inherit SDK scopes. This does not confer any official-app privilege.
-	if !agent.SystemManaged {
-		return false, nil
-	}
+
 	_, err = database.ResolveAgentSDKCapability(ctx, invocation.UserID, invocation.RunID, sdkAgentBinding(descriptor.ProviderBinding))
 	return err == nil, err
 }

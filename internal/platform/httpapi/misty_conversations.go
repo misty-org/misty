@@ -95,10 +95,10 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 			}
 			now := time.Now().UTC().Format(time.RFC3339Nano)
 			modelID := agent.FrontierDefaultModelID()
-			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, "", agent.FrontierModelCatalogVersion)
+			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, "high", agent.FrontierModelCatalogVersion)
 			writeJSON(w, http.StatusCreated, mistyConversation{
 				ID: conversationID, AgentID: identity.ID, Title: title, CreatedAt: now, UpdatedAt: now,
-				SpaceID: body.SpaceID, Kind: "misty", ModelID: modelID,
+				SpaceID: body.SpaceID, Kind: "misty", ModelID: modelID, Reasoning: "high",
 				Messages: []mistyConversationMessage{}, Remote: true,
 			})
 		default:
@@ -191,6 +191,7 @@ func (s *AIService) MistyConversation() http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 		case http.MethodPatch:
 			var body struct {
+				ThinkingMode    *string `json:"thinking_mode"`
 				Title           *string `json:"title"`
 				ModelID         *string `json:"model_id"`
 				ReasoningEffort *string `json:"reasoning_effort"`
@@ -225,31 +226,26 @@ func (s *AIService) MistyConversation() http.HandlerFunc {
 				}
 				response["title"] = title
 			}
-			if body.ModelID != nil || body.ReasoningEffort != nil {
+			if body.ThinkingMode != nil || body.ModelID != nil || body.ReasoningEffort != nil {
 				bound, err := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
 				if err != nil {
 					TestingWriteAIError(w, err)
 					return
 				}
-				modelID := bound.ModelID
-				if body.ModelID != nil {
-					modelID = strings.TrimSpace(*body.ModelID)
+				modelID := agent.FrontierDefaultModelID()
+				mode := ""
+				if body.ThinkingMode != nil {
+					mode = strings.TrimSpace(*body.ThinkingMode)
+					if mode != "normal" && mode != "deep" {
+						writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_thinking_mode", "message": "Thinking mode must be normal or deep."})
+						return
+					}
 				}
-				if modelID == "" || !agent.FrontierModelAvailable(r.Context(), modelID) {
-					writeJSON(w, http.StatusBadRequest, map[string]string{"code": "model_unavailable", "message": "Choose an available Misty model."})
-					return
-				}
-				reasoning := bound.ReasoningEffort
+				legacy := bound.ReasoningEffort
 				if body.ReasoningEffort != nil {
-					reasoning = strings.TrimSpace(*body.ReasoningEffort)
+					legacy = *body.ReasoningEffort
 				}
-				if reasoning != "" && reasoning != "low" && reasoning != "medium" && reasoning != "high" {
-					writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_reasoning_effort", "message": "Reasoning must be low, medium, high, or default."})
-					return
-				}
-				if reasoning != "" && !agent.GatewayModelSupportsReasoning(r.Context(), modelID) {
-					reasoning = ""
-				}
+				reasoning := agent.ManagedReasoning(mode, legacy)
 				if err := s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion); err != nil {
 					TestingWriteAIError(w, err)
 					return
@@ -463,14 +459,11 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 				})
 			}
 		}
-		modelID := summary.ModelID
-		if modelID == "" || !agent.FrontierModelAvailable(r.Context(), modelID) {
-			modelID = agent.FrontierDefaultModelID()
-		}
+		modelID := agent.FrontierDefaultModelID()
 		return mistyConversation{
 			ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
 			SpaceID: summary.SpaceID, Kind: summary.ConversationKind, OriginSurface: summary.OriginSurface,
-			OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: summary.ReasoningEffort,
+			OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: agent.ManagedReasoning("", summary.ReasoningEffort),
 			CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),
 			UpdatedAt: summary.UpdatedAt.UTC().Format(time.RFC3339Nano), Messages: messages, Remote: true,
 		}, nil
@@ -497,14 +490,11 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 			Content: content, CreatedAt: summary.UpdatedAt.UTC().Format(time.RFC3339Nano), State: "completed",
 		})
 	}
-	modelID := summary.ModelID
-	if modelID == "" || !agent.FrontierModelAvailable(r.Context(), modelID) {
-		modelID = agent.FrontierDefaultModelID()
-	}
+	modelID := agent.FrontierDefaultModelID()
 	return mistyConversation{
 		ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
 		SpaceID: summary.SpaceID, Kind: summary.ConversationKind, OriginSurface: summary.OriginSurface,
-		OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: summary.ReasoningEffort,
+		OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: agent.ManagedReasoning("", summary.ReasoningEffort),
 		CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt: summary.UpdatedAt.UTC().Format(time.RFC3339Nano), Messages: messages, Remote: true,
 	}, nil

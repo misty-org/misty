@@ -8,8 +8,8 @@ import (
 
 func TestOfficialCatalogHasStableUniqueApps(t *testing.T) {
 	apps := All()
-	if len(apps) != 12 {
-		t.Fatalf("All() returned %d apps, want 12", len(apps))
+	if len(apps) != 10 {
+		t.Fatalf("All() returned %d apps, want 10", len(apps))
 	}
 	seen := map[string]bool{}
 	for _, item := range apps {
@@ -30,10 +30,12 @@ func TestOfficialCatalogHasStableUniqueApps(t *testing.T) {
 			t.Fatalf("%s must carry its signed download and reviewed permissions: %#v", item.ID, item)
 		}
 	}
-	for _, desktopOnly := range []string{"code", "terminal"} {
-		item, ok := Find(desktopOnly)
-		if !ok || item.Mobile.Runtime != RuntimeUnsupported {
-			t.Fatalf("%s mobile runtime = %#v, want unsupported", desktopOnly, item.Mobile)
+	for _, withdrawn := range []string{"code", "terminal"} {
+		if _, ok := Find(withdrawn); ok {
+			t.Fatalf("%s must not be offered in the catalog", withdrawn)
+		}
+		if _, ok := NormalizeIDs([]string{withdrawn}); ok {
+			t.Fatalf("%s must not be accepted for installation", withdrawn)
 		}
 	}
 	for _, embedded := range []string{"chat", "journal", "planner", "library", "inbox", "agents", "files", "browser", "music", "media"} {
