@@ -89,7 +89,7 @@ export function AppFrameLayout() {
 
   return (
     <>
-      <BrowserSyncStartup key={user?.id} accountId={user?.id ?? ""} onSignOut={logout}>
+      <BrowserSyncStartup key={user?.id} accountId={user?.id ?? ""}>
         <Suspense fallback={<LoadingScreen fullScreen />}>
           <ConnectedDevicesProvider>
             <PlatformLayout getRouteId={desktopRouteIdFromPath} navItems={desktopNavItems} />

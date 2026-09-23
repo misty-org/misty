@@ -21,7 +21,9 @@ export function SyncVaultForm(props: {
   const [confirmation, setConfirmation] = useState("");
   const [secret, setSecret] = useState("");
   const [saved, setSaved] = useState(false);
-  const [remember, setRemember] = useState(false);
+  // The OS credential store is the normal path: users unlock a device once,
+  // while still being able to opt out on shared or temporary machines.
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reveal, setReveal] = useState(false);

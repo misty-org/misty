@@ -528,7 +528,18 @@ pub(super) fn account_api(api_base: &str, account_id: &str) -> Result<SyncApi, S
     let url = super::auth_cookies::server(api_base)?;
     let client = super::auth_cookies::current(&url)?;
     client.require_account(&url, account_id)?;
-    SyncApi::new(api_base, client.http.clone()).map_err(issue)
+    let refresh_client = client.clone();
+    let refresh_url = url.clone();
+    SyncApi::new(api_base, client.http.clone())
+        .map(|api| {
+            api.with_refresh_hook(move || {
+                refresh_client
+                    .persist(&refresh_url)
+                    .map(|_| ())
+                    .map_err(|_| misty_browser_sync::Error::SecureStorage)
+            })
+        })
+        .map_err(issue)
 }
 
 #[tauri::command]

@@ -42,6 +42,7 @@ export function BrowserSyncSettings() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [reconnecting, setReconnecting] = useState(false);
   const native = hasTauriInternals();
   useEffect(() => {
     let active = true;
@@ -65,6 +66,28 @@ export function BrowserSyncSettings() {
       active = false;
     };
   }, [accountId, native, attempt]);
+  const reconnect = async () => {
+    if (!accountId || reconnecting) return;
+    setReconnecting(true);
+    setError(null);
+    try {
+      const opened = await unlockNativeSync(
+        { apiBase: await resolveApiBase(), accountId },
+        null,
+        null,
+        false,
+      );
+      useBrowserSyncStore.setState({ session: opened, issue: null });
+    } catch (failure) {
+      // Opening stops the terminal worker before trying the remembered key. If
+      // no key was saved, expose the normal unlock form without blocking the app.
+      useBrowserSyncStore.setState({ session: null, issue: null });
+      setError(failure instanceof Error ? failure.message : String(failure));
+      setAttempt((value) => value + 1);
+    } finally {
+      setReconnecting(false);
+    }
+  };
   return (
     <div className="grid gap-6">
       <SettingsSection
@@ -96,9 +119,14 @@ export function BrowserSyncSettings() {
               </span>
             </SettingsRow>
             {(issue || session.status.issue) && (
-              <p role="alert" className="px-5 py-3 text-sm text-destructive">
-                {issue ?? session.status.issue}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                <p role="alert" className="text-sm text-destructive">
+                  {issue ?? session.status.issue}
+                </p>
+                <Button variant="outline" disabled={reconnecting} onClick={() => void reconnect()}>
+                  {reconnecting ? "Reconnecting…" : "Reconnect"}
+                </Button>
+              </div>
             )}
             <SettingsRow label="Website data">
               <span role="status" className="text-sm text-cream-muted">

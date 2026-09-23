@@ -34,7 +34,7 @@ describe("sync vault setup and unlock", () => {
     fireEvent.click(screen.getByLabelText("I saved my sync secret"));
     fireEvent.click(screen.getByRole("button", { name: "Create sync vault" }));
     await waitFor(() =>
-      expect(h.onUnlock).toHaveBeenCalledWith({ password, syncSecret: secret, remember: false }),
+      expect(h.onUnlock).toHaveBeenCalledWith({ password, syncSecret: secret, remember: true }),
     );
     await waitFor(() =>
       expect((screen.getByLabelText("Sync password") as HTMLInputElement).value).toBe(""),
@@ -72,7 +72,6 @@ describe("sync vault setup and unlock", () => {
     h.onUnlock.mockRejectedValueOnce(new Error("Could not unlock this vault"));
     fill("Sync password", password);
     fill("Sync secret", secret);
-    fireEvent.click(screen.getByLabelText("Remember vault key"));
     fireEvent.click(screen.getByRole("button", { name: "Unlock sync" }));
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain("Could not unlock"),
