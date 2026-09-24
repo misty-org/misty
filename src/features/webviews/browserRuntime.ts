@@ -231,6 +231,23 @@ export function browserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
   return createdRuntimeIds.has(sdkBrowserContexts.get(tab.id)?.runtimeId ?? browserRuntimeId(tab));
 }
 
+/** Apply a committed sync URL to an existing page without showing or focusing
+ * it. Unopened pages will use the projected URL when they are created. */
+export function navigateSyncedBrowserWebview(
+  tab: BrowserRuntimeTab,
+  url: string,
+  stillCurrent: () => boolean,
+): Promise<void> {
+  const id = browserRuntimeId(tab);
+  return enqueue(id, async () => {
+    // Creation/closing may still be queued, and a newer local or remote edit
+    // may have superseded this URL while we waited for the native view.
+    if (!createdRuntimeIds.has(id) || !stillCurrent()) return;
+    useBrowserRuntimeStore.getState().setLoading(tab.id, true);
+    await invoke("browser_webview_navigate", { request: { id, url } });
+  });
+}
+
 export function requestBrowserWebviewLayout(tab: BrowserRuntimeTab): void {
   lastBounds.delete(registerBrowserRuntime(tab));
   if (typeof window !== "undefined") {

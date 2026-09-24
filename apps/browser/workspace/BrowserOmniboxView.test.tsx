@@ -2,6 +2,28 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserOmniboxView } from "./BrowserOmniboxView";
 afterEach(cleanup);
+it("keeps typed text local until the address is submitted", () => {
+  const onNavigate = vi.fn();
+  render(
+    <BrowserOmniboxView
+      currentUrl="https://example.com/"
+      historyEntries={[]}
+      lightChrome={false}
+      suspensionReason="test-address"
+      setOverlay={vi.fn(async () => {})}
+      onNavigate={onNavigate}
+    />,
+  );
+  const input = screen.getByLabelText("Search or enter address");
+  fireEvent.focus(input);
+  for (const value of ["y", "you", "youtube.com"]) {
+    fireEvent.change(input, { target: { value } });
+    expect(onNavigate).not.toHaveBeenCalled();
+  }
+  fireEvent.submit(input.closest("form")!);
+  expect(onNavigate).toHaveBeenCalledTimes(1);
+  expect(onNavigate).toHaveBeenCalledWith("https://youtube.com/");
+});
 it("reveals a saved website address on request and hides it after Escape without navigating", async () => {
   const props = {
     currentUrl: "https://example.com/private/page",
