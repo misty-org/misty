@@ -108,6 +108,7 @@ func (m SyncMutation) Valid() bool {
 type SyncReceipt struct {
 	OperationID string `json:"operation_id"`
 	Sequence    int64  `json:"sequence"`
+	Discarded   bool   `json:"discarded,omitempty"`
 }
 type SyncEvent struct {
 	SyncMutation
@@ -195,7 +196,16 @@ func (db *Database) EnrollBrowserSyncDevice(ctx context.Context, userID string, 
 	return tx.Commit()
 }
 
-func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m SyncMutation) (*SyncReceipt, error) {
+type SyncPublishOptions struct {
+	Activate    bool
+	ActiveEpoch string
+}
+
+func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m SyncMutation, options ...SyncPublishOptions) (*SyncReceipt, error) {
+	var intent SyncPublishOptions
+	if len(options) > 0 {
+		intent = options[0]
+	}
 	if !m.Valid() {
 		return nil, ErrSyncInvalid
 	}
@@ -205,8 +215,9 @@ func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m Syn
 	}
 	defer tx.Rollback()
 	var head, epoch int64
-	// This row lock is a short transaction sequencer, not a device ownership lease.
-	err = tx.QueryRowContext(ctx, `SELECT head_sequence,key_epoch FROM browser_sync_workspaces WHERE user_id=$1 AND workspace_id=$2 FOR UPDATE`, userID, m.WorkspaceID).Scan(&head, &epoch)
+	var activeDevice, activeEpoch sql.NullString
+	// Selection and publication share a lock, so a takeover cannot race a write.
+	err = tx.QueryRowContext(ctx, `SELECT head_sequence,key_epoch,active_device_id,active_epoch FROM browser_sync_workspaces WHERE user_id=$1 AND workspace_id=$2 FOR UPDATE`, userID, m.WorkspaceID).Scan(&head, &epoch, &activeDevice, &activeEpoch)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSyncForbidden
 	}
@@ -229,7 +240,8 @@ func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m Syn
 	digest := sha256.Sum256(signed)
 	var oldHash []byte
 	var oldSequence int64
-	err = tx.QueryRowContext(ctx, `SELECT content_hash,sequence FROM browser_sync_receipts WHERE workspace_id=$1 AND operation_id=$2`, m.WorkspaceID, m.OperationID).Scan(&oldHash, &oldSequence)
+	var discarded bool
+	err = tx.QueryRowContext(ctx, `SELECT content_hash,sequence,discarded FROM browser_sync_receipts WHERE workspace_id=$1 AND operation_id=$2`, m.WorkspaceID, m.OperationID).Scan(&oldHash, &oldSequence, &discarded)
 	if err == nil {
 		if string(oldHash) != string(digest[:]) {
 			return nil, ErrSyncOperationConflict
@@ -237,7 +249,7 @@ func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m Syn
 		if err = tx.Commit(); err != nil {
 			return nil, err
 		}
-		return &SyncReceipt{m.OperationID, oldSequence}, nil
+		return &SyncReceipt{OperationID: m.OperationID, Sequence: oldSequence, Discarded: discarded}, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -250,6 +262,22 @@ func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m Syn
 	}
 	if m.DeviceCounter != counter+1 {
 		return nil, ErrSyncCounterGap
+	}
+	if !intent.Activate && activeDevice.Valid && (activeDevice.String != m.DeviceID || activeEpoch.String != intent.ActiveEpoch) {
+		// Consume the signed device counter and preserve its receipt, without
+		// broadcasting stale follower data or creating a gap in the event log.
+		_, err = tx.ExecContext(ctx, `INSERT INTO browser_sync_receipts(workspace_id,operation_id,sequence,device_id,device_counter,content_hash,discarded) VALUES($1,$2,$3,$4,$5,$6,true)`, m.WorkspaceID, m.OperationID, head, m.DeviceID, m.DeviceCounter, digest[:])
+		if err != nil {
+			return nil, err
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE browser_sync_devices SET last_counter=$3 WHERE workspace_id=$1 AND device_id=$2`, m.WorkspaceID, m.DeviceID, m.DeviceCounter)
+		if err != nil {
+			return nil, err
+		}
+		if err = tx.Commit(); err != nil {
+			return nil, err
+		}
+		return &SyncReceipt{OperationID: m.OperationID, Sequence: head, Discarded: true}, nil
 	}
 	if head >= SyncMaxCounter {
 		return nil, ErrSyncInvalid
@@ -272,6 +300,12 @@ func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m Syn
 	if err != nil {
 		return nil, err
 	}
+	if intent.Activate {
+		_, err = tx.ExecContext(ctx, `UPDATE browser_sync_workspaces SET active_device_id=$2,active_epoch=$3,active_seen_at=clock_timestamp() WHERE workspace_id=$1`, m.WorkspaceID, m.DeviceID, m.OperationID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	hint, _ := json.Marshal(AccountEvent{UserID: userID, Topic: "browser-sync", ID: m.WorkspaceID})
 	_, err = tx.ExecContext(ctx, `SELECT pg_notify('misty_account_events',$1)`, string(hint))
 	if err != nil {
@@ -280,7 +314,7 @@ func (db *Database) PublishBrowserSync(ctx context.Context, userID string, m Syn
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &SyncReceipt{m.OperationID, sequence}, nil
+	return &SyncReceipt{OperationID: m.OperationID, Sequence: sequence}, nil
 }
 
 // A consistent read prevents compaction from creating a false gap between the

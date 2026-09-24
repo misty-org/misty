@@ -85,6 +85,13 @@ func browserSocketTestDatabase(t *testing.T) (*db.Database, *db.Database) {
 	if _, err = conn.Exec(strings.Split(string(raw), "-- +goose Down")[0]); err != nil {
 		t.Fatal(err)
 	}
+	activeMigration, err := os.ReadFile(filepath.Join("..", "postgres", "migrations", "20270214120000_browser_sync_active_device.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(strings.Split(string(activeMigration), "-- +goose Down")[0]); err != nil {
+		t.Fatal(err)
+	}
 	return a, b
 }
 func socketTestGrant(workspace string, root ed25519.PrivateKey) (db.SyncDeviceGrant, ed25519.PrivateKey) {
@@ -239,5 +246,33 @@ func TestBrowserSyncWebSocketTwoServersReplayAndProof(t *testing.T) {
 	w, err := database.BrowserSyncWorkspace(ctx, "owner")
 	if err != nil || w.HeadSequence != 2 {
 		t.Fatal("rejected frames changed durable head")
+	}
+	claim := socketTestMutation(b, keyB, 2)
+	if err := cb.WriteJSON(map[string]any{"type": "heartbeat", "applied_sequence": 2, "ready": true, "activation": claim}); err != nil {
+		t.Fatal(err)
+	}
+	ack = socketTestRead(t, cb, "ack")
+	if json.Unmarshal(ack["receipt"], &receipt) != nil || receipt.Sequence != 3 || receipt.Discarded {
+		t.Fatal("takeover heartbeat was not accepted")
+	}
+	live = socketTestRead(t, fresh, "events")
+	if json.Unmarshal(live["replay"], &replay) != nil || len(replay.Events) != 1 || replay.Events[0].OperationID != claim.OperationID {
+		t.Fatal("takeover did not reach follower")
+	}
+	stale := socketTestMutation(a, keyA, 2)
+	if err := fresh.WriteJSON(map[string]any{"type": "publish", "mutation": stale}); err != nil {
+		t.Fatal(err)
+	}
+	ack = socketTestRead(t, fresh, "ack")
+	if json.Unmarshal(ack["receipt"], &receipt) != nil || receipt.Sequence != 3 || !receipt.Discarded {
+		t.Fatal("follower write was not discarded")
+	}
+	if err := cb.WriteJSON(map[string]any{"type": "publish", "active_epoch": claim.OperationID, "mutation": socketTestMutation(b, keyB, 3)}); err != nil {
+		t.Fatal(err)
+	}
+	ack = socketTestRead(t, cb, "ack")
+	receipt = db.SyncReceipt{}
+	if json.Unmarshal(ack["receipt"], &receipt) != nil || receipt.Sequence != 4 || receipt.Discarded {
+		t.Fatal("active device could not publish")
 	}
 }

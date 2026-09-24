@@ -23,6 +23,7 @@ type SyncPresence struct {
 	Ready           bool       `json:"ready"`
 	AppliedSequence int64      `json:"applied_sequence"`
 	LastSeenAt      *time.Time `json:"last_seen_at"`
+	Active          bool       `json:"active"`
 }
 
 func (db *Database) BrowserSyncDevices(ctx context.Context, userID, workspaceID string) ([]SyncDevice, error) {
@@ -85,7 +86,7 @@ func (db *Database) ConsumeBrowserSyncTicket(ctx context.Context, hash string) (
 	}
 	return &i, err
 }
-func (db *Database) BrowserSyncHeartbeat(ctx context.Context, i SyncConnectionIdentity, connectionID string, applied int64, ready bool) error {
+func (db *Database) BrowserSyncHeartbeat(ctx context.Context, i SyncConnectionIdentity, connectionID string, applied int64, ready bool, epochs ...string) error {
 	if !validSyncID(connectionID) || applied < 0 || applied > SyncMaxCounter {
 		return ErrSyncInvalid
 	}
@@ -104,6 +105,15 @@ func (db *Database) BrowserSyncHeartbeat(ctx context.Context, i SyncConnectionId
 	if n != 1 {
 		return ErrSyncForbidden
 	}
+	if len(epochs) > 0 && epochs[0] != "" {
+		if !validSyncID(epochs[0]) {
+			return ErrSyncInvalid
+		}
+		_, err = db.Conn.ExecContext(ctx, `UPDATE browser_sync_workspaces SET active_seen_at=clock_timestamp() WHERE user_id=$1 AND workspace_id=$2 AND active_device_id=$3 AND active_epoch=$4`, i.UserID, i.WorkspaceID, i.DeviceID, epochs[0])
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 func (db *Database) BrowserSyncDisconnect(ctx context.Context, i SyncConnectionIdentity, connectionID string) error {
@@ -112,9 +122,9 @@ func (db *Database) BrowserSyncDisconnect(ctx context.Context, i SyncConnectionI
 	return err
 }
 func (db *Database) BrowserSyncPresence(ctx context.Context, userID, workspaceID string) ([]SyncPresence, error) {
-	rows, err := db.Conn.QueryContext(ctx, `SELECT d.device_id,COALESCE(bool_or(c.expires_at>clock_timestamp()),false),COALESCE(bool_or(c.expires_at>clock_timestamp() AND c.ready AND c.applied_sequence>=w.head_sequence),false),COALESCE(max(c.applied_sequence),0),max(c.last_seen_at)
+	rows, err := db.Conn.QueryContext(ctx, `SELECT d.device_id,COALESCE(bool_or(c.expires_at>clock_timestamp()),false),COALESCE(bool_or(c.expires_at>clock_timestamp() AND c.ready AND c.applied_sequence>=w.head_sequence),false),COALESCE(max(c.applied_sequence),0),max(c.last_seen_at),COALESCE(w.active_device_id=d.device_id,false)
  FROM browser_sync_devices d JOIN browser_sync_workspaces w USING(workspace_id) LEFT JOIN browser_sync_connections c ON c.workspace_id=d.workspace_id AND c.device_id=d.device_id
- WHERE w.user_id=$1 AND w.workspace_id=$2 AND d.revoked_at IS NULL GROUP BY d.device_id,w.head_sequence ORDER BY d.device_id`, userID, workspaceID)
+ WHERE w.user_id=$1 AND w.workspace_id=$2 AND d.revoked_at IS NULL GROUP BY d.device_id,w.head_sequence,w.active_device_id ORDER BY d.device_id`, userID, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +132,7 @@ func (db *Database) BrowserSyncPresence(ctx context.Context, userID, workspaceID
 	out := []SyncPresence{}
 	for rows.Next() {
 		var p SyncPresence
-		if err = rows.Scan(&p.DeviceID, &p.Online, &p.Ready, &p.AppliedSequence, &p.LastSeenAt); err != nil {
+		if err = rows.Scan(&p.DeviceID, &p.Online, &p.Ready, &p.AppliedSequence, &p.LastSeenAt, &p.Active); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
