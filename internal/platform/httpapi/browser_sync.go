@@ -185,6 +185,8 @@ type syncClientFrame struct {
 	Mutation        *db.SyncMutation `json:"mutation,omitempty"`
 	AppliedSequence int64            `json:"applied_sequence,omitempty"`
 	Ready           bool             `json:"ready,omitempty"`
+	ActiveEpoch     string           `json:"active_epoch,omitempty"`
+	Activation      *db.SyncMutation `json:"activation,omitempty"`
 }
 
 func (s *BrowserSyncService) Connect() http.HandlerFunc {
@@ -275,10 +277,11 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 	}()
 	defer func() { cancel(); _ = conn.Close(); <-done }()
 	applied, ready := after, false
+	activeEpoch := ""
 	heartbeat := func() error {
 		bounded, stop := context.WithTimeout(ctx, 5*time.Second)
 		defer stop()
-		if err := s.database.BrowserSyncHeartbeat(bounded, identity, connectionID, applied, ready); err != nil {
+		if err := s.database.BrowserSyncHeartbeat(bounded, identity, connectionID, applied, ready, activeEpoch); err != nil {
 			return err
 		}
 		return conn.SetReadDeadline(time.Now().Add(45 * time.Second))
@@ -313,7 +316,7 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 				continue
 			}
 			bounded, stop := context.WithTimeout(ctx, 10*time.Second)
-			receipt, err := s.database.PublishBrowserSync(bounded, identity.UserID, *frame.Mutation)
+			receipt, err := s.database.PublishBrowserSync(bounded, identity.UserID, *frame.Mutation, db.SyncPublishOptions{ActiveEpoch: frame.ActiveEpoch})
 			stop()
 			if err != nil {
 				code, _ := syncErrorCode(err)
@@ -332,8 +335,27 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 				continue
 			}
 			applied, ready = frame.AppliedSequence, frame.Ready
+			activeEpoch = frame.ActiveEpoch
 			if heartbeat() != nil {
 				return
+			}
+			if frame.Activation != nil {
+				m := frame.Activation
+				if m.WorkspaceID != identity.WorkspaceID || m.DeviceID != identity.DeviceID {
+					send(map[string]any{"type": "error", "code": "sync_device_forbidden"})
+					continue
+				}
+				bounded, stop := context.WithTimeout(ctx, 10*time.Second)
+				receipt, err := s.database.PublishBrowserSync(bounded, identity.UserID, *m, db.SyncPublishOptions{Activate: true})
+				stop()
+				if err != nil {
+					code, _ := syncErrorCode(err)
+					if !send(map[string]any{"type": "error", "operation_id": m.OperationID, "code": code}) {
+						return
+					}
+				} else if !send(map[string]any{"type": "ack", "receipt": receipt}) {
+					return
+				}
 			}
 		case "resume":
 			if frame.After < 0 || frame.After > db.SyncMaxCounter {
