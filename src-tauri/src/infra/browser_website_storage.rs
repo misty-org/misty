@@ -186,6 +186,7 @@ impl WebsiteStorage {
                 format!("misty-browser-storage-{}", uuid::Uuid::new_v4()),
                 tauri::WebviewUrl::External(url),
             )
+            .focused(false)
             .initialization_script(script)
             .on_navigation(move |url| {
                 url.as_str() == "about:blank" || url.origin().ascii_serialization() == expected
@@ -352,6 +353,19 @@ async fn open_origin(view: &Webview, origin: &str) -> Result<(), String> {
 #[cfg(all(debug_assertions, target_os = "macos"))]
 pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
     let owner = app.get_webview("main").ok_or("Missing probe window")?;
+    async fn assert_background(owner: &Webview) -> Result<(), String> {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        owner.with_webview(move |_| {
+            let marker = objc2::MainThreadMarker::new().expect("native callback runs on main thread");
+            let active = objc2_app_kit::NSApplication::sharedApplication(marker).isActive();
+            let _ = send.send(active);
+        }).map_err(|_| "Could not inspect probe activation")?;
+        if receive.await.map_err(|_| "Could not inspect probe activation")? {
+            return Err("Background storage activated the application".into());
+        }
+        Ok(())
+    }
+    assert_background(&owner).await?;
     let physical = uuid::Uuid::new_v4().simple().to_string().repeat(2);
     let other = uuid::Uuid::new_v4().simple().to_string().repeat(2);
     let origin = "https://sync-fixture.invalid";
@@ -375,11 +389,13 @@ pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
     if !observed.iter().any(|observation| matches!(observation.area, Area::LocalStorage { .. }) && observation.payload["sync-probe"] == "persisted") {
         return Err("Website capture did not read the stored origin data".into());
     }
-    let mut isolated = WebsiteStorage::new(owner, other.clone());
+    assert_background(&owner).await?;
+    let mut isolated = WebsiteStorage::new(owner.clone(), other.clone());
     let view = isolated.origin(origin, None).await?;
     let empty = evaluate(view, &other, origin, None).await?;
     if empty["local"].get("sync-probe").is_some() {
         return Err("Website data leaked across profiles".into());
     }
-    Ok("PASS: native website storage writes, reads and captures HTTP(S) origins; wrong profiles and cookie imports on nonblank pages remain rejected; separate profiles remain isolated.".into())
+    assert_background(&owner).await?;
+    Ok("PASS: native website storage writes, reads and captures HTTP(S) origins without activating the application; wrong profiles and cookie imports on nonblank pages remain rejected; separate profiles remain isolated.".into())
 }

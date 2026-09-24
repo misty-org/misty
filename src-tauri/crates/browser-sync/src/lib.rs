@@ -12,6 +12,8 @@ pub mod worker;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("This device is following sync. Make it active to publish changes.")]
+    InactiveDevice,
     #[error("Invalid sync data")]
     Invalid,
     #[error("Sync identity or signature did not match")]

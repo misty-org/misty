@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   user: { id: "account-1" } as { id: string } | null,
   availability: vi.fn(),
   credentials: vi.fn(),
+  read: vi.fn(),
   generation: 1,
 }));
 vi.mock("@/features/auth", () => ({
@@ -44,6 +45,11 @@ vi.mock("./native", () => ({
   vaultAvailability: mocks.availability,
   generateSyncSecret: vi.fn(),
   unlockNativeSync: vi.fn(),
+  readNativeSync: mocks.read,
+  activeDeviceEpoch: (session: NativeSyncView) =>
+    session.workspace.active_device?.device_id === session.device_id
+      ? session.workspace.active_device.epoch
+      : null,
 }));
 vi.mock("./SyncVaultForm", () => ({ SyncVaultForm: () => <div>Unlock sync</div> }));
 
@@ -146,6 +152,7 @@ describe("BrowserSyncSettings", () => {
       presence: [],
       pending_operation_ids: [],
       workspace: {
+        active_device: { device_id: "device-1", epoch: "epoch-1", sequence: 1 },
         version: 1,
         sequence: 1,
         records: [],
@@ -156,6 +163,13 @@ describe("BrowserSyncSettings", () => {
       ...overrides,
     };
   }
+
+  it("shows the device role without an active-device toggle", async () => {
+    useBrowserSyncStore.setState({ session: session() });
+    await mount();
+    expect(container.textContent).toContain("This device");
+    expect(container.querySelector('[role="switch"]')).toBeNull();
+  });
 
   it.each(["offline", "connecting"] as const)(
     "shows the connection dependency while %s, not endless preparation or zero devices",

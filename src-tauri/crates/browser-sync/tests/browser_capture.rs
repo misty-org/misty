@@ -21,6 +21,61 @@ fn observed(value: Value) -> Vec<BrowserObservation> {
         payload: value,
     }]
 }
+
+#[test]
+fn native_capture_stops_on_followers_and_old_queued_cookies_cannot_echo_after_takeover() {
+    let mut f = Fixture::new();
+    let claim = serde_json::to_vec(
+        &json!({"kind":"active_device","version":1,"active":true,"previous_epoch":null}),
+    )
+    .unwrap();
+    let first = f.store.enqueue(&f.root, &f.device, &claim).unwrap();
+    let epoch = first.operation_id.clone();
+    f.accept();
+    assert_eq!(f.observe(cookies("active-secret")), State::Queued);
+    let queued = f.store.pending(false, 1).unwrap().remove(0);
+    let payload: Payload =
+        serde_json::from_slice(&f.root.open_mutation(&f.scope, &f.grant, &queued).unwrap())
+            .unwrap();
+    assert!(matches!(payload, Payload::Published { active_epoch, .. } if active_epoch == epoch));
+
+    let other_key = DeviceKey::generate();
+    let other = f.root.grant(&f.scope, &id(), 1, &other_key).unwrap();
+    let takeover = serde_json::to_vec(
+        &json!({"kind":"active_device","version":1,"active":true,"previous_epoch":epoch}),
+    )
+    .unwrap();
+    let mutation = f
+        .root
+        .seal_mutation(&f.scope, &other, &other_key, &id(), 1, &takeover)
+        .unwrap();
+    let sequence = f.store.applied_sequence().unwrap() + 1;
+    f.store
+        .apply_events(
+            &f.root,
+            &[(Event { mutation, sequence }, other)],
+            document::reduce,
+        )
+        .unwrap();
+    assert!(matches!(
+        f.store.observe_browser_profile(
+            &f.root,
+            &f.device,
+            &profile(),
+            &f.generation,
+            observed(cookies("follower-refresh"))
+        ),
+        Err(misty_browser_sync::Error::InactiveDevice)
+    ));
+    f.accept(); // An already-sent old mutation can still be acknowledged, but is ignored.
+    let document: Document =
+        serde_json::from_slice(&f.store.committed_snapshot(&f.root).unwrap()).unwrap();
+    assert_eq!(
+        document.credentials.values().next().unwrap().payload,
+        cookies("initial-secret")
+    );
+    assert_eq!(f.store.pending_count().unwrap(), 0);
+}
 struct Fixture {
     dir: tempfile::TempDir,
     root: VaultRoot,

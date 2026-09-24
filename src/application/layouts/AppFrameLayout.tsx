@@ -4,6 +4,7 @@ import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceR
 import { readApiAuthToken } from "@/api/client/session";
 import { Button } from "@/shared/ui";
 import { BrowserSyncStartup } from "@/features/browser-workspace/BrowserSyncStartup";
+import { BrowserSyncSleepOverlay } from "@/features/browser-workspace/BrowserSyncSleepOverlay";
 import { BrowserSyncBridge } from "@/features/browser-workspace/BrowserSyncBridge";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui/loading-screen";
@@ -102,6 +103,7 @@ export function AppFrameLayout() {
       <AgentExecutionSurface />
       <ActivityPanel />
       <UpdateNotices accountId={user?.id ?? ""} />
+      <BrowserSyncSleepOverlay key={user?.id} accountId={user?.id ?? ""} />
     </>
   );
 }

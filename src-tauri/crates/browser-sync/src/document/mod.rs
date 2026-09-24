@@ -94,6 +94,14 @@ pub struct ResumeRecord {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ActiveDevice {
+    pub device_id: Option<String>,
+    pub epoch: String,
+    pub sequence: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Document {
     pub version: u8,
     pub sequence: u64,
@@ -101,6 +109,8 @@ pub struct Document {
     pub credentials: BTreeMap<String, CredentialRecord>,
     pub rejected_credentials_by_device: BTreeMap<String, RejectedCredentials>,
     pub resumes: BTreeMap<String, ResumeRecord>,
+    #[serde(default)]
+    pub active_device: Option<ActiveDevice>,
 }
 
 /// This is the renderer boundary. Credential payloads and encryption/signing
@@ -114,6 +124,7 @@ pub struct WorkspaceView {
     pub orphaned_tab_ids: Vec<String>,
     pub orphaned_website_ids: Vec<String>,
     pub resumes: BTreeMap<String, ResumeRecord>,
+    pub active_device: Option<ActiveDevice>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -133,6 +144,7 @@ impl Default for Document {
             credentials: BTreeMap::new(),
             rejected_credentials_by_device: BTreeMap::new(),
             resumes: BTreeMap::new(),
+            active_device: None,
         }
     }
 }
@@ -159,6 +171,16 @@ pub enum Change {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Payload {
+    ActiveDevice {
+        version: u8,
+        active: bool,
+        previous_epoch: Option<String>,
+    },
+    Published {
+        version: u8,
+        active_epoch: String,
+        payload: Box<Payload>,
+    },
     Workspace {
         version: u8,
         changes: Vec<Change>,
@@ -174,8 +196,45 @@ pub enum Payload {
 }
 
 impl Payload {
+    pub fn published(self, active_epoch: String) -> Self {
+        Self::Published {
+            version: 1,
+            active_epoch,
+            payload: Box::new(self),
+        }
+    }
+
+    pub fn data(&self) -> &Self {
+        match self {
+            Self::Published { payload, .. } => payload,
+            _ => self,
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         match self {
+            Self::ActiveDevice {
+                version: 1,
+                previous_epoch,
+                ..
+            } if previous_epoch
+                .as_deref()
+                .is_none_or(crate::protocol::valid_id) =>
+            {
+                Ok(())
+            }
+            Self::Published {
+                version: 1,
+                active_epoch,
+                payload,
+            } if crate::protocol::valid_id(active_epoch)
+                && matches!(
+                    payload.as_ref(),
+                    Self::Workspace { .. } | Self::Credentials { .. } | Self::Resume { .. }
+                ) =>
+            {
+                payload.validate()
+            }
             Self::Workspace {
                 version: 1,
                 changes,
@@ -238,6 +297,7 @@ impl Document {
             orphaned_tab_ids: self.orphaned_tabs()?,
             orphaned_website_ids,
             resumes: self.resumes.clone(),
+            active_device: self.active_device.clone(),
         })
     }
 
@@ -255,7 +315,48 @@ impl Document {
         }
         payload.validate()?;
         let sequence = context.sequence;
+        // Legacy events still replay before the first explicit selection. Once
+        // selected, an old sender or a previous tenure cannot change the state.
+        let payload = match payload {
+            Payload::ActiveDevice {
+                active,
+                previous_epoch,
+                ..
+            } => {
+                if active
+                    || (self.active_device.as_ref().map(|v| &v.epoch) == previous_epoch.as_ref()
+                        && self.is_active(&context.device_id))
+                {
+                    self.active_device = Some(ActiveDevice {
+                        device_id: active.then(|| context.device_id.clone()),
+                        epoch: context.operation_id.clone(),
+                        sequence,
+                    });
+                }
+                self.sequence = sequence;
+                return Ok(());
+            }
+            Payload::Published {
+                active_epoch,
+                payload,
+                ..
+            } => {
+                if !self.is_active(&context.device_id)
+                    || self.active_device.as_ref().map(|v| &v.epoch) != Some(&active_epoch)
+                {
+                    self.sequence = sequence;
+                    return Ok(());
+                }
+                *payload
+            }
+            other if self.active_device.is_none() => other,
+            _ => {
+                self.sequence = sequence;
+                return Ok(());
+            }
+        };
         match payload {
+            Payload::ActiveDevice { .. } | Payload::Published { .. } => return Err(Error::Invalid),
             Payload::Workspace { changes, .. } => {
                 for change in changes {
                     match change {
@@ -357,7 +458,35 @@ impl Document {
             .filter(|r| r.deleted_sequence.is_none())
     }
 
+    pub fn is_active(&self, device_id: &str) -> bool {
+        self.active_device
+            .as_ref()
+            .and_then(|v| v.device_id.as_deref())
+            == Some(device_id)
+    }
+
+    pub fn can_publish(&self, device_id: &str, payload: &Payload) -> bool {
+        match payload {
+            Payload::ActiveDevice { .. } => true,
+            Payload::Published { active_epoch, .. } => {
+                self.is_active(device_id)
+                    && self.active_device.as_ref().map(|v| &v.epoch) == Some(active_epoch)
+            }
+            _ => self.active_device.is_none(), // historical clients before selection
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
+        if self.active_device.as_ref().is_some_and(|v| {
+            !crate::protocol::valid_id(&v.epoch)
+                || v.sequence == 0
+                || v.sequence > self.sequence
+                || v.device_id
+                    .as_deref()
+                    .is_some_and(|id| !crate::protocol::valid_id(id))
+        }) {
+            return Err(Error::Invalid);
+        }
         if self.version != 1
             || self.sequence > MAX_COUNTER
             || self.records.len() > 50_000

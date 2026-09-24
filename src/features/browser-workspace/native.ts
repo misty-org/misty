@@ -36,9 +36,20 @@ export const editNativeWorkspace = (
   sessionId: string,
   operationId: string,
   changes: WorkspaceChange[],
-) => invoke<string>("browser_sync_edit", { sessionId, operationId, changes });
-export const saveNativeResume = (sessionId: string, operationId: string, resume: Resume) =>
-  invoke<string>("browser_sync_resume", { sessionId, operationId, resume });
+  activeEpoch: string,
+) => invoke<string>("browser_sync_edit", { sessionId, operationId, changes, activeEpoch });
+export const saveNativeResume = (
+  sessionId: string,
+  operationId: string,
+  resume: Resume,
+  activeEpoch: string,
+) => invoke<string>("browser_sync_resume", { sessionId, operationId, resume, activeEpoch });
+export const activateNativeDevice = (sessionId: string) =>
+  invoke<string>("browser_sync_activate", { sessionId });
+export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
+  session.workspace.active_device?.device_id === session.device_id
+    ? session.workspace.active_device.epoch
+    : null;
 export const vaultAvailability = (account: SyncAccount) =>
   invoke<{ local: boolean; remote: boolean | null }>("browser_sync_availability", { ...account });
 export const generateSyncSecret = () => invoke<string>("browser_sync_generate_secret");

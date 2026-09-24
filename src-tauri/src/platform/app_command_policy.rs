@@ -29,6 +29,7 @@ mod tests {
             "browser_sync_state",
             "browser_sync_edit",
             "browser_sync_resume",
+            "browser_sync_activate",
             "browser_sync_lock",
             "browser_sync_forget_key",
             "browser_recovery_open",

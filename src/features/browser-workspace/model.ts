@@ -67,6 +67,7 @@ export interface WorkspaceView {
   orphaned_tab_ids: string[];
   orphaned_website_ids: string[];
   resumes: Record<string, { sequence: number; resume: Resume }>;
+  active_device?: { device_id: string | null; epoch: string; sequence: number } | null;
 }
 export type WorkspaceChange = {
   [K in RecordKind]:

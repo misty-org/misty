@@ -63,6 +63,7 @@ fn restart_lost_ack_and_replay_preserve_exact_operation_and_counter() {
         encoded
     );
     let receipt = Receipt {
+        discarded: false,
         operation_id: mutation.operation_id.clone(),
         sequence: 1,
     };
@@ -197,6 +198,7 @@ fn multiple_writers_apply_server_order_and_reject_gaps_tampering_and_conflicts()
         .is_err());
     assert!(store
         .acknowledge(&Receipt {
+            discarded: false,
             operation_id: local.operation_id,
             sequence: 1
         })
@@ -311,4 +313,49 @@ fn lost_renderer_reply_retries_same_intent_even_after_replay_and_restart() {
     assert_eq!(store.allocated_counter().unwrap(), 1);
     assert_eq!(store.pending_count().unwrap(), 0);
     assert_eq!(store.committed_snapshot(&root).unwrap().as_slice(), payload);
+}
+
+#[test]
+fn discarded_stale_outbox_drains_without_losing_its_encrypted_recovery_copy() {
+    let temp = TempDir::new().unwrap();
+    let path = temp.path().join("sync.sqlite");
+    let root = VaultRoot::generate();
+    let device = DeviceKey::generate();
+    let scope = scope();
+    let grant = root
+        .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)
+        .unwrap();
+    let mut store =
+        Store::initialize(&path, scope.clone(), grant.clone(), &root, &device, b"").unwrap();
+    let stale = store
+        .enqueue(&root, &device, b"stale-private-fixture")
+        .unwrap();
+    let receipt = Receipt {
+        operation_id: stale.operation_id.clone(),
+        sequence: 1,
+        discarded: true,
+    };
+    store.acknowledge(&receipt).unwrap();
+    store.acknowledge(&receipt).unwrap();
+    assert!(store.pending(false, 10).unwrap().is_empty());
+    assert_eq!(store.applied_sequence().unwrap(), 0);
+    drop(store);
+    let (mut store, device) = Store::unlock(&path, scope, &root).unwrap();
+    let fresh = store.enqueue(&root, &device, b"fresh").unwrap();
+    assert_eq!(fresh.device_counter, 2);
+    store
+        .apply_events(&root, &[event(fresh, 1, &grant)], add)
+        .unwrap();
+    assert_eq!(&**store.committed_snapshot(&root).unwrap(), b"fresh");
+    let db = Connection::open(&path).unwrap();
+    let encoded: String = db
+        .query_row("SELECT mutation FROM sync_discarded", [], |r| r.get(0))
+        .unwrap();
+    assert!(!encoded.contains("stale-private-fixture"));
+    assert_eq!(
+        serde_json::from_str::<Mutation>(&encoded)
+            .unwrap()
+            .operation_id,
+        stale.operation_id
+    );
 }

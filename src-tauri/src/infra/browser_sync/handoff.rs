@@ -179,6 +179,18 @@ pub(super) async fn capture_current(
     active: &mut Session,
 ) -> Result<(), String> {
     account_api(&active.scope.deployment, &active.scope.account_id)?;
+    let committed: Document =
+        serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+            .map_err(|_| "Could not read the active device")?;
+    if !committed.is_active(&active.device_id) {
+        return Err(issue(misty_browser_sync::Error::InactiveDevice));
+    }
+    let epoch = committed
+        .active_device
+        .as_ref()
+        .ok_or("Choose an active device first")?
+        .epoch
+        .clone();
     let status = active.handle.status.borrow().clone();
     if !matches!(status.phase, Phase::CatchingUp | Phase::Ready)
         || status.applied_sequence < status.head_sequence
@@ -263,7 +275,7 @@ pub(super) async fn capture_current(
             // If another device seeds this area after our read, base=0 loses the
             // reducer comparison. Never silently rebase legacy refresh tokens.
             let bytes = Zeroizing::new(
-                serde_json::to_vec(&payload)
+                serde_json::to_vec(&payload.published(epoch))
                     .map_err(|_| "Could not encode the captured cookies")?,
             );
             active.handle.enqueue(bytes).await.map_err(issue)?;

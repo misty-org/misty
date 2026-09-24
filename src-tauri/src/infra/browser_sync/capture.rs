@@ -23,7 +23,8 @@ impl CaptureView {
         let builder = tauri::WebviewBuilder::new(
             format!("misty-browser-capture-{}", uuid::Uuid::new_v4()),
             tauri::WebviewUrl::External("about:blank".parse().map_err(|_| "Invalid capture URL")?),
-        );
+        )
+        .focused(false);
         #[cfg(target_os = "macos")]
         let builder = builder.data_store_identifier(
             super::super::browser_profile::data_store_identifier(Some(physical))?,
@@ -129,6 +130,45 @@ async fn reconcile(
         .browser_import_journal(logical.clone())
         .await
         .map_err(issue)?;
+    let document: Document =
+        serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+            .map_err(|_| "Could not read the workspace")?;
+    if !document.is_active(&active.device_id) {
+        active.capture_view = None;
+        if !connected {
+            return Ok(None);
+        }
+        let target: Vec<_> = document
+            .credentials
+            .values()
+            .filter(|v| v.profile_id == logical)
+            .collect();
+        let imported = journal.applied.as_ref().is_some_and(|receipt| {
+            receipt.credentials.len() == target.len()
+                && target.iter().all(|record| {
+                    receipt.credentials.iter().any(|old| {
+                        old.area.key(&logical).ok() == record.area.key(&logical).ok()
+                            && old.sequence == record.sequence
+                    })
+                })
+        });
+        if !target.is_empty()
+            && (!imported
+                || binding.active.is_none()
+                || binding.staged.is_some()
+                || journal.pending.is_some()
+                || journal.quarantined)
+        {
+            handoff::restore_current(app, active).await?;
+        } else {
+            active
+                .handle
+                .imports_applied(document.sequence)
+                .await
+                .map_err(issue)?;
+        }
+        return Ok(None);
+    }
     if binding.active.is_none()
         || binding.staged.is_some()
         || journal.pending.is_some()

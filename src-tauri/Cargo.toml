@@ -123,3 +123,6 @@ image = { version = "0.25.10", default-features = false, features = ["bmp", "gif
 [patch.crates-io]
 # Preserve the clipboard API while using AppKit instead of a bundled TIFF decoder on macOS.
 arboard = { path = "vendor/arboard" }
+
+# Honor focused(false) when creating background WebKit views on macOS.
+wry = { path = "vendor/wry" }
