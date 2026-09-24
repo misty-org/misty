@@ -19,13 +19,17 @@ import {
   vaultAvailability,
   type NativeSyncView,
   type SyncAccount,
+  activeDeviceEpoch,
 } from "./native";
 import { useBrowserSyncStore } from "./store";
 import { SyncVaultForm } from "./SyncVaultForm";
 
 function statusLabel(session: NativeSyncView) {
   if (session.status.issue) return "Needs attention";
-  if (session.status.phase === "offline") return "Offline · edits queued on this device";
+  if (session.status.phase === "offline")
+    return activeDeviceEpoch(session)
+      ? "Offline · edits queued on this device"
+      : "Offline · waiting to receive changes";
   if (session.status.phase === "connecting") return "Connecting";
   if (session.status.pending_changes)
     return `${session.status.pending_changes} changes waiting to sync`;
@@ -42,6 +46,10 @@ function websiteDataLabel(session: NativeSyncView, issue: string | null) {
     return "Waiting for sync connection";
   if (session.status.phase === "stopped" || session.status.phase === "attention")
     return "Needs attention";
+  if (!activeDeviceEpoch(session))
+    return session.workspace.active_device?.device_id
+      ? "Receiving from the active device"
+      : "Waiting for an active device";
   if (session.browser_profile_ready) return "Automatic sync enabled";
   if (session.status.applied_sequence < session.status.head_sequence)
     return "Waiting for workspace changes";
@@ -147,6 +155,11 @@ export function BrowserSyncSettings() {
           <SettingsNote>Sign in to Misty before setting up device sync.</SettingsNote>
         ) : session?.account_id === accountId ? (
           <>
+            <SettingsRow label="Active device">
+              <span className="text-sm text-cream-muted">
+                {activeDeviceEpoch(session) ? "This device" : "Wake Misty to use this device"}
+              </span>
+            </SettingsRow>
             <SettingsRow label="Workspace status">
               <span role="status" className="text-sm text-cream-muted">
                 {issue ? "Needs attention" : statusLabel(session)}

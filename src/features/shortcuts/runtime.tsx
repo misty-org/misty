@@ -145,6 +145,7 @@ export function ShortcutRuntime(): null {
 }
 
 export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: boolean): boolean {
+  if (document.querySelector("[data-device-sync-sleep]")) return false;
   if (event.defaultPrevented || document.documentElement.dataset.shortcutCapture === "true")
     return false;
   const activeScope = focusedShortcutScope();
@@ -190,6 +191,7 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
 }
 
 export function invokeShortcutCommand(commandId: string): boolean {
+  if (document.querySelector("[data-device-sync-sleep]")) return false;
   const definition = shortcutCommandsById.get(commandId);
   if (!definition) return false;
   const activeScope = focusedShortcutScope();

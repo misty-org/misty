@@ -325,8 +325,9 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
     let nonce = uuid::Uuid::new_v4().to_string();
     let app_id = std::env::var("MISTY_SDK_PROBE_APP").unwrap_or_else(|_| "terminal".into());
     let names_probe = std::env::var("MISTY_NAVIGATION_NAMES_PROBE").as_deref() == Ok("1");
+    let storage_probe = std::env::var("MISTY_SDK_PROBE_SYNC_STORAGE").as_deref() == Ok("1");
     let page = match app_id.as_str() {
-        _ if std::env::var("MISTY_SDK_PROBE_SYNC_STORAGE").as_deref() == Ok("1") => "sdk-sync-storage-probe.html",
+        _ if storage_probe => "sdk-sync-storage-probe.html",
         _ if std::env::var("MISTY_SDK_PROBE_GMAIL_SIGNIN").as_deref() == Ok("1") => {
             "sdk-gmail-signin-probe.html"
         }
@@ -537,21 +538,22 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
                 )));
             }
             tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
-                .on_page_load(|window, payload| {
+                .on_page_load(move |window, payload| {
                     eprintln!("SDK probe host page: {:?}", payload.event());
-                    if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                    if !storage_probe && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                         let _ = window.set_focus();
                     }
                 })
                 .title("Misty downloaded SDK package verification")
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
                 .hidden_title(true)
-                .focused(true)
-                .always_on_top(true)
+                .focused(!storage_probe)
+                .visible(!storage_probe)
+                .always_on_top(!storage_probe)
                 .inner_size(1100.0, 600.0)
                 .data_directory(profile_path)
                 .build()?;
-            app.show()?;
+            if !storage_probe { app.show()?; }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let timeout = std::env::var("MISTY_SDK_PROBE_TIMEOUT_SECONDS")

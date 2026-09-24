@@ -79,6 +79,9 @@ fn connect(path: &Path) -> Result<Connection> {
         CREATE TABLE IF NOT EXISTS sync_local_intents (
             operation_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS sync_discarded (
+            operation_id TEXT PRIMARY KEY, sequence INTEGER NOT NULL, mutation TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS sync_applied (
             sequence INTEGER PRIMARY KEY, operation_id TEXT NOT NULL UNIQUE, digest BLOB NOT NULL
         );
@@ -462,6 +465,35 @@ impl Store {
     }
 
     pub fn acknowledge(&mut self, receipt: &Receipt) -> Result<()> {
+        if receipt.discarded {
+            if !valid_id(&receipt.operation_id) || receipt.sequence > MAX_COUNTER {
+                return Err(Error::Invalid);
+            }
+            let tx = self
+                .connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)?;
+            // Keep the encrypted stale edit for recovery while allowing the
+            // already-consumed server counter to drain from our transport queue.
+            tx.execute("INSERT OR IGNORE INTO sync_discarded SELECT operation_id,?2,mutation FROM sync_outbox WHERE operation_id=?1 AND accepted_sequence IS NULL",
+                params![receipt.operation_id, receipt.sequence])?;
+            let sequence: Option<u64> = tx
+                .query_row(
+                    "SELECT sequence FROM sync_discarded WHERE operation_id=?1",
+                    [&receipt.operation_id],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            if sequence != Some(receipt.sequence) {
+                return Err(Error::Sequence);
+            }
+            tx.execute(
+                "DELETE FROM sync_outbox WHERE operation_id=?1",
+                [&receipt.operation_id],
+            )?;
+            tx.execute("UPDATE sync_high_watermark SET observed_head=max(observed_head,?1) WHERE singleton=1", [receipt.sequence])?;
+            tx.commit()?;
+            return Ok(());
+        }
         if !valid_id(&receipt.operation_id) || !counter(receipt.sequence) {
             return Err(Error::Invalid);
         }

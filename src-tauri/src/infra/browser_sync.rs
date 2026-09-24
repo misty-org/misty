@@ -15,7 +15,7 @@ use misty_browser_sync::{
     secure_store,
     store::{BrowserProfileBinding, CachedVault, Store},
     transport::SyncApi,
-    worker::{Status, Worker, WorkerHandle},
+    worker::{Phase, Status, Worker, WorkerHandle},
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -161,12 +161,21 @@ pub(super) async fn browser_profile_lease(
         _ => (requested.map(str::to_owned), None),
     };
     let mut tab_session = None;
-    if let (Some(active), Some((tab_id, url)), Some(logical)) = (current.as_ref(), tab, logical_profile_id.as_ref()) {
+    if let (Some(active), Some((tab_id, url)), Some(logical)) =
+        (current.as_ref(), tab, logical_profile_id.as_ref())
+    {
         if let Ok(url) = url::Url::parse(url) {
-            let area = document::credentials::Area::SessionStorage { origin: url.origin().ascii_serialization(), tab_id: tab_id.into() };
-            let document: Document = serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
-                .map_err(|_| "Could not read tab session")?;
-            tab_session = document.credentials.get(&area.key(logical).map_err(issue)?).map(|record| record.payload.clone());
+            let area = document::credentials::Area::SessionStorage {
+                origin: url.origin().ascii_serialization(),
+                tab_id: tab_id.into(),
+            };
+            let document: Document =
+                serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+                    .map_err(|_| "Could not read tab session")?;
+            tab_session = document
+                .credentials
+                .get(&area.key(logical).map_err(issue)?)
+                .map(|record| record.payload.clone());
         }
     }
     Ok(BrowserProfileLease {
@@ -235,6 +244,9 @@ fn require_main(webview: &tauri::Webview) -> Result<(), String> {
 fn issue(error: misty_browser_sync::Error) -> String {
     use misty_browser_sync::Error;
     match error {
+        Error::InactiveDevice => {
+            "This device is following sync. Make it active to publish changes."
+        }
         Error::Unlock => "Could not unlock sync. Check the password and sync secret.",
         Error::Identity => "Sync identity did not match. Local data has been preserved.",
         Error::Authentication => "Sign in again to reconnect sync.",
@@ -409,6 +421,10 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
             let document: Document = serde_json::from_slice(&pending.snapshot)
                 .map_err(|_| "Could not read the local workspace")?;
             let mut workspace = document.workspace_view().map_err(issue)?;
+            let committed: Document =
+                serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+                    .map_err(|_| "Could not read the active device")?;
+            workspace.active_device = committed.active_device;
             // Tentative reducer versions must never become a replay/import cursor.
             workspace.sequence = pending.committed_sequence;
             active.cached_workspace = workspace;
@@ -431,7 +447,12 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
     let profile = default_profile_id(&active.scope)?;
     let browser_profile_ready = match active.handle.browser_profile_binding(profile.clone()).await {
         Ok(binding) => match active.handle.browser_import_journal(profile).await {
-            Ok(journal) => binding.active.is_some() && binding.staged.is_none() && journal.pending.is_none() && !journal.quarantined,
+            Ok(journal) => {
+                binding.active.is_some()
+                    && binding.staged.is_none()
+                    && journal.pending.is_none()
+                    && !journal.quarantined
+            }
             Err(_) => false,
         },
         Err(_) => false,
@@ -740,6 +761,10 @@ async fn open_vault(
     let document: Document = serde_json::from_slice(&pending.snapshot)
         .map_err(|_| "Could not read the local workspace")?;
     let mut cached_workspace = document.workspace_view().map_err(issue)?;
+    let committed: Document =
+        serde_json::from_slice(&store.committed_snapshot(&root).map_err(issue)?)
+            .map_err(|_| "Could not read the active device")?;
+    cached_workspace.active_device = committed.active_device;
     cached_workspace.sequence = pending.committed_sequence;
     let device_id = store.grant().device_id.clone();
     let (worker, handle) =
@@ -801,6 +826,7 @@ pub async fn browser_sync_edit(
     session_id: String,
     operation_id: String,
     changes: Vec<Change>,
+    active_epoch: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
     enqueue(
@@ -809,7 +835,8 @@ pub async fn browser_sync_edit(
         Payload::Workspace {
             version: 1,
             changes,
-        },
+        }
+        .published(active_epoch),
     )
     .await
 }
@@ -820,14 +847,41 @@ pub async fn browser_sync_resume(
     session_id: String,
     operation_id: String,
     resume: Resume,
+    active_epoch: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
     enqueue(
         &session_id,
         operation_id,
-        Payload::Resume { version: 1, resume },
+        Payload::Resume { version: 1, resume }.published(active_epoch),
     )
     .await
+}
+
+#[tauri::command]
+pub async fn browser_sync_activate(
+    webview: tauri::Webview,
+    session_id: String,
+) -> Result<String, String> {
+    require_main(&webview)?;
+    let current = session().lock().await;
+    let session = current.as_ref().ok_or("Connect device sync first.")?;
+    require_session(session, &session_id)?;
+    let status = session.handle.status.borrow().clone();
+    if !matches!(status.phase, Phase::Ready | Phase::CatchingUp) {
+        return Err("Waiting for a sync connection. Try waking Misty again in a moment.".into());
+    }
+    let document: Document =
+        serde_json::from_slice(&session.handle.snapshot().await.map_err(issue)?)
+            .map_err(|_| "Could not read the active device")?;
+    let payload = Payload::ActiveDevice {
+        version: 1,
+        active: true,
+        previous_epoch: document.active_device.map(|v| v.epoch),
+    };
+    let bytes =
+        Zeroizing::new(serde_json::to_vec(&payload).map_err(|_| "Could not encode active device")?);
+    session.handle.enqueue(bytes).await.map_err(issue)
 }
 
 async fn enqueue(

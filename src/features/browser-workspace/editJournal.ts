@@ -4,6 +4,7 @@ export interface PendingEdit {
   id: string;
   changes: WorkspaceChange[];
   resume?: Resume;
+  activeEpoch?: string;
 }
 export interface JournalStorage {
   getItem(key: string): string | null;
@@ -41,11 +42,11 @@ export class EditJournal {
   async flush(): Promise<void> {
     await this.storage.flush?.();
   }
-  append(changes: WorkspaceChange[]): void {
+  append(changes: WorkspaceChange[], activeEpoch?: string): void {
     const additions: PendingEdit[] = [];
     let batch: WorkspaceChange[] = [];
     const flush = () => {
-      if (batch.length) additions.push({ id: crypto.randomUUID(), changes: batch });
+      if (batch.length) additions.push({ id: crypto.randomUUID(), changes: batch, activeEpoch });
       batch = [];
     };
     for (const change of changes) {
@@ -61,8 +62,16 @@ export class EditJournal {
     flush();
     this.save([...this.edits, ...additions]);
   }
-  appendResume(resume: Resume): void {
-    this.save([...this.edits, { id: crypto.randomUUID(), changes: [], resume }]);
+  appendResume(resume: Resume, activeEpoch?: string): void {
+    this.save([...this.edits, { id: crypto.randomUUID(), changes: [], resume, activeEpoch }]);
+  }
+  retainActiveEpoch(activeEpoch: string | null): void {
+    const retired = this.edits.filter((edit) => !activeEpoch || edit.activeEpoch !== activeEpoch);
+    if (!retired.length) return;
+    // Preserve unsent edits for recovery, but never relabel a follower's edits
+    // as work performed during a later active-device tenure.
+    this.storage.setItem(`${this.key}:retired:${crypto.randomUUID()}`, JSON.stringify(retired));
+    this.save(this.edits.filter((edit) => activeEpoch && edit.activeEpoch === activeEpoch));
   }
   acknowledge(id: string): void {
     if (this.edits[0]?.id !== id) throw new Error("Workspace edit acknowledgment was out of order");

@@ -17,6 +17,23 @@ describe("shortcut dispatcher", () => {
     useWorkspaceStore.getState().reset();
   });
 
+  it("does not dispatch workspace shortcuts underneath the sleeping device overlay", () => {
+    const overlay = document.createElement("div");
+    overlay.dataset.deviceSyncSleep = "";
+    document.body.appendChild(overlay);
+    const handler = vi.fn();
+    const remove = registerShortcutHandler("search.toggle", handler);
+    expect(
+      dispatchShortcutEvent(
+        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
+      ),
+    ).toBe(false);
+    expect(invokeShortcutCommand("search.toggle")).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+    remove();
+    overlay.remove();
+  });
+
   it("prefers the focused tool over broader scopes", () => {
     useWorkspaceStore.getState().openSurface({
       surfaceId: "terminal",
