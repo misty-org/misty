@@ -34,12 +34,12 @@ adapter.
 | minimax | `mcode acp` | ACP | yes: `session/request_permission` | `session/set_mode plan`; `permissionMode default` | ACP `plan` update | not reported | interactive |
 | kimi | `kimi acp` | ACP | `session/request_permission` exposed | `session/set_mode plan` | ACP `plan` update | not reported | interactive if the request reaches the client in its default mode; confirm |
 | omp | `omp --mode acp` (plan) / `rpc-ui` | ACP / NDJSON | `extension_ui_request` confirm dialogs | `session/set_mode plan` | `op`/`list` todos | not reported | interactive if confirm dialogs cover every change; confirm |
-| opencode | `opencode serve` | HTTP + SSE | `permission.asked` → `/permission/:id/reply` | `agent: plan` | not reported | not reported | interactive (HTTP host session); confirm |
-| dsh | `dsh web` | HTTP + WebSocket | `approval/request` waterfall | `/plan` command | not reported | not reported | interactive (host session); confirm |
+| opencode | `opencode serve` | HTTP + SSE | `permission.asked` → `/permission/:id/reply` | `agent: plan` | not reported | not reported | interactive once a host session exists; **not built**: reported as not supported yet |
+| dsh | `dsh web` | HTTP + WebSocket | `approval/request` waterfall | `/plan` command | not reported | not reported | interactive once a host session exists; **not built**: reported as not supported yet |
 | pi | `pi --mode rpc` | NDJSON | no | `--tools read,grep,find,ls` | none | not reported | launch-time only |
 | agy | `agy --print` | stream-json child | no | `--mode plan`; `--mode accept-edits` | none | not reported | launch-time only |
-| qoder / qoder-cn | `qodercli --acp` / `qoderclicn` | ACP | requests exist but the tool expects bypass mode | none | none | not reported | launch-time only at best; confirm a non-bypass mode exists, else exclude |
-| grok | `grok agent stdio` | ACP | no (`--always-approve` only) | none | none | not reported | full access only |
+| qoder / qoder-cn | `qodercli --acp` / `qoderclicn` | ACP | requests exist; Misty never sets its bypass mode, so unanswered asks may stall it | none | none | not reported | launch-time only: Auto only (no read-only mode); confirm it asks in its default mode |
+| grok | `grok agent stdio` (never `--always-approve`) | ACP | none it relies on; any `session/request_permission` still reaches the bridge | none | none | not reported | full access only, with a refusing pre-push hook unless push is remembered |
 
 Engines that report no usage limit show "Usage cap unavailable for this tool" in
 Settings › Agents › Coding tools; only Codex reports one today.
@@ -50,3 +50,10 @@ None of the tools offers a status command; Misty checks for the credential files
 they write (`detect.rs`). A tool that keeps credentials only in the system
 keychain reads as signed out until a live check proves otherwise, which routes
 work to the fallback rather than failing mid-run.
+
+## Built
+
+Claude Code and Codex (phase 4); the shared ACP adapter for MiniMax, Kimi, Oh My
+Pi, Qoder and Grok, and the launch-only adapters for Antigravity and Pi (phase 6).
+OpenCode and DeepSeek Shell need a local HTTP host session, which is not built:
+routing skips them with "isn't supported in Misty yet" and Settings says so.

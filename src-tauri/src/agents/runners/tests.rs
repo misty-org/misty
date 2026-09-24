@@ -269,6 +269,7 @@ fn routed_work_never_passes_bypass_flags() {
                 mode,
                 model: None,
                 session: None,
+                grants: vec![],
             };
             let Ok(spec) = runner.build_command(&launch) else {
                 continue;

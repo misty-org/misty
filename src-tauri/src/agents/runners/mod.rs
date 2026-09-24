@@ -2,11 +2,14 @@
 //! read what it prints and answer its permission questions; everything around
 //! that (the process registry, permission bridge, budget lease and mirror to
 //! the server) is shared.
+pub mod acp;
+pub mod acp_engines;
 pub mod bridge;
 pub mod claude;
 pub mod codex;
 pub mod detect;
 pub mod events;
+pub mod launch_only;
 pub mod lease;
 pub mod mirror;
 pub mod registry;
@@ -129,6 +132,9 @@ pub struct Launch {
     pub model: Option<String>,
     /// The tool's session to continue, from an earlier Session event.
     pub session: Option<String>,
+    /// What the person remembered for this project (project.edit,
+    /// project.install, git.push), from the lease.
+    pub grants: Vec<String>,
 }
 
 /// The process to start for a launch.
@@ -191,13 +197,23 @@ pub fn runner_for(engine: EngineId) -> Option<Box<dyn Runner>> {
     match engine {
         EngineId::Claude => Some(Box::new(claude::ClaudeRunner)),
         EngineId::Codex => Some(Box::new(codex::CodexRunner)),
-        _ => None,
+        EngineId::Minimax
+        | EngineId::Kimi
+        | EngineId::Omp
+        | EngineId::Qoder
+        | EngineId::QoderCn
+        | EngineId::Grok => Some(Box::new(acp_engines::AcpRunner { engine })),
+        EngineId::Agy => Some(Box::new(launch_only::AgyRunner)),
+        EngineId::Pi => Some(Box::new(launch_only::PiRunner)),
+        // OpenCode and DeepSeek Shell run as local HTTP servers; their host
+        // sessions are not built yet.
+        EngineId::Opencode | EngineId::Dsh => None,
     }
 }
 
 /// Flags and settings that remove the tool's own permission checks. Routed
 /// work never passes them; a test pins every adapter against this list.
-pub const BYPASS_MARKERS: [&str; 7] = [
+pub const BYPASS_MARKERS: [&str; 10] = [
     "--dangerously-skip-permissions",
     "--dangerously-bypass-approvals-and-sandbox",
     "bypassPermissions",
@@ -205,10 +221,15 @@ pub const BYPASS_MARKERS: [&str; 7] = [
     "danger-full-access",
     "\"never\"",
     "--full-auto",
+    "--always-approve",
+    "--auto-approve",
+    "yolo",
 ];
 
 #[cfg(test)]
 mod adapter_tests;
+#[cfg(test)]
+mod engine_tests;
 #[cfg(test)]
 mod route_tests;
 #[cfg(test)]

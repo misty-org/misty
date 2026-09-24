@@ -17,6 +17,7 @@ fn launch(mode: LaunchMode) -> Launch {
         mode,
         model: None,
         session: None,
+        grants: vec![],
     }
 }
 
