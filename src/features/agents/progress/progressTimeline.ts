@@ -112,6 +112,8 @@ const verbs: Record<string, [running: string, done: string]> = {
 
 /** Code project tools read better as whole phrases than as verb + "code". */
 const codePhrases: Record<string, [running: string, done: string, subject: string]> = {
+  delegate: ["Handing", "Handed", "coding to your coding tool"],
+  wait: ["Waiting for", "Waited for", "your coding tool"],
   read: ["Reading", "Read", "a file"],
   list: ["Listing", "Listed", "files"],
   find: ["Finding", "Found", "files"],

@@ -29,11 +29,11 @@ it("attaches no folder when the chat has no project", async () => {
   expect(kinds(await desktopDeviceGrants([], null))).toEqual(["workspace:workspace:device_1"]);
 });
 
-it("attaches only the chat's project, with the code tools", async () => {
+it("attaches only the chat's project, for delegated coding", async () => {
   const contexts = await desktopDeviceGrants([], "scope_site");
   expect(kinds(contexts)).toEqual(["project_folder:scope_site", "workspace:workspace:device_1"]);
   expect(contexts[0]!.capabilities).toEqual(projectCapabilities);
-  expect(projectCapabilities).toContain("code.run");
+  expect(projectCapabilities).toEqual(["files.list", "files.read", "files.send", "code.delegate"]);
   expect(projectCapabilities).toContain("files.read");
 });
 

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * The project each conversation works in, or none (docs/plans/agent-code-projects.md).
+ * The project each conversation works in, or none (docs/plans/coding-runner-capabilities.md).
  * Projects are folders on this computer, so the choice is per device and kept
  * in local storage. A new chat's choice is a draft until the conversation exists.
  */

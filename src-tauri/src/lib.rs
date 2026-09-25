@@ -395,20 +395,6 @@ pub fn run() {
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
-                    app::code_commands::code_execute,
-                    app::code_commands::code_choose_project,
-                    app::code_commands::code_set_project_installs,
-                    app::code_commands::code_allow_project_changes,
-                    app::code_commands::code_remove_project,
-                    app::code_commands::code_checkpoints,
-                    app::code_commands::code_undo,
-                    app::code_snapshots::code_project_snapshot,
-                    app::code_commands::code_new_project,
-                    app::code_commands::code_clone_project,
-                    app::code_commands::code_set_project_push,
-                    app::code_commands::code_run_diff,
-                    app::code_commands::code_git,
-                    app::code_commands::code_git_job,
                     agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
@@ -467,6 +453,18 @@ pub fn run() {
                     coding_run_turn,
                     #[cfg(desktop)]
                     coding_runner_answer,
+                    #[cfg(desktop)]
+                    app::project_commands::project_choose,
+                    #[cfg(desktop)]
+                    app::project_commands::project_new,
+                    #[cfg(desktop)]
+                    app::project_commands::project_remove,
+                    #[cfg(desktop)]
+                    app::project_commands::project_git_diff,
+                    #[cfg(desktop)]
+                    app::project_commands::project_legacy_flags,
+                    #[cfg(desktop)]
+                    app::project_commands::project_legacy_flags_done,
                     #[cfg(desktop)]
                     device_read_shared_file,
                     #[cfg(desktop)]

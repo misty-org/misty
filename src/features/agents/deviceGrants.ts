@@ -10,32 +10,10 @@ import { useConversationProject } from "./store/useConversationProject";
 const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
 
 const folderCapabilities = ["files.list", "files.read", "files.send"];
-/** Projects: the code tools, on this computer only, plus reading documents
- * and sending files to the Space Library the way read-only folders do. */
-export const projectCapabilities = [
-  ...folderCapabilities,
-  "code.read",
-  "code.list",
-  "code.find",
-  "code.search",
-  "code.write",
-  "code.edit",
-  "code.run",
-  "code.start",
-  "code.logs",
-  "code.processes",
-  "code.stop",
-  "code.preview",
-  "code.delegate",
-  "git.status",
-  "git.diff",
-  "git.log",
-  "git.commit",
-  "git.branch",
-  "git.push",
-  "git.pull",
-  "git.pull_request",
-];
+/** Projects: coding through the person's own coding tool, on this computer
+ * only, plus reading documents and sending files to the Space Library the way
+ * read-only folders do. */
+export const projectCapabilities = [...folderCapabilities, "code.delegate"];
 const workspaceCapabilities = ["tabs.list", "tabs.open", "bookmarks.list", "bookmarks.add"];
 /** On another device the agent may also open its own browser session there. */
 const remoteWorkspaceCapabilities = [...workspaceCapabilities, "browser.session"];

@@ -1,4 +1,4 @@
-import { FolderGit2, FolderOpen, FolderPlus } from "lucide-react";
+import { FolderOpen, FolderPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -11,15 +11,16 @@ import {
   MenuTrigger,
 } from "@/shared/ui";
 import type { AgentScope } from "../model/types";
-import { agentsDeviceSnapshot, codeChooseProject } from "../store/useAgentsStore";
+import { agentsDeviceSnapshot, chooseProject } from "../store/useAgentsStore";
 import { useConversationProject } from "../store/useConversationProject";
-import { FromGitHubDialog, NewProjectDialog } from "./ProjectDialogs";
+import { NewProjectDialog } from "./ProjectDialogs";
 
 const none = "none";
 
 /**
  * The composer toolbar's project menu, beside the mode: the folder on this
- * computer the conversation works in, or none (docs/plans/agent-code-projects.md).
+ * computer the conversation works in, or none. Coding there runs in the person's own
+ * coding tool (docs/plans/coding-runner-capabilities.md).
  * Only the chosen project travels with the chat; the next message uses a new
  * choice. Desktop only, since projects are folders on this computer.
  */
@@ -32,7 +33,7 @@ export function AgentProjectMenu({
 }) {
   const [projects, setProjects] = useState<AgentScope[]>([]);
   const [failed, setFailed] = useState("");
-  const [dialog, setDialog] = useState<"new" | "github" | null>(null);
+  const [dialog, setDialog] = useState<"new" | null>(null);
   const chosen = useConversationProject((s) =>
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
@@ -52,7 +53,7 @@ export function AgentProjectMenu({
   const add = async () => {
     setFailed("");
     try {
-      const added = await codeChooseProject();
+      const added = await chooseProject();
       await load();
       if (added) setProject(conversationId, added.id);
     } catch (error) {
@@ -98,7 +99,7 @@ export function AgentProjectMenu({
                   {!project.available
                     ? "Not found on this computer"
                     : project.kind === "project_folder"
-                      ? "Edit files and run commands"
+                      ? "Your coding tool works here"
                       : "Read only"}
                 </span>
               </span>
@@ -113,13 +114,6 @@ export function AgentProjectMenu({
             <span className="text-xs text-cream-muted">
               A new folder with Git, on this computer
             </span>
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setDialog("github")}>
-          <FolderGit2 aria-hidden="true" />
-          <span className="grid min-w-0 gap-0.5">
-            <span>From GitHub…</span>
-            <span className="text-xs text-cream-muted">Clone one of your repositories</span>
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void add()}>
@@ -140,11 +134,6 @@ export function AgentProjectMenu({
       <NewProjectDialog
         open={dialog === "new"}
         onOpenChange={(open) => setDialog(open ? "new" : null)}
-        onCreated={picked}
-      />
-      <FromGitHubDialog
-        open={dialog === "github"}
-        onOpenChange={(open) => setDialog(open ? "github" : null)}
         onCreated={picked}
       />
     </>

@@ -22,12 +22,22 @@ type CodingLease struct {
 	TokenBudget  int64     `json:"token_budget"`
 	UsedTokens   int64     `json:"used_tokens"`
 	ExpiresAt    time.Time `json:"expires_at"`
+	// What the tool reported, by token class, for settling the lease once.
+	Usage CodingLeaseUsage `json:"-"`
 }
 
-const codingLeaseColumns = `id,invocation_id,device_id,engine,model,token_budget,used_tokens,expires_at`
+// CodingLeaseUsage is one usage report: the raw token classes and their
+// weight against the weekly allowance.
+type CodingLeaseUsage struct {
+	Input, Output, CacheWrite, CacheRead, Weighted int64
+}
+
+const codingLeaseColumns = `id,invocation_id,device_id,engine,model,token_budget,used_tokens,expires_at,
+	input_tokens,output_tokens,cache_write_tokens,cache_read_tokens`
 
 func scanCodingLease(row scanner, out *CodingLease) error {
-	return row.Scan(&out.ID, &out.InvocationID, &out.DeviceID, &out.Engine, &out.Model, &out.TokenBudget, &out.UsedTokens, &out.ExpiresAt)
+	return row.Scan(&out.ID, &out.InvocationID, &out.DeviceID, &out.Engine, &out.Model, &out.TokenBudget, &out.UsedTokens, &out.ExpiresAt,
+		&out.Usage.Input, &out.Usage.Output, &out.Usage.CacheWrite, &out.Usage.CacheRead)
 }
 
 func hashLeaseToken(token string) string {
@@ -40,7 +50,7 @@ func hashLeaseToken(token string) string {
 func (db *Database) WeeklyCodingUsed(ctx context.Context, user string) (int64, error) {
 	var used int64
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(user), func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(used_tokens),0) FROM coding_leases WHERE user_id=$1 AND created_at>=date_trunc('week', now())`, user).Scan(&used)
+		return tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(used_tokens),0) FROM coding_leases WHERE user_id=$1 AND created_at>=date_trunc('week', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, user).Scan(&used)
 	})
 	return used, err
 }
@@ -75,12 +85,44 @@ func (db *Database) CodingLeaseByToken(ctx context.Context, user, invocationID, 
 }
 
 // AddCodingLeaseUsage records what the tool used under a lease.
-func (db *Database) AddCodingLeaseUsage(ctx context.Context, user, id string, tokens int64) error {
-	if tokens < 0 {
+func (db *Database) AddCodingLeaseUsage(ctx context.Context, user, id string, usage CodingLeaseUsage) error {
+	if usage.Input < 0 || usage.Output < 0 || usage.CacheWrite < 0 || usage.CacheRead < 0 || usage.Weighted < 0 {
 		return ErrSpaceInvalid
 	}
 	return db.TestingWithRLSContext(ctx, userRLSSettings(user), func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `UPDATE coding_leases SET used_tokens=used_tokens+$3 WHERE id=$1 AND user_id=$2`, id, user, tokens)
+		_, err := tx.ExecContext(ctx, `UPDATE coding_leases SET used_tokens=used_tokens+$3,input_tokens=input_tokens+$4,output_tokens=output_tokens+$5,
+			cache_write_tokens=cache_write_tokens+$6,cache_read_tokens=cache_read_tokens+$7 WHERE id=$1 AND user_id=$2`,
+			id, user, usage.Weighted, usage.Input, usage.Output, usage.CacheWrite, usage.CacheRead)
+		return err
+	})
+}
+
+// UnsettledCodingLeases are a run's leases whose usage is not yet settled.
+func (db *Database) UnsettledCodingLeases(ctx context.Context, user, invocationID string) ([]CodingLease, error) {
+	leases := []CodingLease{}
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(user), func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `SELECT `+codingLeaseColumns+` FROM coding_leases
+			WHERE user_id=$1 AND invocation_id=$2 AND settled_at IS NULL ORDER BY created_at`, user, invocationID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var lease CodingLease
+			if err := scanCodingLease(rows, &lease); err != nil {
+				return err
+			}
+			leases = append(leases, lease)
+		}
+		return rows.Err()
+	})
+	return leases, err
+}
+
+// MarkCodingLeaseSettled records that a lease's usage reached billing.
+func (db *Database) MarkCodingLeaseSettled(ctx context.Context, user, id string) error {
+	return db.TestingWithRLSContext(ctx, userRLSSettings(user), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `UPDATE coding_leases SET settled_at=now() WHERE id=$1 AND user_id=$2 AND settled_at IS NULL`, id, user)
 		return err
 	})
 }

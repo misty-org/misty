@@ -1,5 +1,7 @@
 # Agents that build: code projects on the person's computer
 
+> **Superseded (2026-10-14).** Misty no longer edits projects or runs commands itself: agents hand coding to the person's own coding tools (`code.delegate`, docs/plans/coding-runner-capabilities.md), git changes are read with `git diff`, and the sandbox, checkpoints and GitHub proxy described here were removed. Kept for history.
+
 Status: phases 1–6 built on 2026-10-11, uncommitted. The Projects UI is
 approved and built (`docs/design/code-projects/BRIEF.md`): everything is a
 project, there's a per-chat Project menu in the composer, and Undo appears in

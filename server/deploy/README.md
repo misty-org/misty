@@ -103,6 +103,13 @@ webhooks to `https://billing.mistysys.com/stripe/webhook`; the API calls
 `MISTY_BILLING_SECRET` both services share. See that repository's README for
 its variables and first-time setup.
 
+Work done in a person's own coding tool (Claude Code, Codex and the others)
+counts toward their weekly coding allowance at a reduced rate,
+`MISTY_CODING_EXTERNAL_FACTOR` (0.25 unless set, at most 1). The API applies it
+before reporting that usage, so the billing service must not apply a factor of
+its own; each plan's `external_coding_allowance` comes from the billing
+service's customer summary.
+
 ### Releases
 
 Images build on this computer; nothing builds on GitHub. From a clean,

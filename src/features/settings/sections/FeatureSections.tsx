@@ -1,7 +1,7 @@
 import type { AgentScope } from "@/features/agents";
 import {
   agentsDeviceSnapshot,
-  codeRemoveProject,
+  removeProject,
   CompanionAppearanceSettings,
 } from "@/features/agents";
 import { useSpacesStore } from "@/features/spaces";
@@ -187,7 +187,7 @@ function AgentScopeList() {
   return (
     <Section
       title="Projects"
-      description="Folders on this computer agents can work in when a chat picks them. Add projects in Agents › Integrations."
+      description="Folders on this computer your coding tool works in when a chat picks them. Add one from a chat’s Project menu."
     >
       {scopes.map((s) => (
         <Row
@@ -195,7 +195,7 @@ function AgentScopeList() {
           label={s.displayName}
           description={
             s.kind === "project_folder"
-              ? "Agents can edit files and run sandboxed commands here."
+              ? "Your coding tool works here and asks before changes that need you."
               : "Read only: agents can list and read files here."
           }
         >
@@ -205,13 +205,13 @@ function AgentScopeList() {
               void (async () => {
                 if (
                   !(await confirmAction(
-                    `Stop using “${s.displayName}” as a project? Its files stay on this computer; undo history for it is deleted.`,
+                    `Stop using “${s.displayName}” as a project? Its files stay on this computer.`,
                     "Remove project",
                   ))
                 )
                   return;
                 try {
-                  await codeRemoveProject(s.id);
+                  await removeProject(s.id);
                   await refresh();
                 } catch (e) {
                   setError(String(e));
@@ -225,7 +225,7 @@ function AgentScopeList() {
       ))}
       {!scopes.length && (
         <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No projects yet. Add one in Agents › Integrations.
+          No projects yet. Add one from a chat’s Project menu.
         </p>
       )}
       {error && (
