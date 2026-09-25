@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"github.com/kannachi323/misty/server/internal/billingadapter"
 	"log"
 	"net"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 var migrationFiles embed.FS
 
 type Database struct {
+	Billing  *billingadapter.Service
 	Conn     *sql.DB
 	eventsMu sync.Mutex
 	events   *accountEventHub
