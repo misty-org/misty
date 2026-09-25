@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   shouldSuppressWindowDrag,
   windowRectsMatch,
-} from "@/application/layouts/DesktopLayout/useDesktopWindowChrome";
+} from "@/app/layouts/DesktopLayout/useDesktopWindowChrome";
 import {
   desktopTitlebarNavigationGeometry,
   desktopTitlebarNavigationInset,
   windowsTitlebarNavigationInset,
-} from "@/application/layouts/DesktopLayout/styles";
+} from "@/app/layouts/DesktopLayout/styles";
 
 describe("desktop window chrome drag suppression", () => {
   it("lets plain titlebar surfaces start a native window drag", () => {

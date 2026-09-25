@@ -1,5 +1,5 @@
 import { cn, navigationMenuPrimaryLayoutClass, navigationMenuLinkClass } from "@/shared/ui";
-import type { FramePacingState } from "@/application/layouts/model/types";
+import type { FramePacingState } from "@/app/layouts/model/types";
 
 export const desktopFrameClass = [
   "relative isolate grid h-full min-h-0",

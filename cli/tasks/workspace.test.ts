@@ -14,7 +14,7 @@ test("built-in tools share the host React runtime and local public packages", ()
   for (const name of ["react", "react-dom"]) {
     assert.match(host.dependencies[name], /^19\./);
     const hostRequire = createRequire(resolve(root, "package.json"));
-    const appRequire = createRequire(resolve(root, "src/application/hostMain.tsx"));
+    const appRequire = createRequire(resolve(root, "src/app/hostMain.tsx"));
     assert.equal(hostRequire.resolve(name), appRequire.resolve(name));
   }
   for (const name of ["sdk", "contracts"]) {

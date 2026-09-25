@@ -13,7 +13,7 @@ vi.mock("@/features/spaces", () => ({
   },
 }));
 import { ActivityPanel } from "./ActivityPanel";
-import { ActivityMenu } from "@/application/layouts/DesktopLayout/ActivityMenu";
+import { ActivityMenu } from "@/app/layouts/DesktopLayout/ActivityMenu";
 import { openActivityPanel, closeActivityPanel, useActivityPanel } from "./activityPanelState";
 function Workspace() {
   return <p data-testid="workspace">{useLocation().pathname}</p>;

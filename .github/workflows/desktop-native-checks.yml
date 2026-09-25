@@ -64,7 +64,7 @@ jobs:
         run: npm run typecheck
 
       - name: Test browser frontend
-        run: npm test -- src/features/browser/workspace/BrowserWorkspace.test.ts src/features/agents/worker.test.ts src/features/agents/companion src/features/agents/localExecution.test.ts src/features/agents/voice src/features/agents/components/agentCloudAvatars.test.ts src/features/agents/components/AgentWorkspaceConversation.test.tsx src/application/main.test.ts
+        run: npm test -- src/features/browser/workspace/BrowserWorkspace.test.ts src/features/agents/worker.test.ts src/features/agents/companion src/features/agents/localExecution.test.ts src/features/agents/voice src/features/agents/components/agentCloudAvatars.test.ts src/features/agents/components/AgentWorkspaceConversation.test.tsx src/app/main.test.ts
 
       - name: Compile native desktop
         run: cargo check --manifest-path src-tauri/Cargo.toml --lib

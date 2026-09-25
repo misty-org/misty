@@ -9,7 +9,7 @@ import {
   navItemBaseClass,
   navLinkActiveClass,
   navLinkBaseClass,
-} from "@/application/layouts/DesktopLayout/styles";
+} from "@/app/layouts/DesktopLayout/styles";
 import { sidebarStyles } from "@/features/files/workspace/explorer/components/ExplorerSidebarSupport";
 import { describe, expect, it } from "vitest";
 

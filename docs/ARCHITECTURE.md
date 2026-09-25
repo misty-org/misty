@@ -17,7 +17,7 @@ Misty is an integrated goal-oriented workspace application built with:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      APPLICATION SHELL (src/application/)                   │
+│                      APPLICATION SHELL (src/app/)                   │
 │         Windowing, Tab Management, Route Configuration, Layouts             │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
@@ -52,7 +52,7 @@ Misty is an integrated goal-oriented workspace application built with:
 ```text
 misty/
 ├── src/                                  # Main Application Source
-│   ├── application/                      # Global App Shell & Composition
+│   ├── app/                              # Global App Shell & Composition
 │   │   ├── layouts/                      # DesktopLayout, MobileLayout, shared headers
 │   │   ├── routing/                      # App router, deep links, route configuration
 │   │   └── providers/                    # Top-level React context providers
@@ -154,8 +154,8 @@ misty/
 | A screen, tab, panel, or modal for a product feature | `src/features/<feature>/components/` | `src/features/files/components/FileGrid.tsx` |
 | Feature-specific state and actions | `src/features/<feature>/store/` | `src/features/inbox/store/useInboxStore.ts` |
 | A backend API endpoint or fetch function | `src/api/<domain>/` | `src/api/spaces/api.ts` |
-| Desktop windowing, tabs, or top-level layout | `src/application/layouts/` | `src/application/layouts/DesktopLayout/` |
-| A new route or URL deep link | `src/application/routing/` | `src/application/routing/routeConfig.tsx` |
+| Desktop windowing, tabs, or top-level layout | `src/app/layouts/` | `src/app/layouts/DesktopLayout/` |
+| A new route or URL deep link | `src/app/routing/` | `src/app/routing/routeConfig.tsx` |
 | A Tauri IPC command or native bridge | `src/native/` (TS) & `src-tauri/src/app/` (Rust) | `src/native/filesystem.ts` |
 | An installable 3rd-party plugin or extension | `apps/extensions/<plugin>/` | `apps/extensions/ytdlp/` |
 
@@ -180,7 +180,7 @@ src/features/notes/
 ```
 
 ### Public API Boundary (`index.ts`)
-Each feature exposes an `index.ts`. External callers (such as `src/application/`) import from `@/features/<feature>`, keeping internal helper components private:
+Each feature exposes an `index.ts`. External callers (such as `src/app/`) import from `@/features/<feature>`, keeping internal helper components private:
 
 ```typescript
 // src/features/notes/index.ts

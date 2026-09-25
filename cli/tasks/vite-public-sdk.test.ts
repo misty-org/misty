@@ -15,6 +15,8 @@ test(
     try {
       const sdk = join(root, "node_modules/@misty/sdk");
       const manifest = join(root, "packages/sdk/dist/.build-revision");
+      const appRoot = join(root, "src/app");
+      await mkdir(appRoot, { recursive: true });
       await mkdir(sdk, { recursive: true });
       await mkdir(join(root, "packages/sdk/dist"), { recursive: true });
       await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
@@ -29,18 +31,18 @@ test(
       );
       await writeFile(join(sdk, "index.js"), "export const original = 1;");
       await writeFile(manifest, JSON.stringify({ revision: "first" }));
-      await writeFile(join(root, "index.html"), '<script type="module" src="/entry.js"></script>');
+      await writeFile(join(appRoot, "index.html"), '<script type="module" src="/entry.js"></script>');
       await writeFile(
-        join(root, "entry.js"),
+        join(appRoot, "entry.js"),
         'import * as sdk from "@misty/sdk"; console.log(sdk);',
       );
       server = await createServer({
-        root,
+        root: appRoot,
         configFile: false,
         logLevel: "error",
-        plugins: [publicSdkDevelopmentUpdates()],
+        plugins: [publicSdkDevelopmentUpdates(root)],
         optimizeDeps: { exclude: ["@misty/sdk"] },
-        server: { host: "127.0.0.1", port: 0 },
+        server: { host: "127.0.0.1", port: 0, fs: { allow: [root] } },
       });
       await server.listen();
       const before = (await server.transformRequest("/entry.js")).code;
