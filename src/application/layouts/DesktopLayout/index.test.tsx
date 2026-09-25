@@ -17,6 +17,7 @@ vi.mock("@/features/auth", () => ({
 }));
 
 vi.mock("@/features/workspace", () => ({
+  useWindowDockingLayout: () => ({ navigation: "left", tabs: "top" }),
   useWorkspaceStore: (
     selector: (state: {
       canNavigatePane: (delta: number) => boolean;
@@ -119,11 +120,17 @@ vi.mock("@/features/global-search", () => ({
   GlobalMisty: () => null,
   BrowserContextMenuBridge: () => null,
 }));
-vi.mock("@/features/browser", () => ({
+vi.mock("@/features/browser/workspace", () => ({
   BrowserRuntimeBridge: () => null,
   setBrowserWebviewsSuspended: vi.fn(),
 }));
-vi.mock("@/features/files/explorer", () => ({ MediaSearchViewer: () => null }));
+vi.mock("@/features/webviews/BrowserRuntimeBridge", () => ({ BrowserRuntimeBridge: () => null }));
+vi.mock("@/features/browser-workspace/BrowserSearchDialog", () => ({ BrowserSearchDialog: () => null }));
+vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: vi.fn() }));
+vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({
+  BrowserContextMenuBridge: () => null,
+}));
+vi.mock("@/features/files/workspace/explorer", () => ({ MediaSearchViewer: () => null }));
 vi.mock("@/features/activity", () => ({ ActivityBridge: () => null }));
 vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
 
@@ -229,6 +236,26 @@ describe("DesktopLayout on Auth Routes", () => {
     });
     expect(container.textContent).toBe("Account workspace");
     expect(mocks.resumeAccount).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["/browser", "true", "1 / -1"],
+    ["/activity", "false", "2"],
+    ["/signin", "false", "2"],
+  ])("reserves native chrome correctly on %s", async (route, sharedTabs, row) => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={[route]}>
+          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+        </MemoryRouter>,
+      );
+    });
+    expect(
+      container.querySelector(".misty-docking-titlebar")?.getAttribute("data-shared-tabs"),
+    ).toBe(sharedTabs);
+    expect((container.querySelector("[data-misty-route-shell]") as HTMLElement).style.gridRow).toBe(
+      row,
+    );
   });
 
   it("suppresses the sidebar navigator and renders Outlet directly on /signin", async () => {

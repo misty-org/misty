@@ -41,29 +41,16 @@ export declare const AgentProfileSchema: z.ZodObject<{
     created_at: z.ZodString;
     updated_at: z.ZodString;
 }, z.core.$strict>;
-export declare const AgentAppAssignmentsSchema: z.ZodObject<{
-    agent_id: z.ZodString;
-    space_id: z.ZodString;
-    app_ids: z.ZodArray<z.ZodString>;
-}, z.core.$strict>;
 export declare const AgentTaskContextSchema: z.ZodObject<{
     taskId: z.ZodString;
     agentId: z.ZodString;
-    spaceId: z.ZodString;
+    spaceId: z.ZodDefault<z.ZodString>;
     executionMode: z.ZodEnum<{
         user: "user";
         agent: "agent";
         team: "team";
     }>;
     windowLabel: z.ZodString;
-}, z.core.$strict>;
-export declare const AgentIntegrationDestinationSchema: z.ZodObject<{
-    id: z.ZodString;
-    appId: z.ZodString;
-    providerId: z.ZodString;
-    accountId: z.ZodString;
-    label: z.ZodString;
-    url: z.ZodURL;
 }, z.core.$strict>;
 export declare const AgentTaskArtifactSchema: z.ZodObject<{
     id: z.ZodString;
@@ -80,7 +67,5 @@ export declare const AgentTaskArtifactSchema: z.ZodObject<{
 export type AgentExecutionMode = z.infer<typeof AgentExecutionModeSchema>;
 export type AgentProfileInput = z.infer<typeof AgentProfileInputSchema>;
 export type AgentProfile = z.infer<typeof AgentProfileSchema>;
-export type AgentAppAssignments = z.infer<typeof AgentAppAssignmentsSchema>;
 export type AgentTaskContext = z.infer<typeof AgentTaskContextSchema>;
-export type AgentIntegrationDestination = z.infer<typeof AgentIntegrationDestinationSchema>;
 export type AgentTaskArtifact = z.infer<typeof AgentTaskArtifactSchema>;

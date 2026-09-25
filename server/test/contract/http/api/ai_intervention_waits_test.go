@@ -26,7 +26,7 @@ func TestSpaceInterventionMCPAndTrustedControl(t *testing.T) {
 }
 func testInterventionMCPAndTrustedControl(t *testing.T, spaceRun bool) {
 	database := openPresenceTestDatabase(t)
-	owner, err := database.CreateUser("Browser reviewer", uniqueTestEmail("browser-approval"), "password123")
+	owner, err := database.CreateUserWithUsername("Browser reviewer", "review_"+strings.ReplaceAll(uuid.NewString()[:12], "-", ""), uniqueTestEmail("browser-approval"), "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,30 +1,14 @@
-import layout from "../../../cli/tasks/app-source-layout.json";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 
 export const repositoryRoot = process.cwd();
 
-const appRoots = Object.entries(layout).map(([source, target]) => ({
-  logical: `src/${source}`,
-  physical: resolve(repositoryRoot, "./apps", target),
-}));
-
 export function sourcePath(path: string): string {
-  const match = appRoots.find(
-    ({ logical }) =>
-      path === logical || path.startsWith(`${logical}/`) || path === `${logical}.tsx`,
-  );
-  return match ? match.physical + path.slice(match.logical.length) : resolve(repositoryRoot, path);
+  return resolve(repositoryRoot, path);
 }
 
 export function repositoryPath(path: string): string {
-  const match = appRoots.find(
-    ({ physical }) =>
-      path === physical || path.startsWith(`${physical}/`) || path === `${physical}.tsx`,
-  );
-  return match
-    ? match.logical + path.slice(match.physical.length)
-    : relative(repositoryRoot, path).split("\\").join("/");
+  return relative(repositoryRoot, path).split("\\").join("/");
 }
 
 export function lineCount(path: string): number {
@@ -48,13 +32,6 @@ export function walk(
     if (entry.isDirectory())
       paths.push(...walk(repositoryPath(path), extensions, ignoredDirectories));
     else if (entry.isFile() && extensions.has(extname(entry.name))) paths.push(path);
-  }
-  if (root === "src") {
-    for (const { logical, physical } of appRoots) {
-      if (existsSync(physical)) paths.push(...walk(logical, extensions, ignoredDirectories));
-      else if (existsSync(`${physical}.tsx`) && extensions.has(".tsx"))
-        paths.push(`${physical}.tsx`);
-    }
   }
   return paths;
 }

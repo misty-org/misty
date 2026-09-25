@@ -28,6 +28,7 @@ type AIInvocationContext struct {
 }
 
 func (db *Database) AttachAIInvocationContext(ctx context.Context, userID, invocationID, spaceID, deviceID, kind, opaqueRef, displayName string, capabilities, metadata json.RawMessage) (*AIInvocationContext, error) {
+	spaceID = ""
 	kind, opaqueRef, displayName = strings.TrimSpace(kind), strings.TrimSpace(opaqueRef), strings.TrimSpace(displayName)
 	capabilities, err := normalizeDeviceAgentCapabilities(capabilities)
 	if err != nil || kind != "browser_tab" || opaqueRef == "" || len(opaqueRef) > 512 || !browserOnlyAgentCapabilities(capabilities) {
@@ -46,9 +47,6 @@ func (db *Database) AttachAIInvocationContext(ctx context.Context, userID, invoc
 		DisplayName: displayName, Capabilities: capabilities, Metadata: metadata,
 	}
 	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-			return err
-		}
 		var valid bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocations WHERE id=$1 AND user_id=$2 AND state='queued')`, invocationID, userID).Scan(&valid); err != nil || !valid {
 			if err != nil {
@@ -63,7 +61,7 @@ func (db *Database) AttachAIInvocationContext(ctx context.Context, userID, invoc
 			return ErrDeviceNotFound
 		}
 		return tx.QueryRowContext(ctx, `INSERT INTO ai_invocation_contexts(id,invocation_id,user_id,space_id,device_id,kind,opaque_ref,display_name,capabilities,metadata)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10)
 			RETURNING state,expires_at,created_at,updated_at`, out.ID, out.InvocationID, out.UserID, out.SpaceID, out.DeviceID, out.Kind, out.OpaqueRef, out.DisplayName, out.Capabilities, out.Metadata).
 			Scan(&out.State, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt)
 	})
@@ -73,7 +71,7 @@ func (db *Database) AttachAIInvocationContext(ctx context.Context, userID, invoc
 func (db *Database) AIInvocationContexts(ctx context.Context, userID, invocationID string) ([]AIInvocationContext, error) {
 	items := []AIInvocationContext{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.invocation_id,c.user_id,c.space_id,c.device_id,c.kind,c.opaque_ref,c.display_name,c.capabilities,c.metadata,c.state,c.expires_at,c.created_at,c.updated_at
+		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.invocation_id,c.user_id,COALESCE(c.space_id,''),c.device_id,c.kind,c.opaque_ref,c.display_name,c.capabilities,c.metadata,c.state,c.expires_at,c.created_at,c.updated_at
 			FROM ai_invocation_contexts c JOIN ai_invocations i ON i.id=c.invocation_id AND i.user_id=$1
 			WHERE c.invocation_id=$2 AND c.user_id=$1 AND c.state='attached' AND c.expires_at>NOW() ORDER BY c.created_at`, userID, invocationID)
 		if err != nil {

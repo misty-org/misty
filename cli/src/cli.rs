@@ -4,8 +4,7 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::{
-    checks, config::Settings, desktop, environment, home, mobile, official_apps, release, server,
-    website,
+    checks, config::Settings, desktop, environment, home, mobile, release, server, website,
 };
 
 #[derive(Debug, Parser)]
@@ -19,12 +18,18 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Install the locked workspace dependencies and build the public SDK.
-    Setup,
+    /// Prepare server configuration, Cloudflare resources, or desktop dependencies.
+    Setup(crate::setup::Setup),
     /// Build or validate the public SDK and contracts.
     Sdk {
         #[command(subcommand)]
         command: SdkCommand,
+    },
+    /// Run a project tool using the shared .config registry.
+    Tool {
+        name: String,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        arguments: Vec<String>,
     },
     /// List internal TypeScript build tasks.
     Tasks,
@@ -35,14 +40,13 @@ enum Command {
         arguments: Vec<String>,
     },
     Configure(Configure),
-    Doctor,
+    /// Diagnose setup and service health; choose server, desktop, cloudflare, or release.
+    Doctor(crate::diagnostics::Doctor),
     /// Create and validate private runtime environments.
     Env(Env),
     /// Generate and validate the cross-platform ~/.misty home.
     Home(Home),
     Check(Check),
-    /// Build and package Apps maintained in the Misty repositories.
-    Apps(Apps),
     Desktop(Desktop),
     /// Develop and package the Apple mobile app.
     Mobile(Mobile),
@@ -105,6 +109,14 @@ enum HomeCommand {
 
 #[derive(Debug, Subcommand)]
 enum EnvCommand {
+    /// Save a setting in its registered file; read the value from stdin.
+    Set {
+        #[arg(value_enum)]
+        target: environment::Target,
+        name: String,
+    },
+    /// List environment settings and the files that own them.
+    Describe,
     /// Split legacy private files into the scoped layout.
     Migrate,
     /// Create missing private files without overwriting configured values.
@@ -131,7 +143,7 @@ enum CheckTarget {
     App,
     Server,
     Website,
-    Extensions,
+    Tools,
     Cli,
     All,
 }
@@ -140,38 +152,6 @@ enum CheckTarget {
 struct Desktop {
     #[command(subcommand)]
     command: DesktopCommand,
-}
-
-#[derive(Debug, Args)]
-struct Apps {
-    #[command(subcommand)]
-    command: AppsCommand,
-}
-
-#[derive(Debug, Subcommand)]
-enum AppsCommand {
-    /// Compile selected downloadable apps (all apps when omitted).
-    Build {
-        apps: Vec<String>,
-        #[arg(long)]
-        desktop_only: bool,
-    },
-    /// Sign and package existing app builds for local development.
-    Package { apps: Vec<String> },
-    /// Contributor commands for Misty's first-party Apps.
-    Official(OfficialApps),
-}
-
-#[derive(Debug, Args)]
-struct OfficialApps {
-    #[command(subcommand)]
-    command: OfficialAppsCommand,
-}
-
-#[derive(Debug, Subcommand)]
-enum OfficialAppsCommand {
-    /// Compile, sign for development, validate, and sync all official Apps.
-    Build,
 }
 
 #[derive(Debug, Args)]
@@ -317,18 +297,33 @@ struct Server {
 
 #[derive(Debug, Subcommand)]
 enum ServerCommand {
+    /// Start containers, wait for readiness, and return with a status summary.
     Up {
         #[arg(long)]
         detach: bool,
         #[arg(long)]
         no_build: bool,
+        /// Stream underlying build output.
+        #[arg(long)]
+        verbose: bool,
     },
+    /// Show service health and completed setup jobs.
+    Status,
+    /// Deploy the development collaboration Worker explicitly.
+    Deploy,
     Url,
     Down {
         #[arg(long)]
         volumes: bool,
     },
-    Logs,
+    /// Show recent service logs; add --follow to stream.
+    Logs {
+        service: Option<String>,
+        #[arg(long)]
+        follow: bool,
+        #[arg(long, default_value_t = 100)]
+        tail: u32,
+    },
     /// Operate the production Compose stack explicitly.
     Prod {
         #[command(subcommand)]
@@ -444,7 +439,18 @@ enum ReleaseCommand {
 pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
     load_command_environment(&arguments.command, &settings)?;
     match arguments.command {
-        Command::Setup => crate::development::setup(&settings.workspace),
+        Command::Tool { name, arguments } => crate::process::CommandSpec::new("node")
+            .arg(
+                settings
+                    .workspace
+                    .misty
+                    .join("cli/tasks/run-tool.ts")
+                    .into_os_string(),
+            )
+            .arg(name)
+            .args(arguments)
+            .run(&settings.workspace.misty),
+        Command::Setup(options) => crate::setup::run(&settings.workspace, options),
         Command::Sdk { command } => crate::development::sdk(
             &settings.workspace,
             match command {
@@ -461,8 +467,31 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             println!("Saved workspace configuration to {}", path.display());
             Ok(())
         }
-        Command::Doctor => doctor(&settings),
+        Command::Doctor(options) => {
+            if options.target == crate::diagnostics::Target::Release {
+                if options.json || options.fix {
+                    anyhow::bail!(
+                        "release doctor supports text diagnostics only; omit --json and --fix"
+                    );
+                }
+                doctor(&settings)
+            } else {
+                crate::diagnostics::run(&settings.workspace, options)
+            }
+        }
         Command::Env(command) => match command.command {
+            EnvCommand::Describe => environment::describe(),
+            EnvCommand::Set { target, name } => {
+                use std::io::Read;
+                let mut value = String::new();
+                std::io::stdin().read_to_string(&mut value)?;
+                environment::set(
+                    &settings.workspace,
+                    target,
+                    &name,
+                    value.trim_end_matches(['\r', '\n']),
+                )
+            }
             EnvCommand::Migrate => environment::migrate(&settings.workspace),
             EnvCommand::Init { target } => {
                 environment::init(&settings.workspace, target)?;
@@ -489,33 +518,15 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 .run(&settings.workspace.misty),
             CheckTarget::Server => checks::server(&settings.workspace),
             CheckTarget::Website => checks::website(&settings.workspace),
-            CheckTarget::Extensions => checks::extensions(&settings.workspace),
+            CheckTarget::Tools => checks::builtin_tools(&settings.workspace),
             CheckTarget::Cli => checks::cli(&settings.workspace),
             CheckTarget::All => {
                 checks::app(&settings.workspace)?;
                 checks::server(&settings.workspace)?;
                 checks::website(&settings.workspace)?;
-                checks::extensions(&settings.workspace)?;
+                checks::builtin_tools(&settings.workspace)?;
                 checks::cli(&settings.workspace)
             }
-        },
-        Command::Apps(command) => match command.command {
-            AppsCommand::Build { apps, desktop_only } => {
-                let mut args = apps;
-                if desktop_only {
-                    args.push("--desktop-only".into());
-                }
-                crate::development::task(&settings.workspace, "build-official-app-packages", &args)
-            }
-            AppsCommand::Package { apps } => {
-                crate::development::task(&settings.workspace, "apps/build-official-apps", &apps)
-            }
-            AppsCommand::Official(command) => match command.command {
-                OfficialAppsCommand::Build => {
-                    official_apps::build(&settings.workspace)?;
-                    Ok(())
-                }
-            },
         },
         Command::Desktop(command) => match command.command {
             DesktopCommand::Dev { profile, route } => {
@@ -596,12 +607,20 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             WebsiteCommand::Dev => website::dev(&settings.workspace),
         },
         Command::Server(command) => match command.command {
-            ServerCommand::Up { detach, no_build } => {
-                server::up(&settings.workspace, detach, !no_build)
-            }
+            ServerCommand::Up {
+                detach: _,
+                no_build,
+                verbose,
+            } => server::up(&settings.workspace, true, !no_build, verbose),
+            ServerCommand::Status => server::status(&settings.workspace),
+            ServerCommand::Deploy => server::deploy_development(&settings.workspace),
             ServerCommand::Url => server::url(&settings.workspace),
             ServerCommand::Down { volumes } => server::down(&settings.workspace, volumes),
-            ServerCommand::Logs => server::logs(&settings.workspace),
+            ServerCommand::Logs {
+                service,
+                follow,
+                tail,
+            } => server::logs(&settings.workspace, service.as_deref(), follow, tail),
             ServerCommand::Prod { command } => match command {
                 ProdCommand::Check => server::production_check(&settings.workspace),
                 ProdCommand::Up => server::production_up(&settings.workspace),
@@ -664,11 +683,15 @@ fn load_command_environment(command: &Command, settings: &Settings) -> Result<()
         Command::Configure(_)
         | Command::Env(_)
         | Command::Home(_)
-        | Command::Setup
+        | Command::Setup(_)
         | Command::Sdk { .. }
         | Command::Tasks
         | Command::Task { .. } => &[],
-        Command::Doctor | Command::Release(_) => &["common.env", "release.env"],
+        Command::Doctor(options) if options.target == crate::diagnostics::Target::Release => {
+            &["common.env", "release.env"]
+        }
+        Command::Doctor(_) => &[],
+        Command::Release(_) => &["common.env", "release.env"],
         Command::Desktop(desktop) => match desktop.command {
             DesktopCommand::Build => &["common.env", "release.env"],
             _ => &["common.env"],
@@ -683,7 +706,7 @@ fn load_command_environment(command: &Command, settings: &Settings) -> Result<()
             }
             _ => &["common.env"],
         },
-        Command::Check(_) | Command::Apps(_) | Command::Docs(_) | Command::Website(_) => {
+        Command::Tool { .. } | Command::Check(_) | Command::Docs(_) | Command::Website(_) => {
             &["common.env"]
         }
     };
@@ -830,6 +853,7 @@ mod tests {
     fn parses_the_stable_command_surface() {
         for arguments in [
             vec!["misty", "doctor"],
+            vec!["misty", "tool", "vite", "build", "--mode", "desktop"],
             vec!["misty", "env", "init", "dev"],
             vec!["misty", "env", "migrate"],
             vec!["misty", "env", "check", "prod"],
@@ -849,9 +873,8 @@ mod tests {
             vec!["misty", "check", "app"],
             vec!["misty", "check", "server"],
             vec!["misty", "check", "website"],
-            vec!["misty", "check", "extensions"],
+            vec!["misty", "check", "tools"],
             vec!["misty", "check", "cli"],
-            vec!["misty", "apps", "official", "build"],
             vec!["misty", "desktop", "dev", "--profile", "owner"],
             vec!["misty", "desktop", "build"],
             vec!["misty", "desktop", "clean", "--apply"],

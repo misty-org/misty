@@ -1,6 +1,8 @@
 # Browser workspace: accepted implementation plan
 
 Status: implementation in progress; not a release claim.
+
+Browser completeness work is tracked in [the browser implementation ledger](browser-ledger.md). Complete the everyday browsing baseline before expanding browser agent features.
 This replaces the earlier app-store direction and single-writer handoff prototype.
 
 ## Spaces restoration (September 23)

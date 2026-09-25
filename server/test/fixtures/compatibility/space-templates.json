@@ -9,7 +9,8 @@
       "task_count": 0,
       "note_count": 0,
       "collection_count": 0
-    }
+    },
+    "app_ids": []
   },
   {
     "id": "student-project",
@@ -24,7 +25,13 @@
       "task_count": 3,
       "note_count": 1,
       "collection_count": 3
-    }
+    },
+    "app_ids": [
+      "chat",
+      "journal",
+      "planner",
+      "library"
+    ]
   },
   {
     "id": "startup",
@@ -39,7 +46,14 @@
       "task_count": 3,
       "note_count": 1,
       "collection_count": 3
-    }
+    },
+    "app_ids": [
+      "chat",
+      "inbox",
+      "journal",
+      "planner",
+      "library"
+    ]
   },
   {
     "id": "research",
@@ -54,7 +68,13 @@
       "task_count": 3,
       "note_count": 1,
       "collection_count": 3
-    }
+    },
+    "app_ids": [
+      "chat",
+      "journal",
+      "planner",
+      "library"
+    ]
   },
   {
     "id": "game-development",
@@ -68,7 +88,16 @@
       "task_count": 3,
       "note_count": 1,
       "collection_count": 3
-    }
+    },
+    "app_ids": [
+      "chat",
+      "journal",
+      "planner",
+      "library",
+      "files",
+      "code",
+      "terminal"
+    ]
   },
   {
     "id": "creative-team",
@@ -83,6 +112,30 @@
       "task_count": 3,
       "note_count": 1,
       "collection_count": 4
-    }
+    },
+    "app_ids": [
+      "chat",
+      "journal",
+      "planner",
+      "library"
+    ]
+  },
+  {
+    "id": "family",
+    "name": "Family",
+    "description": "Keep family plans and important material together.",
+    "version": 1,
+    "recommended_integrations": [],
+    "seed_summary": {
+      "task_count": 0,
+      "note_count": 1,
+      "collection_count": 1
+    },
+    "app_ids": [
+      "chat",
+      "planner",
+      "journal",
+      "library"
+    ]
   }
 ]

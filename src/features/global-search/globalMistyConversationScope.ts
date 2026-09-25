@@ -1,8 +1,8 @@
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import type { GlobalSearchState } from "./globalSearchState";
 
-/** New work is personal. Only an explicitly reopened conversation retains its
- * historical server scope; prompt wording never changes that scope. */
+/** New work is personal. Conversation and agent ownership are account-scoped;
+ * content destinations never change the conversation identity. */
 export async function conversationForGlobalPrompt(get: () => GlobalSearchState, _prompt: string) {
   const state = get();
   const current = state.conversations.find((item) => item.id === state.activeConversationId);
@@ -15,9 +15,5 @@ export async function conversationForGlobalPrompt(get: () => GlobalSearchState, 
       ? current.agentId !== state.selectedAgentId
       : state.selectedAgentId !== defaultAgent);
   if (!current || differentAgent) return state.newConversation();
-  if (state.context.some((ref) => ref.spaceId && ref.spaceId !== current.spaceId))
-    throw new Error(
-      "Historical context belongs to another conversation. Reopen that conversation or remove the attachment.",
-    );
   return current.id;
 }

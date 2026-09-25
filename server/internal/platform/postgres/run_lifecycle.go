@@ -14,19 +14,22 @@ func (db *Database) CancelSpaceRun(ctx context.Context, userID, runID string) (*
 	out := &SpaceRun{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var spaceID, requester string
-		if err := tx.QueryRowContext(ctx, `SELECT space_id,requesting_member_id FROM space_runs WHERE id=$1`, runID).Scan(&spaceID, &requester); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(space_id,''),requesting_member_id FROM space_runs WHERE id=$1`, runID).Scan(&spaceID, &requester); err != nil {
 			return err
 		}
 		if requester != userID {
 			return ErrSpaceForbidden
 		}
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAskRun); err != nil {
-			return err
-		}
 		if err := scanSpaceRun(tx.QueryRowContext(ctx, `UPDATE space_runs SET state='canceled',canceled_at=NOW(),completed_at=NOW(),updated_at=NOW() WHERE id=$1 AND state IN ('queued','running','awaiting_approval','cooldown') RETURNING `+spaceRunColumns, runID), out); err != nil {
 			return err
 		}
 		_, _ = tx.ExecContext(ctx, `UPDATE space_run_approvals SET state='canceled',decided_by_user_id=$1,decided_at=NOW() WHERE run_id=$2 AND state='pending'`, userID, runID)
+		if err := releasePersonalAgentRuntimeReservationsTx(ctx, tx, runID); err != nil {
+			return err
+		}
+		if spaceID == "" {
+			return nil
+		}
 		_, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "agent.run.canceled", runID, map[string]any{})
 		return err
 	})
@@ -41,9 +44,12 @@ func requireRunResourceEnabledTx(ctx context.Context, tx *sql.Tx, run *SpaceRun)
 	var err error
 	switch run.ResourceKind {
 	case "agent":
-		err = tx.QueryRowContext(ctx, `SELECT a.enabled AND a.deleted_at IS NULL AND EXISTS(
-			SELECT 1 FROM space_members m WHERE m.space_id=$2 AND m.user_id=a.owner_user_id)
-			FROM misty_ask_identities a WHERE a.id=$1`, run.ResourceID, run.SpaceID).Scan(&enabled)
+		owner := run.OwnerUserID
+		if owner == "" {
+			owner = run.RequestingMemberID
+		}
+		err = tx.QueryRowContext(ctx, `SELECT a.enabled AND a.deleted_at IS NULL
+   FROM misty_ask_identities a WHERE a.id=$1 AND a.owner_user_id=$2`, run.ResourceID, owner).Scan(&enabled)
 	default:
 		return ErrSpaceInvalid
 	}

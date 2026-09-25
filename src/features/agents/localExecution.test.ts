@@ -18,7 +18,9 @@ const mocks = vi.hoisted(() => ({
     submitAnswer: vi.fn(),
   },
   deviceSnapshot: vi.fn(),
+  normalContext: vi.fn(),
 }));
+vi.mock("./companion/normalTabs", () => ({ companionBrowserContext: mocks.normalContext }));
 vi.mock("./betaModes", () => ({ visibleAutopilotAvailable: () => mocks.autopilot }));
 vi.mock("./workspaceAutopilot", () => ({ startWorkspaceAutopilot: mocks.startAutopilot }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
@@ -77,6 +79,35 @@ beforeEach(async () => {
   mocks.state.submitAnswer.mockResolvedValue(undefined);
 });
 describe("native task authority", () => {
+  it("uses an ordinary companion tab without a worker view or closing the user's tab", async () => {
+    mocks.autopilot = true;
+    mocks.normalContext.mockResolvedValueOnce({
+      context: [{ id: "normal-tab", kind: "browser-tab", opaqueScopeId: "normal-scope" }],
+      deviceContexts: [
+        {
+          deviceId: "server-device",
+          kind: "browser_tab",
+          opaqueRef: "normal-scope",
+          capabilities: ["browser.navigate"],
+          metadata: { normal_tab: true },
+        },
+      ],
+    });
+    const execution = await startLocalExecution("owner", "agent", "", "agent", {
+      normalTabs: true,
+      openWhenMissing: true,
+    });
+    expect(execution.normalTabs).toBe(true);
+    expect(execution.views).toEqual([]);
+    expect(mocks.startAutopilot).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_create", expect.anything());
+    expect(mocks.invoke).toHaveBeenCalledWith(
+      "agent_workspace_bind_scope",
+      expect.objectContaining({ scopeId: "normal-scope" }),
+    );
+    await finishLocalExecution();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_close", expect.anything());
+  });
   it("opens the built-in browser without installations, using the workspace native profile", async () => {
     const execution = await startLocalExecution("owner", "agent", "", "agent");
     const create = mocks.invoke.mock.calls.find(([name]) => name === "browser_webview_create")![1]
@@ -218,15 +249,15 @@ describe("native task authority", () => {
     expect(useLocalExecution.getState().execution?.state).toBe("running");
     await finishLocalExecution();
   });
-  it("rejects another agent or Space while pages belong to a paused task", async () => {
+  it("rejects another agent but keeps execution independent of Space changes", async () => {
     await startLocalExecution("owner", "agent", "space", "team");
     await pauseLocalExecution();
     await expect(startLocalExecution("owner", "other", "space", "team")).rejects.toThrow(
       "Stop the current task",
     );
-    await expect(startLocalExecution("owner", "agent", "other-space", "team")).rejects.toThrow(
-      "Stop the current task",
-    );
+    const resumed = await startLocalExecution("owner", "agent", "other-space", "team");
+    expect(resumed.spaceId).toBe("");
+    expect(resumed.state).toBe("running");
   });
   it("explicitly carries task downloads only across a paused task's scope rebinding", async () => {
     const first = await startLocalExecution("owner", "agent", "", "agent");

@@ -18,11 +18,6 @@ type PasswordResetSender interface {
 	SendPasswordResetEmail(ctx context.Context, recipientEmail, resetLink string) error
 }
 
-type WaitlistSender interface {
-	SendWaitlistConfirmationEmail(ctx context.Context, recipientName, recipientEmail string) error
-	SendWaitlistNotificationEmail(ctx context.Context, notifyEmail, waitlistName, waitlistEmail string) error
-}
-
 type SpaceInvitationSender interface {
 	SendSpaceInvitationEmail(
 		ctx context.Context,
@@ -32,7 +27,6 @@ type SpaceInvitationSender interface {
 
 type Sender interface {
 	PasswordResetSender
-	WaitlistSender
 	SpaceInvitationSender
 }
 
@@ -40,16 +34,6 @@ type LogSender struct{}
 
 func (LogSender) SendPasswordResetEmail(_ context.Context, recipientEmail, resetLink string) error {
 	log.Printf("password reset email to %s: %s", recipientEmail, resetLink)
-	return nil
-}
-
-func (LogSender) SendWaitlistConfirmationEmail(_ context.Context, recipientName, recipientEmail string) error {
-	log.Printf("waitlist confirmation email to %s (%s)", recipientName, recipientEmail)
-	return nil
-}
-
-func (LogSender) SendWaitlistNotificationEmail(_ context.Context, notifyEmail, waitlistName, waitlistEmail string) error {
-	log.Printf("waitlist notification email to %s about %s (%s)", notifyEmail, waitlistName, waitlistEmail)
 	return nil
 }
 
@@ -175,40 +159,5 @@ func (s *MailjetSender) SendSpaceInvitationEmail(
 		"<p>This invitation expires in 7 days.</p>"
 	return s.sendMessage(
 		ctx, recipientEmail, "", subject, textBody, htmlBody, "Space invitation",
-	)
-}
-
-func (s *MailjetSender) SendWaitlistConfirmationEmail(ctx context.Context, recipientName, recipientEmail string) error {
-	if strings.TrimSpace(recipientEmail) == "" {
-		return fmt.Errorf("recipient email is required")
-	}
-
-	return s.sendMessage(
-		ctx,
-		recipientEmail,
-		recipientName,
-		"You're on the Misty waitlist",
-		waitlistConfirmationText(recipientName),
-		waitlistConfirmationHTML(recipientName),
-		"waitlist confirmation",
-	)
-}
-
-func (s *MailjetSender) SendWaitlistNotificationEmail(ctx context.Context, notifyEmail, waitlistName, waitlistEmail string) error {
-	if strings.TrimSpace(notifyEmail) == "" {
-		return nil
-	}
-	if strings.TrimSpace(waitlistEmail) == "" {
-		return fmt.Errorf("waitlist email is required")
-	}
-
-	return s.sendMessage(
-		ctx,
-		notifyEmail,
-		"",
-		"New Misty waitlist signup",
-		waitlistNotificationText(waitlistName, waitlistEmail),
-		waitlistNotificationHTML(waitlistName, waitlistEmail),
-		"waitlist notification",
 	)
 }

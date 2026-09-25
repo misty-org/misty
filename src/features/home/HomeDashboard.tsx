@@ -1,4 +1,3 @@
-import { officialAppRoute, useAppsStore } from "@/features/apps";
 import { homeApi } from "@/api/home/api";
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
@@ -62,12 +61,6 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const spacesLoading = useSpacesStore((state) => state.loading);
-  const installations = useAppsStore((state) => state.installations);
-  const installedApps = useMemo(
-    () =>
-      new Set(installations.filter((app) => app.state === "installed").map((app) => app.app_id)),
-    [installations],
-  );
   const recentTools = useRecentToolsStore((state) => state.recentTools);
   const hydrateRecentTools = useRecentToolsStore((state) => state.hydrateRecentTools);
   const [now] = useState(() => new Date());
@@ -143,13 +136,15 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
       .filter((toolId) => {
         if (seen.has(toolId) || toolId === "home" || toolId === "marketplace") return false;
         seen.add(toolId);
-        if (!installedApps.has(toolId === "social" ? "chat" : toolId)) return false;
-        if (global) return true;
+        if (global)
+          return !!(isSpaceTool(toolId)
+            ? preferredDefaultSpace(spaces)
+            : ["files", "browser", "agents"].includes(toolId));
         if (!space) return !isSpaceTool(toolId);
         return !isSpaceTool(toolId) || spaceToolIsAvailable(space, toolId);
       })
       .slice(0, 4);
-  }, [recentTools, space, installedApps, global]);
+  }, [recentTools, space, spaces, global]);
 
   const visibleSpaces = useMemo(
     () =>
@@ -191,10 +186,11 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                 )}
               >
                 {jumpTools.map((toolId) => {
-                  const route = global
-                    ? officialAppRoute(toolId)
-                    : space
-                      ? routeForTool(toolId, space, user?.id ?? "")
+                  const targetSpace = space ?? preferredDefaultSpace(spaces);
+                  const route = targetSpace
+                    ? routeForTool(toolId, targetSpace, user?.id ?? "")
+                    : ["files", "browser", "agents"].includes(toolId)
+                      ? `/${toolId}`
                       : null;
                   if (!route) return null;
                   return (

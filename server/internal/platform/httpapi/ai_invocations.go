@@ -39,6 +39,12 @@ type aiCaptureAttachment struct {
 	ContentHash string `json:"content_hash"`
 }
 
+type aiDisplayCapture struct {
+	aiCaptureAttachment
+	Screen  string `json:"screen"`
+	Primary bool   `json:"primary"`
+}
+
 type aiInvocationDeviceContext struct {
 	DeviceID     string          `json:"device_id"`
 	Kind         string          `json:"kind"`
@@ -49,6 +55,9 @@ type aiInvocationDeviceContext struct {
 }
 
 type aiInvocationInput struct {
+	CompanionMode         string                      `json:"companion_mode,omitempty"`
+	CompanionModel        string                      `json:"companion_model,omitempty"`
+	DisplayCaptures       []aiDisplayCapture          `json:"display_captures,omitempty"`
 	ThinkingMode          string                      `json:"thinking_mode,omitempty"`
 	TaskID                string                      `json:"task_id,omitempty"`
 	AgentID               string                      `json:"agent_id,omitempty"`
@@ -142,7 +151,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			return
 		}
 		var body aiInvocationInput
-		if err := decodeAIJSON(w, r, &body); err != nil {
+		if err := TestingDecodeAIJSONWithLimit(w, r, &body, 24<<20); err != nil {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
@@ -205,27 +214,20 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		var err error
 		modelFallbackNotice := false
 		modelID := agent.FrontierDefaultModelID()
-		reasoning := agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
-		spaceID := firstAIContextSpace(body.Context)
-		if spaceID != "" {
-			if _, spaceErr := s.database.SpaceByID(r.Context(), userID, spaceID); spaceErr != nil {
-				writeSpaceError(w, spaceErr)
+		if body.Mode == "companion" && body.CompanionModel != "" {
+			if !strings.HasPrefix(body.CompanionModel, "openai/") || !agent.FrontierModelAvailable(r.Context(), body.CompanionModel) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_model", "message": "Choose an available OpenAI model."})
 				return
 			}
+			modelID = body.CompanionModel
 		}
+		reasoning := agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
+		spaceID := "" // AI execution belongs to the authenticated account.
 		if conversationID != "" {
 			bound, boundErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
-			if boundErr != nil || (db.AppAuthorityFromContext(r.Context()) != nil && conversationSpaceChanged(bound.SpaceID, spaceID)) || (bound.AgentID != "" && bound.AgentID != body.AgentID) {
+			if boundErr != nil || (bound.AgentID != "" && bound.AgentID != body.AgentID) {
 				writeJSON(w, http.StatusConflict, map[string]any{"code": "conversation_context_changed", "message": "Start a new Misty task for this Space."})
 				return
-			}
-			if spaceID == "" {
-				spaceID = bound.SpaceID
-			} else if bound.SpaceID == "" {
-				if bindErr := s.database.BindMistyConversationSpace(r.Context(), userID, conversationID, spaceID); bindErr != nil {
-					writeMistyConversationBindingError(w, bindErr)
-					return
-				}
 			}
 			if bindErr := s.database.BindConversationAgent(r.Context(), userID, conversationID, body.AgentID); bindErr != nil {
 				writePersonalAgentError(w, bindErr)
@@ -240,14 +242,6 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 					return
 				}
 			}
-		}
-		if spaceID == "" {
-			writeJSON(w, http.StatusForbidden, map[string]any{"code": "agents_space_required", "message": "Which space should I work in?"})
-			return
-		}
-		if _, err := s.database.SpaceByID(r.Context(), userID, spaceID); err != nil {
-			writeSpaceError(w, err)
-			return
 		}
 		payload, _ := json.Marshal(body)
 		if err := s.database.ValidateNativeAgentExecution(r.Context(), &db.AIInvocationRecord{UserID: userID, SpaceID: spaceID, RequestPayload: payload}); err != nil {
@@ -454,14 +448,7 @@ func (s *AIService) CancelInvocation() http.HandlerFunc {
 			http.Error(w, "invocation not found", http.StatusNotFound)
 			return
 		}
-		if stored.SurfaceID == "routine" {
-			if err := s.database.RequestRoutineCancellation(r.Context(), userID, stored.ID); err != nil {
-				writeSDKError(w, err)
-				return
-			}
-			writeJSON(w, http.StatusAccepted, map[string]any{"runtime_cancel_pending": true, "message": "Stop requested. Confirmed and uncertain effects remain in history."})
-			return
-		}
+
 		if _, err := s.invocations.restoreDurable(r.Context(), *stored); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "load invocation stream"})
 			return

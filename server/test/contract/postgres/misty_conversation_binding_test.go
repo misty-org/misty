@@ -6,10 +6,9 @@ import (
 	"testing"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
-	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-func TestMistyConversationSpaceBindingIsImmutableAndOwnerIsolated(t *testing.T) {
+func TestMistyConversationIsAccountOwnedAndOwnerIsolated(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Binding Owner", "binding-owner@example.com", "password123")
@@ -38,11 +37,11 @@ func TestMistyConversationSpaceBindingIsImmutableAndOwnerIsolated(t *testing.T) 
 	if err := database.BindMistyConversationSpace(ctx, owner.ID, conversationID, first.ID); err != nil {
 		t.Fatalf("same-Space bind should be idempotent: %v", err)
 	}
-	if err := database.BindMistyConversationSpace(ctx, owner.ID, conversationID, second.ID); !errors.Is(err, ErrSpaceConflict) {
-		t.Fatalf("conversation was rebound to another Space: %v", err)
+	if err := database.BindMistyConversationSpace(ctx, owner.ID, conversationID, second.ID); err != nil {
+		t.Fatalf("account conversation rejected a new content destination: %v", err)
 	}
 	bound, err := database.AgentConversationIdentity(ctx, owner.ID, conversationID)
-	if err != nil || bound.SpaceID != first.ID {
+	if err != nil || bound.SpaceID != "" {
 		t.Fatalf("bound identity = %#v, %v", bound, err)
 	}
 	if err := database.BindMistyConversationSpace(ctx, other.ID, conversationID, second.ID); !errors.Is(err, serveragent.ErrPersistedSessionNotFound) {

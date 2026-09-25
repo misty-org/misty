@@ -29,7 +29,7 @@ vi.mock("react-router-dom", async () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/features/files/explorer", () => ({
+vi.mock("@/features/files/workspace/explorer", () => ({
   useExplorerStore: {
     getState: () => ({ pushNotification: mocks.pushNotification }),
   },
@@ -95,7 +95,7 @@ vi.mock("@/shared/ui", () => {
   };
 });
 
-import { AddFilesToSpaceDialog } from "@/features/spaces/library";
+import { AddFilesToSpaceDialog } from "@/features/library/library";
 
 describe("AddFilesToSpaceDialog", () => {
   let container: HTMLDivElement;

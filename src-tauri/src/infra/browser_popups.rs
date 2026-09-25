@@ -229,7 +229,8 @@ fn create_popup(
             return None;
         }
     };
-    if attachment_download::install(window.as_ref()).is_err() ||
+    if super::super::browser_site_permissions::install(window.as_ref()).is_err() ||
+        attachment_download::install(window.as_ref()).is_err() ||
         focus_messages::install(app, window.as_ref(), &id).is_err() ||
         install_close_handler(app, window.as_ref(), &id).is_err() {
         let _ = window.destroy();

@@ -188,10 +188,13 @@ export interface AiSurfaceAdapter {
 }
 
 export interface AiInvocationRequest {
-  agentId?:string;
-  taskId?:string;
-  executionMode?: "user"|"agent"|"team";
-  windowLabel?:string;
+  companionMode?: "team" | "auto";
+  companionModel?: string;
+  displayCaptures?: import("@/features/agents/companion/protocol").DisplayCapture[];
+  agentId?: string;
+  taskId?: string;
+  executionMode?: "user" | "agent" | "team";
+  windowLabel?: string;
   mode: AiInvocationMode;
   surfaceId: AiSurfaceId;
   trigger: AiTrigger;
@@ -240,7 +243,15 @@ export interface AiRunCreated {
 }
 
 export type AiInvocationState =
-  "queued" | "running" | "awaiting_approval" | "awaiting_device" | "awaiting_intervention" | "awaiting_timer" | "completed" | "failed" | "canceled";
+  | "queued"
+  | "running"
+  | "awaiting_approval"
+  | "awaiting_device"
+  | "awaiting_intervention"
+  | "awaiting_timer"
+  | "completed"
+  | "failed"
+  | "canceled";
 
 export type AiInvocationEvent =
   | { id: string; type: "invocation.started"; state: AiInvocationState }

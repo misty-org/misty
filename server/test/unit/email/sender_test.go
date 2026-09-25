@@ -96,13 +96,6 @@ func TestMailjetSenderSendPasswordResetEmailSuccess(t *testing.T) {
 	}
 }
 
-func TestMailjetSenderSendWaitlistNotificationEmailAllowsEmptyNotifyEmail(t *testing.T) {
-	sender := &MailjetSender{}
-	if err := sender.SendWaitlistNotificationEmail(context.Background(), "", "Ada", "ada@example.com"); err != nil {
-		t.Fatalf("SendWaitlistNotificationEmail() error = %v", err)
-	}
-}
-
 func TestMailjetSenderSendMessageFailures(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -148,10 +141,5 @@ func TestMailjetSenderInputValidation(t *testing.T) {
 	if err := sender.SendPasswordResetEmail(context.Background(), "user@example.com", ""); err == nil {
 		t.Fatal("SendPasswordResetEmail() succeeded without reset link")
 	}
-	if err := sender.SendWaitlistConfirmationEmail(context.Background(), "Ada", ""); err == nil {
-		t.Fatal("SendWaitlistConfirmationEmail() succeeded without recipient email")
-	}
-	if err := sender.SendWaitlistNotificationEmail(context.Background(), "notify@example.com", "Ada", ""); err == nil {
-		t.Fatal("SendWaitlistNotificationEmail() succeeded without waitlist email")
-	}
+
 }

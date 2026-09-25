@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
+func TestNativeAgentsPrivacyMemoryAndLeases(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Agent owner", "native-owner@example.com", "password123")
@@ -27,11 +27,10 @@ func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
 		t.Fatal(err)
 	}
 	profile := AgentProfileInput{Name: "Communications", Role: "Manage launch communications", Instructions: "Use clear language", ModelMode: "automatic", Enabled: true}
-	// Legacy model and assignment fields cannot override managed policy.
+	// Legacy model fields cannot override managed policy.
 	profile.ModelMode = "pinned"
 	profile.ModelID = "anthropic/legacy-model"
 	profile.ReasoningEffort = "low"
-	profile.Assignment = &AgentAppAssignmentInput{AppIDs: []string{"missing-app"}}
 	agent, err := database.SavePersonalAgent(ctx, owner.ID, "", profile)
 	if err != nil {
 		t.Fatal(err)
@@ -41,27 +40,6 @@ func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
 	}
 	if agent.SystemManaged || agent.ID == misty.ID {
 		t.Fatalf("invalid personal identity: %+v", agent)
-	}
-	assignments, err := database.AgentAppAssignments(ctx, owner.ID, agent.ID, space.ID)
-	if err != nil || len(assignments) != 0 {
-		t.Fatalf("new assignments: %v %v", assignments, err)
-	}
-	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"planner"}); err != nil {
-		t.Fatal(err)
-	}
-	_, err = database.InstallUserApp(ctx, owner.ID, "planner", "1.0.0", 1, []string{"connections.read"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, nil); err != nil {
-		t.Fatal(err)
-	}
-	assignments, err = database.AgentAppAssignments(ctx, owner.ID, agent.ID, secondSpace.ID)
-	if err != nil || len(assignments) != 1 || assignments[0] != "planner" {
-		t.Fatalf("personal assignment should be independent of Space: %v %v", assignments, err)
-	}
-	if err = database.SetAgentAppAssignments(ctx, other.ID, agent.ID, space.ID, []string{"planner"}); err == nil {
-		t.Fatal("another owner changed assignments")
 	}
 	agents, err := database.PersonalAgents(ctx, other.ID)
 	if err != nil || len(agents) != 0 {
@@ -90,11 +68,14 @@ func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, scope := range []struct{ user, agent, space string }{{other.ID, agent.ID, space.ID}, {owner.ID, misty.ID, space.ID}, {owner.ID, agent.ID, secondSpace.ID}} {
+	for _, scope := range []struct{ user, agent, space string }{{other.ID, agent.ID, space.ID}, {owner.ID, misty.ID, space.ID}} {
 		values, err := database.MistyMemoryContext(ctx, scope.user, scope.space, 20, scope.agent)
 		if err == nil && len(values) > 0 {
 			t.Fatalf("memory escaped owner/agent/Space: %+v", scope)
 		}
+	}
+	if values, err := database.MistyMemoryContext(ctx, owner.ID, secondSpace.ID, 20, agent.ID); err != nil || len(values) != 1 || values[0].ID != memory.ID {
+		t.Fatalf("account memory restricted to a Space: %v %v", values, err)
 	}
 	if err = database.UpdateAgentMemory(ctx, owner.ID, agent.ID, space.ID, memory.ID, "Use a concise brand voice"); err != nil {
 		t.Fatal(err)
@@ -135,7 +116,7 @@ func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
 	if err != nil || len(receipts) != 1 || receipts[0].State != "completed" {
 		t.Fatalf("recovery receipts: %+v %v", receipts, err)
 	}
-	for _, boundary := range []struct{ user, agent, space string }{{other.ID, agent.ID, space.ID}, {owner.ID, misty.ID, space.ID}, {owner.ID, agent.ID, secondSpace.ID}} {
+	for _, boundary := range []struct{ user, agent, space string }{{other.ID, agent.ID, space.ID}, {owner.ID, misty.ID, space.ID}} {
 		receipts, err := database.NativeAgentConversationReceipts(ctx, boundary.user, boundary.agent, boundary.space, conversation, "next-invocation")
 		if err != nil || len(receipts) != 0 {
 			t.Fatalf("receipt boundary: %+v %v", receipts, err)

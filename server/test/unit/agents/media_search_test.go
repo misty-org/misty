@@ -12,7 +12,7 @@ import (
 )
 
 func TestGenerateAgentSpeechUsesGatewayAndDecodesAudio(t *testing.T) {
-	expected := []byte("misty speech")
+	expected := []byte{0, 0, 1, 0}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/speech-model" || r.Method != http.MethodPost {
 			t.Fatalf("request=%s %s", r.Method, r.URL.Path)
@@ -24,7 +24,7 @@ func TestGenerateAgentSpeechUsesGatewayAndDecodesAudio(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if body["text"] != "hello" || body["voice"] != "alloy" || body["outputFormat"] != "mp3" {
+		if body["text"] != "hello" || body["voice"] != "alloy" || body["outputFormat"] != "pcm" {
 			t.Fatalf("body=%v", body)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]string{"audio": base64.StdEncoding.EncodeToString(expected)})
@@ -36,7 +36,7 @@ func TestGenerateAgentSpeechUsesGatewayAndDecodesAudio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(audio) != string(expected) || contentType != "audio/mpeg" {
+	if len(audio) != 44+len(expected) || string(audio[:4]) != "RIFF" || string(audio[8:12]) != "WAVE" || string(audio[44:]) != string(expected) || contentType != "audio/wav" {
 		t.Fatalf("audio=%q contentType=%q", audio, contentType)
 	}
 }

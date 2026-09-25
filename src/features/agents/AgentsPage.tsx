@@ -1,4 +1,3 @@
-import { betaExecutionMode, visibleAutopilotAvailable } from "./betaModes";
 import { useSearchParams } from "react-router-dom";
 import { observeAccountChanges } from "@/api/accountEvents";
 import { useEffect, useState } from "react";
@@ -18,8 +17,6 @@ import {
   cn,
 } from "@/shared/ui";
 import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { finishLocalExecution } from "./localExecution";
 import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import {
   Activity,
@@ -83,7 +80,7 @@ export default function NativeAgentsPage() {
   const [recipientSearch, setRecipientSearch] = useState("");
   const [params] = useSearchParams();
   const [activity, setActivity] = useState(
-    () => params.get("view") === "automations" || params.has("run"),
+    () => params.get("view") === "activity",
   );
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
@@ -101,8 +98,6 @@ export default function NativeAgentsPage() {
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
   const conversationSpaceId =
     conversations.find((c) => c.id === activeConversationId)?.spaceId ?? "";
-  const executionMode = useMistyStore((s) => s.executionMode);
-  const executionModeByAgent = useMistyStore((s) => s.executionModeByAgent);
   const scopedConversations = conversations;
 
   useEffect(() => {
@@ -146,10 +141,8 @@ export default function NativeAgentsPage() {
       if (startNew) {
         setExpandedAgents((prev) => ({ ...prev, [id]: true }));
       }
-      const agentMode = useMistyStore.getState().executionModeByAgent?.[id] ?? "user";
       useMistyStore.setState({
         selectedAgentId: id,
-        executionMode: agentMode,
         activeConversationId: startNew
           ? ""
           : (scopedConversations.find(
@@ -623,48 +616,6 @@ export default function NativeAgentsPage() {
                   <span>New conversation</span>
                 </Button>
               </div>
-              {hasTauriInternals() && /Mac|Win/.test(navigator.platform) && (
-                <label className="agents-space-label block text-sm mb-2">
-                  <span className="block text-cream-muted text-xs mb-1">Work mode</span>
-                  <select
-                    aria-label="Agent execution mode"
-                    className={field}
-                    disabled={working}
-                    value={betaExecutionMode(
-                      (profile?.id ? executionModeByAgent?.[profile.id] : undefined) ??
-                        executionMode ??
-                        "user",
-                    )}
-                    onChange={(e) => {
-                      const mode = betaExecutionMode(e.target.value as "user" | "agent" | "team");
-                      const agentId = profile?.id ?? "misty";
-                      void finishLocalExecution()
-                        .then(() =>
-                          useMistyStore.setState((prev) => ({
-                            executionMode: mode,
-                            executionModeByAgent: {
-                              ...prev.executionModeByAgent,
-                              [agentId]: mode,
-                            },
-                          })),
-                        )
-                        .catch((reason) => useMistyStore.setState({ error: String(reason) }));
-                    }}
-                  >
-                    <option value="user" disabled={visibleAutopilotAvailable()}>
-                      {visibleAutopilotAvailable()
-                        ? "User — unavailable in beta"
-                        : "Discuss and draft"}
-                    </option>
-                    <option value="agent">Work in this window</option>
-                    <option value="team" disabled={visibleAutopilotAvailable()}>
-                      {visibleAutopilotAvailable()
-                        ? "Team — unavailable in beta"
-                        : "Work in a separate window"}
-                    </option>
-                  </select>
-                </label>
-              )}
               {conversation && (
                 <MistyModelPicker
                   conversationId={conversation.id}

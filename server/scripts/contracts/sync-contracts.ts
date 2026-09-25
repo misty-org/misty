@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const archiveIndex = process.argv.indexOf("--archive");
 if (archiveIndex !== -1 && (!process.argv[archiveIndex + 1] || process.argv[archiveIndex + 1].startsWith("--"))) throw new Error("--archive requires a reviewed public package path");
 const archive = archiveIndex === -1 ? null : resolve(process.argv[archiveIndex + 1]);
-const source = resolve(root, "../misty/packages/contracts");
+const source = resolve(root, "../packages/contracts");
 const destination = join(root, "third-party/misty-contracts");
 const temporary = await mkdtemp(join(tmpdir(), "misty-public-contracts-"));
 try {

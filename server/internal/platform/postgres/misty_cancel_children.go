@@ -5,12 +5,12 @@ import (
 	"database/sql"
 )
 
-// Parent cancellation revokes descendants in the same owner/Space boundary and
+// Parent cancellation revokes descendants in the same account boundary and
 // queues runtime cancellation, including reservation and approval cleanup.
 func cancelMistyChildrenTx(ctx context.Context, tx *sql.Tx, userID, runID string) error {
 	rows, err := tx.QueryContext(ctx, `WITH RECURSIVE children AS (
  SELECT id,space_id FROM space_runs WHERE (parent_run_id=$1 OR input->>'parent_invocation_id'=$1) AND owner_user_id=$2
- UNION ALL SELECT r.id,r.space_id FROM space_runs r JOIN children c ON r.parent_run_id=c.id AND r.space_id=c.space_id WHERE r.owner_user_id=$2
+ UNION ALL SELECT r.id,r.space_id FROM space_runs r JOIN children c ON r.parent_run_id=c.id WHERE r.owner_user_id=$2
  ) SELECT r.id,COALESCE(r.runtime_run_id,'') FROM space_runs r JOIN children c ON c.id=r.id
  WHERE r.state IN ('queued','running','awaiting_approval','awaiting_device','awaiting_intervention') FOR UPDATE OF r`, runID, userID)
 	if err != nil {

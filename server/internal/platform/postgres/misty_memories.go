@@ -40,7 +40,7 @@ type RememberMistyMemoryInput struct {
 const maxMistyMemoryList = 100
 
 func (db *Database) RememberMistyMemory(ctx context.Context, userID string, input RememberMistyMemoryInput) (MistyMemory, error) {
-	input.SpaceID = strings.TrimSpace(input.SpaceID)
+	input.SpaceID = "" // Memories belong to the account and agent, never a Space.
 	input.Kind = strings.ToLower(strings.TrimSpace(input.Kind))
 	input.Content = strings.TrimSpace(input.Content)
 	input.Reason = strings.TrimSpace(input.Reason)
@@ -119,26 +119,20 @@ func (db *Database) MistyMemories(ctx context.Context, userID, spaceID string, l
 	if len(agentIDs) > 0 {
 		agentID = agentIDs[0]
 	}
-	spaceID = strings.TrimSpace(spaceID)
+	spaceID = ""
 	if limit < 1 || limit > maxMistyMemoryList {
 		limit = maxMistyMemoryList
 	}
 	items := []MistyMemory{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		if spaceID != "" {
-			if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-				return err
-			}
-		}
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id,COALESCE(space_id,''),kind,content,reason,
+			SELECT id,'' AS legacy_space,kind,content,reason,
 				COALESCE(source_conversation_id,''),COALESCE(source_invocation_id,''),
 				last_used_at,created_at,updated_at
 			FROM misty_memories
-			WHERE user_id=$1 AND forgotten_at IS NULL AND COALESCE(agent_id,'')=$4
-				AND ($2='' OR space_id IS NULL OR space_id=$2)
-			ORDER BY (space_id=$2) DESC,updated_at DESC LIMIT $3
-		`, userID, spaceID, limit, agentID)
+			WHERE user_id=$1 AND forgotten_at IS NULL AND COALESCE(agent_id,'')=$3
+			ORDER BY updated_at DESC LIMIT $2
+		`, userID, limit, agentID)
 		if err != nil {
 			return err
 		}
@@ -167,23 +161,17 @@ func (db *Database) MistyMemoryContext(ctx context.Context, userID, spaceID stri
 		if err != nil || !enabled {
 			return err
 		}
-		if spaceID != "" {
-			if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-				return err
-			}
-		}
 		if limit < 1 || limit > 30 {
 			limit = 20
 		}
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id,COALESCE(space_id,''),kind,content,reason,
+			SELECT id,'' AS legacy_space,kind,content,reason,
 				COALESCE(source_conversation_id,''),COALESCE(source_invocation_id,''),
 				last_used_at,created_at,updated_at
 			FROM misty_memories
-			WHERE user_id=$1 AND forgotten_at IS NULL AND COALESCE(agent_id,'')=$4
-				AND (space_id IS NULL OR ($2<>'' AND space_id=$2))
-			ORDER BY (space_id=$2) DESC,updated_at DESC LIMIT $3
-		`, userID, spaceID, limit, agentID)
+			WHERE user_id=$1 AND forgotten_at IS NULL AND COALESCE(agent_id,'')=$3
+			ORDER BY updated_at DESC LIMIT $2
+		`, userID, limit, agentID)
 		if err != nil {
 			return err
 		}
@@ -279,7 +267,7 @@ func (db *Database) UpdateAgentMemory(ctx context.Context, userID, agentID, spac
 	normalized := strings.ToLower(strings.Join(strings.Fields(content), " "))
 	digest := sha256.Sum256([]byte(normalized))
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `UPDATE misty_memories SET content=$5,memory_key=$6,updated_at=NOW() WHERE id=$1 AND user_id=$2 AND agent_id=$3 AND (space_id IS NULL OR space_id=NULLIF($4,'')) AND forgotten_at IS NULL`, memoryID, userID, agentID, spaceID, content, hex.EncodeToString(digest[:]))
+		result, err := tx.ExecContext(ctx, `UPDATE misty_memories SET content=$4,memory_key=$5,updated_at=NOW() WHERE id=$1 AND user_id=$2 AND agent_id=$3 AND forgotten_at IS NULL`, memoryID, userID, agentID, content, hex.EncodeToString(digest[:]))
 		if err != nil {
 			return err
 		}

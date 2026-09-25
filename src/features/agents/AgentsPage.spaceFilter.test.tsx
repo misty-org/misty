@@ -92,7 +92,7 @@ it("omits model and app permission setup for a new global agent", async () => {
   fireEvent.click(screen.getByText("Instructions and memory"));
   expect(screen.queryByRole("group", { name: "Personal apps" })).toBeNull();
   expect(screen.queryByRole("checkbox", { name: "browser" })).toBeNull();
-  expect(screen.queryByLabelText("Model")).toBeNull();
+  expect(within(screen.getByRole("dialog")).queryByLabelText("Model")).toBeNull();
   expect(screen.queryByText("Select a Space to assign apps.")).toBeNull();
 });
 
@@ -143,6 +143,7 @@ it("reopens historical conversations and starts new personal work without their 
     "workspace",
     [],
     expect.objectContaining({ conversationId: "private" }),
+    { executionMode: "user", interactionMode: "team", model: "" },
   );
   await waitFor(() =>
     expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(""),
@@ -167,6 +168,7 @@ it("reopens historical conversations and starts new personal work without their 
     "workspace",
     [],
     { conversationId: "", context: [] },
+    { executionMode: "user", interactionMode: "team", model: "" },
   );
   expect(useMistyStore.getState().selectedSpaceId).toBe("");
 });

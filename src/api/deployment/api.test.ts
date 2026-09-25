@@ -18,7 +18,6 @@ import {
   saveDeploymentConfiguration,
   validateSelfHostedServerUrl,
 } from "@/api/deployment/api";
-import { mintSelfHostEntitlement } from "@/api/self-host/entitlement";
 
 const descriptor = {
   server_id: "server_00000000-0000-0000-0000-000000000001",
@@ -99,25 +98,4 @@ describe("self-hosted deployment routing", () => {
     expect(readDeploymentScope()).toMatch(/^self-hosted-/);
   });
 
-  it("mints through Hosted without disclosing the custom endpoint", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({ token: "signed-proof", expires_at: "2026-08-20T00:00:00Z" }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
-    await expect(mintSelfHostEntitlement("hosted-session")).resolves.toEqual({
-      token: "signed-proof",
-      expires_at: "2026-08-20T00:00:00Z",
-    });
-    const [requestUrl, init] = fetchMock.mock.calls[0];
-    expect(String(requestUrl)).toContain("/billing/self-host-entitlement");
-    expect(init?.body).toBeUndefined();
-    expect(JSON.stringify(init)).not.toContain("misty.example.com");
-    expect(new Headers(init?.headers).has("Authorization")).toBe(false);
-    expect(init?.credentials).toBe("include");
-    expect(new Headers(init?.headers).get("X-Misty-CSRF")).toBe("1");
-  });
 });

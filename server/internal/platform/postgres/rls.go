@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
+
+	"github.com/kannachi323/misty/server/internal/accounts"
 )
 
 const (
@@ -21,7 +22,6 @@ const (
 	rlsModeService      = "service"
 	rlsModeSession      = "session"
 	rlsModeUser         = "user"
-	rlsModeWaitlist     = "waitlist"
 )
 
 func (db *Database) TestingWithRLSContext(ctx context.Context, settings map[string]string, fn func(*sql.Tx) error) error {
@@ -58,20 +58,9 @@ func (db *Database) TestingWithRLSContext(ctx context.Context, settings map[stri
 	return nil
 }
 
-func anonymousRLSSettings(email string) map[string]string {
-	return map[string]string{
-		rlsModeSetting:         rlsModeAnonymous,
-		rlsCurrentEmailSetting: normalizeEmail(email),
-	}
-}
-
-func registrationRLSSettings(userID, licenseID, email string) map[string]string {
-	return map[string]string{
-		rlsModeSetting:         rlsModeRegistration,
-		rlsCurrentUserSetting:  strings.TrimSpace(userID),
-		rlsLicenseIDSetting:    strings.TrimSpace(licenseID),
-		rlsCurrentEmailSetting: normalizeEmail(email),
-	}
+func anonymousRLSSettings(email string) map[string]string { return accounts.AnonymousScope(email) }
+func registrationRLSSettings(user, id, email string) map[string]string {
+	return accounts.RegistrationScope(user, id, email)
 }
 
 func TestingServiceRLSSettings() map[string]string {
@@ -80,29 +69,8 @@ func TestingServiceRLSSettings() map[string]string {
 	}
 }
 
-func sessionRLSSettings(tokenHash string) map[string]string {
-	return map[string]string{
-		rlsModeSetting:        rlsModeSession,
-		rlsSessionHashSetting: strings.TrimSpace(tokenHash),
-	}
+func sessionRLSSettings(hash string) map[string]string { return accounts.SessionScope(hash) }
+func sessionCreateRLSSettings(hash, user string) map[string]string {
+	return accounts.SessionCreateScope(hash, user)
 }
-
-func sessionCreateRLSSettings(tokenHash, userID string) map[string]string {
-	settings := sessionRLSSettings(tokenHash)
-	settings[rlsCurrentUserSetting] = strings.TrimSpace(userID)
-	return settings
-}
-
-func userRLSSettings(userID string) map[string]string {
-	return map[string]string{
-		rlsModeSetting:        rlsModeUser,
-		rlsCurrentUserSetting: strings.TrimSpace(userID),
-	}
-}
-
-func waitlistRLSSettings(email string) map[string]string {
-	return map[string]string{
-		rlsModeSetting:         rlsModeWaitlist,
-		rlsCurrentEmailSetting: normalizeEmail(email),
-	}
-}
+func userRLSSettings(user string) map[string]string { return accounts.UserScope(user) }

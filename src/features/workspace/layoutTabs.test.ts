@@ -1,5 +1,5 @@
 import { createHomeWorkspaceTab } from "./workspaceDefaultTab";
-import { setAppUnsaved } from "@/features/apps/appUpdateSafety";
+import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDockLeaf, dockLeaves, dockTabs, insertDockSplit } from "./dockTree";
 import { activeLayoutView, allLayoutViews, layoutTabs, layoutTabLabel } from "./layoutTabs";
@@ -271,7 +271,7 @@ it("blocks replacement, tab closing, and cross-app Back while work is unsaved", 
     title: "Code",
     route: "/apps/code",
   });
-  setAppUnsaved(code.id, true);
+  setWorkspaceUnsaved(code.id, true);
   try {
     expect(
       state().openSurface({
@@ -284,7 +284,7 @@ it("blocks replacement, tab closing, and cross-app Back while work is unsaved", 
     expect(state().navigatePane(-1)).toBeNull();
     expect(state().closeLayoutTab(state().layout.activeLayoutTabId!)).toBe(false);
   } finally {
-    setAppUnsaved(code.id, false);
+    setWorkspaceUnsaved(code.id, false);
   }
   expect(state().navigatePane(-1)?.id).toBe(first.id);
 });

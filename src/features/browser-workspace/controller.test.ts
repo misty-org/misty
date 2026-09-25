@@ -162,6 +162,61 @@ function harness(disk: JournalStorage = storage()) {
 }
 
 describe("workspace sync controller recovery", () => {
+  it("bounds failed edit retries while another profile keeps notifying and preserves the edit", async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const controller = h.start();
+    try {
+      await settled();
+      h.ports.publish.mockRejectedValue(new Error("Sync unavailable"));
+      h.editTitle("Keep this local edit");
+      await settled();
+      expect(h.ports.publish).toHaveBeenCalledTimes(1);
+      for (let i = 0; i < 50; i++) {
+        controller.refresh();
+        await settled();
+      }
+      expect(h.ports.publish).toHaveBeenCalledTimes(1);
+      expect(h.title()).toBe("Keep this local edit");
+      expect(h.journal.pending).toHaveLength(1);
+      expect(h.ports.state).toHaveBeenLastCalledWith(expect.anything(), true);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await settled();
+      expect(h.ports.publish).toHaveBeenCalledTimes(2);
+      h.ports.publish.mockImplementation(async (_session, id, changes) => h.accept(id, changes));
+      await vi.advanceTimersByTimeAsync(2_000);
+      await settled();
+      expect(h.ports.publish).toHaveBeenCalledTimes(3);
+      expect(h.journal.pending).toHaveLength(0);
+      expect(h.title()).toBe("Keep this local edit");
+    } finally {
+      controller.stop();
+      vi.useRealTimers();
+    }
+  });
+  it("keeps an independent workspace local while receiving cloud state, then rejoins only when enabled", async () => {
+    const h = harness();
+    const controller = h.start();
+    controller.refresh();
+    await settled();
+    h.current().full_sync = false;
+    controller.refresh();
+    await settled();
+    h.editTitle("Independent local tab");
+    h.current().workspace.records.find((r) => r.kind === "tab")!.fields.title = "Cloud tab";
+    h.current().workspace.sequence++;
+    controller.refresh();
+    await settled();
+    expect(h.title()).toBe("Independent local tab");
+    expect(h.ports.publish).not.toHaveBeenCalled();
+    expect(canProjectWorkspace(h.current())).toBe(false);
+    h.current().full_sync = true;
+    controller.refresh();
+    await settled();
+    expect(h.title()).toBe("Cloud tab");
+    expect(h.ports.publish).not.toHaveBeenCalled();
+    await controller.stop();
+  });
   it("handles control moving between the state read and native publish", async () => {
     const h = harness();
     const controller = h.start();

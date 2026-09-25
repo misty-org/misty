@@ -3,12 +3,12 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceTab } from "@/features/workspace/model";
 import { MobileWorkspaceSurface } from "./MobileWorkspaceSurface";
-vi.mock("@/features/browser/BrowserWorkspace", () => ({
+vi.mock("@/features/browser/workspace/BrowserWorkspace", () => ({
   BrowserWorkspace: ({ tab }: { tab: WorkspaceTab }) => (
     <div>Browser: {String((tab.state as { url?: string })?.url)}</div>
   ),
 }));
-vi.mock("@/features/files/mobile/MobileFilesPage", () => ({
+vi.mock("@/features/files/workspace/mobile/MobileFilesPage", () => ({
   MobileFilesPage: () => <div>Local files</div>,
 }));
 vi.mock("@/features/agents/AgentsPage", () => ({ default: () => <div>Personal agents</div> }));

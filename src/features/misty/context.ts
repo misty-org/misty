@@ -23,10 +23,10 @@ export function mistyContextRef(ref: AiContextReference): GlobalAiContextRef {
   return { ...ref, source: "current", attached: true };
 }
 export function contextOptions(
-  spaceId: string,
+  _legacySpaceId: string,
 ): Array<{ label: string; target: MistyContextTarget }> {
+  const spaceId = "";
   const state = useWorkspaceStore.getState();
-  if (spaceId || state.activeScopeKey !== "global") return [];
   const result: Array<{ label: string; target: MistyContextTarget }> = [
     { label: "Entire workspace", target: { kind: "workspace", spaceId: "" } },
   ];
@@ -52,21 +52,13 @@ export function contextOptions(
 }
 export function resolveMistyContext(
   accountId: string,
-  spaceId: string,
+  _legacySpaceId: string,
   targets: MistyContextTarget[] = [],
 ): MistyContextSnapshot {
+  const spaceId = "";
   const state = useWorkspaceStore.getState();
-  if (spaceId || state.activeScopeKey !== "global") {
-    if (targets.length)
-      throw new Error("Start a new conversation to attach browser workspace context.");
-    // Preserve historical conversations without silently adding today's workspace.
-    return { context: [] };
-  }
   if (
-    targets.some(
-      (target) =>
-        target.spaceId || !["workspace", "window", "tab", "pane", "view"].includes(target.kind),
-    )
+    targets.some((target) => !["workspace", "window", "tab", "pane", "view"].includes(target.kind))
   )
     throw new Error("Attach context from the current browser workspace.");
   const windows = currentVirtualWindows(state);
@@ -123,8 +115,6 @@ export function resolveMistyContext(
             continue;
           }
           const refs = registration.adapter.getContext();
-          if (refs.some((ref) => ref.spaceId))
-            throw new Error("The pane contains historical context. Open its current browser view.");
           context.push(...refs.map(mistyContextRef));
           if (requested.length === 1 && ["pane", "view"].includes(target.kind)) {
             selection = registration.adapter.getSelection?.() ?? undefined;

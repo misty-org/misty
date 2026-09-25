@@ -1878,6 +1878,11 @@ pub async fn browser_agent_execute(
         "browser.visual" => {
             let mut observed=inspect_browser(&app,&state,&id,&request).await?;
             if observed["target"]["authentication"]=="required"{return Ok(observed)}
+            #[cfg(any(target_os="macos",windows))]
+            if let Some(captures)=super::cursor_companion::task_visual(&app,request.input.get("__mistyTaskId").and_then(Value::as_str).unwrap_or("")).await? {
+                observed["displayCaptures"]=json!(captures);
+                return Ok(observed);
+            }
             let view=app.get_webview(&webview_label(&id)?).ok_or("browser_context_closed")?;
             view.show().map_err(|e|e.to_string())?;
             let size=view.size().map_err(|e|e.to_string())?.to_logical::<f64>(view.window().scale_factor().map_err(|e|e.to_string())?);

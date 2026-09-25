@@ -174,6 +174,12 @@ func (db *Database) SpaceRun(ctx context.Context, userID, runID string) (*SpaceR
 		if err := scanSpaceRun(tx.QueryRowContext(ctx, `SELECT `+spaceRunColumns+` FROM space_runs WHERE id=$1`, runID), out); err != nil {
 			return err
 		}
+		if out.AgentID != "" {
+			if out.OwnerUserID != userID {
+				return ErrSpaceForbidden
+			}
+			return nil
+		}
 		visible, err := sharedSpaceRunVisibleToUserTx(ctx, tx, out, userID)
 		if err != nil {
 			return err

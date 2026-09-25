@@ -3,6 +3,7 @@ const native = vi.hoisted(() => ({
   invoke: vi.fn(),
   generation: 1,
   fail: false,
+  failRead: false,
   paused: undefined as undefined | (() => Promise<unknown>),
   values: new Map<string, { revision: number; value: string }>(),
   account: "",
@@ -25,6 +26,7 @@ beforeEach(() => {
   native.values.clear();
   native.generation = 1;
   native.fail = false;
+  native.failRead = false;
   native.account = "";
   native.paused = undefined;
   native.invoke.mockReset().mockImplementation(
@@ -39,6 +41,7 @@ beforeEach(() => {
       },
     ) => {
       if (command === "browser_recovery_open") {
+        if (native.failRead) throw new Error("Keychain unavailable");
         native.account = args.accountId;
         return { session_id: args.accountId };
       }
@@ -119,13 +122,63 @@ it("preserves browser originals on failed native writes and can retry without re
   localStorage.setItem("misty:workspace-account:a", raw);
   const h = await context();
   native.fail = true;
-  await expect(h.restoreNativeWorkspace("a")).rejects.toThrow("Disk unavailable");
+  await h.restoreNativeWorkspace("a");
   expect(localStorage.getItem("misty:workspace-account:a")).toBe(raw);
   expect(h.useWorkspaceRecoveryState.getState().ready).toBe(false);
+  expect(h.useWorkspaceRecoveryState.getState().usable).toBe(true);
+  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Recover me");
+  const tab = h.workspace.getState().openBrowserTab({ url: "https://new.example" });
   native.fail = false;
   await h.restoreNativeWorkspace("a");
   expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Recover me");
   expect(localStorage.getItem("misty:workspace-account:a")).toBeNull();
+  expect(JSON.stringify(h.workspace.getState().layout)).toContain(tab.id);
+  expect(h.pendingRecoveredWorkspace("a")).toBeDefined();
+});
+
+it("keeps temporary tabs selected while restoring old windows after an unreadable store recovers", async () => {
+  const h = await context();
+  await h.restoreNativeWorkspace("a");
+  const saved = h.workspace.getState().openBrowserTab({ url: "https://saved.example" });
+  await h.flushNativeWorkspace("a");
+  h.closeNativeWorkspaceRecovery();
+  native.failRead = true;
+  await h.restoreNativeWorkspace("a");
+  expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({ usable: true, ready: false });
+  const added = h.workspace.getState().openBrowserTab({ url: "https://temporary.example" });
+  const active = h.workspace.getState().activeVirtualWindowId;
+  await expect(h.flushNativeWorkspace("a")).rejects.toThrow("unsaved changes");
+  await h.restoreNativeWorkspace("a");
+  expect(h.workspace.getState().activeVirtualWindowId).toBe(active);
+  native.failRead = false;
+  await h.restoreNativeWorkspace("a");
+  expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({ ready: true, issue: null });
+  const windows = JSON.stringify(h.workspace.getState().virtualWindowsByScope);
+  expect(windows).toContain(saved.id);
+  expect(windows).toContain(added.id);
+  expect(h.workspace.getState().activeVirtualWindowId).toBe(active);
+  const persisted = native.values.get("a:workspace")!.value;
+  expect(JSON.parse(persisted).syncBaseline).toBeDefined();
+  h.closeNativeWorkspaceRecovery();
+  await h.restoreNativeWorkspace("a");
+  expect(h.pendingRecoveredWorkspace("a")).toBeDefined();
+  await h.acknowledgeRecoveredWorkspace("a");
+  expect(JSON.parse(native.values.get("a:workspace")!.value).syncBaseline).toBeUndefined();
+});
+
+it("does not expose a previous account when recovery fails for the next account", async () => {
+  const h = await context();
+  await h.restoreNativeWorkspace("a");
+  h.workspace.getState().openBrowserTab({ url: "https://private.example" });
+  await h.flushNativeWorkspace("a");
+  h.closeNativeWorkspaceRecovery();
+  native.generation++;
+  native.failRead = true;
+  await h.restoreNativeWorkspace("b");
+  expect(JSON.stringify(h.workspace.getState().virtualWindowsByScope)).not.toContain(
+    "private.example",
+  );
+  expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({ accountId: "b", usable: true });
 });
 it("does not import an unowned global layout into a newly signed-in account", async () => {
   const raw = legacy("Private old layout");

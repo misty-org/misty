@@ -35,3 +35,13 @@ func Getenv(name string) string {
 func LookupEnv(name string) (string, bool) {
 	return os.LookupEnv(name)
 }
+
+// DeploymentMode defaults to independent self-hosting. Hosted operators opt in
+// explicitly, which also requires an authenticated billing adapter at startup.
+func DeploymentMode() string {
+	mode := strings.ToLower(strings.TrimSpace(Getenv("MISTY_DEPLOYMENT_MODE")))
+	if mode == "" {
+		return "self_hosted"
+	}
+	return mode
+}

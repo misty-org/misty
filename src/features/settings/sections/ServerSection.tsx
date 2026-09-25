@@ -1,5 +1,3 @@
-import { renewSelfHostEntitlement } from "@/api/self-host/entitlement";
-import { readAccountAuthToken, readHostedAccountAuthToken } from "@/features/auth";
 import {
   applyDeployment,
   deploymentHostLabel,
@@ -63,22 +61,6 @@ export function ServerSection(props: SettingsContentProps) {
     void switchTo({ mode: "self_hosted", url });
   };
 
-  const renew = async () => {
-    if (switchingTo) return;
-    setSwitchingTo("verify-access");
-    setNotice("");
-    try {
-      const entitlement = await renewSelfHostEntitlement(
-        await readHostedAccountAuthToken(),
-        await readAccountAuthToken(),
-      );
-      setNotice(`Access verified through ${new Date(entitlement.expires_at).toLocaleString()}.`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not verify self-host access.");
-    } finally {
-      setSwitchingTo(null);
-    }
-  };
 
   return (
     <>
@@ -173,26 +155,7 @@ export function ServerSection(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      {selfHosted ? (
-        <SettingsSectionBlock title="Access">
-          <SettingsRow
-            label="Subscription verification"
-            description="Refresh your private entitlement proof through Misty Hosted without sending this server’s URL or content."
-            last
-          >
-            <Button
-              size="sm"
-              type="button"
-              variant="outline"
-              className={settingsDisabledControlClass}
-              disabled={!nativeAvailable || switchingTo !== null || props.working}
-              onClick={() => void renew()}
-            >
-              {switchingTo === "verify-access" ? "Verifying…" : "Verify access"}
-            </Button>
-          </SettingsRow>
-        </SettingsSectionBlock>
-      ) : null}
+
 
       {notice ? (
         <p className="-mt-2 mb-6 text-[13px] leading-[18px] text-cream-muted" role="status">

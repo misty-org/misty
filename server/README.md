@@ -1,64 +1,90 @@
 # Misty Server
 
-Misty's backend uses Go for the main API and background jobs, with separate
-TypeScript services for AI SDK workflows, Yjs collaboration, and billing. Each service
-keeps its own deployment and dependency boundary. See [backend architecture](docs/backend-architecture.md).
+Misty Server provides accounts, encrypted workspace sync, file services, and the agent runtime. It lives in `server/` alongside the desktop app and CLI.
 
-## Repository layout
+Set up the backend before the [desktop app](../README.md#get-started).
 
-- `cmd/` and `internal/` — Go API entrypoints and application packages.
-- `internal/platform/postgres/migrations/` — existing PostgreSQL schema migrations.
-- `apps/payments/` — isolated billing service; Go integration and ownership handover remain pending.
-- `apps/agent-runtime/` — durable AI workflow execution runtime.
-- `apps/journal-collab/` — collaborative journal and drawing worker.
-- `apps/self-host-collab/` — independently packaged self-hosted Yjs service.
-- `deploy/` and `self-host/` — managed and self-hosted deployment assets.
+## Get started
 
-## Local development
+### 1. Prerequisites
 
-Copy the development environment templates described in `deploy/README.md`,
-then start the backend stack:
+- Git and access to this repository.
+- Rust/Cargo through rustup, to build the CLI using the pinned toolchain.
+- Docker Engine with Compose v2 and Linux containers enabled.
+- curl, for Cloudflare API setup.
+- A Cloudflare account with a domain and a workers.dev subdomain enabled. Create an API token with access to the selected account and zone: account/zone read, Tunnel edit, DNS edit, and Workers Scripts edit. See [Cloudflare's tunnel setup](https://developers.cloudflare.com/tunnel/get-started/).
 
-```sh
-docker compose -f compose.dev.yml up --build
-```
+Go, Node.js, PostgreSQL, Redis, Wrangler, and cloudflared run inside the containers. Desktop development needs its own [native toolchain](../README.md#1-prerequisites). The full development stack still uses Cloudflare; a complete local-only collaboration mode is not implemented.
 
-Run the Go checks directly with:
+### 2. Installation
 
 ```sh
-make fmt-check
-make vet
-make test-unit
+git clone https://github.com/misty-org/misty.git
+cd misty
+cargo install --path cli --locked
+misty setup server
 ```
 
-The optional `misty` developer CLI lives in the separate
-`misty-org/misty-cli` repository.
+Setup creates `server/.env/dev/` and generates development credentials and collaboration keys. Repeating it preserves existing values. Keep these keys with your database and out of Git.
 
-## Public SDK contracts
+### 3. Environment setup
 
-The root Node package builds the separate billing service and maintains the
-reviewed public SDK snapshot; it does not run the Go API. Use `npm ci && npm run contracts:check` to
-verify the Go dispatch routes. `npm run contracts:sync` updates them from the
-reviewed sibling SDK package or an explicit package archive.
+Set `CLOUDFLARE_API_TOKEN` in your shell or save it through `misty env set dev CLOUDFLARE_API_TOKEN`, which reads its value from stdin. Do not put credentials in command arguments.
 
-## Billing service
-
-Billing stays independently packaged in `apps/payments`. Run `npm ci`,
-`npm run typecheck:payments`, `npm run test:payments`, and
-`npm run build:payments` to verify it. Build its image with
-`docker build -f apps/payments/Dockerfile .`.
-
-The service is not cut over: Go still owns live billing. See
-[billing status](docs/billing-service.md) for the remaining Go integration.
-
-## Agent runtime
-
-The agent runtime is part of this backend repository but remains independently
-deployable. From `apps/agent-runtime/`:
+Preview your infrastructure configuration:
 
 ```sh
-npm ci
-npm run typecheck
-npm test
-npm run build
+misty setup cloudflare --account ACCOUNT_ID --zone ZONE_ID --hostname api.example.com
 ```
+
+Repeat with `--apply` to provision the tunnel and DNS route and save the configuration. Setup reuses the named tunnel and rejects conflicting DNS records. It preserves unrelated tunnel routes. It does not deploy the Worker until explicitly requested.
+
+Inspect available settings and validate configuration:
+
+```sh
+misty env describe
+misty env status dev
+misty env check dev
+```
+
+Provider integrations require their own credentials. See the [environment guide](deploy/README.md). `misty doctor server --fix` can create missing local files and development secrets; it does not provision remote infrastructure.
+
+### 4. Start and verify
+
+```sh
+misty server up
+misty server deploy
+misty doctor server
+misty doctor cloudflare
+```
+
+`up` builds and starts containers, applies migrations, waits for service health, and returns. It does not redeploy the Worker. `deploy` explicitly deploys the development collaboration Worker.
+
+```sh
+misty server status
+misty server logs api --tail 100
+misty server logs api --follow
+```
+
+Normal startup shows progress and service status. Failures show the relevant diagnostic tail. Bounded, redacted build diagnostics are saved under `server/.misty/logs/`; `--verbose` displays that output after the build. Container logs rotate at 10 MB with three files per service.
+
+Check `/health` on the configured public API origin before using another computer. Service health is not a substitute for testing account, sync, or agent workflows.
+
+Then return to the desktop setup:
+
+```sh
+misty setup desktop
+misty doctor desktop
+misty desktop dev
+```
+
+Desktop setup creates a root `.env` pointing at the local API if that file is absent. Existing configuration is preserved. Set `MISTY_PUBLIC_API_URL` to your HTTPS API URL ending in `/v1` for remote devices.
+
+## Development and deployment
+
+- [CLI commands](../cli/README.md)
+- [Environment configuration and production deployment](deploy/README.md)
+- [Self-hosted deployment bundle](self-host/README.md)
+- [Backend architecture](docs/backend-architecture.md)
+- [Server development](docs/development.md)
+- [Repository migration and validation ledger](../docs/implementation/cli-server-consolidation.md)

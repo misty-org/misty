@@ -38,7 +38,7 @@ interface Ports {
     resume: Resume,
     activeEpoch: string,
   ): Promise<string>;
-  state(view: NativeSyncView): void;
+  state(view: NativeSyncView, preserveIssue?: boolean): void;
   error(error: unknown): void;
   locked?(): void;
   closed?(): void;
@@ -50,10 +50,11 @@ interface Ports {
  * documents and durable local edits can still open while offline. */
 export function canProjectWorkspace(view: NativeSyncView): boolean {
   return (
-    view.workspace.sequence > 0 ||
-    view.pending_operation_ids.length > 0 ||
-    ((view.status.phase === "catching_up" || view.status.phase === "ready") &&
-      view.status.applied_sequence >= view.status.head_sequence)
+    view.full_sync !== false &&
+    (view.workspace.sequence > 0 ||
+      view.pending_operation_ids.length > 0 ||
+      ((view.status.phase === "catching_up" || view.status.phase === "ready") &&
+        view.status.applied_sequence >= view.status.head_sequence))
   );
 }
 
@@ -72,6 +73,8 @@ export class WorkspaceSyncController {
   private unsubscribe: () => void;
   private captureTimer?: ReturnType<typeof setTimeout>;
   private captureDeadline?: ReturnType<typeof setTimeout>;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private failures = 0;
   private projectedContent: unknown;
   constructor(
     private current: NativeSyncView,
@@ -103,6 +106,7 @@ export class WorkspaceSyncController {
     this.flushCapture();
     void this.ports.journal.flush().catch((error: unknown) => this.ports.error(error));
     this.active = false;
+    clearTimeout(this.retryTimer);
     this.unsubscribe();
     this.ports.closed?.();
   }
@@ -245,6 +249,7 @@ export class WorkspaceSyncController {
   private async pump(): Promise<void> {
     this.running = true;
     let changedPublisher = false;
+    let publishing = false;
     try {
       while (this.active && (this.dirty || this.ports.journal.pending.length)) {
         // Preserve visible, not-yet-captured gestures if a remote notification
@@ -266,16 +271,40 @@ export class WorkspaceSyncController {
           this.stop();
           return;
         }
+        const wasIndependent = this.current.full_sync === false;
+        if (
+          wasIndependent ||
+          latest.session_id !== this.current.session_id ||
+          activeDeviceEpoch(latest) !== activeDeviceEpoch(this.current)
+        ) {
+          clearTimeout(this.retryTimer);
+          this.retryTimer = undefined;
+          this.failures = 0;
+        }
         this.current = latest;
-        this.ports.state(latest);
+        this.ports.state(latest, this.failures > 0 && this.ports.journal.pending.length > 0);
+        if (latest.full_sync === false) {
+          // Keep local browsing and its durable journal intact while continuing
+          // to observe connection/policy changes. Never project remote content.
+          this.previous = this.ports.source.read().windows;
+          this.previousNavigation = navigationRecords(this.ports.source.read());
+          this.previousResume = workspaceResume(this.ports.source.read());
+          return;
+        }
+        if (wasIndependent) this.projectedContent = null;
         this.ports.journal.retainActiveEpoch(activeDeviceEpoch(latest));
         this.seed();
+        // Other profiles keep sending legitimate events while one local edit
+        // fails. Read those updates, but do not retry the rejected edit for
+        // every notification (or project over the unsent local change).
+        if (this.retryTimer && this.ports.journal.pending.length) return;
         // A reconnection may have a new session ID but the same durable device.
         // Drain the stable journal before applying a projection to the renderer.
         while (this.active && this.ports.journal.pending.length) {
           await this.ports.journal.flush();
           if (!this.active) return;
           const edit = this.ports.journal.pending[0];
+          publishing = true;
           const accepted = edit.resume
             ? await this.ports.publishResume!(
                 this.current.session_id,
@@ -289,10 +318,12 @@ export class WorkspaceSyncController {
                 edit.changes,
                 edit.activeEpoch!,
               );
+          publishing = false;
           if (!this.active) return;
           if (accepted !== edit.id) throw new Error("Native sync acknowledged a different edit");
           this.ports.journal.acknowledge(edit.id);
           await this.ports.journal.flush();
+          this.failures = 0;
           this.dirty = true;
         }
         if (this.dirty) continue;
@@ -330,7 +361,16 @@ export class WorkspaceSyncController {
         ) {
           this.current = latest;
           changedPublisher = true;
-        } else this.ports.error(error);
+        } else {
+          this.ports.error(error);
+          if (publishing && !this.retryTimer && this.ports.journal.pending.length) {
+            const delay = Math.min(1_000 * 2 ** Math.min(this.failures++, 5), 30_000);
+            this.retryTimer = setTimeout(() => {
+              this.retryTimer = undefined;
+              this.refresh();
+            }, delay);
+          }
+        }
       }
     } finally {
       this.running = false;

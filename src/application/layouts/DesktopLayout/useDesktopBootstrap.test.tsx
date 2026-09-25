@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 
-vi.mock("@/features/files/explorer", async (importOriginal) => {
+vi.mock("@/features/files/workspace/explorer", async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
   return {
     ...original,

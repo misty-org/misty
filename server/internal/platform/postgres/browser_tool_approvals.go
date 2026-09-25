@@ -28,7 +28,7 @@ func (db *Database) BrowserToolApprovalTarget(ctx context.Context, userID, runID
 			return err
 		}
 		return tx.QueryRowContext(ctx, `SELECT c.id,c.device_id,c.display_name,c.expires_at,j.output FROM ai_invocation_contexts c
-   JOIN ai_invocations i ON i.id=c.invocation_id AND i.space_id=c.space_id
+   JOIN ai_invocations i ON i.id=c.invocation_id AND i.user_id=c.user_id
    JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=$1 AND d.revoked_at IS NULL
    JOIN LATERAL (SELECT output FROM workflow_device_node_jobs WHERE invocation_id=i.id AND ai_context_id=c.id AND operation IN ('browser.inspect','browser.visual','browser.workspace.visual') AND state='completed' ORDER BY completed_at DESC,id DESC LIMIT 1) j ON true
    WHERE c.user_id=$1 AND c.invocation_id=$2 AND c.opaque_ref=$3 AND c.state='attached' AND c.expires_at>NOW() AND c.capabilities ? $4`, userID, runID, scopeID, operation).Scan(&target.ContextID, &target.DeviceID, &target.Label, &target.ExpiresAt, &target.Snapshot)
@@ -52,7 +52,7 @@ func (db *Database) RequireBrowserToolApproval(ctx context.Context, userID, runI
 			return err
 		}
 		var valid bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c JOIN ai_invocations i ON i.id=c.invocation_id AND i.space_id=c.space_id AND i.user_id=c.user_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=$1 AND d.revoked_at IS NULL WHERE c.user_id=$1 AND c.invocation_id=$2 AND c.id=$3 AND c.device_id=$4 AND c.opaque_ref=$5 AND c.state='attached' AND c.expires_at>NOW() AND c.capabilities ? $6)`, userID, runID, target.ContextID, target.DeviceID, target.ScopeID, operation).Scan(&valid); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c JOIN ai_invocations i ON i.id=c.invocation_id AND i.user_id=c.user_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=$1 AND d.revoked_at IS NULL WHERE c.user_id=$1 AND c.invocation_id=$2 AND c.id=$3 AND c.device_id=$4 AND c.opaque_ref=$5 AND c.state='attached' AND c.expires_at>NOW() AND c.capabilities ? $6)`, userID, runID, target.ContextID, target.DeviceID, target.ScopeID, operation).Scan(&valid); err != nil {
 			return err
 		}
 		if !valid {

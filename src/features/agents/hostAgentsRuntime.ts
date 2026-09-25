@@ -3,7 +3,6 @@ import { useActivityStore } from "@/features/activity/useActivityStore";
 import { agentsApi } from "@/api/agents/api";
 import { assistantApi } from "@/api/assistant/api";
 import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
-import { automationsApi } from "./automations/api";
 import { mcpConnectionsApi } from "./mcp/api";
 import { useAuth, useAccountAvatarUrl } from "@/features/auth";
 import { useWorkspaceStore } from "@/features/workspace";
@@ -47,7 +46,6 @@ export function initializeHostAgentsRuntime() {
     agentsApi,
     assistantApi,
     aiSurfaceApi,
-    automationsApi,
     mcpConnectionsApi,
     subscribeToAiInvocation,
     useAuth,

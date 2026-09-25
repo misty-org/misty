@@ -29,3 +29,4 @@ export * from "./WorkspaceTabRouteScope";
 export * from "./workspaceDefaultTab";
 export * from "./layoutTabs";
 export * from "./mobileWorkspaceProjection";
+export { useWindowDockingLayout } from "./useWindowDockingLayout";

@@ -1,6 +1,12 @@
 //! Bounded authenticated HTTP + WebSocket transport. Errors never include a
 //! request URL: its query may contain a one-use connection ticket.
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -27,6 +33,27 @@ const READ_TIMEOUT: Duration = Duration::from_secs(45);
 const MAX_HTTP_BYTES: usize = 1 << 20;
 const MAX_FRAME_BYTES: usize = 6 << 20;
 
+/// Sync WebSocket application bytes, excluding HTTP, TLS and frame overhead.
+/// Owned by an account session and shared across its reconnects.
+#[derive(Default)]
+pub struct TrafficCounters {
+    uploaded: AtomicU64,
+    downloaded: AtomicU64,
+}
+#[derive(Clone, Serialize)]
+pub struct TrafficSnapshot {
+    pub uploaded_bytes: u64,
+    pub downloaded_bytes: u64,
+}
+impl TrafficCounters {
+    pub fn snapshot(&self) -> TrafficSnapshot {
+        TrafficSnapshot {
+            uploaded_bytes: self.uploaded.load(Ordering::Relaxed),
+            downloaded_bytes: self.downloaded.load(Ordering::Relaxed),
+        }
+    }
+}
+
 /// The host passes its native account-cookie client, configured with redirects
 /// disabled. Account cookies and vault keys are never sent to a web renderer.
 #[derive(Clone)]
@@ -34,6 +61,7 @@ pub struct SyncApi {
     base: Url,
     http: reqwest::Client,
     refreshed: Option<Arc<dyn Fn() -> Result<()> + Send + Sync>>,
+    traffic: Arc<TrafficCounters>,
 }
 
 impl SyncApi {
@@ -58,6 +86,7 @@ impl SyncApi {
             base,
             http,
             refreshed: None,
+            traffic: Arc::new(TrafficCounters::default()),
         })
     }
 
@@ -69,6 +98,10 @@ impl SyncApi {
     ) -> Self {
         self.refreshed = Some(Arc::new(refreshed));
         self
+    }
+
+    pub fn traffic(&self) -> Arc<TrafficCounters> {
+        self.traffic.clone()
     }
 
     pub fn deployment(&self) -> String {
@@ -223,6 +256,42 @@ impl SyncApi {
         Ok(response.devices)
     }
 
+    pub async fn control_device(
+        &self,
+        device_id: &str,
+        full_sync: Option<bool>,
+        activate: bool,
+    ) -> Result<String> {
+        let response: serde_json::Value = self
+            .request(
+                reqwest::Method::POST,
+                "control",
+                Some(&serde_json::json!({
+                    "device_id": device_id, "full_sync": full_sync, "activate": activate,
+                })),
+            )
+            .await?;
+        Ok(response["operation_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned())
+    }
+
+    pub async fn advertise_controls(&self, device_id: &str, display_name: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .request(
+                reqwest::Method::POST,
+                "control",
+                Some(&serde_json::json!({
+                    "device_id": device_id, "control_version": 1,
+                    "display_name": display_name,
+                    "platform": std::env::consts::OS,
+                })),
+            )
+            .await?;
+        Ok(())
+    }
+
     async fn ticket(&self, scope: &VaultScope, device_id: &str) -> Result<String> {
         #[derive(Serialize)]
         struct Body<'a> {
@@ -282,6 +351,7 @@ pub struct SyncSocket {
     pub workspace: Workspace,
     pub connection_id: String,
     last_received: Instant,
+    traffic: Arc<TrafficCounters>,
 }
 
 impl SyncSocket {
@@ -329,9 +399,12 @@ impl SyncSocket {
         .map_err(|_| Error::Network)?
         .map_err(|_| Error::Network)?;
         let mut last_received = Instant::now();
-        let challenge = match timeout(WRITE_TIMEOUT, receive(&mut stream, &mut last_received))
-            .await
-            .map_err(|_| Error::Network)??
+        let challenge = match timeout(
+            WRITE_TIMEOUT,
+            receive(&mut stream, &mut last_received, &api.traffic),
+        )
+        .await
+        .map_err(|_| Error::Network)??
         {
             ServerFrame::Challenge {
                 protocol_version: 1,
@@ -342,23 +415,26 @@ impl SyncSocket {
         let signature = device.connection_proof(scope, &grant.device_id, &challenge)?;
         send(
             &mut stream,
+            &api.traffic,
             &ClientFrame::Authenticate {
                 after,
                 signature: &signature,
             },
         )
         .await?;
-        let (workspace, connection_id) =
-            match timeout(WRITE_TIMEOUT, receive(&mut stream, &mut last_received))
-                .await
-                .map_err(|_| Error::Network)??
-            {
-                ServerFrame::Welcome {
-                    workspace,
-                    connection_id,
-                } => (workspace, connection_id),
-                _ => return Err(Error::Identity),
-            };
+        let (workspace, connection_id) = match timeout(
+            WRITE_TIMEOUT,
+            receive(&mut stream, &mut last_received, &api.traffic),
+        )
+        .await
+        .map_err(|_| Error::Network)??
+        {
+            ServerFrame::Welcome {
+                workspace,
+                connection_id,
+            } => (workspace, connection_id),
+            _ => return Err(Error::Identity),
+        };
         if workspace.workspace_id != scope.workspace_id
             || workspace.root_public_key != expected_root
             || workspace.key_epoch != grant.key_epoch
@@ -373,13 +449,14 @@ impl SyncSocket {
             workspace,
             connection_id,
             last_received,
+            traffic: api.traffic(),
         })
     }
 
     pub async fn receive(&mut self) -> Result<ServerFrame> {
         timeout(
             READ_TIMEOUT,
-            receive(&mut self.stream, &mut self.last_received),
+            receive(&mut self.stream, &mut self.last_received, &self.traffic),
         )
         .await
         .map_err(|_| Error::Network)?
@@ -390,7 +467,7 @@ impl SyncSocket {
     }
 
     pub async fn send(&mut self, frame: &ClientFrame<'_>) -> Result<()> {
-        send(&mut self.stream, frame).await
+        send(&mut self.stream, &self.traffic, frame).await
     }
 
     pub async fn close(&mut self) {
@@ -400,21 +477,26 @@ impl SyncSocket {
 
 async fn send(
     stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+    traffic: &TrafficCounters,
     frame: &ClientFrame<'_>,
 ) -> Result<()> {
     let data = serde_json::to_string(frame)?;
     if data.len() > 1500 << 10 {
         return Err(Error::TooLarge);
     }
+    let bytes = data.len() as u64;
     timeout(WRITE_TIMEOUT, stream.send(Message::Text(data.into())))
         .await
         .map_err(|_| Error::Network)?
-        .map_err(|_| Error::Network)
+        .map_err(|_| Error::Network)?;
+    traffic.uploaded.fetch_add(bytes, Ordering::Relaxed);
+    Ok(())
 }
 
 async fn receive(
     stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
     last_received: &mut Instant,
+    traffic: &TrafficCounters,
 ) -> Result<ServerFrame> {
     loop {
         let message = stream
@@ -424,7 +506,12 @@ async fn receive(
             .map_err(|_| Error::Network)?;
         *last_received = Instant::now();
         match message {
-            Message::Text(text) => return Ok(serde_json::from_str(&text)?),
+            Message::Text(text) => {
+                traffic
+                    .downloaded
+                    .fetch_add(text.len() as u64, Ordering::Relaxed);
+                return Ok(serde_json::from_str(&text)?);
+            }
             Message::Ping(_) => {
                 stream.flush().await.map_err(|_| Error::Network)?;
             }
@@ -450,4 +537,50 @@ fn tls_connector() -> Result<Connector> {
     .with_root_certificates(roots)
     .with_no_client_auth();
     Ok(Connector::Rustls(Arc::new(config)))
+}
+
+#[cfg(test)]
+mod traffic_tests {
+    use super::*;
+    #[tokio::test]
+    async fn counts_actual_websocket_payloads_and_shares_them_across_reconnect_clients() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (tcp, _) = listener.accept().await.unwrap();
+            let mut socket = tokio_tungstenite::accept_async(tcp).await.unwrap();
+            let received = socket.next().await.unwrap().unwrap().into_text().unwrap();
+            socket
+                .send(Message::Ping(vec![1, 2, 3].into()))
+                .await
+                .unwrap();
+            let body = r#"{"type":"presence","devices":[]}"#;
+            socket.send(Message::Text(body.into())).await.unwrap();
+            (received.len() as u64, body.len() as u64)
+        });
+        let (mut socket, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .unwrap();
+        let api = SyncApi::new("http://127.0.0.1", reqwest::Client::new()).unwrap();
+        let next_connection = api.clone();
+        send(&mut socket, &api.traffic, &ClientFrame::Resume { after: 7 })
+            .await
+            .unwrap();
+        let mut last = Instant::now();
+        assert!(matches!(
+            receive(&mut socket, &mut last, &api.traffic).await.unwrap(),
+            ServerFrame::Presence { .. }
+        ));
+        let (up, down) = server.await.unwrap();
+        assert_eq!(next_connection.traffic().snapshot().uploaded_bytes, up);
+        assert_eq!(next_connection.traffic().snapshot().downloaded_bytes, down);
+        assert_eq!(
+            SyncApi::new("http://127.0.0.1", reqwest::Client::new())
+                .unwrap()
+                .traffic()
+                .snapshot()
+                .uploaded_bytes,
+            0
+        );
+    }
 }

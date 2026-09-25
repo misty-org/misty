@@ -5,7 +5,7 @@ import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib
 import { Avatar, AvatarFallback, AvatarImage, Badge, cn } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
-import { BrandIcon } from "../../../../.././apps/shared/BrandIcon";
+import { BrandIcon } from "../../../../shared/toolAssets/BrandIcon";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";

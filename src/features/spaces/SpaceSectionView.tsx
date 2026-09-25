@@ -9,21 +9,21 @@ import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlacehold
 import { useSpacesStore } from "./store/useSpacesStore";
 
 const Notes = lazy(() =>
-  import("@/features/notes/SpaceNotes").then((m) => ({ default: m.SpaceNotes })),
+  import("@/features/journal/notes/SpaceNotes").then((m) => ({ default: m.SpaceNotes })),
 );
 const Drawings = lazy(() =>
-  import("@/features/drawings/SpaceDrawings").then((m) => ({ default: m.SpaceDrawings })),
+  import("@/features/journal/drawings/SpaceDrawings").then((m) => ({ default: m.SpaceDrawings })),
 );
 const Planner = lazy(() =>
-  import("@/features/spaces/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
+  import("@/features/planner/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
 );
 // Configure host services before React renders the SDK-compatible implementations.
 // Their runtime hooks deliberately fail if an entry point skips this setup.
 async function loadLibrary() {
   const { initializeHostLibraryRuntime } =
-    await import("@/features/spaces/library/hostLibraryRuntime");
+    await import("@/features/library/library/hostLibraryRuntime");
   initializeHostLibraryRuntime();
-  const { SpaceLibrary } = await import("@/features/spaces/library/SpaceLibrary");
+  const { SpaceLibrary } = await import("@/features/library/library/SpaceLibrary");
   return { default: SpaceLibrary };
 }
 const Library = lazy(loadLibrary);
@@ -42,13 +42,13 @@ export async function preloadSpaceSection(section: string) {
       await loadChat();
       break;
     case "planner":
-      await import("@/features/spaces/planner/SpacePlanner");
+      await import("@/features/planner/planner/SpacePlanner");
       break;
     case "notes":
-      await import("@/features/notes/SpaceNotes");
+      await import("@/features/journal/notes/SpaceNotes");
       break;
     case "drawings":
-      await import("@/features/drawings/SpaceDrawings");
+      await import("@/features/journal/drawings/SpaceDrawings");
       break;
     case "library":
       await loadLibrary();

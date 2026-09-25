@@ -3,7 +3,6 @@ import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { agentsApi } from "@/api/agents/api";
 import type { assistantApi } from "@/api/assistant/api";
 import type { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
-import type { automationsApi } from "./automations/api";
 import type { mcpConnectionsApi } from "./mcp/api";
 import type { useAuth, useAccountAvatarUrl } from "@/features/auth";
 import type { useWorkspaceStore } from "@/features/workspace";
@@ -23,7 +22,6 @@ export interface AgentsRuntime {
   agentsApi: typeof agentsApi;
   assistantApi: typeof assistantApi;
   aiSurfaceApi: typeof aiSurfaceApi;
-  automationsApi: typeof automationsApi;
   mcpConnectionsApi: typeof mcpConnectionsApi;
   subscribeToAiInvocation: typeof subscribeToAiInvocation;
   useAuth: typeof useAuth;
@@ -72,7 +70,6 @@ export const openAgentsMisty = service("openMisty");
 export const runtimeAgentsApi = service("agentsApi"),
   runtimeAssistantApi = service("assistantApi"),
   runtimeAiApi = service("aiSurfaceApi"),
-  runtimeAutomationsApi = service("automationsApi"),
   runtimeMcpApi = service("mcpConnectionsApi"),
   subscribeAgentsInvocation = service("subscribeToAiInvocation"),
   useAgentsAuth = service("useAuth"),

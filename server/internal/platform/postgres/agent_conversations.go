@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,9 +20,7 @@ var _ serveragent.SessionPersistence = (*Database)(nil)
 func (db *Database) CreateAIConversation(ctx context.Context, userID string, requestedSpaceID ...string) (string, error) {
 	id := "conversation_" + uuid.NewString()
 	spaceID := ""
-	if len(requestedSpaceID) > 0 {
-		spaceID = strings.TrimSpace(requestedSpaceID[0])
-	}
+	// requestedSpaceID remains accepted by legacy callers; it is not ownership.
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO misty_ask_conversations(
 			id,user_id,state,active_until,retention_expires_at,space_id
@@ -127,7 +124,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 	items := []AgentSessionSummary{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
-			SELECT id, title, active_until > NOW(), COALESCE(space_id,''),
+			SELECT id, title, active_until > NOW(), ''::text,
 				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,reasoning_effort,created_at,updated_at,COALESCE(agent_id,'')
 			FROM misty_ask_conversations
 			WHERE user_id = $1 AND deleted_at IS NULL
@@ -170,40 +167,13 @@ func (db *Database) UpdateMistyConversationModel(ctx context.Context, userID, co
 // for a built-in Misty conversation. An unbound account conversation may be
 // attached once; subsequent calls are idempotent only for the same Space.
 func (db *Database) BindMistyConversationSpace(ctx context.Context, userID, conversationID, spaceID string) error {
-	spaceID = strings.TrimSpace(spaceID)
-	if spaceID == "" {
-		return ErrSpaceInvalid
-	}
-	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `UPDATE misty_ask_conversations SET
-			space_id=$1,updated_at=NOW()
-			WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL
-				AND (space_id IS NULL OR space_id=$1)`,
-			spaceID, conversationID, userID)
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows > 0 {
-			return nil
-		}
-		var exists bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
-			SELECT 1 FROM misty_ask_conversations WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		)`, conversationID, userID).Scan(&exists); err != nil {
-			return err
-		}
-		if !exists {
-			return serveragent.ErrPersistedSessionNotFound
-		}
-		return ErrSpaceConflict
-	})
+	// Compatibility adapter for old clients. Verify the owner but never bind.
+	_, err := db.AgentConversationIdentity(ctx, userID, conversationID)
+	return err
 }
 
 func (db *Database) BindAskSurfaceConversation(ctx context.Context, userID, conversationID, spaceID, modelID, surfaceID, originHref, privacyBoundary string) error {
+	spaceID = ""
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, `UPDATE misty_ask_conversations SET
 			space_id=NULLIF($1,''),model_id=$2,
@@ -230,7 +200,7 @@ func (db *Database) LinkAgentRunConversation(ctx context.Context, userID, runID,
 		return tx.QueryRowContext(ctx, `UPDATE space_runs AS run
 			SET source_agent_conversation_id=invocation.conversation_id
 			FROM ai_invocations AS invocation
-			WHERE run.id=$1 AND invocation.id=$2 AND invocation.user_id=$3
+			WHERE run.id=$1 AND run.owner_user_id=$3 AND invocation.id=$2 AND invocation.user_id=$3
 				AND invocation.conversation_id IS NOT NULL
 			RETURNING invocation.conversation_id`, runID, invocationID, userID).Scan(&conversationID)
 	})
@@ -261,6 +231,7 @@ func (db *Database) AgentConversationIdentity(ctx context.Context, userID, conve
 		}
 		return err
 	})
+	bound.SpaceID = ""
 	return bound, err
 }
 
@@ -285,10 +256,8 @@ func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conv
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}
-		if err != nil || bound.SpaceID == "" {
-			return err
-		}
-		return validateAgentSpaceAccessTx(ctx, tx, userID, bound.SpaceID)
+		bound.SpaceID = ""
+		return err
 	})
 	if err != nil {
 		return AgentSessionContext{}, err

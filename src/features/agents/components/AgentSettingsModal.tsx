@@ -1,10 +1,5 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  cn,
-} from "@/shared/ui";
+import { CompanionAppearanceSettings } from "../companion/CompanionAppearanceSettings";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, cn } from "@/shared/ui";
 import { Cable, Plus, SlidersHorizontal } from "lucide-react";
 import { McpConnectionsView } from "../mcp/McpConnectionsSheet";
 
@@ -49,6 +44,7 @@ export function AgentSettingsModal(props: {
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 misty-transient-scrollbar">
           {props.activeTab === "settings" && (
             <div className="space-y-6">
+              {!isCreate && <CompanionAppearanceSettings />}
               {props.children}
             </div>
           )}

@@ -11,13 +11,39 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 import { browserWorkspaceStoreVersion, workspaceRecoveryKey } from "./workspaceRecoveryStorage";
 import { workspaceStoreStorageKey, legacyWorkspaceCandidate } from "./workspaceRecoveryPlatform";
+import { mergeRecoveredWorkspace } from "./mergeRecoveredWorkspace";
+import type { WorkspaceStore } from "./useWorkspaceStore";
+import { initialVirtualWorkspace } from "./virtualWindows";
 
 const key = "workspace";
 export const useWorkspaceRecoveryState = create<{
   accountId: string | null;
   ready: boolean;
+  usable: boolean;
   issue: string | null;
-}>(() => ({ accountId: null, ready: false, issue: null }));
+}>(() => ({ accountId: null, ready: false, usable: false, issue: null }));
+let temporary:
+  | {
+      accountId: string;
+      baseline: ReturnType<typeof partialWorkspaceStore>;
+      unregister: () => void;
+    }
+  | undefined;
+let syncBaseline: Partial<WorkspaceStore> | undefined;
+export function pendingRecoveredWorkspace(accountId: string) {
+  return owner?.accountId === accountId ? syncBaseline : undefined;
+}
+export async function acknowledgeRecoveredWorkspace(accountId: string) {
+  if (owner?.accountId !== accountId) return;
+  syncBaseline = undefined;
+  await owner.flush();
+}
+const captureWorkspace = () =>
+  JSON.stringify({
+    version: browserWorkspaceStoreVersion,
+    state: partialWorkspaceStore(useWorkspaceStore.getState()),
+    syncBaseline,
+  });
 let epoch = 0;
 let owner:
   | {
@@ -37,13 +63,46 @@ export function closeNativeWorkspaceRecovery() {
   owner?.close();
   owner = undefined;
   opening = undefined;
-  useWorkspaceRecoveryState.setState({ accountId: null, ready: false, issue: null });
+  temporary?.unregister();
+  temporary = undefined;
+  syncBaseline = undefined;
+  useWorkspaceRecoveryState.setState({ accountId: null, ready: false, usable: false, issue: null });
 }
 export async function flushNativeWorkspace(accountId: string) {
+  if (temporary) {
+    if (temporary.accountId !== accountId)
+      throw new Error("The workspace account changed before saving.");
+    assertTemporarySaved();
+  }
   if (!owner) return;
   if (owner.accountId !== accountId)
     throw new Error("The workspace account changed before saving.");
   await owner.flush();
+}
+
+function assertTemporarySaved() {
+  if (
+    temporary &&
+    JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState())) !==
+      JSON.stringify(temporary.baseline)
+  )
+    throw new Error(
+      "This workspace has unsaved changes. Wait for local recovery before changing accounts.",
+    );
+}
+
+/** A failed read must not expose the previous account or overwrite its saved
+ * data. This account gets a temporary in-memory workspace until recovery works. */
+export function continueWithTemporaryWorkspace(accountId: string, error: unknown) {
+  if (!temporary && !owner) {
+    useWorkspaceStore.getState().reset();
+    temporary = {
+      accountId,
+      baseline: partialWorkspaceStore(useWorkspaceStore.getState()),
+      unregister: registerRecoveryFlush(async () => assertTemporarySaved()),
+    };
+  }
+  useWorkspaceRecoveryState.setState({ accountId, usable: true, issue: failure(error) });
 }
 
 /** Snapshot at the end of a burst, not on every resize frame. The recovery store
@@ -93,9 +152,11 @@ export function restoreNativeWorkspace(accountId: string): Promise<void> {
 }
 async function restore(accountId: string, generation: number) {
   if (owner) throw new Error("Save and close the previous workspace before changing accounts.");
+  if (temporary && temporary.accountId !== accountId)
+    throw new Error("Save and close the previous workspace before changing accounts.");
   const attempt = ++epoch;
   const valid = () => attempt === epoch && generation === readApiSessionGeneration();
-  useWorkspaceRecoveryState.setState({ accountId, ready: false, issue: null });
+  useWorkspaceRecoveryState.setState({ accountId, ready: false });
   let recovery: Awaited<ReturnType<typeof openWorkspaceRecovery>> | undefined;
   try {
     const apiBase = await resolveApiBase();
@@ -128,6 +189,7 @@ async function restore(accountId: string, generation: number) {
       (global && sources.some(([name]) => name === workspaceStoreStorageKey)
         ? global.raw
         : accountRaw);
+    let restored: ReturnType<typeof migrateWorkspaceStore> | undefined;
     if (persisted !== null) {
       const parsed = JSON.parse(persisted);
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
@@ -135,45 +197,58 @@ async function restore(accountId: string, generation: number) {
           "The saved workspace needs recovery. Its original copy has been preserved.",
         );
       const envelope = typeof parsed.version === "number" && parsed.state;
-      const state = migrateWorkspaceStore(
+      restored = migrateWorkspaceStore(
         envelope ? parsed.state : parsed,
         envelope ? parsed.version : 11,
       );
+      if (!restored.layout) Object.assign(restored, initialVirtualWorkspace());
+      if (parsed.syncBaseline)
+        syncBaseline = migrateWorkspaceStore(parsed.syncBaseline, browserWorkspaceStoreVersion);
       if (!valid()) return;
-      // Commit the selected raw recovery before changing visible state or deleting
-      // browser copies. It can be migrated again after an interrupted launch.
-      if (storage.getItem(key) === null) storage.setItem(key, persisted);
-      await storage.flush();
-      if (!valid()) return;
-      useWorkspaceStore.setState(state);
+      // Preserve the original independently of the normalized live snapshot.
+      const archive = await recoveryKey("archive", [key, persisted]);
+      await storage.load(archive);
+      storage.setItem(archive, persisted);
+    }
+    if (!valid()) return;
+    if (temporary?.accountId === accountId) {
+      const live = useWorkspaceStore.getState();
+      const changed =
+        JSON.stringify(partialWorkspaceStore(live)) !== JSON.stringify(temporary.baseline);
+      if (restored)
+        useWorkspaceStore.setState(
+          changed ? mergeRecoveredWorkspace(restored, live, temporary.baseline) : restored,
+        );
+      if (changed) syncBaseline ??= restored ?? temporary.baseline;
+      temporary.unregister();
+      temporary = undefined;
+    } else if (restored) {
+      useWorkspaceStore.setState(restored);
     } else {
-      if (!valid()) return;
       useWorkspaceStore.getState().reset();
     }
-    const capture = () =>
-      JSON.stringify({
-        version: browserWorkspaceStoreVersion,
-        state: partialWorkspaceStore(useWorkspaceStore.getState()),
-      });
-    const writer = new WorkspaceRecoveryWriter(storage, capture, (error) => {
+    const restoredBaseline = partialWorkspaceStore(useWorkspaceStore.getState());
+    const writer = new WorkspaceRecoveryWriter(storage, captureWorkspace, (error) => {
       if (!valid()) return;
       const issue = failure(error);
       useWorkspaceRecoveryState.setState({ issue });
-      // Load the public shell entry lazily: its route exports import the
-      // workspace store, so an eager dependency creates a hydration cycle.
-      void import("@/features/app-shell").then(({ useAppStore }) => {
-        if (valid()) useAppStore.getState().setError(issue);
-      });
     });
-    await writer.flush();
-    if (!valid()) return;
-    for (const [source, raw] of sources) {
-      if (localStorage.getItem(source) === raw) localStorage.removeItem(source);
-    }
     const unsubscribe = useWorkspaceStore.subscribe(() => writer.changed());
     const flush = async () => {
-      await writer.flush();
-      if (valid()) useWorkspaceRecoveryState.setState({ issue: null });
+      try {
+        await writer.flush();
+        if (!valid()) return;
+        for (const [source, raw] of sources) {
+          if (localStorage.getItem(source) === raw) localStorage.removeItem(source);
+        }
+        useWorkspaceRecoveryState.setState({ ready: true, issue: null });
+      } catch (error) {
+        if (valid()) {
+          if (!useWorkspaceRecoveryState.getState().ready) syncBaseline ??= restoredBaseline;
+          useWorkspaceRecoveryState.setState({ issue: failure(error) });
+        }
+        throw error;
+      }
     };
     const unregister = registerRecoveryFlush(flush);
     const release = recovery.release;
@@ -189,11 +264,10 @@ async function restore(accountId: string, generation: number) {
       },
     };
     recovery = undefined;
-    useWorkspaceRecoveryState.setState({ accountId, ready: true, issue: null });
+    useWorkspaceRecoveryState.setState({ accountId, usable: true });
+    await flush();
   } catch (error) {
-    if (valid())
-      useWorkspaceRecoveryState.setState({ accountId, ready: false, issue: failure(error) });
-    throw error;
+    if (valid()) continueWithTemporaryWorkspace(accountId, error);
   } finally {
     recovery?.release();
   }

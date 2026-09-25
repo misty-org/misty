@@ -7,12 +7,11 @@ import { dockLeaves } from "@/features/workspace/dockTree";
 import { useUserStore } from "@/features/auth/core";
 import { isApiSessionTransitioning } from "@/api/client/session";
 
-export function workspaceAutopilotContext(accountId: string, spaceId: string) {
+export function workspaceAutopilotContext(accountId: string, _legacySpaceId: string) {
+  const spaceId = "";
   const state = useWorkspaceStore.getState();
   if (!accountId || isApiSessionTransitioning() || useUserStore.getState().me?.id !== accountId)
     throw new Error("The account changed. Start a new task in the current workspace.");
-  if (spaceId || state.activeScopeKey !== "global")
-    throw new Error("Start a new conversation to control the current browser workspace.");
   return {
     accountId,
     spaceId,

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import { allLayoutViews, layoutTabs } from "@/features/workspace/layoutTabs";
 import { useNavigatorResume } from "./useNavigatorResume";
-import { setAppUnsaved } from "@/features/apps/appUpdateSafety";
+import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 afterEach(() => {
   cleanup();
   useWorkspaceStore.getState().reset();
@@ -45,13 +45,13 @@ it("targets the requested Space and its default route", () => {
 });
 it("preserves the current pane when unsaved work blocks navigation", () => {
   const view = state().openSurface(workspaceSurfaceFromRoute("/apps/code")!);
-  setAppUnsaved(view.id, true);
+  setWorkspaceUnsaved(view.id, true);
   try {
     const { result } = navigator("/discover");
     act(() => result.current.open());
     expect(result.current.location.pathname).toBe("/apps/code");
     expect(allLayoutViews(state().layout).map((view) => view.route)).toEqual(["/apps/code"]);
   } finally {
-    setAppUnsaved(view.id, false);
+    setWorkspaceUnsaved(view.id, false);
   }
 });

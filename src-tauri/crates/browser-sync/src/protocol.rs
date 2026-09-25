@@ -163,6 +163,21 @@ pub struct Device {
     pub grant: DeviceGrant,
     pub last_counter: u64,
     pub revoked_at: Option<String>,
+    #[serde(default)]
+    pub display_name: String,
+    #[serde(default)]
+    pub platform: String,
+    #[serde(default)]
+    pub control_version: u8,
+    #[serde(default = "default_full_sync")]
+    pub full_sync: bool,
+    #[serde(default)]
+    pub activation_request: Option<String>,
+    #[serde(default)]
+    pub activation_expires_at: u64,
+}
+fn default_full_sync() -> bool {
+    true
 }
 
 #[derive(Clone, Serialize, Deserialize)]

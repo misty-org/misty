@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
 func TestAgentModelTurnBudgetConcurrencyAndRecovery(t *testing.T) {
@@ -113,17 +112,7 @@ func TestAgentModelTurnBudgetConcurrencyAndRecovery(t *testing.T) {
 func TestAgentModelTurnBudgetRevalidatesAppAuthority(t *testing.T) {
 	database, _, user, _ := sdkInvocationFixture(t)
 	ctx := t.Context()
-	document, key := sdkInstallFixture(t, "example.modelrequester")
-	document.Scopes = append(document.Scopes, "ai.write")
-	signed, digest := sdkSignFixture(t, document, key)
-	if _, err := database.InstallVerifiedSDKApp(ctx, user, signed, digest); err != nil {
-		t.Fatal(err)
-	}
-	session, err := database.CreateAppRuntimeSession(ctx, user, document.AppID, security.HashToken(uuid.NewString()), "", AppRuntimeSessionTTL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	record, _, err := database.CreateAIInvocationRecord(WithAppExecutionAuthority(ctx, *session), AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user, SurfaceID: "settings", Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: json.RawMessage(`{}`), ExpiresAt: time.Now().Add(time.Hour)})
+	record, _, err := database.CreateAIInvocationRecord(ctx, AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user, SurfaceID: "settings", Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: json.RawMessage(`{}`), ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +123,7 @@ func TestAgentModelTurnBudgetRevalidatesAppAuthority(t *testing.T) {
 	if err := database.ReserveAgentModelTurn(ctx, user, record.ID, runtime, "model:1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.Conn.Exec(`UPDATE user_app_installations SET granted_scopes='[]' WHERE user_id=$1 AND app_id=$2`, user, document.AppID); err != nil {
+	if _, err := database.Conn.Exec(`UPDATE ai_invocations SET request_payload=jsonb_set(request_payload,'{_misty_authority}',$2::jsonb) WHERE id=$1`, record.ID, `{"user_id":"`+user+`","app_id":"retired","installation_generation":1,"scopes":["ai.write","capabilities.invoke"]}`); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.ReserveAgentModelTurn(ctx, user, record.ID, runtime, "model:2"); !errors.Is(err, ErrAppRuntimeForbidden) {
@@ -165,7 +154,7 @@ func TestForegroundAgentModelTurnBudget(t *testing.T) {
 		mode, surface string
 		limit         int
 	}{
-		{"agent", "global", 120}, {"user", "global", 20}, {"team", "global", 20}, {"agent", "sdk", 20}, {"agent", "routine", 20},
+		{"auto", "global", 120}, {"agent", "global", 120}, {"user", "global", 20}, {"team", "global", 20}, {"agent", "sdk", 20}, {"agent", "routine", 20},
 	} {
 		payload, _ := json.Marshal(map[string]string{"agent_id": agent.ID, "execution_mode": scenario.mode, "task_id": lease.TaskID, "window_label": lease.WindowLabel})
 		run, _, err := database.CreateAIInvocationRecord(ctx, AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user, SpaceID: space.ID, SurfaceID: scenario.surface, Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: payload, ExpiresAt: time.Now().Add(time.Hour)})

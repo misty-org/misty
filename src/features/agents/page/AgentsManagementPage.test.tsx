@@ -22,9 +22,6 @@ vi.mock("../components/MistyDashboard", () => ({
   ),
 }));
 
-vi.mock("../automations/AutomationsWorkspace", () => ({
-  AutomationsWorkspace: () => <section aria-label="Automations workspace">Automations</section>,
-}));
 
 describe("Agents conversation page", () => {
   afterEach(() => {

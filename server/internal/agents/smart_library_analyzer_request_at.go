@@ -14,7 +14,7 @@ import (
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
-func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body any, headers map[string]string, dst any) error {
+func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body any, headers map[string]string, dst any) (resultErr error) {
 	key := strings.TrimSpace(a.APIKey)
 	if key == "" {
 		return errors.New("AI Gateway key is required")
@@ -36,12 +36,28 @@ func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body a
 	if client == nil {
 		client = &http.Client{Timeout: 75 * time.Second}
 	}
+	attempt, err := a.beginLibraryRequest(ctx, url, payload, headers)
+	if err != nil {
+		return err
+	}
+	var raw []byte
+	success := false
+	defer func() {
+		units, estimated := libraryResponseUsage(raw)
+		if e := attempt.Finish(ctx, success, units, estimated); e != nil {
+			resultErr = e
+		}
+	}()
 	response, err := client.Do(request)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+	success = response.StatusCode >= 200 && response.StatusCode < 300
+	raw, err = io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
+	if err != nil || len(raw) > 8<<20 {
+		return errors.New("AI Gateway response too large or incomplete")
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("AI Gateway status %d", response.StatusCode)
 	}

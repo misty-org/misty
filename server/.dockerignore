@@ -16,3 +16,6 @@
 **/target
 .git
 .github
+
+# CLI diagnostics are never part of an image build.
+.misty

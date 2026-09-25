@@ -101,6 +101,7 @@ pub struct PermissionSet {
     pub(super) owner_namespace: Option<String>,
     pub(super) native_owner: Option<super::NativeOwner>,
     pub(super) account_owned: bool,
+    pub(super) builtin: bool,
     consent_declaration: String,
     consent_loaded: bool,
     app_id: String,
@@ -138,45 +139,30 @@ pub struct PermissionStatus {
 }
 
 impl PermissionSet {
-    pub fn load(root: &Path, limit: Option<&[String]>) -> Result<Self, String> {
-        let mut document = json!({});
-        for name in ["mini-app.json", "plugin.json", "manifest.json"] {
-            let path = root.join(name);
-            if !path.exists() {
-                continue;
-            }
-            let path = path.canonicalize().map_err(|e| e.to_string())?;
-            if !path.starts_with(root) {
-                return Err("App manifest leaves its package.".into());
-            }
-            let bytes = fs::File::open(path)
-                .map_err(|e| e.to_string())?
-                .take(65_537)
-                .bytes()
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| e.to_string())?;
-            if bytes.len() > 65_536 {
-                return Err("App manifest is too large.".into());
-            }
-            document = serde_json::from_slice(&bytes).map_err(|_| "Invalid App manifest.")?;
-            if name == "mini-app.json" {
-                if let Some(value) = document.get("capabilities").cloned() {
-                    document["runtime_capabilities"] = value;
-                }
-                if let Some(value) = document.get("networkOrigins").cloned() {
-                    document["runtime_network_origins"] = value;
-                }
-            }
-            break;
+    pub(super) fn builtin(tool: &str, purpose: &str) -> Result<Self, String> {
+        if !matches!(tool, "files" | "library")
+            || !matches!(purpose, "documents" | "search" | "previews" | "devices")
+            || (tool != "files" && matches!(purpose, "search" | "devices"))
+        {
+            return Err("Unknown built-in service.".into());
         }
-        Self::from_document(
-            root.file_name()
-                .and_then(|v| v.to_str())
-                .ok_or("Invalid App identity.")?,
-            &document,
-            limit,
-        )
+        let scopes = if purpose == "devices" {
+            vec!["files.read", "connections.read"]
+        } else {
+            vec!["files.read"]
+        };
+        let mut permissions = Self::from_document(
+            tool,
+            &json!({
+                "version": "builtin-v1", "runtime_capabilities": scopes
+            }),
+            None,
+        )?;
+        permissions.granted = permissions.declared.clone();
+        permissions.builtin = true;
+        Ok(permissions)
     }
+
     fn from_document(
         app_id: &str,
         document: &Value,
@@ -225,6 +211,7 @@ impl PermissionSet {
             owner_namespace: None,
             native_owner: None,
             account_owned: false,
+            builtin: false,
             consent_declaration,
             consent_loaded: false,
             app_id: app_id.into(),
@@ -588,7 +575,7 @@ pub async fn mini_app_device_call(
         .map_err(|_| "Backup service verification stopped.")?;
         if let Err(error) = verified {
             return Ok(
-                json!({"available":false,"format":"misty-tar-v1","message":format!("Update Backups to install its archive service. {error}")}),
+                json!({"available":false,"format":"misty-tar-v1","message":format!("The backup worker is unavailable in this Misty release. {error}")}),
             );
         }
         return Ok(backups::availability());
@@ -1489,4 +1476,24 @@ pub fn mini_app_duplicate_file_grant(
         },
     );
     Ok(json!({"handle": id}))
+}
+
+#[cfg(test)]
+mod builtin_tests {
+    use super::*;
+
+    #[test]
+    fn builtin_workers_have_only_their_required_scopes() {
+        let files = PermissionSet::builtin("files", "documents").unwrap();
+        assert!(files.authorize("files.read").is_ok());
+        assert!(files.authorize("files.write").is_err());
+        assert!(files.authorize("connections.read").is_err());
+        assert!(files.authorize("terminal.execute").is_err());
+        let devices = PermissionSet::builtin("files", "devices").unwrap();
+        assert!(devices.authorize("connections.read").is_ok());
+        assert!(devices.files.is_empty());
+        assert!(devices.folders.is_empty());
+        assert!(PermissionSet::builtin("library", "devices").is_err());
+        assert!(PermissionSet::builtin("../../custom", "documents").is_err());
+    }
 }

@@ -5,7 +5,7 @@ vi.mock("@/features/providers", async () => {
   const { create } = await import("zustand");
   return { useProvidersStore: create(() => ({ providers: null })) };
 });
-vi.mock("@/features/files/explorer", async () => {
+vi.mock("@/features/files/workspace/explorer", async () => {
   const { create } = await import("zustand");
   return {
     default: () => <div>Files panel</div>,

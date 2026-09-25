@@ -15,14 +15,14 @@ export const personalAgentsApi = {
     }),
   remove: (id: string) =>
     apiRequest(`/misty/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  memories: (id: string, spaceId: string) =>
+  memories: (id: string, _legacySpaceId?: string) =>
     apiRequest<{ memories: AgentMemory[] }>(
-      `/ai/memories?${new URLSearchParams({ agent_id: id, space_id: spaceId })}`,
+      `/ai/memories?${new URLSearchParams({ agent_id: id })}`,
     ),
-  updateMemory: (id: string, memoryId: string, spaceId: string, content: string) =>
+  updateMemory: (id: string, memoryId: string, _legacySpaceId: string, content: string) =>
     apiRequest(
       `/ai/memories/${encodeURIComponent(memoryId)}?${new URLSearchParams({ agent_id: id })}`,
-      { method: "PUT", body: JSON.stringify({ space_id: spaceId, content }) },
+      { method: "PUT", body: JSON.stringify({ content }) },
     ),
   forget: (id: string, memoryId: string) =>
     apiRequest(

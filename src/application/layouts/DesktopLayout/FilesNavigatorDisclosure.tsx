@@ -6,7 +6,6 @@ import {
   sectionNameKey,
   itemNameKey,
 } from "@/features/navigation-names/store";
-import { officialAppRoute } from "@/features/apps";
 import {
   useWorkspaceStore,
   WorkspaceAppIcon,
@@ -32,13 +31,13 @@ const destinations = [
     id: "explorer" as const,
     label: "Explorer",
     icon: ExplorerDestinationIcon,
-    path: officialAppRoute("files"),
+    path: "/files",
   },
   {
     id: "transfers" as const,
     label: "Transfers",
     icon: TransfersDestinationIcon,
-    path: officialAppRoute("transfers"),
+    path: "/files?view=transfers",
   },
 ];
 
@@ -64,7 +63,7 @@ export function FilesNavigatorDisclosure(props: {
   const resume = useNavigatorResume({
     accountId: props.accountId,
     key: "files",
-    fallbackRoute: officialAppRoute("files"),
+    fallbackRoute: "/files",
   });
   const activate = () => {
     if (active && open) setOpen(false);

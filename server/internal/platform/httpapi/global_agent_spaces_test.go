@@ -48,9 +48,6 @@ func TestGlobalAgentSpacesPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = database.InstallUserApp(ctx, owner.ID, "planner", "1.0.0", 1, []string{"connections.read"}); err != nil {
-		t.Fatal(err)
-	}
 	payload := TestingMustAPIRawJSON(map[string]string{"agent_id": identity.ID, "execution_mode": "user", "prompt": "Create a task in Family"})
 	record, _, err := database.CreateAIInvocationRecord(ctx, db.AIInvocationRecord{ID: "invocation_global_test", UserID: owner.ID, SpaceID: origin.ID, Mode: "drawer", SurfaceID: "global", Trigger: "message", State: "running", IdempotencyKey: "global-test", RequestPayload: payload, ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
@@ -92,11 +89,8 @@ func TestGlobalAgentSpacesPostgres(t *testing.T) {
 	if _, err = executeGlobalAgentSpaceTool(ctx, database, invocation, request); err == nil {
 		t.Fatal("nested routing allowed")
 	}
-	if _, err = database.UninstallUserApp(ctx, owner.ID, "planner", time.Now()); err != nil {
-		t.Fatal(err)
-	}
 	catalog, err = executeGlobalAgentSpaceTool(ctx, database, invocation, agent.ToolRequest{Name: "spaces.tools", Arguments: TestingMustAPIRawJSON(map[string]string{"space_id": destination.ID})})
-	if err != nil || strings.Contains(string(catalog), "tasks.create") {
-		t.Fatalf("uninstalled app retained: %s %v", catalog, err)
+	if err != nil || !strings.Contains(string(catalog), "tasks.create") {
+		t.Fatalf("first-party tools require no app installation: %s %v", catalog, err)
 	}
 }

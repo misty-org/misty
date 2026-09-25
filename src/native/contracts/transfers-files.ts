@@ -11,11 +11,7 @@ import type {
   TransferType,
 } from "@/native/contracts/primitives";
 
-import type {
-  PluginCommandEntry,
-  PluginPanelEntry,
-  ProviderWorkflowOption,
-} from "./workspace-settings";
+import type { ProviderWorkflowOption } from "./workspace-settings";
 export interface ProviderConfigStep {
   kind: string;
   name: string;
@@ -302,25 +298,6 @@ export interface FileToolsSymlinkTargetResult {
 export interface FileToolsActionResult {
   path: string;
   message: string;
-}
-
-export interface PluginDiagnosticsEntry {
-  pluginId: string;
-  pluginName: string;
-  pluginDir: string;
-  installed: boolean;
-  enabled: boolean;
-  runtimeStatus: string;
-  commands: PluginCommandEntry[];
-  panels: PluginPanelEntry[];
-  missingDependencies: string[];
-  errors: string[];
-}
-
-export interface PluginDiagnosticsSnapshot {
-  roots: string[];
-  plugins: PluginDiagnosticsEntry[];
-  removedIds: string[];
 }
 
 export interface FileSyncEndpoint {

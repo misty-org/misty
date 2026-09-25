@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/kannachi323/misty/server/internal/agenttools"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,7 +21,6 @@ import (
 	cap "github.com/kannachi323/misty/server/internal/capabilities"
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -63,41 +63,19 @@ func TestSDKBrowserAndPlannerInvocationGate(t *testing.T) {
 			}
 			var binding cap.BrowserBinding
 			if name == "planner" {
-				if _, err := database.InstallUserApp(ctx, user.ID, "planner", "1.1.0", 6, []string{"tasks.read", "tasks.write"}); err != nil {
-					t.Fatal(err)
-				}
 				targets, err := database.ResolveSDKTargets(ctx, user.ID, cap.TargetResolve{Capability: "tasks.create", SpaceID: space.ID})
 				if err != nil || len(targets) != 1 {
 					t.Fatalf("Planner default: %v %#v", err, targets)
 				}
 				target = &targets[0]
 			} else {
-				definition, ok := cap.Builtin(capability, 1)
+				providerID := "inbox/" + name
+				if name == "todoist" {
+					providerID = "planner/todoist"
+				}
+				provider, ok := cap.OfficialBrowserProvider(providerID, 1)
 				if !ok {
-					t.Fatal("missing canonical contract")
-				}
-				provider := cap.Provider{ID: "example.pilot/" + name, Version: 1, Label: name, Route: cap.Route{Kind: "browser", Adapter: name, AdapterVersion: 1, Origins: []string{origin}, Hints: []string{}}, Capabilities: []cap.Definition{definition}}
-				document := cap.InstallDocument{AppID: "example.pilot", Version: "1.0.0", PermissionVersion: 1, Scopes: []string{"capabilities.providers.write", "capabilities.read", "capabilities.invoke", "browser.inspect", "browser.interact", "browser.navigate", capability}, Capabilities: cap.Manifest{Protocol: 1, Providers: []cap.Provider{provider}}}
-				pub, key, _ := ed25519.GenerateKey(rand.Reader)
-				raw, _ := json.Marshal(document)
-				signed := cap.SignedManifest{Document: string(raw), PublicKey: base64.StdEncoding.EncodeToString(pub), Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(key, []byte(cap.SignatureDomain+string(raw))))}
-				verified, err := cap.Verify(signed)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, verified.Digest); err != nil {
-					t.Fatal(err)
-				}
-				session, err := database.CreateAppRuntimeSession(ctx, user.ID, "example.pilot", security.HashToken(uuid.NewString()), "", db.AppRuntimeSessionTTL)
-				if err != nil {
-					t.Fatal(err)
-				}
-				authority := db.WithAppExecutionAuthority(ctx, *session)
-				if _, err := database.RegisterSDKProvider(authority, user.ID, verified.Digest, provider); err != nil {
-					t.Fatal(err)
-				}
-				if err := database.ReportSDKProviderAvailability(authority, user.ID, provider.ID, cap.Availability{State: "available", ObservedAt: time.Now().UTC()}); err != nil {
-					t.Fatal(err)
+					t.Fatal("missing first-party provider")
 				}
 				deviceKey, _, _ := ed25519.GenerateKey(rand.Reader)
 				device, err = database.RegisterTrustedDevice(user.ID, "Pilot Mac", base64.RawURLEncoding.EncodeToString(deviceKey), "macos", "", json.RawMessage(`[]`), json.RawMessage(`{"browser_tools":true}`))
@@ -149,19 +127,12 @@ func TestSDKBrowserAndPlannerInvocationGate(t *testing.T) {
 			request := cap.Invocation{RequestID: uuid.NewString(), Capability: capability, CapabilityVersion: 1, ProviderID: target.ProviderID, ProviderVersion: 1, TargetID: target.ID, TargetRevision: target.Revision, Input: input, Deadline: time.Now().UTC().Add(time.Hour)}
 			callID := uuid.NewString()
 			var admitted *db.SDKInvocationRecord
-			if mode == "global" {
-				payload, _ := json.Marshal(map[string]any{"mode": "quick", "surface_id": "settings", "trigger": "message", "prompt": "Complete the reviewed pilot action", "space_id": space.ID, "context": []any{}, "timezone": "UTC", "idempotency_key": uuid.NewString()})
-				global, _, createErr := database.CreateAIInvocationRecord(ctx, db.AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user.ID, SpaceID: space.ID, SurfaceID: "settings", Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: payload, ExpiresAt: request.Deadline})
-				err = createErr
-				if err == nil {
-					_, effect := cap.AgentSDKIdentities(user.ID, global.ID, callID)
-					admitted = &db.SDKInvocationRecord{InvocationID: global.ID, EffectID: effect, AdapterVersion: "sdk-browser:global-fixture"}
-				}
-			} else {
-				admitted, err = database.AdmitSDKInvocation(ctx, user.ID, request)
-				if err == nil {
-					callID = admitted.EffectID
-				}
+			payload, _ := json.Marshal(map[string]any{"mode": "quick", "surface_id": "settings", "trigger": "message", "prompt": "Complete the reviewed pilot action", "context": []any{}, "timezone": "UTC", "idempotency_key": uuid.NewString()})
+			global, _, createErr := database.CreateAIInvocationRecord(ctx, db.AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user.ID, SurfaceID: "settings", Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: payload, ExpiresAt: request.Deadline})
+			err = createErr
+			if err == nil {
+				_, effect := cap.AgentSDKIdentities(user.ID, global.ID, callID)
+				admitted = &db.SDKInvocationRecord{InvocationID: global.ID, EffectID: effect, AdapterVersion: "sdk-browser:account-fixture"}
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -209,10 +180,19 @@ func TestSDKBrowserAndPlannerInvocationGate(t *testing.T) {
 				t.Fatalf("catalog %#v %v", catalog, err)
 			}
 			toolName := ""
-			for _, tool := range catalog.Tools {
-				if strings.HasPrefix(tool.Name, "sdk.") {
-					toolName = tool.Name
-					break
+			bindings, err := database.AgentSDKCapabilityBindings(ctx, user.ID, admitted.InvocationID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, pin := range bindings {
+				if pin.TargetID != target.ID || pin.Capability != capability {
+					continue
+				}
+				name := agenttools.ProviderToolName(agenttools.ProviderBinding{TargetID: pin.TargetID, TargetRevision: pin.TargetRevision, ProviderID: pin.ProviderID, ProviderVersion: pin.ProviderVersion, Capability: pin.Capability, CapabilityVersion: pin.CapabilityVersion, AdapterVersion: pin.AdapterVersion})
+				for _, tool := range catalog.Tools {
+					if tool.Name == name {
+						toolName = name
+					}
 				}
 			}
 			if toolName == "" {
@@ -386,15 +366,15 @@ func TestSDKBrowserAndPlannerInvocationGate(t *testing.T) {
 			if writes.Load() != 0 {
 				t.Fatal("committed before review")
 			}
-			approvals, err := database.SDKPendingApprovals(ctx, user.ID, "", 20)
+			approvals, err := database.AgentPendingBrowserApprovals(ctx, user.ID, "", 20)
 			if err != nil || len(approvals.Approvals) != 1 {
 				t.Fatalf("approval inventory: %#v %v", approvals, err)
 			}
 			router := chi.NewRouter()
-			router.Get("/me/capability-approvals/{approvalID}", service.SDKCapabilityApprovalReview())
-			router.Post("/me/sdk-runs/{runID}/approvals/{approvalID}", service.SDKCapabilityApproval())
+			router.Get("/me/agent-approvals/{approvalID}", service.AgentBrowserApprovalReview())
+			router.Post("/me/agent-invocations/{runID}/approvals/{approvalID}", service.AgentBrowserApprovalDecision())
 			bearer := newConversationTestBearerToken(t, database, user.ID)
-			review := performConversationRequest(t, router, http.MethodGet, "/me/capability-approvals/"+approvals.Approvals[0].ID, bearer, nil)
+			review := performConversationRequest(t, router, http.MethodGet, "/me/agent-approvals/"+approvals.Approvals[0].ID, bearer, nil)
 			expected := "Discuss the email"
 			if capability == "inbox.send" {
 				expected = draft.Text
@@ -402,13 +382,13 @@ func TestSDKBrowserAndPlannerInvocationGate(t *testing.T) {
 			if review.Code != 200 || !strings.Contains(review.Body.String(), expected) {
 				t.Fatalf("missing exact review body: %d %s", review.Code, review.Body.String())
 			}
-			decision := performConversationRequest(t, router, http.MethodPost, "/me/sdk-runs/"+db.SDKPublicRunID(record.ID)+"/approvals/"+approvals.Approvals[0].ID, bearer, map[string]bool{"approved": true})
+			decision := performConversationRequest(t, router, http.MethodPost, "/me/agent-invocations/"+db.SDKPublicRunID(record.ID)+"/approvals/"+approvals.Approvals[0].ID, bearer, map[string]bool{"approved": true})
 			if decision.Code != 204 {
 				t.Fatalf("approval: %s", decision.Body.String())
 			}
 			changed.Store(true)
 			if mode == "cancel" {
-				if err := database.RequestSDKCancellation(ctx, user.ID, admitted.InvocationID); err != nil {
+				if err := database.CancelMistyInvocationChildren(ctx, user.ID, admitted.InvocationID); err != nil {
 					t.Fatal(err)
 				}
 			}

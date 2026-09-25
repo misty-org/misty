@@ -198,9 +198,8 @@ func (s *SpacesService) mcpConnectionAccess(r *http.Request, userID, connectionI
 	if err != nil {
 		return nil, "", err
 	}
-	if item.Provider == "activepieces" {
-		bearer, oauthErr := s.activepiecesAccessToken(r.Context(), userID, item)
-		return item, bearer, oauthErr
+	if item.Provider != "custom" {
+		return nil, "", db.ErrSpaceNotFound
 	}
 	bearer, err := s.decryptMCPBearer(item.BearerCiphertext, item.BearerNonce)
 	return item, bearer, err
@@ -234,9 +233,6 @@ func normalizeMCPDiscovery(connectionID string, remote []mcpintegration.Tool) []
 func normalizeMCPDiscoveryForProvider(connectionID, provider string, remote []mcpintegration.Tool) []db.MCPRemoteTool {
 	items := make([]db.MCPRemoteTool, 0, len(remote))
 	for _, tool := range remote {
-		if provider == "activepieces" && !allowedActivepiecesMCPTool(tool.Name) {
-			continue
-		}
 		schema := tool.InputSchema
 		status, reason := "valid", ""
 		if err := validateMCPToolSchema(schema); err != nil {
@@ -247,25 +243,6 @@ func normalizeMCPDiscoveryForProvider(connectionID, provider string, remote []mc
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].RemoteName < items[j].RemoteName })
 	return items
-}
-
-var activepiecesMCPToolAllowlist = map[string]bool{
-	"ap_list_flows": true, "ap_flow_structure": true, "ap_read_step_code": true,
-	"ap_read_step_settings": true, "ap_validate_flow": true, "ap_research_pieces": true,
-	"ap_search_actions": true, "ap_search_triggers": true, "ap_get_piece_props": true,
-	"ap_resolve_property_options": true, "ap_resolve_property_chain": true,
-	"ap_validate_step_config": true, "ap_list_connections": true, "ap_list_runs": true,
-	"ap_get_run": true, "ap_setup_guide": true, "ap_set_project_context": true,
-	"ap_create_flow": true, "ap_duplicate_flow": true, "ap_rename_flow": true,
-	"ap_change_flow_status": true, "ap_lock_and_publish": true, "ap_build_flow": true,
-	"ap_update_trigger": true, "ap_add_step": true, "ap_update_step": true,
-	"ap_delete_step": true, "ap_add_branch": true, "ap_update_branch": true,
-	"ap_delete_branch": true, "ap_manage_notes": true, "ap_test_flow": true,
-	"ap_test_step": true, "ap_retry_run": true,
-}
-
-func allowedActivepiecesMCPTool(name string) bool {
-	return activepiecesMCPToolAllowlist[strings.TrimSpace(name)]
 }
 
 func stableMCPToolName(connectionID, remoteName string) string {
@@ -409,10 +386,6 @@ func mcpErrorCode(err error) string {
 	default:
 		return "mcp_unavailable"
 	}
-}
-
-func TestingAllowedActivepiecesMCPTool(name string) bool {
-	return allowedActivepiecesMCPTool(name)
 }
 
 func TestingNormalizeMCPDiscoveryForProvider(connectionID, provider string, remote []mcpintegration.Tool) []db.MCPRemoteTool {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-18T18:19:52.903215+00:00",
-  "title": "Design System: Misty Agents — Operate",
+  "generatedAt": "2026-09-24T18:18:25.885618+00:00",
+  "title": "Design System: Misty Agents \u2014 Operate",
   "extensions": {
     "colorMeta": {
       "canvas": {
@@ -656,7 +656,7 @@
       "kind": "nav",
       "refersTo": "roster-selected",
       "description": "One-line selected agent with a custom emoji override; default identities use cloud artwork.",
-      "html": "<button class=\"ds-roster\" aria-pressed=\"true\"><span class=\"ds-avatar\">✏️</span><span>Assistant</span></button>",
+      "html": "<button class=\"ds-roster\" aria-pressed=\"true\"><span class=\"ds-avatar\">\u270f\ufe0f</span><span>Assistant</span></button>",
       "css": ".ds-roster{font:400 16px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:12px;width:258px;height:68px;padding:10px;border:0;border-radius:11px;background:#323232;color:#eee;text-align:left;cursor:pointer;}.ds-avatar{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#3c3c3c;font-size:24px;font-weight:500;}.ds-roster[aria-pressed=\"false\"]{background:transparent;}.ds-roster[aria-pressed=\"false\"]:hover{background:#242424;}.ds-roster:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
     },
     {
@@ -686,7 +686,7 @@
   ],
   "narrative": {
     "northStar": "Operate",
-    "overview": "**Creative North Star: \"Operate\"**\n\nThe user-pinned Grok Bot layout is the structural authority for this scoped Agents surface: a quiet, dense roster and an open conversation, with details revealed alongside. Misty's identity, truthful capability language, and PRODUCT.md remain normative. This record replaces the rejected Agents design; it does not redefine other Misty surfaces or the root design record.\n\nThe composition begins with conversational greeting bubbles and four lettered choices, followed by a custom-answer field. A single bottom composer anchors the canvas. There is no centered hero, runtime exposition, Marketplace entry, or persistent mode/model/context toolbar. Misty uses the original blue cloud logo. Personal agents use stable cloud color/expression variants unless a custom emoji is configured. The avatar picker offers Sky (original), Lavender (wink), Mint (focused), and Peach (joyful).\n\nSource authority is AgentsPage.tsx, agentsWorkspace.css, components/AgentWorkspaceConversation.tsx, AgentSearchDialog.tsx, AgentAvatar.tsx, and AgentConversationView.tsx. WorkspaceCanvas.tsx supplies the conditional host-chrome treatment. Evidence is the real React component rendered with synthetic data: repository-root .impeccable/review/agents/grok-desktop.png (1045 × 768), grok-user-1111.png (1111 × 823), grok-mobile.png (390 × 844), grok-details.png, grok-settings.png, and grok-search.png; grok-reference-native.png is the actual Grok reference. The reviewer found desktop structural fidelity met and requested documentation replacement and larger mobile targets. The final verdict pass scored both the documentation and mobile-target corrections resolved (ship at that scope). These captures do not verify native Misty chrome, voice recording, live account integration, or AI backend execution. Native Misty was unavailable in the application inventory.",
+    "overview": "**Creative North Star: \"Operate\"**\n\nThe user-pinned Grok Bot layout is the structural authority for this scoped Agents surface: a quiet, dense roster and an open conversation, with details revealed alongside. Misty's identity, truthful capability language, and PRODUCT.md remain normative. This record replaces the rejected Agents design; it does not redefine other Misty surfaces or the root design record.\n\nThe composition begins with conversational greeting bubbles and four lettered choices, followed by a custom-answer field. A single bottom composer anchors the canvas. There is no centered hero, runtime exposition, or Marketplace entry. Inline Companion controls now precede the conversation: persistent Team/Auto choices, Cursor on/off, status, conditional Stop, and expandable Voice & model options. This replaces the earlier prohibition on persistent mode controls; detailed companion tokens and behavior live in `companion/DESIGN.md`. Misty uses the original blue cloud logo. Personal agents use stable cloud color/expression variants unless a custom emoji is configured. The avatar picker offers Sky (original), Lavender (wink), Mint (focused), and Peach (joyful).\n\nSource authority is AgentsPage.tsx, agentsWorkspace.css, components/AgentWorkspaceConversation.tsx, AgentSearchDialog.tsx, AgentAvatar.tsx, and AgentConversationView.tsx. WorkspaceCanvas.tsx supplies the conditional host-chrome treatment. Evidence is the real React component rendered with synthetic data: repository-root .impeccable/review/agents/grok-desktop.png (1045 \u00d7 768), grok-user-1111.png (1111 \u00d7 823), grok-mobile.png (390 \u00d7 844), grok-details.png, grok-settings.png, and grok-search.png; grok-reference-native.png is the actual Grok reference. The reviewer found desktop structural fidelity met and requested documentation replacement and larger mobile targets. The final verdict pass scored both the documentation and mobile-target corrections resolved (ship at that scope). These captures do not verify native Misty chrome, voice recording, live account integration, or AI backend execution. That earlier review did not observe native Misty. The later companion update has renderer captures at `.impeccable/review/cursor-agents/team.png`, `auto.png`, and `narrow.png`, plus the actual packaged macOS capture `packaged-macos-auto.png`. Packaged macOS observation confirms rendered original sprites and Team-to-Auto switching through the native controller, without establishing voice, multimonitor behavior, or Windows parity.",
     "keyCharacteristics": [
       "Single-line roster, compact header, and top-aligned conversational content.",
       "Near-black grayscale surfaces with small tonal steps and native system type.",
@@ -708,15 +708,15 @@
     "dos": [
       "Do preserve the user-pinned Grok structure and Misty identity together.",
       "Do use the scoped grayscale tokens and existing semantic status treatments where the shared conversation renderer requires them.",
-      "Do retain visible focus, current-Space conversation boundaries, and explicit settings labels.",
+      "Do retain visible focus, personal new-work scope, saved historical conversation scope, and explicit settings labels.",
       "Do keep mobile header, suggestion-dismiss, attachment, voice, send, and stop controls at 44px square.",
       "Do describe activity, permissions, working states, and failures truthfully."
     ],
     "donts": [
-      "Don’t restore a centered hero, roster responsibility subtitles, runtime marketing text, or persistent mode/model/context controls.",
-      "Don’t add Marketplace to this Agents surface or infer a product-wide removal.",
-      "Don’t turn the activity tile into a simulated live computer stream.",
-      "Don’t treat synthetic component captures as native-shell, voice, backend, or permission-enforcement verification."
+      "Don\u2019t restore a centered hero, roster responsibility subtitles, runtime marketing text, or the replaced User/Agent/Team work-mode selector. Keep the authorized Team/Auto companion controls inline in Agents.",
+      "Don\u2019t add Marketplace to this Agents surface or infer a product-wide removal.",
+      "Don\u2019t turn the activity tile into a simulated live computer stream.",
+      "Don\u2019t treat synthetic component captures as native-shell, voice, backend, or permission-enforcement verification."
     ]
   }
 }

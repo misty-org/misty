@@ -128,10 +128,10 @@ vi.mock("@/features/app-shell", () => {
     }),
   };
 });
-vi.mock("@/features/files/explorer", () => ({
+vi.mock("@/features/files/workspace/explorer", () => ({
   useExplorerStore: { setState: mocks.explorerSetState },
 }));
-vi.mock("@/features/files/search", () => ({
+vi.mock("@/features/files/workspace/search", () => ({
   resetSearchAccountState: mocks.resetSearchAccountState,
 }));
 vi.mock("@/features/spaces", () => ({
@@ -150,7 +150,7 @@ vi.mock("@/features/agents", () => ({
     void mocks.agentRefresh();
   },
 }));
-vi.mock("@/features/notes", () => ({
+vi.mock("@/features/journal/notes", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
 }));
 vi.mock("@/telemetry/lifecycle", () => ({ setAnalyticsAuthenticationState: vi.fn() }));

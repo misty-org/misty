@@ -25,7 +25,7 @@ func sdkToolBinding(b db.AgentSDKCapabilityBinding) agenttools.ProviderBinding {
 
 func (s *SpacesService) agentSDKRegistrations(ctx context.Context, run *db.SpaceRun) ([]agenttools.Registration, error) {
 	registrations := []agenttools.Registration{}
-	if !sdkExecutionEnabled() || !managedMistyRun(run) {
+	if !sdkExecutionEnabled() || run == nil || run.OwnerUserID == "" || run.AgentID == "" {
 		return registrations, nil
 	}
 	return s.sdkRunRegistrations(ctx, run.OwnerUserID, run.ID)
@@ -102,7 +102,7 @@ type sdkExecutionRun struct {
 }
 
 func (s *SpacesService) executeConversationalSDKTool(ctx context.Context, run *db.SpaceRun, call agentRuntimeToolCall) (agentRuntimeToolOutcome, error) {
-	if !sdkExecutionEnabled() || !managedMistyRun(run) {
+	if !sdkExecutionEnabled() || run == nil || run.OwnerUserID == "" || run.AgentID == "" {
 		return agentRuntimeToolOutcome{}, db.ErrAppRuntimeForbidden
 	}
 	reference := sdkExecutionRun{ID: run.ID, OwnerUserID: run.OwnerUserID, SpaceID: run.SpaceID, AgentID: run.AgentID, Source: "space_conversation", Deadline: run.CreatedAt.Add(24 * time.Hour).UTC()}
@@ -117,9 +117,7 @@ func (s *SpacesService) executeConversationalSDKTool(ctx context.Context, run *d
 }
 func (s *SpacesService) executeAIProviderTool(ctx context.Context, record *db.AIInvocationRecord, call agentRuntimeToolCall) (agentRuntimeToolOutcome, error) {
 	if record.SurfaceID == "routine" {
-		if err := s.authorizeRoutineCall(ctx, record, call); err != nil {
-			return agentRuntimeToolOutcome{}, err
-		}
+		return agentRuntimeToolOutcome{}, db.ErrSpaceInvalid
 	}
 	if !sdkExecutionEnabled() || record.SurfaceID == "sdk" || record.AgentRunID != "" {
 		return agentRuntimeToolOutcome{}, db.ErrAppRuntimeForbidden

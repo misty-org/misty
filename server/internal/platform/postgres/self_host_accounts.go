@@ -133,28 +133,23 @@ func (db *Database) SelfHostAccountAccess(ctx context.Context, userID string) (S
 		return tx.QueryRowContext(ctx, `SELECT entitlement_subject,entitlement_expires_at,is_admin,disabled_at FROM self_host_accounts WHERE user_id=$1`, userID).
 			Scan(&access.EntitlementSubject, &access.EntitlementExpiresAt, &access.IsAdmin, &disabledAt)
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		// Accounts already registered with this server keep ordinary access during
+		// the upgrade. No administrator privilege or cross-server identity is added.
+		var exists bool
+		err = db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+			return tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id=$1)", userID).Scan(&exists)
+		})
+		if err == nil && !exists {
+			err = sql.ErrNoRows
+		}
+	}
+
 	if err != nil {
 		return access, err
 	}
 	access.Disabled = disabledAt.Valid
 	return access, nil
-}
-
-func (db *Database) RenewSelfHostEntitlement(ctx context.Context, userID, subject string, expiresAt time.Time) error {
-	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `UPDATE self_host_accounts SET entitlement_expires_at=$3,updated_at=NOW() WHERE user_id=$1 AND entitlement_subject=$2 AND disabled_at IS NULL`, userID, subject, expiresAt)
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows != 1 {
-			return ErrSelfHostSubjectBound
-		}
-		return nil
-	})
 }
 
 func (db *Database) CreateSelfHostInvitation(ctx context.Context, adminUserID, invitationID, tokenHash string, expiresAt time.Time) error {

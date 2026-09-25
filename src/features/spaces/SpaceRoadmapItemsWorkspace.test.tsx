@@ -13,7 +13,7 @@ vi.mock("@/api/spaces/api", () => ({
   spacesApi: { roadmaps, roadmap, tasks },
 }));
 
-import { SpaceRoadmapItemsWorkspace } from "@/features/spaces/roadmap/SpaceRoadmapItemsWorkspace";
+import { SpaceRoadmapItemsWorkspace } from "@/features/planner/roadmap/SpaceRoadmapItemsWorkspace";
 
 describe("SpaceRoadmapItemsWorkspace", () => {
   let container: HTMLDivElement;

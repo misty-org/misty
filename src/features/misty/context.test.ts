@@ -88,10 +88,10 @@ describe("Misty workspace context", () => {
       resolveMistyContext("a", "", [{ kind: "pane", spaceId: "", paneId: "missing" }]),
     ).toThrow(/closed/);
   });
-  it("rejects historical attachments and never uses another account's adapter", () => {
-    expect(() => resolveMistyContext("a", "", [{ kind: "workspace", spaceId: "other" }])).toThrow(
-      /current browser workspace/,
-    );
+  it("ignores legacy Space bindings and never uses another account's adapter", () => {
+    expect(
+      resolveMistyContext("a", "", [{ kind: "workspace", spaceId: "other" }]).context[0].kind,
+    ).toBe("workspace.scope");
     expect(resolveMistyContext("b", "").context[0].id).toBe("view-p");
   });
   it("collects the open workspace as one scoped attachment", () => {
@@ -101,10 +101,11 @@ describe("Misty workspace context", () => {
   });
 });
 
-it("never attaches the live workspace to historical conversations", () => {
-  expect(contextOptions("old-space")).toEqual([]);
-  expect(resolveMistyContext("a", "old-space")).toEqual({ context: [] });
-  expect(() =>
-    resolveMistyContext("a", "old-space", [{ kind: "workspace", spaceId: "old-space" }]),
-  ).toThrow(/new conversation/);
+it("keeps browser context available to historical conversations", () => {
+  expect(contextOptions("old-space")).toEqual(contextOptions(""));
+  expect(resolveMistyContext("a", "old-space")).toEqual(resolveMistyContext("a", ""));
+  expect(
+    resolveMistyContext("a", "old-space", [{ kind: "workspace", spaceId: "old-space" }]).context[0]
+      .kind,
+  ).toBe("workspace.scope");
 });

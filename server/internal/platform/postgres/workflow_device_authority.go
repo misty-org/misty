@@ -90,7 +90,8 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 	if !valid {
 		return ErrSpaceForbidden
 	}
-	// A queued job cannot outlive an app assignment or cross its owning window.
+	// Revalidate the signed device, attached context and originating window.
+	// Native browser tools do not depend on the retired app-install platform.
 	if strings.HasPrefix(job.RunID, "invocation_") {
 		var payload json.RawMessage
 		var spaceID string
@@ -112,7 +113,7 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 			if input.Mode == "user" && job.RequiredCapability != "browser.inspect" && job.RequiredCapability != "browser.visual" && job.RequiredCapability != "browser.downloads.list" {
 				return ErrSpaceForbidden
 			}
-			err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c JOIN misty_agent_app_assignments a ON a.owner_user_id=c.user_id AND a.app_id=c.metadata->>'app_id' JOIN user_app_installations sa ON sa.user_id=a.owner_user_id AND sa.app_id=a.app_id AND sa.state='installed' AND NOT sa.consent_required WHERE c.id=$1 AND c.invocation_id=$2 AND c.user_id=$3 AND a.agent_id=$4 AND c.metadata->>'window_label'=$5)`, job.ContextID, job.RunID, job.UserID, input.AgentID, input.WindowLabel).Scan(&valid)
+			err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c WHERE c.id=$1 AND c.invocation_id=$2 AND c.user_id=$3 AND c.metadata->>'window_label'=$4)`, job.ContextID, job.RunID, job.UserID, input.WindowLabel).Scan(&valid)
 			if err != nil {
 				return err
 			}
@@ -129,12 +130,10 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 				}
 				if upload.DownloadID != "" {
 					// Recheck the source as well as the destination on claim/begin/
-					// lease renewal. Revoking either app or context stops the transfer.
+					// lease renewal. Detaching either context stops the transfer.
 					err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c
- JOIN misty_agent_app_assignments a ON a.owner_user_id=c.user_id AND a.app_id=c.metadata->>'app_id'
- JOIN user_app_installations sa ON sa.user_id=a.owner_user_id AND sa.app_id=a.app_id AND sa.state='installed' AND NOT sa.consent_required
- WHERE c.invocation_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.device_id=$4 AND c.state='attached' AND c.expires_at>NOW()
- AND c.capabilities ? 'browser.downloads.list' AND a.agent_id=$5 AND c.metadata->>'window_label'=$6)`, job.RunID, job.UserID, upload.SourceScopeID, deviceID, input.AgentID, input.WindowLabel).Scan(&valid)
+  WHERE c.invocation_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.device_id=$4 AND c.state='attached' AND c.expires_at>NOW()
+ AND c.capabilities ? 'browser.downloads.list' AND c.metadata->>'window_label'=$5)`, job.RunID, job.UserID, upload.SourceScopeID, deviceID, input.WindowLabel).Scan(&valid)
 					if err != nil {
 						return err
 					}

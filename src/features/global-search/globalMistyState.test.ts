@@ -116,6 +116,80 @@ describe("Global Misty state", () => {
     );
   });
 
+  it("does not overwrite a new response with a late history refresh", async () => {
+    let finish!: (value: { conversations: never[] }) => void;
+    vi.spyOn(globalMistyApi, "conversations").mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    useMistyStore.setState({ accountId: "account-a", working: false });
+    const loading = useMistyStore.getState().loadConversations();
+    useMistyStore.setState({ working: true, activeConversationId: "new-response" });
+    const messages = useMistyStore.getState().conversations;
+    finish({ conversations: [] });
+    await loading;
+    expect(useMistyStore.getState().conversations).toBe(messages);
+    expect(useMistyStore.getState().activeConversationId).toBe("new-response");
+    expect(useMistyStore.getState().conversationsLoading).toBe(false);
+  });
+
+  it("keeps legacy companion callers compatible without implicit page context", async () => {
+    const create = vi
+      .spyOn(aiSurfaceApi, "createInvocation")
+      .mockRejectedValueOnce(new Error("stop after admission"));
+    useMistyStore.setState({
+      accountId: "account-a",
+      executionMode: "agent",
+      activeConversationId: "companion",
+      selectedAgentId: "default-misty",
+      conversations: [
+        {
+          id: "companion",
+          agentId: "default-misty",
+          title: "Companion",
+          createdAt: "",
+          updatedAt: "",
+          messages: [],
+          remote: true,
+        },
+      ],
+    });
+    await useMistyStore
+      .getState()
+      .submitAnswer(
+        "Explain agents",
+        [],
+        undefined,
+        "workspace",
+        [],
+        { conversationId: "companion", context: [] },
+        { executionMode: "user" },
+      );
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "companion", executionMode: "user", context: [] }),
+    );
+    expect(useMistyStore.getState().executionMode).toBe("agent");
+  });
+
+  it("does not admit a request stopped while availability was pending", async () => {
+    let admit!: () => void;
+    vi.mocked(assertMistyAvailable).mockReturnValueOnce(
+      new Promise((resolve) => {
+        admit = resolve;
+      }),
+    );
+    const create = vi.spyOn(aiSurfaceApi, "createInvocation");
+    useMistyStore.setState({ accountId: "account-a", working: false });
+    const pending = useMistyStore.getState().submitAnswer("obsolete request");
+    await useMistyStore.getState().cancelResponse?.();
+    admit();
+    await pending;
+    expect(create).not.toHaveBeenCalled();
+    expect(useMistyStore.getState().working).toBe(false);
+  });
+
   it("collapses without canceling background work", () => {
     useMistyStore.setState({ panel: "results", working: true });
     useMistyStore.getState().closePanel();

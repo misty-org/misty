@@ -39,8 +39,6 @@ export async function controlPlaneRequest<T>(
     | "activate"
     | "context"
     | "budget"
-    | "routine-agent"
-    | "routine-wait"
     | "mcp-token"
     | "tools"
     | "events"

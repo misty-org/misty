@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kannachi323/misty/server/internal/platform/transport"
 	"sync"
 	"time"
 
@@ -12,11 +13,7 @@ import (
 
 // AccountEvent is an invalidation, never a grant or an effect receipt. Clients
 // reconcile durable, authorized snapshots on initial connect and reconnect.
-type AccountEvent struct {
-	UserID string `json:"userId,omitempty"`
-	Topic  string `json:"topic"`
-	ID     string `json:"id,omitempty"`
-}
+type AccountEvent = transport.AccountEvent
 
 type accountEventHub struct {
 	mu       sync.Mutex

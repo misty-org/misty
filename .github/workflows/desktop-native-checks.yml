@@ -64,10 +64,40 @@ jobs:
         run: npm run typecheck
 
       - name: Test browser frontend
-        run: npm test -- apps/browser/workspace/BrowserWorkspace.test.ts src/features/agents/worker.test.ts
+        run: npm test -- src/features/browser/workspace/BrowserWorkspace.test.ts src/features/agents/worker.test.ts src/features/agents/companion src/features/agents/localExecution.test.ts src/features/agents/voice src/features/agents/components/agentCloudAvatars.test.ts src/features/agents/components/AgentWorkspaceConversation.test.tsx src/application/main.test.ts
 
       - name: Compile native desktop
         run: cargo check --manifest-path src-tauri/Cargo.toml --lib
 
       - name: Test native desktop
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Build packaged companion frontend
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        run: npm run build:desktop
+
+      - name: Write acceptance packaging configuration
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        run: node -e "require('node:fs').writeFileSync('cursor-acceptance.conf.json', JSON.stringify({build:{beforeBuildCommand:''},bundle:{createUpdaterArtifacts:false}}))"
+
+      - name: Package unsigned macOS acceptance app
+        if: runner.os == 'macOS'
+        run: npm run tauri -- build --debug --bundles app --no-sign --config "${{ github.workspace }}/cursor-acceptance.conf.json"
+
+      - name: Package unsigned Windows acceptance app
+        if: runner.os == 'Windows'
+        run: npm run tauri -- build --debug --bundles nsis --no-sign --config "${{ github.workspace }}/cursor-acceptance.conf.json"
+
+      - name: Archive macOS app with executable permissions
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent src-tauri/target/debug/bundle/macos/Misty.app src-tauri/target/debug/bundle/macos/Misty-acceptance.zip
+
+      - name: Preserve desktop acceptance package
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-acceptance-${{ runner.os }}
+          path: |
+            src-tauri/target/debug/bundle/**/*.zip
+            src-tauri/target/debug/bundle/**/*.exe
+          retention-days: 7

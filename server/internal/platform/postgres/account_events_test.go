@@ -53,7 +53,7 @@ CREATE TABLE ai_intervention_waits(id text, user_id text);`)
 		t.Fatal(err)
 	}
 	defer conn.Exec("DROP SCHEMA event_test CASCADE")
-	migration, err := migrationFiles.ReadFile("migrations/20270211000000_account_event_notifications.sql")
+	migration, err := os.ReadFile("../../../test/fixtures/schema-history/20270211000000_account_event_notifications.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

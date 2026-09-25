@@ -57,11 +57,9 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     #[cfg(not(windows))]
     CommandSpec::new("./test.sh").run(&workspace.server)?;
 
-    let container_contract = workspace
-        .server
-        .join("cli/tasks/check-container-contract.sh");
+    let container_contract = workspace.server.join("scripts/check-container-contract.sh");
     if container_contract.is_file() {
-        CommandSpec::new("./cli/tasks/check-container-contract.sh").run(&workspace.server)?;
+        CommandSpec::new("./scripts/check-container-contract.sh").run(&workspace.server)?;
     }
 
     let worker = workspace.server.join("apps/journal-collab");
@@ -89,14 +87,13 @@ pub fn website(workspace: &Workspace) -> Result<()> {
     Ok(())
 }
 
-pub fn extensions(workspace: &Workspace) -> Result<()> {
-    workspace.validate()?;
-    for script in ["validate", "test", "build"] {
-        CommandSpec::new(npm())
-            .args(["run", script])
-            .run(&workspace.extensions)?;
+pub fn builtin_tools(workspace: &Workspace) -> Result<()> {
+    if !workspace.features.is_dir() {
+        bail!("built-in features directory is missing");
     }
-    Ok(())
+    CommandSpec::new(npm())
+        .args(["test", "--", "src/features", "src/shared/toolAssets"])
+        .run(&workspace.misty)
 }
 
 pub fn cli(workspace: &Workspace) -> Result<()> {

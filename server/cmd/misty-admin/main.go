@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	if !strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_DEPLOYMENT_MODE")), "self_hosted") {
+	if envconfig.DeploymentMode() != "self_hosted" {
 		fatal("misty-admin is available only when MISTY_DEPLOYMENT_MODE=self_hosted")
 	}
 	if len(os.Args) < 2 {

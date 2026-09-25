@@ -7,7 +7,7 @@ import (
 )
 
 func TestTipTapJournalResetIsNativeOnlyAndRetryable(t *testing.T) {
-	raw, err := os.ReadFile("../../../internal/platform/postgres/migrations/20261029000000_tiptap_journal.sql")
+	raw, err := os.ReadFile("../../../test/fixtures/schema-history/20261029000000_tiptap_journal.sql")
 	if err != nil {
 		t.Fatal(err)
 	}

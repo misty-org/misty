@@ -48,7 +48,7 @@ func (s *SpacesService) GlobalVisualSearch() http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_visual_query"})
 			return
 		}
-		vector, _, err := s.searchAnalyzer.EmbedVisualQuery(r.Context(), attachment.ModelMIMEType, bytes, body.Query)
+		vector, _, err := s.searchAnalyzer.WithBilling(s.database.BillingService(), userID, "visual-query:"+body.AttachmentID).EmbedVisualQuery(r.Context(), attachment.ModelMIMEType, bytes, body.Query)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "visual_embedding_failed", "message": "Misty could not understand that image yet."})
 			return

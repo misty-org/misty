@@ -86,4 +86,55 @@ describe("sleeping device", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(mocks.suspend).not.toHaveBeenCalled();
   });
+  it("keeps local browsing usable when website sign-in recovery fails", () => {
+    useBrowserSyncStore.setState({
+      session: { ...session(), browser_profile_issue: "Could not verify browser sign-in storage." },
+    });
+    render(<BrowserSyncSleepOverlay accountId="account" />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mocks.suspend).not.toHaveBeenCalled();
+  });
+  it.each(["connecting", "offline", "attention", "stopped"] as const)(
+    "keeps local browsing usable while sync is %s",
+    (phase) => {
+      const view = session();
+      view.status.phase = phase;
+      useBrowserSyncStore.setState({ session: view });
+      render(<BrowserSyncSleepOverlay accountId="account" />);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(mocks.suspend).not.toHaveBeenCalled();
+    },
+  );
+  it("does not treat an unselected or partially received startup workspace as another active device", () => {
+    const view = session();
+    view.workspace.active_device = null;
+    useBrowserSyncStore.setState({ session: view });
+    const rendered = render(<BrowserSyncSleepOverlay accountId="account" />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    act(() =>
+      useBrowserSyncStore.setState({
+        session: {
+          ...view,
+          workspace: {
+            ...view.workspace,
+            active_device: { device_id: null, epoch: "cleared", sequence: 2 },
+          },
+        },
+      }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const pending = session();
+    pending.status.head_sequence = 5;
+    act(() => useBrowserSyncStore.setState({ session: pending }));
+    rendered.rerender(<BrowserSyncSleepOverlay accountId="account" />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(mocks.suspend).not.toHaveBeenCalled();
+  });
+});
+
+it("keeps independent devices usable even while another device is active", () => {
+  useBrowserSyncStore.setState({ session: { ...session(), full_sync: false } });
+  render(<BrowserSyncSleepOverlay accountId="account" />);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(mocks.suspend).not.toHaveBeenCalledWith(true, "device-sync-sleep");
 });

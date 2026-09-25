@@ -1,4 +1,4 @@
-//! A document processor is executable package content, never a host-linked parser.
+//! Document processing runs in a confined worker bundled with Misty.
 //! This endpoint accepts a retained file handle, not an ambient filesystem path.
 use super::MiniAppState;
 use serde::Deserialize;
@@ -15,7 +15,6 @@ use std::{
 
 const MAX_INPUT: u64 = 50 * 1024 * 1024;
 const MAX_OUTPUT: u64 = 4 * 1024 * 1024;
-const MAX_WORKER: u64 = 64 * 1024 * 1024;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -24,82 +23,36 @@ struct Input {
     display_name: String,
     extension: String,
 }
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Envelope {
-    payload: String,
-    signature: String,
-    signature_key_id: String,
-}
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Descriptor {
-    protocol: u32,
-    service: String,
-    app_id: String,
-    app_version: String,
-    platform: String,
-    sha256: String,
-    bytes: u64,
-}
-
-fn bounded_read(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
-    let mut bytes = Vec::new();
-    File::open(path)
-        .map_err(|_| "Update this app to install its native service.")?
-        .take(limit + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| "Could not read the processor package.")?;
-    if bytes.len() as u64 > limit {
-        return Err("Processor package exceeds its limits.".into());
-    }
-    Ok(bytes)
-}
-
 fn verified_worker(root: &Path, app_id: &str, version: &str) -> Result<Vec<u8>, String> {
     verified_service(root, app_id, version, "document-processing", 5)
 }
 
 pub(crate) fn verified_service(
-    root: &Path,
-    app_id: &str,
-    version: &str,
+    _root: &Path,
+    _tool: &str,
+    _version: &str,
     service: &str,
     protocol: u32,
 ) -> Result<Vec<u8>, String> {
-    use sha2::{Digest, Sha256};
-    let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
-    let directory = root.join("native").join(service).join(&platform);
-    let envelope: Envelope =
-        serde_json::from_slice(&bounded_read(&directory.join("service.json"), 16384)?)
-            .map_err(|_| "Invalid processor receipt.")?;
-    let signed = format!("misty-native-service-v1\n{}", envelope.payload);
-    crate::infra::misty::verify_official_app_signature(
-        signed.as_bytes(),
-        &envelope.signature,
-        &envelope.signature_key_id,
-    )?;
-    let descriptor: Descriptor =
-        serde_json::from_str(&envelope.payload).map_err(|_| "Invalid processor description.")?;
-    if descriptor.protocol != protocol
-        || descriptor.service != service
-        || descriptor.app_id != app_id
-        || descriptor.app_version != version
-        || descriptor.platform != platform
-        || descriptor.bytes == 0
-        || descriptor.bytes > MAX_WORKER
+    #[cfg(test)]
     {
-        return Err("The processor does not match this app release or device.".into());
+        let fixture = _root
+            .join("native")
+            .join(service)
+            .join(format!(
+                "{}-{}",
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            ))
+            .join("worker");
+        if fixture.is_file() {
+            return std::fs::read(fixture).map_err(|error| error.to_string());
+        }
     }
-    // Copy and verify the exact bytes we will execute. A later package mutation
-    // cannot substitute another executable between verification and launch.
-    let bytes = bounded_read(&directory.join("worker"), MAX_WORKER)?;
-    if bytes.len() as u64 != descriptor.bytes
-        || format!("{:x}", Sha256::digest(&bytes)) != descriptor.sha256
-    {
-        return Err("Native service checksum verification failed.".into());
-    }
-    Ok(bytes)
+    #[cfg(target_os = "macos")]
+    return builtin_worker(service, protocol).map(|bytes| bytes.to_vec());
+    #[cfg(not(target_os = "macos"))]
+    Err("Bundled workers are unavailable on this platform.".into())
 }
 
 struct Cancellation {
@@ -473,39 +426,6 @@ pub(super) mod tests {
         std::fs::write(directory.join("service.json"), envelope.to_string()).unwrap();
         std::fs::write(directory.join("worker"), bytes).unwrap();
     }
-    #[test]
-    fn signed_service_is_bound_to_app_release_and_bytes() {
-        let root = tempfile::tempdir().unwrap();
-        receipt(root.path(), b"test-worker");
-        assert_eq!(
-            verified_worker(root.path(), "files", "1").unwrap(),
-            b"test-worker"
-        );
-        assert!(verified_worker(root.path(), "library", "1").is_err());
-        assert!(verified_worker(root.path(), "files", "2").is_err());
-        let directory = root.path().join(format!(
-            "native/document-processing/{}-{}",
-            std::env::consts::OS,
-            std::env::consts::ARCH
-        ));
-        std::fs::write(directory.join("worker"), b"replacement").unwrap();
-        assert!(verified_worker(root.path(), "files", "1")
-            .unwrap_err()
-            .contains("checksum"));
-        let mut envelope: Value =
-            serde_json::from_slice(&std::fs::read(directory.join("service.json")).unwrap())
-                .unwrap();
-        envelope["payload"] = Value::String(
-            envelope["payload"]
-                .as_str()
-                .unwrap()
-                .replace("files", "library"),
-        );
-        std::fs::write(directory.join("service.json"), envelope.to_string()).unwrap();
-        assert!(verified_worker(root.path(), "library", "1")
-            .unwrap_err()
-            .contains("signature"));
-    }
     pub(crate) fn fixture() -> (MiniAppState, tempfile::TempDir) {
         let root = tempfile::tempdir().unwrap();
         let mut permissions = super::super::PermissionSet::from_document(
@@ -530,8 +450,7 @@ pub(super) mod tests {
             super::super::super::Instance {
                 root: root.path().into(),
                 permissions,
-                _profile: None,
-                pending: Default::default(),
+
             },
         );
         (state, root)
@@ -1863,7 +1782,7 @@ impl ServiceLease {
     #[cfg(all(test, target_os = "macos"))]
     pub(super) fn fixture_worker(service: &'static str) -> Arc<Self> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(".././apps/native-services")
+            .join("services")
             .join(service)
             .join("target/debug")
             .join(format!("misty-{service}"));
@@ -1966,7 +1885,7 @@ impl ServiceLease {
                 ("code-tools", _) => "code.execute",
                 _ => return Err("Invalid native service owner.".into()),
             };
-            let (root, app_id, version, epoch, namespace, native_owner, mut changes) = {
+            let (root, app_id, version, builtin, epoch, namespace, native_owner, mut changes) = {
                 let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
                 let app = registry.get(instance).ok_or("App is closed.")?;
                 let p = &app.permissions;
@@ -1984,6 +1903,7 @@ impl ServiceLease {
                     app.root.clone(),
                     p.app_id.clone(),
                     p.version.clone(),
+                    p.builtin,
                     p.epoch,
                     p.owner_namespace.clone().ok_or("Missing app owner.")?,
                     p.native_owner.clone(),
@@ -2001,7 +1921,11 @@ impl ServiceLease {
             };
             let installed_version = version.clone();
             let worker = tokio::task::spawn_blocking(move || {
-                verified_service(&root, &app_id, &version, service, protocol)
+                if builtin {
+                    builtin_worker(service, protocol).map(|bytes| bytes.to_vec())
+                } else {
+                    verified_service(&root, &app_id, &version, service, protocol)
+                }
             })
             .await
             .map_err(|_| "Processor verification failed.")??;
@@ -2191,4 +2115,11 @@ impl Drop for CancelService {
     fn drop(&mut self) {
         self.0.store(true, Ordering::Release);
     }
+}
+
+#[cfg(target_os = "macos")]
+fn builtin_worker(service: &str, protocol: u32) -> Result<&'static [u8], String> {
+    // Executable bytes are part of the signed Misty binary, never downloaded or
+    // resolved from a user-controlled package directory.
+    include!(concat!(env!("OUT_DIR"), "/builtin_workers.rs"))
 }

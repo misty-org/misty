@@ -17,7 +17,6 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	userID, name, templateID string,
 	providers []string,
 	idempotencyKey string,
-	selectedApps ...AppInstallSpec,
 ) (*CreateSpaceResult, error) {
 	name, err := normalizeSpaceName(name)
 	if err != nil {
@@ -26,6 +25,9 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	template, ok := TestingTemplateByID(templateID)
 	if !ok {
 		template, err = db.personalTemplateDefinition(ctx, userID, templateID)
+		if errors.Is(err, ErrSpaceNotFound) {
+			return nil, ErrSpaceInvalid
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -34,25 +36,6 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 	if err != nil {
 		return nil, err
 	}
-	copyTemplate := *template
-	selected := map[string]bool{}
-	for _, app := range selectedApps {
-		if selected[app.ID] {
-			return nil, ErrSpaceInvalid
-		}
-		selected[app.ID] = true
-	}
-	if !selected["planner"] {
-		copyTemplate.Tasks = nil
-	}
-	if !selected["journal"] {
-		copyTemplate.NoteTitle = ""
-		copyTemplate.NoteMarkdown = ""
-	}
-	if !selected["library"] {
-		copyTemplate.Collections = nil
-	}
-	template = &copyTemplate
 	result := &CreateSpaceResult{
 		Space: Space{
 			ID: "space_" + uuid.NewString(), SecurityDomainID: "sd_" + uuid.NewString(),
@@ -65,11 +48,11 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 		return nil, ErrSpaceInvalid
 	}
 	fingerprintInput, _ := json.Marshal(struct {
-		Name      string           `json:"name"`
-		Template  string           `json:"template"`
-		Providers []string         `json:"providers"`
-		Apps      []AppInstallSpec `json:"apps"`
-	}{Name: name, Template: template.ID, Providers: providers, Apps: selectedApps})
+		Name      string   `json:"name"`
+		Template  string   `json:"template"`
+		Providers []string `json:"providers"`
+		Apps      []string `json:"apps"`
+	}{Name: name, Template: template.ID, Providers: providers, Apps: nil})
 	fingerprintDigest := sha256.Sum256(fingerprintInput)
 	fingerprint := hex.EncodeToString(fingerprintDigest[:])
 	existingSpaceID := ""

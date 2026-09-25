@@ -83,7 +83,7 @@ func TestCreatorToolApprovalIsExactOwnerScopedAndRecoverable(t *testing.T) {
 	}
 }
 
-func TestCreatorRunCancelsWhenSpaceMembershipIsRevoked(t *testing.T) {
+func TestAccountRunSurvivesSpaceRemovalWithoutRetainingSpaceAccess(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Space Owner", "revoke-run-owner@example.com", "password123")
@@ -117,7 +117,10 @@ func TestCreatorRunCancelsWhenSpaceMembershipIsRevoked(t *testing.T) {
 		t.Fatal(err)
 	}
 	state, _, err := database.PersonalAgentTaskRunJobState(ctx, run.ID)
-	if err != nil || state != "canceled" {
+	if err != nil || state != "queued" {
 		t.Fatalf("job state after membership revocation = %q, %v", state, err)
+	}
+	if _, err := database.SpaceByID(ctx, creator.ID, space.ID); err == nil {
+		t.Fatal("removed member retained Space data access")
 	}
 }

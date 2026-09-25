@@ -24,7 +24,7 @@ func testConversationalSDKCrossApp(t *testing.T, database *db.Database, service 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.ConfigureSDKTarget(t.Context(), user, cap.TargetConfiguration{TargetID: targetID, ExpectedRevision: 1, ProviderID: "example.habits/backend", ProviderVersion: 1, SpaceID: space.ID, Label: "Habits for this Space", Capabilities: []string{"habits.list", "habits.record"}, CallerApps: []string{"example.habits"}}); err != nil {
+	if _, err := database.ConfigureSDKTarget(t.Context(), user, cap.TargetConfiguration{TargetID: targetID, ExpectedRevision: 1, ProviderID: "example.habits/backend", ProviderVersion: 1, SpaceID: space.ID, Label: "Habits for this Space", Capabilities: []string{"habits.list", "habits.record"}, CallerApps: []string{}}); err != nil {
 		t.Fatal(err)
 	}
 	agent, err := database.EnsureAskIdentity(t.Context(), user, serveragent.InitialSelectedModelID)

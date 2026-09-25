@@ -115,6 +115,10 @@ func (db *Database) FinishSpaceRun(ctx context.Context, runID, state string, res
 		} else if err != nil {
 			return err
 		}
+		if out.AgentID != "" {
+			// The account event trigger publishes Agent completion independently of content.
+			return nil
+		}
 		eventID, err := recordSpaceEventTx(ctx, tx, out.SpaceID, out.InitiatedByUserID, out.ResourceKind+".run."+state, out.ID, out)
 		if err != nil {
 			return err

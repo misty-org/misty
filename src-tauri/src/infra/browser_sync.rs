@@ -37,6 +37,7 @@ struct Session {
     cached_workspace: WorkspaceView,
     cached_pending: Vec<String>,
     device_id: String,
+    api: SyncApi,
     handle: WorkerHandle,
     task: JoinHandle<misty_browser_sync::Result<()>>,
     notifications: JoinHandle<()>,
@@ -78,7 +79,7 @@ fn select_bound_profile(
     binding: &BrowserProfileBinding,
     previous: Option<&SelectedProfile>,
 ) -> Result<Option<SelectedProfile>, String> {
-    if binding.staged.is_some() {
+    if binding.staged.is_some() && binding.active.is_none() {
         return Err(
             "Browser sign-in state is being restored. Wait before opening this page.".into(),
         );
@@ -122,30 +123,21 @@ pub(super) async fn browser_profile_lease(
     if BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire) != epoch {
         return Err("The browser account changed before this page could open.".into());
     }
-    let current = session().lock().await;
+    let mut current = session().lock().await;
+    let previous_issue = current.as_ref().and_then(|active| active.credential_issue);
     let previous = selected_profile()
         .lock()
         .map_err(|_| "Browser profile state is unavailable")?
         .clone();
     let mut selected = previous.clone();
-    if let Some(active) = current.as_ref() {
+    if let Some(active) = current.as_mut() {
         let logical = default_profile_id(&active.scope)?;
         if requested.is_none() || requested == Some(logical.as_str()) {
-            let binding = active
-                .handle
-                .browser_profile_binding(logical.clone())
-                .await
-                .map_err(issue)?;
-            selected = select_bound_profile(&logical, &binding, previous.as_ref())?;
-            if let Some(selected) = selected
-                .as_ref()
-                .filter(|selected| previous.as_ref() != Some(selected))
-            {
-                // An encrypted receipt from a previous process does not prove
-                // what the engine holds now. Observe the actual store before
-                // exposing it; never rewrite a live store during this check.
-                verify_selected_profile(app, &active.handle, selected, &binding).await?;
-            }
+            selected = resolve_local_profile(active, &logical, previous.as_ref()).await?;
+            // The authenticated binding selects local storage, not sync readiness.
+            // Live cookies/storage can legitimately differ from an import receipt.
+            // Background capture reports those failures through credential_issue;
+            // only incoming restores need native read-back before activation.
             *selected_profile()
                 .lock()
                 .map_err(|_| "Browser profile state is unavailable")? = selected.clone();
@@ -161,21 +153,26 @@ pub(super) async fn browser_profile_lease(
         _ => (requested.map(str::to_owned), None),
     };
     let mut tab_session = None;
-    if let (Some(active), Some((tab_id, url)), Some(logical)) =
-        (current.as_ref(), tab, logical_profile_id.as_ref())
-    {
+    if let (Some(active), Some((tab_id, url)), Some(logical)) = (
+        current.as_mut().filter(|active| full_sync_enabled(active)),
+        tab,
+        logical_profile_id.as_ref(),
+    ) {
         if let Ok(url) = url::Url::parse(url) {
             let area = document::credentials::Area::SessionStorage {
                 origin: url.origin().ascii_serialization(),
                 tab_id: tab_id.into(),
             };
-            let document: Document =
-                serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
-                    .map_err(|_| "Could not read tab session")?;
-            tab_session = document
-                .credentials
-                .get(&area.key(logical).map_err(issue)?)
-                .map(|record| record.payload.clone());
+            tab_session = local_tab_session(active, logical, &area).await;
+        }
+    }
+    if let (Some(app), Some(active)) = (app, current.as_ref()) {
+        if active.credential_issue != previous_issue {
+            let _ = app.emit_to(
+                "main",
+                "misty:browser-sync-changed",
+                &active.scope.workspace_id,
+            );
         }
     }
     Ok(BrowserProfileLease {
@@ -186,44 +183,56 @@ pub(super) async fn browser_profile_lease(
     })
 }
 
-#[cfg(any(target_os = "macos", windows))]
-async fn verify_selected_profile(
-    app: Option<&tauri::AppHandle>,
-    handle: &WorkerHandle,
-    selected: &SelectedProfile,
-    binding: &BrowserProfileBinding,
-) -> Result<(), String> {
-    let app = app.ok_or("The native browser is unavailable")?;
-    if binding
-        .active
-        .as_ref()
-        .is_none_or(|generation| generation.physical_id != selected.physical)
-    {
-        return Err("The native browser profile changed before verification".into());
+// A stopped transport may no longer answer worker commands. Reuse only the
+// already selected identity for this account; never guess a different store.
+async fn resolve_local_profile(
+    active: &mut Session,
+    logical: &str,
+    previous: Option<&SelectedProfile>,
+) -> Result<Option<SelectedProfile>, String> {
+    match active.handle.browser_profile_binding(logical.into()).await {
+        Ok(binding) => select_bound_profile(logical, &binding, previous),
+        Err(error) => {
+            if let Some(previous) = previous.filter(|previous| previous.logical == logical) {
+                active.credential_issue = Some(
+                    "Website sign-in sync is unavailable. You can keep browsing with this device's existing data.",
+                );
+                Ok(Some(previous.clone()))
+            } else {
+                Err(issue(error))
+            }
+        }
     }
-    // This never navigates; RAII closes the exact physical store on every exit.
-    let view = capture::CaptureView::open(app, &selected.physical)?;
-    let mut backend = super::browser_storage_restore::BrowserProfile::for_generation(
-        view.view.clone(),
-        selected.logical.clone(),
-        selected.physical.clone(),
-    );
-    misty_browser_sync::restore::verify_active_profile(handle, &selected.logical, &mut backend)
-        .await
-        .map_err(|_| {
-            "Could not verify browser sign-in storage. Existing data has been preserved."
-        })?;
-    Ok(())
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
-async fn verify_selected_profile(
-    _app: Option<&tauri::AppHandle>,
-    _handle: &WorkerHandle,
-    _selected: &SelectedProfile,
-    _binding: &BrowserProfileBinding,
-) -> Result<(), String> {
-    Err("Restoring browser sign-ins is not implemented on this device yet.".into())
+async fn local_tab_session(
+    active: &mut Session,
+    logical: &str,
+    area: &document::credentials::Area,
+) -> Option<serde_json::Value> {
+    let result = async {
+        let document: Document =
+            serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+                .map_err(|_| "Could not read tab session".to_string())?;
+        Ok::<_, String>(
+            document
+                .credentials
+                .get(&area.key(logical).map_err(issue)?)
+                .map(|record| record.payload.clone()),
+        )
+    }
+    .await;
+    match result {
+        Ok(value) => value,
+        Err(_) => {
+            // Session restoration is optional; a failed sync read must not
+            // prevent a new local browsing session or clear persistent storage.
+            active.credential_issue = Some(
+                "Synced tab sessions could not be restored. You can keep browsing with this device's existing data.",
+            );
+            None
+        }
+    }
 }
 
 /// WebKit requests popup creation synchronously on its UI thread. Never block
@@ -411,6 +420,9 @@ pub struct SyncView {
     browser_profile_issue: Option<&'static str>,
     status: Status,
     presence: Vec<Presence>,
+    devices: Vec<misty_browser_sync::protocol::Device>,
+    full_sync: bool,
+    traffic: misty_browser_sync::transport::TrafficSnapshot,
     workspace: WorkspaceView,
     pending_operation_ids: Vec<String>,
 }
@@ -445,18 +457,19 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
     // A local website-storage failure does not stop workspace transport.
     let status = active.handle.status.borrow().clone();
     let profile = default_profile_id(&active.scope)?;
-    let browser_profile_ready = match active.handle.browser_profile_binding(profile.clone()).await {
-        Ok(binding) => match active.handle.browser_import_journal(profile).await {
-            Ok(journal) => {
-                binding.active.is_some()
-                    && binding.staged.is_none()
-                    && journal.pending.is_none()
-                    && !journal.quarantined
-            }
+    let browser_profile_ready = active.credential_issue.is_none()
+        && match active.handle.browser_profile_binding(profile.clone()).await {
+            Ok(binding) => match active.handle.browser_import_journal(profile).await {
+                Ok(journal) => {
+                    binding.active.is_some()
+                        && binding.staged.is_none()
+                        && journal.pending.is_none()
+                        && !journal.quarantined
+                }
+                Err(_) => false,
+            },
             Err(_) => false,
-        },
-        Err(_) => false,
-    };
+        };
     Ok(SyncView {
         browser_profile_ready,
         browser_profile_issue: active.credential_issue,
@@ -469,6 +482,9 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
         supports_cookie_handoff: handoff::supported(),
         status,
         presence: active.handle.presence.borrow().clone(),
+        devices: active.handle.devices.borrow().clone(),
+        full_sync: full_sync_enabled(active),
+        traffic: active.handle.traffic.snapshot(),
         workspace: active.cached_workspace.clone(),
         pending_operation_ids: active.cached_pending.clone(),
     })
@@ -625,7 +641,6 @@ async fn open_vault(
             active.scope.deployment == api.deployment()
                 && active.scope.account_id == account_id
                 && !active.task.is_finished()
-                && active.credential_issue.is_none()
         })
     {
         return view(current.as_mut().expect("live session exists")).await;
@@ -767,11 +782,27 @@ async fn open_vault(
     cached_workspace.active_device = committed.active_device;
     cached_workspace.sequence = pending.committed_sequence;
     let device_id = store.grant().device_id.clone();
-    let (worker, handle) =
-        Worker::new(api, scope.clone(), root, device, store, document::reduce).map_err(issue)?;
+    let (worker, handle) = Worker::new(
+        api.clone(),
+        scope.clone(),
+        root,
+        device,
+        store,
+        document::reduce,
+    )
+    .map_err(issue)?;
+    let advertise_api = api.clone();
+    let advertise_device = device_id.clone();
+    let advertise_name = control_device_name(&device_id);
+    tokio::spawn(async move {
+        let _ = advertise_api
+            .advertise_controls(&advertise_device, &advertise_name)
+            .await;
+    });
     let task = tokio::spawn(worker.run());
     let mut status = handle.status.clone();
     let mut presence = handle.presence.clone();
+    let mut devices = handle.devices.clone();
     let notify_workspace = scope.workspace_id.clone();
     let notify_app = app.clone();
     let notifications = tokio::spawn(async move {
@@ -779,6 +810,7 @@ async fn open_vault(
             let alive = tokio::select! {
                 result = status.changed() => result.is_ok(),
                 result = presence.changed() => result.is_ok(),
+                result = devices.changed() => result.is_ok(),
             };
             if !alive {
                 break;
@@ -798,6 +830,7 @@ async fn open_vault(
         cached_pending: pending.operation_ids,
         scope,
         device_id,
+        api,
         handle,
         task,
         notifications,
@@ -867,6 +900,9 @@ pub async fn browser_sync_activate(
     let current = session().lock().await;
     let session = current.as_ref().ok_or("Connect device sync first.")?;
     require_session(session, &session_id)?;
+    if !full_sync_enabled(session) {
+        return Err("Enable Full sync before switching to this device.".into());
+    }
     let status = session.handle.status.borrow().clone();
     if !matches!(status.phase, Phase::Ready | Phase::CatchingUp) {
         return Err("Waiting for a sync connection. Try waking Misty again in a moment.".into());
@@ -884,6 +920,72 @@ pub async fn browser_sync_activate(
     session.handle.enqueue(bytes).await.map_err(issue)
 }
 
+fn control_device_name(device_id: &str) -> String {
+    #[cfg(unix)]
+    let host = {
+        let mut bytes = [0u8; 256];
+        // gethostname writes at most the supplied length. Reserve a terminator.
+        let ok = unsafe { libc::gethostname(bytes.as_mut_ptr().cast(), bytes.len() - 1) } == 0;
+        ok.then(|| {
+            String::from_utf8_lossy(
+                &bytes[..bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len())],
+            )
+            .into_owned()
+        })
+    };
+    #[cfg(not(unix))]
+    let host = std::env::var("COMPUTERNAME").ok();
+    let host = host
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| std::env::consts::OS.into());
+    format!(
+        "{} · {}",
+        host.chars().take(32).collect::<String>(),
+        device_id.chars().take(8).collect::<String>()
+    )
+}
+
+fn full_sync_enabled(active: &Session) -> bool {
+    active
+        .handle
+        .devices
+        .borrow()
+        .iter()
+        .find(|d| d.grant.device_id == active.device_id)
+        .is_some_and(|d| d.full_sync)
+}
+
+#[tauri::command]
+pub async fn browser_sync_control_device(
+    webview: tauri::Webview,
+    session_id: String,
+    device_id: String,
+    full_sync: Option<bool>,
+    activate: bool,
+) -> Result<String, String> {
+    require_main(&webview)?;
+    if activate == full_sync.is_some() {
+        return Err("Choose one device action.".into());
+    }
+    let current = session().lock().await;
+    let active = current.as_ref().ok_or("Connect device sync first.")?;
+    require_session(active, &session_id)?;
+    if !active
+        .handle
+        .devices
+        .borrow()
+        .iter()
+        .any(|d| d.grant.device_id == device_id && d.revoked_at.is_none() && d.control_version >= 1)
+    {
+        return Err("Update Misty on this device before using device controls.".into());
+    }
+    active
+        .api
+        .control_device(&device_id, full_sync, activate)
+        .await
+        .map_err(issue)
+}
+
 async fn enqueue(
     session_id: &str,
     operation_id: String,
@@ -893,6 +995,9 @@ async fn enqueue(
     let current = session().lock().await;
     let active = current.as_ref().ok_or("Unlock browser sync first.")?;
     require_session(active, session_id)?;
+    if !full_sync_enabled(active) {
+        return Err("Full sync is off for this device.".into());
+    }
     let bytes = Zeroizing::new(
         serde_json::to_vec(&payload).map_err(|_| "Could not encode workspace change")?,
     );
@@ -1015,7 +1120,156 @@ mod tests {
             id: uuid::Uuid::new_v4().to_string(),
             physical_id: "c".repeat(64),
         });
-        assert!(select_bound_profile(&logical, &binding, Some(&selected)).is_err());
+        // A failed incoming staging attempt must not block the authenticated
+        // active local store or select the incomplete incoming generation.
+        assert_eq!(select_bound_profile(&logical, &binding, Some(&selected)).unwrap(), Some(selected.clone()));
+        assert_eq!(select_bound_profile(&logical, &binding, None).unwrap(), Some(selected));
+    }
+
+    #[tokio::test]
+    async fn local_profile_survives_failed_sync_verification_and_stopped_worker() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("workspace.sqlite");
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let api = SyncApi::new("http://127.0.0.1:9", reqwest::Client::new()).unwrap();
+        let scope = VaultScope {
+            deployment: api.deployment(),
+            account_id: "local-browser-fixture".into(),
+            workspace_id: uuid::Uuid::new_v4().to_string(),
+        };
+        let logical = default_profile_id(&scope).unwrap();
+        let root = VaultRoot::generate();
+        let device = DeviceKey::generate();
+        let device_id = uuid::Uuid::new_v4().to_string();
+        let grant = root.grant(&scope, &device_id, 1, &device).unwrap();
+        let mut store = Store::initialize(
+            &path,
+            scope.clone(),
+            grant.clone(),
+            &root,
+            &device,
+            &Document::default().encode().unwrap(),
+        )
+        .unwrap();
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "kind": "credentials", "version": 1,
+            "batch": {"profile_id": logical, "updates": [{
+                "area": {"kind": "cookies"}, "base_sequence": 0, "payload": []
+            }]}
+        }))
+        .unwrap();
+        let mutation = store.enqueue(&root, &device, &payload).unwrap();
+        store
+            .apply_events(
+                &root,
+                &[(
+                    misty_browser_sync::protocol::Event {
+                        mutation,
+                        sequence: 1,
+                    },
+                    grant,
+                )],
+                document::reduce,
+            )
+            .unwrap();
+        let generation = uuid::Uuid::new_v4().to_string();
+        let binding = store
+            .stage_browser_profile(&root, &logical, 0, &generation)
+            .unwrap();
+        let physical = binding.staged.as_ref().unwrap().physical_id.clone();
+        let journal = store
+            .begin_browser_import(&root, &logical, 0, &generation, 1)
+            .unwrap();
+        store
+            .finish_browser_import(
+                &root,
+                &logical,
+                journal.revision,
+                &generation,
+                &journal.pending.unwrap().credentials,
+            )
+            .unwrap();
+        store
+            .activate_browser_profile(&root, &logical, binding.revision, &generation)
+            .unwrap();
+        let cached_workspace = Document::default().workspace_view().unwrap();
+        let (worker, handle) = Worker::new(
+            api.clone(),
+            scope.clone(),
+            root,
+            device,
+            store,
+            document::reduce,
+        )
+        .unwrap();
+        let mut active = Session {
+            id: uuid::Uuid::new_v4().to_string(),
+            scope,
+            device_id,
+            api,
+            _database_lock: lock_database(&path).unwrap(),
+            cached_workspace,
+            cached_pending: vec![],
+            handle,
+            task: tokio::spawn(worker.run()),
+            notifications: tokio::spawn(std::future::pending()),
+            credential_task: None,
+            credential_issue: Some("Website storage unavailable"),
+            #[cfg(any(target_os = "macos", windows))]
+            capture_view: None,
+        };
+        // A failed read-back must not revoke an activated local store. This is
+        // the same journal failure that previously prevented native tab creation.
+        let journal = active
+            .handle
+            .browser_import_journal(logical.clone())
+            .await
+            .unwrap();
+        assert!(active
+            .handle
+            .finish_browser_import(logical.clone(), journal.revision, generation, vec![])
+            .await
+            .is_err());
+        let selected = resolve_local_profile(&mut active, &logical, None)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(selected.physical, physical);
+        let status = view(&mut active).await.unwrap();
+        assert!(!status.browser_profile_ready);
+        assert_eq!(
+            status.browser_profile_issue,
+            Some("Website storage unavailable")
+        );
+
+        active.handle.stop();
+        (&mut active.task).await.unwrap().unwrap();
+        let retained = resolve_local_profile(&mut active, &logical, Some(&selected))
+            .await
+            .unwrap();
+        assert_eq!(retained, Some(selected.clone()));
+        // A failed worker cannot justify switching accounts or inventing a new
+        // store. Optional synced sessionStorage failure still permits browsing.
+        assert!(
+            resolve_local_profile(&mut active, &"f".repeat(64), Some(&selected))
+                .await
+                .is_err()
+        );
+        assert!(resolve_local_profile(&mut active, &logical, None)
+            .await
+            .is_err());
+        assert!(local_tab_session(
+            &mut active,
+            &logical,
+            &document::credentials::Area::SessionStorage {
+                origin: "https://example.test".into(),
+                tab_id: uuid::Uuid::new_v4().to_string(),
+            }
+        )
+        .await
+        .is_none());
+        assert!(active.credential_issue.is_some());
+        active.notifications.abort();
     }
 
     #[tokio::test]
@@ -1064,13 +1318,21 @@ mod tests {
             &initial.encode().unwrap(),
         )
         .unwrap();
-        let (worker, handle) =
-            Worker::new(api, scope.clone(), root, device, store, document::reduce).unwrap();
+        let (worker, handle) = Worker::new(
+            api.clone(),
+            scope.clone(),
+            root,
+            device,
+            store,
+            document::reduce,
+        )
+        .unwrap();
         let observer = handle.clone();
         let active = Session {
             id: uuid::Uuid::new_v4().to_string(),
             scope,
             device_id,
+            api,
             _database_lock: database_lock,
             cached_workspace: initial.workspace_view().unwrap(),
             cached_pending: vec![],

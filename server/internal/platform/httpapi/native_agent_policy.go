@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"strings"
@@ -16,6 +15,9 @@ func nativeAgentManagementTool(name string) bool {
 func nativeAgentToolAllowed(name, risk, mode string, tools map[string]bool) bool {
 	if strings.HasPrefix(name, "browser.workspace.") {
 		return mode == "agent" && tools["browser"]
+	}
+	if strings.HasPrefix(name, "spaces.") {
+		return true
 	}
 	if strings.HasPrefix(name, "agents.") {
 		return true
@@ -39,8 +41,37 @@ func nativeAgentToolAllowed(name, risk, mode string, tools map[string]bool) bool
 }
 
 func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, bool, error) {
-	if database == nil || !isAIInvocationRuntimeID(invocation.RunID) {
+	if database == nil {
 		return false, false, nil
+	}
+	if !isAIInvocationRuntimeID(invocation.RunID) {
+		if !strings.HasPrefix(invocation.RunID, "run_") || invocation.AgentID == "" {
+			return false, false, nil
+		}
+		run, err := database.SpaceRun(ctx, invocation.UserID, invocation.RunID)
+		if err != nil {
+			return true, false, err
+		}
+		if run.AgentID != invocation.AgentID || run.OwnerUserID != invocation.UserID {
+			return true, false, db.ErrSpaceForbidden
+		}
+		identity, err := database.AskIdentityByID(ctx, invocation.UserID, run.AgentID)
+		if err != nil {
+			return true, false, err
+		}
+		if !identity.Enabled {
+			return true, false, db.ErrSpaceForbidden
+		}
+		if descriptor.ProviderBinding != nil {
+			allowed, err := authorizeAgentSDKTool(ctx, database, invocation, descriptor)
+			return true, allowed, err
+		}
+		if strings.HasPrefix(descriptor.Name, "mcp.") {
+			allowed, err := authorizeMCPAgentTool(ctx, database, invocation, descriptor)
+			return true, allowed, err
+		}
+		// Browser/device descriptors are registered only for live run targets.
+		return true, true, nil
 	}
 	record, err := database.AIInvocationByID(ctx, invocation.UserID, invocation.RunID)
 	if err != nil {
@@ -56,30 +87,21 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 	if err := database.ValidateNativeAgentExecution(ctx, record); err != nil {
 		return true, false, err
 	}
-	visibleAutopilot := false
-	for _, target := range body.DeviceContexts {
-		var metadata map[string]any
-		_ = json.Unmarshal(target.Metadata, &metadata)
-		if metadata["workspace_control"] == true {
-			visibleAutopilot = true
-		}
-	}
-	if visibleAutopilot && descriptor.Risk != serveragent.RiskRead && descriptor.Name != "browser.workspace.interact" {
-		return true, false, nil
-	}
 	tools, err := database.AgentWorkspaceTools(ctx, record.UserID, body.AgentID)
 	if err != nil {
 		return true, false, err
+	}
+	// Destination tools use the user's existing access. There is no per-agent grant.
+	if invocation.SpaceID != "" && globalSpaceTool(descriptor.Name) {
+		return true, true, nil
 	}
 	allowed := map[string]bool{}
 	for _, id := range tools {
 		allowed[id] = true
 	}
 	if descriptor.ProviderBinding != nil {
-		if descriptor.ProviderBinding.ProviderID != "" && allowed[descriptor.ProviderBinding.ProviderID] {
-			return true, nativeAgentToolAllowed(descriptor.Name, descriptor.Risk, body.ExecutionMode, allowed), nil
-		}
-		return true, false, nil
+		allowed, err := authorizeAgentSDKTool(ctx, database, invocation, descriptor)
+		return true, allowed, err
 	}
 	if strings.HasPrefix(descriptor.Name, "mcp.") {
 		authorized, err := authorizeMCPAgentTool(ctx, database, invocation, descriptor)
@@ -129,8 +151,9 @@ func filterNativeAgentContext(refs []aiContextReference, tools []string) []aiCon
 			if browser && ref.Metadata["app_id"] == "browser" {
 				result = append(result, ref)
 			}
-		case "workspace-view", "workspace.scope":
-			// The context broker separately validates ownership and members.
+		default:
+			// Agents inherit the account's content access; the broker resolves
+			// sources under the signed-in user rather than a per-agent grant.
 			result = append(result, ref)
 		}
 	}
@@ -162,7 +185,7 @@ func authorizeNativeAgentBrowserScope(ctx context.Context, database *db.Database
 		return err
 	}
 	for _, item := range contexts {
-		if item.OpaqueRef != scopeID || item.SpaceID != record.SpaceID {
+		if item.OpaqueRef != scopeID {
 			continue
 		}
 		var metadata struct {

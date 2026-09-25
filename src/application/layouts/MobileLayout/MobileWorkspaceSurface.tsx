@@ -5,12 +5,12 @@ import { LoadingState } from "@/shared/ui";
 import { lazy, Suspense } from "react";
 
 const BrowserWorkspace = lazy(() =>
-  import("@/features/browser/BrowserWorkspace").then((module) => ({
+  import("@/features/browser/workspace/BrowserWorkspace").then((module) => ({
     default: module.BrowserWorkspace,
   })),
 );
 const MobileFilesPage = lazy(() =>
-  import("@/features/files/mobile/MobileFilesPage").then((module) => ({
+  import("@/features/files/workspace/mobile/MobileFilesPage").then((module) => ({
     default: module.MobileFilesPage,
   })),
 );

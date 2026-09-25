@@ -77,7 +77,7 @@ func (db *Database) EnsureWorkflowNodeApproval(ctx context.Context, runID, nodeI
 	approved := false
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		var userID, spaceID string
-		if err := tx.QueryRowContext(ctx, `SELECT requesting_member_id,space_id FROM space_runs WHERE id=$1 AND state IN ('running','awaiting_approval') FOR UPDATE`, runID).Scan(&userID, &spaceID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT requesting_member_id,COALESCE(space_id,'') FROM space_runs WHERE id=$1 AND state IN ('running','awaiting_approval') FOR UPDATE`, runID).Scan(&userID, &spaceID); err != nil {
 			return err
 		}
 		var state string
@@ -103,6 +103,9 @@ func (db *Database) EnsureWorkflowNodeApproval(ctx context.Context, runID, nodeI
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE space_runs SET state='awaiting_approval',updated_at=NOW() WHERE id=$1`, runID); err != nil {
 			return err
+		}
+		if spaceID == "" {
+			return nil
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,payload) VALUES($1,$2,'approval',$3)`, userID, spaceID, mustJSON(map[string]any{"run_id": runID, "node_id": nodeID, "approval_id": approvalID, "action_digest": digest}))
 		return err

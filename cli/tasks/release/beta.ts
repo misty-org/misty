@@ -33,7 +33,7 @@ const directory = mkdtempSync(resolve(tmpdir(),`misty-${tag}-`));
 run('gh',['release','download',tag,'--repo','misty-org/misty','--dir',directory]);
 verifyChecksums(directory);
 const manifest = readJSON(resolve(directory,'release-manifest.json'));
-if (manifest.version !== releaseVersion || manifest.source.sdk !== manifest.source.host || manifest.source.apps !== manifest.source.host || manifest.source.server !== pins.server) throw new Error('Draft source pins do not match this checkout.');
+if (manifest.version !== releaseVersion || manifest.source.sdk !== manifest.source.host || manifest.source.server !== pins.server) throw new Error('Draft source pins do not match this checkout.');
 if (command === 'prepare') {
   if (manifest.source.host !== capture('git',['rev-parse','HEAD'])) throw new Error('The draft belongs to a different host revision. Check out its prepared revision before collecting.');
   let sdkRelease;
@@ -52,7 +52,7 @@ if (command === 'prepare') {
       run('gh',['release','upload',sdkTag,'--repo','misty-org/misty',resolve(directory,name)]);
     }
   }
-  console.log(`Verified drafts are ready. Assets and the exact Go catalog overlay are in ${directory}. No catalog or update feed was published.`);
+  console.log(`Verified drafts are ready. Assets are in ${directory}. No update feed was published.`);
 } else {
   const phase = process.argv[3];
   if (!['assets','feeds'].includes(phase)) throw new Error('Choose assets or feeds for explicit promotion.');
@@ -61,14 +61,10 @@ if (command === 'prepare') {
     run('gh',['release','edit',tag,'--repo','misty-org/misty','--draft=false','--prerelease']);
   } else {
     const validation = readJSON(resolve(root,'release/validation.json'));
-    if (validation.version !== releaseVersion || !validation.appleSiliconInstall || !validation.intelInstall || !validation.twoVersionUpdate || !validation.appsSmokeCheck)
-      throw new Error('Complete and record the real installation, two-version update, and app smoke checks in release/validation.json before publishing the feed.');
-    const response = await fetch(`${manifest.api}/apps/release`,{signal:AbortSignal.timeout(30000)});
-    if (!response.ok) throw new Error('The Go API release metadata is unavailable. Deploy the prepared catalog first.');
-    const deployed = await response.json();
-    const expected = createHash('sha256').update(readFileSync(resolve(directory,'official-app-catalog.json'),'utf8').trim()).digest('hex');
-    if (deployed.catalog_sha256 !== expected) throw new Error('The Go API does not serve this exact prepared catalog yet.');
+    if (validation.version !== releaseVersion || !validation.appleSiliconInstall || !validation.intelInstall || !validation.twoVersionUpdate || !validation.builtinToolsSmokeCheck)
+      throw new Error('Complete and record the real installation, two-version update, and built-in tool checks in release/validation.json before publishing the feed.');
+
   }
-  run('gh',['workflow','run','apps-release.yml','--repo','misty-org/misty','--ref',capture('git',['branch','--show-current']),'-f',`tag=${tag}`,'-f',`phase=${phase}`]);
-  console.log(`Requested ${phase} promotion in Misty Apps. Check its deployment run before sharing the release.`);
+  run('gh',['workflow','run','updates-release.yml','--repo','misty-org/misty','--ref',capture('git',['branch','--show-current']),'-f',`tag=${tag}`,'-f',`phase=${phase}`]);
+  console.log(`Requested ${phase} promotion of the Misty update feed. Check its deployment run before sharing the release.`);
 }

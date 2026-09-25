@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SettingsSection } from "@/features/settings";
 import type * as AppShell from "@/features/app-shell";
-import type * as FileSearch from "@/features/files/search";
+import type * as FileSearch from "@/features/files/workspace/search";
 import { NAVIGATOR_APP_IDS } from "@/features/workspace";
 import type * as SettingsStoreModule from "./store/useSettingsStore";
 
@@ -68,7 +68,7 @@ vi.mock("./store/useSettingsStore", async (importOriginal) => {
   return { ...actual, useSettingsStore };
 });
 
-vi.mock("@/features/files/search", async (importOriginal) => {
+vi.mock("@/features/files/workspace/search", async (importOriginal) => {
   const actual = await importOriginal<typeof FileSearch>();
   const useSearchStore = (selector?: (state: unknown) => unknown) =>
     selector ? selector(mocks.searchState) : mocks.searchState;
@@ -150,7 +150,7 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector("main")?.textContent).not.toContain("Deployment");
   });
 
-  it.each(["models", "extensions"] as const)(
+  it.each(["models"] as const)(
     "labels the unfinished %s settings page as coming soon",
     async (section) => {
       await renderWorkspace(section);

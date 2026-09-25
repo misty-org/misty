@@ -50,7 +50,7 @@ export function McpConnectionsView(props: {
   const { load } = store;
   const [adding, setAdding] = useState(false);
   const customConnections = store.connections.filter(
-    (connection) => connection.provider !== "activepieces",
+    (connection) => !connection.provider || connection.provider === "custom",
   );
 
   useEffect(() => {
@@ -62,8 +62,7 @@ export function McpConnectionsView(props: {
       <header className="pr-8 text-left">
         <h2 className="text-base font-semibold text-cream-bright">Tool connections</h2>
         <p className="mt-1 text-xs text-cream-muted">
-          Add custom tool servers for Misty agents. The built-in automation engine is managed by
-          your Misty server.
+          Add custom tool servers for Misty agents. Connect tools your agents can use.
         </p>
       </header>
 

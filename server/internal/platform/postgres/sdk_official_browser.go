@@ -11,20 +11,15 @@ import (
 )
 
 func sdkOfficialBrowserProviderTx(ctx context.Context, tx *sql.Tx, userID, spaceID string, provider cap.Provider) (cap.Provider, string, time.Time, error) {
-	var appVersion string
+	appVersion := "builtin-1"
 	var installed time.Time
-	var rawScopes []byte
 	appID := strings.Split(provider.ID, "/")[0]
-	err := tx.QueryRowContext(ctx, `SELECT installed_version,installed_at,granted_scopes FROM user_app_installations WHERE user_id=$1 AND app_id=$2 AND state='installed' AND NOT consent_required FOR SHARE`, userID, appID).Scan(&appVersion, &installed, &rawScopes)
+	err := tx.QueryRowContext(ctx, `SELECT created_at FROM users WHERE id=$1`, userID).Scan(&installed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return provider, appVersion, installed, ErrSDKProviderUnavailable
 	}
 	if err != nil {
 		return provider, appVersion, installed, err
-	}
-	var scopes []string
-	if json.Unmarshal(rawScopes, &scopes) != nil || !cap.HasScopes(scopes, []string{"browser.inspect"}) {
-		return provider, appVersion, installed, ErrAppRuntimeForbidden
 	}
 	expected, _ := json.Marshal(provider)
 	_, err = tx.ExecContext(ctx, `INSERT INTO sdk_provider_versions(user_id,provider_id,version,app_id,definition) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, userID, provider.ID, provider.Version, appID, expected)

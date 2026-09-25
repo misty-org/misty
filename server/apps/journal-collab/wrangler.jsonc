@@ -2,13 +2,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "misty-journal-collab",
   "main": "src/index.ts",
+  "workers_dev": true,
   "compatibility_date": "2026-06-25",
   "compatibility_flags": ["nodejs_compat"],
-
-  // The account is not a secret; it appears in every Cloudflare dashboard URL.
-  // Move it to a CLOUDFLARE_ACCOUNT_ID environment variable if this repository
-  // ever becomes public and you would rather not publish it.
-  "account_id": "d7f44352f4bc93b83944cdb10b0abd6e",
 
   "observability": { "enabled": true },
 

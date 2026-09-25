@@ -12,9 +12,6 @@ func (s *SpacesService) ProcessAgentRuntimeDeliveries(ctx context.Context, limit
 	if !s.agentRuntime.Enabled() {
 		return 0, nil
 	}
-	if err := s.database.ExpireRoutineWaits(ctx); err != nil {
-		return 0, err
-	}
 	if err := s.database.ExpireAIUserInterventions(ctx); err != nil {
 		return 0, err
 	}
@@ -86,7 +83,7 @@ func (s *SpacesService) ProcessAgentRuntimeDeliveries(ctx context.Context, limit
 				if record, lookupErr := s.database.AIInvocationByID(finishCtx, delivery.UserID, delivery.RunID); lookupErr != nil {
 					eventErr = lookupErr
 				} else if record.SurfaceID == "routine" {
-					eventErr = s.completeRoutine(finishCtx, record, false)
+					eventErr = s.retireRemovedInvocation(finishCtx, record)
 				} else if record.SurfaceID == "sdk" {
 					eventErr = s.completeSDKInvocation(finishCtx, record, false)
 				}
@@ -110,12 +107,10 @@ func (s *SpacesService) ProcessAgentRuntimeDeliveries(ctx context.Context, limit
 
 func (s *SpacesService) prepareInvocationDelivery(ctx context.Context, record *db.AIInvocationRecord) error {
 	if record.SurfaceID == "routine" {
-		_, err := s.prepareRoutineRuntime(ctx, record)
-		return err
+		return db.ErrSpaceInvalid
 	}
 	if record.SurfaceID == "sdk" {
-		_, err := s.prepareSDKInvocationRuntime(ctx, record)
-		return err
+		return db.ErrSpaceInvalid
 	}
 	var body aiInvocationInput
 	if json.Unmarshal(record.RequestPayload, &body) != nil {
@@ -163,7 +158,7 @@ func (s *SpacesService) deliverAgentContinuation(ctx context.Context, delivery d
 			return err
 		}
 		if record, err := s.database.AIInvocationByID(ctx, delivery.UserID, delivery.RunID); err == nil && record.SurfaceID == "routine" {
-			return s.completeRoutine(ctx, record, true)
+			return s.retireRemovedInvocation(ctx, record)
 		}
 		if record, err := s.database.AIInvocationByID(ctx, delivery.UserID, delivery.RunID); err == nil && record.SurfaceID == "sdk" {
 			return s.completeSDKInvocation(ctx, record, true)
@@ -188,7 +183,7 @@ func (s *SpacesService) deliverAgentContinuation(ctx context.Context, delivery d
 				return err
 			}
 			if record.SurfaceID == "routine" {
-				return s.completeRoutine(ctx, record, status == "cancelled")
+				return s.retireRemovedInvocation(ctx, record)
 			}
 			return s.completeSDKInvocation(ctx, record, false)
 		}

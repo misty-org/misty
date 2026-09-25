@@ -67,15 +67,6 @@ func (s *SpacesService) AIRuns() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		space, err := s.managedMistyRunSpace(r.Context(), userID, strings.TrimSpace(body.SpaceID), body.Context)
-		if err != nil {
-			writeSpaceError(w, err)
-			return
-		}
-		if _, err := s.database.SpaceByID(r.Context(), userID, space.ID); err != nil {
-			writeSpaceError(w, err)
-			return
-		}
 		delegatedPrompt := aiContextPrompt(body.Prompt, resolved, nil, body.Context)
 		invocationID := strings.TrimSpace(body.InvocationID)
 		conversationID := strings.TrimSpace(body.ConversationID)
@@ -113,25 +104,12 @@ func (s *SpacesService) AIRuns() http.HandlerFunc {
 				return
 			}
 		}
-		if conversationID != "" {
-			bound, boundErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
-			if boundErr != nil || conversationSpaceChanged(bound.SpaceID, space.ID) {
-				writeJSON(w, http.StatusConflict, map[string]any{"code": "conversation_context_changed", "message": "Start a new conversation to work in a different Space."})
-				return
-			}
-			if bound.SpaceID == "" {
-				if bindErr := s.database.BindMistyConversationSpace(r.Context(), userID, conversationID, space.ID); bindErr != nil {
-					writeMistyConversationBindingError(w, bindErr)
-					return
-				}
-			}
-		}
 		misty, err := s.database.EnsureAskIdentity(r.Context(), userID, serveragent.InitialSelectedModelID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		run, err := s.database.CreateCreatorAgentRun(r.Context(), userID, space.ID, misty.ID, db.CreatorAgentRunInput{
+		run, err := s.database.CreateCreatorAgentRun(r.Context(), userID, "", misty.ID, db.CreatorAgentRunInput{
 			Instruction: delegatedPrompt, Mode: "auto", SourceType: "direct", Timezone: "UTC",
 			AIInvocationID: invocationID, AIConversationID: conversationID,
 			AIIdempotencyKey: body.IdempotencyKey,
@@ -141,9 +119,9 @@ func (s *SpacesService) AIRuns() http.HandlerFunc {
 			return
 		}
 		decision := &db.RoutingDecision{Selected: &db.RoutingOption{
-			SpaceID: space.ID, SpaceName: space.Name, AgentID: misty.ID, AgentName: "Misty",
+			AgentID: misty.ID, AgentName: "Misty",
 			CapabilityID: "companion", CapabilityName: "Misty",
-		}, Reason: "Misty automatically selected the active Space and managed runtime."}
+		}, Reason: "Agents run under your account."}
 		if invocationID != "" {
 			if err := s.database.LinkAIInvocationAgentRun(r.Context(), userID, invocationID, run.ID); err != nil {
 				writeSpaceError(w, err)
@@ -159,7 +137,7 @@ func (s *SpacesService) AIRuns() http.HandlerFunc {
 		if linkedConversationID != "" {
 			agentsHref += "?conversation=" + url.QueryEscape(linkedConversationID)
 		} else {
-			agentsHref += "?space=" + url.QueryEscape(space.ID) + "&run=" + url.QueryEscape(run.ID)
+			agentsHref += "?run=" + url.QueryEscape(run.ID)
 		}
 		if run.IdempotentReplay {
 			writeJSON(w, http.StatusOK, map[string]any{"status": run.State, "routing": decision, "run": run, "agents_href": agentsHref, "origin": body.Origin, "replayed": true})

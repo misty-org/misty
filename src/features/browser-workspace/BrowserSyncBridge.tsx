@@ -5,6 +5,12 @@ import { useAppStore } from "@/features/app-shell";
 import { accountScopeWillResetEvent } from "@/features/auth";
 import { partialWorkspaceStore } from "@/features/workspace/workspaceStorePersistence";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import {
+  acknowledgeRecoveredWorkspace,
+  pendingRecoveredWorkspace,
+} from "@/features/workspace/nativeWorkspaceRecovery";
+import { workspaceChanges } from "./changes";
+import { recordChanges } from "./recordChanges";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { canProjectWorkspace, WorkspaceSyncController } from "./controller";
 import { EditJournal, editJournalKey } from "./editJournal";
@@ -20,6 +26,7 @@ import {
   readNativeSync,
   watchNativeSync,
   watchNativeProfile,
+  activeDeviceEpoch,
 } from "./native";
 import { browserProfileChanged } from "@/features/webviews/browserRuntime";
 import { workspaceSource } from "./source";
@@ -102,6 +109,51 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
           await recovery.storage.flush();
         }
         if (!valid()) return;
+        const journal = new EditJournal(recovery.storage, native, journalKey);
+        const baseline = pendingRecoveredWorkspace(accountId);
+        if (baseline) {
+          const epoch = activeDeviceEpoch(native);
+          // Keep recovered local edits visible until this device may publish.
+          // Never turn work done during recovery into a follower projection.
+          if (!epoch) {
+            releaseRecovery?.();
+            releaseRecovery = undefined;
+            return;
+          }
+          journal.retainActiveEpoch(epoch);
+          // A brand-new vault must seed the entire local workspace, not just
+          // the recovery delta. The controller already owns that operation.
+          if (
+            native.workspace.records.length ||
+            native.pending_operation_ids.length ||
+            journal.pending.length
+          ) {
+            const live = workspaceSource.read();
+            const changes = workspaceChanges(
+              baseline.virtualWindowsByScope?.global ?? [],
+              live.windows,
+              native.profile_id,
+            );
+            journal.append(
+              [
+                ...changes.changes,
+                ...recordChanges(
+                  [...(baseline.websiteGroups ?? []), ...(baseline.savedWebsites ?? [])],
+                  [...(live.groups ?? []), ...(live.websites ?? [])],
+                ),
+              ],
+              epoch,
+            );
+            if (changes.remapped.size)
+              workspaceSource.write({
+                windows: changes.windows,
+                activeWindowId: changes.remapped.get(live.activeWindowId) ?? live.activeWindowId,
+                groups: live.groups ?? [],
+                websites: live.websites ?? [],
+                recoveryTabIds: [],
+              });
+          }
+        }
         controller = new WorkspaceSyncController(native, {
           captureDelayMs: 400,
           source: {
@@ -113,12 +165,13 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
               });
             },
           },
-          journal: new EditJournal(recovery.storage, native, journalKey),
+          journal,
           read: readNativeSync,
           publish: editNativeWorkspace,
           publishResume: saveNativeResume,
-          state(session) {
-            if (valid()) useBrowserSyncStore.setState({ session, issue: null });
+          state(session, preserveIssue) {
+            if (valid())
+              useBrowserSyncStore.setState({ session, ...(preserveIssue ? {} : { issue: null }) });
           },
           error: fail,
           locked() {
@@ -130,6 +183,12 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
           },
         });
         removeFlush = registerRecoveryFlush(() => controller?.flushLocal() ?? Promise.resolve());
+        if (baseline) {
+          // The edit journal must be durable before clearing its recovery
+          // baseline. A failed save keeps the baseline available next launch.
+          await journal.flush();
+          if (valid()) await acknowledgeRecoveredWorkspace(accountId);
+        }
       } catch (error) {
         if (!controller) {
           releaseRecovery?.();

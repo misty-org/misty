@@ -34,7 +34,7 @@ vi.mock("./store/useSpacesStore", () => ({
   ),
 }));
 
-vi.mock("@/features/files/explorer", () => ({
+vi.mock("@/features/files/workspace/explorer", () => ({
   useExplorerStore: (selector: (state: typeof mocks.explorer) => unknown) =>
     selector(mocks.explorer),
 }));

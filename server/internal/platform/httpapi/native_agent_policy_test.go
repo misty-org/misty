@@ -8,14 +8,14 @@ import (
 func TestNativeAgentWorkspaceToolFamilies(t *testing.T) {
 	builtins := map[string]bool{"browser": true, "files": true}
 	for _, mode := range []string{"user", "agent", "team"} {
-		for _, name := range []string{"browser.inspect", "browser.upload", "files.list", "agents.configure", "memory.remember", "mcp.call", "weather.current"} {
+		for _, name := range []string{"browser.inspect", "browser.upload", "files.list", "agents.configure", "memory.remember", "mcp.call", "weather.current", "spaces.list", "spaces.tools", "spaces.execute"} {
 			if !nativeAgentToolAllowed(name, serveragent.RiskWrite, mode, builtins) {
 				t.Errorf("built-in %s unavailable in %s", name, mode)
 			}
 		}
 		// Historical installations cannot re-enable retired surfaces.
 		legacy := map[string]bool{"planner": true, "journal": true, "chat": true, "library": true, "terminal": true, "code": true, "inbox": true}
-		for _, name := range []string{"context.get", "tasks.create", "notes.get", "messages.list", "library.list", "terminal.exec", "code.edit", "mail.send", "spaces.execute", "space.get", "members.list", "ask.delegate", "unknown.execute", "browser.upload", "files.list"} {
+		for _, name := range []string{"context.get", "tasks.create", "notes.get", "messages.list", "library.list", "terminal.exec", "code.edit", "mail.send", "space.get", "members.list", "ask.delegate", "unknown.execute", "browser.upload", "files.list"} {
 			if nativeAgentToolAllowed(name, serveragent.RiskWrite, mode, legacy) {
 				t.Errorf("retired/unavailable %s admitted in %s", name, mode)
 			}
@@ -36,11 +36,11 @@ func TestNativeAgentContextUsesBrowserWorkspace(t *testing.T) {
 		{Kind: "browser-tab", ID: "missing-metadata"},
 	}
 	filtered := filterNativeAgentContext(refs, []string{"browser", "files"})
-	if len(filtered) != 2 || filtered[0].ID != "workspace" || filtered[1].ID != "browser" {
+	if len(filtered) != 5 || filtered[0].ID != "history" || filtered[4].ID != "browser" {
 		t.Fatalf("unexpected context: %+v", filtered)
 	}
 	filtered = filterNativeAgentContext(refs, []string{"planner", "journal"})
-	if len(filtered) != 1 || filtered[0].ID != "workspace" {
+	if len(filtered) != 4 || filtered[0].ID != "history" {
 		t.Fatalf("legacy installations revived context: %+v", filtered)
 	}
 }

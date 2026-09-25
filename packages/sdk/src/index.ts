@@ -5,7 +5,6 @@ export * from "./file-system.js";
 import { createCodeControlsSDK } from "./code-controls.js";
 import { createCapabilitiesSDK, type MistyCapabilitiesSDK } from "./capabilities.js";
 export * from "./capabilities.js";
-export * from "./routines.js";
 import {createAgentsSDK,type MistyAgentsSDK} from "./agents.js";
 import {createSocialSDK,type MistySocialSDK} from "./social.js";
 import {createLibrarySDK,type MistyLibrarySDK} from "./library.js";

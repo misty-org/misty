@@ -1,5 +1,5 @@
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
-import { appViewHasUnsavedChanges } from "@/features/apps/appUpdateSafety";
+import { workspaceViewHasUnsavedChanges } from "@/features/workspace/unsavedChanges";
 import type {
   WorkspaceDockNode,
   WorkspaceScopeKey,
@@ -73,10 +73,10 @@ export function lastUsedUpdatesForTab(
 }
 
 export function canCloseWorkspaceTab(_tab?: WorkspaceTab, _scopedTabs?: WorkspaceTab[]): boolean {
-  if (_tab && appViewHasUnsavedChanges(_tab.id)) {
+  if (_tab && workspaceViewHasUnsavedChanges(_tab.id)) {
     window.dispatchEvent(
-      new CustomEvent("misty:app-update-notice", {
-        detail: "Save the changes in Code before closing this tab.",
+      new CustomEvent("misty:workspace-notice", {
+        detail: "Save your changes before closing this tab.",
       }),
     );
     return false;

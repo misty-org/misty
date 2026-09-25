@@ -325,7 +325,7 @@ pub fn execute_with_worker(
         }
         "backups.backupStart" => {
             let worker_lease =
-                worker_lease.ok_or("Update Backups to install its archive service.")?;
+                worker_lease.ok_or("The backup worker is unavailable in this Misty release.")?;
             permissions.authorize("files.read")?;
             let source_ids = params
                 .get("sources")
@@ -379,7 +379,7 @@ pub fn execute_with_worker(
         }
         "backups.restoreStart" => {
             let worker_lease =
-                worker_lease.ok_or("Update Backups to install its archive service.")?;
+                worker_lease.ok_or("The backup worker is unavailable in this Misty release.")?;
             permissions.authorize("files.write")?;
             let snapshot = text(params, "snapshot", 128)?.to_owned();
             let destination_id = text(params, "destination", 128)?;
@@ -425,7 +425,7 @@ pub fn execute_with_worker(
         }
         "backups.snapshotsStart" | "backups.checkStart" => {
             let worker_lease =
-                worker_lease.ok_or("Update Backups to install its native service.")?;
+                worker_lease.ok_or("The backup worker is unavailable in this Misty release.")?;
             let permit = worker()?;
             let repository = permissions
                 .backup_repositories

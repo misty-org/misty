@@ -18,15 +18,14 @@ type AgentSDKCapabilityBinding struct {
 	AdapterVersion    string
 }
 
-// Pin scope before publishing the run's dispatch intent. Space conversations use
-// explicitly Space-bound targets; account-only targets are not implicit shared
-// conversation authority. Delegation inherits the parent's exact implementations.
+// Pin all available account targets before dispatch. Delegation inherits the
+// parent's exact implementations; each target retains its own content destination.
 func pinAgentSDKCapabilitiesTx(ctx context.Context, tx *sql.Tx, runID, userID, spaceID, parentRunID string, payload json.RawMessage) error {
 	if parentRunID != "" {
 		_, err := tx.ExecContext(ctx, `INSERT INTO agent_sdk_capability_bindings(run_id,user_id,target_id,target_revision,capability,capability_version,provider_id,provider_version,adapter_version)
    SELECT $1,b.user_id,b.target_id,b.target_revision,b.capability,b.capability_version,b.provider_id,b.provider_version,b.adapter_version
    FROM agent_sdk_capability_bindings b LEFT JOIN space_runs p ON p.id=b.space_run_id LEFT JOIN ai_invocations i ON i.id=b.ai_invocation_id
-   WHERE b.run_id=$2 AND b.user_id=$3 AND COALESCE(p.owner_user_id,i.user_id)=$3 AND COALESCE(p.space_id,i.space_id,'')=$4`, runID, parentRunID, userID, spaceID)
+   WHERE b.run_id=$2 AND b.user_id=$3 AND COALESCE(p.owner_user_id,i.user_id)=$3`, runID, parentRunID, userID)
 		return err
 	}
 	if err := ensureSDKPlannerTargetTx(ctx, tx, userID, spaceID); err != nil {
@@ -45,8 +44,8 @@ func pinAgentSDKCapabilitiesTx(ctx context.Context, tx *sql.Tx, runID, userID, s
   FROM sdk_targets t JOIN sdk_target_versions v ON v.user_id=t.user_id AND v.id=t.id AND v.revision=t.revision
   JOIN sdk_provider_versions p ON p.user_id=v.user_id AND p.provider_id=v.provider_id AND p.version=v.provider_version,
   LATERAL jsonb_array_elements(p.definition->'capabilities') c
-  WHERE t.user_id=$1 AND t.enabled AND COALESCE(v.space_id,'')=$2 AND v.capabilities ? (c->>'name')
-  ORDER BY t.id,c->>'name'`, userID, spaceID)
+  WHERE t.user_id=$1 AND t.enabled AND v.capabilities ? (c->>'name')
+  ORDER BY t.id,c->>'name'`, userID)
 	if err != nil {
 		return err
 	}
@@ -108,8 +107,7 @@ func (db *Database) ResolveAgentSDKCapability(ctx context.Context, userID, runID
 	var result *SDKBoundCapability
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		var payload []byte
-		var spaceID string
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(r.input,i.request_payload),COALESCE(r.space_id,i.space_id,'') FROM agent_sdk_capability_bindings b LEFT JOIN space_runs r ON r.id=b.space_run_id LEFT JOIN ai_invocations i ON i.id=b.ai_invocation_id WHERE b.run_id=$1 AND COALESCE(r.owner_user_id,i.user_id)=$2 AND b.user_id=$2 AND b.target_id=$3 AND b.target_revision=$4 AND b.capability=$5 AND b.capability_version=$6 AND b.provider_id=$7 AND b.provider_version=$8 AND b.adapter_version=$9 AND COALESCE(r.state,i.state) IN ('queued','running','awaiting_approval','awaiting_device','awaiting_intervention')`, runID, userID, binding.TargetID, binding.TargetRevision, binding.Capability, binding.CapabilityVersion, binding.ProviderID, binding.ProviderVersion, binding.AdapterVersion).Scan(&payload, &spaceID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(r.input,i.request_payload) FROM agent_sdk_capability_bindings b LEFT JOIN space_runs r ON r.id=b.space_run_id LEFT JOIN ai_invocations i ON i.id=b.ai_invocation_id WHERE b.run_id=$1 AND COALESCE(r.owner_user_id,i.user_id)=$2 AND b.user_id=$2 AND b.target_id=$3 AND b.target_revision=$4 AND b.capability=$5 AND b.capability_version=$6 AND b.provider_id=$7 AND b.provider_version=$8 AND b.adapter_version=$9 AND COALESCE(r.state,i.state) IN ('queued','running','awaiting_approval','awaiting_device','awaiting_intervention')`, runID, userID, binding.TargetID, binding.TargetRevision, binding.Capability, binding.CapabilityVersion, binding.ProviderID, binding.ProviderVersion, binding.AdapterVersion).Scan(&payload); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrAppRuntimeForbidden
 			}
@@ -126,7 +124,7 @@ func (db *Database) ResolveAgentSDKCapability(ctx context.Context, userID, runID
 		if err != nil {
 			return err
 		}
-		if cap.ExecutionAdapterVersion(result.Provider) != binding.AdapterVersion || result.Target.SpaceID != spaceID || result.Provider.ID != binding.ProviderID || result.Provider.Version != binding.ProviderVersion {
+		if cap.ExecutionAdapterVersion(result.Provider) != binding.AdapterVersion || result.Provider.ID != binding.ProviderID || result.Provider.Version != binding.ProviderVersion {
 			return ErrAppRuntimeForbidden
 		}
 		return nil

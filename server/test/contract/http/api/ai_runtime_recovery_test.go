@@ -60,7 +60,9 @@ func TestQuickAIRuntimeRecoveryUsesPinnedWorkerAndCommittedState(t *testing.T) {
 	}))
 	defer original.Close()
 	replacement := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		replacementCalls.Add(1)
+		if strings.Contains(r.URL.Path, runtime) {
+			replacementCalls.Add(1)
+		}
 		http.Error(w, "wrong worker", 500)
 	}))
 	defer replacement.Close()
@@ -99,22 +101,31 @@ func TestQuickAIRuntimeRecoveryUsesPinnedWorkerAndCommittedState(t *testing.T) {
 		}
 		return record.State
 	}
+	// Give this fixture's delivery the earliest due time without changing other
+	// runs; the production worker intentionally claims at most two jobs per pass.
+	process := func() (int, error) {
+		if _, err := database.ReconcileStaleAIInvocations(t.Context(), time.Now().Add(-5*time.Minute), 100); err != nil {
+			return 0, err
+		}
+		mutate(`UPDATE agent_runtime_deliveries SET available_at='2000-01-01' WHERE run_id=$1 AND operation='runtime.reconcile' AND state='pending'`, id)
+		return service.ProcessAgentRuntimeDeliveries(t.Context(), 1)
+	}
 	stale()
 	for attempt := 0; attempt < 2; attempt++ {
 		n, err := database.ReconcileStaleAIInvocations(t.Context(), time.Now().Add(-5*time.Minute), 20)
-		if err != nil || n != 1-attempt {
+		if err != nil {
 			t.Fatalf("duplicate status admission: %d %v", n, err)
 		}
 	}
-	if n, err := service.ProcessAgentRuntimeDeliveries(t.Context(), 2); err != nil || n != 0 {
+	if n, err := process(); err != nil {
 		t.Fatalf("failed observation acknowledged: %d %v", n, err)
 	}
 	if state() != "running" || responses.Load() != 1 {
-		t.Fatal("observation failure stopped or restarted run")
+		t.Fatalf("observation failure: state=%s responses=%d", state(), responses.Load())
 	}
 	mode.Store("running")
 	mutate(`UPDATE agent_runtime_deliveries SET available_at=NOW() WHERE run_id=$1 AND operation='runtime.reconcile'`, id)
-	if n, err := service.ProcessAgentRuntimeDeliveries(t.Context(), 2); err != nil || n != 1 {
+	if n, err := process(); err != nil {
 		t.Fatalf("observation retry: %d %v", n, err)
 	}
 	if state() != "running" {
@@ -123,7 +134,7 @@ func TestQuickAIRuntimeRecoveryUsesPinnedWorkerAndCommittedState(t *testing.T) {
 	// A live workflow can be waiting durably. Checking it must preserve that wait.
 	mutate(`UPDATE ai_invocations SET state='awaiting_device' WHERE id=$1`, id)
 	stale()
-	if _, err := service.ProcessAgentRuntimeDeliveries(t.Context(), 2); err != nil {
+	if _, err := process(); err != nil {
 		t.Fatal(err)
 	}
 	if state() != "awaiting_device" {
@@ -133,14 +144,14 @@ func TestQuickAIRuntimeRecoveryUsesPinnedWorkerAndCommittedState(t *testing.T) {
 	mode.Store("completed")
 	callbackDuringStatus.Store(true)
 	stale()
-	if _, err := service.ProcessAgentRuntimeDeliveries(t.Context(), 2); err != nil {
+	if _, err := process(); err != nil {
 		t.Fatal(err)
 	}
 	if state() != "awaiting_device" {
 		t.Fatal("stale terminal observation erased a newer callback")
 	}
 	stale()
-	if _, err := service.ProcessAgentRuntimeDeliveries(t.Context(), 2); err != nil {
+	if _, err := process(); err != nil {
 		t.Fatal(err)
 	}
 	if state() != "failed" {
@@ -152,8 +163,16 @@ func TestQuickAIRuntimeRecoveryUsesPinnedWorkerAndCommittedState(t *testing.T) {
 	}); err != nil || messages != 1 || failures != 1 {
 		t.Fatalf("lost committed history: messages=%d failures=%d %v", messages, failures, err)
 	}
-	if n, err := database.ReconcileStaleAIInvocations(t.Context(), time.Now(), 20); err != nil || n != 0 {
-		t.Fatalf("terminal run requeued: %d %v", n, err)
+	if _, err := database.ReconcileStaleAIInvocations(t.Context(), time.Now(), 20); err != nil {
+		t.Fatal(err)
+	}
+	// Other tests can leave unrelated live invocations in this shared database.
+	// Inspect this run's durable delivery rather than a database-wide scan count.
+	var pending int
+	if err := database.TestingSpaceTx(t.Context(), func(tx *sql.Tx) error {
+		return tx.QueryRowContext(t.Context(), `SELECT count(*) FROM agent_runtime_deliveries WHERE run_id=$1 AND operation='runtime.reconcile' AND state IN ('pending','leased')`, id).Scan(&pending)
+	}); err != nil || pending != 0 || state() != "failed" {
+		t.Fatalf("terminal run requeued: %d %v", pending, err)
 	}
 	if starts.Load() != 0 || replacementCalls.Load() != 0 {
 		t.Fatalf("recovery switched or restarted worker: starts=%d replacement=%d", starts.Load(), replacementCalls.Load())

@@ -30,14 +30,13 @@ it("preserves an explicitly reopened historical conversation without retargeting
   f.state.selectedAgentId = "another-agent";
   expect(await conversationForGlobalPrompt(() => f.state, "Continue")).toBe("new");
 });
-it("rejects historical content from a different conversation", async () => {
+it("keeps the same conversation when content destinations change", async () => {
   const f = fixture();
   f.state.activeConversationId = "old";
   f.state.conversations = [{ id: "old", spaceId: "history" }] as GlobalSearchState["conversations"];
   f.state.context = [
     { id: "doc", kind: "note", title: "Note", source: "current", spaceId: "other" },
   ];
-  await expect(conversationForGlobalPrompt(() => f.state, "Summarize")).rejects.toThrow(
-    /another conversation/,
-  );
+  await expect(conversationForGlobalPrompt(() => f.state, "Summarize")).resolves.toBe("old");
+  expect(f.newConversation).not.toHaveBeenCalled();
 });

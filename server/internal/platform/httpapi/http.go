@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"github.com/kannachi323/misty/server/internal/platform/transport"
 	"io"
 	"net/http"
 )
@@ -42,7 +43,5 @@ func rejectInvalidJSON(w http.ResponseWriter) error {
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	transport.WriteJSON(w, status, payload)
 }

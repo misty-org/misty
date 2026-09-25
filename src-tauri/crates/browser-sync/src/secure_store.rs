@@ -1,5 +1,6 @@
-//! Remembering an unlocked root uses the operating system's credential store.
-//! No fallback to the application's file credential helper is permitted.
+//! On macOS, one OS-protected device key wraps all remembered roots locally.
+//! Other platforms use their operating system's credential store directly.
+//! No plaintext fallback to the application's file credential helper is permitted.
 //! These blocking APIs belong on the native coordinator's blocking worker.
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
@@ -10,6 +11,16 @@ use crate::{
 };
 
 const SERVICE: &str = "com.misty.browser-sync.root.v1";
+
+#[cfg(any(target_os = "macos", test))]
+mod device_store;
+
+/// Configure the shared, device-local directory before accepting native IPC.
+/// This does not open Keychain; the first blocking read unlocks the device key.
+#[cfg(target_os = "macos")]
+pub fn configure_device_store(directory: std::path::PathBuf) -> Result<()> {
+    platform::configure(directory)
+}
 
 fn account(scope: &VaultScope) -> Result<String> {
     scope.validate()?;
@@ -51,21 +62,29 @@ pub fn forget(scope: &VaultScope) -> Result<()> {
 /// replace a missing key when a database already contains recoverable records.
 pub fn workspace_recovery_root(scope: &VaultScope, create: bool) -> Result<VaultRoot> {
     let name = format!("workspace-recovery:v1:{}", account(scope)?);
-    if let Some(bytes) = platform::read(&name)? {
-        if bytes.len() != 33 || bytes[0] != 1 {
-            return Err(Error::SecureStorage);
-        }
+    #[cfg(target_os = "macos")]
+    {
+        let bytes = platform::recovery(&name, create)?;
         return VaultRoot::from_protected(&bytes[1..]);
     }
-    if !create {
-        return Err(Error::SecureStorage);
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(bytes) = platform::read(&name)? {
+            if bytes.len() != 33 || bytes[0] != 1 {
+                return Err(Error::SecureStorage);
+            }
+            return VaultRoot::from_protected(&bytes[1..]);
+        }
+        if !create {
+            return Err(Error::SecureStorage);
+        }
+        let root = VaultRoot::generate();
+        let mut bytes = Zeroizing::new(Vec::with_capacity(33));
+        bytes.push(1);
+        bytes.extend_from_slice(root.protected_bytes());
+        platform::write(&name, &bytes)?;
+        Ok(root)
     }
-    let root = VaultRoot::generate();
-    let mut bytes = Zeroizing::new(Vec::with_capacity(33));
-    bytes.push(1);
-    bytes.extend_from_slice(root.protected_bytes());
-    platform::write(&name, &bytes)?;
-    Ok(root)
 }
 
 pub fn forget_workspace_recovery_root(scope: &VaultScope) -> Result<()> {
@@ -74,27 +93,96 @@ pub fn forget_workspace_recovery_root(scope: &VaultScope) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 mod platform {
+    use super::device_store::{Backend, DeviceStore};
     use super::*;
+    use security_framework::item::{ItemClass, ItemSearchOptions, Limit};
     use security_framework::passwords::{
         delete_generic_password, get_generic_password, set_generic_password,
     };
+    use std::{
+        path::PathBuf,
+        sync::{Mutex, OnceLock},
+    };
     const ITEM_NOT_FOUND: i32 = -25300; // errSecItemNotFound
 
+    static DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+    static STORE: Mutex<Option<DeviceStore>> = Mutex::new(None);
+
+    pub fn configure(directory: PathBuf) -> Result<()> {
+        if let Some(existing) = DIRECTORY.get() {
+            return if existing == &directory {
+                Ok(())
+            } else {
+                Err(Error::SecureStorage)
+            };
+        }
+        DIRECTORY.set(directory).map_err(|_| Error::SecureStorage)
+    }
+
+    fn with_store<T>(action: impl FnOnce(&mut DeviceStore) -> Result<T>) -> Result<T> {
+        let mut store = STORE.lock().map_err(|_| Error::SecureStorage)?;
+        if store.is_none() {
+            *store = Some(DeviceStore::open(
+                DIRECTORY.get().ok_or(Error::SecureStorage)?,
+                &Keychain,
+            )?);
+        }
+        action(store.as_mut().ok_or(Error::SecureStorage)?)
+    }
+
     pub fn write(account: &str, bytes: &[u8]) -> Result<()> {
-        set_generic_password(SERVICE, account, bytes).map_err(|_| Error::SecureStorage)
+        with_store(|store| store.put(account, bytes))
     }
     pub fn read(account: &str) -> Result<Option<Zeroizing<Vec<u8>>>> {
-        match get_generic_password(SERVICE, account) {
-            Ok(bytes) => Ok(Some(Zeroizing::new(bytes))),
-            Err(e) if e.code() == ITEM_NOT_FOUND => Ok(None),
-            Err(_) => Err(Error::SecureStorage),
-        }
+        with_store(|store| store.get(account))
     }
     pub fn delete(account: &str) -> Result<()> {
-        match delete_generic_password(SERVICE, account) {
-            Ok(()) => Ok(()),
-            Err(e) if e.code() == ITEM_NOT_FOUND => Ok(()),
-            Err(_) => Err(Error::SecureStorage),
+        with_store(|store| store.delete(account))
+    }
+    pub fn recovery(account: &str, create: bool) -> Result<Zeroizing<Vec<u8>>> {
+        with_store(|store| store.recovery(account, create))
+    }
+
+    struct Keychain;
+    impl Backend for Keychain {
+        fn write(&self, account: &str, bytes: &[u8]) -> Result<()> {
+            set_generic_password(SERVICE, account, bytes).map_err(|_| Error::SecureStorage)
+        }
+        fn read(&self, account: &str) -> Result<Option<Zeroizing<Vec<u8>>>> {
+            match get_generic_password(SERVICE, account) {
+                Ok(bytes) => Ok(Some(Zeroizing::new(bytes))),
+                Err(e) if e.code() == ITEM_NOT_FOUND => Ok(None),
+                Err(_) => Err(Error::SecureStorage),
+            }
+        }
+        fn delete(&self, account: &str) -> Result<()> {
+            match delete_generic_password(SERVICE, account) {
+                Ok(()) => Ok(()),
+                Err(e) if e.code() == ITEM_NOT_FOUND => Ok(()),
+                Err(_) => Err(Error::SecureStorage),
+            }
+        }
+        fn legacy_accounts(&self) -> Result<Vec<String>> {
+            // Attributes only: never turn secret data into an ordinary String.
+            let results = match ItemSearchOptions::new()
+                .class(ItemClass::generic_password())
+                .service(SERVICE)
+                .load_attributes(true)
+                .limit(Limit::All)
+                .search()
+            {
+                Ok(items) => items,
+                Err(e) if e.code() == ITEM_NOT_FOUND => return Ok(Vec::new()),
+                Err(_) => return Err(Error::SecureStorage),
+            };
+            results
+                .into_iter()
+                .map(|item| {
+                    item.simplify_dict()
+                        .and_then(|mut attrs| attrs.remove("acct"))
+                        .ok_or(Error::SecureStorage)
+                })
+                .collect()
         }
     }
 }
@@ -208,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(windows)]
     #[ignore = "requires an interactive OS credential store; uses a disposable test entry"]
     fn os_store_roundtrip_and_forget() {
         let scope = VaultScope {

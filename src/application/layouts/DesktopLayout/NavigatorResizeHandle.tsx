@@ -7,11 +7,13 @@ import {
 } from "./navigatorMode";
 
 export function NavigatorResizeHandle(props: {
+  side?: "left" | "right";
   width: number;
   zoom: number;
   onChange: (width: number) => void;
   onResizingChange: (resizing: boolean) => void;
 }) {
+  const direction = props.side === "right" ? -1 : 1;
   const latest = useRef(props);
   latest.current = props;
   const cleanup = useRef<(() => void) | undefined>(undefined);
@@ -29,13 +31,13 @@ export function NavigatorResizeHandle(props: {
       aria-description="Drag to resize. Double-click to reset."
       onDoubleClick={() => props.onChange(navigatorWidths.full)}
       data-misty-window-drag-block="true"
-      className="group absolute inset-y-0 right-0 z-30 w-1.5 touch-none cursor-col-resize focus-visible:outline-none"
+      className={`group absolute inset-y-0 ${props.side === "right" ? "left-0" : "right-0"} z-30 w-1.5 touch-none cursor-col-resize focus-visible:outline-none`}
       onKeyDown={(event) => {
         const width =
           event.key === "ArrowLeft"
-            ? props.width - 10
+            ? props.width - 10 * direction
             : event.key === "ArrowRight"
-              ? props.width + 10
+              ? props.width + 10 * direction
               : event.key === "Home"
                 ? navigatorMinWidth
                 : event.key === "End"
@@ -64,7 +66,7 @@ export function NavigatorResizeHandle(props: {
           if (next.pointerId !== pointerId) return;
           next.preventDefault();
           latest.current.onChange(
-            clampNavigatorWidth(startWidth + (next.clientX - startX) / props.zoom),
+            clampNavigatorWidth(startWidth + ((next.clientX - startX) * direction) / props.zoom),
           );
         };
         const stop = () => {
@@ -101,7 +103,7 @@ export function NavigatorResizeHandle(props: {
     >
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-0 w-px bg-transparent transition-none group-hover:bg-cream-bright group-focus-visible:bg-cream-bright group-active:bg-cream-bright"
+        className={`pointer-events-none absolute inset-y-0 ${props.side === "right" ? "left-0" : "right-0"} w-px bg-transparent transition-none group-hover:bg-cream-bright group-focus-visible:bg-cream-bright group-active:bg-cream-bright`}
       />
     </div>
   );

@@ -137,7 +137,7 @@ func (config libraryS3Config) empty() bool {
 func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	config := libraryS3ConfigFromEnv()
 	environment := strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT"))
-	deployment := strings.ToLower(strings.TrimSpace(envconfig.Getenv("MISTY_DEPLOYMENT_MODE")))
+	deployment := envconfig.DeploymentMode()
 	backend := strings.ToLower(strings.TrimSpace(envconfig.Getenv("MISTY_LIBRARY_BACKEND")))
 	localRoot := firstConfigured("MISTY_LIBRARY_FILESYSTEM_DIR", "MISTY_LIBRARY_LOCAL_DIR")
 	if backend == "" {

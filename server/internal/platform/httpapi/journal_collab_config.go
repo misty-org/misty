@@ -56,7 +56,7 @@ func JournalCollabConfigFromEnv() (JournalCollabConfig, error) {
 		Issuer:   journalTicketIssuer,
 		Audience: journalTicketAudience,
 	}
-	selfHosted := strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_DEPLOYMENT_MODE")), "self_hosted")
+	selfHosted := envconfig.DeploymentMode() == "self_hosted"
 	if selfHosted && strings.TrimSpace(envconfig.Getenv("MISTY_COLLAB_PUBLIC_URL")) != "" {
 		origin, err := validateCollaborationPublicOrigin(envconfig.Getenv("MISTY_COLLAB_PUBLIC_URL"))
 		if err != nil {

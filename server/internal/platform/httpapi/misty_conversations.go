@@ -54,13 +54,7 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 				http.Error(w, "invalid request", http.StatusBadRequest)
 				return
 			}
-			body.SpaceID = strings.TrimSpace(body.SpaceID)
-			if body.SpaceID != "" {
-				if _, err := s.database.SpaceByID(r.Context(), userID, body.SpaceID); err != nil {
-					writeSpaceError(w, err)
-					return
-				}
-			}
+			body.SpaceID = "" // Compatibility input; personal conversations are account-owned.
 			var identity *db.AskIdentity
 			var identityErr error
 			if body.AgentID == "" {
@@ -74,16 +68,7 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 			}
 			var conversationID string
 			var err error
-			if body.SpaceID != "" {
-				conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, body.SpaceID, identity.ID)
-			} else if identity.SystemManaged {
-				conversationID, err = s.database.CreateAIConversation(r.Context(), userID)
-				if err == nil {
-					err = s.database.BindConversationAgent(r.Context(), userID, conversationID, identity.ID)
-				}
-			} else {
-				err = db.ErrSpaceInvalid
-			}
+			conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, "", identity.ID)
 			if err != nil {
 				TestingWriteAIError(w, err)
 				return
@@ -203,20 +188,11 @@ func (s *AIService) MistyConversation() http.HandlerFunc {
 			}
 			response := map[string]any{"id": conversationID}
 			if body.SpaceID != nil {
-				spaceID := strings.TrimSpace(*body.SpaceID)
-				if spaceID == "" {
-					writeJSON(w, http.StatusBadRequest, map[string]string{"code": "space_required", "message": "Choose a Space for this conversation."})
+				if err := s.database.BindMistyConversationSpace(r.Context(), userID, conversationID, ""); err != nil {
+					TestingWriteAIError(w, err)
 					return
 				}
-				if _, err := s.database.SpaceByID(r.Context(), userID, spaceID); err != nil {
-					writeSpaceError(w, err)
-					return
-				}
-				if err := s.database.BindMistyConversationSpace(r.Context(), userID, conversationID, spaceID); err != nil {
-					writeMistyConversationBindingError(w, err)
-					return
-				}
-				response["spaceId"] = spaceID
+				response["spaceId"] = ""
 			}
 			if body.Title != nil {
 				title := cleanMistyTitle(*body.Title)
@@ -282,13 +258,9 @@ func (s *AIService) MistyConversationTurn() http.HandlerFunc {
 			http.Error(w, "conversation and prompt are required", http.StatusBadRequest)
 			return
 		}
-		conversation, accessErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
+		_, accessErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
 		if accessErr != nil {
 			writeSpaceError(w, accessErr)
-			return
-		}
-		if _, err := s.database.SpaceByID(r.Context(), userID, conversation.SpaceID); err != nil {
-			writeSpaceError(w, err)
 			return
 		}
 		if body.Mode == "action" {
@@ -323,12 +295,12 @@ func (s *AIService) MistyConversationTurn() http.HandlerFunc {
 		}
 		payload, _ := json.Marshal(invocationBody)
 		now := time.Now().UTC()
-		bound, err := s.database.ValidateAgentSessionAccess(r.Context(), userID, conversationID)
+		_, err = s.database.ValidateAgentSessionAccess(r.Context(), userID, conversationID)
 		if err != nil {
 			TestingWriteAIError(w, err)
 			return
 		}
-		spaceID := bound.SpaceID
+		spaceID := ""
 		stored, _, err := s.database.CreateAIInvocationRecord(r.Context(), db.AIInvocationRecord{
 			ID: "invocation_" + uuid.NewString(), UserID: userID, SpaceID: spaceID, ConversationID: conversationID,
 			SurfaceID: "global", Mode: "drawer", Trigger: "explicit", State: "queued",

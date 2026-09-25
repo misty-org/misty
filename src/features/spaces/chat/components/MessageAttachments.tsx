@@ -1,4 +1,4 @@
-import { copyLibraryItemsToClipboard } from "@/features/spaces/library/libraryClipboard";
+import { copyLibraryItemsToClipboard } from "@/features/library/library/libraryClipboard";
 import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
 import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto/interfaces/types";
 import { Badge, Button } from "@/shared/ui";

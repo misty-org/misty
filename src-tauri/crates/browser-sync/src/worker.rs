@@ -33,7 +33,7 @@ pub enum Phase {
     Stopped,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, PartialEq, Eq)]
 pub struct Status {
     pub phase: Phase,
     pub applied_sequence: u64,
@@ -103,6 +103,8 @@ pub struct WorkerHandle {
     stop: watch::Sender<bool>,
     pub status: watch::Receiver<Status>,
     pub presence: watch::Receiver<Vec<Presence>>,
+    pub devices: watch::Receiver<Vec<Device>>,
+    pub traffic: Arc<crate::transport::TrafficCounters>,
     events: broadcast::Sender<AccountEvent>,
 }
 
@@ -402,6 +404,7 @@ pub struct Worker<F> {
     stop: watch::Receiver<bool>,
     status: watch::Sender<Status>,
     presence: watch::Sender<Vec<Presence>>,
+    devices: watch::Sender<Vec<Device>>,
     events: broadcast::Sender<AccountEvent>,
     imported_through: Option<u64>,
     roster: HashMap<String, DeviceGrant>,
@@ -440,6 +443,7 @@ where
             issue: None,
         });
         let (presence, presence_rx) = watch::channel(Vec::new());
+        let (devices, devices_rx) = watch::channel(Vec::new());
         let (events, _) = broadcast::channel(32);
         let handle = WorkerHandle {
             browser_imports: Arc::new(tokio::sync::Mutex::new(())),
@@ -447,6 +451,8 @@ where
             stop: stop_tx,
             status: status_rx,
             presence: presence_rx,
+            devices: devices_rx,
+            traffic: api.traffic(),
             events: events.clone(),
         };
         Ok((
@@ -461,6 +467,7 @@ where
                 stop,
                 status,
                 presence,
+                devices,
                 events,
                 imported_through: None,
                 roster: HashMap::new(),
@@ -759,12 +766,22 @@ where
                 Phase::CatchingUp
             };
         }
-        self.status.send_replace(Status {
+        let next = Status {
             phase,
             applied_sequence: cursor,
             head_sequence: self.head,
             pending_changes: pending,
             issue,
+        };
+        // A failed command is not a state change. Notifying on every rejection
+        // feeds the renderer's retry back into this same command indefinitely.
+        self.status.send_if_modified(|current| {
+            if *current == next {
+                false
+            } else {
+                *current = next;
+                true
+            }
         });
         Ok(())
     }
@@ -773,6 +790,7 @@ where
         if devices.len() > 1024 {
             return Err(Error::TooLarge);
         }
+        let enrolled = devices.clone();
         let mut roster = HashMap::new();
         let mut own = false;
         for device in devices {
@@ -803,6 +821,34 @@ where
             return Err(Error::Authentication);
         }
         self.roster = roster;
+        // A request is delivered through the existing authenticated roster.
+        // The target signs its own takeover. The request ID makes replay and
+        // reconnect idempotent; a stale request never wakes a returning device.
+        if let Some(own) = enrolled
+            .iter()
+            .find(|d| d.grant.device_id == self.store.grant().device_id)
+        {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            if own.full_sync && own.activation_expires_at > now {
+                if let Some(request) = own.activation_request.as_deref().filter(|id| valid_id(id)) {
+                    let payload = crate::document::Payload::ActiveDevice {
+                        version: 1,
+                        active: true,
+                        previous_epoch: None,
+                    };
+                    self.store.enqueue_identified(
+                        &self.root,
+                        &self.device,
+                        request,
+                        &serde_json::to_vec(&payload)?,
+                    )?;
+                }
+            }
+        }
+        self.devices.send_replace(enrolled);
         Ok(())
     }
 
@@ -884,7 +930,7 @@ where
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
                     // Catch up before publishing offline credentials; the reducer
                     // will enforce their base-version preconditions atomically.
-                    if in_flight.is_none() && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {
+                    if in_flight.is_none() && self.devices.borrow().iter().any(|d| d.grant.device_id == self.store.grant().device_id && d.full_sync) && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {
                         if let Some(mutation) = self.store.pending(true, 1)?.into_iter().next() {
                             let bytes = self.root.open_mutation(&self.scope, self.store.grant(), &mutation)?;
                             let payload = serde_json::from_slice::<crate::document::Payload>(&bytes).ok();
@@ -920,5 +966,144 @@ fn publication_frame<'a>(
             mutation,
             active_epoch: None,
         },
+    }
+}
+
+#[cfg(test)]
+mod control_tests {
+    use super::*;
+    #[test]
+    fn rejected_edits_do_not_emit_unchanged_status_and_trigger_retries() {
+        let directory = tempfile::tempdir().unwrap();
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let api = SyncApi::new("http://127.0.0.1", reqwest::Client::new()).unwrap();
+        let scope = VaultScope {
+            deployment: api.deployment(),
+            account_id: "fixture".into(),
+            workspace_id: uuid::Uuid::new_v4().to_string(),
+        };
+        let root = VaultRoot::generate();
+        let key = DeviceKey::generate();
+        let grant = root
+            .grant(&scope, &uuid::Uuid::new_v4().to_string(), 1, &key)
+            .unwrap();
+        let store = Store::initialize(
+            &directory.path().join("sync.sqlite"),
+            scope.clone(),
+            grant,
+            &root,
+            &key,
+            &crate::document::Document::default().encode().unwrap(),
+        )
+        .unwrap();
+        let (mut worker, mut handle) =
+            Worker::new(api, scope, root, key, store, crate::document::reduce).unwrap();
+        handle.status.borrow_and_update();
+        for _ in 0..10 {
+            let (reply, mut result) = oneshot::channel();
+            worker
+                .command(Some(Command::Enqueue(
+                    uuid::Uuid::new_v4().to_string(),
+                    Zeroizing::new(b"invalid edit".to_vec()),
+                    reply,
+                )))
+                .unwrap();
+            assert!(result.try_recv().unwrap().is_err());
+            assert!(
+                !handle.status.has_changed().unwrap(),
+                "a rejected edit must not notify the renderer to retry itself"
+            );
+        }
+        worker.report(Phase::Connecting, None).unwrap();
+        assert!(handle.status.has_changed().unwrap());
+        handle.status.borrow_and_update();
+        worker.report(Phase::Connecting, None).unwrap();
+        assert!(!handle.status.has_changed().unwrap());
+        worker
+            .report(Phase::Attention, Some("fixture_failure"))
+            .unwrap();
+        assert!(handle.status.has_changed().unwrap());
+    }
+
+    #[test]
+    fn remote_activation_is_signed_once_and_ignores_expired_or_independent_requests() {
+        let directory = tempfile::tempdir().unwrap();
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let api = SyncApi::new("http://127.0.0.1", reqwest::Client::new()).unwrap();
+        let scope = VaultScope {
+            deployment: api.deployment(),
+            account_id: "fixture".into(),
+            workspace_id: uuid::Uuid::new_v4().to_string(),
+        };
+        let root = VaultRoot::generate();
+        let key = DeviceKey::generate();
+        let grant = root
+            .grant(&scope, &uuid::Uuid::new_v4().to_string(), 1, &key)
+            .unwrap();
+        let store = Store::initialize(
+            &directory.path().join("sync.sqlite"),
+            scope.clone(),
+            grant.clone(),
+            &root,
+            &key,
+            &crate::document::Document::default().encode().unwrap(),
+        )
+        .unwrap();
+        let (mut worker, handle) =
+            Worker::new(api, scope, root, key, store, crate::document::reduce).unwrap();
+        // Decode the real flattened wire format, including optional controls.
+        let mut json = serde_json::to_value(&grant).unwrap();
+        json["last_counter"] = 0.into();
+        json["revoked_at"] = serde_json::Value::Null;
+        let legacy: Device = serde_json::from_value(json.clone()).unwrap();
+        assert!(legacy.full_sync);
+        let request = uuid::Uuid::new_v4().to_string();
+        json["activation_request"] = request.clone().into();
+        json["activation_expires_at"] = 1u64.into();
+        worker
+            .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
+            .unwrap();
+        assert!(worker.store.pending(true, 10).unwrap().is_empty());
+        json["activation_expires_at"] = (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + 30000)
+            .into();
+        json["full_sync"] = false.into();
+        worker
+            .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
+            .unwrap();
+        assert!(worker.store.pending(true, 10).unwrap().is_empty());
+        assert!(!handle.devices.borrow()[0].full_sync);
+        json["full_sync"] = true.into();
+        // Existing clients ignore the additive metadata, including the flattened grant.
+        #[derive(serde::Deserialize)]
+        struct LegacyDevice {
+            #[serde(flatten)]
+            grant: crate::protocol::DeviceGrant,
+            last_counter: u64,
+            revoked_at: Option<String>,
+        }
+        let older: LegacyDevice = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(older.grant.device_id, grant.device_id);
+        assert_eq!(older.last_counter, 0);
+        assert!(older.revoked_at.is_none());
+        for _ in 0..2 {
+            worker
+                .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
+                .unwrap();
+        }
+        let pending = worker.store.pending(true, 10).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].operation_id, request);
+        let bytes = worker
+            .root
+            .open_mutation(&worker.scope, &grant, &pending[0])
+            .unwrap();
+        assert!(matches!(
+            serde_json::from_slice::<crate::document::Payload>(&bytes).unwrap(),
+            crate::document::Payload::ActiveDevice { active: true, .. }
+        ));
     }
 }

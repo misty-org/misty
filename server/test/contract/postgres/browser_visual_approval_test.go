@@ -5,11 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/google/uuid"
-	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 func TestBrowserApprovalUsesLatestCompletedInspectionIncludingVisual(t *testing.T) {
@@ -22,12 +23,6 @@ func TestBrowserApprovalUsesLatestCompletedInspectionIncludingVisual(t *testing.
 	space := createTestSpace(t, database, ctx, owner.ID, "Visual")
 	agent, err := database.SavePersonalAgent(ctx, owner.ID, "", AgentProfileInput{Name: "Visual", Role: "Inspect", ModelMode: "automatic", Enabled: true})
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = database.InstallUserApp(ctx, owner.ID, "browser", "1.0.0", 1, []string{"connections.read"}); err != nil {
-		t.Fatal(err)
-	}
-	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"browser"}); err != nil {
 		t.Fatal(err)
 	}
 	lease := AgentExecutionLease{AgentID: agent.ID, SpaceID: space.ID, TaskID: "visual-task", WindowLabel: "main"}

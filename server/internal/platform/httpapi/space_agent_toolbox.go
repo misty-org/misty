@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
@@ -45,6 +46,9 @@ func spaceAgentToolboxWithBrowserProvidersAndExtra(database *db.Database, browse
 	}
 	messageTriggers := []string{"message"}
 	legacyHandler := func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
+		if request.Name == toolboxContextGet && invocation.SpaceID == "" {
+			return json.Marshal(map[string]any{"scope": "account", "current_time": time.Now().UTC().Format(time.RFC3339), "timezone": "UTC"})
+		}
 		if request.Name == toolboxMessagesSearch {
 			request.Name = "space.search_messages"
 		}
@@ -229,6 +233,11 @@ func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 		if allowed, err := authorizeAppRuntimeTool(ctx, database, invocation, descriptor); err != nil || !allowed {
 			return false, err
 		}
+		// Account runs discover Space destinations through spaces.tools/execute.
+		// Missing a destination is not a failed permission lookup for the entire catalog.
+		if invocation.SpaceID == "" && (descriptor.OwnerOnly || descriptor.RequiredPermission != "") && globalSpaceTool(descriptor.Name) {
+			return false, nil
+		}
 		if native, allowed, err := nativeAgentInvocationPolicy(ctx, database, invocation, descriptor); native {
 			if err != nil || !allowed {
 				return false, err
@@ -239,7 +248,7 @@ func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 					return false, err
 				}
 			}
-			if descriptor.RequiredPermission != "" {
+			if descriptor.RequiredPermission != "" && invocation.SpaceID != "" {
 				return database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)
 			}
 			return true, nil
@@ -271,7 +280,7 @@ func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 				return false, nil
 			}
 		}
-		if descriptor.RequiredPermission == "" {
+		if descriptor.RequiredPermission == "" || invocation.SpaceID == "" {
 			return true, nil
 		}
 		allowed, err := database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)

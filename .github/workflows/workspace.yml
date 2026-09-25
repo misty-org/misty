@@ -18,10 +18,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: cli
-      - run: cargo run --manifest-path cli/Cargo.toml --locked -- setup
+      - run: cargo run --manifest-path cli/Cargo.toml --locked -- setup desktop
       - run: cargo run --manifest-path cli/Cargo.toml --locked -- sdk check
       - run: cargo run --manifest-path cli/Cargo.toml --locked -- check tasks
       - run: cargo run --manifest-path cli/Cargo.toml --locked -- check cli
       - run: npm run typecheck
       - run: npm run build:desktop
-      - run: cargo run --manifest-path cli/Cargo.toml --locked -- apps build planner --desktop-only

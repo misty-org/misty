@@ -57,8 +57,12 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(2));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut retry = CaptureRetry::default();
         loop {
             tick.tick().await;
+            if !retry.ready(std::time::Instant::now()) {
+                continue;
+            }
             let _lifecycle = browser_lifecycle().write().await;
             let mut current = session().lock().await;
             let Some(active) = current.as_mut().filter(|active| active.id == expected) else {
@@ -72,6 +76,7 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                 continue;
             }
             let result = reconcile(&app, active).await;
+            retry.finished(result.is_ok(), std::time::Instant::now());
             let issue = match result {
                 Ok(issue) => issue,
                 Err(error) => {
@@ -90,10 +95,53 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
         }
     })
 }
+
+// Recovery runs quietly at a bounded rate. It cannot replace open pages.
+#[derive(Default)]
+struct CaptureRetry {
+    failures: u32,
+    after: Option<std::time::Instant>,
+}
+impl CaptureRetry {
+    fn ready(&self, now: std::time::Instant) -> bool {
+        self.after.is_none_or(|after| now >= after)
+    }
+    fn finished(&mut self, success: bool, now: std::time::Instant) {
+        if success {
+            *self = Self::default();
+        } else {
+            let seconds = (30u64 << self.failures.min(4)).min(300);
+            self.failures = self.failures.saturating_add(1);
+            self.after = Some(now + std::time::Duration::from_secs(seconds));
+        }
+    }
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    #[test]
+    fn repeated_restore_failures_back_off_and_success_resets_capture() {
+        let mut retry = CaptureRetry::default();
+        let mut now = std::time::Instant::now();
+        for seconds in [30, 60, 120, 240, 300, 300] {
+            assert!(retry.ready(now));
+            retry.finished(false, now);
+            assert!(!retry.ready(now + std::time::Duration::from_millis(1)));
+            now += std::time::Duration::from_secs(seconds);
+            assert!(retry.ready(now));
+        }
+        retry.finished(true, now);
+        assert!(retry.ready(now));
+        retry.finished(false, now);
+        assert!(retry.ready(now + std::time::Duration::from_secs(30)));
+    }
+}
 // Only known, static diagnostics cross into the renderer. Platform errors and
 // website storage/cookie values must never be included in status messages.
 fn capture_issue(error: &str) -> &'static str {
     match error {
+        handoff::RESTORE_DEFERRED => handoff::RESTORE_DEFERRED,
         "Website profile could not be verified" => "Website storage could not verify this browser profile. Retrying automatically.",
         "Website navigated during sync" | "Website changed origin during sync" => "A website navigated during capture. Retrying automatically.",
         "This website's storage could not be transferred" => "A website's storage could not be read. Retrying automatically.",
@@ -108,6 +156,10 @@ async fn reconcile(
     app: &tauri::AppHandle,
     active: &mut Session,
 ) -> Result<Option<&'static str>, String> {
+    if !super::full_sync_enabled(active) {
+        active.capture_view = None;
+        return Ok(None);
+    }
     if !handoff::supported() {
         return Ok(Some(
             "Website sign-in sync requires macOS 14 or newer, or Windows.",
@@ -159,7 +211,7 @@ async fn reconcile(
                 || journal.pending.is_some()
                 || journal.quarantined)
         {
-            handoff::restore_current(app, active).await?;
+            handoff::restore_current(app, active, handoff::RestoreMode::Background).await?;
         } else {
             active
                 .handle
@@ -188,7 +240,7 @@ async fn reconcile(
             .values()
             .any(|record| record.profile_id == logical)
         {
-            handoff::restore_current(app, active).await?;
+            handoff::restore_current(app, active, handoff::RestoreMode::Background).await?;
         } else {
             handoff::capture_current(app, active).await?;
         }
@@ -196,7 +248,7 @@ async fn reconcile(
     }
     let result = observe(app, active).await?;
     if result.is_some() && connected {
-        handoff::restore_current(app, active).await?;
+        handoff::restore_current(app, active, handoff::RestoreMode::Background).await?;
         return Ok(None);
     }
     Ok(result)

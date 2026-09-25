@@ -12,7 +12,7 @@ if [ ! -s /workspace/.dev.vars ]; then
   exit 1
 fi
 
-api_origin="${MISTY_DEV_API_ORIGIN:-https://dev-api.mistysys.com}"
+api_origin="${MISTY_DEV_API_ORIGIN:?run misty setup cloudflare}"
 case "$api_origin" in
   https://*) ;;
   *)
