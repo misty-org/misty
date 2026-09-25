@@ -1,8 +1,6 @@
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { restoreAccountWorkspace } from "@/features/workspace/workspaceAccountState";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
-import { readApiAuthToken } from "@/api/client/session";
-import { Button } from "@/shared/ui";
+import { useWorkspaceRecoveryRetry } from "@/features/workspace/useWorkspaceRecoveryRetry";
 import { BrowserSyncStartup } from "@/features/browser-workspace/BrowserSyncStartup";
 import { BrowserSyncSleepOverlay } from "@/features/browser-workspace/BrowserSyncSleepOverlay";
 import { BrowserSyncBridge } from "@/features/browser-workspace/BrowserSyncBridge";
@@ -20,11 +18,14 @@ import { ConnectedDevicesProvider } from "@/features/connected-devices";
 const PlatformLayout = lazy(() => import("@/application/platform-layout"));
 
 export function AppFrameLayout() {
-  const { user, transitioning, logout } = useAuth();
+  const { user, transitioning } = useAuth();
   const recovery = useWorkspaceRecoveryState();
   const location = useLocation();
   const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
   const isInviteRoute = location.pathname.startsWith("/invite/");
+  useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
+  const syncAllowed =
+    !nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready);
 
   // Keep hook order stable as identity changes, and let account transitions
   // finish before deciding that the user needs to sign in.
@@ -40,45 +41,9 @@ export function AppFrameLayout() {
     !isAuthRoute &&
     user &&
     nativeWorkspaceRecoveryEnabled() &&
-    (recovery.accountId !== user.id || !recovery.ready)
+    (recovery.accountId !== user.id || (!recovery.ready && !recovery.usable))
   ) {
-    const issue = recovery.accountId === user.id ? recovery.issue : null;
-    if (!issue) return <LoadingScreen fullScreen label="Restoring workspace" />;
-    const report = (error: unknown) => {
-      if (useWorkspaceRecoveryState.getState().accountId === user.id)
-        useWorkspaceRecoveryState.setState({
-          issue: error instanceof Error ? error.message : String(error),
-        });
-    };
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal-bg p-6 text-cream">
-        <div className="grid max-w-lg gap-4">
-          <h1 className="text-lg font-semibold">Your workspace could not be restored</h1>
-          <p role="alert" className="text-sm text-cream-muted">
-            {issue}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => {
-                void readApiAuthToken()
-                  .then(() => restoreAccountWorkspace(user.id))
-                  .catch(report);
-              }}
-            >
-              Retry
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                void logout().catch(report);
-              }}
-            >
-              Choose account
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingScreen fullScreen label="Restoring workspace" />;
   }
 
   if (isAuthRoute) {
@@ -91,19 +56,25 @@ export function AppFrameLayout() {
 
   return (
     <>
-      <BrowserSyncStartup key={user?.id} accountId={user?.id ?? ""}>
+      <BrowserSyncStartup
+        key={`sync-startup:${user?.id ?? "anonymous"}`}
+        accountId={syncAllowed ? (user?.id ?? "") : ""}
+      >
         <Suspense fallback={<LoadingScreen fullScreen />}>
           <ConnectedDevicesProvider>
             <PlatformLayout getRouteId={desktopRouteIdFromPath} navItems={desktopNavItems} />
           </ConnectedDevicesProvider>
         </Suspense>
       </BrowserSyncStartup>
-      <BrowserSyncBridge accountId={user?.id ?? ""} />
+      <BrowserSyncBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
       <AgentExecutionSurface />
       <ActivityPanel />
       <UpdateNotices accountId={user?.id ?? ""} />
-      <BrowserSyncSleepOverlay key={user?.id} accountId={user?.id ?? ""} />
+      <BrowserSyncSleepOverlay
+        key={`sync-sleep:${user?.id ?? "anonymous"}`}
+        accountId={syncAllowed ? (user?.id ?? "") : ""}
+      />
     </>
   );
 }

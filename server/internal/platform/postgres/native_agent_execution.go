@@ -15,6 +15,7 @@ type AgentExecutionLease struct {
 }
 
 func (db *Database) AcquireAgentExecution(ctx context.Context, userID string, input AgentExecutionLease) error {
+	input.SpaceID = ""
 	if AppAuthorityFromContext(ctx) != nil || input.TaskID == "" || len(input.TaskID) > 128 || input.WindowLabel == "" || len(input.WindowLabel) > 128 {
 		return ErrSpaceForbidden
 	}
@@ -23,7 +24,7 @@ func (db *Database) AcquireAgentExecution(ctx context.Context, userID string, in
 			return err
 		}
 		if input.Renew {
-			result, err := tx.ExecContext(ctx, `UPDATE misty_agent_execution_leases SET expires_at=NOW()+INTERVAL '25 seconds' WHERE owner_user_id=$1 AND agent_id=$2 AND space_id=$3 AND task_id=$4 AND window_label=$5 AND expires_at>NOW()`, userID, input.AgentID, input.SpaceID, input.TaskID, input.WindowLabel)
+			result, err := tx.ExecContext(ctx, `UPDATE misty_agent_execution_leases SET expires_at=NOW()+INTERVAL '25 seconds' WHERE owner_user_id=$1 AND agent_id=$2 AND COALESCE(space_id,'')=$3 AND task_id=$4 AND window_label=$5 AND expires_at>NOW()`, userID, input.AgentID, input.SpaceID, input.TaskID, input.WindowLabel)
 			if err != nil {
 				return err
 			}
@@ -33,7 +34,7 @@ func (db *Database) AcquireAgentExecution(ctx context.Context, userID string, in
 			}
 			return err
 		}
-		result, err := tx.ExecContext(ctx, `INSERT INTO misty_agent_execution_leases(owner_user_id,agent_id,space_id,task_id,window_label,expires_at) VALUES($1,$2,$3,$4,$5,NOW()+INTERVAL '25 seconds') ON CONFLICT(owner_user_id,agent_id) DO UPDATE SET space_id=EXCLUDED.space_id,task_id=EXCLUDED.task_id,window_label=EXCLUDED.window_label,expires_at=EXCLUDED.expires_at WHERE misty_agent_execution_leases.expires_at<=NOW() OR (misty_agent_execution_leases.task_id=EXCLUDED.task_id AND misty_agent_execution_leases.window_label=EXCLUDED.window_label AND misty_agent_execution_leases.space_id=EXCLUDED.space_id)`, userID, input.AgentID, input.SpaceID, input.TaskID, input.WindowLabel)
+		result, err := tx.ExecContext(ctx, `INSERT INTO misty_agent_execution_leases(owner_user_id,agent_id,space_id,task_id,window_label,expires_at) VALUES($1,$2,NULLIF($3,''),$4,$5,NOW()+INTERVAL '25 seconds') ON CONFLICT(owner_user_id,agent_id) DO UPDATE SET space_id=EXCLUDED.space_id,task_id=EXCLUDED.task_id,window_label=EXCLUDED.window_label,expires_at=EXCLUDED.expires_at WHERE misty_agent_execution_leases.expires_at<=NOW() OR (misty_agent_execution_leases.task_id=EXCLUDED.task_id AND misty_agent_execution_leases.window_label=EXCLUDED.window_label AND misty_agent_execution_leases.space_id IS NOT DISTINCT FROM EXCLUDED.space_id)`, userID, input.AgentID, input.SpaceID, input.TaskID, input.WindowLabel)
 		if err != nil {
 			return err
 		}
@@ -69,6 +70,7 @@ func (db *Database) ValidateNativeAgentExecution(ctx context.Context, record *AI
 }
 
 func validateNativeAgentExecutionTx(ctx context.Context, tx *sql.Tx, userID, spaceID string, payload json.RawMessage) error {
+	spaceID = ""
 	var input struct {
 		AgentID     string `json:"agent_id"`
 		Mode        string `json:"execution_mode"`
@@ -82,7 +84,7 @@ func validateNativeAgentExecutionTx(ctx context.Context, tx *sql.Tx, userID, spa
 		return nil
 	}
 	var valid bool
-	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_ask_identities a WHERE a.id=$2 AND a.owner_user_id=$1 AND a.enabled AND a.deleted_at IS NULL AND ($6='user' OR EXISTS(SELECT 1 FROM misty_agent_execution_leases l WHERE l.owner_user_id=$1 AND l.agent_id=$2 AND l.space_id=$3 AND l.task_id=$4 AND l.window_label=$5 AND l.expires_at>NOW())))`, userID, input.AgentID, spaceID, input.TaskID, input.WindowLabel, input.Mode).Scan(&valid)
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_ask_identities a WHERE a.id=$2 AND a.owner_user_id=$1 AND a.enabled AND a.deleted_at IS NULL AND ($6='user' OR EXISTS(SELECT 1 FROM misty_agent_execution_leases l WHERE l.owner_user_id=$1 AND l.agent_id=$2 AND COALESCE(l.space_id,'')=$3 AND l.task_id=$4 AND l.window_label=$5 AND l.expires_at>NOW())))`, userID, input.AgentID, spaceID, input.TaskID, input.WindowLabel, input.Mode).Scan(&valid)
 	if err != nil {
 		return err
 	}

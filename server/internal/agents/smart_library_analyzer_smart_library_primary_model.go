@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/kannachi323/misty/server/internal/library"
 )
 
 const (
@@ -96,6 +98,7 @@ type SmartLibraryEmbedding struct {
 }
 
 type SmartLibraryAnalyzer struct {
+	billing                     *library.Meter
 	APIKey, BaseURL             string
 	PrimaryModel, FallbackModel string
 	EmbeddingModel              string
@@ -116,6 +119,9 @@ func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibrar
 	fallbackModel := a.fallbackModel()
 	primary, usage, err := a.analyzeWithModel(ctx, primaryModel, assets)
 	analysis := SmartLibraryAnalysis{Failures: map[string]string{}, Usage: usage}
+	if billingErr := a.BillingError(); billingErr != nil {
+		return analysis, billingErr
+	}
 	byID := map[string]SmartLibraryMetadata{}
 	for _, result := range primary {
 		result = normalizeSmartLibraryMetadata(result)
@@ -129,6 +135,9 @@ func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibrar
 		}
 		if reason == "" && shouldRunVisualEntityAudit(result) {
 			audit, auditUsage, auditErr := a.analyzeWithModelPrompt(ctx, fallbackModel, []SmartLibraryAsset{asset}, visualEntityAuditPrompt)
+			if billingErr := a.BillingError(); billingErr != nil {
+				return analysis, billingErr
+			}
 			analysis.Usage.InputTokens += auditUsage.InputTokens
 			analysis.Usage.CachedInputTokens += auditUsage.CachedInputTokens
 			analysis.Usage.OutputTokens += auditUsage.OutputTokens
@@ -150,6 +159,9 @@ func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibrar
 			continue
 		}
 		fallback, fallbackUsage, fallbackErr := a.analyzeWithModel(ctx, fallbackModel, []SmartLibraryAsset{asset})
+		if billingErr := a.BillingError(); billingErr != nil {
+			return analysis, billingErr
+		}
 		analysis.Usage.InputTokens += fallbackUsage.InputTokens
 		analysis.Usage.CachedInputTokens += fallbackUsage.CachedInputTokens
 		analysis.Usage.OutputTokens += fallbackUsage.OutputTokens

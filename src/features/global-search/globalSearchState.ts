@@ -1,3 +1,8 @@
+import type { BrowserAskRequest } from "./browserAskContext";
+import type { MistyHandoff } from "@/features/misty/handoff";
+import type { MistyContextTarget } from "@/features/misty/context";
+import type { AiArtifact, AiCaptureAttachment } from "@/features/ai-surface/types";
+import type { ThinkingMode } from "@/features/agents/thinkingMode";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "@/features/ai-surface";
 import type {
   GlobalAiContextRef,
@@ -12,18 +17,18 @@ import type {
 export type MistySubmissionPresentation = "panel" | "workspace";
 
 export interface GlobalSearchState {
-  thinkingMode?: import("@/features/agents/thinkingMode").ThinkingMode;
-  selectedAgentId?:string;
-  executionMode?: "user"|"agent"|"team";
+  thinkingMode?: ThinkingMode;
+  selectedAgentId?: string;
+  executionMode?: "user" | "agent" | "team";
   executionModeByAgent?: Record<string, "user" | "agent" | "team">;
   artifactPaneId?: string;
-  pendingArtifact?: import("@/features/ai-surface/types").AiArtifact;
+  pendingArtifact?: AiArtifact;
   screenLabel?: string;
   selectedSpaceId?: string;
-  targets?: import("@/features/misty/context").MistyContextTarget[];
-  handoff?: import("@/features/misty/handoff").MistyHandoff;
+  targets?: MistyContextTarget[];
+  handoff?: MistyHandoff;
   invocationId?: string;
-  browserRequest?: import("./browserAskContext").BrowserAskRequest;
+  browserRequest?: BrowserAskRequest;
   accountId: string;
   panel: UnifiedMistyPanel;
   mode: GlobalAiMode;
@@ -61,6 +66,7 @@ export interface GlobalSearchState {
   deleteConversation: (conversationId: string) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
   submit: () => Promise<void>;
+  cancelResponse?: () => Promise<void>;
   submitAnswer: (
     prompt: string,
     attachments?: MistyImageAttachment[],
@@ -68,6 +74,14 @@ export interface GlobalSearchState {
     presentation?: MistySubmissionPresentation,
     deviceContexts?: AiInvocationDeviceContext[],
     origin?: { conversationId: string; context: GlobalAiContextRef[] },
+    companion?: {
+      executionMode: "user" | "team" | "agent";
+      turn?: number;
+      interactionMode?: "team" | "auto";
+      model?: string;
+      displayCaptures?: import("@/features/agents/companion/protocol").DisplayCapture[];
+      capture?: AiCaptureAttachment;
+    },
   ) => Promise<void>;
   submitAgentTask: (
     prompt: string,

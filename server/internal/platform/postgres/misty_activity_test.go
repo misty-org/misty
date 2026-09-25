@@ -51,21 +51,21 @@ func TestMistyActivityPersonalScope(t *testing.T) {
 		return result
 	}
 	personal := read("owner", "", "")
-	if len(personal) != 3 || personal["personal-null"] != "completed" || personal["personal-empty"] != "paused" || personal["delegated"] != "completed" {
+	if len(personal) != 4 || personal["personal-null"] != "completed" || personal["personal-empty"] != "paused" || personal["delegated"] != "completed" {
 		t.Fatalf("incorrect personal activity: %#v", personal)
 	}
 	filtered := read("owner", "", "one")
-	if len(filtered) != 2 || filtered["personal-empty"] != "" {
+	if len(filtered) != 3 || filtered["personal-empty"] != "" {
 		t.Fatalf("agent filter: %#v", filtered)
 	}
 	if rows := read("other", "", ""); len(rows) != 1 || rows["other-account"] != "completed" {
 		t.Fatalf("cross-account leak: %#v", rows)
 	}
-	if rows := read("owner", "history", ""); len(rows) != 1 || rows["historical"] != "completed" {
+	if rows := read("owner", "history", ""); len(rows) != 4 || rows["historical"] != "completed" {
 		t.Fatalf("history filter: %#v", rows)
 	}
-	if _, err = database.MistyActivity(ctx, "other", "history"); !errors.Is(err, ErrSpaceForbidden) {
-		t.Fatalf("history membership: %v", err)
+	if rows := read("other", "history", ""); len(rows) != 1 || rows["other-account"] != "completed" {
+		t.Fatalf("legacy destination changed account history: %#v", rows)
 	}
 	if _, err = database.MistyActivity(ctx, "", ""); !errors.Is(err, ErrSpaceForbidden) {
 		t.Fatalf("missing identity: %v", err)

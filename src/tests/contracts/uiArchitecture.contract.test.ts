@@ -6,16 +6,16 @@ import { repositoryPath, walk } from "./repositoryPolicy";
 const extensions = new Set([".ts", ".tsx"]);
 const uiImplementationRoots = ["src/shared/ui/"];
 const protectedRoots = [
-  "src/features/files/explorer/",
-  "src/features/files/preview/",
-  "src/features/files/search/",
+  "src/features/files/workspace/explorer/",
+  "src/features/files/workspace/preview/",
+  "src/features/files/workspace/search/",
   "src/features/providers/",
   "src/features/settings/",
   "src/features/spaces/chat/",
-  "src/features/spaces/library/",
+  "src/features/library/library/",
   "src/features/spaces/members/",
-  "src/features/spaces/planner/",
-  "src/features/spaces/roadmap/",
+  "src/features/planner/planner/",
+  "src/features/planner/roadmap/",
   "src/features/spaces/",
   "src/features/transfers/",
 ];

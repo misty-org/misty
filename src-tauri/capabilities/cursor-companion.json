@@ -1,0 +1,1 @@
+{"identifier":"cursor-companion","description":"Presentation-only cursor overlays and companion controls","platforms":["macOS","windows"],"webviews":["misty-cursor-*"],"permissions":["core:event:default"]}

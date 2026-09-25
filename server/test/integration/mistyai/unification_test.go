@@ -26,10 +26,6 @@ func TestPrivateActivityDelegationAndRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec := db.AppInstallSpec{ID: "agents", Version: "1", PermissionVersion: 1, Scopes: []string{"ai.use"}}
-	if _, err = database.InstallSpaceApp(ctx, owner.ID, space.ID, spec, nil); err != nil {
-		t.Fatal(err)
-	}
 	identity, err := database.EnsureAskIdentity(ctx, owner.ID, "gpt-5")
 	if err != nil {
 		t.Fatal(err)
@@ -58,8 +54,21 @@ func TestPrivateActivityDelegationAndRevocation(t *testing.T) {
 	if !strings.Contains(string(activity), child.ID) || !strings.Contains(string(activity), "Private research") {
 		t.Fatalf("missing activity: %s", activity)
 	}
-	if _, err = database.MistyActivity(ctx, other.ID, space.ID); err == nil {
-		t.Fatal("private activity exposed")
+	otherInvocation, _, err := database.CreateAIInvocationRecord(ctx, db.AIInvocationRecord{ID: "invocation_other_account", UserID: other.ID, SurfaceID: "global", Mode: "drawer", Trigger: "message", State: "running", IdempotencyKey: "other-account", RequestPayload: json.RawMessage(`{"prompt":"Other account research"}`), ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Activity is account-owned. A legacy Space argument neither grants access
+	// to another account nor prevents the caller reading their own journal.
+	otherActivity, err := database.MistyActivity(ctx, other.ID, space.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var otherEntries []struct {
+		ID string `json:"id"`
+	}
+	if err = json.Unmarshal(otherActivity, &otherEntries); err != nil || len(otherEntries) != 1 || otherEntries[0].ID != otherInvocation.ID {
+		t.Fatalf("account activity isolation failed: %s (%v)", otherActivity, err)
 	}
 	if err = database.CancelMistyInvocationChildren(ctx, owner.ID, invocation.ID); err != nil {
 		t.Fatal(err)
@@ -79,13 +88,7 @@ func TestPrivateActivityDelegationAndRevocation(t *testing.T) {
 			t.Fatalf("descendant not canceled: %s", activity)
 		}
 	}
-	if _, err = database.RemoveSpaceApp(ctx, owner.ID, space.ID, "agents"); err != nil {
-		t.Fatal(err)
-	}
-	if err = database.RequireSpaceApp(ctx, owner.ID, space.ID, "agents"); err == nil {
-		t.Fatal("removed Agents remains available")
-	}
-	if _, err = database.MistyActivity(ctx, owner.ID, space.ID); err == nil {
-		t.Fatal("dashboard survived revocation")
+	if _, err = database.MistyActivity(ctx, owner.ID, space.ID); err != nil {
+		t.Fatal("account activity no longer depends on app installation", err)
 	}
 }

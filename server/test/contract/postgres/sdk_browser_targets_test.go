@@ -10,12 +10,10 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	cap "github.com/kannachi323/misty/server/internal/capabilities"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
 func TestSDKBrowserTargetConfigurationPreservesProfilesAndRejectsBackendDispatch(t *testing.T) {
@@ -29,7 +27,7 @@ func TestSDKBrowserTargetConfigurationPreservesProfilesAndRejectsBackendDispatch
 	if err != nil {
 		t.Fatal(err)
 	}
-	document, key := sdkInstallFixture(t, "example.mail")
+	document, _ := sdkInstallFixture(t, "example.mail")
 	document.Scopes = []string{"capabilities.providers.write", "capabilities.read", "browser.inspect", "inbox.read"}
 	provider := &document.Capabilities.Providers[0]
 	provider.ID = "example.mail/browser"
@@ -51,22 +49,9 @@ func TestSDKBrowserTargetConfigurationPreservesProfilesAndRejectsBackendDispatch
 	if provider.Capabilities[0].Name != "inbox.read" {
 		t.Fatal("missing canonical inbox.read fixture")
 	}
-	signed, digest := sdkSignFixture(t, document, key)
-	if _, err := database.InstallVerifiedSDKApp(ctx, owner.ID, signed, digest); err != nil {
-		t.Fatal(err)
-	}
-	session, err := database.CreateAppRuntimeSession(ctx, owner.ID, document.AppID, security.HashToken("browser-target-provider"), "", AppRuntimeSessionTTL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	seedConnectedProvider(t, database, owner.ID, document.AppID, *provider)
+	session := &AppRuntimeSession{UserID: owner.ID, AppID: document.AppID, AuthorityGeneration: 1, Scopes: document.Scopes}
 	appctx := WithAppExecutionAuthority(ctx, *session)
-	if _, err := database.RegisterSDKProvider(appctx, owner.ID, digest, *provider); err != nil {
-		t.Fatal(err)
-	}
-	// A provider report cannot enable an adapter that the host has not implemented.
-	if err := database.ReportSDKProviderAvailability(appctx, owner.ID, provider.ID, cap.Availability{State: "available", ObservedAt: time.Now().UTC()}); err != nil {
-		t.Fatal(err)
-	}
 	deviceFor := func(user string) *TrustedDevice {
 		t.Helper()
 		public, _, _ := ed25519.GenerateKey(rand.Reader)

@@ -1,4 +1,4 @@
-import { reserveAppUpdate } from "@/features/apps/appUpdateSafety";
+import { reserveMistyUpdate } from "@/features/workspace/unsavedChanges";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
@@ -89,7 +89,7 @@ export function DesktopUpdaterSettings() {
     setProgress(EMPTY_UPDATE_PROGRESS);
     let releaseUpdate = () => {};
     try {
-      releaseUpdate = reserveAppUpdate();
+      releaseUpdate = reserveMistyUpdate();
       await update.downloadAndInstall((event) => {
         setProgress((current) => applyUpdateProgress(current, event));
       });
@@ -127,7 +127,7 @@ export function DesktopUpdaterSettings() {
         <span className="text-sm text-cream">Beta</span>
       </DesktopSettingsRow>
       <DesktopSettingsRow
-        label="App updates"
+        label="Misty updates"
         description="Misty verifies every update’s signature before installation."
       >
         <div className="grid w-full max-w-sm justify-items-end gap-2 max-[760px]:justify-items-start">
@@ -136,7 +136,7 @@ export function DesktopUpdaterSettings() {
               <SystemErrorActivity
                 error={error}
                 scope="settings:updates"
-                title="App update needs attention"
+                title="Misty update needs attention"
               />
             ) : null}
             <span className="text-xs text-cream-muted" role="status">

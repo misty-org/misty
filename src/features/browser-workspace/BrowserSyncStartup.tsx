@@ -7,7 +7,7 @@ import {
 } from "@/api/client/session";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { readNativeSync, unlockNativeSync } from "./native";
-import { useBrowserSyncStore } from "./store";
+import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
 
 /** Best-effort background startup. Sync must never gate the signed-in app: a
  * missing vault, unavailable server, or browser-profile recovery remains visible
@@ -29,10 +29,12 @@ export function BrowserSyncStartup({
     let running = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
+    let nextAttempt = 0;
     const connect = async () => {
       if (!valid() || running) return;
       running = true;
       clearTimeout(timer);
+      let opening = false;
       try {
         // Restore the native JWT cookie jar before asking sync to use it. This
         // is local credential loading, not a dependency on the /me request.
@@ -50,19 +52,23 @@ export function BrowserSyncStartup({
         ) {
           // A live worker already owns network retries and JWT refresh.
           useBrowserSyncStore.setState({ session: existing, issue: null });
-          failures = 0;
+          if (existing.status.phase === "ready") failures = 0;
           return;
         }
+        // Reopening a cached vault is not proof the server recovered. Keep
+        // backing off if successive workers exit after a successful local open.
+        failures += 1;
+        opening = true;
         useBrowserSyncStore.setState({ connecting: true });
         // Try the saved client key directly, even without cached vault metadata.
         // Native code fetches any missing metadata and verifies the key.
         const opened = await unlockNativeSync(account, null, null, false);
         if (valid()) {
-          failures = 0;
+          if (opened.status?.phase === "ready") failures = 0;
           useBrowserSyncStore.setState({ session: opened, issue: null });
         }
       } catch (error) {
-        failures += 1;
+        if (!opening) failures += 1;
         if (valid())
           useBrowserSyncStore.setState({
             session: null,
@@ -74,21 +80,28 @@ export function BrowserSyncStartup({
           useBrowserSyncStore.setState({ connecting: false });
           // Keep trying after startup failures and terminal worker exits. A
           // healthy worker is only inspected; it is never restarted by polling.
-          timer = setTimeout(
-            () => void connect(),
-            failures ? Math.min(1_000 * 2 ** Math.min(failures, 5), 30_000) : 30_000,
-          );
+          const delay = Math.min(30_000 * 2 ** Math.min(Math.max(0, failures - 1), 4), 300_000);
+          nextAttempt = Date.now() + delay;
+          timer = setTimeout(() => void connect(), delay);
         }
       }
     };
-    const retry = () => void connect();
+    const retry = () => {
+      // Connectivity flapping must not bypass a failed attempt's cooldown.
+      if (Date.now() >= nextAttempt) void connect();
+    };
+    const requestedRetry = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === accountId) void connect();
+    };
     void connect();
     window.addEventListener("online", retry);
+    window.addEventListener(browserSyncRetryEvent, requestedRetry);
     return () => {
       active = false;
       useBrowserSyncStore.setState({ connecting: false });
       clearTimeout(timer);
       window.removeEventListener("online", retry);
+      window.removeEventListener(browserSyncRetryEvent, requestedRetry);
     };
   }, [accountId, enabled]);
   return children;

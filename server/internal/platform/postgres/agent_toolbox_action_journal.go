@@ -94,18 +94,8 @@ func (db *Database) JournalAgentToolboxAction(ctx context.Context, action AgentT
 			if err := tx.QueryRowContext(ctx, query, action.RunID, action.UserID).Scan(&state); err != nil {
 				return err
 			}
-			var routineCancelled bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_routine_runs WHERE invocation_id=$1 AND user_id=$2 AND cancel_requested_at IS NOT NULL)`, action.RunID, action.UserID).Scan(&routineCancelled); err != nil {
-				return err
-			}
-			if routineCancelled {
-				return ErrSpaceConflict
-			}
 			if state != "running" {
 				return ErrSpaceConflict
-			}
-			if err := routineAgentEffectClaimTx(ctx, tx, action); err != nil {
-				return err
 			}
 			var pending string
 			err := tx.QueryRowContext(ctx, `SELECT idempotency_key FROM agent_toolbox_action_journal WHERE run_id=$1 AND user_id=$2 AND idempotency_key<>$3 AND risk<>'read' AND (state IN ('started','unknown') OR (state='failed' AND COALESCE(error_code,'')<>'tool_not_attempted')) ORDER BY created_at,idempotency_key LIMIT 1`, action.RunID, action.UserID, action.IdempotencyKey).Scan(&pending)

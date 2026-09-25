@@ -11,6 +11,7 @@ import {
 
 /** Fixed account island below the navigation scroll area. */
 export function NavigatorProfileBar(props: {
+  compact?: boolean;
   profileAnchorRef: RefObject<HTMLButtonElement | null>;
   profileOpen: boolean;
   settingsOpen: boolean;
@@ -19,7 +20,7 @@ export function NavigatorProfileBar(props: {
 }) {
   return (
     <div
-      className="relative z-20 mx-3 mb-2 mt-1 shrink-0"
+      className={cn("relative z-20 shrink-0", props.compact ? "mx-2" : "mx-3 mb-2 mt-1")}
       data-navigator-profile-bar="fixed"
       data-misty-window-drag-block="true"
       onPointerDown={(event) => event.stopPropagation()}
@@ -35,7 +36,7 @@ export function NavigatorProfileBar(props: {
             props.profileOpen && "bg-charcoal-active text-cream-bright",
           )}
           avatarClassName="size-6 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
-          showAccountName
+          showAccountName={!props.compact}
         />
         <TooltipProvider delayDuration={450}>
           <Tooltip>

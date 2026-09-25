@@ -64,12 +64,10 @@ func (s *SpacesService) executeMCPAgentTool(ctx context.Context, run *db.SpaceRu
 			return nil, workflowv2.ErrAwaitingApproval
 		}
 	}
-	var bearer string
-	if item.ConnectionProvider == "activepieces" {
-		bearer, err = s.activepiecesAccessToken(ctx, run.RequestingMemberID, &db.MCPRemoteConnection{ID: item.ConnectionID, Provider: item.ConnectionProvider})
-	} else {
-		bearer, err = s.decryptMCPBearer(item.BearerCipher, item.BearerNonce)
+	if item.ConnectionProvider != "custom" {
+		return nil, workflowv2.ErrCapabilityDenied
 	}
+	bearer, err := s.decryptMCPBearer(item.BearerCipher, item.BearerNonce)
 	if err != nil {
 		return nil, workflowv2.ErrCapabilityDenied
 	}

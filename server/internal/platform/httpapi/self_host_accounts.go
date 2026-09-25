@@ -1,9 +1,6 @@
 package api
 
 import (
-	"crypto/ed25519"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -11,8 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
-	"github.com/kannachi323/misty/server/internal/platform/entitlement"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
@@ -34,12 +29,8 @@ func SelfHostBootstrap(database *db.Database) http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
 			return
 		}
-		claims, ok := requireSelfHostProof(w, r)
-		if !ok {
-			return
-		}
 		user, err := database.CreateSelfHostBootstrapAdmin(r.Context(), body.Name, body.Username, body.Email, body.Password,
-			security.HashToken(body.BootstrapToken), claims.Subject, time.Unix(claims.ExpiresAt, 0).UTC())
+			security.HashToken(body.BootstrapToken), "local:"+uuid.NewString(), time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 		if err != nil {
 			writeSelfHostAccountError(w, err)
 			return
@@ -59,12 +50,8 @@ func SelfHostEnroll(database *db.Database) http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
 			return
 		}
-		claims, ok := requireSelfHostProof(w, r)
-		if !ok {
-			return
-		}
 		user, err := database.CreateSelfHostEnrolledUser(r.Context(), body.Name, body.Username, body.Email, body.Password,
-			security.HashToken(body.Invitation), claims.Subject, time.Unix(claims.ExpiresAt, 0).UTC())
+			security.HashToken(body.Invitation), "local:"+uuid.NewString(), time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 		if err != nil {
 			writeSelfHostAccountError(w, err)
 			return
@@ -119,34 +106,7 @@ func SelfHostInvitation(database *db.Database) http.HandlerFunc {
 	}
 }
 
-func RenewSelfHostEntitlement(database *db.Database) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if InstanceConfigFromEnv().Deployment != "self_hosted" {
-			writeJSON(w, http.StatusNotFound, map[string]string{"code": "not_found"})
-			return
-		}
-		userID, err := sessionUserID(r, database)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"code": "internal_error"})
-			return
-		}
-		if userID == "" {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"code": "not_authenticated"})
-			return
-		}
-		claims, ok := requireSelfHostProof(w, r)
-		if !ok {
-			return
-		}
-		if err := database.RenewSelfHostEntitlement(r.Context(), userID, claims.Subject, time.Unix(claims.ExpiresAt, 0).UTC()); err != nil {
-			writeJSON(w, http.StatusForbidden, map[string]string{"code": "entitlement_subject_mismatch"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"status": "eligible", "expires_at": time.Unix(claims.ExpiresAt, 0).UTC()})
-	}
-}
-
-func SelfHostedEntitlementMiddleware(database *db.Database) func(http.Handler) http.Handler {
+func SelfHostedAccountMiddleware(database *db.Database) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if InstanceConfigFromEnv().Deployment != "self_hosted" || selfHostRecoveryPath(r.URL.Path) {
@@ -163,10 +123,10 @@ func SelfHostedEntitlementMiddleware(database *db.Database) func(http.Handler) h
 				return
 			}
 			access, err := database.SelfHostAccountAccess(r.Context(), userID)
-			if err != nil || access.Disabled || !access.EntitlementExpiresAt.After(time.Now().UTC()) {
-				writeJSON(w, http.StatusPaymentRequired, map[string]any{
-					"code":    "self_host_entitlement_required",
-					"actions": []string{"retry_verification", "open_settings", "switch_hosted", "sign_out"},
+			if err != nil || access.Disabled {
+				writeJSON(w, http.StatusForbidden, map[string]any{
+					"code":    "self_host_account_disabled",
+					"actions": []string{"open_settings", "switch_hosted", "sign_out"},
 				})
 				return
 			}
@@ -175,41 +135,13 @@ func SelfHostedEntitlementMiddleware(database *db.Database) func(http.Handler) h
 	}
 }
 
-func SelfHostedFeatureGate(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if InstanceConfigFromEnv().Deployment != "self_hosted" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		path := trimPublicAPIPrefix(r.URL.Path)
-		blockedPrefix := []string{
-			"/ai", "/agents", "/billing", "/cloud", "/integrations", "/misty",
-			"/provider-callbacks", "/runs", "/waitlist", "/auth/forgot", "/auth/reset", "/auth/handoff",
-		}
-		for _, prefix := range blockedPrefix {
-			if path == prefix || strings.HasPrefix(path, prefix+"/") {
-				writeJSON(w, http.StatusNotImplemented, map[string]string{"code": "feature_unavailable_self_hosted"})
-				return
-			}
-		}
-		if strings.Contains(path, "/integrations/") || strings.Contains(path, "/agents/") {
-			writeJSON(w, http.StatusNotImplemented, map[string]string{"code": "feature_unavailable_self_hosted"})
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func acceptSelfHostLoginProof(w http.ResponseWriter, r *http.Request, database *db.Database, userID string) bool {
+func acceptSelfHostLogin(w http.ResponseWriter, r *http.Request, database *db.Database, userID string) bool {
 	if InstanceConfigFromEnv().Deployment != "self_hosted" {
 		return true
 	}
-	claims, ok := requireSelfHostProof(w, r)
-	if !ok {
-		return false
-	}
-	if err := database.RenewSelfHostEntitlement(r.Context(), userID, claims.Subject, time.Unix(claims.ExpiresAt, 0).UTC()); err != nil {
-		writeJSON(w, http.StatusForbidden, map[string]string{"code": "entitlement_subject_mismatch"})
+	access, err := database.SelfHostAccountAccess(r.Context(), userID)
+	if err != nil || access.Disabled {
+		writeJSON(w, http.StatusForbidden, map[string]string{"code": "self_host_account_disabled"})
 		return false
 	}
 	return true
@@ -229,37 +161,10 @@ func (body selfHostAccountRequest) valid() bool {
 		strings.TrimSpace(body.Email) != "" && len(body.Password) >= 8
 }
 
-func requireSelfHostProof(w http.ResponseWriter, r *http.Request) (entitlement.Claims, bool) {
-	proof := strings.TrimSpace(r.Header.Get(entitlementHeader))
-	claims, err := entitlement.Verify(proof, selfHostEntitlementPublicKeys(), time.Now().UTC())
-	if err != nil {
-		writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": "self_host_entitlement_required"})
-		return entitlement.Claims{}, false
-	}
-	return claims, true
-}
-
-func selfHostEntitlementPublicKeys() map[string]ed25519.PublicKey {
-	keys := make(map[string]ed25519.PublicKey, len(entitlement.BundledPublicKeys))
-	for keyID, key := range entitlement.BundledPublicKeys {
-		keys[keyID] = key
-	}
-	var configured map[string]string
-	if json.Unmarshal([]byte(strings.TrimSpace(envconfig.Getenv("MISTY_SELF_HOST_ENTITLEMENT_PUBLIC_KEYS"))), &configured) == nil {
-		for keyID, encoded := range configured {
-			raw, err := base64.StdEncoding.DecodeString(encoded)
-			if err == nil && len(raw) == ed25519.PublicKeySize && strings.TrimSpace(keyID) != "" {
-				keys[keyID] = ed25519.PublicKey(raw)
-			}
-		}
-	}
-	return keys
-}
-
 func selfHostRecoveryPath(path string) bool {
 	path = trimPublicAPIPrefix(path)
 	switch path {
-	case "/health", "/instance", "/login", "/logout", "/self-host/bootstrap", "/self-host/enroll", "/self-host/entitlement":
+	case "/health", "/instance", "/login", "/logout", "/self-host/bootstrap", "/self-host/enroll":
 		return true
 	default:
 		return false

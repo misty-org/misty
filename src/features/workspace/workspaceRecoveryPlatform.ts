@@ -3,12 +3,10 @@ import { workspaceRecoveryKey } from "./workspaceRecoveryStorage";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 
-export const workspaceStoreStorageKey = import.meta.env.MISTY_OFFICIAL_APP_ID
-  ? `misty:official-app:${import.meta.env.MISTY_OFFICIAL_APP_ID}:dock:v1`
-  : "misty:desktop-dock:space-apps-v1";
+export const workspaceStoreStorageKey = "misty:desktop-dock:space-apps-v1";
 
 export function nativeWorkspaceRecoveryEnabled() {
-  return hasTauriInternals() && !isNativeMobileBuild && !import.meta.env.MISTY_OFFICIAL_APP_ID;
+  return hasTauriInternals() && !isNativeMobileBuild;
 }
 
 // Freeze ownership before AuthProvider updates display metadata for another

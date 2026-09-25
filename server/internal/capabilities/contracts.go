@@ -4,10 +4,6 @@ package capabilities
 
 import (
 	"bytes"
-	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,8 +24,7 @@ var scopePattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$`)
 var appPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]{1,79}$`)
 var providerPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]+/[a-z][a-z0-9_-]*$`)
 
-const MaxManifestBytes = 2 << 20
-const SignatureDomain = "misty.sdk.manifest.v1\n"
+const MaxDeclarationBytes = 2 << 20
 
 type Effects struct {
 	Kind       string   `json:"kind"`
@@ -125,32 +120,6 @@ type Provider struct {
 	Route        Route        `json:"route"`
 	Capabilities []Definition `json:"capabilities"`
 }
-type Manifest struct {
-	Protocol  int        `json:"protocol"`
-	Providers []Provider `json:"providers"`
-}
-
-// InstallDocument is reviewed in trusted Misty controls. The first install pins
-// its publisher key; a signature proves continuity, not a publisher's reputation.
-type InstallDocument struct {
-	AppID             string   `json:"appId"`
-	Version           string   `json:"version"`
-	PermissionVersion int      `json:"permissionVersion"`
-	Scopes            []string `json:"scopes"`
-	Capabilities      Manifest `json:"capabilities"`
-}
-type SignedManifest struct {
-	Document  string `json:"document"`
-	PublicKey string `json:"publicKey"`
-	Signature string `json:"signature"`
-}
-type VerifiedManifest struct {
-	InstallDocument
-	Digest    string
-	PublicKey []byte
-	Document  string
-	Signature []byte
-}
 type Availability struct {
 	State      string    `json:"state"`
 	ObservedAt time.Time `json:"observedAt"`
@@ -158,7 +127,7 @@ type Availability struct {
 }
 
 func Decode(raw []byte, out any) error {
-	if len(raw) == 0 || len(raw) > MaxManifestBytes {
+	if len(raw) == 0 || len(raw) > MaxDeclarationBytes {
 		return ErrInvalid
 	}
 	// Reject duplicate object keys before decoding: signatures, schemas and host
@@ -220,43 +189,6 @@ func Decode(raw []byte, out any) error {
 	return nil
 }
 
-func Verify(signed SignedManifest) (*VerifiedManifest, error) {
-	key, err := base64.StdEncoding.DecodeString(signed.PublicKey)
-	if err != nil || len(key) != ed25519.PublicKeySize {
-		return nil, ErrInvalid
-	}
-	signature, err := base64.StdEncoding.DecodeString(signed.Signature)
-	if err != nil || len(signature) != ed25519.SignatureSize || len(signed.Document) > MaxManifestBytes {
-		return nil, ErrInvalid
-	}
-	if !ed25519.Verify(key, []byte(SignatureDomain+signed.Document), signature) {
-		return nil, ErrInvalid
-	}
-	var document InstallDocument
-	if err := Decode([]byte(signed.Document), &document); err != nil {
-		return nil, err
-	}
-	if !appPattern.MatchString(document.AppID) || !textWithin(document.Version, 1, 40) || !validVersion(document.PermissionVersion) || document.Scopes == nil || len(document.Scopes) > 128 || !unique(document.Scopes) || document.Capabilities.Protocol != 1 || document.Capabilities.Providers == nil || len(document.Capabilities.Providers) > 32 {
-		return nil, ErrInvalid
-	}
-	for _, scope := range document.Scopes {
-		if !validScope(scope) {
-			return nil, ErrInvalid
-		}
-	}
-	providers := map[string]bool{}
-	for _, provider := range document.Capabilities.Providers {
-		if providers[provider.ID] {
-			return nil, ErrInvalid
-		}
-		providers[provider.ID] = true
-		if err := provider.Validate(document.AppID, document.Scopes); err != nil {
-			return nil, err
-		}
-	}
-	digest := sha256.Sum256([]byte(signed.Document))
-	return &VerifiedManifest{InstallDocument: document, Digest: hex.EncodeToString(digest[:]), PublicKey: key, Document: signed.Document, Signature: signature}, nil
-}
 func ValidProviderID(id string) bool         { return len(id) <= 240 && providerPattern.MatchString(id) }
 func ValidName(name string) bool             { return len(name) <= 160 && namePattern.MatchString(name) }
 func validVersion(v int) bool                { return v > 0 && v <= 2147483647 }

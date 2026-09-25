@@ -9,17 +9,17 @@ import {
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import type { ReactNode } from "react";
-import { BrandIcon } from "../../../.././apps/shared/BrandIcon";
-import { brandIconAsset } from "../../../.././apps/shared/brandIcons";
+import { BrandIcon } from "../../../shared/toolAssets/BrandIcon";
+import { brandIconAsset } from "../../../shared/toolAssets/brandIcons";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
 import type { NavigatorAppId } from "@/features/workspace";
-import { ProviderBrandIcon } from "../../../.././apps/shared/ProviderBrandIcon";
+import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
-} from "../../../.././apps/shared/websiteIntegrations";
-import { WebsiteBrandIcon } from "../../../.././apps/shared/WebsiteBrandIcon";
-import { providers, providerFromRoute } from "../../../.././apps/shared/providers";
+} from "../../../shared/toolAssets/websiteIntegrations";
+import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
+import { providers, providerFromRoute } from "../../../shared/toolAssets/providers";
 import { appIconStrokeWidth } from "@/shared/ui/app-icons";
 import {
   parseBrowserTabState,

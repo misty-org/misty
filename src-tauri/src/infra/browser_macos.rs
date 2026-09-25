@@ -155,6 +155,7 @@ pub(super) fn configure_browser_webview(
     webview: &Webview,
     native_live_resize: bool,
 ) -> Result<(), String> {
+    super::browser_site_permissions::install(webview)?;
     use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSViewLayerContentsRedrawPolicy};
     webview
         .with_webview(move |platform_webview| unsafe {

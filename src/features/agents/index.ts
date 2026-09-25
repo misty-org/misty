@@ -15,3 +15,6 @@ export {
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
 export * from "./store/useAiServerStore";
+
+export { companionReply } from "./companion/companionReply";
+export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";

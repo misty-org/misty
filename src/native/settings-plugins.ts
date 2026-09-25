@@ -3,10 +3,6 @@ import type {
   CloudConfigPaths,
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
-  PluginCommandRunResult,
-  PluginCommandsSnapshot,
-  PluginDiagnosticsSnapshot,
-  PluginPanelRenderResult,
   ProviderConfigRequest,
   ProviderConfigStep,
   ProviderJobStart,
@@ -16,8 +12,6 @@ import type {
   ReassignShortcutRequest,
   RemoteEditDraft,
   RemoteTestResult,
-  RenderPluginPanelRequest,
-  RunPluginCommandRequest,
   SaveRemoteRequest,
   SaveSettingsRequest,
   ResetShortcutRequest,
@@ -140,51 +134,6 @@ function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsS
     () => undefined,
   );
   return hydrated;
-}
-
-let readSpaceApps: () => Promise<ReadonlySet<string>> = async () => new Set();
-export function configurePluginSpaceAuthority(read: () => Promise<ReadonlySet<string>>) {
-  readSpaceApps = read;
-  return () => {
-    if (readSpaceApps === read) readSpaceApps = async () => new Set();
-  };
-}
-
-export async function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {
-  const apps = await readSpaceApps();
-  const snapshot = await invoke<PluginCommandsSnapshot>("plugin_commands_snapshot");
-  return {
-    ...snapshot,
-    commands: snapshot.commands.filter((entry) => apps.has(entry.pluginId)),
-    panels: snapshot.panels.filter((entry) => apps.has(entry.pluginId)),
-  };
-}
-
-export async function pluginCommandRun(
-  request: RunPluginCommandRequest,
-): Promise<PluginCommandRunResult> {
-  const snapshot = await pluginCommandsSnapshot();
-  if (!snapshot.commands.some((entry) => entry.id === request.commandId))
-    throw new Error("This command is not available in the active Space.");
-  return invoke("plugin_command_run", { request });
-}
-
-export async function pluginPanelRender(
-  request: RenderPluginPanelRequest,
-): Promise<PluginPanelRenderResult> {
-  const snapshot = await pluginCommandsSnapshot();
-  if (
-    !snapshot.panels.some(
-      (entry) =>
-        entry.id === request.panelId && (!request.pluginId || entry.pluginId === request.pluginId),
-    )
-  )
-    throw new Error("This app is not available in the active Space.");
-  return invoke("plugin_panel_render", { request });
-}
-
-export function pluginDiagnosticsSnapshot(): Promise<PluginDiagnosticsSnapshot> {
-  return invoke("plugin_diagnostics_snapshot");
 }
 
 export function openExternalUrl(url: string): Promise<void> {

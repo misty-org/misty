@@ -15,14 +15,16 @@ export class RenderErrorBoundary extends Component<
     if (import.meta.env.DEV) {
       console.error("Workspace render failed", error, info.componentStack);
     }
-    recoverFromHookOrderMismatch(error);
+    if (this.props.scope !== "tab") recoverFromHookOrderMismatch(error);
   }
 
   render() {
     if (!this.state.error) return this.props.children;
     return (
       <section className="grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-charcoal-bg p-8 text-center text-cream">
-        <h1 className="m-0 text-[22px] font-semibold">Workspace render failed</h1>
+        <h1 className="m-0 text-[22px] font-semibold">
+          {this.props.scope === "tab" ? "This tab could not be loaded" : "Workspace render failed"}
+        </h1>
         <p className="m-0 max-w-[680px] text-cream-muted [overflow-wrap:anywhere]">
           {this.state.error.message}
         </p>
@@ -30,8 +32,11 @@ export class RenderErrorBoundary extends Component<
           className="rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-cream"
           type="button"
           onClick={() => {
-            clearVolatileWorkspaceSnapshots();
-            clearHookOrderRecoveryAttempt();
+            // A failed module request does not imply damaged workspace data.
+            if (this.state.error && isHookOrderMismatch(this.state.error)) {
+              clearVolatileWorkspaceSnapshots();
+              clearHookOrderRecoveryAttempt();
+            }
             if (typeof window !== "undefined") {
               window.location.reload();
               return;
@@ -39,7 +44,7 @@ export class RenderErrorBoundary extends Component<
             this.setState({ error: null });
           }}
         >
-          Try again
+          {this.props.scope === "tab" ? "Reload Misty" : "Try again"}
         </Button>
       </section>
     );
@@ -97,6 +102,7 @@ function clearHookOrderRecoveryAttempt(): void {
 
 export interface RenderErrorBoundaryProps {
   children: ReactNode;
+  scope?: "workspace" | "tab";
 }
 
 export interface RenderErrorBoundaryState {

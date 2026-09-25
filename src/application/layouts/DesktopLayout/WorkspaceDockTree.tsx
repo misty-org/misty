@@ -4,7 +4,6 @@ import { WorkspacePaneControls } from "./WorkspacePaneControls";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
 import { useSettingsStore } from "@/features/settings";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
-import { useAppsStore } from "@/features/apps/useAppsStore";
 import { usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
 import {
   canFitDockSplit,
@@ -97,8 +96,7 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
             transfers: "Transfers",
           } as Record<string, string>
         )[id] ??
-        useAppsStore.getState().catalog.find((app) => app.id === id)?.name ??
-        "App";
+        "Tool";
       contextLabel = label;
     }
     const existing = map.get(key);

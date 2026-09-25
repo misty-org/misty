@@ -1,4 +1,4 @@
-import {runtimeAgentsApi as agentsApi} from "@/features/agents/agentsRuntime";
+import { runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -28,6 +28,8 @@ export function useAiVoiceRecorder({
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef(0);
   const timeoutRef = useRef<number | null>(null);
+  const generation = useRef(0);
+  const transcription = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const discardRecordingRef = useRef(false);
   const onActivityChangeRef = useRef(onActivityChange);
@@ -61,8 +63,11 @@ export function useAiVoiceRecorder({
 
   useEffect(() => {
     mountedRef.current = true;
+    const recordingGeneration = generation;
     return () => {
       mountedRef.current = false;
+      recordingGeneration.current++;
+      transcription.current?.abort();
       discardRecordingRef.current = true;
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       if (recorderRef.current?.state === "recording") recorderRef.current.stop();
@@ -73,6 +78,7 @@ export function useAiVoiceRecorder({
 
   const start = async () => {
     if (requesting || recording || transcribing) return;
+    const epoch = ++generation.current;
     onError("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       onError("Voice recording is not available on this device.");
@@ -84,7 +90,7 @@ export function useAiVoiceRecorder({
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: selectedInputDeviceId ? { deviceId: { exact: selectedInputDeviceId } } : true,
       });
-      if (!mountedRef.current) {
+      if (!mountedRef.current || epoch !== generation.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -106,7 +112,8 @@ export function useAiVoiceRecorder({
         recorderRef.current = null;
         streamRef.current = null;
         stream.getTracks().forEach((track) => track.stop());
-        if (discardRecordingRef.current || !mountedRef.current) return;
+        if (discardRecordingRef.current || !mountedRef.current || epoch !== generation.current)
+          return;
         setRecording(false);
         const duration = Math.max(1, Math.min(60_000, Date.now() - startedAtRef.current));
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
@@ -115,14 +122,21 @@ export function useAiVoiceRecorder({
           return void onError("No audio was recorded.");
         }
         setTranscribing(true);
+        const controller = new AbortController();
+        transcription.current = controller;
         void agentsApi
-          .transcribeVoice(blob, duration)
-          .then((result) => onTranscript(result.transcript))
-          .catch((reason) =>
-            onError(reason instanceof Error ? reason.message : "Voice could not be transcribed."),
-          )
+          .transcribeVoice(blob, duration, controller.signal)
+          .then((result) => {
+            if (mountedRef.current && generation.current === epoch) onTranscript(result.transcript);
+          })
+          .catch((reason) => {
+            if (mountedRef.current && generation.current === epoch)
+              onError(reason instanceof Error ? reason.message : "Voice could not be transcribed.");
+          })
           .finally(() => {
-            if (mountedRef.current) setTranscribing(false);
+            if (!mountedRef.current || generation.current !== epoch) return;
+            transcription.current = null;
+            setTranscribing(false);
             onActivityChangeRef.current?.(false);
           });
       };
@@ -132,6 +146,7 @@ export function useAiVoiceRecorder({
       setRecording(true);
       timeoutRef.current = window.setTimeout(() => recorder.stop(), 60_000);
     } catch (reason) {
+      if (!mountedRef.current || generation.current !== epoch) return;
       setRequesting(false);
       onActivityChangeRef.current?.(false);
       onError(microphoneErrorMessage(reason));
@@ -143,6 +158,23 @@ export function useAiVoiceRecorder({
     timeoutRef.current = null;
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
   };
+
+  const cancel = useCallback(() => {
+    generation.current++;
+    discardRecordingRef.current = true;
+    transcription.current?.abort();
+    transcription.current = null;
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderRef.current = null;
+    streamRef.current = null;
+    setRequesting(false);
+    setRecording(false);
+    setTranscribing(false);
+    onActivityChangeRef.current?.(false);
+  }, []);
 
   const selectInputDevice = (deviceId: string) => {
     const normalized = deviceId.trim();
@@ -160,6 +192,7 @@ export function useAiVoiceRecorder({
     selectInputDevice,
     start,
     stop,
+    cancel,
   };
 }
 

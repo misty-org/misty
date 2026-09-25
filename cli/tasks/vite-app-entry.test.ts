@@ -10,7 +10,7 @@ test("the app dependency scan succeeds before Explorer is opened", { timeout: 60
   // probe HTML must not poison this scan or alter a running developer's cache.
   const cacheDir = await mkdtemp(join(tmpdir(), "misty-app-entry-test-"));
   try {
-    const config = await resolveConfig({ cacheDir, mode: "desktop", logLevel: "error" }, "serve");
+    const config = await resolveConfig({ configFile: join(import.meta.dirname, "../../.config/vite.config.ts"), cacheDir, mode: "desktop", logLevel: "error" }, "serve");
     const metadata = await optimizeDeps(config, true, true);
     for (const dependency of [
       "react",

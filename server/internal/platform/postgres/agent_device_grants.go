@@ -61,10 +61,10 @@ func (db *Database) AgentDeviceGrants(ctx context.Context, userID, spaceID, agen
 		if _, err := askExecutionContextTx(ctx, tx, userID, spaceID, agentID); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.owner_user_id,r.agent_id,c.space_id,c.device_id,c.opaque_ref,c.capabilities,c.metadata,c.expires_at,
+		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.owner_user_id,r.agent_id,COALESCE(c.space_id,''),c.device_id,c.opaque_ref,c.capabilities,c.metadata,c.expires_at,
 			CASE WHEN c.state='attached' THEN NULL ELSE c.updated_at END,c.created_at,c.updated_at FROM agent_run_contexts c JOIN space_runs r ON r.id=c.run_id
-			WHERE c.owner_user_id=$1 AND c.space_id=$2 AND r.agent_id=$3 AND r.state IN ('queued','running','awaiting_approval','awaiting_device') AND c.state='attached' AND c.expires_at>NOW()
-			ORDER BY c.created_at DESC`, userID, spaceID, agentID)
+			WHERE c.owner_user_id=$1 AND r.agent_id=$2 AND r.state IN ('queued','running','awaiting_approval','awaiting_device') AND c.state='attached' AND c.expires_at>NOW()
+			ORDER BY c.created_at DESC`, userID, agentID)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (db *Database) AgentDeviceGrants(ctx context.Context, userID, spaceID, agen
 func (db *Database) AgentRunDeviceGrants(ctx context.Context, userID, runID string) ([]AgentDeviceGrant, error) {
 	items := []AgentDeviceGrant{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.owner_user_id,r.agent_id,c.space_id,c.device_id,c.opaque_ref,c.capabilities,c.metadata,c.expires_at,
+		rows, err := tx.QueryContext(ctx, `SELECT c.id,c.owner_user_id,r.agent_id,COALESCE(c.space_id,''),c.device_id,c.opaque_ref,c.capabilities,c.metadata,c.expires_at,
 			CASE WHEN c.state='attached' THEN NULL ELSE c.updated_at END,c.created_at,c.updated_at FROM agent_run_contexts c JOIN space_runs r ON r.id=c.run_id
 			WHERE c.run_id=$1 AND c.owner_user_id=$2 AND r.owner_user_id=$2 AND c.state='attached' AND c.expires_at>NOW()
 			ORDER BY c.created_at`, runID, userID)
@@ -237,7 +237,7 @@ func (db *Database) AttachAgentRunContext(ctx context.Context, ownerUserID, runI
 	}
 	out := &AgentRunContext{ID: "context_" + uuid.NewString(), RunID: runID, OwnerUserID: ownerUserID, DeviceID: deviceID, Kind: kind, OpaqueRef: opaqueRef, DisplayName: displayName, Capabilities: capabilities, Metadata: metadata}
 	err = db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := tx.QueryRowContext(ctx, `SELECT r.space_id FROM space_runs r JOIN misty_ask_identities a ON a.id=r.agent_id WHERE r.id=$1 AND r.owner_user_id=$2 AND a.owner_user_id=$2 AND r.state='queued'`, runID, ownerUserID).Scan(&out.SpaceID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT ''::text FROM space_runs r JOIN misty_ask_identities a ON a.id=r.agent_id WHERE r.id=$1 AND r.owner_user_id=$2 AND a.owner_user_id=$2 AND r.state='queued'`, runID, ownerUserID).Scan(&out.SpaceID); err != nil {
 			return ErrSpaceForbidden
 		}
 		var online bool
@@ -245,7 +245,7 @@ func (db *Database) AttachAgentRunContext(ctx context.Context, ownerUserID, runI
 			return ErrDeviceNotFound
 		}
 		return tx.QueryRowContext(ctx, `INSERT INTO agent_run_contexts(id,run_id,owner_user_id,space_id,device_id,kind,opaque_ref,display_name,capabilities,metadata,expires_at)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()+INTERVAL '24 hours') RETURNING state,expires_at,created_at,updated_at`, out.ID, out.RunID, out.OwnerUserID, out.SpaceID, out.DeviceID, out.Kind, out.OpaqueRef, out.DisplayName, out.Capabilities, out.Metadata).Scan(&out.State, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt)
+			VALUES($1,$2,$3,NULLIF($4,''),$5,$6,$7,$8,$9,$10,NOW()+INTERVAL '24 hours') RETURNING state,expires_at,created_at,updated_at`, out.ID, out.RunID, out.OwnerUserID, out.SpaceID, out.DeviceID, out.Kind, out.OpaqueRef, out.DisplayName, out.Capabilities, out.Metadata).Scan(&out.State, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt)
 	})
 	return out, err
 }

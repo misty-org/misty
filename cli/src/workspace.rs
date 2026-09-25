@@ -7,7 +7,7 @@ pub struct Workspace {
     pub misty: PathBuf,
     pub server: PathBuf,
     pub website: PathBuf,
-    pub extensions: PathBuf,
+    pub features: PathBuf,
     pub cli: PathBuf,
 }
 
@@ -33,9 +33,9 @@ impl Workspace {
         let misty = Self::discover(&absolute).unwrap_or_else(|| absolute.join("misty"));
         let root = misty.parent().unwrap_or(&misty).to_path_buf();
         Ok(Self {
-            extensions: misty.join("apps"),
+            features: misty.join("src/features"),
             cli: misty.join("cli"),
-            server: root.join("misty-server"),
+            server: misty.join("server"),
             website: root.join("misty-website"),
             misty,
             root,
@@ -51,7 +51,6 @@ impl Workspace {
                 self.misty.join("src-tauri/tauri.conf.json"),
                 "Misty native configuration",
             ),
-            (self.extensions.join("catalog.json"), "Misty app catalog"),
             (self.cli.join("Cargo.toml"), "Misty CLI"),
         ] {
             if !path.is_file() {
@@ -75,7 +74,6 @@ mod tests {
             "package.json",
             "src-tauri/tauri.conf.json",
             "cli/Cargo.toml",
-            "apps/catalog.json",
             "packages/sdk/package.json",
         ] {
             let file = checkout.join(name);
@@ -90,7 +88,7 @@ mod tests {
             let workspace = Workspace::from_root(path.clone()).unwrap();
             workspace.validate().unwrap();
             assert_eq!(workspace.misty, checkout);
-            assert_eq!(workspace.extensions, checkout.join("apps"));
+            assert_eq!(workspace.features, checkout.join("src/features"));
             assert_eq!(workspace.cli, checkout.join("cli"));
             assert!(!workspace.server.exists());
         }
@@ -101,6 +99,6 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let workspace = Workspace::from_root(temporary.path().to_path_buf()).unwrap();
         assert_eq!(workspace.misty, temporary.path().join("misty"));
-        assert_eq!(workspace.server, temporary.path().join("misty-server"));
+        assert_eq!(workspace.server, temporary.path().join("misty/server"));
     }
 }

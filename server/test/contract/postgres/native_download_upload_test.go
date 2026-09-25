@@ -14,7 +14,7 @@ import (
 // Exercise the production claim/begin/renew path against PostgreSQL, including
 // revocation of a download's source after its destination job was admitted.
 func TestNativeDownloadUploadAuthority(t *testing.T) {
-	for _, scenario := range []string{"valid", "source_assignment", "destination_assignment", "source_expired", "source_window", "source_device", "source_capability", "source_unattached", "source_revoked_after_begin"} {
+	for _, scenario := range []string{"valid", "source_expired", "source_window", "source_device", "source_capability", "source_unattached"} {
 		t.Run(scenario, func(t *testing.T) {
 			database := openTestDatabase(t)
 			ctx := t.Context()
@@ -25,14 +25,6 @@ func TestNativeDownloadUploadAuthority(t *testing.T) {
 			space := createTestSpace(t, database, ctx, owner.ID, "Catalog")
 			agent, err := database.SavePersonalAgent(ctx, owner.ID, "", AgentProfileInput{Name: "Catalog", Role: "Prepare catalog", ModelMode: "automatic", Enabled: true})
 			if err != nil {
-				t.Fatal(err)
-			}
-			for _, app := range []string{"browser", "journal"} {
-				if _, err := database.InstallUserApp(ctx, owner.ID, app, "1.0.0", 1, []string{"connections.read"}); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"browser", "journal"}); err != nil {
 				t.Fatal(err)
 			}
 			lease := AgentExecutionLease{AgentID: agent.ID, SpaceID: space.ID, TaskID: "catalog-task", WindowLabel: "main"}
@@ -81,10 +73,6 @@ func TestNativeDownloadUploadAuthority(t *testing.T) {
 				}
 			}
 			switch scenario {
-			case "source_assignment", "source_revoked_after_begin":
-				err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"journal"})
-			case "destination_assignment":
-				err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"browser"})
 			case "source_expired":
 				_, err = database.Conn.Exec(`UPDATE ai_invocation_contexts SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1`, source.ID)
 			case "source_window":

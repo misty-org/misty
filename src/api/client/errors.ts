@@ -34,12 +34,6 @@ export function apiErrorMessage(code: string | undefined, fallback: string): str
     voice_duration_invalid: "That voice recording could not be read. Please try again.",
     voice_transcription_failed: "Misty could not transcribe that recording. Please try again.",
     voice_speech_failed: "Misty could not generate speech for that response.",
-    activepieces_not_configured: "This Misty server has not configured its automation service yet.",
-    activepieces_not_connected: "The built-in automation engine is not ready yet.",
-    activepieces_not_ready:
-      "Misty could not prepare your automation workspace. Try again or ask the server operator to check Activity.",
-    mcp_oauth_discovery_failed:
-      "Misty could not reach its automation service. Ask the server operator to check Activepieces.",
   };
   return code && messages[code] ? messages[code] : fallback.trim() || "The Misty request failed.";
 }

@@ -75,8 +75,8 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if activated.SpaceID != space.ID {
-		t.Fatalf("durable invocation Space = %q, want %q", activated.SpaceID, space.ID)
+	if activated.SpaceID != "" {
+		t.Fatalf("account-owned invocation has Space %q", activated.SpaceID)
 	}
 	prompt := "Inspect Family Space members, research summer camps in the attached browser, create a task named Compare summer camps, save the research, and post a cited summary to Family Space"
 	toolNames, err := api.TestingResolveAIInvocationSpaceToolNames(

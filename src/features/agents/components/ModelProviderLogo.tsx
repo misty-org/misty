@@ -1,6 +1,6 @@
 import { Aperture, Bot, BrainCircuit, Cpu, Zap, type LucideIcon } from "lucide-react";
-import { BrandIcon } from "@/features/apps/shared/BrandIcon";
-import type { BrandId } from "@/features/apps/shared/brandIcons";
+import { BrandIcon } from "@/shared/toolAssets/BrandIcon";
+import type { BrandId } from "@/shared/toolAssets/brandIcons";
 
 export type ModelProviderLogoSpec =
   { kind: "brand"; brand: BrandId } | { kind: "lucide"; icon: LucideIcon; color?: string };

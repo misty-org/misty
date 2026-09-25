@@ -250,7 +250,7 @@ pub fn dev(workspace: &Workspace, options: DevOptions<'_>) -> Result<()> {
         }
     }
 
-    server::up(workspace, true, false)?;
+    server::up(workspace, true, false, false)?;
 
     let port = available_mobile_port(
         env::var("MISTY_MOBILE_DEV_PORT")
@@ -278,34 +278,28 @@ pub fn dev(workspace: &Workspace, options: DevOptions<'_>) -> Result<()> {
     if let (Some(device), Some(host)) = (device.as_ref(), host.as_deref()) {
         if device.kind == AppleDeviceKind::Physical {
             launch_physical_device_when_ready(workspace, device, host, port, options.release)?;
-            return with_official_app_development_assets(
-                dev_command(
-                    DevOptions {
-                        device: None,
-                        open: true,
-                        host: Some(host),
-                        ..options
-                    },
-                    false,
-                    Some(&config_path),
-                ),
-                workspace,
+            return dev_command(
+                DevOptions {
+                    device: None,
+                    open: true,
+                    host: Some(host),
+                    ..options
+                },
+                false,
+                Some(&config_path),
             )
             .run(&workspace.misty);
         }
     }
 
-    with_official_app_development_assets(
-        dev_command(
-            DevOptions {
-                device: device.as_ref().map(|device| device.name.as_str()),
-                host: host.as_deref(),
-                ..options
-            },
-            physical_device,
-            Some(&config_path),
-        ),
-        workspace,
+    dev_command(
+        DevOptions {
+            device: device.as_ref().map(|device| device.name.as_str()),
+            host: host.as_deref(),
+            ..options
+        },
+        physical_device,
+        Some(&config_path),
     )
     .run(&workspace.misty)
 }
@@ -403,21 +397,6 @@ fn dev_command(
         command = command.arg("--host");
     }
     command
-}
-
-fn with_official_app_development_assets(
-    command: CommandSpec,
-    workspace: &Workspace,
-) -> CommandSpec {
-    command
-        .env(
-            "MISTY_OFFICIAL_APPS_DIR",
-            workspace.extensions.join("public/official-apps"),
-        )
-        .env(
-            "MISTY_OFFICIAL_APPS_CATALOG",
-            workspace.extensions.join("catalog.json"),
-        )
 }
 
 fn mobile_dev_config(port: u16) -> serde_json::Value {
@@ -927,7 +906,7 @@ mod tests {
             misty,
             server: temporary.path().join("misty-server"),
             website: temporary.path().join("misty-website"),
-            extensions: temporary.path().join("misty-store"),
+            features: temporary.path().join("src/features"),
             cli,
         };
 

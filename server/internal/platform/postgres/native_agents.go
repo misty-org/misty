@@ -161,6 +161,7 @@ func (db *Database) BindConversationAgent(ctx context.Context, userID, conversat
 }
 
 func (db *Database) CreatePersonalAgentConversation(ctx context.Context, userID, spaceID, agentID string) (string, error) {
+	spaceID = "" // Retained argument for old callers; ownership is the account.
 	if _, err := db.AskExecutionContext(ctx, userID, spaceID, agentID); err != nil {
 		return "", err
 	}

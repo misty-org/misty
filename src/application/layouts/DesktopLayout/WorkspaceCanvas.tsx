@@ -1,3 +1,4 @@
+import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { useBrowserSyncStore } from "@/features/browser-workspace/store";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { mapAllVirtualWorkspaceLayouts } from "@/features/workspace/virtualWindows";
@@ -29,6 +30,7 @@ import { minimumForWorkspaceTabs, WorkspaceDockTree } from "./WorkspaceDockTree"
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
 export function WorkspaceCanvas(props: {
+  tabPosition?: DockPosition;
   titlebarInsets?: { left: number; right: number; animate?: boolean };
   windowsTitlebarControls?: boolean;
 }) {
@@ -429,18 +431,21 @@ export function WorkspaceCanvas(props: {
     allLayoutViews(layout).length === 1 &&
     (leaves[0].tabs[0]?.surfaceId === "agents" || leaves[0].tabs[0]?.groupKey === "app:agents") &&
     virtualWindows.length <= 1 &&
-    !props.windowsTitlebarControls;
+    !props.windowsTitlebarControls &&
+    !props.titlebarInsets &&
+    (props.tabPosition ?? "top") === "top";
 
   return (
     <div
       ref={windowTransitionRef}
-      className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-border"
+      className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-border ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
       data-workspace-panes={leaves.length}
       data-workspace-scope={activeScopeKey}
       data-virtual-window={activeVirtualWindowId}
     >
       {!standaloneAgents && (
         <WorkspaceLayoutTabs
+          position={props.tabPosition}
           titlebarInsets={props.titlebarInsets}
           windowsTitlebarControls={props.windowsTitlebarControls}
           focusedPaneId={layout.focusedPaneId}
@@ -473,7 +478,7 @@ export function WorkspaceCanvas(props: {
         return (
           <div
             key={tab.id}
-            className={active ? "min-h-0 flex-1 overflow-hidden" : "hidden"}
+            className={active ? "min-h-0 min-w-0 flex-1 overflow-hidden" : "hidden"}
             role="tabpanel"
             aria-label={layoutTabLabel(tab)}
             aria-hidden={!active}

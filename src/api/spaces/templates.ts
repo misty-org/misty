@@ -1,10 +1,8 @@
 import { apiRequest } from "@/api/client";
-import type { OfficialApp } from "@/api/apps";
 export interface PersonalSpaceTemplate {
   id: string;
   name: string;
   description: string;
-  apps: Array<{ app_id: string; release_metadata: OfficialApp }>;
   version: number;
 }
 export const personalSpaceTemplatesApi = {

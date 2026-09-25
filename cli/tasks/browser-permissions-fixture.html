@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Browser permission test</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px system-ui; }
+    body { max-width: 640px; margin: 48px auto; padding: 24px; }
+    button { font: inherit; padding: 10px 14px; margin: 4px; }
+    output { display: block; margin-top: 24px; white-space: pre-wrap; }
+  </style>
+  <h1>Browser permission test</h1>
+  <p>Local test fixture. Requests happen only when a button is pressed. Any granted stream is stopped immediately; nothing is recorded or uploaded.</p>
+  <button data-kind="camera">Request camera</button>
+  <button data-kind="microphone">Request microphone</button>
+  <button data-kind="both">Request both</button>
+  <output role="status">No request made.</output>
+  <script>
+    document.querySelectorAll("button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const kind = button.dataset.kind;
+        const output = document.querySelector("output");
+        output.textContent = `Requesting ${kind}…`;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: kind !== "microphone", audio: kind !== "camera",
+          });
+          stream.getTracks().forEach((track) => track.stop());
+          output.textContent = `${kind}: granted; all tracks stopped.`;
+        } catch (error) {
+          output.textContent = `${kind}: ${error.name}. ${error.message}`;
+        }
+      });
+    });
+  </script>
+</html>

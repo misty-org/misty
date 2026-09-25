@@ -9,6 +9,7 @@ vi.mock("@/features/global-search/MistyModelPicker", () => ({ MistyModelPicker: 
 vi.mock("./AgentConversationView", () => ({
   AgentConversationView: () => <div>Conversation messages</div>,
 }));
+import { useCompanionState, initialCompanionPresentation } from "../companion/companionState";
 const finishExecutionMock = vi.fn(async () => {});
 vi.mock("@/features/agents/localExecution", () => ({
   finishLocalExecution: () => finishExecutionMock(),
@@ -38,6 +39,17 @@ const renderWorkspace = (profile = agent) =>
   );
 beforeEach(() => {
   vi.clearAllMocks();
+  useCompanionState.setState({
+    accountId: "owner",
+    presentation: initialCompanionPresentation,
+    control: async (control) => {
+      await finishExecutionMock();
+      if (control.kind === "mode")
+        useCompanionState.setState((s) => ({
+          presentation: { ...s.presentation, mode: control.mode },
+        }));
+    },
+  });
   useMistyStore.setState({
     accountId: "owner",
     selectedAgentId: "another-agent",
@@ -58,28 +70,23 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Agents workspace conversations", () => {
-  it("keeps all mode labels but only permits Agent in the Mac beta", async () => {
+  it("uses shared Team/Auto controls and removes the old User/Agent modes", async () => {
     renderWorkspace();
-    const userRadio = screen.getByRole("radio", { name: "User" });
-    const agentRadio = screen.getByRole("radio", { name: "Agent" });
-    const teamRadio = screen.getByRole("radio", { name: "Team" });
-
-    expect(userRadio).toBeDefined();
-    expect(agentRadio).toBeDefined();
-    expect(teamRadio).toBeDefined();
-    expect((userRadio as HTMLButtonElement).disabled).toBe(true);
-    expect((teamRadio as HTMLButtonElement).disabled).toBe(true);
-    expect(useMistyStore.getState().executionMode).toBe("user");
-
-    fireEvent.click(agentRadio);
-    await waitFor(() => expect(useMistyStore.getState().executionMode).toBe("agent"));
-    expect(finishExecutionMock).toHaveBeenCalled();
-
-    fireEvent.click(teamRadio);
-    expect(useMistyStore.getState().executionMode).toBe("agent");
+    expect(screen.queryByRole("radio", { name: "User" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Agent" })).toBeNull();
+    expect(screen.getByRole("radio", { name: "Team" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("radio", { name: "Auto" }));
+    await waitFor(() => expect(useCompanionState.getState().presentation.mode).toBe("auto"));
+    expect(finishExecutionMock).toHaveBeenCalledOnce();
+    const auto = screen.getByRole("radio", { name: "Auto" });
+    expect(auto.tabIndex).toBe(0);
+    expect(screen.getByRole("radio", { name: "Team" }).tabIndex).toBe(-1);
+    fireEvent.keyDown(auto, { key: "ArrowLeft" });
+    await waitFor(() => expect(useCompanionState.getState().presentation.mode).toBe("team"));
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Team" }));
   });
 
-  it("submits to the displayed agent and Space without opening another panel", async () => {
+  it("submits to the displayed agent without binding its conversation to a Space", async () => {
     renderWorkspace();
     fireEvent.change(screen.getByLabelText("Message Misty"), {
       target: { value: "Draft a launch note" },
@@ -88,14 +95,20 @@ describe("Agents workspace conversations", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
     expect(useMistyStore.getState()).toMatchObject({
       selectedAgentId: "writer",
-      selectedSpaceId: "studio",
+      selectedSpaceId: "",
     });
-    expect(submit).toHaveBeenCalledWith("Draft a launch note", [], undefined, "workspace", [], {
-      conversationId: "",
-      context: [
-        expect.objectContaining({ kind: "space", id: "studio", spaceId: "studio", attached: true }),
-      ],
-    });
+    expect(submit).toHaveBeenCalledWith(
+      "Draft a launch note",
+      [],
+      undefined,
+      "workspace",
+      [],
+      {
+        conversationId: "",
+        context: [],
+      },
+      { executionMode: "agent", interactionMode: "team", model: "" },
+    );
     expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe("");
   });
   it("keeps a failed draft available to retry", async () => {

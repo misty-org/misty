@@ -7,7 +7,6 @@ import (
 
 type preparedAIInvocationRuntime struct {
 	sdkRequest         *db.SDKInvocationRecord
-	routineExecution   *db.RoutineExecution
 	body               aiInvocationInput
 	resolved           []aiResolvedContext
 	spaceID            string

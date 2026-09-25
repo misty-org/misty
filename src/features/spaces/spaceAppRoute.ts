@@ -1,4 +1,4 @@
-import { packageRoute } from "@/features/apps/package/routes";
+import { packageRoute } from "@/shared/lib/toolRoutes";
 import { canonicalSpaceRoute } from "./spaceRouteNormalization";
 
 /** Preserve existing links to shared content after moving it out of Apps. */

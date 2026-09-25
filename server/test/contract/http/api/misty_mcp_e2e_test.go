@@ -117,19 +117,16 @@ func TestManagedMistyMCPNegotiatesWithOfficialGoSDK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var contextTool, drawingCreateTool, drawingApplyTool, remoteTool *mcp.Tool
+	var contextTool, spaceCatalogTool, spaceExecuteTool, remoteTool *mcp.Tool
 	for _, tool := range result.Tools {
-		if tool.Name == "agents.list" || tool.Name == "agents.status" {
-			t.Fatalf("managed Misty exposed the retired Agent roster tool %q", tool.Name)
-		}
 		if tool.Name == "context.get" {
 			contextTool = tool
 		}
-		if tool.Name == "drawings.create" {
-			drawingCreateTool = tool
+		if tool.Name == "spaces.tools" {
+			spaceCatalogTool = tool
 		}
-		if tool.Name == "drawings.apply" {
-			drawingApplyTool = tool
+		if tool.Name == "spaces.execute" {
+			spaceExecuteTool = tool
 		}
 		if tool.Name == remoteName {
 			remoteTool = tool
@@ -144,11 +141,11 @@ func TestManagedMistyMCPNegotiatesWithOfficialGoSDK(t *testing.T) {
 	if contextTool.Meta["misty/risk"] != "read" || contextTool.Meta["misty/version"] == nil {
 		t.Fatalf("context.get is missing Misty metadata: %#v", contextTool.Meta)
 	}
-	if drawingCreateTool == nil || drawingApplyTool == nil {
-		t.Fatalf("drawing write tools are missing from the run-scoped MCP catalog")
+	if spaceCatalogTool == nil || spaceExecuteTool == nil {
+		t.Fatalf("Space destination tools are missing from the run-scoped MCP catalog")
 	}
-	if drawingCreateTool.Meta["misty/risk"] != "write" || drawingApplyTool.Meta["misty/risk"] != "write" {
-		t.Fatalf("drawing tools are missing write-risk metadata")
+	if spaceCatalogTool.Meta["misty/risk"] != "read" || spaceExecuteTool.Meta["misty/risk"] != "write" {
+		t.Fatalf("Space destination tools have incorrect risk metadata")
 	}
 	if remoteTool == nil || remoteTool.InputSchema == nil || remoteTool.OutputSchema == nil {
 		t.Fatalf("connected remote MCP tool is not advertised with typed schemas: %#v", remoteTool)

@@ -1,3 +1,4 @@
+import { companionReply } from "../companion/companionReply";
 import type {
   GlobalAiActionProposal,
   GlobalAiConversation,
@@ -7,7 +8,7 @@ import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRunt
 
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Button, cn } from "@/shared/ui";
 import {
   AlertCircle,
@@ -185,8 +186,9 @@ function CollapsibleText({ text }: { text: string }) {
         {text}
       </p>
       {long ? (
-        <Button variant="ghost"
-         
+        <Button
+          variant="ghost"
+
           className="mt-2 text-xs font-medium text-cream-muted hover:text-cream"
           onClick={() => setExpanded((value) => !value)}
         >
@@ -229,9 +231,7 @@ function AgentActionStatus(props: {
             </span>
           </div>
           {proposal.summary ? (
-            <p className="mb-0 mt-1 text-[12px] leading-relaxed text-cream">
-              {proposal.summary}
-            </p>
+            <p className="mb-0 mt-1 text-[12px] leading-relaxed text-cream">{proposal.summary}</p>
           ) : null}
           {proposal.error ? (
             <SystemErrorActivity
@@ -322,8 +322,9 @@ function MessageFeedback(props: {
 
 function FeedbackButton(props: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <Button variant="ghost"
-     
+    <Button
+      variant="ghost"
+
       aria-label={props.label}
       title={props.label}
       onClick={props.onClick}
@@ -375,7 +376,7 @@ function actionStatus(state: GlobalAiActionProposal["state"]) {
 }
 
 function visibleConversationContent(value: string, role: GlobalAiMessage["role"]) {
-  let content = value.trim();
+  let content = role === "assistant" ? companionReply(value).text : value.trim();
   if (content.startsWith("User request:\n")) content = content.slice("User request:\n".length);
   const privateMarkers = [
     "\n\nTrusted context envelope.",

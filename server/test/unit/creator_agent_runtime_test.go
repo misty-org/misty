@@ -146,7 +146,7 @@ func TestCreatorAuthorityPolicyAndBrowserCatalog(t *testing.T) {
 	if api.TestingPersonalAgentCapabilityAllowed(json.RawMessage(`{"mode":"inherit_invoker"}`), "browser.navigate", "write") {
 		t.Fatal("retired invoker policy must fail closed")
 	}
-	want := map[string]bool{"browser.inspect": true, "browser.navigate": true, "browser.click": true, "browser.downloads.list": true}
+	want := map[string]bool{"browser.inspect": true, "browser.navigate": true, "browser.click": true, "browser.downloads.list": true, "browser.request_user_action": true, "browser.interact": true, "browser.visual": true, "browser.workspace.visual": true, "browser.workspace.interact": true, "browser.upload": true, "browser.type": true}
 	for _, descriptor := range api.TestingPersonalAgentToolboxDescriptors() {
 		if !strings.HasPrefix(descriptor.Name, "browser.") {
 			continue

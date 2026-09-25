@@ -41,7 +41,7 @@ func (db *Database) AIInvocationDeviceWait(ctx context.Context, userID, runID, r
 		var target string
 		var expiry time.Time
 		var count int
-		err := tx.QueryRowContext(ctx, `SELECT c.id,LEAST(c.expires_at,i.expires_at,NOW()+INTERVAL '24 hours'),COUNT(*) OVER() FROM ai_invocation_contexts c JOIN ai_invocations i ON i.id=c.invocation_id AND i.space_id=c.space_id AND i.user_id=c.user_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id AND d.revoked_at IS NULL WHERE c.invocation_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.capabilities ? $4 AND c.state='attached' AND c.expires_at>NOW() AND i.expires_at>NOW()`, runID, userID, scope, capability).Scan(&target, &expiry, &count)
+		err := tx.QueryRowContext(ctx, `SELECT c.id,LEAST(c.expires_at,i.expires_at,NOW()+INTERVAL '24 hours'),COUNT(*) OVER() FROM ai_invocation_contexts c JOIN ai_invocations i ON i.id=c.invocation_id AND i.user_id=c.user_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id AND d.revoked_at IS NULL WHERE c.invocation_id=$1 AND c.user_id=$2 AND c.opaque_ref=$3 AND c.capabilities ? $4 AND c.state='attached' AND c.expires_at>NOW() AND i.expires_at>NOW()`, runID, userID, scope, capability).Scan(&target, &expiry, &count)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrDeviceNotFound
 		}
@@ -64,7 +64,7 @@ func (db *Database) AIInvocationDeviceWait(ctx context.Context, userID, runID, r
 	return waiting, err
 }
 
-const aiDeviceReady = `EXISTS(SELECT 1 FROM ai_invocation_contexts c JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id WHERE c.id=i.device_wait_context_id AND c.invocation_id=i.id AND c.user_id=i.user_id AND c.space_id=i.space_id AND c.opaque_ref=i.device_wait_scope_id AND c.capabilities ? i.device_wait_capability AND c.state='attached' AND c.expires_at>NOW() AND d.revoked_at IS NULL AND d.last_seen_at>NOW()-INTERVAL '90 seconds')`
+const aiDeviceReady = `EXISTS(SELECT 1 FROM ai_invocation_contexts c JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=c.user_id WHERE c.id=i.device_wait_context_id AND c.invocation_id=i.id AND c.user_id=i.user_id AND c.opaque_ref=i.device_wait_scope_id AND c.capabilities ? i.device_wait_capability AND c.state='attached' AND c.expires_at>NOW() AND d.revoked_at IS NULL AND d.last_seen_at>NOW()-INTERVAL '90 seconds')`
 
 func (db *Database) AIInvocationDeviceWaitsReady(ctx context.Context, limit int) ([]AgentDeviceWait, error) {
 	if limit < 1 || limit > 100 {
@@ -146,7 +146,7 @@ func (db *Database) AIInvocationDeviceResumeAuthorized(ctx context.Context, deli
 		if err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocations i JOIN ai_invocation_contexts c ON c.id=i.device_wait_context_id AND c.invocation_id=i.id AND c.user_id=i.user_id AND c.space_id=i.space_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=i.user_id WHERE i.id=$1 AND c.state='attached' AND c.expires_at>NOW() AND c.opaque_ref=i.device_wait_scope_id AND c.capabilities ? i.device_wait_capability AND d.revoked_at IS NULL)`, delivery.RunID).Scan(&allowed)
+		return tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocations i JOIN ai_invocation_contexts c ON c.id=i.device_wait_context_id AND c.invocation_id=i.id AND c.user_id=i.user_id JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=i.user_id WHERE i.id=$1 AND c.state='attached' AND c.expires_at>NOW() AND c.opaque_ref=i.device_wait_scope_id AND c.capabilities ? i.device_wait_capability AND d.revoked_at IS NULL)`, delivery.RunID).Scan(&allowed)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil

@@ -38,7 +38,7 @@ func (meter *recordingUsageMeter) ReserveForSpace(userID, spaceID, key string, _
 	return meter.Reserve(userID, key, "", provider, model, 0, 0)
 }
 
-func TestSpaceCompletionPreservesUsageScopeWithAndWithoutTools(t *testing.T) {
+func TestSpaceContentCompletionBillsOnlyRequestingAccount(t *testing.T) {
 	for _, testCase := range []struct {
 		name     string
 		manifest ToolManifest
@@ -53,7 +53,7 @@ func TestSpaceCompletionPreservesUsageScopeWithAndWithoutTools(t *testing.T) {
 			if _, err := service.CompleteWithToolsForSpaceContext(context.Background(), "member", "space-owner", "space-123", "identity", "prompt", TierLow, testCase.manifest, testCase.execute); err != nil {
 				t.Fatal(err)
 			}
-			if meter.userID != "member" || meter.spaceID != "space-123" {
+			if meter.userID != "member" || meter.spaceID != "" {
 				t.Fatalf("usage scope = user %q space %q", meter.userID, meter.spaceID)
 			}
 		})

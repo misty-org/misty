@@ -4,8 +4,8 @@ import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/clien
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui/button";
-import misty from "@/shared/assets/misty-cloud-expression-cycle.webp";
-import mistyStill from "@/shared/assets/agents/cloud-sky-poster.webp";
+import misty from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
+import mistyStill from "@/shared/assets/agents/cloud-sky-poster.webp?inline";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
 import { useBrowserSyncStore } from "./store";
 
@@ -19,13 +19,16 @@ export function SyncSleepScreen({
   onWake: () => void;
 }) {
   return (
-    <Dialog.Root open>
+    <Dialog.Root open modal={false}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[2147483200] bg-black/75 backdrop-blur-sm" />
+        <div
+          aria-hidden="true"
+          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483200] bg-black/75 backdrop-blur-sm"
+        />
         <Dialog.Content
           data-slot="dialog-content"
           data-device-sync-sleep=""
-          className="fixed inset-0 z-[2147483201] flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
+          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -93,6 +96,12 @@ export function BrowserSyncSleepOverlay({ accountId }: { accountId: string }) {
     hasTauriInternals() &&
     accountId &&
     session?.account_id === accountId &&
+    session.full_sync !== false &&
+    session.workspace.active_device?.device_id &&
+    (session.status.phase === "ready" || session.status.phase === "catching_up") &&
+    session.status.applied_sequence >= session.status.head_sequence &&
+    !session.status.issue &&
+    !session.browser_profile_issue &&
     !activeDeviceEpoch(session) &&
     !isApiSessionTransitioning(),
   );

@@ -1,0 +1,14 @@
+{
+  "vite": {
+    "package": "vite",
+    "config": "vite.config.ts",
+    "requires": ["tailwind.config.js"],
+    "shortConfig": "-c"
+  },
+  "vitest": { "package": "vitest", "config": "vitest.config.ts", "shortConfig": "-c" },
+  "eslint": { "package": "eslint", "config": "eslint.config.js", "shortConfig": "-c" },
+  "prettier": { "package": "prettier", "config": "prettier.json" },
+  "audit-ci": { "package": "audit-ci", "config": "audit-ci.json" },
+  "wrangler": { "package": "wrangler", "config": "wrangler.jsonc", "shortConfig": "-c" },
+  "gitleaks": { "executable": "gitleaks", "config": "gitleaks.toml" }
+}

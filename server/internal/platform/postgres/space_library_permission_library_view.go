@@ -6,33 +6,35 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/kannachi323/misty/server/internal/spaces"
 )
 
 const (
-	PermissionLibraryView        = "library.view"
-	PermissionMessagesRead       = "messages.read"
-	PermissionMessagesWrite      = "messages.write"
-	PermissionLibraryUpload      = "library.upload"
-	PermissionAttachmentUpload   = "attachments.upload"
-	PermissionLibraryAdd         = "library.add"
-	PermissionLibraryEdit        = "library.edit"
-	PermissionLibraryDownload    = "library.download"
-	PermissionLibraryImport      = "library.import"
-	PermissionStorageViewMembers = "storage.view_member_usage"
-	PermissionStorageManage      = "storage.manage"
-	PermissionStorageViewOwn     = "storage.view_own_usage"
-	PermissionStudioView         = "studio.view"
-	PermissionStudioManage       = "studio.manage"
-	PermissionAskRun             = "ask.run"
-	PermissionTasksView          = "tasks.view"
-	PermissionTasksManage        = "tasks.manage"
-	PermissionIntegrationsManage = "integrations.manage"
-	PermissionSpaceInvite        = "space.invite"
-	PermissionSpaceRename        = "space.rename"
-	PermissionSpaceTransfer      = "space.transfer"
-	PermissionSpaceDelete        = "space.delete"
-	PermissionSpaceLeave         = "space.leave"
-	LibraryRecoveryWindow        = 30 * 24 * time.Hour
+	PermissionLibraryView        = spaces.PermissionLibraryView
+	PermissionMessagesRead       = spaces.PermissionMessagesRead
+	PermissionMessagesWrite      = spaces.PermissionMessagesWrite
+	PermissionLibraryUpload      = spaces.PermissionLibraryUpload
+	PermissionAttachmentUpload   = spaces.PermissionAttachmentUpload
+	PermissionLibraryAdd         = spaces.PermissionLibraryAdd
+	PermissionLibraryEdit        = spaces.PermissionLibraryEdit
+	PermissionLibraryDownload    = spaces.PermissionLibraryDownload
+	PermissionLibraryImport      = spaces.PermissionLibraryImport
+	PermissionStorageViewMembers = spaces.PermissionStorageViewMembers
+	PermissionStorageManage      = spaces.PermissionStorageManage
+	PermissionStorageViewOwn     = spaces.PermissionStorageViewOwn
+	PermissionStudioView         = spaces.PermissionStudioView
+	PermissionStudioManage       = spaces.PermissionStudioManage
+	PermissionAskRun             = spaces.PermissionAskRun
+	PermissionTasksView          = spaces.PermissionTasksView
+	PermissionTasksManage        = spaces.PermissionTasksManage
+	PermissionIntegrationsManage = spaces.PermissionIntegrationsManage
+	PermissionSpaceInvite        = spaces.PermissionSpaceInvite
+	PermissionSpaceRename        = spaces.PermissionSpaceRename
+	PermissionSpaceTransfer      = spaces.PermissionSpaceTransfer
+	PermissionSpaceDelete        = spaces.PermissionSpaceDelete
+	PermissionSpaceLeave         = spaces.PermissionSpaceLeave
+	LibraryRecoveryWindow        = spaces.LibraryRecoveryWindow
 )
 
 // RequireSpacePermission exposes the database's canonical permission check to
@@ -47,65 +49,30 @@ func (db *Database) RequireSpacePermission(ctx context.Context, userID, spaceID,
 // maximum file size applies. The database enforces the maximum independently of
 // the API service so a misconfigured service cannot widen the limit.
 const (
-	UploadPurposeLibrary        = "library"
-	UploadPurposeChatAttachment = "attachment"
-	UploadPurposeNoteAttachment = "note_attachment"
-	UploadPurposeDrawingAsset   = "drawing_attachment"
+	UploadPurposeLibrary        = spaces.UploadPurposeLibrary
+	UploadPurposeChatAttachment = spaces.UploadPurposeChatAttachment
+	UploadPurposeNoteAttachment = spaces.UploadPurposeNoteAttachment
+	UploadPurposeDrawingAsset   = spaces.UploadPurposeDrawingAsset
 )
 
 // Default per-purpose maximums. Deployments may lower these through
 // configuration, but never above the ceiling enforced here.
 const (
-	DefaultLibraryMaxFileBytes        = int64(100 << 20)
-	DefaultChatAttachmentMaxFileBytes = int64(10 << 20)
-	DefaultNoteAttachmentMaxFileBytes = int64(15 << 20)
-	DefaultDrawingAssetMaxFileBytes   = int64(15 << 20)
+	DefaultLibraryMaxFileBytes        = spaces.DefaultLibraryMaxFileBytes
+	DefaultChatAttachmentMaxFileBytes = spaces.DefaultChatAttachmentMaxFileBytes
+	DefaultNoteAttachmentMaxFileBytes = spaces.DefaultNoteAttachmentMaxFileBytes
+	DefaultDrawingAssetMaxFileBytes   = spaces.DefaultDrawingAssetMaxFileBytes
 )
 
 // MaxUploadBytesForPurpose is the hard database ceiling for a purpose. An
 // unknown purpose has no valid ceiling and returns 0.
-func MaxUploadBytesForPurpose(purpose string) int64 {
-	switch purpose {
-	case UploadPurposeLibrary:
-		return DefaultLibraryMaxFileBytes
-	case UploadPurposeChatAttachment:
-		return DefaultChatAttachmentMaxFileBytes
-	case UploadPurposeNoteAttachment:
-		return DefaultNoteAttachmentMaxFileBytes
-	case UploadPurposeDrawingAsset:
-		return DefaultDrawingAssetMaxFileBytes
-	default:
-		return 0
-	}
-}
+func MaxUploadBytesForPurpose(purpose string) int64 { return spaces.MaxUploadBytesForPurpose(purpose) }
 
-// UploadPurposePermission maps a purpose to the Space permission it requires.
 func UploadPurposePermission(purpose string) (string, bool) {
-	switch purpose {
-	case UploadPurposeLibrary:
-		return PermissionLibraryUpload, true
-	case UploadPurposeChatAttachment:
-		return PermissionAttachmentUpload, true
-	case UploadPurposeNoteAttachment:
-		// Note assets authorize against the parent note, not a Space-wide
-		// permission. Callers must check note edit access before reaching here.
-		return PermissionLibraryView, true
-	case UploadPurposeDrawingAsset:
-		// Drawing assets authorize against the parent drawing.
-		return PermissionLibraryView, true
-	default:
-		return "", false
-	}
+	return spaces.UploadPurposePermission(purpose)
 }
 
-var configurableSpacePermissions = []string{
-	PermissionMessagesRead, PermissionMessagesWrite,
-	PermissionLibraryView, PermissionLibraryUpload, PermissionAttachmentUpload,
-	PermissionLibraryAdd, PermissionLibraryEdit, PermissionLibraryDownload,
-	PermissionLibraryImport, PermissionStorageViewOwn, PermissionStorageViewMembers,
-	PermissionStorageManage, PermissionStudioView, PermissionStudioManage, PermissionAskRun,
-	PermissionTasksView, PermissionTasksManage, PermissionIntegrationsManage,
-}
+var configurableSpacePermissions = spaces.ConfigurablePermissions()
 
 var (
 	ErrLibraryNotFound         = errors.New("library resource not found")

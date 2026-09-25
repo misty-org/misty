@@ -1,3 +1,4 @@
+import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { browserHomeUrl } from "./browserHome";
@@ -355,6 +356,7 @@ export interface WorkspaceLayoutTab {
 }
 
 export interface WorkspaceVirtualWindow {
+  dockingLayout?: DockingLayout;
   id: string;
   title: string;
   layout: WorkspaceLayout;

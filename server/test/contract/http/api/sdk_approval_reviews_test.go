@@ -23,9 +23,9 @@ func testSDKApprovalReview(t *testing.T, database *db.Database, user, approvalID
 		t.Fatal(err)
 	}
 	router := chi.NewRouter()
-	router.Get("/me/capability-approvals", service.SDKCapabilityApprovals())
-	router.Get("/me/capability-approvals/{approvalID}", service.SDKCapabilityApprovalReview())
-	path := "/me/capability-approvals/" + approvalID
+	router.Get("/me/agent-approvals", service.AgentBrowserApprovals())
+	router.Get("/me/agent-approvals/{approvalID}", service.AgentBrowserApprovalReview())
+	path := "/me/agent-approvals/" + approvalID
 	account := newConversationTestBearerToken(t, database, user)
 	response := performConversationRequest(t, router, http.MethodGet, path, account, nil)
 	var result struct {
@@ -47,7 +47,7 @@ func testSDKApprovalReview(t *testing.T, database *db.Database, user, approvalID
 			t.Fatalf("review leaked %s", private)
 		}
 	}
-	listed := performConversationRequest(t, router, http.MethodGet, "/me/capability-approvals?limit=20", account, nil)
+	listed := performConversationRequest(t, router, http.MethodGet, "/me/agent-approvals?limit=20", account, nil)
 	if listed.Code != 200 || !strings.Contains(listed.Body.String(), approvalID) || strings.Contains(listed.Body.String(), "ciphertext") || strings.Contains(listed.Body.String(), "execution") || listed.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("pending approval discovery: %d %s", listed.Code, listed.Body.String())
 	}
@@ -59,7 +59,7 @@ func testSDKApprovalReview(t *testing.T, database *db.Database, user, approvalID
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherList := performConversationRequest(t, router, http.MethodGet, "/me/capability-approvals", newConversationTestBearerToken(t, database, other.ID), nil)
+	otherList := performConversationRequest(t, router, http.MethodGet, "/me/agent-approvals", newConversationTestBearerToken(t, database, other.ID), nil)
 	if otherList.Code != 200 || strings.Contains(otherList.Body.String(), approvalID) {
 		t.Fatalf("cross-user discovery: %d %s", otherList.Code, otherList.Body.String())
 	}

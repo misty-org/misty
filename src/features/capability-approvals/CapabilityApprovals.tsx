@@ -110,7 +110,10 @@ export function CapabilityApprovalDetail({ id, onClose }: { id: string; onClose(
     void capabilityApprovalsApi
       .review(id, controller.signal)
       .then((value) => {
-        if (!controller.signal.aborted && useCapabilityApprovals.getState().accountId === accountId) {
+        if (
+          !controller.signal.aborted &&
+          useCapabilityApprovals.getState().accountId === accountId
+        ) {
           setReview(value);
           if (value.approval.state !== "pending")
             useActivityStore.getState().resolveSourceRequest(accountId, "capabilities", id);
@@ -288,20 +291,6 @@ function ReviewField({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-function effectLabel(kind: string) {
-  return (
-    (
-      {
-        read: "Read information",
-        write: "Create or change information",
-        send: "Send information to others",
-        destructive: "Delete or destructively change information",
-        execute: "Execute an operation",
-      } as Record<string, string>
-    )[kind] ?? kind
-  );
-}
-
 function approvalDisplayDetails(value: CapabilityApprovalReview) {
   const detail = value.review;
   if (detail.kind === "browser") {
@@ -350,14 +339,5 @@ function approvalDisplayDetails(value: CapabilityApprovalReview) {
       browser: detail,
     };
   }
-  return {
-    action: detail.execution.capability,
-    target: detail.target.label,
-    provider: detail.target.appId,
-    deadline: detail.execution.deadline,
-    effect: effectLabel(detail.effects.kind),
-    incidental: detail.effects.incidental,
-    input: detail.prepared ? { account: detail.prepared.account, content: detail.prepared.content, request: detail.execution.input } : detail.execution.input,
-    browser: undefined,
-  };
+  throw new Error("Unsupported Agent action review");
 }

@@ -378,6 +378,8 @@ export function normalizeConversation(conversation: GlobalAiConversation): Globa
   const now = new Date().toISOString();
   return {
     ...conversation,
+    spaceId: undefined, // Historical provenance does not scope Agents.
+
     title: conversation.title?.trim() || "New conversation",
     createdAt: conversation.createdAt || now,
     updatedAt: conversation.updatedAt || now,

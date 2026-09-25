@@ -58,7 +58,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_OPERATOR_USER_ID",
             "MISTY_PUBLIC_API_URL",
             "MISTY_SDK_EXECUTION_ENABLED",
-            "MISTY_SDK_PROVIDERS_ENABLED",
             "MISTY_WEBSITE_URL",
             "PASSWORD_RESET_START_URL",
             "PASSWORD_RESET_URL",
@@ -117,6 +116,9 @@ const FILES: &[FileSpec] = &[
         path: "integrations/cloudflare.env",
         names: &[
             "CLOUDFLARE_ACCOUNT_ID",
+            "CLOUDFLARE_ZONE_ID",
+            "MISTY_CLOUDFLARE_TUNNEL_ID",
+            "MISTY_CLOUDFLARE_TUNNEL_NAME",
             "CLOUDFLARE_API_TOKEN",
             "CLOUDFLARE_TUNNEL_TOKEN",
             "MISTY_CLOUDFLARE_WORKER_HOST",
@@ -130,16 +132,11 @@ const FILES: &[FileSpec] = &[
         ],
     },
     FileSpec {
-        path: "integrations/activepieces.env",
+        path: "integrations/billing.env",
         names: &[
-            "ACTIVEPIECES_ENCRYPTION_KEY",
-            "ACTIVEPIECES_HOST_PORT",
-            "ACTIVEPIECES_JWT_SECRET",
-            "ACTIVEPIECES_POSTGRES_DATABASE",
-            "ACTIVEPIECES_POSTGRES_PASSWORD",
-            "ACTIVEPIECES_POSTGRES_USERNAME",
-            "ACTIVEPIECES_PUBLIC_URL",
-            "ACTIVEPIECES_REDIS_PASSWORD",
+            "MISTY_BILLING_ADAPTER",
+            "MISTY_BILLING_URL",
+            "MISTY_BILLING_SECRET",
         ],
     },
     FileSpec {
@@ -161,7 +158,6 @@ const FILES: &[FileSpec] = &[
             "MAILJET_FROM_EMAIL",
             "MAILJET_FROM_NAME",
             "MAILJET_SECRET_KEY",
-            "WAITLIST_NOTIFY_EMAIL",
         ],
     },
     FileSpec {
@@ -223,21 +219,6 @@ const FILES: &[FileSpec] = &[
         ],
     },
     FileSpec {
-        path: "integrations/stripe.env",
-        names: &[
-            "STRIPE_CHECKOUT_CANCEL_URL",
-            "STRIPE_CHECKOUT_SUCCESS_URL",
-            "STRIPE_PORTAL_RETURN_URL",
-            "STRIPE_PRICE_MAX_MONTHLY",
-            "STRIPE_PRICE_MAX_YEARLY",
-            "STRIPE_PRICE_PRO_MONTHLY",
-            "STRIPE_PRICE_PRO_YEARLY",
-            "STRIPE_SECRET_KEY",
-            "STRIPE_WEBHOOK_PATH",
-            "STRIPE_WEBHOOK_SECRET",
-        ],
-    },
-    FileSpec {
         path: "crypto/documents.env",
         names: &[
             "DOCUMENT_KEY_ID",
@@ -277,9 +258,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_AUTH_SIGNING_KEY",
             "MISTY_AUTH_SIGNING_KEY_PREVIOUS",
             "MISTY_COLLAB_INTERNAL_SECRET",
-            "MISTY_SELF_HOST_ENTITLEMENT_KEY_ID",
-            "MISTY_SELF_HOST_ENTITLEMENT_PRIVATE_KEY",
-            "MISTY_SELF_HOST_ENTITLEMENT_SUBJECT_SECRET",
         ],
     },
 ];
@@ -287,13 +265,6 @@ const FILES: &[FileSpec] = &[
 const DEPRECATED_NAMES: &[&str] = &["MISTY_CONNECTED_DEVICES_ENABLED"];
 
 const PROD_REQUIRED: &[&str] = &[
-    "ACTIVEPIECES_ENCRYPTION_KEY",
-    "ACTIVEPIECES_JWT_SECRET",
-    "ACTIVEPIECES_POSTGRES_DATABASE",
-    "ACTIVEPIECES_POSTGRES_PASSWORD",
-    "ACTIVEPIECES_POSTGRES_USERNAME",
-    "ACTIVEPIECES_PUBLIC_URL",
-    "ACTIVEPIECES_REDIS_PASSWORD",
     "DB_HOST",
     "DB_MIGRATION_PASSWORD",
     "DB_MIGRATION_USER",
@@ -307,35 +278,20 @@ const PROD_REQUIRED: &[&str] = &[
     "MISTY_ENVIRONMENT",
     "MISTY_OPERATOR_USER_ID",
     "MISTY_PUBLIC_API_URL",
-    "MISTY_SELF_HOST_ENTITLEMENT_KEY_ID",
-    "MISTY_SELF_HOST_ENTITLEMENT_PRIVATE_KEY",
-    "MISTY_SELF_HOST_ENTITLEMENT_SUBJECT_SECRET",
     "R2_ACCESS_KEY",
     "R2_BUCKET",
     "R2_ENDPOINT",
     "R2_SECRET_KEY",
     "SPACE_LINK_ENCRYPTION_KEY",
-    "STRIPE_CHECKOUT_CANCEL_URL",
-    "STRIPE_CHECKOUT_SUCCESS_URL",
-    "STRIPE_PORTAL_RETURN_URL",
-    "STRIPE_PRICE_MAX_MONTHLY",
-    "STRIPE_PRICE_MAX_YEARLY",
-    "STRIPE_PRICE_PRO_MONTHLY",
-    "STRIPE_PRICE_PRO_YEARLY",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
 ];
 
 const DEV_REQUIRED: &[&str] = &[
-    "ACTIVEPIECES_ENCRYPTION_KEY",
-    "ACTIVEPIECES_JWT_SECRET",
-    "ACTIVEPIECES_POSTGRES_DATABASE",
-    "ACTIVEPIECES_POSTGRES_PASSWORD",
-    "ACTIVEPIECES_POSTGRES_USERNAME",
-    "ACTIVEPIECES_PUBLIC_URL",
-    "ACTIVEPIECES_REDIS_PASSWORD",
     "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_TUNNEL_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "MISTY_DEV_API_ORIGIN",
+    "MISTY_DEV_API_TUNNEL_HOSTNAME",
+    "MISTY_CLOUDFLARE_WORKER_HOST",
 ];
 
 pub fn root(workspace: &Workspace, target: Target) -> PathBuf {
@@ -372,26 +328,20 @@ pub fn init(workspace: &Workspace, target: Target) -> Result<()> {
 }
 
 fn initial_file_contents(spec: FileSpec, target: Target) -> String {
-    if spec.path != "integrations/activepieces.env" {
-        return String::new();
+    if target == Target::Dev {
+        match spec.path {
+            "runtime.env" => return "# Container development defaults.\nMISTY_ENVIRONMENT=development\nMISTY_HOST_PORT=8081\n".into(),
+            "crypto/services.env" => { use base64::Engine; return format!("# Generated once; preserve across restarts.\nMISTY_AUTH_SIGNING_KEY={}\nMISTY_AGENT_RUNTIME_CONTROL_SECRET={}\n", base64::engine::general_purpose::STANDARD.encode(random_hex(32)), base64::engine::general_purpose::STANDARD.encode(random_hex(32))); },
+            "database.env" => return format!("# Generated once; preserve these with the database volume.\nDB_USER=misty_app\nDB_NAME=misty_server\nDB_MIGRATION_USER=misty\nDB_PASSWORD={}\nDB_MIGRATION_PASSWORD={}\nAGENT_RUNTIME_DB_PASSWORD={}\n", random_hex(32), random_hex(32), random_hex(32)),
+            _ => {}
+        }
     }
-    let public_url = match target {
-        Target::Dev => "https://dev-api.mistysys.com/activepieces",
-        Target::Prod => "",
-    };
     format!(
-        "ACTIVEPIECES_PUBLIC_URL={public_url}\n\
-ACTIVEPIECES_HOST_PORT=8090\n\
-ACTIVEPIECES_POSTGRES_DATABASE=activepieces\n\
-ACTIVEPIECES_POSTGRES_USERNAME=activepieces\n\
-ACTIVEPIECES_POSTGRES_PASSWORD={}\n\
-ACTIVEPIECES_REDIS_PASSWORD={}\n\
-ACTIVEPIECES_ENCRYPTION_KEY={}\n\
-ACTIVEPIECES_JWT_SECRET={}\n",
-        random_hex(32),
-        random_hex(32),
-        random_hex(16),
-        random_hex(32),
+        "# Managed by misty env. Configure only the features you use.\n{}",
+        spec.names
+            .iter()
+            .map(|name| format!("# {name}=\n"))
+            .collect::<String>()
     )
 }
 
@@ -410,7 +360,7 @@ pub fn migrate(workspace: &Workspace) -> Result<()> {
     Ok(())
 }
 
-pub fn check(workspace: &Workspace, target: Target) -> Result<()> {
+pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
     read_cli_files(workspace)?;
     let values = read(workspace, target)?;
     let missing = required(target)
@@ -429,6 +379,73 @@ pub fn check(workspace: &Workspace, target: Target) -> Result<()> {
             missing.join(", ")
         );
     }
+
+    let deployment = values
+        .get("MISTY_DEPLOYMENT_MODE")
+        .map(|s| s.trim())
+        .unwrap_or("self_hosted");
+    let billing = values
+        .get("MISTY_BILLING_ADAPTER")
+        .map(|s| s.trim())
+        .unwrap_or("none");
+    if deployment == "hosted" && billing != "http" {
+        bail!("Hosted deployment requires MISTY_BILLING_ADAPTER=http");
+    }
+    if !matches!(billing, "" | "none" | "null" | "http") {
+        bail!("Unknown MISTY_BILLING_ADAPTER mode");
+    }
+    if billing == "http" {
+        let raw = values
+            .get("MISTY_BILLING_URL")
+            .context("MISTY_BILLING_URL is required")?;
+        let url = url::Url::parse(raw).context("Invalid MISTY_BILLING_URL")?;
+        let local = target == Target::Dev
+            && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"));
+        if (url.scheme() != "https" && !(url.scheme() == "http" && local))
+            || url.host_str().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            bail!("Billing URL requires HTTPS, except for development loopback");
+        }
+        if values
+            .get("MISTY_BILLING_SECRET")
+            .is_none_or(|secret| secret.len() < 32)
+        {
+            bail!("MISTY_BILLING_SECRET must contain at least 32 bytes");
+        }
+    }
+    if target == Target::Dev {
+        {
+            let name = "MISTY_DEV_API_ORIGIN";
+            let value = values.get(name).context("missing API origin")?;
+            let url = url::Url::parse(value).context("API origin must be a valid HTTPS origin")?;
+            if url.scheme() != "https"
+                || url.host_str().is_none()
+                || !matches!(url.path(), "" | "/")
+                || url.query().is_some()
+                || url.fragment().is_some()
+                || !url.username().is_empty()
+                || url.password().is_some()
+            {
+                bail!("{name} must be an HTTPS origin without a path or credentials");
+            }
+            if url.host_str()
+                != values
+                    .get("MISTY_DEV_API_TUNNEL_HOSTNAME")
+                    .map(String::as_str)
+            {
+                bail!("API origin and tunnel hostname must match");
+            }
+        }
+        if let Some(port) = values.get("MISTY_HOST_PORT") {
+            if port.parse::<u16>().ok().is_none_or(|p| p == 0) {
+                bail!("MISTY_HOST_PORT must be a port between 1 and 65535");
+            }
+        }
+    }
     if target == Target::Prod {
         let placeholders = values
             .iter()
@@ -442,15 +459,12 @@ pub fn check(workspace: &Workspace, target: Target) -> Result<()> {
             );
         }
     }
-    println!(
-        "{} environment is valid ({} configured values across {} files).",
-        target.label(),
-        values
-            .values()
-            .filter(|value| !value.trim().is_empty())
-            .count(),
-        FILES.len()
-    );
+    Ok(())
+}
+
+pub fn check(workspace: &Workspace, target: Target) -> Result<()> {
+    validate(workspace, target)?;
+    println!("{} environment is valid.", target.label());
     Ok(())
 }
 
@@ -806,6 +820,55 @@ fn secure_directories(root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Update one registered setting without printing its value or replacing other settings.
+pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Result<()> {
+    if value.contains(['\n', '\r', '\0']) {
+        bail!("environment values must be single-line");
+    }
+    let owners = ownership()?;
+    let relative = owners.get(name).context("unknown environment setting")?;
+    let path = root(workspace, target).join(relative);
+    let contents = fs::read_to_string(&path)?;
+    let mut lines: Vec<String> = contents
+        .lines()
+        .filter(|line| {
+            line.split_once('=')
+                .is_none_or(|(key, _)| key.trim() != name)
+        })
+        .map(str::to_owned)
+        .collect();
+    // Single quoting prevents dotenv expansion of dollar signs in credentials.
+    if value.contains('\'') {
+        bail!("environment values cannot contain a single quote");
+    }
+    lines.push(format!("{name}='{value}'"));
+    use std::io::Write;
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(path.parent().context("environment path has no parent")?)?;
+    temporary.write_all(format!("{}\n", lines.join("\n")).as_bytes())?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(&path).map_err(|e| e.error)?;
+    Ok(())
+}
+
+/// The environment registry is shared by init, validation, setup and Compose.
+pub fn describe() -> Result<()> {
+    for spec in FILES {
+        println!("{}", spec.path);
+        for name in spec.names {
+            println!(
+                "  {name}{}",
+                if DEV_REQUIRED.contains(name) {
+                    " (required for development)"
+                } else {
+                    ""
+                }
+            );
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -816,10 +879,7 @@ mod tests {
         assert!(owners.len() > 80);
         assert_eq!(owners["DISCORD_BOT_TOKEN"], "integrations/discord.env");
         assert_eq!(owners["INSTAGRAM_APP_SECRET"], "integrations/instagram.env");
-        assert_eq!(
-            owners["ACTIVEPIECES_JWT_SECRET"],
-            "integrations/activepieces.env"
-        );
+
         assert_eq!(owners["JOURNAL_COLLAB_ROOM_SALT"], "crypto/journal.env");
         assert_eq!(owners["MISTY_AUTH_SIGNING_KEY"], "crypto/services.env");
         assert_eq!(
@@ -835,23 +895,65 @@ mod tests {
     }
 
     #[test]
-    fn activepieces_defaults_are_ready_for_development() {
-        let spec = FILES
-            .iter()
-            .find(|spec| spec.path == "integrations/activepieces.env")
-            .copied()
-            .unwrap();
-        let body = initial_file_contents(spec, Target::Dev);
-        let values = dotenvy::from_read_iter(body.as_bytes())
-            .map(|item| item.unwrap())
-            .collect::<BTreeMap<_, _>>();
+    fn setup_is_idempotent_and_setting_values_stay_private() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = Workspace {
+            root: tmp.path().to_path_buf(),
+            misty: tmp.path().to_path_buf(),
+            server: tmp.path().join("server"),
+            cli: tmp.path().join("cli"),
+            website: tmp.path().join("website"),
+            features: tmp.path().join("src/features"),
+        };
+        init(&workspace, Target::Dev).unwrap();
+        crate::server::initialize_development_secrets(&workspace).unwrap();
+        crate::server::validate_development_secrets(&workspace).unwrap();
+        let first = read(&workspace, Target::Dev).unwrap();
+        let worker = workspace.server.join("apps/journal-collab/.dev.vars");
+        let original_worker = fs::read(&worker).unwrap();
+        fs::remove_file(&worker).unwrap();
+        crate::server::initialize_development_secrets(&workspace).unwrap();
         assert_eq!(
-            values["ACTIVEPIECES_PUBLIC_URL"],
-            "https://dev-api.mistysys.com/activepieces"
+            fs::read(&worker).unwrap(),
+            original_worker,
+            "interrupted setup must recover the same Worker keys"
         );
-        assert_eq!(values["ACTIVEPIECES_ENCRYPTION_KEY"].len(), 32);
-        assert_eq!(values["ACTIVEPIECES_JWT_SECRET"].len(), 64);
-        assert_eq!(values["ACTIVEPIECES_POSTGRES_PASSWORD"].len(), 64);
-        assert_eq!(values["ACTIVEPIECES_REDIS_PASSWORD"].len(), 64);
+
+        set(
+            &workspace,
+            Target::Dev,
+            "OPENAI_API_KEY",
+            "test-$literal-secret",
+        )
+        .unwrap();
+        init(&workspace, Target::Dev).unwrap();
+        crate::server::initialize_development_secrets(&workspace).unwrap();
+        let second = read(&workspace, Target::Dev).unwrap();
+        assert_eq!(second["OPENAI_API_KEY"], "test-$literal-secret");
+        for (name, value) in first {
+            assert_eq!(second[&name], value, "{name} changed on rerun");
+        }
+        assert!(set(&workspace, Target::Dev, "UNKNOWN", "x").is_err());
+        assert!(set(&workspace, Target::Dev, "OPENAI_API_KEY", "x\nINJECTED=bad").is_err());
+        assert!(validate(&workspace, Target::Dev).is_err());
+        for (key, val) in [
+            ("CLOUDFLARE_API_TOKEN", "fixture"),
+            ("CLOUDFLARE_TUNNEL_TOKEN", "fixture"),
+            ("CLOUDFLARE_ACCOUNT_ID", "0123456789abcdef0123456789abcdef"),
+            ("MISTY_CLOUDFLARE_WORKER_HOST", "fixture.workers.dev"),
+            ("MISTY_DEV_API_ORIGIN", "https://api.example.com"),
+            ("MISTY_DEV_API_TUNNEL_HOSTNAME", "api.example.com"),
+        ] {
+            set(&workspace, Target::Dev, key, val).unwrap();
+        }
+        validate(&workspace, Target::Dev).unwrap();
+        set(
+            &workspace,
+            Target::Dev,
+            "MISTY_DEV_API_ORIGIN",
+            "https://api.example.com/v1",
+        )
+        .unwrap();
+        assert!(validate(&workspace, Target::Dev).is_err());
     }
 }

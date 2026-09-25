@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
   transitioning: false,
+  nativeRecovery: false,
+}));
+vi.mock("@/features/workspace/workspaceRecoveryPlatform", async (original) => ({
+  ...(await original<object>()),
+  nativeWorkspaceRecoveryEnabled: () => mocks.nativeRecovery,
 }));
 
 vi.mock("@/features/auth", () => ({
@@ -30,25 +35,6 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
     selector({ activeScopeKey: "" }),
 }));
 
-vi.mock("@/features/apps", () => ({
-  useAppsStore: {
-    getState: () => ({
-      selectAccount: vi.fn(),
-      reset: vi.fn(),
-      invalidate: vi.fn(),
-      load: vi.fn(),
-      spaceId: "",
-      accountId: "",
-      error: null,
-      installations: [],
-    }),
-  },
-}));
-
-vi.mock("@/native/settings-plugins", () => ({
-  configurePluginSpaceAuthority: vi.fn(),
-}));
-
 vi.mock("@/application/platform-layout", () => ({
   default: () => <div data-testid="platform-layout">Platform Layout Content</div>,
 }));
@@ -70,6 +56,7 @@ vi.mock("@/features/connected-devices", () => ({
 }));
 
 import { AppFrameLayout } from "./AppFrameLayout";
+import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 
 function LocationProbe() {
   const location = useLocation();
@@ -94,6 +81,13 @@ describe("AppFrameLayout", () => {
     root = createRoot(container);
     mocks.user = null;
     mocks.transitioning = false;
+    mocks.nativeRecovery = false;
+    useWorkspaceRecoveryState.setState({
+      accountId: null,
+      ready: false,
+      usable: false,
+      issue: null,
+    });
     vi.clearAllMocks();
   });
 
@@ -242,5 +236,49 @@ describe("AppFrameLayout", () => {
     expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="activity-panel"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="update-notices"]')).not.toBeNull();
+  });
+
+  it("keeps sibling sync identities distinct and resets the workspace only when the account changes", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const view = () => (
+      <MemoryRouter initialEntries={["/browser"]}>
+        <AppFrameLayout />
+      </MemoryRouter>
+    );
+    mocks.user = { id: "account-a", email: "a@example.test" };
+    await act(async () => root.render(view()));
+    const original = container.querySelector('[data-testid="platform-layout"]');
+    expect(original).not.toBeNull();
+    await act(async () => root.render(view()));
+    expect(container.querySelector('[data-testid="platform-layout"]')).toBe(original);
+    mocks.user = { id: "account-b", email: "b@example.test" };
+    await act(async () => root.render(view()));
+    const switched = container.querySelector('[data-testid="platform-layout"]');
+    expect(switched).not.toBeNull();
+    expect(switched).not.toBe(original);
+    expect(container.querySelectorAll('[data-testid="platform-layout"]')).toHaveLength(1);
+    expect(errors.mock.calls.filter((args) => args.join(" ").includes("same key"))).toEqual([]);
+  });
+
+  it("keeps the signed-in browser mounted during local recovery failures", async () => {
+    mocks.user = { id: "user-1", email: "user@example.com" };
+    mocks.nativeRecovery = true;
+    useWorkspaceRecoveryState.setState({
+      accountId: "user-1",
+      ready: false,
+      usable: true,
+      issue: "Keychain unavailable",
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <AppFrameLayout />
+        </MemoryRouter>,
+      );
+    });
+    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Local saving is unavailable");
+    expect(container.textContent).not.toContain("Your workspace could not be restored");
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 });

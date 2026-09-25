@@ -13,9 +13,8 @@ mod infra;
 mod platform;
 mod shell_plugins;
 mod telemetry;
-
-#[cfg(all(debug_assertions, target_os = "macos"))]
-pub mod sdk_package_probe;
+#[cfg(all(desktop, debug_assertions))]
+mod development_profile;
 
 #[cfg(desktop)]
 use app::commands::{
@@ -57,7 +56,7 @@ use app::commands::{
     operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
     operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
-    plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
+
     providers_backend_actions, providers_config_paths, providers_config_security,
     providers_configure_remote, providers_disconnect_remote, providers_harden_config,
     providers_import_cloud_connection, providers_job_cancel, providers_job_status,
@@ -65,7 +64,7 @@ use app::commands::{
     providers_save_remote, providers_select_remote, providers_snapshot, providers_test_remote,
     providers_verify_result, providers_verify_start, saved_searches_delete, saved_searches_save,
     saved_searches_snapshot, search_cancel_scan, search_get_status, search_init, search_query,
-    search_start_scan, self_host_entitlement_load, self_host_entitlement_store,
+    search_start_scan,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
     settings_snapshot, smart_library_apply_results, smart_library_assets_page,
@@ -111,14 +110,12 @@ use infra::browser_agent_control::{
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(all(desktop, not(target_os = "macos")))]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
-#[cfg(desktop)]
-use infra::misty::fetch_plugin_bundle_checksum;
 use infra::misty::{
-    check_system, ensure_local_access_token, fetch_misty_releases, finalize_official_app_install,
-    get_misty_process_status, install_plugin_bundle, launch_misty, official_app_package_path,
-    official_app_package_ready, open_external_url, probe_paths,
-    restart_misty, save_authenticated_user, save_verified_license, scan_local_plugins,
-    set_plugin_enabled, sign_out_misty, stop_misty, uninstall_plugin,
+    check_system, ensure_local_access_token, fetch_misty_releases,
+    get_misty_process_status, launch_misty,
+    open_external_url, probe_paths,
+    restart_misty, save_authenticated_user, save_verified_license,
+    sign_out_misty, stop_misty,
 };
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
@@ -148,6 +145,9 @@ use telemetry::TelemetryReporter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut context = tauri::generate_context!();
+    #[cfg(all(desktop, debug_assertions))]
+    development_profile::configure(&mut context).expect("invalid development profile");
     // Use one TLS provider for backend calls, updates and the peer transport.
     let _ = rustls::crypto::ring::default_provider().install_default();
     telemetry::initialize();
@@ -188,6 +188,18 @@ pub fn run() {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
+            #[cfg(all(desktop, debug_assertions))]
+            if let Ok(profile) = std::env::var("MISTY_DESKTOP_PROFILE")
+                .or_else(|_| std::env::var("MISTY_PROFILE"))
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title(&profile)?;
+                }
+            }
+            #[cfg(target_os = "macos")]
+            misty_browser_sync::secure_store::configure_device_store(
+                app.path().local_data_dir()?.join("com.misty.desktop/device-keys"),
+            )?;
             #[cfg(any(target_os = "ios", target_os = "android"))]
             let runtime = {
                 let data_root = app
@@ -217,6 +229,8 @@ pub fn run() {
             #[cfg(any(desktop, target_os = "ios"))]
             app.manage(BrowserSessionState::default());
             app.manage(infra::agent_workspace::AgentWorkspaceState::default());
+            #[cfg(any(target_os = "macos", windows))]
+            app.manage(std::sync::Arc::new(infra::cursor_companion::CursorCompanionState::default()));
             #[cfg(desktop)]
             app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
@@ -237,9 +251,7 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = builder
-        .manage(platform::mini_app::MiniAppState::default())
-        .register_uri_scheme_protocol("misty-mini-app", platform::mini_app::handle)
-        .register_uri_scheme_protocol("misty-extension", platform::extension_protocol::handle);
+        .manage(platform::mini_app::MiniAppState::default());
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
@@ -298,6 +310,7 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_edit,
                     crate::infra::browser_sync::browser_sync_resume,
                     crate::infra::browser_sync::browser_sync_activate,
+                    crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_forget_key,
                     crate::infra::auth_cookies::auth_cookie_capture,
@@ -311,19 +324,9 @@ pub fn run() {
                     crate::infra::misty_context::misty_screen_capture,
                     crate::infra::workspace_autopilot::agent_workspace_context,
                     #[cfg(desktop)]
-                    platform::mini_app::mini_app_open,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_widget_open,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_app_layout,
+                    platform::mini_app::builtin_service_open,
                     #[cfg(desktop)]
                     platform::mini_app::mini_app_close,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_app_rpc,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_app_reply,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_app_post,
                     #[cfg(desktop)]
                     platform::mini_app::permissions::mini_app_permission_status,
                     #[cfg(desktop)]
@@ -351,8 +354,6 @@ pub fn run() {
                     mobile_cache_write,
                     mobile_cache_remove,
                     mobile_cache_purge_account,
-                    self_host_entitlement_store,
-                    self_host_entitlement_load,
                     agents_device_snapshot,
                     agents_register_folder_scope,
                     agents_open_citation,
@@ -401,21 +402,6 @@ pub fn run() {
                     launch_misty,
                     restart_misty,
                     stop_misty,
-                    #[cfg(desktop)]
-                    scan_local_plugins,
-                    #[cfg(desktop)]
-                    fetch_plugin_bundle_checksum,
-                    #[cfg(desktop)]
-                    install_plugin_bundle,
-                    #[cfg(desktop)]
-                    official_app_package_ready,
-                    official_app_package_path,
-                    #[cfg(desktop)]
-                    finalize_official_app_install,
-                    #[cfg(desktop)]
-                    set_plugin_enabled,
-                    #[cfg(desktop)]
-                    uninstall_plugin,
                     get_misty_process_status,
                     open_external_url,
                     #[cfg(desktop)]
@@ -471,6 +457,19 @@ pub fn run() {
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_create,
                     infra::agent_workspace::agent_window_open,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_configure,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_interrupt,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_present,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_capture,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_bind_task,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_snapshot,
+                    #[cfg(any(target_os = "macos", windows))]
                     infra::agent_workspace::agent_window_take_task,
                     infra::agent_workspace::agent_window_ack_task,
                     infra::agent_workspace::agent_foreground_queue,
@@ -509,6 +508,14 @@ pub fn run() {
                     browser_webview_forward,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_reload,
+                    #[cfg(target_os = "macos")]
+                    infra::browser_site_permissions::browser_site_info,
+                    #[cfg(target_os = "macos")]
+                    infra::browser_site_permissions::browser_site_permissions_set,
+                    #[cfg(target_os = "macos")]
+                    infra::browser_site_permissions::browser_site_permissions_list,
+                    #[cfg(target_os = "macos")]
+                    infra::browser_site_permissions::browser_site_permissions_reset,
                     browser_webview_set_zoom,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_show,
@@ -649,14 +656,6 @@ pub fn run() {
                     shortcuts_update,
                     shortcuts_reassign,
                     shortcuts_reset,
-                    #[cfg(desktop)]
-                    plugin_commands_snapshot,
-                    #[cfg(desktop)]
-                    plugin_command_run,
-                    #[cfg(desktop)]
-                    plugin_panel_render,
-                    #[cfg(desktop)]
-                    plugin_diagnostics_snapshot,
                     providers_snapshot,
                     providers_refresh,
                     providers_import_cloud_connection,
@@ -728,7 +727,7 @@ pub fn run() {
                 dispatch(invoke)
             }
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("failed to build Misty Tauri app")
         .run(|_app, event| {
             // Dock activation must work even if the frontend is still loading

@@ -8,9 +8,9 @@ import (
 // These are service-transaction reads, not public views. Run/context identities
 // remain in their original tables; the shared journal never aliases accounts.
 const interventionRunsSQL = `(SELECT id,user_id,COALESCE(space_id,'') AS space_id,runtime_run_id,state,expires_at FROM ai_invocations WHERE COALESCE(agent_run_id,'')=''
- UNION ALL SELECT id,owner_user_id AS user_id,space_id,runtime_run_id,state,'infinity'::timestamptz AS expires_at FROM space_runs)`
+ UNION ALL SELECT id,owner_user_id AS user_id,COALESCE(space_id,'') AS space_id,runtime_run_id,state,'infinity'::timestamptz AS expires_at FROM space_runs)`
 const interventionContextsSQL = `(SELECT id,invocation_id AS run_id,user_id,COALESCE(space_id,'') AS space_id,device_id,kind,opaque_ref,display_name,capabilities,state,expires_at FROM ai_invocation_contexts
- UNION ALL SELECT id,run_id,owner_user_id AS user_id,space_id,device_id,kind,opaque_ref,display_name,capabilities,state,expires_at FROM agent_run_contexts)`
+ UNION ALL SELECT id,run_id,owner_user_id AS user_id,COALESCE(space_id,'') AS space_id,device_id,kind,opaque_ref,display_name,capabilities,state,expires_at FROM agent_run_contexts)`
 
 func lockAgentInterventionParentTx(ctx context.Context, tx *sql.Tx, user, run string) (string, error) {
 	query := `SELECT runtime_run_id FROM space_runs WHERE id=$1 AND owner_user_id=$2 AND state='awaiting_intervention' FOR UPDATE`
@@ -30,11 +30,16 @@ func agentInterventionStateTx(ctx context.Context, tx *sql.Tx, user, run, wait, 
 		}
 		return aiDeviceWaitStatusTx(ctx, tx, run, wait, phase, message)
 	}
-	var space string
+	var space sql.NullString
 	if err := tx.QueryRowContext(ctx, `UPDATE space_runs SET state=$2,runtime_phase=$3,updated_at=NOW() WHERE id=$1 AND owner_user_id=$4 RETURNING space_id`, run, state, phase, user).Scan(&space); err != nil {
 		return err
 	}
-	_, err := recordSpaceEventTx(ctx, tx, space, user, "agent.run."+phase, run, map[string]any{"run_id": run, "wait_id": wait, "phase": phase})
+	// Account-owned runs have no Space event stream. Their wait and state are
+	// already persisted transactionally for the account controls and runtime.
+	if !space.Valid || space.String == "" {
+		return nil
+	}
+	_, err := recordSpaceEventTx(ctx, tx, space.String, user, "agent.run."+phase, run, map[string]any{"run_id": run, "wait_id": wait, "phase": phase})
 	return err
 }
 

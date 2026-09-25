@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	platformmetrics "github.com/kannachi323/misty/server/internal/platform/metrics"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
@@ -31,11 +32,15 @@ type AgentsService struct {
 	database         *db.Database
 	connectedDevices ConnectedDevicesConfig
 	voiceAnalyzer    *serveragent.SmartLibraryAnalyzer
+	voiceLimiter     *SlidingWindowLimiter
+	voiceMetrics     *platformmetrics.Registry
 }
 
 func NewAgentsService(database *db.Database) *AgentsService {
-	return &AgentsService{database: database}
+	return &AgentsService{database: database, voiceLimiter: NewSlidingWindowLimiter(10, time.Minute)}
 }
+
+func (s *AgentsService) SetVoiceMetrics(metrics *platformmetrics.Registry) { s.voiceMetrics = metrics }
 
 func (s *AgentsService) SetVoiceAnalyzer(analyzer *serveragent.SmartLibraryAnalyzer) {
 	s.voiceAnalyzer = analyzer

@@ -1,3 +1,4 @@
+import { validDockingLayout, type DockingLayout } from "@/features/app-shell/dockingLayout";
 import {
   initialWebsiteNavigation,
   type WebsiteNavigationState,
@@ -135,6 +136,7 @@ export interface WorkspaceStore extends VirtualWorkspaceState, WebsiteNavigation
   closePane: (paneId: string) => void;
   swapPanes: (firstPaneId: string, secondPaneId: string) => boolean;
   movePane: (paneId: string, direction: DockSplitDirection, targetPaneId?: string) => boolean;
+  setWindowDockingLayout: (layout: DockingLayout) => void;
   createVirtualWindow: (title?: string) => WorkspaceVirtualWindow;
   switchVirtualWindow: (windowId: string) => boolean;
   closeVirtualWindow: (windowId: string) => boolean;
@@ -736,6 +738,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (root === current.layout.root) return false;
         set({ ...withLayout(current, { ...current.layout, root, focusedPaneId: secondPaneId }) });
         return true;
+      },
+      setWindowDockingLayout: (dockingLayout) => {
+        if (!validDockingLayout(dockingLayout)) return;
+        set((state) => ({
+          virtualWindowsByScope: {
+            ...state.virtualWindowsByScope,
+            [state.activeScopeKey]: currentVirtualWindows(state).map((window) =>
+              window.id === state.activeVirtualWindowId
+                ? {
+                    ...window,
+                    dockingLayout: {
+                      navigation: dockingLayout.navigation,
+                      tabs: dockingLayout.tabs,
+                    },
+                  }
+                : window,
+            ),
+          },
+        }));
       },
       createVirtualWindow: (title) => {
         const { window, update } = addVirtualWindow(get(), title);

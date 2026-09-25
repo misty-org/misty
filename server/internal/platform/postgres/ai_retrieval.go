@@ -23,6 +23,8 @@ type AIRetrievalHit struct {
 }
 
 type AIEmbeddingChunk struct {
+	AccountID   string
+	AttemptID   string
 	DocumentID  string
 	Ordinal     int
 	Content     string
@@ -36,18 +38,23 @@ func (db *Database) PendingAIEmbeddingChunks(ctx context.Context, limit int) ([]
 	items := []AIEmbeddingChunk{}
 	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
-			SELECT c.document_id,c.ordinal,c.content,c.content_hash
-			FROM ai_retrieval_chunks c JOIN ai_retrieval_documents d ON d.id=c.document_id
-			WHERE d.lifecycle_state='active' AND c.embedding IS NULL
-			ORDER BY c.updated_at,c.document_id,c.ordinal LIMIT $1
-		`, limit)
+ WITH candidates AS (
+ SELECT c.document_id,c.ordinal,d.owner_user_id
+ FROM ai_retrieval_chunks c JOIN ai_retrieval_documents d ON d.id=c.document_id
+ WHERE d.lifecycle_state='active' AND d.owner_user_id IS NOT NULL AND c.embedding IS NULL
+ AND (c.embedding_lease_until IS NULL OR c.embedding_lease_until<=now())
+ ORDER BY c.updated_at,c.document_id,c.ordinal LIMIT $1 FOR UPDATE OF c SKIP LOCKED
+ ) UPDATE ai_retrieval_chunks c SET embedding_attempt_id=gen_random_uuid(),embedding_lease_until=now()+interval '5 minutes'
+ FROM candidates p WHERE c.document_id=p.document_id AND c.ordinal=p.ordinal
+ RETURNING c.document_id,c.ordinal,c.content,c.content_hash,p.owner_user_id,c.embedding_attempt_id
+ `, limit)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var item AIEmbeddingChunk
-			if err := rows.Scan(&item.DocumentID, &item.Ordinal, &item.Content, &item.ContentHash); err != nil {
+			if err := rows.Scan(&item.DocumentID, &item.Ordinal, &item.Content, &item.ContentHash, &item.AccountID, &item.AttemptID); err != nil {
 				return err
 			}
 			items = append(items, item)
@@ -63,9 +70,9 @@ func (db *Database) CompleteAIEmbeddingChunk(ctx context.Context, chunk AIEmbedd
 	}
 	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `
-			UPDATE ai_retrieval_chunks SET embedding=$1::vector,embedding_model=$2,updated_at=NOW()
-			WHERE document_id=$3 AND ordinal=$4 AND content_hash=$5 AND embedding IS NULL
-		`, aiVectorLiteral(embedding), model, chunk.DocumentID, chunk.Ordinal, chunk.ContentHash)
+			UPDATE ai_retrieval_chunks SET embedding=$1::vector,embedding_model=$2,embedding_lease_until=NULL,updated_at=NOW()
+			WHERE document_id=$3 AND ordinal=$4 AND content_hash=$5 AND embedding_attempt_id=$6::uuid AND embedding IS NULL
+		`, aiVectorLiteral(embedding), model, chunk.DocumentID, chunk.Ordinal, chunk.ContentHash, chunk.AttemptID)
 		return err
 	})
 }
@@ -201,4 +208,11 @@ func aiVectorLiteral(values []float64) string {
 		parts[index] = strconv.FormatFloat(value, 'g', -1, 64)
 	}
 	return fmt.Sprintf("[%s]", strings.Join(parts, ","))
+}
+
+func (db *Database) RetryAIEmbeddingChunk(ctx context.Context, chunk AIEmbeddingChunk) error {
+	return db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `UPDATE ai_retrieval_chunks SET embedding_lease_until=now()+interval '1 minute' WHERE document_id=$1 AND ordinal=$2 AND embedding_attempt_id=$3::uuid`, chunk.DocumentID, chunk.Ordinal, chunk.AttemptID)
+		return err
+	})
 }

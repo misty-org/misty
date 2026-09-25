@@ -289,6 +289,19 @@ function toServerInvocation(input: AiInvocationRequest) {
     prompt: input.prompt,
     context: input.context.map(toServerContextReference),
     selection: input.selection,
+    companion_mode: input.companionMode,
+    companion_model: input.companionModel,
+    display_captures: input.displayCaptures?.map((c) => ({
+      id: c.id,
+      name: c.name,
+      mime_type: c.mimeType,
+      data_url: c.dataUrl,
+      width: c.width,
+      height: c.height,
+      content_hash: c.contentHash,
+      screen: c.screen,
+      primary: c.primary,
+    })),
     capture: input.capture
       ? {
           id: input.capture.id,

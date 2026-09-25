@@ -194,9 +194,9 @@ components:
 
 The user-pinned Grok Bot layout is the structural authority for this scoped Agents surface: a quiet, dense roster and an open conversation, with details revealed alongside. Misty's identity, truthful capability language, and PRODUCT.md remain normative. This record replaces the rejected Agents design; it does not redefine other Misty surfaces or the root design record.
 
-The composition begins with conversational greeting bubbles and four lettered choices, followed by a custom-answer field. A single bottom composer anchors the canvas. There is no centered hero, runtime exposition, Marketplace entry, or persistent mode/model/context toolbar. Misty uses the original blue cloud logo. Personal agents use stable cloud color/expression variants unless a custom emoji is configured. The avatar picker offers Sky (original), Lavender (wink), Mint (focused), and Peach (joyful).
+The composition begins with conversational greeting bubbles and four lettered choices, followed by a custom-answer field. A single bottom composer anchors the canvas. There is no centered hero, runtime exposition, or Marketplace entry. Inline Companion controls now precede the conversation: persistent Team/Auto choices, Cursor on/off, status, conditional Stop, and expandable Voice & model options. This replaces the earlier prohibition on persistent mode controls; detailed companion tokens and behavior live in `companion/DESIGN.md`. Misty uses the original blue cloud logo. Personal agents use stable cloud color/expression variants unless a custom emoji is configured. The avatar picker offers Sky (original), Lavender (wink), Mint (focused), and Peach (joyful).
 
-Source authority is AgentsPage.tsx, agentsWorkspace.css, components/AgentWorkspaceConversation.tsx, AgentSearchDialog.tsx, AgentAvatar.tsx, and AgentConversationView.tsx. WorkspaceCanvas.tsx supplies the conditional host-chrome treatment. Evidence is the real React component rendered with synthetic data: repository-root .impeccable/review/agents/grok-desktop.png (1045 × 768), grok-user-1111.png (1111 × 823), grok-mobile.png (390 × 844), grok-details.png, grok-settings.png, and grok-search.png; grok-reference-native.png is the actual Grok reference. The reviewer found desktop structural fidelity met and requested documentation replacement and larger mobile targets. The final verdict pass scored both the documentation and mobile-target corrections resolved (ship at that scope). These captures do not verify native Misty chrome, voice recording, live account integration, or AI backend execution. Native Misty was unavailable in the application inventory.
+Source authority is AgentsPage.tsx, agentsWorkspace.css, components/AgentWorkspaceConversation.tsx, AgentSearchDialog.tsx, AgentAvatar.tsx, and AgentConversationView.tsx. WorkspaceCanvas.tsx supplies the conditional host-chrome treatment. Evidence is the real React component rendered with synthetic data: repository-root .impeccable/review/agents/grok-desktop.png (1045 × 768), grok-user-1111.png (1111 × 823), grok-mobile.png (390 × 844), grok-details.png, grok-settings.png, and grok-search.png; grok-reference-native.png is the actual Grok reference. The reviewer found desktop structural fidelity met and requested documentation replacement and larger mobile targets. The final verdict pass scored both the documentation and mobile-target corrections resolved (ship at that scope). These captures do not verify native Misty chrome, voice recording, live account integration, or AI backend execution. That earlier review did not observe native Misty. The later companion update has renderer captures at `.impeccable/review/cursor-agents/team.png`, `auto.png`, and `narrow.png`, plus the actual packaged macOS capture `packaged-macos-auto.png`. Packaged macOS observation confirms rendered original sprites and Team-to-Auto switching through the native controller, without establishing voice, multimonitor behavior, or Windows parity.
 
 **Key Characteristics:**
 
@@ -261,6 +261,10 @@ All four cloud presets are transparent animated WebPs, with a 512px canvas and a
 
 The original asset is `src/shared/assets/misty-cloud-expression-cycle.webp`; transparent companion variants live in `src/shared/assets/agents/`. Preserve the cloud silhouette, light body, colored rim, white inner outline, and readable face. Avoid the former orb or initials for default agent identities. The identity picker is reached by clicking the avatar in settings; it previews immediately and persists through Save changes as `avatar.cloudVariant`. Existing custom `avatar.emoji` values remain authoritative until a cloud is selected. New agents start with Lavender; older personal agents without a saved choice receive a stable ID-based variant. Other avatar metadata is preserved. Color/expression pairs are presets, not independent selectors.
 
+### Inline companion controls
+
+The Companion section sits above the conversation scroll region and shares its controller and Team/Auto mode with native voice and the typed composer. Team/Auto is a radio group with roving Tab focus, arrow-key selection, and Home/End selection. Cursor visibility, working status, Stop, expandable voice/model options, and retryable errors stay in this section. Original WebP bytes are imported inline for packaged asset reliability. `companion/DESIGN.md` and its sidecar own the scoped control and overlay values; retain the rest of this Agents system.
+
 ### Greeting and choices
 
 A centered date precedes two left-aligned conversational bubbles. The four A–D options populate the editable composer; the custom answer shares the draft and can submit with Enter. Dismiss removes the suggestion group. The absent-agent state offers creation; disabled agents expose a clear settings instruction.
@@ -269,15 +273,15 @@ A centered date precedes two left-aligned conversational bubbles. The four A–D
 
 The bottom pill contains attachment, editable message, voice, and send/stop controls in one row. Attachment previews can add a row above. The textarea grows within its implemented limit (140px). Voice recording, transcription, working, errors, and disabled state have concrete UI; integration success has not been established by the captures. Enter sends, Shift+Enter creates a line break, and composition events avoid premature submission.
 
-Conversation history is scoped to the selected agent and Space. Existing message rendering preserves attachments, citations, approval actions, retry, cancellation, and copy behavior. The workspace restyles assistant messages as bubbles. Drafts, uploads, recording, and unsaved editor changes participate in navigation guards.
+Conversation selection is scoped to the selected agent within the account-loaded history, without filtering to the current Space. New work is personal; historical conversations retain their saved scope when reopened. Existing message rendering preserves attachments, citations, approval actions, retry, cancellation, and copy behavior. The workspace restyles assistant messages as bubbles. Drafts, uploads, recording, and unsaved editor changes participate in navigation guards.
 
 ### Details, settings, and history
 
-Details contains a monitor-icon activity tile and truthful links to ongoing work, scheduled tasks, and approvals. It is an activity destination, not a computer preview. Settings retain identity, description, model and advanced agent configuration, personal app assignments, and remembered preferences. Conversation context, existing-conversation model choice, and native Mac/Windows work mode live here rather than beside the composer. History lists agent conversations in the current Space. Close/back controls stay in the panel header.
+Details contains a monitor-icon activity tile and truthful links to ongoing work, scheduled tasks, and approvals. It is an activity destination, not a computer preview. Settings retain identity, description, model and advanced agent configuration, personal app assignments, and remembered preferences. Conversation context and existing-conversation model choice remain in settings. Shared Team/Auto mode and companion voice/model options now live in the inline Companion section above the conversation. The previous User/Agent/Team work-mode selector is removed. History shows the account-loaded conversations for the selected agent, without a current-Space filter. Close/back controls stay in the panel header.
 
 ### Command search
 
-Search includes agents, conversations in the current Space, and actions for Agent settings, Activity, Connections, and Create agent. The dialog supplies arrow-key/Enter guidance and a no-results state. Its selected result uses the dialog-selection tone. It is not a product-wide launcher or a Marketplace search.
+Search includes agents, account-loaded conversations, and actions for Agent settings, Activity, Connections, and Create agent. The dialog supplies arrow-key/Enter guidance and a no-results state. Its selected result uses the dialog-selection tone. It is not a product-wide launcher or a Marketplace search.
 
 ### Fields and state feedback
 
@@ -289,13 +293,13 @@ Workspace form controls declare a visible two-pixel muted focus outline with a t
 
 - Do preserve the user-pinned Grok structure and Misty identity together.
 - Do use the scoped grayscale tokens and existing semantic status treatments where the shared conversation renderer requires them.
-- Do retain visible focus, current-Space conversation boundaries, and explicit settings labels.
+- Do retain visible focus, personal new-work scope, saved historical conversation scope, and explicit settings labels.
 - Do keep mobile header, suggestion-dismiss, attachment, voice, send, and stop controls at 44px square.
 - Do describe activity, permissions, working states, and failures truthfully.
 
 ### Don't:
 
-- Don’t restore a centered hero, roster responsibility subtitles, runtime marketing text, or persistent mode/model/context controls.
+- Don’t restore a centered hero, roster responsibility subtitles, runtime marketing text, or the replaced User/Agent/Team work-mode selector. Keep the authorized Team/Auto companion controls inline in Agents.
 - Don’t add Marketplace to this Agents surface or infer a product-wide removal.
 - Don’t turn the activity tile into a simulated live computer stream.
 - Don’t treat synthetic component captures as native-shell, voice, backend, or permission-enforcement verification.

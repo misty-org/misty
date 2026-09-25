@@ -64,7 +64,7 @@ func (db *Database) QueueWorkflowDeviceNodeJob(ctx context.Context, userID, runI
 		var contextCapabilities json.RawMessage
 		var contextExpiresAt time.Time
 		if err := tx.QueryRowContext(ctx, `SELECT c.id,c.device_id,c.capabilities,c.expires_at FROM space_runs r
-			JOIN agent_run_contexts c ON c.run_id=r.id AND c.owner_user_id=$1 AND c.space_id=r.space_id
+			JOIN agent_run_contexts c ON c.run_id=r.id AND c.owner_user_id=$1
 				AND c.opaque_ref=$3 AND c.state='attached' AND c.expires_at>NOW() AND c.capabilities ? $4
 			JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=$1 AND d.revoked_at IS NULL AND d.last_seen_at>NOW()-INTERVAL '90 seconds'
 			WHERE r.id=$2 AND r.owner_user_id=$1 ORDER BY c.updated_at DESC LIMIT 1`, userID, runID, scopeID, capability).Scan(&contextID, &deviceID, &contextCapabilities, &contextExpiresAt); errors.Is(err, sql.ErrNoRows) {

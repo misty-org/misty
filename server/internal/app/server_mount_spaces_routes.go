@@ -110,8 +110,6 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Delete(prefix+"/spaces/{spaceID}/social/bindings/{bindingID}", spaces.SocialBinding())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/social/authorities", spaces.SocialSendAuthorities())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/social/authorities", spaces.SocialSendAuthorities())
-	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/social/automation-rules", spaces.SocialAutomationRules())
-	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/social/automation-rules", spaces.SocialAutomationRules())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/social/scheduled-messages", spaces.SocialScheduledMessages())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/social/scheduled-messages", spaces.SocialScheduledMessages())
 	s.Router.Delete(prefix+"/spaces/{spaceID}/social/scheduled-messages/{scheduledID}", spaces.SocialScheduledMessage())
@@ -219,6 +217,7 @@ func (s *Server) CleanupExpiredJournalAssets(
 
 func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-voice/transcriptions", service.AgentVoiceTranscription())
+	s.Router.MethodFunc(http.MethodPost, prefix+"/agent-voice/speech", service.AgentVoiceSpeech())
 	deviceJobsEnabled := serverFeatureEnabled("MISTY_DEVICE_JOBS_ENABLED")
 	connectedDevicesEnabled := serverConnectedDevicesConfigured()
 	if !deviceJobsEnabled && !connectedDevicesEnabled {
@@ -234,9 +233,9 @@ func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 		s.Router.Get(prefix+"/devices/{deviceID}/pairing-sessions/{sessionID}", service.DeviceAuthenticated(service.DevicePairingStatus()))
 		s.Router.Post(prefix+"/devices/{deviceID}/pairing-sessions/{sessionID}/confirm", service.DeviceAuthenticated(service.ConfirmDevicePairing()))
 		s.Router.Post(prefix+"/devices/{deviceID}/pairing/redeem", service.DeviceAuthenticated(service.RedeemDevicePairing()))
-		s.Router.Post(prefix+"/devices/{deviceID}/apps/files/presence", service.DeviceAuthenticated(service.UpdateSpaceConnectedDevicePresence()))
-		s.Router.Get(prefix+"/devices/{deviceID}/apps/files/peers", service.DeviceAuthenticated(service.ListSpaceConnectedDevicePeers()))
-		s.Router.Post(prefix+"/devices/{deviceID}/apps/files/peer-tickets", service.DeviceAuthenticated(service.IssueSpaceConnectedDeviceTicket()))
+		s.Router.Post(prefix+"/devices/{deviceID}/files/presence", service.DeviceAuthenticated(service.UpdateSpaceConnectedDevicePresence()))
+		s.Router.Get(prefix+"/devices/{deviceID}/files/peers", service.DeviceAuthenticated(service.ListSpaceConnectedDevicePeers()))
+		s.Router.Post(prefix+"/devices/{deviceID}/files/peer-tickets", service.DeviceAuthenticated(service.IssueSpaceConnectedDeviceTicket()))
 		s.Router.Post(prefix+"/devices/{deviceID}/presence", service.DeviceAuthenticated(service.UpdateConnectedDevicePresence()))
 		s.Router.Get(prefix+"/devices/{deviceID}/peers", service.DeviceAuthenticated(service.ListConnectedDevicePeers()))
 		s.Router.Put(prefix+"/devices/{deviceID}/pairs/{pairID}/name", service.DeviceAuthenticated(service.RenameConnectedDevicePeer()))

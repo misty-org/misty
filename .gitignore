@@ -198,14 +198,22 @@ node_modules/@misty/desktop
 # Consolidated workspace build products
 **/.build/
 **/*.tsbuildinfo
-/apps/public/official-apps/
-/apps/public/official-app-assets/
-!apps/**/*.svg
-!apps/**/*.png
-!apps/**/*.webp
 !examples/**/*.svg
 
 # Agent avatars and reduced-motion posters are source assets.
 !src/shared/assets/agents/*.webp
 !src/shared/assets/agents/*.png
 !src/shared/assets/agents/*.svg
+
+# Server CLI local diagnostic output
+/server/.misty/
+
+# Built-in tool source assets and native build outputs.
+!src/features/**/*.svg
+!src/features/**/*.png
+!src/features/**/*.webp
+!src/shared/toolAssets/**/*.svg
+!src/shared/toolAssets/**/*.png
+!src/shared/toolAssets/**/*.webp
+/src-tauri/services/*/target/
+/src-tauri/.build/

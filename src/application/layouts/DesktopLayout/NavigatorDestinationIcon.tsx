@@ -1,10 +1,10 @@
-import { WebsiteBrandIcon } from "../../../.././apps/shared/WebsiteBrandIcon";
+import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
-} from "../../../.././apps/shared/websiteIntegrations";
-import { ProviderBrandIcon } from "../../../.././apps/shared/ProviderBrandIcon";
-import { providerFromRoute } from "../../../.././apps/shared/providers";
+} from "../../../shared/toolAssets/websiteIntegrations";
+import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
+import { providerFromRoute } from "../../../shared/toolAssets/providers";
 import {
   NotesDestinationIcon,
   DrawingsDestinationIcon,

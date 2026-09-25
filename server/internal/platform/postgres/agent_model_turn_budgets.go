@@ -55,10 +55,9 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 			return ErrSpaceInvalid
 		}
 		if routineMarker.Routine {
-			if err := routineAgentModelTurnTx(ctx, tx, userID, runID, runtimeID, nodeID); err != nil {
-				return err
-			}
+			return ErrSpaceInvalid
 		}
+
 		if version == 0 {
 			return nil
 		}
@@ -102,7 +101,7 @@ func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 	if err != nil {
 		return 0, err
 	}
-	if record.SurfaceID == "sdk" || record.SurfaceID == "routine" || authority != nil || AppAuthorityFromContext(ctx) != nil || input.Mode != "agent" || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" || record.SpaceID == "" {
+	if record.SurfaceID == "sdk" || record.SurfaceID == "routine" || authority != nil || AppAuthorityFromContext(ctx) != nil || (input.Mode != "agent" && input.Mode != "auto") || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" {
 		return ordinaryLimit, nil
 	}
 	if err := validateNativeAgentExecutionTx(ctx, tx, record.UserID, record.SpaceID, record.RequestPayload); err != nil {

@@ -1,4 +1,4 @@
-import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
+import { supportsBundledDocumentWorkers } from "@/shared/platform/nativeServices";
 import type {
   AnalysisResult,
   AndroidAllFilesAccessStatus,
@@ -96,8 +96,8 @@ export function explorerCalculateDirectorySizes(
 }
 
 async function invokeSearch<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
-  if (!supportsPackagedDocuments()) return invoke<T>(command, args);
-  const { invokeFilesSearch } = await import("@/features/apps/nativeSearchService");
+  if (!supportsBundledDocumentWorkers()) return invoke<T>(command, args);
+  const { invokeFilesSearch } = await import("@/features/builtin-services");
   return invokeFilesSearch<T>(command, args);
 }
 
@@ -154,8 +154,8 @@ export function explorerCancelDragPreparation(sessionId: string): Promise<void> 
 }
 
 export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
-  if (supportsPackagedDocuments())
-    return import("@/features/apps/nativeImageService").then(({ invokeFilesImage }) =>
+  if (supportsBundledDocumentWorkers())
+    return import("@/features/builtin-services").then(({ invokeFilesImage }) =>
       invokeFilesImage<ExplorerPreviewPayload>("explorer_preview_item", { path }),
     );
   return invoke("explorer_preview_item", { path });
@@ -183,8 +183,8 @@ export function explorerGenerateImageThumbnail(
     remoteModified: options.remoteModified ?? null,
     sizeBytes: options.sizeBytes ?? null,
   };
-  if (supportsPackagedDocuments())
-    return import("@/features/apps/nativeImageService").then(({ invokeFilesImage }) =>
+  if (supportsBundledDocumentWorkers())
+    return import("@/features/builtin-services").then(({ invokeFilesImage }) =>
       invokeFilesImage<GeneratedImageThumbnail>("explorer_generate_image_thumbnail", args),
     );
   return invoke("explorer_generate_image_thumbnail", args);
@@ -237,11 +237,11 @@ export async function smartLibraryPreparePreviews(
   maxDimension = 512,
   originSpaceId?: string,
 ): Promise<PreparedSmartLibraryPreview[]> {
-  if (!supportsPackagedDocuments())
+  if (!supportsBundledDocumentWorkers())
     return invoke("smart_library_prepare_previews", { request: { assetIds, maxDimension } });
-  const { withNativeDocumentService } = await import("@/features/apps/nativeDocumentService");
+  const { withBuiltinService } = await import("@/features/builtin-services");
   const spaceId = originSpaceId ?? "";
-  return withNativeDocumentService("library", spaceId, (instance) =>
+  return withBuiltinService("library", spaceId, (instance) =>
     invoke("smart_library_prepare_previews", { instance, request: { assetIds, maxDimension } }),
   );
 }

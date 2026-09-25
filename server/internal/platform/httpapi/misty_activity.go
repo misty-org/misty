@@ -8,7 +8,7 @@ func (s *AIService) MistyActivity() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		spaceID := r.URL.Query().Get("space_id")
+		spaceID := ""
 		rows, err := s.database.MistyActivity(r.Context(), userID, spaceID, r.URL.Query().Get("agent_id"))
 		if err != nil {
 			writeSpaceError(w, err)

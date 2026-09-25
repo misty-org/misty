@@ -95,73 +95,17 @@ func bindAppAuthority(ctx context.Context, payload json.RawMessage) (json.RawMes
 	return json.Marshal(value)
 }
 
-// Validate current installation grants as well as the admission-time ceiling.
-// The short-lived app bearer may expire while a durable run is waiting.
+// Retired app credentials never become account credentials. Keep this explicit
+// denial for persisted runs carrying an old principal during recovery.
 func (db *Database) ValidateAppExecutionAuthority(ctx context.Context, authority *AppExecutionAuthority, userID, spaceID string, scopes ...string) error {
-	if authority == nil {
-		return nil
-	}
-	// Reject malformed principals before opening a connection, as before.
-	if authority.Generation <= 0 || authority.UserID != userID || (authority.SpaceID != "" || spaceID != "") {
+	if authority != nil {
 		return ErrAppRuntimeForbidden
 	}
-	for _, scope := range scopes {
-		found := false
-		for _, granted := range authority.Scopes {
-			if scope != "" && scope == granted {
-				found = true
-			}
-		}
-		if !found {
-			return ErrAppRuntimeForbidden
-		}
-	}
-	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		return validateAppExecutionAuthorityTx(ctx, tx, authority, userID, spaceID, scopes...)
-	})
+	return nil
 }
-
 func validateAppExecutionAuthorityTx(ctx context.Context, tx *sql.Tx, authority *AppExecutionAuthority, userID, spaceID string, scopes ...string) error {
-	if authority == nil {
-		return nil
-	}
-	if authority.Generation <= 0 || authority.UserID != userID || (authority.SpaceID != "" || spaceID != "") {
+	if authority != nil {
 		return ErrAppRuntimeForbidden
-	}
-	contains := func(values []string, key string) bool {
-		for _, value := range values {
-			if value == key {
-				return true
-			}
-		}
-		return false
-	}
-	for _, scope := range scopes {
-		if scope == "" || !contains(authority.Scopes, scope) {
-			return ErrAppRuntimeForbidden
-		}
-	}
-
-	var raw []byte
-	var generation int64
-	err := tx.QueryRowContext(ctx, `SELECT granted_scopes,authority_generation FROM user_app_installations WHERE user_id=$1 AND app_id=$2 AND state='installed' AND NOT consent_required FOR SHARE`, userID, authority.AppID).Scan(&raw, &generation)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrAppRuntimeForbidden
-	}
-	if err != nil {
-		return err
-	}
-	if generation != authority.Generation {
-		return ErrAppRuntimeForbidden
-	}
-	var current []string
-	if json.Unmarshal(raw, &current) != nil {
-		return ErrAppRuntimeForbidden
-	}
-	for _, scope := range scopes {
-		if !contains(current, scope) {
-			return ErrAppRuntimeForbidden
-		}
 	}
 	return nil
 }

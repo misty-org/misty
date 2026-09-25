@@ -5,7 +5,6 @@ import {
   readApiAuthToken,
   readApiSessionGeneration,
 } from "@/api/client/session";
-import { attachSelfHostEntitlementProof } from "@/api/self-host/proof";
 import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import type { AccountHandoffPath, AccountMeResponse, LoginResponse } from "./types";
@@ -48,7 +47,6 @@ async function requestJson<T>(method: AccountMethod, path: string, body?: unknow
     assertAccountGeneration(accountGeneration);
     const headers = addRequestCorrelation(requestHeaders(body, token) ?? new Headers());
     if (path === "/login" || path.startsWith("/self-host/")) {
-      await attachSelfHostEntitlementProof(headers);
     }
     const response = await httpRequest(url, {
       method,

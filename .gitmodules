@@ -1,0 +1,3 @@
+[submodule "vendor/clicky"]
+	path = vendor/clicky
+	url = https://github.com/farzaa/clicky.git

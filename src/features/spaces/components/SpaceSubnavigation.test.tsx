@@ -1,4 +1,4 @@
-import { SpacePlannerHeader } from "@/features/spaces/planner/components/SpacePlannerHeader";
+import { SpacePlannerHeader } from "@/features/planner/planner/components/SpacePlannerHeader";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";

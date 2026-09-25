@@ -25,7 +25,7 @@ export function AgentExecutionSurface() {
     [error, setError] = useState("");
   const [routing, setRouting] = useState(false);
   useEffect(() => {
-    if (execution?.state === "finished")
+    if (execution?.state === "finished" && !execution.normalTabs)
       void continueQueuedLocalWork(execution.taskId).catch((e) => setError(String(e)));
   }, [execution?.taskId, execution?.state]);
   const viewport = useRef<HTMLDivElement>(null);
@@ -46,7 +46,7 @@ export function AgentExecutionSurface() {
     };
   }, [execution]);
   useEffect(() => {
-    if (!execution || execution.autopilot) return;
+    if (!execution || execution.autopilot || execution.normalTabs) return;
     let disposed = false;
     const layout = async () => {
       const rect = viewport.current?.getBoundingClientRect();
@@ -81,7 +81,7 @@ export function AgentExecutionSurface() {
     return () => window.removeEventListener("pagehide", close);
   }, [execution?.taskId]);
   if (!execution) return null;
-  if (execution.autopilot) return null;
+  if (execution.autopilot || execution.normalTabs) return null;
   const action = (task: () => Promise<unknown>) => {
     setError("");
     void task().catch((e) => setError(String(e)));

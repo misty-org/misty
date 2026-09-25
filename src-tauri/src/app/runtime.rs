@@ -8,8 +8,6 @@ use crate::domain::file_sync::FileSyncPairStore;
 use crate::infra::connected_devices::ConnectedDevicesService;
 #[cfg(desktop)]
 use crate::infra::media_search::MediaSearchService;
-#[cfg(desktop)]
-use crate::infra::plugin_commands::PluginCommandService;
 use crate::infra::{
     agents::AgentService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
@@ -38,8 +36,6 @@ pub struct MistyRuntime {
     pub connected_devices: ConnectedDevicesService,
     pub directory_size: DirectorySizeService,
     pub metadata: MetadataService,
-    #[cfg(desktop)]
-    pub plugin_commands: PluginCommandService,
     pub power_pack: PowerPackService,
     pub search: SearchService,
     pub explorer: ExplorerService,
@@ -94,8 +90,6 @@ impl MistyRuntime {
         let devices = DeviceService::new();
         let directory_size = DirectorySizeService::new(environment.clone(), storage.clone());
         let metadata = MetadataService::new();
-        #[cfg(desktop)]
-        let plugin_commands = PluginCommandService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), storage.clone());
         let explorer = ExplorerService::new(
@@ -143,8 +137,6 @@ impl MistyRuntime {
             connected_devices,
             directory_size,
             metadata,
-            #[cfg(desktop)]
-            plugin_commands,
             power_pack,
             search,
             explorer,

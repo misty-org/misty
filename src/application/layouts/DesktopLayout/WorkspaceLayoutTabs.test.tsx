@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { dockLeaves } from "@/features/workspace/dockTree";
-import { setAppUnsaved } from "@/features/apps/appUpdateSafety";
+import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 import { WorkspaceLayoutTabs } from "./WorkspaceLayoutTabs";
 vi.mock("./WorkspaceDockTree", () => ({
   minimumForWorkspaceTabs: () => ({ width: 280, height: 180 }),
@@ -20,10 +20,11 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-function mount() {
+function mount(position: "top" | "bottom" | "left" | "right" = "top") {
   const state = useWorkspaceStore.getState();
   return render(
     <WorkspaceLayoutTabs
+      position={position}
       focusedPaneId={state.layout.focusedPaneId}
       lastUsedTabByGroup={{}}
       onOpen={vi.fn()}
@@ -73,7 +74,7 @@ it("does not close a pane with unsaved work from the dropdown", async () => {
   const browser = dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs[0];
   state.splitPane(useWorkspaceStore.getState().layout.focusedPaneId, "right");
   mount();
-  setAppUnsaved(browser.id, true);
+  setWorkspaceUnsaved(browser.id, true);
   try {
     fireEvent.pointerDown(screen.getByRole("button", { name: "Show panes in Google" }), {
       button: 0,
@@ -83,6 +84,24 @@ it("does not close a pane with unsaved work from the dropdown", async () => {
     fireEvent.click((await screen.findAllByRole("menuitem", { name: "Close pane Google" }))[0]);
     expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
   } finally {
-    setAppUnsaved(browser.id, false);
+    setWorkspaceUnsaved(browser.id, false);
   }
 });
+
+it.each(["left", "right"] as const)(
+  "keeps New tab before the scrolling list and supports vertical keys on the %s",
+  (position) => {
+    useWorkspaceStore.getState().newLayoutTab();
+    mount(position);
+    const list = screen.getByRole("tablist");
+    const newTab = screen.getByRole("button", { name: "New tab" });
+    expect(list.getAttribute("aria-orientation")).toBe("vertical");
+    expect(list.contains(newTab)).toBe(false);
+    expect(newTab.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const tabs = screen.getAllByRole("tab");
+    fireEvent.keyDown(tabs[1], { key: "ArrowUp" });
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(tabs[0], { key: "End" });
+    expect(tabs[1].getAttribute("aria-selected")).toBe("true");
+  },
+);

@@ -1,16 +1,18 @@
 mod artifacts;
 mod checks;
 mod cli;
+mod cloudflare;
 mod config;
 mod desktop;
 mod development;
+mod diagnostics;
 mod environment;
 mod home;
 mod mobile;
-mod official_apps;
 mod process;
 mod release;
 mod server;
+mod setup;
 mod website;
 mod workspace;
 

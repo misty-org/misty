@@ -26,6 +26,7 @@ func TestBuiltInSpaceTemplatesHaveStableBetaContracts(t *testing.T) {
 		"research",
 		"game-development",
 		"creative-team",
+		"family",
 	}
 	if !reflect.DeepEqual(gotIDs, wantIDs) {
 		t.Fatalf("template IDs = %#v, want %#v", gotIDs, wantIDs)
@@ -35,7 +36,7 @@ func TestBuiltInSpaceTemplatesHaveStableBetaContracts(t *testing.T) {
 		templates[0].SeedSummary.CollectionCount != 0 {
 		t.Fatalf("Blank seed summary = %#v, want empty", templates[0].SeedSummary)
 	}
-	for _, template := range templates[1:] {
+	for _, template := range templates[1 : len(templates)-1] {
 		if template.SeedSummary.TaskCount != 3 || template.SeedSummary.NoteCount != 1 {
 			t.Fatalf("template %q seed summary = %#v", template.ID, template.SeedSummary)
 		}
