@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/kannachi323/misty/server/internal/billingadapter"
 	"sort"
 	"time"
 )
@@ -14,8 +15,9 @@ var (
 )
 
 type storageQuotaState struct {
-	Personal StorageQuotaDimension
-	Space    StorageQuotaDimension
+	BillingAvailable bool
+	Personal         StorageQuotaDimension
+	Space            StorageQuotaDimension
 }
 
 func remainingStorageBytes(used, reserved, limit int64) int64 {
@@ -64,7 +66,8 @@ func storageQuotaStateTx(ctx context.Context, tx *sql.Tx, userID, spaceID string
 	}
 	spaceLimit := ownerEntitlements.SpaceStorageLimitBytes
 	return storageQuotaState{
-		Personal: personal.Personal,
+		BillingAvailable: personal.BillingAvailable && ownerEntitlements.BillingAvailable,
+		Personal:         personal.Personal,
 		Space: StorageQuotaDimension{
 			UsedBytes: spaceUsed, ReservedBytes: spaceReserved,
 			LimitBytes:     spaceLimit,
@@ -79,6 +82,9 @@ func reserveStorageQuotaTx(ctx context.Context, tx *sql.Tx, userID, spaceID stri
 	if err != nil {
 		return storageQuotaState{}, err
 	}
+	if !state.BillingAvailable {
+		return state, billingadapter.ErrUnavailable
+	}
 	if bytes > state.Personal.RemainingBytes {
 		return state, ErrPersonalStorageQuota
 	}
@@ -89,6 +95,9 @@ func reserveStorageQuotaTx(ctx context.Context, tx *sql.Tx, userID, spaceID stri
 }
 
 func storageQuotaError(state storageQuotaState, bytes int64) error {
+	if !state.BillingAvailable {
+		return billingadapter.ErrUnavailable
+	}
 	if bytes > state.Personal.RemainingBytes {
 		return ErrPersonalStorageQuota
 	}

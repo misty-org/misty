@@ -1,14 +1,17 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/kannachi323/misty/server/internal/billingadapter"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const maxAgentVoiceRecordingBytes = 10 << 20
@@ -16,7 +19,8 @@ const maxAgentVoiceJSONBytes = (maxAgentVoiceRecordingBytes*4)/3 + (1 << 20)
 
 func (s *AgentsService) AgentVoiceTranscription() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := s.requireUser(w, r); !ok {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
 			return
 		}
 		if s.voiceAnalyzer == nil {
@@ -40,12 +44,41 @@ func (s *AgentsService) AgentVoiceTranscription() http.HandlerFunc {
 			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"code": "voice_recording_too_large"})
 			return
 		}
-		text, language, actualDurationMS, err := s.voiceAnalyzer.TranscribeAgentVoice(r.Context(), audio, mimeType, durationMS)
+		ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+		defer cancel()
+		settings, _, err := s.database.AISettings(ctx, userID)
 		if err != nil {
+			writeAgentError(w, err)
+			return
+		}
+		if !settings.Enabled {
+			writeJSON(w, http.StatusForbidden, map[string]string{"code": "ai_disabled"})
+			return
+		}
+		if s.voiceLimiter != nil {
+			if allowed, retry := s.voiceLimiter.Allow(userID, time.Now()); !allowed {
+				w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
+				writeJSON(w, http.StatusTooManyRequests, map[string]string{"code": "voice_rate_limited"})
+				return
+			}
+		}
+		started := time.Now()
+		text, language, usage, err := s.voiceAnalyzer.TranscribeAgentVoiceWithBilling(ctx, audio, mimeType, durationMS, s.database.BillingService(), userID)
+		outcome := "completed"
+		if err != nil {
+			outcome = "failed"
+		}
+		s.voiceMetrics.RecordAIInvocation("agents", "transcription", usage.Model, outcome, time.Since(started), 0)
+		if err != nil {
+			if errors.Is(err, billingadapter.ErrDenied) || errors.Is(err, billingadapter.ErrUnavailable) || errors.Is(err, billingadapter.ErrConflict) {
+				writeBillingError(w, err)
+				return
+			}
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "voice_transcription_failed"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"transcript": text, "detected_language": language, "duration_ms": actualDurationMS})
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusOK, map[string]any{"transcript": text, "detected_language": language, "duration_ms": usage.DurationMS})
 	}
 }
 
@@ -66,6 +99,9 @@ func readAgentVoiceRecording(w http.ResponseWriter, r *http.Request) ([]byte, st
 			}
 			return nil, "", 0, "voice_recording_required"
 		}
+		if decoder.Decode(new(any)) != io.EOF {
+			return nil, "", 0, "voice_recording_required"
+		}
 		audio, err := base64.StdEncoding.DecodeString(body.AudioBase64)
 		if err != nil || len(audio) == 0 {
 			return nil, "", 0, "voice_recording_required"
@@ -80,6 +116,9 @@ func readAgentVoiceRecording(w http.ResponseWriter, r *http.Request) ([]byte, st
 	r.Body = http.MaxBytesReader(w, r.Body, maxAgentVoiceRecordingBytes+(1<<20))
 	if err := r.ParseMultipartForm(maxAgentVoiceRecordingBytes); err != nil {
 		return nil, "", 0, "voice_recording_too_large"
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 	file, header, err := r.FormFile("audio")
 	if err != nil {
