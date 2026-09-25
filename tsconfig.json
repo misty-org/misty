@@ -53,9 +53,6 @@
       ],
       "@misty/contracts": ["./node_modules/@misty/contracts/dist/index.d.ts"],
       "qrcode.react": ["./node_modules/qrcode.react/lib/index.d.mts"],
-      "material-icon-theme/dist/material-icons.json": [
-        "./node_modules/material-icon-theme/dist/material-icons.json"
-      ],
       "react-pdf": ["./node_modules/react-pdf/dist/esm/index.d.ts"],
       "konva": ["./node_modules/konva/lib/index-types.d.ts"],
       "react-konva": ["./node_modules/react-konva/ReactKonvaCore.d.ts"],

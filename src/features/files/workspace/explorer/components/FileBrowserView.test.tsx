@@ -70,6 +70,8 @@ it("renders the existing list/grid and filtering with SDK data and owning-view s
     const row = [...element.querySelectorAll("tr")].find((row) =>
       row.textContent?.includes(fixture.file.name),
     )!;
+    expect(row.querySelector("svg.lucide-file-code")).not.toBeNull();
+    expect(row.querySelector("img")).toBeNull();
     await act(async () => row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
     expect(opened).toHaveBeenCalledWith(listing.entries[0]);
     props.commandQuery = "missing-file";
@@ -79,6 +81,8 @@ it("renders the existing list/grid and filtering with SDK data and owning-view s
     props.viewMode = "grid";
     await render();
     expect(element.textContent).toContain(fixture.file.name);
+    expect(element.querySelector("svg.lucide-file-code")).not.toBeNull();
+    expect(element.querySelector("img")).toBeNull();
     props.error = "Folder disconnected";
     await render();
     expect(element.querySelector('[role="alert"]')?.textContent).toBe("Folder disconnected");

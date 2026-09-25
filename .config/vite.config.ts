@@ -1,71 +1,10 @@
 import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "../cli/tasks/app-env.ts";
-import { defineConfig, type Plugin, type ResolvedConfig } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import { publicSdkDevelopmentUpdates } from "../cli/tasks/vite-public-sdk.ts";
-import { materialIconProjection, copyMaterialIcons } from "../cli/tasks/material-icon-assets.ts";
-import { createReadStream, existsSync } from "node:fs";
-import { createRequire } from "node:module";
-import { basename, dirname, extname, join, resolve } from "node:path";
-
-// Resolve through Node so the static icon copy works wherever npm hoists the
-// package.
-const materialIconThemeDir = dirname(
-  createRequire(import.meta.url).resolve("material-icon-theme/package.json"),
-);
-const materialIconThemeIconsDir = join(materialIconThemeDir, "icons");
-const materialIconThemePublicPath = "/assets/material-icon-theme/";
-
-// Keep SVGs outside Rollup's module graph. Copy only assets referenced by
-// Misty's file/folder associations; editor-specific theme variants stay out.
-function materialIconThemeAssets(): Plugin {
-  let resolvedConfig: ResolvedConfig;
-
-  return {
-    name: "misty-material-icon-theme-assets",
-    configResolved(config) {
-      resolvedConfig = config;
-    },
-    configureServer(server) {
-      server.middlewares.use((request, response, next) => {
-        const requestPath = request.url?.split("?", 1)[0];
-        if (!requestPath?.startsWith(materialIconThemePublicPath)) {
-          next();
-          return;
-        }
-
-        let fileName: string;
-        try {
-          fileName = decodeURIComponent(requestPath.slice(materialIconThemePublicPath.length));
-        } catch {
-          next();
-          return;
-        }
-        if (fileName !== basename(fileName) || extname(fileName) !== ".svg") {
-          next();
-          return;
-        }
-
-        const iconPath = join(materialIconThemeIconsDir, fileName);
-        if (!existsSync(iconPath)) {
-          next();
-          return;
-        }
-
-        response.setHeader("Content-Type", "image/svg+xml");
-        response.setHeader("Cache-Control", "public, max-age=86400");
-        createReadStream(iconPath).pipe(response);
-      });
-    },
-    writeBundle(outputOptions) {
-      const outputDir = outputOptions.dir
-        ? resolve(outputOptions.dir)
-        : resolve(resolvedConfig.root, resolvedConfig.build.outDir);
-      copyMaterialIcons(join(outputDir, resolvedConfig.build.assetsDir, "material-icon-theme"));
-    },
-  };
-}
+import { resolve } from "node:path";
 
 export default defineConfig(({ command, mode }) => {
   const env = loadAppEnv(process.cwd());
@@ -101,8 +40,6 @@ export default defineConfig(({ command, mode }) => {
       publicSdkDevelopmentUpdates(process.cwd()),
       react(),
       tailwindcss(),
-      ...(mode === "mobile" || mode === "android" ? [materialIconThemeAssets()] : []),
-      materialIconProjection(),
       ...(uploadSourceMaps
         ? [
             posthog({
