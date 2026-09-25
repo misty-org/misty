@@ -1,7 +1,7 @@
 import {
   advanceTransferCompletionTracker,
   emptyTransferCompletionTracker,
-} from "@/application/layouts/transferCompletionNotifications";
+} from "@/app/layouts/transferCompletionNotifications";
 import type { TransferRecord } from "@/native/contracts";
 import type { TransferStatus } from "@/native/contracts/primitives";
 import { describe, expect, it } from "vitest";

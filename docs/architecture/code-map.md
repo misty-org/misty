@@ -3,7 +3,7 @@
 Misty organizes code by platform shell first and product domain second. The mnemonic is: **shells frame; features work; native bridges devices; shared knows no domain**.
 
 ```text
-src/application/layouts/
+src/app/layouts/
   DesktopLayout/       desktop shell, panes, windows and desktop chrome
   MobileLayout/        mobile shell, navigation, projection and switcher
   shared/              shell behavior genuinely shared by both platforms

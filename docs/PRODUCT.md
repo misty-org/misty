@@ -55,7 +55,7 @@ The supplied Inbox, Planner, and Files screenshots are binding visual references
 ## Evidence on Hand
 
 - Product and beta direction: `../BUSINESS.md`
-- Existing desktop shell and navigation: `src/application/layouts/DesktopLayout/`
+- Existing desktop shell and navigation: `src/app/layouts/DesktopLayout/`
 - Existing split-pane and tab primitives: `src/features/workspace/`
 - Existing shared UI primitives: `src/shared/ui/`
 - Existing design tokens and global behavior: `src/styles/styles.css`

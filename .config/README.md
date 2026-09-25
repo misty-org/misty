@@ -8,7 +8,7 @@ Examples:
 misty tool vite build --mode desktop
 misty tool vitest run src/features/files
 misty tool eslint src
-misty tool prettier --check src/application/entry.ts
+misty tool prettier --check src/app/entry.ts
 misty tool gitleaks detect
 ```
 
@@ -16,8 +16,10 @@ misty tool gitleaks detect
 
 A missing configuration or unknown tool is an error; tools do not silently fall back to default settings. Config paths belong in the registry rather than individual npm scripts. Explicit config overrides are rejected by the shared runner. Install a tool's npm package before using it; Gitleaks is a separate executable on PATH.
 
-Prettier's package.json field and Tailwind's CSS `@config` directive are discovery bridges to this directory. External editor integrations do not use the Misty runner: configure ESLint integrations with `.config/eslint.config.js`. Independent packages, such as the public SDK and server, retain their own project configuration.
+Prettier's package.json field and Tailwind's CSS `@config` directive are discovery bridges to this directory. The runner supplies `.config/prettierignore` and the root `.gitignore` to Prettier; patterns in `prettierignore` are relative to `.config/`. External editor integrations do not use the Misty runner: configure ESLint integrations with `.config/eslint.config.js`, and set the editor's Prettier ignore path (VS Code/Cursor: `prettier.ignorePath`) to `.config/prettierignore`. Independent packages, such as the public SDK and server, retain their own project configuration.
 
-Some files still have required root discovery or entry-point roles: npm manifests, TypeScript configuration, Rust and Node version pins, shadcn's `components.json`, HTML entry points, Git rules, and Prettier ignore rules. `.github/workflows`, `.agents/skills`, and `.codex` retain their automatic discovery locations.
+The main and cursor companion HTML entry points live in `src/app/`, Vite's app root. Development and packaged URLs remain `/index.html` and `/companion.html`; public assets and build output remain in the repository's `public/` and `dist/` directories.
+
+Some files still have required root discovery roles: npm manifests, TypeScript configuration, Rust and Node version pins, shadcn's `components.json`, and Git rules. `.github/workflows`, `.agents/skills`, and `.codex` retain their automatic discovery locations.
 
 Product, design, and roadmap documentation live in `docs/`.

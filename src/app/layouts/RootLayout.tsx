@@ -1,4 +1,4 @@
-import { RenderErrorBoundary } from "@/application/layouts/RenderErrorBoundary";
+import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
 import { useSetupStore } from "@/features/installer";

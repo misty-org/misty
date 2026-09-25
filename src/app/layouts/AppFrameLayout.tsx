@@ -15,7 +15,7 @@ import { useAuth } from "@/features/auth";
 import { desktopNavItems, desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 
-const PlatformLayout = lazy(() => import("@/application/platform-layout"));
+const PlatformLayout = lazy(() => import("@/app/platform-layout"));
 
 export function AppFrameLayout() {
   const { user, transitioning } = useAuth();

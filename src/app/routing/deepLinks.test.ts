@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { routeForMistyDeepLink } from "@/application/routing/deepLinks";
-import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "@/application/routing/navigation";
+import { routeForMistyDeepLink } from "@/app/routing/deepLinks";
+import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "@/app/routing/navigation";
 
 describe("Misty deep links", () => {
   it("preserves Assistant scope parameters for the legacy redirect", () => {

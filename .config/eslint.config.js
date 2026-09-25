@@ -155,7 +155,7 @@ export default tseslint.config(
         [
           [
             "@/api/*",
-            "@/application/*",
+            "@/app/*",
             "@/features/*",
             "@/native/*",
             "@/platform/*",
@@ -172,7 +172,7 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          ["@/application/*", "@/features/*", "@/telemetry/*"],
+          ["@/app/*", "@/features/*", "@/telemetry/*"],
           "api/ must not depend on application or features.",
         ],
       ]),
@@ -184,7 +184,7 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          ["@/api/*", "@/application/*", "@/features/*", "@/telemetry/*"],
+          ["@/api/*", "@/app/*", "@/features/*", "@/telemetry/*"],
           "native/ must not depend on application layers.",
         ],
       ]),
@@ -196,7 +196,7 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          ["@/application/*", "@/features/*"],
+          ["@/app/*", "@/features/*"],
           "telemetry/ must not depend on application or features.",
         ],
       ]),
@@ -207,13 +207,13 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [["@/application/*"], "features/ must not import from application/."],
+        [["@/app/*"], "features/ must not import from app/."],
         FEATURE_INTERNALS,
       ]),
     },
   },
   {
-    files: ["src/application/**/*.{ts,tsx}"],
+    files: ["src/app/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([MODELS_BAN, FEATURE_INTERNALS]),
     },
@@ -223,7 +223,7 @@ export default tseslint.config(
   // feature's dedicated entry directly, but can never reach desktop-only UI.
   {
     files: [
-      "src/application/layouts/MobileLayout/**/*.{ts,tsx}",
+      "src/app/layouts/MobileLayout/**/*.{ts,tsx}",
       "src/features/**/mobile/**/*.{ts,tsx}",
     ],
     rules: {
@@ -231,8 +231,8 @@ export default tseslint.config(
         MODELS_BAN,
         [
           [
-            "@/application/layouts/DesktopLayout",
-            "@/application/layouts/DesktopLayout/*",
+            "@/app/layouts/DesktopLayout",
+            "@/app/layouts/DesktopLayout/*",
             "@/features/extensions",
             "@/features/extensions/*",
             "@/features/marketplace",

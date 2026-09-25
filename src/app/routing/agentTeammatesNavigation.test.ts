@@ -1,4 +1,4 @@
-import { desktopNavItems, desktopRouteIdFromPath } from "@/application/routing/navigation";
+import { desktopNavItems, desktopRouteIdFromPath } from "@/app/routing/navigation";
 import { describe, expect, it } from "vitest";
 
 describe("first-class Agent navigation", () => {

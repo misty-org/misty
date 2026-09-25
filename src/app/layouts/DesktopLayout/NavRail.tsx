@@ -1,4 +1,4 @@
-import type { DesktopNavItem } from "@/application/layouts/model/types";
+import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/auth";
 import { useSetupStore } from "@/features/installer";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";

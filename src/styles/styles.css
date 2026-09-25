@@ -1,5 +1,5 @@
 @config "../../.config/tailwind.config.js";
-@import "tailwindcss";
+@import "tailwindcss" source("../../");
 @import "tw-animate-css";
 @import "./overflow-fade.css";
 

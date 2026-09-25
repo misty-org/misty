@@ -1,7 +1,7 @@
 import {
   adjacentPanelLeft,
   fitFloatingPanel,
-} from "@/application/layouts/DesktopLayout/popupGeometry";
+} from "@/app/layouts/DesktopLayout/popupGeometry";
 import { describe, expect, it } from "vitest";
 
 describe("popup geometry", () => {

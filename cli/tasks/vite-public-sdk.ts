@@ -16,8 +16,8 @@ export function publicSdkRevision(root) {
   }
 }
 
-/** @returns {import('vite').Plugin} */
-export function publicSdkDevelopmentUpdates() {
+/** @param {string} [workspaceRoot] @returns {import('vite').Plugin} */
+export function publicSdkDevelopmentUpdates(workspaceRoot) {
   let root;
   let revision;
   return {
@@ -35,7 +35,7 @@ export function publicSdkDevelopmentUpdates() {
       return resolve(dirname(packagePath), entry);
     },
     config(config) {
-      root = resolve(config.root ?? process.cwd());
+      root = resolve(workspaceRoot ?? config.root ?? process.cwd());
       revision = publicSdkRevision(root);
       return {
         optimizeDeps: {

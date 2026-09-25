@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  content: [new URL("../src/**/*.{html,ts,tsx}", import.meta.url).pathname],
   theme: {
     extend: {
       zIndex: {

@@ -1,4 +1,4 @@
-import type { DesktopNavItem } from "@/application/layouts/model/types";
+import type { DesktopNavItem } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { routes } from "@/features/app-shell";
 import { appIcons } from "@/shared/ui/app-icons";

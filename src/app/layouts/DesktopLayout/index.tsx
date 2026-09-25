@@ -4,7 +4,7 @@ import "./docking.css";
 import { CursorCompanionController } from "@/features/agents/companion/CursorCompanionController";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
-import type { DesktopNavItem } from "@/application/layouts/model/types";
+import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
@@ -67,7 +67,7 @@ export type {
   FramePacingState,
   WindowBounds,
   WindowRect,
-} from "@/application/layouts/model/types";
+} from "@/app/layouts/model/types";
 
 export function DesktopLayout(props: {
   getRouteId: (pathname: string) => AppTab;
