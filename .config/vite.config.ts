@@ -140,7 +140,11 @@ export default defineConfig(({ command, mode }) => {
     clearScreen: false,
     // Keep each app runtime separate from other Vite servers and temporary previews.
     // Sharing optimized dependencies can invalidate imports in an already-open webview.
-    cacheDir: resolve(process.cwd(), "node_modules/.vite", `misty-${mode}`),
+    cacheDir: resolve(
+      process.cwd(),
+      "node_modules/.vite",
+      command === "serve" ? `misty-${mode}-${desktopDevPort}` : `misty-${mode}`,
+    ),
     optimizeDeps: {
       // Scan the real app (including its lazy imports), not standalone HTML
       // probes in cli/tasks/. A probe-only unresolved import aborts Vite's scan;

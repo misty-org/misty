@@ -45,6 +45,28 @@ Keychain access controls.
 Release signing and mobile builds are unchanged. Direct `npx tauri dev` bypasses
 the Misty launcher; use the commands above for stable desktop dev signing.
 
+### Test device sync with two development profiles
+
+Run these in separate terminals:
+
+```sh
+misty desktop dev --profile dev1
+misty desktop dev --profile dev2
+```
+
+Sign in to the same account on the same server in both profiles, and connect
+both to the existing sync vault. Each profile retains its own device ID and
+local sync database across restarts; multiple windows within one profile remain
+one device. Do not copy sync databases between profiles or reset IDs to test sync.
+Their Vite dependency caches are separate, and Control lists the profile name
+alongside its host and device ID.
+
+Enable **Full sync** on both devices. Only the **Active** device publishes tab
+and workspace changes. In the other profile, use **Control → Switch to This
+device** to reverse direction. Website sign-in capture/restoration has its own
+status: a sign-in warning does not mean the device IDs collided or that tab sync
+is disconnected. Full sync off keeps that profile's workspace independent.
+
 Start the website with:
 
 ```sh
