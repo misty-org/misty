@@ -262,7 +262,13 @@ const FILES: &[FileSpec] = &[
     },
 ];
 
-const DEPRECATED_NAMES: &[&str] = &["MISTY_CONNECTED_DEVICES_ENABLED"];
+// Accepted only when reading older environments; retired switches and settings
+// must not block startup or become active configuration again.
+const DEPRECATED_NAMES: &[&str] = &[
+    "MISTY_CONNECTED_DEVICES_ENABLED",
+    "MISTY_SDK_PROVIDERS_ENABLED",
+    "WAITLIST_NOTIFY_EMAIL",
+];
 
 const PROD_REQUIRED: &[&str] = &[
     "DB_HOST",
@@ -892,6 +898,52 @@ mod tests {
     fn paths_use_short_target_names() {
         assert!(relative_paths(Target::Dev)[0].starts_with(".env/dev/"));
         assert!(relative_paths(Target::Prod)[0].starts_with(".env/prod/"));
+    }
+
+    #[test]
+    fn retired_product_settings_do_not_block_or_enter_the_environment() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = Workspace {
+            root: tmp.path().to_path_buf(),
+            misty: tmp.path().to_path_buf(),
+            server: tmp.path().join("server"),
+            cli: tmp.path().join("cli"),
+            website: tmp.path().join("website"),
+            features: tmp.path().join("src/features"),
+        };
+        for target in [Target::Dev, Target::Prod] {
+            init(&workspace, target).unwrap();
+            let base = root(&workspace, target);
+            assert!(!base.join("integrations/stripe.env").exists());
+            assert!(!base.join("integrations/activepieces.env").exists());
+            for (file, entry) in [
+                ("runtime.env", "MISTY_SDK_PROVIDERS_ENABLED=true"),
+                (
+                    "integrations/email.env",
+                    "WAITLIST_NOTIFY_EMAIL=fixture@example.invalid",
+                ),
+            ] {
+                let path = base.join(file);
+                let contents = fs::read_to_string(&path).unwrap();
+                write_private(&path, format!("{contents}\n{entry}\n").as_bytes()).unwrap();
+            }
+            let values = read(&workspace, target).unwrap();
+            for name in DEPRECATED_NAMES {
+                assert!(!values.contains_key(*name));
+                assert!(owner(name).is_err());
+            }
+            let runtime = base.join("runtime.env");
+            let contents = fs::read_to_string(&runtime).unwrap();
+            write_private(
+                &runtime,
+                format!("{contents}\nMISTY_UNKNOWN_SETTING=true\n").as_bytes(),
+            )
+            .unwrap();
+            assert!(read(&workspace, target)
+                .unwrap_err()
+                .to_string()
+                .contains("MISTY_UNKNOWN_SETTING"));
+        }
     }
 
     #[test]
