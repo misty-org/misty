@@ -16,8 +16,8 @@ misty tool gitleaks detect
 
 A missing configuration or unknown tool is an error; tools do not silently fall back to default settings. Config paths belong in the registry rather than individual npm scripts. Explicit config overrides are rejected by the shared runner. Install a tool's npm package before using it; Gitleaks is a separate executable on PATH.
 
-Prettier's package.json field and Tailwind's CSS `@config` directive are discovery bridges to this directory. External editor integrations do not use the Misty runner: configure ESLint integrations with `.config/eslint.config.js`. Independent packages, such as the public SDK and server, retain their own project configuration.
+Prettier's package.json field, Tailwind's CSS `@config` directive, and the root `tsconfig.json` are discovery bridges to this directory. TypeScript settings live in `.config/tsconfig.json`; its paths are relative to `.config`, while the root file lets editors and plain `tsc` discover the project. External editor integrations do not use the Misty runner: configure ESLint integrations with `.config/eslint.config.js`. Independent packages, such as the public SDK and server, retain their own project configuration.
 
-Some files still have required root discovery or entry-point roles: npm manifests, TypeScript configuration, Rust and Node version pins, shadcn's `components.json`, HTML entry points, Git rules, and Prettier ignore rules. `.github/workflows`, `.agents/skills`, and `.codex` retain their automatic discovery locations.
+Some files still have required root discovery or entry-point roles: npm manifests, the small TypeScript discovery file, Rust and Node version pins, shadcn's `components.json`, HTML entry points, Git rules, and Prettier ignore rules. `.github/workflows`, `.agents/skills`, and `.codex` retain their automatic discovery locations.
 
 Product, design, and roadmap documentation live in `docs/`.
