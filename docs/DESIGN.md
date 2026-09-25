@@ -159,6 +159,8 @@ The primary palette is black, white, and gray: a compressed charcoal ladder, off
 - **Misty Logo**: Always monochrome. Use warm white on dark surfaces and near-black on light surfaces, inheriting the surrounding foreground color so the mark stays consistent across themes. Keep the original silhouette unchanged.
 - **Integration logos**: Use the original brand SVG colors and gradients in navigation, tabs, Discover, connection screens, and app views. Reuse `src/shared/toolAssets/brandIcons.ts` everywhere. Preserve brand colors on inactive rows; show selection through the surrounding neutral background. Inherently monochrome brands use their light or dark foreground variant. Misty tool icons remain monochrome.
 
+Explorer file and folder icons use inline Lucide SVGs with a consistent 1.75 stroke, muted gray at rest and brighter on hover or selection. Shapes distinguish documents, code, images, audio, video, spreadsheets, and archives; unknown files use a generic file outline. Keep real thumbnails where available. Do not reintroduce external icon-theme image requests or per-extension brand colors.
+
 ### Primary: monochrome
 
 Use neutral tones for navigation, tabs, buttons, links, focus rings, source icons, unread indicators, notification counts, and status labels. Selected controls gain brightness, weight, a neutral underline, or one tonal fill. Success, collaboration, and agent-related UI do not automatically earn green.
