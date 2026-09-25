@@ -415,11 +415,8 @@ pub(super) mod tests {
         let directory = root.join("native").join(service).join(&platform);
         std::fs::create_dir_all(&directory).unwrap();
         let payload = serde_json::json!({"protocol":protocol,"service":service,"appId":app_id,"appVersion":"1","platform":platform,"sha256":format!("{:x}",Sha256::digest(bytes)),"bytes":bytes.len()}).to_string();
-        let seed: [u8; 32] =
-            hex::decode("REDACTED_LEGACY_CREDENTIAL")
-                .unwrap()
-                .try_into()
-                .unwrap();
+        // Deterministic fixture seed; never a development or release credential.
+        let seed = [7u8; 32];
         let signature = SigningKey::from_bytes(&seed)
             .sign(format!("misty-native-service-v1\n{payload}").as_bytes());
         let envelope = serde_json::json!({"payload":payload,"signature":base64::engine::general_purpose::STANDARD.encode(signature.to_bytes()),"signatureKeyId":"misty-development-2026-01"});
