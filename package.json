@@ -6,41 +6,35 @@
   "scripts": {
     "dev": "npm run dev:desktop",
     "dev:desktop": "node cli/tasks/run-tool.ts vite --mode desktop",
-    "dev:mobile": "node cli/tasks/run-tool.ts vite --mode mobile --host 0.0.0.0 --port 5173",
-    "dev:android": "node cli/tasks/run-tool.ts vite --mode android --host 0.0.0.0",
     "dev:web": "node cli/tasks/run-tool.ts vite --mode web --host 0.0.0.0 --port 5173",
     "build": "npm run build:desktop",
     "build:desktop": "tsc && node cli/tasks/run-tool.ts vite build --mode desktop",
-    "build:mobile": "tsc && node cli/tasks/run-tool.ts vite build --mode mobile",
-    "build:android": "tsc && node cli/tasks/run-tool.ts vite build --mode android",
     "build:web": "tsc && node --max-old-space-size=8192 cli/tasks/run-tool.ts vite build --mode web",
     "deploy:web:dev": "npm run build:web && node cli/tasks/run-tool.ts wrangler deploy --env dev",
     "preview": "node cli/tasks/run-tool.ts vite preview --mode desktop",
-    "preview:mobile": "node cli/tasks/run-tool.ts vite preview --mode mobile",
     "preview:web": "node cli/tasks/run-tool.ts vite preview --mode web",
-    "icons:ios": "node cli/tasks/generate-ios-app-icons.ts",
     "tauri": "node --disable-warning=ExperimentalWarning --experimental-strip-types cli/tasks/tauri.ts",
     "typecheck": "tsc --noEmit",
     "lint": "node cli/tasks/run-tool.ts eslint .",
     "lint:fix": "node cli/tasks/run-tool.ts eslint . --fix",
     "test": "node cli/tasks/run-tool.ts vitest run",
-    "test:sdk-refresh": "node --test cli/tasks/vite-public-sdk.test.ts",
     "test:dev-navigation": "node --test cli/tasks/vite-app-entry.test.ts",
     "audit:production": "node cli/tasks/run-tool.ts audit-ci",
-    "check": "npm run check:format && npm run typecheck && npm run lint && npm run test && npm run test:sdk-refresh && npm run test:dev-navigation && npm run audit:production",
+    "check": "npm run check:format && npm run typecheck && npm run lint && npm run test && npm run test:dev-navigation && npm run audit:production",
     "format": "node cli/tasks/run-tool.ts prettier --write \"src/**/*.{ts,tsx,css}\"",
     "check:format": "node cli/tasks/run-tool.ts prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "sdk:sync": "node cli/tasks/sync-public-sdk.ts",
     "beta:prepare": "node cli/tasks/release/beta.ts prepare",
     "beta:promote": "node cli/tasks/release/beta.ts promote",
     "beta:keys": "node cli/tasks/release/setup-keys.ts",
-    "sdk:build": "npm run build --workspace @misty/contracts && npm run build --workspace @misty/sdk",
-    "sdk:check": "npm run sdk:build && tsc -p packages/sdk/tsconfig.test.json && vitest run --config packages/sdk/vitest.config.ts",
-    "sdk:packed": "node cli/tasks/sdk/check-packed.ts",
-    "postinstall": "npm run sdk:build",
     "cli": "cargo run --manifest-path cli/Cargo.toml --",
     "test:tasks": "node --test cli/tasks/*.test.ts cli/tasks/release/*.test.ts",
-    "tool": "node cli/tasks/run-tool.ts"
+    "tool": "node cli/tasks/run-tool.ts",
+    "dev:mobile": "node cli/tasks/run-tool.ts vite --mode mobile --host 0.0.0.0 --port 5173",
+    "dev:android": "node cli/tasks/run-tool.ts vite --mode android --host 0.0.0.0",
+    "build:mobile": "tsc && node cli/tasks/run-tool.ts vite build --mode mobile",
+    "build:android": "tsc && node cli/tasks/run-tool.ts vite build --mode android",
+    "preview:mobile": "node cli/tasks/run-tool.ts vite preview --mode mobile",
+    "icons:ios": "node cli/tasks/generate-ios-app-icons.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.4",
@@ -70,8 +64,6 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@impierce/tauri-plugin-keystore": "^2.1.0-alpha.1",
     "@lezer/highlight": "^1.2.1",
-    "@misty/contracts": "0.1.0",
-    "@misty/sdk": "0.1.0",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-checkbox": "^1.3.7",
@@ -164,7 +156,8 @@
     "y-partyserver": "^2.2.0",
     "y-prosemirror": "^1.3.7",
     "yjs": "^13.6.27",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.0",
@@ -206,9 +199,6 @@
       "nanoid": "3.3.17"
     }
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "engines": {
     "node": ">=24.12.0",
     "npm": ">=11"

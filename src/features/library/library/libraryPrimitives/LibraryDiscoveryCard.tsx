@@ -1,5 +1,5 @@
 import type { LibraryDiscoveryGroup } from "@/api/spaces/dto/interfaces/types";
-import { Button } from "@/shared/ui";
+import { Button, DiscoverCard } from "@/shared/ui";
 import { Pin, type LucideIcon } from "lucide-react";
 import { useContext } from "react";
 import { AlbumCover } from "./AlbumCover";
@@ -24,7 +24,7 @@ export function LibraryDiscoveryCard({
   const canEdit = useContext(LibraryCanEditContext);
 
   return (
-    <article className="group relative overflow-hidden rounded-xl bg-charcoal-card shadow-xs inset-ring-1 inset-ring-cream/10">
+    <DiscoverCard>
       <Button
         className="block w-full border-0 bg-transparent p-0 text-left"
         type="button"
@@ -52,6 +52,6 @@ export function LibraryDiscoveryCard({
           <Pin size={14} fill={pinned ? "currentColor" : "none"} />
         </Button>
       ) : null}
-    </article>
+    </DiscoverCard>
   );
 }

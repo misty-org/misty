@@ -14,6 +14,7 @@ export * from "./coming-soon-surface";
 export * from "./context-menu";
 export * from "./desktop-access-state";
 export * from "./dialog";
+export * from "./discover-card";
 export * from "./drag-layer";
 export * from "./dropdown-menu";
 export { IconButton as PrimitiveIconButton } from "./icon-button";

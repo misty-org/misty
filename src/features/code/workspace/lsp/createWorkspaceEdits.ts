@@ -15,7 +15,7 @@ export interface WorkspaceEditPreview {
   readonly title: string;
   readonly files: readonly WorkspaceEditFilePreview[];
 }
-/** Shared data only. SDK access and version readers belong to individual adapters. */
+/** Shared data only. Service access and version readers belong to individual adapters. */
 export function createWorkspaceEditState() {
   return {
     previews: new Map<

@@ -3,7 +3,7 @@ import { createJSONStorage } from "zustand/middleware";
 import { createCodingWorkspaceStore, type OpenTab } from "./createCodingWorkspaceStore";
 export * from "./createCodingWorkspaceStore";
 
-// The embedded host keeps its existing persisted store; SDK mounts create their own.
+// The host keeps its existing persisted workspace store.
 export const useCodingWorkspaceStore = createCodingWorkspaceStore(
   createJSONStorage(() => localStorage),
 );

@@ -1,6 +1,6 @@
 import { showStartupFailure } from "./startupFailure";
 
-// Keep this entry independent of React, the SDK, and the rest of the app graph.
+// Keep this entry independent of React and the rest of the app graph.
 // Even a missing module export must leave a usable reload action on screen.
 void import("./main")
   .then(({ startup }) => startup)

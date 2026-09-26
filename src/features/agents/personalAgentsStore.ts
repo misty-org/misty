@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentProfile } from "@misty/contracts";
+import type { AgentProfile } from "@/shared/contracts";
 import { personalAgentsApi } from "@/api/agents/native";
 
 interface PersonalAgentsState {

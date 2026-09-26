@@ -23,7 +23,7 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-/** One view-owned protocol client. The native or SDK transport is supplied by its owner. */
+/** One view-owned protocol client. The native transport is supplied by its owner. */
 export class LspClient {
   private sessionId: string | null = null;
   private unlisten: (() => void) | null = null;

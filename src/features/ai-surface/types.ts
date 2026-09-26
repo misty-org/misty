@@ -1,5 +1,4 @@
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
-
 export type AiSurfaceId =
   | "global"
   | "home"
@@ -22,14 +21,12 @@ export type AiSurfaceId =
   | "photo-editor"
   | "agents"
   | "settings";
-
 export type AiInvocationMode = "quick" | "drawer" | "companion";
 export type AiTrigger = "message" | "selection" | "object" | "schedule" | "event" | "handoff";
 export type AiPrivacyClass = "shared" | "private" | "device" | "provider";
 export type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
 export type AiApprovalPolicy =
   "none" | "auto_apply_with_undo" | "visible_apply" | "confirm" | "always_confirm";
-
 export interface AiContextReference {
   kind: string;
   id: string;
@@ -42,7 +39,6 @@ export interface AiContextReference {
   attached?: boolean;
   metadata?: Record<string, string | number | boolean>;
 }
-
 export interface AiInvocationDeviceContext {
   deviceId: string;
   kind: "browser_tab";
@@ -51,7 +47,6 @@ export interface AiInvocationDeviceContext {
   capabilities: string[];
   metadata?: Record<string, string | number | boolean>;
 }
-
 export interface AiSelectionSnapshot {
   kind: "text" | "blocks" | "canvas" | "objects" | "rows";
   content?: string;
@@ -59,7 +54,6 @@ export interface AiSelectionSnapshot {
   anchors?: Record<string, string | number | boolean | null>;
   contentHash: string;
 }
-
 export interface AiCaptureAttachment {
   id: string;
   name: string;
@@ -69,7 +63,6 @@ export interface AiCaptureAttachment {
   height: number;
   contentHash: string;
 }
-
 export type AiArtifactKind =
   | "text_patch"
   | "task_set"
@@ -85,14 +78,12 @@ export type AiArtifactKind =
   | "transfer_plan"
   | "extension_action"
   | "image_edit";
-
 export interface AiArtifactTarget {
   kind: string;
   id: string;
   spaceId?: string;
   href?: string;
 }
-
 export interface AiArtifact<TOperations = unknown> {
   id: string;
   schemaVersion: typeof AI_ARTIFACT_SCHEMA_VERSION;
@@ -110,7 +101,6 @@ export interface AiArtifact<TOperations = unknown> {
   state: "proposed" | "applying" | "applied" | "rejected" | "stale" | "failed";
   error?: string;
 }
-
 export interface AiCitation {
   id: string;
   kind: string;
@@ -119,7 +109,6 @@ export interface AiCitation {
   revision?: string | number;
   excerpt?: string;
 }
-
 export interface AiSuggestedAction {
   id: string;
   label: string;
@@ -127,10 +116,8 @@ export interface AiSuggestedAction {
   trigger?: AiTrigger;
   requestedArtifactKind?: AiArtifactKind;
 }
-
 export type MistyPresencePhase =
   "home" | "following" | "composing" | "working" | "speaking" | "awaiting_approval" | "returning";
-
 export interface MistySpeech {
   id: string;
   kind: "status" | "reply" | "error" | "clarification";
@@ -140,21 +127,18 @@ export interface MistySpeech {
   createdAt: string;
   persistent?: boolean;
 }
-
 export interface MistyApprovalPrompt {
   artifact: AiArtifact;
   title: string;
   summary: string;
   confirmLabel: string;
 }
-
 export interface MistyUndoReceipt {
   id: string;
   artifactId: string;
   title: string;
   expiresAt: string;
 }
-
 export interface AiCompanionRect {
   x: number;
   y: number;
@@ -171,7 +155,6 @@ export interface AiCompanionAnchor {
   rect?: AiCompanionRect;
   surfaceRevision?: string | number;
 }
-
 export interface AiSurfaceAdapter {
   surfaceId: AiSurfaceId;
   label: string;
@@ -186,7 +169,6 @@ export interface AiSurfaceAdapter {
   onArtifactApplied?: (artifact: AiArtifact, result?: unknown) => void | Promise<void>;
   openCitation?: (citation: AiCitation) => void;
 }
-
 export interface AiInvocationRequest {
   companionMode?: "team" | "auto";
   companionModel?: string;
@@ -212,14 +194,12 @@ export interface AiInvocationRequest {
   idempotencyKey: string;
   timezone?: string;
 }
-
 export interface AiInvocationCreated {
   invocationId: string;
   conversationId?: string;
   state: AiInvocationState;
   eventsUrl: string;
 }
-
 export interface AiRunRoutingOption {
   space_id: string;
   space_name: string;
@@ -228,12 +208,15 @@ export interface AiRunRoutingOption {
   capability_id: string;
   capability_name: string;
 }
-
 export interface AiRunCreated {
   status: string;
   agents_href?: string;
   replayed?: boolean;
-  run?: { id: string; state: string; error_message?: string };
+  run?: {
+    id: string;
+    state: string;
+    error_message?: string;
+  };
   routing?: {
     needs_clarification?: boolean;
     question?: string;
@@ -241,7 +224,6 @@ export interface AiRunCreated {
     selected?: AiRunRoutingOption;
   };
 }
-
 export type AiInvocationState =
   | "queued"
   | "running"
@@ -252,9 +234,12 @@ export type AiInvocationState =
   | "completed"
   | "failed"
   | "canceled";
-
 export type AiInvocationEvent =
-  | { id: string; type: "invocation.started"; state: AiInvocationState }
+  | {
+      id: string;
+      type: "invocation.started";
+      state: AiInvocationState;
+    }
   | {
       id: string;
       type: "assistant.status";
@@ -264,24 +249,70 @@ export type AiInvocationEvent =
       summary?: string;
       toolName?: string;
     }
-  | { id: string; type: "response.delta"; delta: string }
-  | { id: string; type: "assistant.message"; text: string; summary: string }
-  | { id: string; type: "citation"; citation: AiCitation }
-  | { id: string; type: "artifact.proposed"; artifact: AiArtifact }
-  | { id: string; type: "approval.required"; artifact: AiArtifact }
-  | { id: string; type: "effect.applied"; artifactId: string; summary: string }
-  | { id: string; type: "undo.available"; receipt: MistyUndoReceipt }
-  | { id: string; type: "run.started"; runId: string }
+  | {
+      id: string;
+      type: "response.delta";
+      delta: string;
+    }
+  | {
+      id: string;
+      type: "assistant.message";
+      text: string;
+      summary: string;
+    }
+  | {
+      id: string;
+      type: "citation";
+      citation: AiCitation;
+    }
+  | {
+      id: string;
+      type: "artifact.proposed";
+      artifact: AiArtifact;
+    }
+  | {
+      id: string;
+      type: "approval.required";
+      artifact: AiArtifact;
+    }
+  | {
+      id: string;
+      type: "effect.applied";
+      artifactId: string;
+      summary: string;
+    }
+  | {
+      id: string;
+      type: "undo.available";
+      receipt: MistyUndoReceipt;
+    }
+  | {
+      id: string;
+      type: "run.started";
+      runId: string;
+    }
   | {
       id: string;
       type: "tool.started" | "tool.completed" | "tool.failed";
       toolCallId: string;
       toolName: string;
     }
-  | { id: string; type: "invocation.completed"; state: AiInvocationState }
-  | { id: string; type: "invocation.failed"; state: AiInvocationState; error: string }
-  | { id: string; type: "invocation.canceled"; state: AiInvocationState };
-
+  | {
+      id: string;
+      type: "invocation.completed";
+      state: AiInvocationState;
+    }
+  | {
+      id: string;
+      type: "invocation.failed";
+      state: AiInvocationState;
+      error: string;
+    }
+  | {
+      id: string;
+      type: "invocation.canceled";
+      state: AiInvocationState;
+    };
 export interface AiTranscriptMessage {
   id: string;
   role: "user" | "assistant";

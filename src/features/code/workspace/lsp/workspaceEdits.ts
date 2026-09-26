@@ -6,7 +6,7 @@ import { createWorkspaceEdits } from "./createWorkspaceEdits";
 export * from "./textEdits";
 export type { WorkspaceEditFilePreview, WorkspaceEditPreview } from "./createWorkspaceEdits";
 
-/** Existing host integration; downloaded Code creates an instance with its own SDK buffers. */
+/** Host integration for workspace edits. */
 export const {
   prepareWorkspaceEdit,
   getWorkspaceEditPreview,

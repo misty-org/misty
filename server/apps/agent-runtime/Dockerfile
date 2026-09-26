@@ -3,13 +3,7 @@ WORKDIR /src/apps/agent-runtime
 COPY apps/agent-runtime/package.json apps/agent-runtime/package-lock.json ./
 COPY apps/agent-runtime/vendor ./vendor
 COPY apps/agent-runtime/scripts ./scripts
-COPY third-party/misty-contracts /src/third-party/misty-contracts
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
-# Materialize the local file dependency so its dependencies resolve beside the
-# runtime's packages and the final image does not contain a dangling symlink.
-RUN cp -RL node_modules/@misty/contracts /tmp/misty-contracts \
-    && rm node_modules/@misty/contracts \
-    && mv /tmp/misty-contracts node_modules/@misty/contracts
 COPY apps/agent-runtime ./
 RUN npm run build
 

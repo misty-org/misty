@@ -1,5 +1,5 @@
 import { apiRequest } from "@/api/client";
-import type { AgentProfile, AgentProfileInput } from "@misty/contracts";
+import type { AgentProfile, AgentProfileInput } from "@/shared/contracts";
 
 export const personalAgentsApi = {
   list: () => apiRequest<{ agents: AgentProfile[] }>("/misty/agents"),

@@ -22,21 +22,6 @@ pub fn setup(workspace: &Workspace) -> Result<()> {
     CommandSpec::new(npm()).args(["ci"]).run(&workspace.misty)
 }
 
-pub fn sdk(workspace: &Workspace, action: &str) -> Result<()> {
-    workspace.validate()?;
-    let scripts: &[&str] = match action {
-        "build" => &["sdk:sync"],
-        "check" => &["sdk:check", "sdk:packed"],
-        _ => bail!("Unknown SDK action: {action}"),
-    };
-    for script in scripts {
-        CommandSpec::new(npm())
-            .args(["run", script])
-            .run(&workspace.misty)?;
-    }
-    Ok(())
-}
-
 /// Tooling that uses Vite/Node APIs stays in TypeScript under cli/tasks.
 /// Only repository-owned tasks may be selected; arguments remain separate OS arguments.
 pub fn task(workspace: &Workspace, name: &str, arguments: &[String]) -> Result<()> {
@@ -57,7 +42,7 @@ fn task_path(root: &std::path::Path, name: &str) -> Result<PathBuf> {
             .split('/')
             .any(|s| s.is_empty() || s == "." || s == "..")
     {
-        bail!("Use a task name relative to cli/tasks, such as release/package-apps");
+        bail!("Use a task name relative to cli/tasks, such as release/prepare-manifest");
     }
     let path = root.join(format!("{name}.ts")).canonicalize()?;
     if !path.starts_with(root) || !path.is_file() {

@@ -20,11 +20,6 @@ pub struct Cli {
 enum Command {
     /// Prepare server configuration, Cloudflare resources, or desktop dependencies.
     Setup(crate::setup::Setup),
-    /// Build or validate the public SDK and contracts.
-    Sdk {
-        #[command(subcommand)]
-        command: SdkCommand,
-    },
     /// Run a project tool using the shared .config registry.
     Tool {
         name: String,
@@ -56,12 +51,6 @@ enum Command {
     Website(Website),
     Server(Server),
     Release(Release),
-}
-
-#[derive(Debug, Subcommand)]
-enum SdkCommand {
-    Build,
-    Check,
 }
 
 #[derive(Debug, Args)]
@@ -138,7 +127,6 @@ enum EnvCommand {
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum CheckTarget {
-    Sdk,
     Tasks,
     App,
     Server,
@@ -451,13 +439,6 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             .args(arguments)
             .run(&settings.workspace.misty),
         Command::Setup(options) => crate::setup::run(&settings.workspace, options),
-        Command::Sdk { command } => crate::development::sdk(
-            &settings.workspace,
-            match command {
-                SdkCommand::Build => "build",
-                SdkCommand::Check => "check",
-            },
-        ),
         Command::Tasks => crate::development::tasks(&settings.workspace),
         Command::Task { name, arguments } => {
             crate::development::task(&settings.workspace, &name, &arguments)
@@ -512,7 +493,6 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
         },
         Command::Check(command) => match command.target {
             CheckTarget::App => checks::app(&settings.workspace),
-            CheckTarget::Sdk => crate::development::sdk(&settings.workspace, "check"),
             CheckTarget::Tasks => crate::process::CommandSpec::new(crate::process::npm())
                 .args(["run", "test:tasks"])
                 .run(&settings.workspace.misty),
@@ -684,7 +664,6 @@ fn load_command_environment(command: &Command, settings: &Settings) -> Result<()
         | Command::Env(_)
         | Command::Home(_)
         | Command::Setup(_)
-        | Command::Sdk { .. }
         | Command::Tasks
         | Command::Task { .. } => &[],
         Command::Doctor(options) if options.target == crate::diagnostics::Target::Release => {

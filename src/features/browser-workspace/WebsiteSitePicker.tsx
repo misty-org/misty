@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ChevronLeft, Pencil, Trash2, Folder, Globe, Search } from "lucide-react";
-import { mistyBrowserProviders } from "@misty/sdk";
+import { mistyBrowserProviders } from "@/shared/contracts";
 import { BrandIcon } from "../../shared/toolAssets/BrandIcon";
 import { providers, type ProviderId } from "@/features/webviews/providers";
 import {

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { mistyBrowserProviders } from "@misty/sdk";
+import { mistyBrowserProviders } from "@/shared/contracts";
 import { providerLaunchUrl, providerLoginUrls } from "./providerLoginUrls";
 import { providers } from "./providers";
 import { providerUrlAllowed } from "../../features/browser/workspace/browserProviders";
