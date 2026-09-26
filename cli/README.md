@@ -42,7 +42,7 @@ removes its encrypted roots while retaining the device key for other accounts.
 If that key is missing or mismatched, Misty preserves the database and fails
 closed rather than generating a replacement. The launcher does not loosen
 Keychain access controls.
-Release signing and mobile builds are unchanged. Direct `npx tauri dev` bypasses
+Release signing is unchanged. Direct `npx tauri dev` bypasses
 the Misty launcher; use the commands above for stable desktop dev signing.
 
 ### Test device sync with two development profiles
@@ -79,30 +79,6 @@ Start the documentation site with:
 misty docs dev
 ```
 
-On macOS, prepare and run the Apple mobile app with:
-
-```sh
-misty mobile doctor
-misty mobile devices
-misty mobile open
-misty mobile setup
-misty mobile dev --open
-```
-
-After Xcode signing is configured, launch a connected device directly by name:
-
-```sh
-misty mobile dev --device "My iPhone"
-```
-
-That command discovers the Mac's LAN address, selects an available development
-port, starts Vite and Tauri, builds and installs Misty, and keeps hot reload
-running. It uses Apple's CoreDevice path automatically for paired wireless
-iPhones and exits immediately with an unlock instruction when the device is
-locked. The mobile command also starts the local server stack, so it is the only
-command needed for an ordinary iPhone development session. Desktop and website
-development servers can remain open.
-
 Built-in tools compile with Misty. Native workers are bundled during the desktop build.
 
 The CLI discovers the current Misty checkout, including when run from a nested directory. Built-in tools and the CLI live in `src/features/` and `cli/`. Optional server and website repositories can live next to the checkout. Configure a fallback location with:
@@ -116,8 +92,6 @@ misty configure --workspace /path/to/misty-org
 ```sh
 misty doctor
 misty setup
-misty sdk build
-misty sdk check
 misty check tasks
 misty check app
 misty check server
@@ -144,15 +118,6 @@ misty desktop clean
 misty desktop clean --apply
 misty desktop icons sync
 
-misty mobile doctor
-misty mobile devices
-misty mobile open
-misty mobile setup
-misty mobile dev --open
-misty mobile dev --device "My iPhone"
-misty mobile run --device "My iPhone" --release
-misty mobile build --target simulator --no-sign
-misty mobile build --build-number 42 --export-method app-store-connect
 
 misty docs dev
 misty docs build

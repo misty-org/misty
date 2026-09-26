@@ -94,7 +94,7 @@ sent with credentialed requests from the allowed Misty web origins.
 Billing webhooks belong to the separately deployed billing service. The browser
 server exposes no payment-provider webhook. Self-hosted deployments leave the
 optional billing adapter disabled; hosted deployments must explicitly configure
-the authenticated HTTP adapter. See [the public contract](../docs/billing-adapter.md).
+the authenticated HTTP adapter. See [the public contract](https://github.com/misty-org/misty/wiki/Server-billing-adapter).
 
 The production Journal Worker is deployed separately and points directly to:
 

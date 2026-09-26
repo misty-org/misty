@@ -88,7 +88,7 @@ components:
 
 **Creative North Star: "Misty at the Cursor"**
 
-A small animated Misty buddy follows the cursor, giving temporary voice and pointing feedback in the visual language of Clicky's overlay. The existing `misty-cloud-expression-cycle.webp` is the sole character asset. The overlay and inline controls in the Agents conversation form a local companion design; this document does not replace Misty's workspace design system. The overlay-only renderer boots through `companion.html`; controls belong in Agents rather than a tray window. The original character bytes are imported with `?inline` so the packaged application can render the existing WebP.
+The Misty desktop mark follows the cursor, giving temporary voice and pointing feedback in the visual language of Clicky's overlay. The current `src/assets/branding/misty-icon.png` is the sole companion asset, copied from the native desktop icon. The overlay and inline controls in the Agents conversation form a local companion design; this document does not replace Misty's workspace design system. The overlay-only renderer boots through `companion.html`; controls belong in Agents rather than a tray window. The PNG is imported with `?inline` so the packaged application needs no separate asset request.
 
 The visual authority is `vendor/clicky/leanring-buddy/OverlayWindow.swift`, expressed by the finished `CursorCompanionRoot.tsx`, `cursorCompanion.css`, and `motion.ts`. Preserve its blue waveform, open spinner, pointing bubble, spring following, and curved flights. `AgentCompanionPanel.tsx` and `agentCompanionPanel.css` place shared ghost buttons, a Team/Auto radio group, and a native model selector above the conversation. `companionState.ts` and `CursorCompanionController.tsx` share one mode and control handler with typed and native voice interactions. Controls inherit the Agents system type and theme tokens. The source blue glow and system font are deliberate parts of the approved direction.
 
@@ -166,7 +166,7 @@ Evidence includes `.impeccable/review/cursor-agents/team.png`, `auto.png`, and `
 ## Do's and Don'ts
 
 ### Do:
-- **Do** retain `misty-cloud-expression-cycle.webp` as the sole companion character asset.
+- **Do** use the current desktop icon as the sole companion asset.
 - **Do** preserve the source blue signals, open spinner, spring motion, and typed pointing bubble.
 - **Do** keep the overlay transparent and non-interactive to pointer input.
 - **Do** keep controls inline in Agents, with keyboard-operable Team/Auto choices and expandable voice/model options.
