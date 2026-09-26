@@ -60,7 +60,7 @@ function HostTaskIntegration(props: PlannerTaskIntegration & { workspaceTabId?: 
   const adapter = useMemo(
     () => ({
       ...props.adapter,
-      openCitation: (citation: import("@misty/sdk").MistyAiCitation) => {
+      openCitation: (citation: import("@/features/ai-surface/types").AiCitation) => {
         window.dispatchEvent(new CustomEvent("misty:open-ai-citation", { detail: citation }));
       },
     }),

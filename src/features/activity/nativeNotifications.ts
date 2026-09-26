@@ -6,15 +6,11 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import type { ActivityItem, NativeNotificationPermission } from "./types";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import { useActivityStore } from "./useActivityStore";
-
-import { activityAccountKey } from "./activityState";
 import { activityCategory, isActivityMuted, shouldNotifyActivity } from "./activityPolicy";
-
+import { activityAccountKey } from "./activityState";
+import type { ActivityItem, NativeNotificationPermission } from "./types";
+import { useActivityStore } from "./useActivityStore";
 const permissionDeniedStorageKey = "misty:activity:notification-permission-denied";
-
 export async function nativeNotificationPermission(): Promise<NativeNotificationPermission> {
   if (!hasTauriInternals()) return "unsupported";
   try {
@@ -45,7 +41,6 @@ export async function requestNativeNotificationPermission(): Promise<NativeNotif
     return "denied";
   }
 }
-
 export async function publishNativeActivity(item: ActivityItem): Promise<boolean> {
   if (!hasTauriInternals() || !shouldNotifyActivity(item)) return false;
   const activity = useActivityStore.getState();
@@ -73,15 +68,18 @@ export async function publishNativeActivity(item: ActivityItem): Promise<boolean
   if ((await nativeNotificationPermission()) !== "granted") return false;
   if (activityAccountKey(useActivityStore.getState()) !== context) return false;
   try {
-    const mobileCount = Math.max(1, useActivityStore.getState().attentionCount);
     sendNotification({
-      title: isNativeMobileBuild ? "Misty" : item.title,
-      ...(isNativeMobileBuild
-        ? { body: `${mobileCount} new ${mobileCount === 1 ? "update" : "updates"}.` }
-        : item.body
-          ? { body: item.body }
-          : {}),
-      ...(preferences.soundNotificationsEnabled ? { sound: "Ping" } : {}),
+      title: item.title,
+      ...(item.body
+        ? {
+            body: item.body,
+          }
+        : {}),
+      ...(preferences.soundNotificationsEnabled
+        ? {
+            sound: "Ping",
+          }
+        : {}),
       group: "misty-activity",
       autoCancel: true,
     });
@@ -90,7 +88,6 @@ export async function publishNativeActivity(item: ActivityItem): Promise<boolean
     return false;
   }
 }
-
 export async function syncNativeBadge(count: number): Promise<void> {
   if (!hasTauriInternals()) return;
   const preferences = selectNotificationPreferences(useSettingsStore.getState().settings?.document);
@@ -101,7 +98,6 @@ export async function syncNativeBadge(count: number): Promise<void> {
     // Dock/taskbar badging is platform dependent and should never break Activity.
   }
 }
-
 async function mistyWindowIsFocused(): Promise<boolean> {
   if (typeof document !== "undefined" && document.hasFocus()) return true;
   try {
@@ -110,7 +106,6 @@ async function mistyWindowIsFocused(): Promise<boolean> {
     return typeof document !== "undefined" ? document.hasFocus() : true;
   }
 }
-
 function readPermissionDenied(): boolean {
   try {
     return localStorage.getItem(permissionDeniedStorageKey) === "true";
@@ -118,7 +113,6 @@ function readPermissionDenied(): boolean {
     return false;
   }
 }
-
 function writePermissionDenied(denied: boolean): void {
   try {
     if (denied) localStorage.setItem(permissionDeniedStorageKey, "true");

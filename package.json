@@ -28,13 +28,7 @@
     "beta:keys": "node cli/tasks/release/setup-keys.ts",
     "cli": "cargo run --manifest-path cli/Cargo.toml --",
     "test:tasks": "node --test cli/tasks/*.test.ts cli/tasks/release/*.test.ts",
-    "tool": "node cli/tasks/run-tool.ts",
-    "dev:mobile": "node cli/tasks/run-tool.ts vite --mode mobile --host 0.0.0.0 --port 5173",
-    "dev:android": "node cli/tasks/run-tool.ts vite --mode android --host 0.0.0.0",
-    "build:mobile": "tsc && node cli/tasks/run-tool.ts vite build --mode mobile",
-    "build:android": "tsc && node cli/tasks/run-tool.ts vite build --mode android",
-    "preview:mobile": "node cli/tasks/run-tool.ts vite preview --mode mobile",
-    "icons:ios": "node cli/tasks/generate-ios-app-icons.ts"
+    "tool": "node cli/tasks/run-tool.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.4",

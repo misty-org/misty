@@ -25,10 +25,7 @@ export default defineConfig(({ command, mode }) => {
   const uploadSourceMaps = Boolean(
     command === "build" && sourceMapKey && posthogProjectId && posthogHost && mode !== "test",
   );
-  const platformLayoutPath =
-    mode === "mobile" || mode === "android"
-      ? new URL("../src/app/platform-layout.mobile.tsx", import.meta.url).pathname
-      : new URL("../src/app/platform-layout.tsx", import.meta.url).pathname;
+  const platformLayoutPath = new URL("../src/app/platform-layout.tsx", import.meta.url).pathname;
 
   return {
     root: resolve(process.cwd(), "src/app"),

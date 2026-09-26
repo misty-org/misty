@@ -44,8 +44,8 @@ test("signing runs after Cargo builds, retaining config and application argument
   }
 });
 
-test("release builds, mobile dev, and help do not use development signing", () => {
-  for (const args of [["build"], ["ios", "dev"], ["android", "dev"], ["dev", "--help"]]) {
+test("release builds and help do not use development signing", () => {
+  for (const args of [["build"], ["dev", "--help"]]) {
     assert.deepEqual(prepareTauriDevelopment(args), args);
   }
 });

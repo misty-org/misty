@@ -4,30 +4,24 @@ import { platform } from "@tauri-apps/plugin-os";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
-
 let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
-
 export function configureMistyBrowserLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
 ): void {
   openInMistyBrowser = opener;
 }
-
 export function configureProviderAuthorizationLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
 ): void {
   configureMistyBrowserLinkOpener(opener);
 }
-
 export async function openExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) return;
-
   if (!isWebUrl(href)) {
     await openSystemExternalLink(href);
     return;
   }
-
   if (openInMistyBrowser) {
     await openInMistyBrowser(href);
     return;
@@ -35,17 +29,14 @@ export async function openExternalLink(url: string): Promise<void> {
   if (hasTauriInternals()) {
     throw new Error("Misty Browser is not ready. Try opening the link again.");
   }
-
   window.open(href, "_blank", "noopener,noreferrer");
 }
-
 export async function openSystemExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) return;
 
-  // Legacy callers share the same web routing policy, including SDK links.
+  // All callers share the same web routing policy.
   if (isWebUrl(href)) return openExternalLink(href);
-
   try {
     await openNativeUrl(href);
     return;
@@ -54,10 +45,8 @@ export async function openSystemExternalLink(url: string): Promise<void> {
       throw error;
     }
   }
-
   window.open(href, "_blank", "noopener,noreferrer");
 }
-
 export async function openProviderAuthorizationLink(
   url: string,
 ): Promise<ProviderAuthorizationOpenResult> {
@@ -66,42 +55,7 @@ export async function openProviderAuthorizationLink(
   if (!href) {
     throw new Error("Provider authorization URL is empty.");
   }
-
   const currentPlatform = nativePlatform();
-  if (currentPlatform === "ios" || currentPlatform === "android") {
-    try {
-      await openUrl(href, "inAppBrowser");
-      return {
-        strategy: "in-app-browser",
-        platform: currentPlatform,
-        attemptedAt,
-      };
-    } catch (error) {
-      try {
-        await openNativeUrl(href);
-        return {
-          strategy: "system-browser",
-          platform: currentPlatform,
-          attemptedAt,
-          fallbackReason: errorTextForOpen(error),
-        };
-      } catch (fallbackError) {
-        if (hasTauriInternals()) {
-          throw new Error(
-            `inAppBrowser failed: ${errorTextForOpen(error)}; system browser failed: ${errorTextForOpen(fallbackError)}`,
-          );
-        }
-        window.open(href, "_blank", "noopener,noreferrer");
-        return {
-          strategy: "window-open",
-          platform: currentPlatform,
-          attemptedAt,
-          fallbackReason: `${errorTextForOpen(error)}; ${errorTextForOpen(fallbackError)}`,
-        };
-      }
-    }
-  }
-
   await openExternalLink(href);
   return {
     strategy: openInMistyBrowser ? "misty-browser" : "window-open",
@@ -109,7 +63,6 @@ export async function openProviderAuthorizationLink(
     attemptedAt,
   };
 }
-
 export function handleExternalLinkClick(
   url: string,
 ): (event: ReactMouseEvent<HTMLAnchorElement>) => void {
@@ -118,7 +71,6 @@ export function handleExternalLinkClick(
     void openExternalLink(url);
   };
 }
-
 export function installExternalLinkRouting(root: Document = document): () => void {
   const handleClick = (event: MouseEvent) => {
     if (event.defaultPrevented || ![0, 1].includes(event.button)) return;
@@ -137,7 +89,6 @@ export function installExternalLinkRouting(root: Document = document): () => voi
     event.preventDefault();
     void openExternalLink(anchor.href);
   };
-
   root.addEventListener("click", handleClick);
   root.addEventListener("auxclick", handleClick);
   return () => {
@@ -145,16 +96,13 @@ export function installExternalLinkRouting(root: Document = document): () => voi
     root.removeEventListener("auxclick", handleClick);
   };
 }
-
 function isWebUrl(url: string): boolean {
   return url.startsWith("https://") || url.startsWith("http://");
 }
-
 export function normalizeExternalUrl(value: string): string {
   const href = value.trim();
   if (!href) return "";
   if (href.length > 4096) throw new Error("External URL is too long.");
-
   let parsed: URL;
   try {
     parsed = new URL(href);
@@ -172,25 +120,13 @@ export function normalizeExternalUrl(value: string): string {
   }
   return href;
 }
-
 async function openNativeUrl(url: string): Promise<void> {
   await openUrl(url);
 }
-
 function nativePlatform(): string {
   try {
     return hasTauriInternals() ? platform() : "browser";
   } catch {
     return "browser";
-  }
-}
-
-function errorTextForOpen(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
   }
 }

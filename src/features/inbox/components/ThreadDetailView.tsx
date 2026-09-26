@@ -27,14 +27,12 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { InboxUiRuntime } from "../inboxUiRuntime";
 import { formatAddress, type InboxThread, type ReplyMode } from "../model";
 import { EmailBodyView } from "./EmailBodyView";
-import type { InboxUiRuntime } from "../inboxUiRuntime";
 import { InlineQuickReplyView } from "./InlineQuickReplyView";
-
 export function ThreadDetailView(props: {
   runtime: InboxUiRuntime;
-  mobile?: boolean;
   thread: InboxThread | null;
   accounts?: MailAccount[];
   loading: boolean;
@@ -69,7 +67,6 @@ export function ThreadDetailView(props: {
     };
   }, [props.thread?.key]);
   const [summarizing, setSummarizing] = useState(false);
-
   if (!props.thread) {
     return (
       <section className="grid min-h-0 place-items-center bg-charcoal-bg p-8 max-[1100px]:hidden">
@@ -83,9 +80,7 @@ export function ThreadDetailView(props: {
       </section>
     );
   }
-
   const thread = props.thread;
-
   const handleGenerateSummary = async () => {
     if (!props.onSummarizeThread || summaryPending.current) return;
     const generation = summaryGeneration.current;
@@ -101,7 +96,10 @@ export function ThreadDetailView(props: {
           error,
           scope: "inbox:summary",
           title: "Summary unavailable",
-          target: { kind: "route", href: "/inbox" },
+          target: {
+            kind: "route",
+            href: "/inbox",
+          },
         });
       }
     } finally {
@@ -111,15 +109,11 @@ export function ThreadDetailView(props: {
       }
     }
   };
-
   return (
     <section className="flex h-full min-h-0 flex-col bg-charcoal-bg">
-      <Toolbar
-        label="Message actions"
-        className={props.mobile ? "min-h-12 shrink-0 px-2" : "h-14 shrink-0 px-4"}
-      >
+      <Toolbar label="Message actions" className={"h-14 shrink-0 px-4"}>
         <ToolbarGroup>
-          {!props.mobile ? (
+          {
             <>
               <Button
                 type="button"
@@ -132,17 +126,25 @@ export function ThreadDetailView(props: {
               </Button>
               <span className="mx-1 h-5 w-px bg-charcoal-border" aria-hidden="true" />
             </>
-          ) : null}
+          }
           <Action
             label="Archive"
-            onClick={() => props.onAction({ archived: true })}
+            onClick={() =>
+              props.onAction({
+                archived: true,
+              })
+            }
             disabled={props.actioning}
           >
             <Archive />
           </Action>
           <Action
             label={thread.unread ? "Mark read" : "Mark unread"}
-            onClick={() => props.onAction({ read: thread.unread })}
+            onClick={() =>
+              props.onAction({
+                read: thread.unread,
+              })
+            }
             disabled={props.actioning}
           >
             {thread.unread ? <MailOpen /> : <Mail />}
@@ -190,7 +192,11 @@ export function ThreadDetailView(props: {
 
           <Action
             label={thread.starred ? "Unstar" : "Star"}
-            onClick={() => props.onAction({ starred: !thread.starred })}
+            onClick={() =>
+              props.onAction({
+                starred: !thread.starred,
+              })
+            }
             disabled={props.actioning}
           >
             <Star className={thread.starred ? "fill-sage-fg text-sage-fg" : ""} />
@@ -206,26 +212,22 @@ export function ThreadDetailView(props: {
       </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div
-          className={
-            props.mobile
-              ? "mx-auto w-full max-w-4xl px-4 py-4"
-              : "mx-auto w-full max-w-4xl px-6 py-6 lg:px-8"
-          }
-        >
+        <div className={"mx-auto w-full max-w-4xl px-6 py-6 lg:px-8"}>
           <div className="mb-6 flex items-start gap-4">
             <h2
               className={
-                props.mobile
-                  ? "m-0 min-w-0 flex-1 text-lg font-semibold leading-tight tracking-[-0.02em] text-cream-bright"
-                  : "m-0 min-w-0 flex-1 text-xl font-semibold leading-tight tracking-[-0.02em] text-cream-bright"
+                "m-0 min-w-0 flex-1 text-xl font-semibold leading-tight tracking-[-0.02em] text-cream-bright"
               }
             >
               {thread.subject}
             </h2>
             <Action
               label={thread.starred ? "Unstar" : "Star"}
-              onClick={() => props.onAction({ starred: !thread.starred })}
+              onClick={() =>
+                props.onAction({
+                  starred: !thread.starred,
+                })
+              }
               disabled={props.actioning}
             >
               <Star className={thread.starred ? "fill-sage-fg text-sage-fg" : ""} />
@@ -371,7 +373,6 @@ export function ThreadDetailView(props: {
     </section>
   );
 }
-
 function Action(props: {
   label: string;
   disabled: boolean;
@@ -392,7 +393,6 @@ function Action(props: {
     </Button>
   );
 }
-
 function MessageMenu(props: {
   thread: InboxThread;
   actioning: boolean;
@@ -415,15 +415,33 @@ function MessageMenu(props: {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => props.onAction({ read: props.thread.unread })}>
+        <DropdownMenuItem
+          onSelect={() =>
+            props.onAction({
+              read: props.thread.unread,
+            })
+          }
+        >
           {props.thread.unread ? <MailOpen /> : <Mail />}
           {props.thread.unread ? "Mark as read" : "Mark as unread"}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => props.onAction({ starred: !props.thread.starred })}>
+        <DropdownMenuItem
+          onSelect={() =>
+            props.onAction({
+              starred: !props.thread.starred,
+            })
+          }
+        >
           <Star />
           {props.thread.starred ? "Remove star" : "Add star"}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => props.onAction({ archived: true })}>
+        <DropdownMenuItem
+          onSelect={() =>
+            props.onAction({
+              archived: true,
+            })
+          }
+        >
           <Archive />
           Archive
         </DropdownMenuItem>
@@ -444,7 +462,6 @@ function MessageMenu(props: {
     </DropdownMenu>
   );
 }
-
 function formatMessageDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return "";
@@ -455,7 +472,6 @@ function formatMessageDate(value: string): string {
     minute: "2-digit",
   });
 }
-
 function formatAttachmentSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

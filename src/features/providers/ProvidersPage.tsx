@@ -1,14 +1,14 @@
-import type { ProviderRemote, ProviderWorkflow } from "@/native/contracts";
 import { SystemErrorActivity } from "@/features/activity";
+import type { ProviderRemote, ProviderWorkflow } from "@/native/contracts";
 import { Button } from "@/shared/ui";
 import { Cloud, Plus, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ProviderConnectionDialog } from "./components/ProviderConnectionDialog";
 import { ProviderDisconnectDialog } from "./components/ProviderDisconnectDialog";
+import { ProviderLogo } from "./components/ProviderLogo";
 import { RemoteEditPanel } from "./components/RemoteEditPanel";
 import { RemoteListPanel } from "./components/RemoteListPanel";
-import { ProviderLogo } from "./components/ProviderLogo";
 import {
   createProvidersWorkspaceState,
   isProviderWorkspaceStale,
@@ -22,34 +22,24 @@ const REMOTES_WORKSPACE_ID = "remotes://root";
 const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
 const EMPTY_PROVIDER_WORKFLOWS: ProviderWorkflow[] = [];
 const EMPTY_PROVIDER_WORKSPACE = createProvidersWorkspaceState();
-
 const providersShellClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
-
 const providersPageShellClass = "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] bg-charcoal-bg";
-
 const providersOverlayHeaderClass =
   "flex items-center justify-between gap-3 border-b border-charcoal-border/70 px-5 py-3.5";
-
 const providersPaneContainerClass = "min-h-0 min-w-0 overflow-hidden p-4";
-
 const providersPaneWorkspaceClass =
   "grid h-full min-h-0 min-w-0 grid-cols-[minmax(300px,0.38fr)_minmax(420px,0.62fr)] overflow-hidden rounded-2xl border border-charcoal-border/70 bg-charcoal-card/55 max-[860px]:grid-cols-[minmax(0,1fr)]";
-
 const providersEmptyClass =
   "grid h-full min-h-0 place-items-center overflow-auto rounded-2xl border border-charcoal-border/70 bg-charcoal-card/45 p-8";
-
 export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
   presentation?: "page" | "overlay";
   onClose?: () => void;
 }) {
   const loadProviders = useProvidersStore((state) => state.load);
-
   useEffect(() => {
     void loadProviders();
   }, [loadProviders]);
-
   const overlay = props.presentation === "overlay";
-
   return (
     <div className={overlay ? providersShellClass : providersPageShellClass}>
       {overlay ? (
@@ -74,16 +64,13 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
     </div>
   );
 });
-
 export const ProvidersWorkspacePanel = memo(function ProvidersWorkspacePanel(props: {
   workspaceId: string;
 }) {
   const loadProviders = useProvidersStore((state) => state.load);
-
   useEffect(() => {
     void loadProviders();
   }, [loadProviders]);
-
   return (
     <>
       <ProvidersPane workspaceId={props.workspaceId} />
@@ -91,7 +78,6 @@ export const ProvidersWorkspacePanel = memo(function ProvidersWorkspacePanel(pro
     </>
   );
 });
-
 const ProvidersDialogs = memo(function ProvidersDialogs() {
   const {
     connection,
@@ -125,7 +111,6 @@ const ProvidersDialogs = memo(function ProvidersDialogs() {
     })),
   );
   const providerWorkflows = providers?.workflows ?? EMPTY_PROVIDER_WORKFLOWS;
-
   return (
     <>
       {connection ? (
@@ -153,7 +138,6 @@ const ProvidersDialogs = memo(function ProvidersDialogs() {
     </>
   );
 });
-
 const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }) {
   const {
     loading,
@@ -216,7 +200,6 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
       null)
     : null;
   const providerWorkflows = providers?.workflows ?? EMPTY_PROVIDER_WORKFLOWS;
-
   useEffect(() => {
     ensureWorkspace(props.workspaceId);
     void loadWorkspaceConfigPaths(props.workspaceId);
@@ -242,7 +225,6 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     workspace.draft,
     workspace.loadingRemoteName,
   ]);
-
   if (!loading && remotes.length === 0 && !serviceError) {
     return (
       <section className={providersEmptyClass}>
@@ -281,7 +263,10 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
               error={actionError}
               scope="files:remotes:connect"
               title="Storage provider could not be connected"
-              target={{ kind: "workspace-tool", tool: "files" }}
+              target={{
+                kind: "workspace-tool",
+                tool: "files",
+              }}
             />
           ) : null}
           <p className="text-xs text-cream-muted">
@@ -291,7 +276,6 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
       </section>
     );
   }
-
   return (
     <section className={providersPaneWorkspaceClass}>
       <RemoteListPanel
@@ -340,5 +324,4 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     </section>
   );
 });
-
 export default ProvidersWorkspace;

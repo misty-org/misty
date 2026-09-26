@@ -1,5 +1,4 @@
 import { lazy, Suspense } from "react";
-
 const LazyProvidersWorkspace = lazy(async () => ({
   default: (await import("./ProvidersPage")).ProvidersWorkspace,
 }));
@@ -9,7 +8,6 @@ const LazyProvidersWorkspacePanel = lazy(async () => ({
 const LazyConnectedStoragePanel = lazy(async () => ({
   default: (await import("./components/ConnectedStoragePanel")).ConnectedStoragePanel,
 }));
-
 export function ConnectedStoragePanel(props: { onClose(): void }) {
   return (
     <Suspense fallback={null}>
@@ -17,7 +15,6 @@ export function ConnectedStoragePanel(props: { onClose(): void }) {
     </Suspense>
   );
 }
-
 export function ProvidersWorkspace(props: {
   presentation?: "page" | "overlay";
   onClose?: () => void;
@@ -28,7 +25,6 @@ export function ProvidersWorkspace(props: {
     </Suspense>
   );
 }
-
 export function ProvidersWorkspacePanel(props: { workspaceId: string }) {
   return (
     <Suspense fallback={null}>
@@ -36,7 +32,6 @@ export function ProvidersWorkspacePanel(props: { workspaceId: string }) {
     </Suspense>
   );
 }
-
 export const ProvidersPage = ProvidersWorkspace;
 export default ProvidersWorkspace;
 export * from "./providerUtils";

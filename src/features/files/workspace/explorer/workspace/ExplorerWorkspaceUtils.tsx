@@ -1,17 +1,16 @@
 import type { MultiPanelTab, useMultiPanelStore } from "@/features/workspace";
 import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote } from "@/native/contracts";
-import { Button } from "@/shared/ui";
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import {
   explorerPathKey,
   explorerPathName,
   joinExplorerPath,
   normalizeExplorerPath,
 } from "@/shared/lib/pathNormalization";
+import { Button } from "@/shared/ui";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { cx } from "./ExplorerDesktopShared";
 import { explorerShellStyles } from "./ExplorerShellStyles";
-
 export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
   previewVisible: boolean;
@@ -49,7 +48,6 @@ export function ExplorerBottomBar(props: {
     </footer>
   );
 }
-
 export function buildExplorerLocationResults(
   homePath: string,
   mountRoot: string,
@@ -57,7 +55,6 @@ export function buildExplorerLocationResults(
   remotes: ProviderRemote[],
   library: ExplorerLibrarySnapshot | null,
   workspacePaths: string[],
-  androidLocal = false,
 ): ExplorerLocationResult[] {
   const results: ExplorerLocationResult[] = [];
   const seen = new Set<string>();
@@ -75,20 +72,13 @@ export function buildExplorerLocationResults(
       badge,
     });
   };
-
-  if (androidLocal) {
-    add("Local", homePath, "Quick");
-    add("Recent", "misty://recent", "Quick");
-    add("Starred", "misty://starred", "Quick");
-    add("Trash", "misty://trash", "Quick");
-  } else {
+  {
     add("Home", homePath, "Quick");
     add("Desktop", joinPath(homePath, "Desktop"), "Quick");
     add("Documents", joinPath(homePath, "Documents"), "Quick");
     add("Downloads", joinPath(homePath, "Downloads"), "Quick");
     add("Projects", joinPath(homePath, "Projects"), "Quick");
   }
-
   for (const path of pinnedPaths) {
     add(path.split("/").filter(Boolean).pop() || path, path, "Pinned");
   }
@@ -104,10 +94,8 @@ export function buildExplorerLocationResults(
   for (const remote of remotes) {
     add(remote.name, joinPath(mountRoot, remote.name), remote.type);
   }
-
   return results;
 }
-
 export function mountedDevicesEqual(left: MountedDevice[], right: MountedDevice[]): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
@@ -124,7 +112,6 @@ export function mountedDevicesEqual(left: MountedDevice[], right: MountedDevice[
     );
   });
 }
-
 export function workspaceSearchPaths(tabs: MultiPanelTab[]): string[] {
   const paths: string[] = [];
   const seen = new Set<string>();
@@ -140,16 +127,13 @@ export function workspaceSearchPaths(tabs: MultiPanelTab[]): string[] {
   }
   return paths;
 }
-
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
-
 export function resolveMountRoot(homePath: string, configuredPath: string): string {
   if (configuredPath.startsWith("/")) return configuredPath.replace(/\/+$/, "");
   return `${homePath.replace(/\/+$/, "")}/${configuredPath.replace(/^\/+|\/+$/g, "")}`;
 }
-
 export function resolvePreferredWorkspaceRoot(
   preferredWorkspaceRoot: string,
   fallbackHomePath: string,
@@ -160,15 +144,12 @@ export function resolvePreferredWorkspaceRoot(
   if (isAbsolutePath(trimmed)) return normalizedPath(trimmed) || fallbackHomePath;
   return joinPath(fallbackHomePath, trimmed);
 }
-
 function isAbsolutePath(path: string): boolean {
   return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
 }
-
 function normalizedPath(path: string): string {
   return normalizeExplorerPath(path);
 }
-
 function titleFromPath(path: string): string {
   if (path === "misty://local") return "Local";
   if (path === "misty://recent") return "Recent";
@@ -176,12 +157,10 @@ function titleFromPath(path: string): string {
   if (path === "misty://trash") return "Trash";
   return explorerPathName(path) || "Home";
 }
-
 function joinPath(...parts: string[]): string {
   const [first, ...rest] = parts;
   return joinExplorerPath(first, ...rest);
 }
-
 export function multiPanelWorkspaceNeedsSave(
   state: ReturnType<typeof useMultiPanelStore.getState>,
   previous: ReturnType<typeof useMultiPanelStore.getState>,

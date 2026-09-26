@@ -1,23 +1,19 @@
 import type { MailDraftInput } from "@/api/mail";
 import type { AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import { cn, PermissionState, Sheet, SheetContent, SheetHeader, SheetTitle } from "@/shared/ui";
-import { Archive, Reply, Star } from "lucide-react";
+import { cn, PermissionState } from "@/shared/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { ComposeDialogView } from "./components/ComposeDialogView";
-import type { InboxWorkspaceRuntime } from "./inboxWorkspaceRuntime";
 import { InboxBottomBar } from "./components/InboxBottomBar";
 import { InboxSidebar } from "./components/InboxSidebar";
-import { MobileInboxThreadList } from "./mobile/MobileInboxThreadList";
 import { ThreadDetailView } from "./components/ThreadDetailView";
 import { ThreadList } from "./components/ThreadList";
-import { selectVisibleInboxThreads } from "./store/inboxStore";
+import type { InboxWorkspaceRuntime } from "./inboxWorkspaceRuntime";
 import type { InboxThread, ReplyMode } from "./model";
+import { selectVisibleInboxThreads } from "./store/inboxStore";
 import { useInboxKeyboardShortcuts } from "./useInboxKeyboardShortcuts";
-
 let refreshInboxAfterAuthorization = false;
-
 export function InboxWorkspaceView(props: {
   workspaceId?: string;
   initialRoute?: string;
@@ -45,11 +41,6 @@ export function InboxWorkspaceView(props: {
   const [notice, setNotice] = useState("");
   const [reconnectingConnectionId, setReconnectingConnectionId] = useState("");
   const [leftShelfVisible, setLeftShelfVisible] = useState(true);
-  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const presentation = runtime.presentation;
-  const mobile = presentation !== "desktop";
-  const mobileRegular = presentation === "mobile-regular";
-
   const inboxStore = runtime.store;
   const inbox = inboxStore(
     useShallow((state) => ({
@@ -86,7 +77,6 @@ export function InboxWorkspaceView(props: {
     })),
   );
   const workspaceFocused = runtime.focused;
-
   const threads = useMemo(
     () =>
       selectVisibleInboxThreads({
@@ -97,7 +87,6 @@ export function InboxWorkspaceView(props: {
       }),
     [inbox.accounts, inbox.selectedConnectionId, inbox.selectedProvider, inbox.threadsByConnection],
   );
-
   const visibleAccounts = useMemo(
     () =>
       inbox.selectedProvider
@@ -109,9 +98,7 @@ export function InboxWorkspaceView(props: {
     () => new Set(visibleAccounts.map((account) => account.connection_id)),
     [visibleAccounts],
   );
-
   const connections = runtime.connections;
-
   const setInboxAccount = inbox.setAccount;
   const loadInbox = inbox.load;
   const selectInboxProvider = inbox.selectProvider;
@@ -119,19 +106,16 @@ export function InboxWorkspaceView(props: {
   const openInboxThread = inbox.openThread;
   const selectedInboxThreadKey = inbox.selectedThreadKey;
   const setConnectionsAccount = connections.setAccount;
-
   useEffect(() => {
     const accountId = user?.id ?? "";
     setInboxAccount(accountId);
     setConnectionsAccount(accountId);
   }, [setConnectionsAccount, setInboxAccount, user?.id]);
-
   useEffect(() => {
     if (requestedProvider !== "google" && requestedProvider !== "microsoft") return;
     if (selectedInboxProvider === requestedProvider) return;
     void selectInboxProvider(requestedProvider);
   }, [requestedProvider, selectInboxProvider, selectedInboxProvider]);
-
   useEffect(() => {
     if (!user?.id || inbox.accountId !== user.id) return;
     const force = refreshInboxAfterAuthorization;
@@ -141,7 +125,6 @@ export function InboxWorkspaceView(props: {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [inbox.accountId, loadInbox, user?.id]);
-
   useEffect(() => {
     for (const [connectionId, error] of Object.entries(inbox.accountErrors)) {
       const account = inbox.accounts.find((candidate) => candidate.connection_id === connectionId);
@@ -152,11 +135,13 @@ export function InboxWorkspaceView(props: {
         scope: `inbox:${connectionId}`,
         title: `${label} could not refresh`,
         error,
-        target: { kind: "route", href: "/inbox" },
+        target: {
+          kind: "route",
+          href: "/inbox",
+        },
       });
     }
   }, [inbox.accountErrors, inbox.accounts, user?.id, reportSystemError]);
-
   useEffect(() => {
     if (inbox.error) {
       reportSystemError({
@@ -165,7 +150,10 @@ export function InboxWorkspaceView(props: {
         scope: "inbox",
         title: "Inbox needs attention",
         error: inbox.error,
-        target: { kind: "route", href: "/inbox" },
+        target: {
+          kind: "route",
+          href: "/inbox",
+        },
       });
     }
     if (connections.error) {
@@ -175,11 +163,13 @@ export function InboxWorkspaceView(props: {
         scope: "inbox:connections",
         title: "Email connection needs attention",
         error: connections.error,
-        target: { kind: "route", href: "/inbox" },
+        target: {
+          kind: "route",
+          href: "/inbox",
+        },
       });
     }
   }, [connections.error, inbox.error, user?.id, reportSystemError]);
-
   const canLoadMore = useMemo(
     () =>
       Object.entries(inbox.nextPageByConnection).some(
@@ -196,7 +186,6 @@ export function InboxWorkspaceView(props: {
       visibleConnectionIds,
     ],
   );
-
   const totalCount = useMemo(() => {
     const estimatedTotal = Object.entries(inbox.estimatedTotalByConnection).reduce(
       (total, [connectionId, count]) =>
@@ -214,7 +203,6 @@ export function InboxWorkspaceView(props: {
     threads.length,
     visibleConnectionIds,
   ]);
-
   const openCompose = useCallback((thread: InboxThread | null, mode: ReplyMode = "reply") => {
     setAiDraft(undefined);
     setDraftSource("user");
@@ -222,7 +210,6 @@ export function InboxWorkspaceView(props: {
     setReplyMode(mode);
     setComposeOpen(true);
   }, []);
-
   const rememberMessageView = useCallback(
     (visible: boolean, thread?: InboxThread | null) => {
       const next = new URLSearchParams(searchParams);
@@ -232,7 +219,6 @@ export function InboxWorkspaceView(props: {
     },
     [searchParams, setSearchParams],
   );
-
   useEffect(() => {
     if (!requestedThread || !threads.length) return;
     const thread = threads.find(
@@ -241,62 +227,19 @@ export function InboxWorkspaceView(props: {
     if (!thread || selectedInboxThreadKey === thread.key) return;
     void openInboxThread(thread);
   }, [openInboxThread, requestedThread, selectedInboxThreadKey, threads]);
-
   const handleOpenThread = (thread: InboxThread) => {
     rememberMessageView(true, thread);
     void inbox.openThread(thread);
   };
-
   const handleCloseThread = useCallback(() => {
     rememberMessageView(false, inbox.selectedThread);
   }, [inbox.selectedThread, rememberMessageView]);
-
-  const mobileChrome = useMemo(
-    () =>
-      mobile
-        ? messageVisible && inbox.selectedThread && !mobileRegular
-          ? {
-              title: inbox.selectedThread.subject || "Message",
-              level: "detail" as const,
-              onBack: handleCloseThread,
-              primaryAction: {
-                id: "reply",
-                label: "Reply",
-                icon: Reply,
-                onPress: () => openCompose(inbox.selectedThread, "reply"),
-              },
-              overflowActions: [
-                {
-                  id: "archive",
-                  label: "Archive",
-                  icon: Archive,
-                  onPress: () => void inbox.actOnThread(inbox.selectedThread!, { archived: true }),
-                },
-                {
-                  id: "star",
-                  label: inbox.selectedThread.starred ? "Unstar" : "Star",
-                  icon: Star,
-                  onPress: () =>
-                    void inbox.actOnThread(inbox.selectedThread!, {
-                      starred: !inbox.selectedThread!.starred,
-                    }),
-                },
-              ],
-            }
-          : { title: "Inbox", level: "root" as const }
-        : null,
-    [handleCloseThread, inbox, messageVisible, mobile, mobileRegular, openCompose],
-  );
-  runtime.useMobileSurfaceChrome(mobileChrome);
-
   const handleFocusSearch = () => {
     const input = searchInputRef.current;
     input?.focus();
     input?.select();
   };
-
   const shortcutsEnabled = useCallback(() => workspaceFocused, [workspaceFocused]);
-
   useInboxKeyboardShortcuts({
     threads,
     selectedThread: inbox.selectedThread,
@@ -310,7 +253,6 @@ export function InboxWorkspaceView(props: {
     onFocusSearch: handleFocusSearch,
     enabled: shortcutsEnabled,
   });
-
   const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
     const thread = inbox.selectedThread;
     if (!thread || !messageVisible) return null;
@@ -325,14 +267,22 @@ export function InboxWorkspaceView(props: {
           title: thread.subject,
           privacy: "provider",
           opaqueScopeId: thread.connectionId,
-          metadata: { provider: thread.provider, message_count: thread.messages.length },
+          metadata: {
+            provider: thread.provider,
+            message_count: thread.messages.length,
+          },
         },
       ],
       getSelection: () => ({
         kind: "text",
         content,
-        object: { kind: "mail.thread", id: thread.provider_id },
-        anchors: { message_count: thread.messages.length },
+        object: {
+          kind: "mail.thread",
+          id: thread.provider_id,
+        },
+        anchors: {
+          message_count: thread.messages.length,
+        },
         contentHash: aiContentHash(content),
       }),
       getSuggestedActions: () => [
@@ -385,7 +335,6 @@ export function InboxWorkspaceView(props: {
         await aiActions.runAction(action);
       }
     : undefined;
-
   if (transitioning) return <CenteredMessage label="Switching accounts…" />;
   if (!user) {
     return (
@@ -396,7 +345,6 @@ export function InboxWorkspaceView(props: {
       />
     );
   }
-
   const connect = async (provider: string, connectionId = "") => {
     setNotice("");
     connections.clearError();
@@ -413,7 +361,6 @@ export function InboxWorkspaceView(props: {
       setReconnectingConnectionId((current) => (current === connectionId ? "" : current));
     }
   };
-
   const removeAccount = async (account: (typeof inbox.accounts)[number]) => {
     setNotice("");
     connections.clearError();
@@ -428,14 +375,12 @@ export function InboxWorkspaceView(props: {
       // The connection store retains a safe error message.
     }
   };
-
   const handleSendQuickReply = async (draftPayload: MailDraftInput) => {
     const saved = await inbox.saveDraft(draftPayload);
     await inbox.sendDraft(saved.provider_id, draftPayload.connection_id);
     setNotice("Reply sent.");
     setTimeout(() => setNotice(""), 3000);
   };
-
   const inboxSidebar = (
     <InboxSidebar
       accounts={visibleAccounts}
@@ -447,15 +392,12 @@ export function InboxWorkspaceView(props: {
       loading={inbox.loading}
       onSelectAccount={(connectionId) => {
         void inbox.selectScope(connectionId);
-        if (mobile) setMobileNavigationOpen(false);
       }}
       onSelectFolderKind={(kind) => {
         void inbox.selectFolderKind(kind);
-        if (mobile) setMobileNavigationOpen(false);
       }}
       onCompose={() => {
         openCompose(null);
-        if (mobile) setMobileNavigationOpen(false);
       }}
       authorizationPending={Boolean(connections.authorizingProvider)}
       reconnectingConnectionId={reconnectingConnectionId}
@@ -465,119 +407,9 @@ export function InboxWorkspaceView(props: {
       onRemoveAccount={(account) => void removeAccount(account)}
     />
   );
-
-  if (mobile) {
-    const showList = mobileRegular || !messageVisible || !inbox.selectedThread;
-    const showDetail = mobileRegular || (messageVisible && Boolean(inbox.selectedThread));
-    return (
-      <main className="relative h-full min-h-0 overflow-hidden bg-charcoal-bg">
-        <div
-          className={cn("grid h-full min-h-0", mobileRegular && "grid-cols-[300px_minmax(0,1fr)]")}
-        >
-          {showList ? (
-            <MobileInboxThreadList
-              searchInputRef={searchInputRef}
-              accounts={visibleAccounts}
-              threads={threads}
-              totalCount={totalCount}
-              selectedKey={inbox.selectedThreadKey}
-              query={inbox.query}
-              loading={inbox.loading}
-              loadingMore={inbox.loadingMore}
-              canLoadMore={canLoadMore}
-              onSearch={(query) => void inbox.search(query)}
-              onOpen={handleOpenThread}
-              onRefresh={() => void inbox.load(true)}
-              onLoadMore={() => void inbox.loadMore()}
-              onCompose={() => openCompose(null)}
-              onOpenNavigation={() => setMobileNavigationOpen(true)}
-              onAction={(thread, action) =>
-                void inbox.actOnThread(thread, action).catch(() => undefined)
-              }
-            />
-          ) : null}
-          {showDetail ? (
-            inbox.selectedThread ? (
-              <div
-                className="min-h-0 min-w-0 border-l border-charcoal-border"
-                data-mobile-inbox-detail
-              >
-                <ThreadDetailView
-                  runtime={runtime.ui}
-                  mobile
-                  thread={inbox.selectedThread}
-                  accounts={visibleAccounts}
-                  loading={inbox.detailLoading}
-                  actioning={inbox.actioning}
-                  onAction={(action) =>
-                    void inbox.actOnThread(inbox.selectedThread!, action).catch(() => undefined)
-                  }
-                  onReply={(mode) => openCompose(inbox.selectedThread, mode ?? "reply")}
-                  onSendQuickReply={handleSendQuickReply}
-                  onExpandToModal={(draft) => {
-                    setDraftSource("user");
-                    setAiDraft(draft);
-                    setReplyTo(inbox.selectedThread);
-                    setReplyMode(draft.mode);
-                    setComposeOpen(true);
-                  }}
-                  onSummarizeThread={summarizeThread}
-                  onBack={handleCloseThread}
-                />
-              </div>
-            ) : (
-              <PermissionState
-                className="h-full border-l border-charcoal-border"
-                title="Choose a message"
-                description="Select a message from the list to read it here."
-              />
-            )
-          ) : null}
-        </div>
-
-        <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
-          <SheetContent
-            side="bottom"
-            showCloseButton={false}
-            className="h-[min(82dvh,720px)] gap-0 overflow-hidden rounded-t-2xl p-0 pb-[env(safe-area-inset-bottom)]"
-          >
-            <SheetHeader className="border-b border-charcoal-border px-4 py-3 text-left">
-              <SheetTitle>Mailboxes</SheetTitle>
-            </SheetHeader>
-            <div className="min-h-0 flex-1 overflow-hidden">{inboxSidebar}</div>
-          </SheetContent>
-        </Sheet>
-
-        <ComposeDialogView
-          runtime={runtime.ui}
-          mobile
-          open={composeOpen}
-          accounts={visibleAccounts}
-          replyTo={replyTo}
-          replyMode={replyMode}
-          initialDraft={aiDraft}
-          authoringSource={draftSource}
-          onOpenChange={setComposeOpen}
-          onSave={inbox.saveDraft}
-          onSend={inbox.sendDraft}
-        />
-
-        {notice ? (
-          <div
-            className="absolute inset-x-4 bottom-4 z-20 rounded-lg bg-charcoal-active px-4 py-3 text-center text-sm text-cream-bright shadow-xl"
-            role="status"
-          >
-            {notice}
-          </div>
-        ) : null}
-      </main>
-    );
-  }
-
   const shelfGrid = leftShelfVisible
     ? "grid-cols-[248px_minmax(0,1fr)] max-[1100px]:grid-cols-[220px_minmax(0,1fr)]"
     : "grid-cols-[minmax(0,1fr)]";
-
   return (
     <main className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg">
       <div className={cn("grid min-h-0 flex-1 overflow-hidden", shelfGrid)}>
@@ -683,7 +515,6 @@ export function InboxWorkspaceView(props: {
     </main>
   );
 }
-
 function inboxThreadAiText(thread: InboxThread) {
   const messages = thread.messages.length
     ? thread.messages.map((message) => {
@@ -697,7 +528,6 @@ function inboxThreadAiText(thread: InboxThread) {
     : [thread.snippet];
   return `Subject: ${thread.subject}\nParticipants: ${thread.participants.map((item) => item.name || item.email).join(", ")}\n\n${messages.join("\n\n")}`;
 }
-
 function aiContentHash(value: string) {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index++) {
@@ -706,7 +536,6 @@ function aiContentHash(value: string) {
   }
   return `fnv1a-${(hash >>> 0).toString(16)}`;
 }
-
 function CenteredMessage({ label }: { label: string }) {
   return (
     <div className="grid h-full place-items-center bg-charcoal-bg text-xs text-cream-muted">

@@ -22,13 +22,10 @@ export type {
   ConnectorCardProps,
   NotesIntegrationsDialogProps,
 } from "../model/interfaces/components/NotesIntegrationsDialog";
-
 const sectionTitleClass = "mb-2 text-[10px] font-semibold text-cream-muted/70";
-
 export function NotesIntegrationsDialog(props: NotesIntegrationsDialogProps) {
   const connected = props.adjacent.filter((entry) => entry.availability === "connected");
   const planned = props.adjacent.filter((entry) => entry.availability !== "connected");
-
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-[560px] gap-0 p-0">
@@ -85,14 +82,12 @@ export function NotesIntegrationsDialog(props: NotesIntegrationsDialogProps) {
     </Dialog>
   );
 }
-
 function ConnectorCard(props: ConnectorCardProps) {
   const { connector } = props;
   const status = connector.status();
   const presentation = providerStatusPresentation[status];
   const lastSynced = connector.lastSyncedAt();
   const native = connector.source === "misty";
-
   return (
     <Card className="border-charcoal-border bg-charcoal-card p-3 shadow-sm">
       <div className="flex items-start gap-3">
@@ -160,11 +155,9 @@ function ConnectorCard(props: ConnectorCardProps) {
     </Card>
   );
 }
-
 function AdjacentCard(props: { entry: NotesIntegrationCard }) {
   const { entry } = props;
   const planned = entry.availability === "planned";
-
   return (
     <Card className="border-charcoal-border bg-charcoal-card p-3 shadow-none">
       <div className="flex items-center gap-3">

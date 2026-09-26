@@ -10,11 +10,6 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
-#[cfg(target_os = "android")]
-use sha2::{Digest, Sha256};
-#[cfg(target_os = "android")]
-use tauri_plugin_document_tree::{DocumentTreeExt, PickTreeRequest};
-
 use crate::app::runtime::MistyRuntime;
 use crate::domain::clipboard::{
     ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
@@ -185,47 +180,6 @@ pub async fn mail_cache_remove(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<()> {
     crate::infra::mail_cache::remove(&state.environment.cache_dir(), &account_id).await
-}
-
-#[tauri::command]
-pub fn mobile_cache_read(
-    account_id: String,
-    record_key: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Option<String>> {
-    crate::infra::mobile_cache::read(&state.environment.cache_dir(), &account_id, &record_key)
-}
-
-#[tauri::command]
-pub fn mobile_cache_write(
-    account_id: String,
-    record_key: String,
-    value: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mobile_cache::write(
-        &state.environment.cache_dir(),
-        &account_id,
-        &record_key,
-        &value,
-    )
-}
-
-#[tauri::command]
-pub fn mobile_cache_remove(
-    account_id: String,
-    record_key: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mobile_cache::remove(&state.environment.cache_dir(), &account_id, &record_key)
-}
-
-#[tauri::command]
-pub fn mobile_cache_purge_account(
-    account_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mobile_cache::purge_account(&state.environment.cache_dir(), &account_id)
 }
 
 #[tauri::command]
@@ -726,97 +680,8 @@ pub async fn explorer_list_directory(
             created_ms: None,
         });
     }
-    #[cfg(target_os = "android")]
-    if state
-        .explorer
-        .is_android_local_virtual_path(request.path.as_deref())
-    {
-        return state
-            .explorer
-            .list_android_local_directory(&app, request)
-            .await;
-    }
+
     state.explorer.list_directory(request).await
-}
-
-#[cfg(target_os = "android")]
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AndroidGrantedFolder {
-    pub uri: String,
-    pub name: String,
-    pub document_id: String,
-    pub can_write: bool,
-    pub path: String,
-}
-
-#[cfg(target_os = "android")]
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AndroidAllFilesAccessStatus {
-    pub granted: bool,
-    pub can_request: bool,
-    pub storage_root: Option<String>,
-}
-
-#[cfg(target_os = "android")]
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AndroidGrantLocalFolderRequest {
-    pub initial_directory: Option<String>,
-}
-
-#[cfg(target_os = "android")]
-#[tauri::command]
-pub fn android_grant_local_folder(
-    app: AppHandle,
-    request: Option<AndroidGrantLocalFolderRequest>,
-) -> ApiResult<AndroidGrantedFolder> {
-    let folder = app
-        .document_tree()
-        .pick_tree(PickTreeRequest {
-            initial_directory: request.and_then(|value| value.initial_directory),
-        })
-        .map_err(|error| ApiError::Message(error.to_string()))?;
-    let digest = Sha256::digest(folder.uri.as_bytes());
-    let location_id = hex::encode(&digest[..8]);
-    Ok(AndroidGrantedFolder {
-        uri: folder.uri,
-        name: folder.name,
-        document_id: folder.document_id,
-        can_write: folder.can_write,
-        path: format!("misty://local/{location_id}"),
-    })
-}
-
-#[cfg(target_os = "android")]
-#[tauri::command]
-pub fn android_all_files_access_status(app: AppHandle) -> ApiResult<AndroidAllFilesAccessStatus> {
-    let status = app
-        .document_tree()
-        .all_files_access_status()
-        .map_err(|error| ApiError::Message(error.to_string()))?;
-    Ok(AndroidAllFilesAccessStatus {
-        granted: status.granted,
-        can_request: status.can_request,
-        storage_root: status.storage_root,
-    })
-}
-
-#[cfg(target_os = "android")]
-#[tauri::command]
-pub fn android_open_all_files_access_settings(
-    app: AppHandle,
-) -> ApiResult<AndroidAllFilesAccessStatus> {
-    let status = app
-        .document_tree()
-        .open_all_files_access_settings()
-        .map_err(|error| ApiError::Message(error.to_string()))?;
-    Ok(AndroidAllFilesAccessStatus {
-        granted: status.granted,
-        can_request: status.can_request,
-        storage_root: status.storage_root,
-    })
 }
 
 #[tauri::command]
@@ -1780,7 +1645,6 @@ pub fn coding_ai_clear_api_key(provider_id: String) -> ApiResult<()> {
     crate::infra::credentials::clear_coding_ai_key(&provider_id)
 }
 
-
 #[tauri::command]
 pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<DeviceSnapshot> {
     let devices = state.devices.clone();
@@ -1854,7 +1718,7 @@ pub async fn connected_devices_initialize(
     Ok(snapshot)
 }
 
-#[cfg(all(any(desktop, target_os = "ios"), not(target_os = "macos")))]
+#[cfg(all(desktop, not(target_os = "macos")))]
 #[tauri::command]
 pub async fn connected_devices_initialize(
     request: InitializeConnectedDevicesRequest,
@@ -1873,7 +1737,7 @@ pub async fn connected_devices_initialize(
     Ok(snapshot)
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_snapshot(
     state: State<'_, MistyRuntime>,
@@ -1881,7 +1745,7 @@ pub async fn connected_devices_snapshot(
     state.connected_devices.snapshot()
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_subscribe_directory(
     path: String,
@@ -1896,7 +1760,7 @@ pub async fn connected_devices_subscribe_directory(
     )
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_connect(
     request: ConnectPeerRequest,
@@ -1905,7 +1769,7 @@ pub async fn connected_devices_connect(
     state.connected_devices.connect(request).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_open_workspace_route(
     device_id: String,
@@ -1918,7 +1782,7 @@ pub async fn connected_devices_open_workspace_route(
         .await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_roots(
     device_id: String,
@@ -1927,7 +1791,7 @@ pub async fn connected_devices_roots(
     state.connected_devices.roots(&device_id).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_list_directory(
     request: PeerPathRequest,
@@ -1936,7 +1800,7 @@ pub async fn connected_devices_list_directory(
     state.connected_devices.list_directory(request).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_read_file(
     request: PeerReadRequest,
@@ -1945,7 +1809,7 @@ pub async fn connected_devices_read_file(
     state.connected_devices.read_file(request).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_media_url(
     path: String,
@@ -1954,7 +1818,7 @@ pub async fn connected_devices_media_url(
     state.connected_devices.media_url(&path).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_prepare_clipboard_files(
     device_id: String,
@@ -2237,14 +2101,8 @@ fn open_path_default(file_path: &str) -> ApiResult<()> {
         .args(["/C", "start", "", file_path])
         .spawn();
 
-    #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     let spawn_result = Command::new("xdg-open").arg(file_path).spawn();
-
-    #[cfg(any(target_os = "ios", target_os = "android"))]
-    let spawn_result: Result<std::process::Child, std::io::Error> = Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "opening local files with the default app is not supported on this platform",
-    ));
 
     spawn_result
         .map(|_| ())
@@ -2304,10 +2162,7 @@ fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
         }
     }
 
-    #[cfg(all(
-        unix,
-        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
-    ))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     {
         let mut candidates = Vec::<String>::new();
         match preferred {
@@ -2345,12 +2200,6 @@ fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
         )));
     }
 
-    #[cfg(any(target_os = "ios", target_os = "android"))]
-    {
-        Err(ApiError::Message(
-            "Opening a terminal is not supported on this platform.".to_owned(),
-        ))
-    }
 }
 
 #[tauri::command]

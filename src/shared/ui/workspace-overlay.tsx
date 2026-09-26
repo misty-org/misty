@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-
 const settingsOverlayLayerClass = [
   "fixed inset-0 z-[2147482600] grid place-items-center bg-black/45 px-8 py-8",
   "animate-in fade-in-0 duration-200",
@@ -24,7 +23,6 @@ export function WorkspaceOverlay(props: {
   children: ReactNode;
 }) {
   const { onClose, open } = props;
-
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -33,9 +31,7 @@ export function WorkspaceOverlay(props: {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, open]);
-
   if (!open) return null;
-
   return createPortal(
     <div
       data-slot="workspace-overlay"

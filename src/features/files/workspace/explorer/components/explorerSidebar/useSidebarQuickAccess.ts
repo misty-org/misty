@@ -23,23 +23,13 @@ export function useSidebarQuickAccess(options: {
   setHiddenQuickAccessPaths: React.Dispatch<React.SetStateAction<string[]>>;
 }) {
   const { sidebar, hiddenQuickAccessPaths, setHiddenQuickAccessPaths } = options;
-
   const quickAccess = useMemo(
     () =>
       options.items ??
       buildQuickAccessItems({
-        androidLocal: sidebar.androidLocal,
-        androidAllFilesAccess: sidebar.androidAllFilesAccess,
-        androidGrantedFolders: sidebar.androidGrantedFolders,
         homePath: sidebar.homePath,
       }),
-    [
-      options.items,
-      sidebar.androidAllFilesAccess,
-      sidebar.androidGrantedFolders,
-      sidebar.androidLocal,
-      sidebar.homePath,
-    ],
+    [options.items, sidebar.homePath],
   );
   const visiblePinnedPaths = useMemo(
     () =>
@@ -55,7 +45,6 @@ export function useSidebarQuickAccess(options: {
     () => quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),
     [hiddenQuickAccessPaths, quickAccess],
   );
-
   const removeQuickAccessItem = (item: QuickAccessMenuItem) => {
     if (item.kind === "builtIn") {
       setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path));
@@ -63,11 +52,9 @@ export function useSidebarQuickAccess(options: {
       sidebar.onUnpinPinnedPath(item.path);
     }
   };
-
   const resetQuickAccessDefaults = () => {
     setHiddenQuickAccessPaths([]);
   };
-
   const toggleQuickAccessDefault = (path: string) => {
     setHiddenQuickAccessPaths((paths) =>
       quickAccessPathHidden(path, paths)
@@ -81,10 +68,8 @@ export function useSidebarQuickAccess(options: {
   /** True when this built-in row has been hidden by the user. */
   const isQuickAccessPathHidden = (path: string) =>
     quickAccessPathHidden(path, hiddenQuickAccessPaths);
-
   const hideQuickAccessPath = (path: string) =>
     setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, path));
-
   return {
     quickAccess,
     isQuickAccessPathHidden,

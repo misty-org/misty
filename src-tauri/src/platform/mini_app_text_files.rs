@@ -3,7 +3,7 @@ use super::PermissionSet;
 use serde_json::{json, Value};
 use std::io::{Read, Seek, SeekFrom, Write};
 
-// Keep aligned with MISTY_TEXT_FILE_MAX_BYTES in @misty/contracts and Code's editor.
+// Keep aligned with the text-file size limit in Code's editor.
 const MAX_TEXT_BYTES: usize = 5 * 1024 * 1024;
 
 pub(super) fn execute(

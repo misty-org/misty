@@ -1,8 +1,6 @@
+import type { AiArtifact as AiArtifact, AiSurfaceAdapter as AiSurfaceAdapter } from "@/features/ai-surface/types";
 import { useRoadmapRuntime, isPlannerConflict } from "./spaceRoadmap/roadmapRuntime";
-import {
-  type MistyAiArtifact as AiArtifact,
-  type MistySurfaceAdapter as AiSurfaceAdapter,
-} from "@misty/sdk";
+
 import type {
   SpaceRoadmap,
   SpaceRoadmapNode,

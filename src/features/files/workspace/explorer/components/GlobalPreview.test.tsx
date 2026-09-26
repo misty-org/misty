@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-
+import { globalPreviewKindForSource } from "./GlobalPreview";
 vi.mock("@/features/files/workspace/native", () => ({
   archiveList: vi.fn(),
   explorerOpenPath: vi.fn(),
@@ -12,12 +12,15 @@ vi.mock("@/shared/platform/tauri", () => ({
   safeTauriAssetUrl: (path: string) => `asset://${path}`,
 }));
 vi.mock("@tauri-apps/api/image", () => ({
-  Image: { fromBytes: vi.fn(async () => ({ close: vi.fn() })) },
+  Image: {
+    fromBytes: vi.fn(async () => ({
+      close: vi.fn(),
+    })),
+  },
 }));
-vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeImage: vi.fn() }));
-
-import { globalPreviewKindForSource } from "./GlobalPreview";
-
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
+  writeImage: vi.fn(),
+}));
 describe("globalPreviewKindForSource", () => {
   it.each([
     ["md", "text/markdown", "markdown"],
@@ -38,7 +41,6 @@ describe("globalPreviewKindForSource", () => {
   ] as const)("routes .%s through the %s reader", (extension, mimeType, expected) => {
     expect(globalPreviewKindForSource(extension, mimeType)).toBe(expected);
   });
-
   it("reserves the generic fallback for unknown custom formats", () => {
     expect(globalPreviewKindForSource("mistycustom", "application/x-misty-custom")).toBe("generic");
   });

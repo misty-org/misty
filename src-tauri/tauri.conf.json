@@ -97,15 +97,7 @@
         "schemes": [
           "misty"
         ]
-      },
-      "mobile": [
-        {
-          "scheme": [
-            "misty"
-          ],
-          "appLink": false
-        }
-      ]
+      }
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZEOUZENUM4QUJBQTJFNEQKUldSTkxxcXJ5TldmL1VCcFVJQlhsZEh6NWpkQ29FWVNBVk5qYytmblhqcVMxNVg0UlBhRDRWQloK",

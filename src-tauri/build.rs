@@ -6,7 +6,6 @@ use std::{
 fn main() {
     expose_public_app_configuration();
     build_builtin_workers();
-    build_ios_browser_adapter();
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         // Objective-C availability checks need Clang's runtime when targeting
         // older macOS versions. Rust links with -nodefaultlibs, so the driver
@@ -40,23 +39,6 @@ fn main() {
         }
     }
     tauri_build::build();
-}
-
-fn build_ios_browser_adapter() {
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("ios") {
-        return;
-    }
-
-    let source = PathBuf::from("native/ios/MistyBrowserAdapter.mm");
-    println!("cargo:rerun-if-changed={}", source.display());
-    cc::Build::new()
-        .cpp(true)
-        .file(source)
-        .flag("-fobjc-arc")
-        .compile("misty_ios_browser_adapter");
-    println!("cargo:rustc-link-lib=framework=Foundation");
-    println!("cargo:rustc-link-lib=framework=UIKit");
-    println!("cargo:rustc-link-lib=framework=WebKit");
 }
 
 fn expose_public_app_configuration() {

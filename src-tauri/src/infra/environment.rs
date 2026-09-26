@@ -246,7 +246,6 @@ impl AppEnvironment {
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
-        ensure_mobile_user_dirs(&home_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -311,7 +310,6 @@ impl AppEnvironment {
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
-        ensure_mobile_user_dirs(&home_dir);
         let grpc_address = settings_advanced_string(&settings_path, "server_address")
             .unwrap_or_else(|| "localhost:50051".to_owned());
         let mount_path = settings_advanced_string(&settings_path, "mount_path")
@@ -490,27 +488,7 @@ fn clean_display_path(path: &str) -> String {
     path.to_string()
 }
 
-#[cfg(target_os = "ios")]
-fn ensure_mobile_user_dirs(home_dir: &Path) {
-    for name in ["Documents", "Downloads"] {
-        let _ = fs::create_dir_all(home_dir.join(name));
-    }
-}
-
-#[cfg(not(target_os = "ios"))]
-fn ensure_mobile_user_dirs(_home_dir: &Path) {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn unique_test_home(name: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        env::temp_dir().join(format!("misty-env-{name}-{nanos}"))
+-{nanos}"))
     }
 
     #[test]

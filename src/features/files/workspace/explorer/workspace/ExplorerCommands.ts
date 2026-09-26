@@ -1,7 +1,11 @@
 export { newestUndoableTransfer, transferTypeLabel } from "./explorerCommands/transferLabels";
 import { useTransfersStore } from "@/features/transfers";
 import { dockLeaves, multiPanelStoreForPane, useWorkspaceStore } from "@/features/workspace";
-import { operationQueueRedo, operationQueueUndo, transfersSnapshot } from "@/features/files/workspace/native";
+import {
+  operationQueueRedo,
+  operationQueueUndo,
+  transfersSnapshot,
+} from "@/features/files/workspace/native";
 import { errorText } from "@/shared/lib/format";
 import { selectedPathsForPane, useExplorerStore, useOperationQueueStore } from "../store";
 import { openCompareWith } from "./ExplorerContextMenu";
@@ -78,7 +82,9 @@ export function runExplorerCommand(
       navigateRoute(openTransfersTab().route);
       break;
     case "app.open_settings":
-      navigateRoute("/settings");
+      window.dispatchEvent(
+        new CustomEvent("misty:open-settings", { detail: { section: "files" } }),
+      );
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();

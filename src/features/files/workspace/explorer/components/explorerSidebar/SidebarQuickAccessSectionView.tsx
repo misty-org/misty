@@ -1,5 +1,6 @@
 import {
   Button,
+  cn,
   Collapsible,
   CollapsibleContent,
   ContextMenu,
@@ -8,12 +9,11 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  cn,
 } from "@/shared/ui";
-import { Check, ExternalLink, Folder, PinOff, Plus, RefreshCcw, X } from "lucide-react";
-import type { ExplorerSidebarRuntime } from "./ExplorerSidebarRuntime";
+import { ExternalLink, Folder, PinOff, Plus, RefreshCcw, X } from "lucide-react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
 import { pinnedPathLabel, SidebarSectionHeader, sidebarStyles } from "../ExplorerSidebarSupport";
+import type { ExplorerSidebarRuntime } from "./ExplorerSidebarRuntime";
 import type { useSidebarQuickAccess } from "./useSidebarQuickAccess";
 
 /**
@@ -35,8 +35,6 @@ export function SidebarQuickAccessSectionView({
   onToggle: () => void;
   quick: ReturnType<typeof useSidebarQuickAccess>;
 }) {
-  const branchCount = quick.visibleQuickAccess.length + quick.visiblePinnedPaths.length;
-
   return (
     <Collapsible className={sidebarStyles.section} open={!collapsed}>
       <ContextMenu>
@@ -47,17 +45,16 @@ export function SidebarQuickAccessSectionView({
               collapsed={collapsed}
               onToggle={() => onToggle()}
               actions={
-                sidebar.androidLocal || sidebar.onChooseFolder ? (
+                sidebar.onChooseFolder ? (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={sidebar.onChooseFolder ? "Add folder" : "Add local folder"}
+                    aria-label={"Add folder"}
                     className={sidebarStyles.sectionActionButton}
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (sidebar.onChooseFolder) sidebar.onChooseFolder();
-                      else sidebar.onGrantLocalFolder();
+                      sidebar.onChooseFolder?.();
                     }}
                   >
                     <Plus size={15} />
@@ -89,11 +86,8 @@ export function SidebarQuickAccessSectionView({
         <div className={sidebarStyles.list}>
           {quick.visibleQuickAccess.map((item) => {
             const Icon = item.icon;
-            const grantedPath = item.grantRequest?.grantedPath;
-            const selected = grantedPath
-              ? sidebar.activePath === grantedPath ||
-                sidebar.activePath.startsWith(`${grantedPath}/`)
-              : sidebar.activePath === item.path;
+
+            const selected = sidebar.activePath === item.path;
             return (
               <ContextMenu key={`quick:${item.path}`}>
                 <ContextMenuTrigger asChild>
@@ -108,20 +102,16 @@ export function SidebarQuickAccessSectionView({
                     >
                       <DropTarget
                         id={`sidebar:quick:${item.path}`}
-                        path={grantedPath ?? item.path}
-                        springLoad={!item.grantRequest || Boolean(grantedPath)}
-                        onSpringLoad={() => sidebar.onNavigate(grantedPath ?? item.path)}
+                        path={item.path}
+                        springLoad
+                        onSpringLoad={() => sidebar.onNavigate(item.path)}
                       >
                         <Button
                           type="button"
                           variant="ghost"
                           className={sidebarStyles.pinnedButton}
                           onClick={() => {
-                            if (item.grantRequest) {
-                              sidebar.onGrantLocalFolder(item.grantRequest);
-                            } else {
-                              sidebar.onNavigate(item.path);
-                            }
+                            sidebar.onNavigate(item.path);
                           }}
                         >
                           <span className={sidebarStyles.itemIcon} aria-hidden="true">
@@ -132,25 +122,7 @@ export function SidebarQuickAccessSectionView({
                           </span>
                         </Button>
                       </DropTarget>
-                      {item.grantRequest && !grantedPath ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className={sidebarStyles.pinnedUnpinButton}
-                          aria-label={`Grant access to ${item.label}`}
-                          onClick={() => sidebar.onGrantLocalFolder(item.grantRequest)}
-                        >
-                          <Plus size={15} />
-                        </Button>
-                      ) : item.grantRequest ? (
-                        <span
-                          className={sidebarStyles.pinnedUnpinButton}
-                          aria-label={`${item.label} access granted`}
-                        >
-                          <Check size={15} />
-                        </span>
-                      ) : (
+                      {
                         <Button
                           type="button"
                           variant="ghost"
@@ -161,7 +133,7 @@ export function SidebarQuickAccessSectionView({
                         >
                           <PinOff size={15} />
                         </Button>
-                      )}
+                      }
                     </div>
                   </div>
                 </ContextMenuTrigger>

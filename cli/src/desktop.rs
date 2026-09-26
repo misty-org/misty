@@ -78,22 +78,11 @@ pub fn clean(workspace: &Workspace, apply: bool) -> Result<()> {
         "design-qa-output",
         "artifacts/design-qa",
         "src-tauri/target",
-        "src-tauri/gen/apple/build",
-        "src-tauri/gen/apple/DerivedData",
-        "src-tauri/gen/apple/Externals",
-        "src-tauri/gen/apple/Pods",
-        "src-tauri/gen/android/.gradle",
     ]
     .into_iter()
     .map(|path| root.join(path))
     .collect::<Vec<_>>();
     collect_named(root, ".DS_Store", false, &mut candidates);
-    collect_named(
-        &root.join("src-tauri/gen/android"),
-        "build",
-        true,
-        &mut candidates,
-    );
     candidates.sort();
     candidates.dedup();
 

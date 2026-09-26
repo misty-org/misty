@@ -382,15 +382,11 @@ export function peerIsOnline(peer: ServerConnectedPeer): boolean {
   return heartbeat > Date.now() - 90_000;
 }
 
-function connectedDevicePlatform(): "ios" | "macos" | "windows" | "unknown" {
+function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unknown" {
   const value = navigator.userAgent.toLowerCase();
-  if (
-    /iphone|ipad|ipod/.test(value) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  )
-    return "ios";
   if (value.includes("mac")) return "macos";
   if (value.includes("win")) return "windows";
+  if (value.includes("linux")) return "linux";
   return "unknown";
 }
 

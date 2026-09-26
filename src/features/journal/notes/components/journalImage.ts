@@ -1,5 +1,5 @@
 import { Image } from "@tiptap/extension-image";
-import type { JournalImageLease } from "@/features/journal/sdkJournalAssets";
+import type { JournalImageLease } from "@/features/journal/journalAssets";
 
 /** Resolve authenticated attachments without storing signed URLs or image bytes in Yjs. */
 export function journalImage(resolve: (reference: string) => Promise<JournalImageLease>) {

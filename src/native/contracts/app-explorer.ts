@@ -11,7 +11,6 @@ import type {
   SearchSourceKind,
 } from "@/native/contracts/primitives";
 import type { SavedSearchRule } from "./transfers-files";
-
 export interface AppSnapshot {
   appName: string;
   version: string;
@@ -19,13 +18,11 @@ export interface AppSnapshot {
   storageRuntime: StorageRuntimeSnapshot;
   environment: AppEnvironmentSnapshot;
 }
-
 export interface StorageRuntimeSnapshot {
   ready: boolean;
   error: string | null;
   version: string;
 }
-
 export interface AppEnvironmentSnapshot {
   homeDir: string;
   mistyDir: string;
@@ -49,32 +46,22 @@ export interface AppEnvironmentSnapshot {
   configExists: boolean;
   derivedEnv: Record<string, string>;
 }
-
 export interface StorageSnapshot {
   ready: boolean;
   statusCode: number | null;
   error: string | null;
 }
-
-export interface AndroidAllFilesAccessStatus {
-  granted: boolean;
-  canRequest: boolean;
-  storageRoot: string | null;
-}
-
 export interface ClaudeStatus {
   installed: boolean;
   running: boolean;
   sessionId: string | null;
   error: string | null;
 }
-
 export interface ClaudeSendRequest {
   prompt: string;
   cwd?: string | null;
   resumeSession?: boolean;
 }
-
 export interface ClaudeStreamEvent {
   kind: ClaudeEventKind;
   sessionId: string | null;
@@ -85,7 +72,6 @@ export interface ClaudeStreamEvent {
   toolResult: string;
   costUsd: number;
 }
-
 export interface ClipboardFileRef {
   display_name: string;
   local_path: string;
@@ -94,7 +80,6 @@ export interface ClipboardFileRef {
   remote_path: string;
   is_dir: boolean;
 }
-
 export interface ClipboardImage {
   mime_type: string;
   blob_id: string;
@@ -103,7 +88,6 @@ export interface ClipboardImage {
   width: number;
   height: number;
 }
-
 export interface ClipboardPayload {
   kind: ClipboardPayloadKind;
   origin: ClipboardOrigin;
@@ -117,12 +101,10 @@ export interface ClipboardPayload {
   file_refs: ClipboardFileRef[];
   images: ClipboardImage[];
 }
-
 export interface ClipboardSnapshot {
   local: ClipboardPayload;
   shared: ClipboardPayload;
 }
-
 export interface NoteAssetStoreRequest {
   accountId: string;
   spaceId: string;
@@ -131,14 +113,12 @@ export interface NoteAssetStoreRequest {
   mimeType?: string | null;
   bytes: number[];
 }
-
 export interface NoteAssetStoreResult {
   path: string;
   name: string;
   mimeType: string | null;
   byteSize: number;
 }
-
 export interface MountedDevice {
   id: string;
   volumeId: string;
@@ -153,18 +133,15 @@ export interface MountedDevice {
   totalBytes: number;
   freeBytes: number;
 }
-
 export interface DeviceSnapshot {
   devices: MountedDevice[];
 }
-
 export interface ConnectedPeerStatus {
   deviceId: string;
   state: "online" | "authorization_expired" | "connecting" | "offline";
   connectionType: "direct" | "relay" | "unknown";
   authorizationExpiresAt: number;
 }
-
 export interface ConnectedDevicesSnapshot {
   enabled: boolean;
   endpointId: string | null;
@@ -173,14 +150,12 @@ export interface ConnectedDevicesSnapshot {
   peers: ConnectedPeerStatus[];
   unavailableReason: string | null;
 }
-
 export interface PeerRoot {
   id: string;
   name: string;
   kind: "system" | "volume" | "folder";
   readonly: true;
 }
-
 export interface PeerEntry {
   name: string;
   path: string;
@@ -191,14 +166,40 @@ export interface PeerEntry {
   readonly: true;
   hidden: boolean;
 }
-
 export type PeerResponse =
-  | { type: "roots"; data: { roots: PeerRoot[] } }
-  | { type: "directory"; data: { path: string; entries: PeerEntry[]; snapshot: string } }
-  | { type: "stat"; data: { entry: PeerEntry } }
-  | { type: "symlink"; data: { target: number[]; snapshot: string } }
-  | { type: "pong"; data: { nonce: number } };
-
+  | {
+      type: "roots";
+      data: {
+        roots: PeerRoot[];
+      };
+    }
+  | {
+      type: "directory";
+      data: {
+        path: string;
+        entries: PeerEntry[];
+        snapshot: string;
+      };
+    }
+  | {
+      type: "stat";
+      data: {
+        entry: PeerEntry;
+      };
+    }
+  | {
+      type: "symlink";
+      data: {
+        target: number[];
+        snapshot: string;
+      };
+    }
+  | {
+      type: "pong";
+      data: {
+        nonce: number;
+      };
+    };
 export interface ExplorerLocation {
   kind: ExplorerLocationKind;
   providerType: string | null;
@@ -207,15 +208,6 @@ export interface ExplorerLocation {
   peerDeviceId?: string | null;
   peerRootId?: string | null;
 }
-
-export interface AndroidGrantedFolder {
-  uri: string;
-  name: string;
-  documentId: string;
-  canWrite: boolean;
-  path: string;
-}
-
 export interface FileEntry {
   id: string;
   name: string;
@@ -232,7 +224,6 @@ export interface FileEntry {
   isDeleted?: boolean;
   location: ExplorerLocation;
 }
-
 export interface DirectorySizeRecord {
   path: string;
   sizeBytes: number | null;
@@ -240,17 +231,14 @@ export interface DirectorySizeRecord {
   calculatedAtMs: number | null;
   error?: string | null;
 }
-
 export interface DirectorySizeRequest {
   paths: string[];
   force?: boolean;
 }
-
 export interface SearchScanError {
   source: string;
   message: string;
 }
-
 export interface SearchStatus {
   scanInProgress: boolean;
   scanPhase: SearchScanPhase;
@@ -272,7 +260,6 @@ export interface SearchStatus {
   lastScanRemovedItemCount: number;
   lastScanUnchangedItemCount: number;
 }
-
 export interface SearchScanRequest {
   roots?: string[];
   includeLocal?: boolean;
@@ -282,7 +269,6 @@ export interface SearchScanRequest {
   ignoredPaths?: string[];
   incremental?: boolean;
 }
-
 export interface SearchQueryRequest {
   query: string;
   currentPath?: string | null;
@@ -294,7 +280,6 @@ export interface SearchQueryRequest {
   rules?: SavedSearchRule[];
   matchMode?: "all" | "any";
 }
-
 export interface SearchResult {
   entry: FileEntry;
   score: number;
@@ -302,7 +287,6 @@ export interface SearchResult {
   indexedAtMs: number;
   match?: SearchResultMatch;
 }
-
 export interface SearchResultMatch {
   kind: "filename" | "metadata" | "semantic" | "hybrid";
   semanticScore?: number | null;

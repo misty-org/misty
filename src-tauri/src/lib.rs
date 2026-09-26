@@ -1,5 +1,5 @@
 // Several platform-gated and migration paths are intentionally compiled but
-// not active in every desktop build. Keep those paths available to the mobile
+// not active in every desktop build. Keep those paths available to the native
 // and upgrade targets without treating their absence from this target as lint
 // failures.
 #![allow(dead_code, unused_imports, unused_variables)]
@@ -48,8 +48,7 @@ use app::commands::{
     file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
     file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
     file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, mail_cache_read,
-    mail_cache_remove, mail_cache_write, mobile_cache_purge_account, mobile_cache_read,
-    mobile_cache_remove, mobile_cache_write, navigation_names_snapshot, navigation_names_update,
+    mail_cache_remove, mail_cache_write, navigation_names_snapshot, navigation_names_update,
     notes_store_asset, open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
     operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
     operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
@@ -74,12 +73,8 @@ use app::commands::{
     storage_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
     workspaces_save, workspaces_snapshot,
 };
-#[cfg(target_os = "android")]
-use app::commands::{
-    android_all_files_access_status, android_grant_local_folder,
-    android_open_all_files_access_settings,
-};
-#[cfg(any(desktop, target_os = "ios"))]
+
+#[cfg(desktop)]
 use app::commands::{
     connected_devices_connect, connected_devices_initialize, connected_devices_list_directory,
     connected_devices_media_url, connected_devices_open_workspace_route,
@@ -90,7 +85,7 @@ use app::runtime::MistyRuntime;
 use app::shortcut_commands::{
     shortcuts_reassign, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
 };
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
@@ -159,7 +154,6 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use telemetry::TelemetryReporter;
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut context = tauri::generate_context!();
     #[cfg(all(desktop, debug_assertions))]
@@ -197,7 +191,6 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_document_tree::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_notification::init()))
@@ -216,19 +209,7 @@ pub fn run() {
             misty_browser_sync::secure_store::configure_device_store(
                 app.path().local_data_dir()?.join("com.misty.desktop/device-keys"),
             )?;
-            #[cfg(any(target_os = "ios", target_os = "android"))]
-            let runtime = {
-                let data_root = app
-                    .path()
-                    .app_data_dir()
-                    .ok()
-                    .map(|path| path.join("Misty"));
-                if let Some(root) = &data_root {
-                    infra::paths::set_mobile_data_root(root.clone());
-                }
-                MistyRuntime::new_with_data_root(data_root)
-            };
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+
             let runtime = MistyRuntime::new();
             #[cfg(desktop)]
             {
@@ -242,7 +223,7 @@ pub fn run() {
                     }));
             }
             app.manage(runtime);
-            #[cfg(any(desktop, target_os = "ios"))]
+            #[cfg(desktop)]
             app.manage(BrowserSessionState::default());
             app.manage(infra::agent_workspace::AgentWorkspaceState::default());
             #[cfg(any(target_os = "macos", windows))]
@@ -375,10 +356,6 @@ pub fn run() {
                     mail_cache_read,
                     mail_cache_write,
                     mail_cache_remove,
-                    mobile_cache_read,
-                    mobile_cache_write,
-                    mobile_cache_remove,
-                    mobile_cache_purge_account,
                     agents_device_snapshot,
                     agents_register_folder_scope,
                     agents_open_citation,
@@ -389,25 +366,25 @@ pub fn run() {
                     agents_device_identity_load,
                     #[cfg(desktop)]
                     agents_device_identity_store,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_initialize,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_snapshot,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_subscribe_directory,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_connect,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_open_workspace_route,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_roots,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_list_directory,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_read_file,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_media_url,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     connected_devices_prepare_clipboard_files,
                     claude_status,
                     claude_send_message,
@@ -479,7 +456,7 @@ pub fn run() {
                     code_lsp_send,
                     #[cfg(all(desktop, not(target_os = "macos")))]
                     code_lsp_stop,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_create,
                     infra::agent_workspace::agent_window_open,
                     #[cfg(any(target_os = "macos", windows))]
@@ -513,25 +490,25 @@ pub fn run() {
                     #[cfg(desktop)]
                     crate::infra::browser::browser_profile_persistence,
                     crate::infra::browser::browser_profile_remove,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_shortcuts_update,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_set_bounds,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_capture_region,
                     #[cfg(target_os = "macos")]
                     infra::browser_macos::host_webview_capture_region,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_reconcile,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_set_theme,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_navigate,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_back,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_forward,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_reload,
                     #[cfg(target_os = "macos")]
                     infra::browser_site_permissions::browser_site_info,
@@ -632,12 +609,7 @@ pub fn run() {
                     devices_snapshot,
                     devices_unmount,
                     explorer_list_directory,
-                    #[cfg(target_os = "android")]
-                    android_grant_local_folder,
-                    #[cfg(target_os = "android")]
-                    android_all_files_access_status,
-                    #[cfg(target_os = "android")]
-                    android_open_all_files_access_settings,
+
                     explorer_directory_size_snapshot,
                     explorer_calculate_directory_sizes,
                     explorer_create_item,

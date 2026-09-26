@@ -1,9 +1,5 @@
-export type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
-import {
-  type MistyAiContextReference as AiContextReference,
-  type MistySurfaceAdapter as AiSurfaceAdapter,
-} from "@misty/sdk";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+import type { AiContextReference, AiSurfaceAdapter } from "@/features/ai-surface/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,20 +10,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui";
-import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
-import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { SpaceTaskDrawer } from "./SpacePlannerViews";
 import { SpacePlannerHeader } from "./components/SpacePlannerHeader";
+import { SpaceTaskDrawer } from "./SpacePlannerViews";
 import { SpacePlannerBody } from "./spaceTasks/SpacePlannerBody";
-import { TaskFilters } from "./spaceTasks/TaskFilters";
 import { normalizeView } from "./spaceTasks/taskFiltering";
+import { TaskFilters } from "./spaceTasks/TaskFilters";
+import type { PlannerTaskRuntime } from "./spaceTasks/taskRuntime";
 import { useSpaceTaskActions } from "./spaceTasks/useSpaceTaskActions";
 import { useSpaceTasksData } from "./spaceTasks/useSpaceTasksData";
 import { useTaskFilterParams } from "./spaceTasks/useTaskFilterParams";
-
-import type { PlannerTaskRuntime } from "./spaceTasks/taskRuntime";
+export type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 export function SpaceTasksView({
   spaceId,
   canManage,
@@ -40,26 +34,31 @@ export function SpaceTasksView({
   const { api, members, userId } = runtime;
   const navigate = useNavigate();
   const location = useLocation();
-  const presentation = useSurfacePresentation();
-  const mobileCompact = presentation === "mobile-compact";
   const routeParts = location.pathname.split("/").filter(Boolean);
   const view = normalizeView(routeParts[routeParts.length - 1]);
-  const [mobileView, setMobileView] = useState<"board" | "list">("list");
-  const effectiveView = mobileCompact ? mobileView : view;
-
-  const filters = useTaskFilterParams({ view: effectiveView, currentUserId: userId });
+  const filters = useTaskFilterParams({
+    view: view,
+    currentUserId: userId,
+  });
   const data = useSpaceTasksData({
     api,
     subscribeChanges: runtime.subscribeChanges,
     spaceId,
-    view: effectiveView,
+    view: view,
     filters,
   });
-  const actions = useSpaceTaskActions({ api, spaceId, canManage, data });
+  const actions = useSpaceTaskActions({
+    api,
+    spaceId,
+    canManage,
+    data,
+  });
   const [deleteTarget, setDeleteTarget] = useState<SpaceTask | null>(null);
   const reloadTasks = data.load;
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
-    const metadata: Record<string, string> = { sort: filters.sort };
+    const metadata: Record<string, string> = {
+      sort: filters.sort,
+    };
     if (filters.status !== "all") metadata.status = filters.status;
     if (filters.priority !== "all") metadata.priority = filters.priority;
     if (filters.query.trim()) metadata.search = filters.query.trim();
@@ -136,24 +135,10 @@ export function SpaceTasksView({
     filters.status,
     spaceId,
   ]);
-  const title =
-    actions.editing?.title?.trim() || (effectiveView === "list" ? "Task list" : "Task board");
+  const title = actions.editing?.title?.trim() || (view === "list" ? "Task list" : "Task board");
   const createQueryConsumedRef = useRef(false);
-
   const openCreate = useCallback(() => actions.openCreate(), [actions.openCreate]);
   const openEdit = actions.openEdit;
-  const chromeConfig = useMemo(
-    () => ({
-      title: "Planner",
-      level: "root" as const,
-      primaryAction: canManage
-        ? { id: "new-task", label: "New task", icon: Plus, onPress: openCreate }
-        : undefined,
-    }),
-    [canManage, openCreate],
-  );
-  useMobileSurfaceChrome(chromeConfig);
-
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("create") !== "task") {
@@ -164,12 +149,16 @@ export function SpaceTasksView({
     createQueryConsumedRef.current = true;
     params.delete("create");
     navigate(
-      { pathname: location.pathname, search: params.size ? `?${params}` : "" },
-      { replace: true },
+      {
+        pathname: location.pathname,
+        search: params.size ? `?${params}` : "",
+      },
+      {
+        replace: true,
+      },
     );
     if (canManage) openCreate();
   }, [canManage, location.pathname, location.search, navigate, openCreate]);
-
   useEffect(() => {
     const taskId = new URLSearchParams(location.search).get("task");
     if (!taskId || data.loading) return;
@@ -179,11 +168,15 @@ export function SpaceTasksView({
     const params = new URLSearchParams(location.search);
     params.delete("task");
     navigate(
-      { pathname: location.pathname, search: params.size ? `?${params}` : "" },
-      { replace: true },
+      {
+        pathname: location.pathname,
+        search: params.size ? `?${params}` : "",
+      },
+      {
+        replace: true,
+      },
     );
   }, [data.loading, data.tasks, location.pathname, location.search, navigate, openEdit]);
-
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       {runtime.renderIntegration({
@@ -193,14 +186,12 @@ export function SpaceTasksView({
         onCreate: openCreate,
       })}
       <SpacePlannerHeader
-        view={effectiveView}
+        view={view}
         onViewChange={(nextView) => {
-          if (mobileCompact) setMobileView(nextView);
-          else
-            navigate({
-              pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/${nextView}`,
-              search: location.search,
-            });
+          navigate({
+            pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/${nextView}`,
+            search: location.search,
+          });
         }}
         query={filters.query}
         activeFilterCount={filters.activeFilterCount}
@@ -212,7 +203,6 @@ export function SpaceTasksView({
         filters={
           <TaskFilters
             members={members}
-
             status={filters.status}
             assignee={filters.assignee}
             priority={filters.priority}
@@ -227,9 +217,8 @@ export function SpaceTasksView({
 
       <SpacePlannerBody
         renderError={runtime.renderError}
-        view={effectiveView}
+        view={view}
         members={members}
-
         canManage={canManage}
         assignee={filters.assignee}
         due={filters.due}
@@ -244,7 +233,6 @@ export function SpaceTasksView({
           setDraft={actions.setDraft}
           editing={actions.editing}
           members={members}
-
           busy={actions.busy === "task" || actions.busy === actions.editing?.id}
           canManage={canManage}
           onClose={() => actions.setEditing(undefined)}
@@ -267,7 +255,6 @@ export function SpaceTasksView({
     </div>
   );
 }
-
 function TaskDeleteDialog(props: {
   task: SpaceTask | null;
   busy: boolean;
@@ -275,11 +262,9 @@ function TaskDeleteDialog(props: {
   onConfirm: () => Promise<boolean>;
 }) {
   const [error, setError] = useState("");
-
   useEffect(() => {
     setError("");
   }, [props.task?.id]);
-
   const remove = async () => {
     if (props.busy) return;
     setError("");
@@ -287,7 +272,6 @@ function TaskDeleteDialog(props: {
     if (removed) props.onOpenChange(false);
     else setError("This task could not be deleted. Try again.");
   };
-
   return (
     <AlertDialog
       open={Boolean(props.task)}

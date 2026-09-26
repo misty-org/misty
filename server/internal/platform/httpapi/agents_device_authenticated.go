@@ -294,7 +294,7 @@ func normalizedDevicePlatform(platform string) string {
 	if platform == "" {
 		return "unknown"
 	}
-	for _, allowed := range []string{"macos", "windows", "linux", "ios", "android", "unknown"} {
+	for _, allowed := range []string{"macos", "windows", "linux", "unknown"} {
 		if platform == allowed {
 			return platform
 		}

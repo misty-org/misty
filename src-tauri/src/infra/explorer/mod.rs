@@ -12,9 +12,6 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(target_os = "android")]
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-
 #[cfg(not(target_os = "macos"))]
 use image::{
     codecs::{
@@ -27,12 +24,6 @@ use image::{
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
-
-#[cfg(target_os = "android")]
-use tauri::AppHandle;
-
-#[cfg(target_os = "android")]
-use tauri_plugin_document_tree::{DocumentTreeExt, ListChildrenRequest};
 
 use crate::domain::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
 use crate::domain::explorer::{
@@ -63,8 +54,7 @@ const VIRTUAL_PATH_RECENT: &str = "misty://recent";
 const VIRTUAL_PATH_STARRED: &str = "misty://starred";
 const VIRTUAL_PATH_TRASH: &str = "misty://trash";
 const VIRTUAL_PATH_LIBRARY: &str = "misty://library";
-#[cfg(target_os = "android")]
-const VIRTUAL_PATH_LOCAL: &str = "misty://local";
+
 const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
 const DEFAULT_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
 const MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;

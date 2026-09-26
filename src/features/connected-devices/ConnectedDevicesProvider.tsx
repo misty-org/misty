@@ -1,8 +1,6 @@
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useConnectedDevices as useConnectedDevicesController } from "./useConnectedDevices";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace/core";
 import type { OpenWorkspaceRouteRequest } from "@/native/contracts";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import {
   createContext,
@@ -13,18 +11,15 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { useConnectedDevices as useConnectedDevicesController } from "./useConnectedDevices";
 type ConnectedDevicesController = ReturnType<typeof useConnectedDevicesController>;
-
 const ConnectedDevicesContext = createContext<ConnectedDevicesController | null>(null);
-
 export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
   const controller = useConnectedDevicesController();
   const navigate = useNavigate();
   const [notice, setNotice] = useState("");
-
   useEffect(() => {
-    if (!hasTauriInternals() || isNativeMobileBuild) return;
+    if (!hasTauriInternals()) return;
     let unlisten: (() => void) | undefined;
     let active = true;
     void listen<OpenWorkspaceRouteRequest>("misty://open-workspace-route", ({ payload }) => {
@@ -43,7 +38,6 @@ export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
       unlisten?.();
     };
   }, [navigate]);
-
   const value = useMemo(() => controller, [controller]);
   return (
     <ConnectedDevicesContext.Provider value={value}>
@@ -59,7 +53,6 @@ export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
     </ConnectedDevicesContext.Provider>
   );
 }
-
 export function useConnectedDevices(): ConnectedDevicesController {
   const value = useContext(ConnectedDevicesContext);
   if (!value) throw new Error("useConnectedDevices must be used inside ConnectedDevicesProvider.");
