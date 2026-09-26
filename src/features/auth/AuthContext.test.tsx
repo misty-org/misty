@@ -2,7 +2,8 @@ import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { AuthProvider, useAuth, type AuthContextValue } from "./AuthContext";
+import SignIn from "./SignInPage";
 const mocks = vi.hoisted(() => {
   const accountA = {
     id: "account-a",
@@ -28,8 +29,15 @@ const mocks = vi.hoisted(() => {
     status: "active",
     allows_use: true,
   };
-  const meB = { ...meA, id: accountB.id, name: accountB.name, email: accountB.email };
-  const userState = { me: meA as typeof meA | null };
+  const meB = {
+    ...meA,
+    id: accountB.id,
+    name: accountB.name,
+    email: accountB.email,
+  };
+  const userState = {
+    me: meA as typeof meA | null,
+  };
   const userStore = {
     get me() {
       return userState.me;
@@ -41,14 +49,20 @@ const mocks = vi.hoisted(() => {
       userState.me = null;
     }),
   };
-  const useUserStore = Object.assign(vi.fn(), { getState: () => userStore });
+  const useUserStore = Object.assign(vi.fn(), {
+    getState: () => userStore,
+  });
   const spacesLoad = vi.fn().mockResolvedValue(undefined);
   const useSpacesStore = Object.assign(vi.fn(), {
-    getState: () => ({ load: spacesLoad }),
+    getState: () => ({
+      load: spacesLoad,
+    }),
   });
   const agentRefresh = vi.fn().mockResolvedValue(undefined);
   const useAgentSessionStore = Object.assign(vi.fn(), {
-    getState: () => ({ refreshStatus: agentRefresh }),
+    getState: () => ({
+      refreshStatus: agentRefresh,
+    }),
   });
   return {
     accountA,
@@ -82,8 +96,6 @@ const mocks = vi.hoisted(() => {
     explorerSetState: vi.fn(),
   };
 });
-
-vi.mock("@/shared/platform/buildTarget", () => ({ isNativeMobileBuild: false }));
 vi.mock("./store/useAccountStore", () => ({
   accountFetchMe: mocks.accountFetchMe,
   accountLogout: mocks.accountLogout,
@@ -100,17 +112,24 @@ vi.mock("./store/useAuthTokenStore", () => ({
   setAccountSessionTransitioning: mocks.setAccountSessionTransitioning,
   updateSavedAccountSession: mocks.updateSavedAccountSession,
 }));
-vi.mock("./store/useUserStore", () => ({ useUserStore: mocks.useUserStore }));
+vi.mock("./store/useUserStore", () => ({
+  useUserStore: mocks.useUserStore,
+}));
 vi.mock("@/features/installer", () => {
   const state = {
     signOut: mocks.signOut,
     saveAuthenticatedUser: mocks.saveAuthenticatedUser,
-    status: { current_user: null, current_license: null },
+    status: {
+      current_user: null,
+      current_license: null,
+    },
   };
   return {
     useSetupStore: Object.assign(
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
-      { getState: () => state },
+      {
+        getState: () => state,
+      },
     ),
   };
 });
@@ -118,20 +137,30 @@ vi.mock("@/features/app-shell", () => {
   const state = {
     signOut: mocks.signOut,
     saveAuthenticatedUser: mocks.saveAuthenticatedUser,
-    status: { current_user: null, current_license: null },
+    status: {
+      current_user: null,
+      current_license: null,
+    },
   };
   return {
     useSetupStore: Object.assign(
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
-      { getState: () => state },
+      {
+        getState: () => state,
+      },
     ),
     useAppRouteMemoryStore: Object.assign(vi.fn(), {
-      getState: () => ({ resetAppRoute: vi.fn(), lastAppRoute: "/home" }),
+      getState: () => ({
+        resetAppRoute: vi.fn(),
+        lastAppRoute: "/home",
+      }),
     }),
   };
 });
 vi.mock("@/features/files/workspace/explorer", () => ({
-  useExplorerStore: { setState: mocks.explorerSetState },
+  useExplorerStore: {
+    setState: mocks.explorerSetState,
+  },
 }));
 vi.mock("@/features/files/workspace/search", () => ({
   resetSearchAccountState: mocks.resetSearchAccountState,
@@ -155,22 +184,21 @@ vi.mock("@/features/agents", () => ({
 vi.mock("@/features/journal/notes", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
 }));
-vi.mock("@/telemetry/lifecycle", () => ({ setAnalyticsAuthenticationState: vi.fn() }));
-vi.mock("@/telemetry/client", () => ({ analytics: {} }));
+vi.mock("@/telemetry/lifecycle", () => ({
+  setAnalyticsAuthenticationState: vi.fn(),
+}));
+vi.mock("@/telemetry/client", () => ({
+  analytics: {},
+}));
 vi.mock("@/telemetry/identity", () => ({
   TelemetryIdentityManager: class {
     sync() {}
   },
 }));
-
-import { AuthProvider, useAuth, type AuthContextValue } from "./AuthContext";
-import SignIn from "./SignInPage";
-
 describe("AuthProvider account switching", () => {
   let container: HTMLDivElement;
   let root: Root | undefined;
   let auth: AuthContextValue | null;
-
   beforeAll(() => {
     const values = new Map<string, string>();
     vi.stubGlobal("localStorage", {
@@ -184,12 +212,12 @@ describe("AuthProvider account switching", () => {
       },
     });
   });
-
   afterAll(() => vi.unstubAllGlobals());
-
   beforeEach(() => {
     (
-      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+      globalThis as typeof globalThis & {
+        IS_REACT_ACT_ENVIRONMENT?: boolean;
+      }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     localStorage.clear();
     localStorage.setItem("misty_user", JSON.stringify(mocks.accountA));
@@ -226,18 +254,15 @@ describe("AuthProvider account switching", () => {
     document.body.append(container);
     root = createRoot(container);
   });
-
   afterEach(async () => {
     if (root) await act(async () => root?.unmount());
     container.remove();
   });
-
   it("restores the previous token and identity when target session persistence fails", async () => {
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -248,13 +273,11 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     await expect(
       act(async () => {
         await auth!.switchAccount(mocks.accountB.id);
       }),
     ).rejects.toThrow("keystore update failed");
-
     expect(mocks.activateAccountSession.mock.calls.map(([accountId]) => accountId)).toEqual([
       mocks.accountB.id,
       mocks.accountA.id,
@@ -262,18 +285,13 @@ describe("AuthProvider account switching", () => {
     expect(mocks.saveAuthenticatedUser).not.toHaveBeenCalled();
     expect(mocks.userState.me?.id).toBe(mocks.accountA.id);
     expect(auth?.user?.id).toBe(mocks.accountA.id);
-    expect(mocks.setAccountSessionTransitioning.mock.calls.map(([value]) => value)).toEqual([
-      true,
-      false,
-    ]);
+    expect(mocks.setAccountSessionTransitioning.mock.calls.map(([value]) => value)).toEqual([true]);
   });
-
   it("preserves the original sign-in error when the previous saved session is stale", async () => {
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -284,11 +302,9 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     mocks.activateAccountSession.mockRejectedValueOnce(
       new Error("That saved Misty session is no longer available."),
     );
-
     let signInError: unknown;
     await act(async () => {
       try {
@@ -299,18 +315,15 @@ describe("AuthProvider account switching", () => {
         signInError = error;
       }
     });
-
     expect(signInError).toEqual(new Error("Invalid email or password."));
     expect(mocks.userStore.clear).toHaveBeenCalled();
     expect(auth?.user).toBeNull();
   });
-
   it("clears every account-scoped surface when the visible identity is removed", async () => {
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -321,22 +334,18 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     await act(async () => {
       await auth!.setUser(null);
     });
-
     expect(auth?.user).toBeNull();
     expect(mocks.userStore.clear).toHaveBeenCalled();
     expect(mocks.resetSpacesAccountState).toHaveBeenCalled();
   });
-
   it("rehydrates the active user and profile from the server", async () => {
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -347,7 +356,6 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     const refreshedMe = {
       ...mocks.meA,
       name: "Updated Account",
@@ -356,11 +364,9 @@ describe("AuthProvider account switching", () => {
       tier: "pro",
     };
     mocks.accountFetchMe.mockResolvedValueOnce(refreshedMe);
-
     await act(async () => {
       await auth!.refreshUser();
     });
-
     expect(mocks.userStore.setMe).toHaveBeenLastCalledWith(refreshedMe);
     expect(auth?.user).toMatchObject({
       id: mocks.accountA.id,
@@ -370,15 +376,12 @@ describe("AuthProvider account switching", () => {
       currentPlan: "pro",
     });
   });
-
   it("restores the active saved account before protected pages render", async () => {
     localStorage.removeItem("misty_user");
-
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -389,14 +392,14 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     expect(auth?.user?.id).toBe(mocks.accountA.id);
     expect(mocks.accountFetchMe).toHaveBeenCalled();
   });
-
   it("clears an expired legacy identity during StrictMode startup and releases the transition", async () => {
     mocks.accountFetchMe.mockRejectedValue(
-      Object.assign(new Error("not authenticated"), { status: 401 }),
+      Object.assign(new Error("not authenticated"), {
+        status: 401,
+      }),
     );
     function Probe() {
       auth = useAuth();
@@ -419,7 +422,6 @@ describe("AuthProvider account switching", () => {
     expect(auth?.transitioning).toBe(false);
     expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
   });
-
   it("releases the transition after an expired-cookie event changes the visible account", async () => {
     function Probe() {
       auth = useAuth();
@@ -434,7 +436,11 @@ describe("AuthProvider account switching", () => {
         </MemoryRouter>,
       );
     });
-    mocks.accountFetchMe.mockRejectedValue(Object.assign(new Error("expired"), { status: 401 }));
+    mocks.accountFetchMe.mockRejectedValue(
+      Object.assign(new Error("expired"), {
+        status: 401,
+      }),
+    );
     await act(async () => {
       window.dispatchEvent(new CustomEvent("misty:account-session-invalid"));
     });
@@ -443,7 +449,6 @@ describe("AuthProvider account switching", () => {
     expect(auth?.transitioning).toBe(false);
     expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
   });
-
   it.each(["valid", "offline", "account changed"])(
     "keeps the account active after a stale 401 when validation is %s",
     async (outcome) => {
@@ -479,7 +484,11 @@ describe("AuthProvider account switching", () => {
         if (outcome === "valid") resolve(mocks.meA);
         else {
           if (outcome === "account changed") mocks.generation++;
-          reject(Object.assign(new Error(outcome), { status: outcome === "offline" ? 503 : 401 }));
+          reject(
+            Object.assign(new Error(outcome), {
+              status: outcome === "offline" ? 503 : 401,
+            }),
+          );
         }
       });
       expect(mocks.deactivateActiveAccount).not.toHaveBeenCalled();
@@ -487,7 +496,6 @@ describe("AuthProvider account switching", () => {
       expect(auth?.user?.id).toBe(mocks.accountA.id);
     },
   );
-
   it.each(["switch", "authenticate", "resume", "logout"])(
     "releases the account transition when %s preparation throws",
     async (operation) => {
@@ -526,7 +534,6 @@ describe("AuthProvider account switching", () => {
       expect(auth?.user?.id).toBe(mocks.accountA.id);
     },
   );
-
   it("rejects a second resume while restoration is pending instead of reporting success", async () => {
     localStorage.clear();
     mocks.readActiveSavedAccountSession.mockReturnValue(null);
@@ -563,7 +570,6 @@ describe("AuthProvider account switching", () => {
     expect(auth?.user?.id).toBe(mocks.accountA.id);
     expect(auth?.transitioning).toBe(false);
   });
-
   it("resumes a saved account from the chooser through identity remount and protected navigation", async () => {
     localStorage.clear();
     mocks.readActiveSavedAccountSession.mockReturnValue(null);
@@ -626,19 +632,18 @@ describe("AuthProvider account switching", () => {
     expect(container.textContent).toBe("Workspace for account-a");
     expect(auth?.transitioning).toBe(false);
     expect(mocks.saveAuthenticatedUser).toHaveBeenCalledWith(
-      expect.objectContaining({ id: mocks.accountA.id }),
+      expect.objectContaining({
+        id: mocks.accountA.id,
+      }),
       expect.anything(),
     );
   });
-
   it("swaps verified account identity without reloading retired Spaces", async () => {
     mocks.updateSavedAccountSession.mockReset().mockResolvedValue(undefined);
-
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -649,34 +654,33 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     expect(auth?.user?.id).toBe(mocks.accountA.id);
-
     await act(async () => {
       await auth!.switchAccount(mocks.accountB.id);
     });
-
     expect(auth?.user?.id).toBe(mocks.accountB.id);
     expect(mocks.userState.me?.id).toBe(mocks.accountB.id);
     expect(mocks.saveAuthenticatedUser).toHaveBeenCalledWith(
-      expect.objectContaining({ id: mocks.accountB.id }),
+      expect.objectContaining({
+        id: mocks.accountB.id,
+      }),
       expect.anything(),
     );
     expect(mocks.spacesLoad).not.toHaveBeenCalled();
   });
-
   it("keeps a switch target whose session expired and restores the previous account", async () => {
     mocks.updateSavedAccountSession.mockReset().mockResolvedValue(undefined);
     mocks.accountFetchMe.mockReset().mockImplementation(async () => {
-      if (mocks.activeAccountId === mocks.accountB.id) throw { status: 401 };
+      if (mocks.activeAccountId === mocks.accountB.id)
+        throw {
+          status: 401,
+        };
       return mocks.meA;
     });
-
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -687,26 +691,23 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     await expect(
       act(async () => {
         await auth!.switchAccount(mocks.accountB.id);
       }),
-    ).rejects.toMatchObject({ name: "SavedAccountSessionUnavailableError" });
-
+    ).rejects.toMatchObject({
+      name: "SavedAccountSessionUnavailableError",
+    });
     expect(mocks.clearAccountAuthToken).not.toHaveBeenCalled();
     expect(auth?.user?.id).toBe(mocks.accountA.id);
     expect(auth?.accounts.map((account) => account.id)).toContain(mocks.accountB.id);
   });
-
   it("finishes signing out even when a cleanup step fails", async () => {
     mocks.signOut.mockRejectedValueOnce(new Error("native sign-out failed"));
-
     function Probe() {
       auth = useAuth();
       return null;
     }
-
     await act(async () => {
       root!.render(
         <MemoryRouter>
@@ -717,11 +718,9 @@ describe("AuthProvider account switching", () => {
       );
       await Promise.resolve();
     });
-
     await act(async () => {
       await auth!.logout();
     });
-
     expect(mocks.accountLogout).toHaveBeenCalledWith(mocks.accountA.id);
     expect(mocks.deactivateActiveAccount).toHaveBeenCalled();
     expect(mocks.activateAccountSession).not.toHaveBeenCalled();

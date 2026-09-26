@@ -1,3 +1,4 @@
+import mistyCompanion from "@/assets/branding/misty-icon.png?inline";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
   AlertDialog,
@@ -8,6 +9,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Button,
+  cn,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -18,15 +21,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  cn,
-  Button,
 } from "@/shared/ui";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Cable, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
 export function MistyConversationSidebar(props: {
-  mobile?: boolean;
   conversations: GlobalAiConversation[];
   activeConversationId: string;
   loading: boolean;
@@ -40,11 +38,9 @@ export function MistyConversationSidebar(props: {
   const [renameDraft, setRenameDraft] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<GlobalAiConversation>();
   const renameRef = useRef<HTMLInputElement | null>(null);
-
   useEffect(() => {
     if (renamingId) renameRef.current?.select();
   }, [renamingId]);
-
   const beginRename = (conversation: GlobalAiConversation) => {
     setRenamingId(conversation.id);
     setRenameDraft(conversation.title);
@@ -55,12 +51,11 @@ export function MistyConversationSidebar(props: {
     setRenamingId("");
     setRenameDraft("");
   };
-
   return (
     <aside
       className={cn(
         "flex min-h-0 flex-col border-r border-charcoal-border/80 bg-charcoal-sidebar px-2 pb-2",
-        props.mobile && "h-full border-r-0",
+        false,
       )}
     >
       <header className="flex h-16 shrink-0 items-center gap-2.5 px-2">
@@ -126,7 +121,6 @@ export function MistyConversationSidebar(props: {
                   ) : (
                     <Button
                       variant="ghost"
-
                       className="min-w-0 flex-1 px-2.5 py-2 text-left"
                       onClick={() => props.onSelect(conversation.id)}
                     >
@@ -227,11 +221,13 @@ export function MistyConversationSidebar(props: {
     </aside>
   );
 }
-
 function relativeTime(value: string) {
   const elapsed = Date.now() - Date.parse(value);
   if (elapsed < 60_000) return "Just now";
   if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m ago`;
   if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)}h ago`;
-  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }

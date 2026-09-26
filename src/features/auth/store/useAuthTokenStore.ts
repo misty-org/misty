@@ -1,13 +1,12 @@
-import { SavedAccountSessionUnavailableError } from "../sessionErrors";
-import { restoreAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
-import { resolveApiBase, resolveHostedApiBase } from "@/api/deployment/api";
+import { forgetAccountCookies, restoreAccountCookies } from "@/api/client/cookie-session";
 import { configureApiSession } from "@/api/client/session";
 import {
   deploymentStorageKey,
   readDeploymentScope,
   readDeploymentStorageItem,
+  resolveApiBase,
+  resolveHostedApiBase,
 } from "@/api/deployment/api";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
 import type {
@@ -15,25 +14,23 @@ import type {
   SecureAccountSession,
   SecureAccountVault,
 } from "../model/stores/account/interfaces/useAuthTokenStore";
+import { SavedAccountSessionUnavailableError } from "../sessionErrors";
 export type {
   SavedAccountSession,
   SecureAccountSession,
   SecureAccountVault,
 } from "../model/stores/account/interfaces/useAuthTokenStore";
-
 const desktopTokenService = "com.impierce.identity-wallet";
 const desktopTokenUser = "tester";
 const tokenStoredMarkerKey = "misty:account-auth-token:file-present";
 const accountIndexKey = "misty:account-sessions";
 const activeAccountKey = "misty:active-account-id";
 const legacyUserKey = "misty_user";
-
 let cachedToken: string | null | undefined;
 let cachedVault: SecureAccountVault | undefined;
 let vaultReadPromise: Promise<SecureAccountVault> | undefined;
 // A cold start can fan out several authenticated requests before the first
-// secure-store read finishes. On iOS each concurrent read can present its own
-// system authentication sheet, so every caller must share one retrieval.
+// secure-store read finishes. Share one retrieval across concurrent callers.
 let tokenReadPromise: Promise<string | null> | undefined;
 // The most recent payload written to the native credential store. The app persists the vault on nearly every
 // auth state change (login, /me refresh, effect re-runs), so we skip redundant
@@ -41,20 +38,16 @@ let tokenReadPromise: Promise<string | null> | undefined;
 let lastPersistedPayload: string | undefined;
 let accountSessionTransitioning = false;
 let accountSessionGeneration = 0;
-
 export function setAccountSessionTransitioning(transitioning: boolean): void {
   if (transitioning && !accountSessionTransitioning) accountSessionGeneration += 1;
   accountSessionTransitioning = transitioning;
 }
-
 export function isAccountSessionTransitioning(): boolean {
   return accountSessionTransitioning;
 }
-
 export function readAccountSessionGeneration(): number {
   return accountSessionGeneration;
 }
-
 export async function saveAccountAuthToken(
   token: string,
   account?: Omit<SavedAccountSession, "lastUsedAt">,
@@ -62,12 +55,10 @@ export async function saveAccountAuthToken(
   if (cachedToken !== undefined && cachedToken !== (token || null)) accountSessionGeneration += 1;
   cachedToken = token || null;
   if (!token || !hasTauriInternals()) return;
-
-  if (isNativeMobileBuild || !account?.id) {
+  if (!account?.id) {
     await persistRawToken(token);
     return;
   }
-
   try {
     const vault = await loadSecureVault();
     const saved: SavedAccountSession = {
@@ -77,7 +68,11 @@ export async function saveAccountAuthToken(
     const sessions = vault.sessions.filter(
       (item) => !isCurrentDeploymentSession(item) || item.account.id !== saved.id,
     );
-    sessions.push({ account: saved, token, deploymentScope: readDeploymentScope() });
+    sessions.push({
+      account: saved,
+      token,
+      deploymentScope: readDeploymentScope(),
+    });
     await persistSecureVault({
       version: 1,
       activeAccountId: vaultAccountId(saved.id),
@@ -94,7 +89,6 @@ export async function saveAccountAuthToken(
     await syncManagedAiToken(token);
   }
 }
-
 export async function readAccountAuthToken(): Promise<string | null> {
   if (!hasTauriInternals()) {
     return import.meta.env.DEV && import.meta.env.VITE_MISTY_DEMO_MODE === "1"
@@ -112,15 +106,10 @@ export async function readAccountAuthToken(): Promise<string | null> {
     tokenReadPromise = undefined;
   }
 }
-
 async function loadAccountAuthToken(): Promise<string | null> {
   const generation = accountSessionGeneration;
   try {
-    if (isNativeMobileBuild) {
-      const token = await retrieve(desktopTokenService, desktopTokenUser);
-      if (generation !== accountSessionGeneration) return cachedToken ?? null;
-      if (cachedToken === undefined) cachedToken = token;
-    } else {
+    {
       const vault = await loadSecureVault();
       if (generation !== accountSessionGeneration) return cachedToken ?? null;
       const active = selectActiveSession(vault);
@@ -151,7 +140,6 @@ async function loadAccountAuthToken(): Promise<string | null> {
 export async function readHostedAccountAuthToken(): Promise<string | null> {
   if (!hasTauriInternals()) return null;
   if (readDeploymentScope() === "hosted") return readAccountAuthToken();
-  if (isNativeMobileBuild) return null;
   const vault = await loadSecureVault();
   const hosted = vault.sessions
     .filter((session) => sessionDeploymentScope(session) === "hosted")
@@ -160,7 +148,6 @@ export async function readHostedAccountAuthToken(): Promise<string | null> {
   if (!(await restoreAccountCookies(resolveHostedApiBase(), hosted.account.id))) return null;
   return hosted.token;
 }
-
 export function listSavedAccountSessions(): SavedAccountSession[] {
   try {
     const raw = readDeploymentStorageItem(accountIndexKey);
@@ -176,28 +163,28 @@ export function listSavedAccountSessions(): SavedAccountSession[] {
     return [];
   }
 }
-
 export function readActiveSavedAccountSession(): SavedAccountSession | null {
   const activeAccountId = readActiveAccountId();
   if (!activeAccountId) return null;
   return listSavedAccountSessions().find((account) => account.id === activeAccountId) ?? null;
 }
-
 export async function updateSavedAccountSession(
   account: Omit<SavedAccountSession, "lastUsedAt">,
 ): Promise<void> {
-  if (!hasTauriInternals() || isNativeMobileBuild) return;
+  if (!hasTauriInternals()) return;
   const vault = await loadSecureVault();
   const session = vault.sessions.find(
     (item) => isCurrentDeploymentSession(item) && item.account.id === account.id,
   );
   if (!session) return;
-  session.account = { ...session.account, ...account };
+  session.account = {
+    ...session.account,
+    ...account,
+  };
   await persistSecureVault(vault);
 }
-
 export async function activateAccountSession(accountId: string): Promise<SavedAccountSession> {
-  if (!hasTauriInternals() || isNativeMobileBuild) {
+  if (!hasTauriInternals()) {
     throw new Error("Saved account switching is only available in the Misty desktop app.");
   }
   const vault = await loadSecureVault();
@@ -222,30 +209,21 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
   // Restore first: an unavailable cookie record must not activate a handle
   // whose requests would still use the previous account's cookies.
   await syncManagedAiToken(session.token);
-  session.account = { ...session.account, lastUsedAt: new Date().toISOString() };
+  session.account = {
+    ...session.account,
+    lastUsedAt: new Date().toISOString(),
+  };
   vault.activeAccountId = vaultAccountId(accountId);
   if (cachedToken !== session.token) accountSessionGeneration += 1;
   cachedToken = session.token;
   await persistSecureVault(vault);
   return session.account;
 }
-
 export async function clearAccountAuthToken(): Promise<SavedAccountSession | null> {
   accountSessionGeneration += 1;
   cachedToken = null;
   if (!hasTauriInternals()) return null;
   await syncManagedAiToken("");
-
-  if (isNativeMobileBuild) {
-    writeTokenStoredMarker(false);
-    try {
-      await remove(desktopTokenService, desktopTokenUser);
-    } catch (error) {
-      recordRemoveError(error);
-    }
-    return null;
-  }
-
   try {
     const vault = await loadSecureVault();
     const activeId = readActiveAccountId();
@@ -279,19 +257,6 @@ export async function deactivateActiveAccount(): Promise<void> {
   cachedToken = null;
   if (!hasTauriInternals()) return;
   await syncManagedAiToken("");
-
-  if (isNativeMobileBuild) {
-    // Mobile keeps a single raw token and no multi-account chooser, so signing
-    // out clears it outright.
-    writeTokenStoredMarker(false);
-    try {
-      await remove(desktopTokenService, desktopTokenUser);
-    } catch (error) {
-      recordRemoveError(error);
-    }
-    return;
-  }
-
   try {
     const vault = await loadSecureVault();
     if (vault.sessions.length === 0) return;
@@ -308,7 +273,7 @@ export async function deactivateActiveAccount(): Promise<void> {
  * reported through diagnostics; the active identity remains unchanged.
  */
 export async function removeSavedAccountSession(accountId: string): Promise<boolean> {
-  if (!accountId || !hasTauriInternals() || isNativeMobileBuild) return false;
+  if (!accountId || !hasTauriInternals()) return false;
   try {
     const vault = await loadSecureVault();
     if (
@@ -330,7 +295,6 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     return false;
   }
 }
-
 async function loadSecureVault(): Promise<SecureAccountVault> {
   if (cachedVault) return cachedVault;
   if (vaultReadPromise) return vaultReadPromise;
@@ -339,7 +303,6 @@ async function loadSecureVault(): Promise<SecureAccountVault> {
   });
   return vaultReadPromise;
 }
-
 async function readSecureVault(): Promise<SecureAccountVault> {
   let raw: string | null = null;
   try {
@@ -347,7 +310,6 @@ async function readSecureVault(): Promise<SecureAccountVault> {
   } catch {
     // A missing credential file is a normal signed-out state.
   }
-
   const parsed = parseSecureVault(raw);
   cachedVault = parsed.vault;
   if (parsed.migrated && parsed.vault.sessions.length > 0) {
@@ -359,8 +321,10 @@ async function readSecureVault(): Promise<SecureAccountVault> {
   }
   return parsed.vault;
 }
-
-function parseSecureVault(raw: string | null): { vault: SecureAccountVault; migrated: boolean } {
+function parseSecureVault(raw: string | null): {
+  vault: SecureAccountVault;
+  migrated: boolean;
+} {
   if (raw) {
     try {
       const value = JSON.parse(raw) as Partial<SecureAccountVault>;
@@ -369,7 +333,11 @@ function parseSecureVault(raw: string | null): { vault: SecureAccountVault; migr
           .filter(isSecureAccountSession)
           .filter((session) => session.token.startsWith("cookie-session:"));
         return {
-          vault: { version: 1, activeAccountId: String(value.activeAccountId ?? ""), sessions },
+          vault: {
+            version: 1,
+            activeAccountId: String(value.activeAccountId ?? ""),
+            sessions,
+          },
           migrated: false,
         };
       }
@@ -377,22 +345,32 @@ function parseSecureVault(raw: string | null): { vault: SecureAccountVault; migr
       // Existing releases stored the active token directly; migrate it below.
     }
   }
-
   const legacyAccount = readLegacyAccount();
   if (raw?.startsWith("cookie-session:") && legacyAccount) {
-    const account = { ...legacyAccount, lastUsedAt: new Date().toISOString() };
+    const account = {
+      ...legacyAccount,
+      lastUsedAt: new Date().toISOString(),
+    };
     return {
       vault: {
         version: 1,
         activeAccountId: `hosted:${account.id}`,
-        sessions: [{ account, token: raw, deploymentScope: "hosted" }],
+        sessions: [
+          {
+            account,
+            token: raw,
+            deploymentScope: "hosted",
+          },
+        ],
       },
       migrated: true,
     };
   }
-  return { vault: emptyVault(), migrated: false };
+  return {
+    vault: emptyVault(),
+    migrated: false,
+  };
 }
-
 async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
   cachedVault = vault;
   if (vault.sessions.length === 0) {
@@ -418,7 +396,6 @@ async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
   );
   writeTokenStoredMarker(true);
 }
-
 async function persistRawToken(token: string): Promise<void> {
   try {
     await store(token);
@@ -433,7 +410,6 @@ async function persistRawToken(token: string): Promise<void> {
   }
   await syncManagedAiToken(token);
 }
-
 function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | null {
   const preferredId = readActiveAccountId() || activeAccountIdForCurrentDeployment(vault);
   const sessions = currentDeploymentSessions(vault);
@@ -446,7 +422,6 @@ function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | 
     null
   );
 }
-
 function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: string): void {
   try {
     const indexKey = deploymentStorageKey(accountIndexKey);
@@ -459,7 +434,6 @@ function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: str
     // Account display metadata is best-effort; tokens remain in the native credential store.
   }
 }
-
 function readActiveAccountId(): string {
   try {
     return readDeploymentStorageItem(activeAccountKey) ?? "";
@@ -467,7 +441,6 @@ function readActiveAccountId(): string {
     return "";
   }
 }
-
 function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
   try {
     const raw = localStorage.getItem(legacyUserKey);
@@ -486,13 +459,11 @@ function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
     return null;
   }
 }
-
 function isSavedAccountSession(value: unknown): value is SavedAccountSession {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SavedAccountSession>;
   return Boolean(item.id && item.email && item.name && item.lastUsedAt);
 }
-
 function isSecureAccountSession(value: unknown): value is SecureAccountSession {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SecureAccountSession>;
@@ -503,23 +474,18 @@ function isSecureAccountSession(value: unknown): value is SecureAccountSession {
     (item.deploymentScope === undefined || typeof item.deploymentScope === "string"),
   );
 }
-
 function sessionDeploymentScope(session: SecureAccountSession): string {
   return session.deploymentScope || "hosted";
 }
-
 function isCurrentDeploymentSession(session: SecureAccountSession): boolean {
   return sessionDeploymentScope(session) === readDeploymentScope();
 }
-
 function currentDeploymentSessions(vault: SecureAccountVault): SecureAccountSession[] {
   return vault.sessions.filter(isCurrentDeploymentSession);
 }
-
 function vaultAccountId(accountId: string): string {
   return `${readDeploymentScope()}:${accountId}`;
 }
-
 function activeAccountIdForCurrentDeployment(vault: SecureAccountVault): string {
   const prefix = `${readDeploymentScope()}:`;
   if (vault.activeAccountId.startsWith(prefix)) return vault.activeAccountId.slice(prefix.length);
@@ -529,11 +495,13 @@ function activeAccountIdForCurrentDeployment(vault: SecureAccountVault): string 
   }
   return "";
 }
-
 function emptyVault(): SecureAccountVault {
-  return { version: 1, activeAccountId: "", sessions: [] };
+  return {
+    version: 1,
+    activeAccountId: "",
+    sessions: [],
+  };
 }
-
 function recordRemoveError(error: unknown): void {
   recordTokenDebugEvent({
     level: "error",
@@ -553,7 +521,6 @@ async function syncManagedAiToken(token: string): Promise<void> {
   const restored = await restoreAccountCookies(await resolveApiBase(), accountId);
   if (accountId && !restored) throw new SavedAccountSessionUnavailableError();
 }
-
 function writeTokenStoredMarker(value: boolean): void {
   try {
     if (value) localStorage.setItem(tokenStoredMarkerKey, "1");
@@ -562,7 +529,6 @@ function writeTokenStoredMarker(value: boolean): void {
     // The marker is non-secret. If storage is unavailable, keep the in-memory cache only.
   }
 }
-
 function errorDetail(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -572,7 +538,6 @@ function errorDetail(error: unknown): string {
     return "";
   }
 }
-
 function recordTokenDebugEvent(event: {
   level: "info" | "warn" | "error";
   scope: string;
@@ -584,16 +549,14 @@ function recordTokenDebugEvent(event: {
     recordClientDebugEvent(event);
   });
 }
-
 function tokenDebugEnabled(): boolean {
-  return !isNativeMobileBuild && (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
+  return import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1";
 }
-
 configureApiSession({
   isTransitioning: isAccountSessionTransitioning,
   // Desktop only: the browser's own cookies decide there. Unknown until the
   // keystore has been read, so startup requests still go out and restore it.
-  isSignedOut: () => hasTauriInternals() && !isNativeMobileBuild && cachedToken === null,
+  isSignedOut: () => hasTauriInternals() && cachedToken === null,
   readGeneration: readAccountSessionGeneration,
   readToken: async () => {
     await readAccountAuthToken();

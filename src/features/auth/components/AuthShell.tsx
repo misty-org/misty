@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 
 export default function AuthShell({ title, description, children, onBack }: AuthShellProps) {
   return (
-    <div className="relative flex min-h-full flex-col overflow-y-auto bg-charcoal-bg px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-[max(7rem,env(safe-area-inset-top))] sm:px-6 sm:pt-32">
+    <div className="relative flex min-h-full flex-col overflow-y-auto bg-charcoal-bg px-4 pb-24 pt-28 sm:px-6 sm:pt-32">
       {onBack ? (
         <Button
-          className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-10 text-cream-muted sm:left-7 sm:top-7"
+          className="absolute left-4 top-4 z-10 text-cream-muted sm:left-7 sm:top-7"
           size="icon"
           variant="ghost"
           type="button"

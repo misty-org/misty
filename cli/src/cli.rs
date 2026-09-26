@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::{
-    checks, config::Settings, desktop, environment, home, mobile, release, server, website,
+    checks, config::Settings, desktop, environment, home, release, server, website,
 };
 
 #[derive(Debug, Parser)]
@@ -43,8 +43,6 @@ enum Command {
     Home(Home),
     Check(Check),
     Desktop(Desktop),
-    /// Develop and package the Apple mobile app.
-    Mobile(Mobile),
     /// Run the documentation site.
     Docs(Docs),
     /// Run the public website.
@@ -143,12 +141,6 @@ struct Desktop {
 }
 
 #[derive(Debug, Args)]
-struct Mobile {
-    #[command(subcommand)]
-    command: MobileCommand,
-}
-
-#[derive(Debug, Args)]
 struct Website {
     #[command(subcommand)]
     command: WebsiteCommand,
@@ -190,82 +182,6 @@ enum DesktopCommand {
     Icons {
         #[command(subcommand)]
         command: IconCommand,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-enum MobileCommand {
-    /// Validate Xcode, Rust targets, Tauri, and the tracked Apple project.
-    Doctor,
-    /// List the iPhones, iPads, and simulators visible to Xcode.
-    Devices,
-    /// Open the generated Apple project in Xcode.
-    Open,
-    /// Install Rust targets and initialize Tauri's iOS project when absent.
-    Setup {
-        /// Refresh CocoaPods and other generated Apple dependencies.
-        #[arg(long)]
-        reinstall_deps: bool,
-        /// Do not let Tauri install missing Rust iOS targets.
-        #[arg(long)]
-        skip_targets_install: bool,
-    },
-    /// Run the iOS app with development hot reload.
-    Dev {
-        /// Xcode device name, such as "My iPhone".
-        #[arg(long)]
-        device: Option<String>,
-        /// Open the generated project in Xcode instead of launching directly.
-        #[arg(long)]
-        open: bool,
-        /// Use a particular local address for the mobile development server.
-        #[arg(long)]
-        host: Option<String>,
-        /// Compile the Rust application in release mode.
-        #[arg(long)]
-        release: bool,
-        /// Disable Rust source watching.
-        #[arg(long)]
-        no_watch: bool,
-    },
-    /// Run the built frontend on an iOS device without a development server.
-    Run {
-        /// Xcode device name, such as "My iPhone".
-        #[arg(long)]
-        device: Option<String>,
-        /// Open the generated project in Xcode instead of launching directly.
-        #[arg(long)]
-        open: bool,
-        /// Compile the Rust application in release mode.
-        #[arg(long)]
-        release: bool,
-        /// Disable Rust source watching.
-        #[arg(long)]
-        no_watch: bool,
-    },
-    /// Build an iOS device or simulator application.
-    Build {
-        /// Apple architecture to build.
-        #[arg(long, value_enum, default_value = "device")]
-        target: mobile::BuildTarget,
-        /// Produce a debug build.
-        #[arg(long)]
-        debug: bool,
-        /// Open the generated project in Xcode.
-        #[arg(long)]
-        open: bool,
-        /// Skip code signing (useful for simulator and CI verification).
-        #[arg(long)]
-        no_sign: bool,
-        /// App Store build number to embed.
-        #[arg(long)]
-        build_number: Option<String>,
-        /// Export a signed archive for the selected distribution method.
-        #[arg(long, value_enum)]
-        export_method: Option<mobile::ExportMethod>,
-        /// Disable interactive prompts.
-        #[arg(long)]
-        ci: bool,
     },
 }
 
@@ -520,65 +436,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 }
             },
         },
-        Command::Mobile(command) => match command.command {
-            MobileCommand::Doctor => mobile::doctor(&settings.workspace),
-            MobileCommand::Devices => mobile::devices(&settings.workspace),
-            MobileCommand::Open => mobile::open(&settings.workspace),
-            MobileCommand::Setup {
-                reinstall_deps,
-                skip_targets_install,
-            } => mobile::setup(&settings.workspace, reinstall_deps, skip_targets_install),
-            MobileCommand::Dev {
-                device,
-                open,
-                host,
-                release,
-                no_watch,
-            } => mobile::dev(
-                &settings.workspace,
-                mobile::DevOptions {
-                    device: device.as_deref(),
-                    open,
-                    host: host.as_deref(),
-                    release,
-                    no_watch,
-                },
-            ),
-            MobileCommand::Run {
-                device,
-                open,
-                release,
-                no_watch,
-            } => mobile::run(
-                &settings.workspace,
-                mobile::RunOptions {
-                    device: device.as_deref(),
-                    open,
-                    release,
-                    no_watch,
-                },
-            ),
-            MobileCommand::Build {
-                target,
-                debug,
-                open,
-                no_sign,
-                build_number,
-                export_method,
-                ci,
-            } => mobile::build(
-                &settings.workspace,
-                mobile::BuildOptions {
-                    target,
-                    debug,
-                    open,
-                    no_sign,
-                    build_number: build_number.as_deref(),
-                    export_method,
-                    ci,
-                },
-            ),
-        },
+
         Command::Docs(command) => match command.command {
             DocsCommand::Dev => website::docs(&settings.workspace),
             DocsCommand::Build => website::docs_build(&settings.workspace),
@@ -675,10 +533,7 @@ fn load_command_environment(command: &Command, settings: &Settings) -> Result<()
             DesktopCommand::Build => &["common.env", "release.env"],
             _ => &["common.env"],
         },
-        Command::Mobile(mobile) => match mobile.command {
-            MobileCommand::Build { .. } => &["common.env", "release.env"],
-            _ => &["common.env"],
-        },
+
         Command::Server(server) => match &server.command {
             ServerCommand::Worker { .. } | ServerCommand::R2 { .. } => {
                 &["common.env", "cloudflare.env"]
@@ -858,39 +713,7 @@ mod tests {
             vec!["misty", "desktop", "build"],
             vec!["misty", "desktop", "clean", "--apply"],
             vec!["misty", "desktop", "icons", "sync"],
-            vec!["misty", "mobile", "doctor"],
-            vec!["misty", "mobile", "devices"],
-            vec!["misty", "mobile", "open"],
-            vec!["misty", "mobile", "setup", "--reinstall-deps"],
-            vec![
-                "misty",
-                "mobile",
-                "dev",
-                "--device",
-                "Matthew's iPhone",
-                "--host",
-                "192.168.1.20",
-            ],
-            vec!["misty", "mobile", "dev", "--open"],
-            vec!["misty", "mobile", "run", "--release"],
-            vec![
-                "misty",
-                "mobile",
-                "build",
-                "--target",
-                "simulator",
-                "--no-sign",
-            ],
-            vec![
-                "misty",
-                "mobile",
-                "build",
-                "--build-number",
-                "42",
-                "--export-method",
-                "app-store-connect",
-                "--ci",
-            ],
+
             vec!["misty", "docs", "dev"],
             vec!["misty", "website", "dev"],
             vec!["misty", "server", "up", "--detach", "--no-build"],
@@ -961,8 +784,4 @@ mod tests {
         assert!(Cli::try_parse_from(["misty", "docs"]).is_err());
     }
 
-    #[test]
-    fn mobile_requires_an_explicit_subcommand() {
-        assert!(Cli::try_parse_from(["misty", "mobile"]).is_err());
-    }
 }

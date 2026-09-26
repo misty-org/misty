@@ -30,7 +30,7 @@ pub(crate) mod cloud_handoff;
 pub mod code_lsp;
 pub mod command_defaults;
 pub mod commands;
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 pub mod connected_devices;
 pub mod credential_store;
 pub mod devices;
@@ -50,13 +50,12 @@ pub mod media_search;
 pub mod metadata;
 pub mod misty;
 pub mod misty_template;
-pub mod mobile_cache;
 pub mod native_clipboard;
 pub mod operation_queue;
 pub mod paths;
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 pub mod peer_files;
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 pub mod peer_identity;
 #[cfg(desktop)]
 mod plugin_routes;
@@ -143,3 +142,4 @@ pub mod cursor_companion;
 
 #[cfg(target_os = "macos")]
 pub mod browser_site_permissions;
+

@@ -1,28 +1,22 @@
-import type { ExplorerSidebarRuntime } from "./explorerSidebar/ExplorerSidebarRuntime";
 import { providerIconForType } from "@/shared/assets/icons";
 import {
   AssetIcon,
   Button,
+  cn,
   Collapsible,
   CollapsibleContent,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  cn,
 } from "@/shared/ui";
-import {
-  HardDrive,
-  Pencil,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  Unplug,
-} from "lucide-react";
+import { HardDrive, Pencil, Plus, Search, SlidersHorizontal, Unplug } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
+import type { ExplorerSidebarRuntime } from "./explorerSidebar/ExplorerSidebarRuntime";
 import { SidebarQuickAccessSectionView } from "./explorerSidebar/SidebarQuickAccessSectionView";
 import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
+import type { SidebarDeviceEntry } from "./ExplorerSidebarSupport";
 import {
   buildDeviceEntries,
   deviceCapacityLabel,
@@ -35,15 +29,12 @@ import {
   smartFolderQueryFromRules,
   visibleSmartFolderRules,
 } from "./ExplorerSidebarSupport";
-import type { SidebarDeviceEntry } from "./ExplorerSidebarSupport";
-export type {
-  AndroidLocalGrantRequest,
-  ExplorerSidebarProps,
-} from "../model/interfaces/components/ExplorerSidebar";
+export type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
 export type { QuickAccessItem } from "../model/types/components/ExplorerSidebar";
-
 export const ExplorerSidebarView = memo(function ExplorerSidebarView(
-  props: ExplorerSidebarProps & { runtime: ExplorerSidebarRuntime },
+  props: ExplorerSidebarProps & {
+    runtime: ExplorerSidebarRuntime;
+  },
 ) {
   const {
     collapsedSections,
@@ -52,9 +43,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
     setHiddenQuickAccessPaths,
     toggleSection,
   } = props.runtime.useSidebarPreferences();
-  const [deviceActionError, setDeviceActionError] = useState<string | null>(
-    null,
-  );
+  const [deviceActionError, setDeviceActionError] = useState<string | null>(null);
   const [localDevicesOpen, setLocalDevicesOpen] = useState(true);
   const {
     savedSearches,
@@ -77,7 +66,6 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
     () => buildDeviceEntries(props.devices, deviceCustomization),
     [deviceCustomization, props.devices],
   );
-
   return (
     <aside className={sidebarStyles.root} data-explorer-scroll-container>
       <SidebarQuickAccessSectionView
@@ -116,7 +104,10 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                 error={smartFolderError}
                 scope="files:sidebar:collections"
                 title="File collection needs attention"
-                target={{ kind: "workspace-tool", tool: "files" }}
+                target={{
+                  kind: "workspace-tool",
+                  tool: "files",
+                }}
               />
             ) : null}
             {smartFoldersLoading && savedSearches.length === 0 ? (
@@ -128,15 +119,9 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
             {savedSearches.map((search) => {
               const query =
                 search.query.trim() ||
-                smartFolderQueryFromRules(
-                  search.rules,
-                  smartFolderMatchMode(search.rules),
-                );
+                smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
               return (
-                <div
-                  className={`${sidebarStyles.pinnedRow} group/pin`}
-                  key={search.id}
-                >
+                <div className={`${sidebarStyles.pinnedRow} group/pin`} key={search.id}>
                   <Button
                     type="button"
                     variant="ghost"
@@ -151,8 +136,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                         {search.name}
                       </span>
                       <small className={sidebarStyles.smartMeta}>
-                        {query ||
-                          `${visibleSmartFolderRules(search.rules).length} rules`}
+                        {query || `${visibleSmartFolderRules(search.rules).length} rules`}
                       </small>
                     </span>
                   </Button>
@@ -173,10 +157,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
         ) : null}
       </section>
 
-      <Collapsible
-        className={sidebarStyles.section}
-        open={!collapsedSections.remote}
-      >
+      <Collapsible className={sidebarStyles.section} open={!collapsedSections.remote}>
         <SidebarSectionHeader
           title="Remote"
           collapsed={collapsedSections.remote}
@@ -223,8 +204,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                 const path = joinPath(props.mountRoot, remote.name);
                 const providerIcon = providerIconForType(remote.type);
                 const selected =
-                  props.activePath === path ||
-                  props.activePath.startsWith(`${path}/`);
+                  props.activePath === path || props.activePath.startsWith(`${path}/`);
                 return (
                   <props.runtime.DropTarget
                     key={`${remote.type}:${remote.name}`}
@@ -246,11 +226,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                         onClick={() => props.onNavigate(path)}
                       >
                         <span className={sidebarStyles.remoteIcon}>
-                          <AssetIcon
-                            src={providerIcon.src}
-                            color={providerIcon.color}
-                            size={24}
-                          />
+                          <AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} />
                         </span>
                         <span className="min-w-0 truncate">{remote.name}</span>
                       </Button>
@@ -263,10 +239,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
         </CollapsibleContent>
       </Collapsible>
 
-      <Collapsible
-        className={sidebarStyles.section}
-        open={!collapsedSections.devices}
-      >
+      <Collapsible className={sidebarStyles.section} open={!collapsedSections.devices}>
         <SidebarSectionHeader
           title="Devices"
           collapsed={collapsedSections.devices}
@@ -280,23 +253,15 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
           >
             {deviceEntries.length === 0 ? (
               <div className={sidebarStyles.deviceGroupEmpty}>
-                {props.devicesLoading
-                  ? "Loading drives..."
-                  : "No local devices"}
+                {props.devicesLoading ? "Loading drives..." : "No local devices"}
               </div>
             ) : (
               <div className={sidebarStyles.list}>
                 {deviceEntries.map((device) => {
-                  const usedBytes = Math.max(
-                    0,
-                    device.totalBytes - device.freeBytes,
-                  );
+                  const usedBytes = Math.max(0, device.totalBytes - device.freeBytes);
                   const usedRatio =
                     device.totalBytes > 0
-                      ? Math.min(
-                          100,
-                          Math.round((usedBytes / device.totalBytes) * 100),
-                        )
+                      ? Math.min(100, Math.round((usedBytes / device.totalBytes) * 100))
                       : 0;
                   return (
                     <ContextMenu key={device.id}>
@@ -307,9 +272,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                               id={`sidebar:device:${device.id}`}
                               path={device.mountPath}
                               springLoad
-                              onSpringLoad={() =>
-                                props.onNavigate(device.mountPath)
-                              }
+                              onSpringLoad={() => props.onNavigate(device.mountPath)}
                             >
                               <Button
                                 type="button"
@@ -317,19 +280,12 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                                 className={cn(
                                   sidebarStyles.treeSurface,
                                   sidebarStyles.deviceButton,
-                                  pathIsInside(
-                                    props.activePath,
-                                    device.mountPath,
-                                  ) && sidebarStyles.itemSelected,
+                                  pathIsInside(props.activePath, device.mountPath) &&
+                                    sidebarStyles.itemSelected,
                                 )}
-                                onClick={() =>
-                                  props.onNavigate(device.mountPath)
-                                }
+                                onClick={() => props.onNavigate(device.mountPath)}
                               >
-                                <span
-                                  className={sidebarStyles.deviceIcon}
-                                  aria-hidden="true"
-                                >
+                                <span className={sidebarStyles.deviceIcon} aria-hidden="true">
                                   <HardDrive size={24} strokeWidth={1.9} />
                                 </span>
                                 <span className={sidebarStyles.deviceCopy}>
@@ -344,15 +300,12 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                                     )}
                                   </small>
                                   {device.totalBytes > 0 ? (
-                                    <span
-                                      className={sidebarStyles.deviceMeter}
-                                      aria-hidden="true"
-                                    >
+                                    <span className={sidebarStyles.deviceMeter} aria-hidden="true">
                                       <i
-                                        className={
-                                          sidebarStyles.deviceMeterFill
-                                        }
-                                        style={{ width: `${usedRatio}%` }}
+                                        className={sidebarStyles.deviceMeterFill}
+                                        style={{
+                                          width: `${usedRatio}%`,
+                                        }}
                                       />
                                     </span>
                                   ) : null}
@@ -366,11 +319,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                         <ContextMenuItem
                           disabled={!canUnmountMountedDevice(device)}
                           onSelect={() =>
-                            void unmountMountedDevice(
-                              device,
-                              setDeviceActionError,
-                              props.runtime,
-                            )
+                            void unmountMountedDevice(device, setDeviceActionError, props.runtime)
                           }
                         >
                           <Unplug size={15} />
@@ -393,7 +342,10 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                 error={deviceActionError}
                 scope="files:sidebar:device"
                 title="Device action could not be completed"
-                target={{ kind: "workspace-tool", tool: "files" }}
+                target={{
+                  kind: "workspace-tool",
+                  tool: "files",
+                }}
               />
             ) : null}
           </SidebarDeviceGroup>
@@ -419,10 +371,8 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
     </aside>
   );
 });
-
 export function canUnmountMountedDevice(device: SidebarDeviceEntry): boolean {
-  const macos =
-    /mac/i.test(navigator.platform) || /mac os/i.test(navigator.userAgent);
+  const macos = /mac/i.test(navigator.platform) || /mac os/i.test(navigator.userAgent);
   return (
     macos &&
     !device.custom &&
@@ -431,7 +381,6 @@ export function canUnmountMountedDevice(device: SidebarDeviceEntry): boolean {
     (device.isRemovable || device.isExternal || device.isNetwork)
   );
 }
-
 async function unmountMountedDevice(
   device: SidebarDeviceEntry,
   setError: (message: string | null) => void,

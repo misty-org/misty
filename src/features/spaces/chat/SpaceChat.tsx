@@ -1,28 +1,32 @@
-import { useSocialAi as useAiSurfaceAdapter } from "@/features/spaces/chat/socialRuntime";
-export type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
 import type { SocialProviderId } from "@/api/social";
-import { useSocialConnections as useConnectionsStore } from "@/features/spaces/chat/socialRuntime";
-import { openSocialAuthorization as openProviderAuthorizationLink } from "@/features/spaces/chat/socialRuntime";
+import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
+import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
+import type { MistyPickerSource } from "@/features/picker";
+import {
+  openSocialAuthorization as openProviderAuthorizationLink,
+  socialApi as spacesApi,
+  useSocialAi as useAiSurfaceAdapter,
+  useSocialAuth as useAuth,
+  useSocialConnections as useConnectionsStore,
+  useSocialSetup as useSetupStore,
+  useSocialDraft as useSpaceChatDraft,
+  useSocialTitle as useWorkspaceTabTitle,
+} from "@/features/spaces/chat/socialRuntime";
+import { SpaceSetupCards } from "@/features/spaces/components/SpaceSetupCards";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
-import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
-import { Lightbulb, LightbulbOff } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useSocialAuth as useAuth } from "@/features/spaces/chat/socialRuntime";
-import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import { useSocialSetup as useSetupStore } from "@/features/spaces/chat/socialRuntime";
-import type { MistyPickerSource } from "@/features/picker";
-import { SpaceSetupCards } from "@/features/spaces/components/SpaceSetupCards";
-import { useSocialTitle as useWorkspaceTabTitle } from "@/features/spaces/chat/socialRuntime";
-import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import {
+  socialProvider as normalizeSocialProvider,
+  socialConversationPath,
+  socialProviderPath,
+} from "../social/socialRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { ChatPresencePill } from "./components/ChatPresencePill";
 import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./components/SpaceChatComposer";
-import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
-import { useSocialDraft as useSpaceChatDraft } from "@/features/spaces/chat/socialRuntime";
 import { SpaceChatThread } from "./components/SpaceChatThread";
 import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
 import { useChatSuggestions } from "./hooks/useChatSuggestions";
@@ -32,12 +36,7 @@ import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
-import {
-  socialConversationPath,
-  socialProvider as normalizeSocialProvider,
-  socialProviderPath,
-} from "../social/socialRoute";
-
+export type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
 export function SpaceSocial({
   spaceId,
   spaceName,
@@ -49,7 +48,6 @@ export function SpaceSocial({
   provider: SocialProviderId;
   workspaceTabId?: string;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
@@ -58,7 +56,6 @@ export function SpaceSocial({
   const conversationId = searchParams.get("conversation") ?? "";
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastReadReceiptRef = useRef("");
-
   const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
   // Misty opens the Space's Everyone chat. Only external providers need a
   // conversation selected before they can show their landing page.
@@ -110,18 +107,17 @@ export function SpaceSocial({
     accountConnections.some(
       (connection) => normalizeSocialProvider(connection.provider) === provider,
     );
-
   useEffect(() => {
     if (conversationId || !resolvesProviderLanding || !landingConversation) return;
-    navigate(socialConversationPath(spaceId, provider, landingConversation.id), { replace: true });
+    navigate(socialConversationPath(spaceId, provider, landingConversation.id), {
+      replace: true,
+    });
   }, [conversationId, landingConversation, navigate, provider, resolvesProviderLanding, spaceId]);
-
   useEffect(() => {
     if (provider === "misty" || !user?.id) return;
     setConnectionsAccount(user.id);
     void loadConnections();
   }, [loadConnections, provider, setConnectionsAccount, user?.id]);
-
   const connectProvider = async () => {
     if (provider === "misty") return;
     clearConnectionsError();
@@ -136,7 +132,6 @@ export function SpaceSocial({
       // The connections store retains the user-safe failure message rendered below.
     }
   };
-
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
   const suggestions = useChatSuggestions({
@@ -172,11 +167,15 @@ export function SpaceSocial({
     () => [...scope.members.map((member) => member.name)],
     [scope.members],
   );
-
   const actions = useSpaceChatMessageActions({
     spaceId,
     conversationId,
-    currentUser: user ? { id: user.id, name: user.name } : undefined,
+    currentUser: user
+      ? {
+          id: user.id,
+          name: user.name,
+        }
+      : undefined,
     activeConversation: scope.activeConversation,
     members: scope.members,
     draft,
@@ -188,7 +187,6 @@ export function SpaceSocial({
     storeDeleteMessage: store.deleteMessage,
     storeToggleReaction: store.toggleMessageReaction,
   });
-
   const messagesLoading = conversationId
     ? conversationChat.loading && conversationChat.messages.length === 0
     : (store.messageLoadingBySpace[spaceId] ?? store.loading) && scope.defaultMessages.length === 0;
@@ -331,7 +329,6 @@ export function SpaceSocial({
     store.referenceOnly,
     user?.id,
   ]);
-
   useEffect(() => {
     if (!activeProviderConversation) return;
     const last = scope.messages[scope.messages.length - 1];
@@ -353,17 +350,6 @@ export function SpaceSocial({
     spaceId,
     store.referenceOnly,
   ]);
-
-  const mobileBack = useCallback(
-    () => navigate(socialProviderPath(spaceId, provider), { replace: true }),
-    [navigate, provider, spaceId],
-  );
-  useMobileSurfaceChrome({
-    title: scope.activeConversation?.title || socialProviderLabel(provider),
-    level: conversationId ? "detail" : "root",
-    onBack: conversationId ? mobileBack : undefined,
-  });
-
   if (!conversationId && resolvesProviderLanding) {
     if (conversationChat.error) {
       return (
@@ -398,7 +384,11 @@ export function SpaceSocial({
             <Button
               type="button"
               variant="outline"
-              onClick={() => void loadConnections({ force: true })}
+              onClick={() =>
+                void loadConnections({
+                  force: true,
+                })
+              }
             >
               Try again
             </Button>
@@ -448,7 +438,6 @@ export function SpaceSocial({
       />
     );
   }
-
   if (conversationId && conversationChat.error && !scope.activeConversation) {
     return (
       <ErrorState
@@ -463,7 +452,6 @@ export function SpaceSocial({
       />
     );
   }
-
   if (conversationId && conversationChat.loading && !scope.activeConversation) {
     return (
       <LoadingState
@@ -473,7 +461,6 @@ export function SpaceSocial({
       />
     );
   }
-
   if (!activeProviderConversation) {
     return (
       <EmptyState
@@ -484,7 +471,11 @@ export function SpaceSocial({
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate(socialProviderPath(spaceId, provider), { replace: true })}
+            onClick={() =>
+              navigate(socialProviderPath(spaceId, provider), {
+                replace: true,
+              })
+            }
           >
             Back to {socialProviderLabel(provider)}
           </Button>
@@ -492,14 +483,11 @@ export function SpaceSocial({
       />
     );
   }
-
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
       <header
         className={
-          mobile
-            ? "sr-only"
-            : "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5"
+          "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5"
         }
       >
         <h1 className="m-0 shrink-0 text-sm font-semibold">
@@ -594,7 +582,6 @@ export function SpaceSocial({
     </div>
   );
 }
-
 export function shouldShowSocialConversation(
   provider: SocialProviderId,
   conversationId: string,
@@ -603,7 +590,6 @@ export function shouldShowSocialConversation(
   if (!conversationId) return provider === "misty";
   return conversationProvider === provider;
 }
-
 export function socialLandingConversation(
   provider: SocialProviderId,
   conversations: Array<{
@@ -618,10 +604,8 @@ export function socialLandingConversation(
     (conversation) => conversation.origin === provider && !conversation.direct_agent_id,
   );
 }
-
 function socialProviderLabel(provider: SocialProviderId): string {
   if (provider === "x") return "X";
   return provider.charAt(0).toUpperCase() + provider.slice(1);
 }
-
 export const SpaceChat = SpaceSocial;

@@ -1,11 +1,9 @@
-import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./roadmapRuntime";
 import type {
   SpaceRoadmapSaveState,
   SpaceRoadmapSnapshot,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { Button, cn } from "@/shared/ui";
-import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import {
   ArrowLeft,
   Check,
@@ -34,14 +32,13 @@ import { RoadmapInspector } from "./RoadmapInspector";
 import type { RoadmapPaletteItem } from "./roadmapNodeCatalog";
 import { RoadmapNodeDrawer } from "./RoadmapNodeDrawer";
 import { RoadmapOutline } from "./RoadmapOutline";
+import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./roadmapRuntime";
 import { roadmapEndpoint } from "./RoadmapWorkspaceHelpers";
-
 export type RoadmapMutation = <T>(
   action: (version: number) => Promise<T>,
   apply?: (current: SpaceRoadmapSnapshot, result: T) => SpaceRoadmapSnapshot,
   optimistic?: (current: SpaceRoadmapSnapshot) => SpaceRoadmapSnapshot,
 ) => Promise<void>;
-
 export function RoadmapEditor(props: {
   spaceId: string;
   canManage: boolean;
@@ -52,20 +49,37 @@ export function RoadmapEditor(props: {
   selectedId: string;
   expandedGoalIds: Set<string>;
   nodeDrawerOpen: boolean;
-  placementRequest?: { paletteId: string; token: string };
+  placementRequest?: {
+    paletteId: string;
+    token: string;
+  };
   palette: RoadmapPaletteItem[];
   navigate: NavigateFunction;
   mutate: RoadmapMutation;
   load: () => Promise<void>;
   retrySave: () => Promise<void>;
   archiveRoadmap: () => Promise<void>;
-  addPaletteItem: (item: RoadmapPaletteItem, position?: { x: number; y: number }) => void;
+  addPaletteItem: (
+    item: RoadmapPaletteItem,
+    position?: {
+      x: number;
+      y: number;
+    },
+  ) => void;
   saveLayout: (nodes: RoadmapNode[]) => void;
   setSaveState: Dispatch<SetStateAction<SpaceRoadmapSaveState>>;
   setSelectedId: Dispatch<SetStateAction<string>>;
   setExpandedGoalIds: Dispatch<SetStateAction<Set<string>>>;
   setNodeDrawerOpen: Dispatch<SetStateAction<boolean>>;
-  setPlacementRequest: Dispatch<SetStateAction<{ paletteId: string; token: string } | undefined>>;
+  setPlacementRequest: Dispatch<
+    SetStateAction<
+      | {
+          paletteId: string;
+          token: string;
+        }
+      | undefined
+    >
+  >;
 }) {
   const {
     spaceId,
@@ -92,11 +106,15 @@ export function RoadmapEditor(props: {
     setNodeDrawerOpen,
     setPlacementRequest,
   } = props;
-  const presentation = useSurfacePresentation();
-  const mobile = presentation !== "desktop";
-  const [inspectorAnchor, setInspectorAnchor] = useState<{ x: number; y: number }>();
+  const [inspectorAnchor, setInspectorAnchor] = useState<{
+    x: number;
+    y: number;
+  }>();
   const [dailyPlanOpen, setDailyPlanOpen] = useState(true);
-  const [focusRequest, setFocusRequest] = useState<{ id: string; token: string }>();
+  const [focusRequest, setFocusRequest] = useState<{
+    id: string;
+    token: string;
+  }>();
   const editorRef = useRef<HTMLDivElement | null>(null);
   const [editorBounds, setEditorBounds] = useState(() => ({
     left: 0,
@@ -107,15 +125,6 @@ export function RoadmapEditor(props: {
     height: typeof window === "undefined" ? 900 : window.innerHeight,
   }));
   const { api: spacesApi, focused: workspaceFocused } = useRoadmapRuntime();
-  const backToRoadmaps = useCallback(
-    () => navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`),
-    [navigate, spaceId],
-  );
-  useMobileSurfaceChrome({
-    title: snapshot.roadmap.name,
-    level: "detail",
-    onBack: backToRoadmaps,
-  });
   useShortcutHandler(
     "roadmap.create",
     () => setNodeDrawerOpen(true),
@@ -131,7 +140,13 @@ export function RoadmapEditor(props: {
       }),
     [setExpandedGoalIds],
   );
-  const selectForEditing = (id: string, anchor?: { x: number; y: number }) => {
+  const selectForEditing = (
+    id: string,
+    anchor?: {
+      x: number;
+      y: number;
+    },
+  ) => {
     setSelectedId(id);
     setInspectorAnchor(id ? anchor : undefined);
   };
@@ -169,7 +184,7 @@ export function RoadmapEditor(props: {
   );
   return (
     <div ref={editorRef} className="flex h-full min-h-0 flex-col bg-charcoal-bg">
-      {!mobile ? (
+      {
         <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
           <Button
             type="button"
@@ -185,7 +200,10 @@ export function RoadmapEditor(props: {
             variant="ghost"
             className="h-8 min-w-0 max-w-md justify-start px-2 text-left"
             onClick={(event) =>
-              selectForEditing(snapshot.roadmap.id, { x: event.clientX, y: event.clientY })
+              selectForEditing(snapshot.roadmap.id, {
+                x: event.clientX,
+                y: event.clientY,
+              })
             }
           >
             <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">
@@ -217,19 +235,22 @@ export function RoadmapEditor(props: {
             <RefreshCcw className={`size-4 ${saveState === "saving" ? "animate-spin" : ""}`} />
           </Button>
         </header>
-      ) : null}
+      }
       {error ? (
         <ErrorBanner message={error} onRetry={() => void retrySave()} retryLabel="Retry saving" />
       ) : null}
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        {!mobile ? (
+        {
           <RoadmapNodeDrawer
             open={nodeDrawerOpen}
             canManage={canManage}
             definitions={snapshot.node_definitions}
             onClose={() => setNodeDrawerOpen(false)}
             onAdd={(item) =>
-              setPlacementRequest({ paletteId: item.id, token: crypto.randomUUID() })
+              setPlacementRequest({
+                paletteId: item.id,
+                token: crypto.randomUUID(),
+              })
             }
             onCreateDefinition={async (definition) => {
               await spacesApi.createRoadmapNodeDefinition(spaceId, definition);
@@ -244,21 +265,9 @@ export function RoadmapEditor(props: {
               await load();
             }}
           />
-        ) : null}
+        }
         <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
-          {mobile ? (
-            <RoadmapOutline
-              mobile
-              snapshot={snapshot}
-              selectedId={selectedId}
-              onSelect={(id) => selectForEditing(id)}
-              onOpenTask={(taskId) =>
-                navigate(
-                  `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
-                )
-              }
-            />
-          ) : (
+          {
             <RoadmapCanvas
               snapshot={snapshot}
               selectedId={selectedId}
@@ -298,7 +307,10 @@ export function RoadmapEditor(props: {
                       ),
                     (current, result) => ({
                       ...current,
-                      roadmap: { ...current.roadmap, graph_version: result.graph_version },
+                      roadmap: {
+                        ...current.roadmap,
+                        graph_version: result.graph_version,
+                      },
                       edges: [...current.edges, result.edge],
                     }),
                   );
@@ -375,8 +387,8 @@ export function RoadmapEditor(props: {
                   void mutate((version) => spacesApi.deleteRoadmapEdge(spaceId, edge, version));
               }}
             />
-          )}
-          {!mobile ? (
+          }
+          {
             <RoadmapOutline
               snapshot={snapshot}
               selectedId={selectedId}
@@ -387,9 +399,9 @@ export function RoadmapEditor(props: {
                 )
               }
             />
-          ) : null}
+          }
         </div>
-        {dailyPlanOpen && !mobile ? (
+        {dailyPlanOpen ? (
           <RoadmapExecutionRail
             snapshot={snapshot}
             selectedId={selectedId}
@@ -397,7 +409,10 @@ export function RoadmapEditor(props: {
             onFocus={(id) => {
               setSelectedId(id);
               setInspectorAnchor(undefined);
-              setFocusRequest({ id, token: crypto.randomUUID() });
+              setFocusRequest({
+                id,
+                token: crypto.randomUUID(),
+              });
             }}
             onOpenTask={(taskId) =>
               navigate(
@@ -407,7 +422,7 @@ export function RoadmapEditor(props: {
           />
         ) : null}
       </div>
-      {!mobile ? (
+      {
         <footer className="flex h-10 shrink-0 items-center border-t border-charcoal-border bg-charcoal-bg px-2">
           <Button
             type="button"
@@ -442,56 +457,27 @@ export function RoadmapEditor(props: {
             )}
           </Button>
         </footer>
-      ) : (
-        <footer className="flex min-h-14 shrink-0 items-center gap-2 border-t border-charcoal-border bg-charcoal-bg px-3 pb-[env(safe-area-inset-bottom)]">
-          <Button
-            className="min-h-11 flex-1"
-            variant="outline"
-            onClick={() => setSelectedId(snapshot.roadmap.id)}
-          >
-            Roadmap settings
-          </Button>
-          <SaveStatus state={saveState} />
-          <Button
-            className="size-11"
-            size="icon"
-            variant="ghost"
-            aria-label="Refresh roadmap"
-            onClick={() => void load()}
-          >
-            <RefreshCcw className={cn("size-4", saveState === "saving" && "animate-spin")} />
-          </Button>
-        </footer>
-      )}
+      }
       {selectedId ? (
         <div
           className={cn(
             "fixed z-50 overflow-auto bg-charcoal-card",
-            mobile
-              ? "inset-0 h-dvh w-screen pt-[env(safe-area-inset-top)]"
-              : "max-h-[min(540px,calc(100vh-32px))] w-[min(344px,calc(100vw-32px))] rounded-xl shadow-xl ring-1 ring-cream/10",
+            "max-h-[min(540px,calc(100vh-32px))] w-[min(344px,calc(100vw-32px))] rounded-xl shadow-xl ring-1 ring-cream/10",
           )}
-          style={
-            mobile
-              ? undefined
-              : {
-                  left: inspectorLeft,
-                  top: inspectorTop,
-                  width: inspectorWidth,
-                  maxHeight: inspectorHeight,
-                }
-          }
-          data-popup-surface={!mobile ? "" : undefined}
+          style={{
+            left: inspectorLeft,
+            top: inspectorTop,
+            width: inspectorWidth,
+            maxHeight: inspectorHeight,
+          }}
+          data-popup-surface={""}
           role="dialog"
           aria-label="Edit roadmap selection"
         >
           <Button
             size="icon"
             variant="ghost"
-            className={cn(
-              "absolute right-2 z-10 rounded-full",
-              mobile ? "top-[max(8px,env(safe-area-inset-top))] size-11" : "top-2 size-7",
-            )}
+            className={cn("absolute right-2 z-10 rounded-full", "top-2 size-7")}
             aria-label="Close editor"
             onClick={() => selectForEditing("")}
           >
@@ -508,7 +494,10 @@ export function RoadmapEditor(props: {
                 (version) => spacesApi.updateRoadmapMilestone(spaceId, value, version),
                 (current, result) => ({
                   ...current,
-                  roadmap: { ...current.roadmap, graph_version: result.graph_version },
+                  roadmap: {
+                    ...current.roadmap,
+                    graph_version: result.graph_version,
+                  },
                   milestones: current.milestones.map((item) =>
                     item.id === result.milestone.id
                       ? {
@@ -542,7 +531,10 @@ export function RoadmapEditor(props: {
                 (version) => spacesApi.updateRoadmapGoal(spaceId, value, version, manual),
                 (current, result) => ({
                   ...current,
-                  roadmap: { ...current.roadmap, graph_version: result.graph_version },
+                  roadmap: {
+                    ...current.roadmap,
+                    graph_version: result.graph_version,
+                  },
                   goals: current.goals.map((item) =>
                     item.id === result.goal.id
                       ? {
@@ -617,7 +609,10 @@ export function RoadmapEditor(props: {
                 (version) => spacesApi.updateRoadmapNode(spaceId, value, version),
                 (current, result) => ({
                   ...current,
-                  roadmap: { ...current.roadmap, graph_version: result.graph_version },
+                  roadmap: {
+                    ...current.roadmap,
+                    graph_version: result.graph_version,
+                  },
                   nodes: current.nodes.map((item) =>
                     item.id === result.node.id ? result.node : item,
                   ),
@@ -646,7 +641,10 @@ export function RoadmapEditor(props: {
                 (version) => spacesApi.saveRoadmapEdge(spaceId, snapshot.roadmap.id, edge, version),
                 (current, result) => ({
                   ...current,
-                  roadmap: { ...current.roadmap, graph_version: result.graph_version },
+                  roadmap: {
+                    ...current.roadmap,
+                    graph_version: result.graph_version,
+                  },
                   edges: current.edges.map((item) =>
                     item.id === result.edge.id ? result.edge : item,
                   ),
@@ -671,8 +669,14 @@ export function RoadmapEditor(props: {
             onUpdateRoadmap={(roadmap) =>
               void mutate(
                 (version) =>
-                  spacesApi.updateRoadmap(spaceId, { ...roadmap, graph_version: version }),
-                (current, result) => ({ ...current, roadmap: result }),
+                  spacesApi.updateRoadmap(spaceId, {
+                    ...roadmap,
+                    graph_version: version,
+                  }),
+                (current, result) => ({
+                  ...current,
+                  roadmap: result,
+                }),
                 (current) => ({
                   ...current,
                   roadmap: {
@@ -690,7 +694,6 @@ export function RoadmapEditor(props: {
     </div>
   );
 }
-
 function SaveStatus({ state }: { state: SpaceRoadmapSaveState }) {
   const failed = state === "unsaved" || state === "conflict";
   const label =
@@ -718,7 +721,6 @@ function SaveStatus({ state }: { state: SpaceRoadmapSaveState }) {
     </span>
   );
 }
-
 export function ErrorBanner({
   message,
 }: {

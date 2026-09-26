@@ -8,7 +8,6 @@ mod development;
 mod diagnostics;
 mod environment;
 mod home;
-mod mobile;
 mod process;
 mod release;
 mod server;

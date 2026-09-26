@@ -1,10 +1,14 @@
-import { useActivityStore } from "./useActivityStore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  nativeNotificationPermission,
+  publishNativeActivity,
+  requestNativeNotificationPermission,
+  syncNativeBadge,
+} from "./nativeNotifications";
 import type { ActivityItem } from "./types";
-
+import { useActivityStore } from "./useActivityStore";
 const mocks = vi.hoisted(() => ({
   tauri: true,
-  mobile: false,
   focused: false,
   granted: true,
   requestedPermission: "granted" as NotificationPermission,
@@ -22,49 +26,36 @@ const mocks = vi.hoisted(() => ({
   isFocused: vi.fn(async () => false),
   setBadgeCount: vi.fn(async () => undefined),
 }));
-
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => mocks.tauri,
 }));
-
-vi.mock("@/shared/platform/buildTarget", () => ({
-  get isNativeMobileBuild() {
-    return mocks.mobile;
-  },
-}));
-
 vi.mock("@tauri-apps/plugin-notification", () => ({
   isPermissionGranted: mocks.isPermissionGranted,
   requestPermission: mocks.requestPermission,
   sendNotification: mocks.sendNotification,
 }));
-
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     isFocused: mocks.isFocused,
     setBadgeCount: mocks.setBadgeCount,
   }),
 }));
-
 vi.mock("@/features/settings", () => ({
   selectNotificationPreferences: () => mocks.preferences,
-  useSettingsStore: { getState: () => ({ settings: { document: {} } }) },
+  useSettingsStore: {
+    getState: () => ({
+      settings: {
+        document: {},
+      },
+    }),
+  },
 }));
-
-import {
-  nativeNotificationPermission,
-  publishNativeActivity,
-  requestNativeNotificationPermission,
-  syncNativeBadge,
-} from "./nativeNotifications";
-
 describe("nativeNotifications", () => {
   beforeEach(() => {
     localStorage.clear();
     useActivityStore.setState(useActivityStore.getInitialState(), true);
     useActivityStore.getState().setAccount("account-1");
     mocks.tauri = true;
-    mocks.mobile = false;
     mocks.focused = false;
     mocks.granted = true;
     mocks.requestedPermission = "granted";
@@ -81,13 +72,11 @@ describe("nativeNotifications", () => {
     mocks.requestPermission.mockClear();
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
   });
-
   it("suppresses OS banners while Misty is focused", async () => {
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     expect(await publishNativeActivity(itemFixture())).toBe(false);
     expect(mocks.sendNotification).not.toHaveBeenCalled();
   });
-
   it("sends a native background notification and respects sound preference", async () => {
     mocks.preferences.soundNotificationsEnabled = true;
     expect(await publishNativeActivity(itemFixture())).toBe(true);
@@ -99,17 +88,6 @@ describe("nativeNotifications", () => {
       }),
     );
   });
-
-  it("redacts mobile notification content to a generic count", async () => {
-    mocks.mobile = true;
-    expect(await publishNativeActivity(itemFixture())).toBe(true);
-    expect(mocks.sendNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Misty", body: "1 new update." }),
-    );
-    expect(JSON.stringify(mocks.sendNotification.mock.calls[0])).not.toContain("Transfer");
-    expect(JSON.stringify(mocks.sendNotification.mock.calls[0])).not.toContain("file");
-  });
-
   it.each(["disabled", "quiet", "digest"])("suppresses %s background delivery", async (mode) => {
     if (mode === "disabled") mocks.preferences.desktopNotificationsEnabled = false;
     if (mode === "quiet") mocks.preferences.quietHoursEnabled = true;
@@ -117,14 +95,12 @@ describe("nativeNotifications", () => {
     expect(await publishNativeActivity(itemFixture())).toBe(false);
     expect(mocks.sendNotification).not.toHaveBeenCalled();
   });
-
   it("never requests permission during publication", async () => {
     mocks.granted = false;
     expect(await nativeNotificationPermission()).toBe("prompt");
     expect(await publishNativeActivity(itemFixture())).toBe(false);
     expect(mocks.requestPermission).not.toHaveBeenCalled();
   });
-
   it("requests permission only through the explicit permission operation", async () => {
     mocks.requestedPermission = "denied";
     mocks.granted = false;
@@ -132,26 +108,22 @@ describe("nativeNotifications", () => {
     expect(mocks.requestPermission).toHaveBeenCalledTimes(1);
     expect(await nativeNotificationPermission()).toBe("denied");
   });
-
   it("keeps a dismissed permission prompt requestable", async () => {
     mocks.requestedPermission = "default";
     mocks.granted = false;
     expect(await requestNativeNotificationPermission()).toBe("prompt");
     expect(await nativeNotificationPermission()).toBe("prompt");
   });
-
   it("sends the full Dock count and clears it at zero or when badges are disabled", async () => {
     await syncNativeBadge(147);
     await syncNativeBadge(0);
     mocks.preferences.badgeCountEnabled = false;
     await syncNativeBadge(8);
-
     expect(mocks.setBadgeCount).toHaveBeenNthCalledWith(1, 147);
     expect(mocks.setBadgeCount).toHaveBeenNthCalledWith(2, undefined);
     expect(mocks.setBadgeCount).toHaveBeenNthCalledWith(3, undefined);
   });
 });
-
 function itemFixture(): ActivityItem {
   return {
     id: "device:account-1:transfer-1",
@@ -163,17 +135,24 @@ function itemFixture(): ActivityItem {
     body: "A file could not be copied.",
     createdAt: "2026-08-08T12:00:00Z",
     attention: true,
-    target: { kind: "workspace-tool", tool: "transfers" },
+    target: {
+      kind: "workspace-tool",
+      tool: "transfers",
+    },
   };
 }
-
 describe("Activity delivery policy", () => {
   it("applies category controls and ignores read updates", async () => {
     useActivityStore.setState(useActivityStore.getInitialState(), true);
     useActivityStore.getState().setAccount("account-1");
     mocks.sendNotification.mockClear();
     useActivityStore.getState().setCategoryEnabled("completions", false);
-    expect(await publishNativeActivity({ ...itemFixture(), kind: "completion" })).toBe(false);
+    expect(
+      await publishNativeActivity({
+        ...itemFixture(),
+        kind: "completion",
+      }),
+    ).toBe(false);
     expect(
       await publishNativeActivity({
         ...itemFixture(),
@@ -188,8 +167,18 @@ describe("Activity delivery policy", () => {
     useActivityStore.getState().setAccount("account-1");
     useActivityStore.getState().setSourceMuted("app:files", true);
     mocks.sendNotification.mockClear();
-    expect(await publishNativeActivity({ ...itemFixture(), appId: "files" })).toBe(false);
-    expect(await publishNativeActivity({ ...itemFixture(), accountId: "other" })).toBe(false);
+    expect(
+      await publishNativeActivity({
+        ...itemFixture(),
+        appId: "files",
+      }),
+    ).toBe(false);
+    expect(
+      await publishNativeActivity({
+        ...itemFixture(),
+        accountId: "other",
+      }),
+    ).toBe(false);
     expect(mocks.sendNotification).not.toHaveBeenCalled();
   });
 });

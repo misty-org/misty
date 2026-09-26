@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import { useLibraryAi as useAiSurfaceAdapter } from "@/features/library/library/libraryRuntime";
-import { useLibraryTitle as useWorkspaceTabTitle } from "@/features/library/library/libraryRuntime";
+import {
+  useLibraryAi as useAiSurfaceAdapter,
+  useLibraryTitle as useWorkspaceTabTitle,
+} from "@/features/library/library/libraryRuntime";
 import { ComingSoonSurface } from "@/shared/ui";
-import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
-import { Upload } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
@@ -38,31 +38,11 @@ export function SpaceLibrary({
   workspaceTabId?: string;
 }) {
   const data = useSpaceLibraryData(spaceId);
-  const presentation = useSurfacePresentation();
-  const mobile = presentation !== "desktop";
   const [searchParams, setSearchParams] = useSearchParams();
   const uploadQueryConsumedRef = useRef(false);
   const itemActions = useSpaceLibraryItemActions(data);
   const collectionActions = useSpaceLibraryCollectionActions(data, itemActions);
   const { canUploadLibrary, setFilePickerOpen } = data;
-  const mobileTitle = libraryWorkspaceTitle(data);
-  const openUpload = useCallback(() => setFilePickerOpen(true), [setFilePickerOpen]);
-  const chromeConfig = useMemo(
-    () => ({
-      title: mobileTitle,
-      level: "root" as const,
-      primaryAction: canUploadLibrary
-        ? {
-            id: "upload-library-item",
-            label: "Upload",
-            icon: Upload,
-            onPress: openUpload,
-          }
-        : undefined,
-    }),
-    [canUploadLibrary, mobileTitle, openUpload],
-  );
-  useMobileSurfaceChrome(chromeConfig);
   useWorkspaceTabTitle(workspaceTabId, libraryWorkspaceTitle(data));
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const selectedItems = data.selectedItems ?? [];
@@ -110,7 +90,6 @@ export function SpaceLibrary({
     };
   }, [data.selectedItems, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
-
   useEffect(() => {
     if (searchParams.get("upload") !== "1") {
       uploadQueryConsumedRef.current = false;
@@ -120,22 +99,26 @@ export function SpaceLibrary({
     uploadQueryConsumedRef.current = true;
     const next = new URLSearchParams(searchParams);
     next.delete("upload");
-    setSearchParams(next, { replace: true });
+    setSearchParams(next, {
+      replace: true,
+    });
     if (canUploadLibrary) setFilePickerOpen(true);
   }, [canUploadLibrary, searchParams, setFilePickerOpen, setSearchParams]);
-
   if (data.collection === "memory") {
     return <ComingSoonSurface feature="Library memories" />;
   }
-
   return (
-    <SpaceLibraryProvider value={{ data, itemActions, collectionActions }}>
+    <SpaceLibraryProvider
+      value={{
+        data,
+        itemActions,
+        collectionActions,
+      }}
+    >
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
         <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-transparent">
           <SpaceLibraryTopChrome />
-          <div
-            className={`min-h-0 overflow-auto bg-transparent pb-6 ${mobile ? "px-3 pt-3" : "px-5 pt-5"}`}
-          >
+          <div className={`min-h-0 overflow-auto bg-transparent pb-6 ${"px-5 pt-5"}`}>
             <DateGroupIndex />
             {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
             <AlbumsIndex />
@@ -152,7 +135,6 @@ export function SpaceLibrary({
     </SpaceLibraryProvider>
   );
 }
-
 const collectionTitles: Partial<Record<string, string>> = {
   recent: "Library",
   months: "Months",
@@ -173,7 +155,6 @@ const collectionTitles: Partial<Record<string, string>> = {
   shared: "Shared references",
   imports: "Imports",
 };
-
 function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): string {
   const displayItems = data.displayItems ?? [];
   const selectedItems = data.selectedItems ?? [];

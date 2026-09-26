@@ -1,10 +1,9 @@
 import { extensionThemeChangedEvent, extensionThemeSnapshot } from "@/features/settings";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealMainWindow } from "@/native";
 import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import { useEffect } from "react";
 import { windowSurfaceBackground } from "./windowSurfaceBackground";
@@ -14,7 +13,7 @@ import { windowSurfaceBackground } from "./windowSurfaceBackground";
  */
 export function DesktopWindowReady() {
   useEffect(() => {
-    if (isNativeMobileBuild || !hasTauriInternals() || platform() !== "macos") return;
+    if (!hasTauriInternals() || platform() !== "macos") return;
     let disposed = false;
     // Color the NSWindow behind the renderer without making the renderer
     // opaque: embedded Browser views and native wallpaper need transparency.

@@ -2192,7 +2192,7 @@ mod workspace_route_tests {
             surface: WorkspaceRouteSurface::Terminal,
             sent_at: chrono::Utc::now().to_rfc3339(),
             source_device_id: "source-device".to_owned(),
-            source_device_name: "Misty iPhone".to_owned(),
+            source_device_name: "Misty Laptop".to_owned(),
         }
     }
 

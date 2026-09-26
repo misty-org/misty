@@ -1,11 +1,8 @@
+import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import { useDropZone, usePointerDrag } from "@/features/dnd";
+import { Button, cn } from "@/shared/ui";
 import { Check, EllipsisVertical, Star } from "lucide-react";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
-
-import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn } from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
-
-import { useDropZone, usePointerDrag } from "@/features/dnd";
 import {
   formatBytes,
   formatTime,
@@ -13,15 +10,12 @@ import {
   normalizeLibraryItemScale,
 } from "../libraryFormat";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
-import { LibraryItemThumbnail, libraryFileTypeLabel } from "../SpaceLibraryPrimitives";
-
+import { libraryFileTypeLabel, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
 const ITEM_ACTION_MENU_WIDTH = 224;
 const ITEM_ACTION_MENU_HEIGHT = 336;
-
 const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
 const LIST_THUMBNAIL_WIDTHS = [96, 132, 176] as const;
 const LIBRARY_ITEM_DRAG_KIND = "library-item";
-
 function clampMenuPosition(left: number, top: number, anchor?: Element) {
   const pane = anchor?.closest<HTMLElement>("[data-workspace-pane]");
   const bounds = pane?.getBoundingClientRect() ?? {
@@ -35,15 +29,12 @@ function clampMenuPosition(left: number, top: number, anchor?: Element) {
     top: Math.max(bounds.top + 8, Math.min(top, bounds.bottom - ITEM_ACTION_MENU_HEIGHT - 8)),
   };
 }
-
 function assetStackLabel(assetStack: LibraryAssetStack) {
   if (assetStack.kind === "live_photo") return "Live";
   if (assetStack.kind === "raw_pair") return "RAW+";
   return `${assetStack.members.length} burst`;
 }
-
 export function SpaceLibraryItems() {
-  const mobile = useSurfacePresentation() !== "desktop";
   const {
     data: {
       displayItems,
@@ -58,30 +49,26 @@ export function SpaceLibraryItems() {
     },
     itemActions: { loadMore },
   } = useSpaceLibraryContext();
-
   const showItemMenu = (itemId: string, left: number, top: number, anchor?: Element) => {
     setItemMenu({
       itemId,
       ...clampMenuPosition(left, top, anchor),
     });
   };
-
   const openItemContextMenu = (event: ReactMouseEvent, itemId: string) => {
     event.preventDefault();
     event.stopPropagation();
     showItemMenu(itemId, event.clientX, event.clientY, event.currentTarget);
   };
-
   const itemScale = normalizeLibraryItemScale(libraryItemScale);
   const listLayout = libraryViewMode === "list";
-
   return (
     <div
       className={listLayout ? "grid gap-2" : "grid gap-3.5"}
       style={{
         gridTemplateColumns: listLayout
           ? "1fr"
-          : `repeat(auto-fill,minmax(${mobile ? Math.min(148, GRID_COLUMN_WIDTHS[itemScale]) : GRID_COLUMN_WIDTHS[itemScale]}px,1fr))`,
+          : `repeat(auto-fill,minmax(${GRID_COLUMN_WIDTHS[itemScale]}px,1fr))`,
       }}
     >
       {displayItems.map((item, itemIndex) => {
@@ -89,7 +76,6 @@ export function SpaceLibraryItems() {
         const previousDateGroup =
           itemIndex > 0 ? libraryDateGroupLabel(displayItems[itemIndex - 1], sort) : "";
         const assetStack = stackByItemID.get(item.id);
-
         return (
           <Fragment key={item.id}>
             {dateGroup && dateGroup !== previousDateGroup ? (
@@ -125,7 +111,6 @@ export function SpaceLibraryItems() {
     </div>
   );
 }
-
 function LibraryItemCard({
   assetStack,
   item,
@@ -143,7 +128,6 @@ function LibraryItemCard({
   onShowMenu: (itemId: string, left: number, top: number, anchor?: Element) => void;
   selected: boolean;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const {
     data: {
       spaceId,
@@ -161,7 +145,7 @@ function LibraryItemCard({
     collectionActions: { reorderAlbumItem },
   } = useSpaceLibraryContext();
   const { startDrag, state } = usePointerDrag();
-  const reorderable = !mobile && canReorderAlbum && selectedItemIds.length === 0;
+  const reorderable = canReorderAlbum && selectedItemIds.length === 0;
   const dragging = state.payload?.kind === LIBRARY_ITEM_DRAG_KIND && state.payload.id === item.id;
   const dropZone = useDropZone({
     id: `library-item:${item.id}`,
@@ -175,7 +159,6 @@ function LibraryItemCard({
   const itemSelectionStyle = selected
     ? "inset-ring-2 inset-ring-charcoal-active"
     : "inset-ring-1 inset-ring-cream/10";
-
   return (
     <article
       data-misty-window-drag-block={reorderable ? "true" : undefined}
@@ -195,7 +178,10 @@ function LibraryItemCard({
         if ((event.target as HTMLElement).closest("button, input, [role='combobox']")) return;
         startDrag(
           event,
-          { kind: LIBRARY_ITEM_DRAG_KIND, id: item.id },
+          {
+            kind: LIBRARY_ITEM_DRAG_KIND,
+            id: item.id,
+          },
           <LibraryItemDragPreview name={item.display_name} />,
         );
       }}
@@ -226,14 +212,12 @@ function LibraryItemCard({
               menuOpen={itemMenu?.itemId === item.id}
               onShowMenu={onShowMenu}
               updateItem={updateItem}
-              mobile={mobile}
             />
           ) : null}
         </div>
       </div>
     </article>
   );
-
   function LibraryItemPreview({
     assetStack,
     item,
@@ -248,7 +232,13 @@ function LibraryItemCard({
     return (
       <div
         className={listLayout ? "relative shrink-0" : "relative w-full min-w-0"}
-        style={listLayout ? { width: `${LIST_THUMBNAIL_WIDTHS[itemScale]}px` } : undefined}
+        style={
+          listLayout
+            ? {
+                width: `${LIST_THUMBNAIL_WIDTHS[itemScale]}px`,
+              }
+            : undefined
+        }
       >
         <Button
           className={[
@@ -276,7 +266,7 @@ function LibraryItemCard({
         </Button>
         {selectionAvailable ? (
           <Button
-            className={selectionToggleClassName(selected, mobile)}
+            className={selectionToggleClassName(selected)}
             type="button"
             aria-label={`${selected ? "Deselect" : "Select"} ${item.display_name}`}
             aria-pressed={selected}
@@ -292,13 +282,11 @@ function LibraryItemCard({
     );
   }
 }
-
 function LibraryItemActions({
   item,
   menuOpen,
   onShowMenu,
   updateItem,
-  mobile,
 }: {
   item: SpaceLibraryItem;
   menuOpen: boolean;
@@ -307,18 +295,14 @@ function LibraryItemActions({
     item: SpaceLibraryItem,
     patch: Partial<Pick<SpaceLibraryItem, "favorite">>,
   ) => Promise<unknown>;
-  mobile?: boolean;
 }) {
-  const actionVisibility = mobile
+  const actionVisibility = menuOpen
     ? "pointer-events-auto opacity-100"
-    : menuOpen
-      ? "pointer-events-auto opacity-100"
-      : [
-          "pointer-events-none opacity-0",
-          "group-hover:pointer-events-auto group-hover:opacity-100",
-          "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-        ].join(" ");
-
+    : [
+        "pointer-events-none opacity-0",
+        "group-hover:pointer-events-auto group-hover:opacity-100",
+        "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+      ].join(" ");
   return (
     <div
       className={`flex shrink-0 items-center gap-0.5 transition-opacity ${actionVisibility}`}
@@ -327,10 +311,14 @@ function LibraryItemActions({
       <Button
         className={cn(
           "grid shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream",
-          mobile ? "size-11" : "size-7",
+          "size-7",
         )}
         type="button"
-        onClick={() => void updateItem(item, { favorite: !item.favorite })}
+        onClick={() =>
+          void updateItem(item, {
+            favorite: !item.favorite,
+          })
+        }
         title={item.favorite ? "Remove favorite" : "Favorite"}
         aria-label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}
       >
@@ -339,7 +327,7 @@ function LibraryItemActions({
       <Button
         className={cn(
           "grid shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream",
-          mobile ? "size-11" : "size-7",
+          "size-7",
         )}
         type="button"
         onClick={(event) => {
@@ -359,7 +347,6 @@ function LibraryItemActions({
     </div>
   );
 }
-
 function LibraryItemDragPreview({ name }: { name: string }) {
   return (
     <div className="max-w-[240px] truncate rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-xs font-medium text-cream shadow-lg">
@@ -367,19 +354,15 @@ function LibraryItemDragPreview({ name }: { name: string }) {
     </div>
   );
 }
-
-function selectionToggleClassName(selected: boolean, mobile: boolean) {
+function selectionToggleClassName(selected: boolean) {
   const visibleState = "border-charcoal-active bg-charcoal-active text-cream-bright opacity-100";
-  const hiddenState = mobile
-    ? "border-charcoal-border/70 bg-charcoal-workspace text-transparent opacity-100"
-    : [
-        "pointer-events-none border-charcoal-border/50 bg-charcoal-workspace text-transparent opacity-0",
-        "group-hover:pointer-events-auto group-hover:opacity-100",
-        "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-      ].join(" ");
-
+  const hiddenState = [
+    "pointer-events-none border-charcoal-border/50 bg-charcoal-workspace text-transparent opacity-0",
+    "group-hover:pointer-events-auto group-hover:opacity-100",
+    "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+  ].join(" ");
   return [
-    `absolute right-2 top-2 z-10 grid place-items-center rounded-md border shadow-xs ${mobile ? "size-11" : "size-5"}`,
+    `absolute right-2 top-2 z-10 grid place-items-center rounded-md border shadow-xs ${"size-5"}`,
     "transition-opacity",
     selected ? visibleState : hiddenState,
   ].join(" ");

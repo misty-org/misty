@@ -1,22 +1,16 @@
+import "@/features/files/workspace/native";
+import { registerShortcutHandler, shortcutCommandsById } from "@/features/shortcuts";
 import {
   dockLeaves,
   useMultiPanelStore,
   useWorkspaceStore,
   type MultiPanelStoreHook,
 } from "@/features/workspace";
-import {
-  androidGrantLocalFolder,
-  androidOpenAllFilesAccessSettings,
-} from "@/features/files/workspace/native";
-import { registerShortcutHandler, shortcutCommandsById } from "@/features/shortcuts";
-import { errorText } from "@/shared/lib/format";
-import { useCallback, useEffect, type RefObject } from "react";
+import { useEffect, type RefObject } from "react";
 import type { NavigateFunction } from "react-router-dom";
-import type { AndroidLocalGrantRequest } from "../../model/interfaces/components/ExplorerSidebar";
 import { useExplorerStore } from "../../store";
 import { runExplorerCommand } from "../ExplorerCommands";
 import { parsePluginTabPath } from "../ExplorerDesktopPlugins";
-
 export function useLegacyPluginTabMigration(options: {
   homePath: string;
   workspacePathSignature: string;
@@ -29,11 +23,13 @@ export function useLegacyPluginTabMigration(options: {
     const legacyTabs = multi.tabs.filter((tab) => parsePluginTabPath(tab.path));
     for (const tab of legacyTabs) {
       multi.updateActiveTabPath(tab.activePaneId, homePath, "Files");
-      multi.setTabPanelVisibility(tab.id, { sidebarVisible: true, previewVisible: true });
+      multi.setTabPanelVisibility(tab.id, {
+        sidebarVisible: true,
+        previewVisible: true,
+      });
     }
   }, [homePath, options.multiPanelStore, workspacePathSignature]);
 }
-
 export function useOperationErrorNotification(
   operationError: string | null,
   pushNotification: (
@@ -52,7 +48,6 @@ export function useOperationErrorNotification(
     pushNotification(message, recoveredWorkspace ? "info" : "error", 4500);
   }, [operationError, pushNotification]);
 }
-
 export function useExplorerKeyboardShortcuts(options: {
   active?: boolean;
   navigate: NavigateFunction;
@@ -135,76 +130,4 @@ export function useExplorerKeyboardShortcuts(options: {
     options.workspaceId,
     options.active,
   ]);
-}
-
-export function useAndroidLocalFolderGrant(options: {
-  homePath: string;
-  multiPanelStore?: MultiPanelStoreHook;
-  refreshAndroidAllFilesAccess: () => Promise<{
-    granted: boolean;
-    storageRoot?: string | null;
-  } | null>;
-  refreshAndroidGrantedFolders: () => Promise<unknown>;
-}): (request?: AndroidLocalGrantRequest) => void {
-  const { homePath, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders } = options;
-  return useCallback(
-    (request?: AndroidLocalGrantRequest) => {
-      void (async () => {
-        const currentStatus = await refreshAndroidAllFilesAccess();
-        if (!currentStatus?.granted) {
-          try {
-            await androidOpenAllFilesAccessSettings();
-            useExplorerStore
-              .getState()
-              .pushNotification(
-                "Enable All files access for Misty, then return to continue browsing local files.",
-                "info",
-              );
-          } catch (error) {
-            useExplorerStore
-              .getState()
-              .pushNotification(
-                `Could not open Android storage settings: ${errorText(error)}`,
-                "error",
-              );
-          }
-          return;
-        }
-        const storageRoot = currentStatus.storageRoot?.replace(/\/+$/, "");
-        if (storageRoot) {
-          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
-          const targetPath = request?.initialDirectory
-            ? `${storageRoot}/${request.initialDirectory.replace(/^\/+|\/+$/g, "")}`
-            : storageRoot;
-          if (paneId) await useExplorerStore.getState().navigatePane(paneId, targetPath);
-          return;
-        }
-        if (request?.grantedPath) {
-          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
-          if (paneId) await useExplorerStore.getState().navigatePane(paneId, request.grantedPath);
-          return;
-        }
-        try {
-          const folder = await androidGrantLocalFolder({
-            initialDirectory: request?.initialDirectory,
-          });
-          await refreshAndroidGrantedFolders();
-          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
-          if (paneId)
-            await useExplorerStore.getState().navigatePane(paneId, folder.path || homePath);
-          useExplorerStore
-            .getState()
-            .pushNotification(`Added local folder ${folder.name}`, "success");
-        } catch (error) {
-          const message = errorText(error);
-          if (!/cancel/i.test(message)) {
-            useExplorerStore
-              .getState()
-              .pushNotification(`Could not add local folder: ${message}`, "error");
-          }
-        }
-      })();
-    },
-    [homePath, options.multiPanelStore, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders],
-  );
 }

@@ -7,7 +7,7 @@ import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRunt
 
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
-import mistyCompanion from "@/shared/assets/mist-orb-expression-cycle.webp?inline";
+import mistyCompanion from "@/assets/branding/misty-icon.png?inline";
 import { Button, cn } from "@/shared/ui";
 import {
   AlertCircle,

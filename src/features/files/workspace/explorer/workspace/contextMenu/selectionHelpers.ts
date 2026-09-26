@@ -16,7 +16,7 @@ export function fileStem(path: string) {
 }
 
 export function primaryShortcutLabel(): string {
-  if (typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform))
+  if (typeof navigator !== "undefined" && /Mac/i.test(navigator.platform))
     return "Cmd";
   return "Ctrl";
 }

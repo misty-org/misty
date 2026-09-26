@@ -1,3 +1,4 @@
+import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import type { MistyPickerSource } from "@/features/picker";
 import {
   cn,
@@ -11,16 +12,13 @@ import {
   PopoverTrigger,
 } from "@/shared/ui";
 import { Plus, Send } from "lucide-react";
-import { useSurfacePresentation } from "@/shared/mobile";
 import { useId, useMemo, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { splitMentionSegments } from "../hooks/mentionHighlight";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { useComposerInput } from "../hooks/useComposerInput";
-import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { ChatAttachmentChips } from "./ChatAttachmentChips";
 import { ChatReplyBanner } from "./ChatReplyBanner";
 import { ChatSuggestionPopover } from "./ChatSuggestionPopover";
-
 const MAX_MESSAGE_LENGTH = 3000;
 // Most messages are nowhere near the cap, so the counter only earns its
 // place in the toolbar once it's actually useful information.
@@ -30,7 +28,6 @@ const MESSAGE_LENGTH_WARNING_THRESHOLD = MAX_MESSAGE_LENGTH - 200;
 // stay pixel-aligned between the two layers.
 const composerTextClass =
   "min-h-20 max-h-40 whitespace-pre-wrap break-words px-4 py-3.5 text-base md:text-sm";
-
 export interface SpaceChatComposerProps {
   draft: SpaceChatDraft;
   suggestions: ChatSuggestionsState;
@@ -44,9 +41,7 @@ export interface SpaceChatComposerProps {
   onSubmit: (event: FormEvent) => void;
   onOpenPicker: (source: MistyPickerSource) => void;
 }
-
 export function SpaceChatComposer(props: SpaceChatComposerProps) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const { draft, suggestions, input } = props;
   const listId = useId();
   const composerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +65,6 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
       el.setSelectionRange(el.value.length, el.value.length);
     });
   };
-
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (suggestions.open) {
       if (event.key === "ArrowDown") {
@@ -105,14 +99,8 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
       event.currentTarget.form?.requestSubmit();
     }
   };
-
   return (
-    <div
-      className={cn(
-        "shrink-0 bg-charcoal-bg px-[clamp(16px,2.5vw,32px)] pt-2",
-        mobile ? "pb-[max(12px,env(safe-area-inset-bottom))]" : "pb-5",
-      )}
-    >
+    <div className={cn("shrink-0 bg-charcoal-bg px-[clamp(16px,2.5vw,32px)] pt-2", "pb-5")}>
       <form onSubmit={props.onSubmit}>
         <Popover open={suggestions.open} onOpenChange={suggestions.setOpen}>
           <PopoverAnchor asChild>
@@ -201,7 +189,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
               >
                 {props.canUploadAttachments || props.canBrowseLibrary ? (
                   <InputGroupButton
-                    className={cn(mobile && "size-11")}
+                    className={cn(false)}
                     variant="ghost"
                     size="icon-xs"
                     type="button"
@@ -216,7 +204,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 ) : null}
                 <PopoverTrigger asChild>
                   <InputGroupButton
-                    className={cn(mobile && "size-11")}
+                    className={cn(false)}
                     variant="ghost"
                     size="icon-xs"
                     type="button"
@@ -237,7 +225,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 <InputGroupButton
                   className={cn(
                     "rounded-full bg-charcoal-active p-2 text-cream-bright transition-colors hover:bg-[#494949]",
-                    mobile && "size-11",
+                    false,
                     draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
                   )}
                   size="icon-sm"

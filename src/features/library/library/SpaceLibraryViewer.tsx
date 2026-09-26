@@ -1,55 +1,39 @@
 import type { LibraryItemViewerProps } from "@/api/spaces/dto/interfaces/SpaceLibraryViewer";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  cn,
-} from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
-import { Info } from "lucide-react";
+import { cn, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
 import { useState } from "react";
-import { libraryItemMIME } from "./SpaceLibraryPrimitives";
-import { libraryEditStyle, normalizeLibraryEdit } from "./SpaceLibraryViewerUtils";
 import { copyLibraryItemsToClipboard } from "./libraryClipboard";
+import { libraryMediaKind } from "./libraryViewer/libraryMediaKind";
 import { LibraryPhotoEditorView } from "./libraryViewer/LibraryPhotoEditorView";
 import { LibraryViewerSidebar } from "./libraryViewer/LibraryViewerSidebar";
 import { LibraryViewerStage } from "./libraryViewer/LibraryViewerStage";
 import { LibraryViewerToolbar } from "./libraryViewer/LibraryViewerToolbar";
-import { libraryMediaKind } from "./libraryViewer/libraryMediaKind";
 import { useLibraryEditActions } from "./libraryViewer/useLibraryEditActions";
 import { useLibraryEditVersions } from "./libraryViewer/useLibraryEditVersions";
 import { useLibraryItemContent } from "./libraryViewer/useLibraryItemContent";
 import { useLibraryStackMedia } from "./libraryViewer/useLibraryStackMedia";
 import { useLibraryViewerKeyboard } from "./libraryViewer/useLibraryViewerKeyboard";
 import { useLibraryViewerPlayback } from "./libraryViewer/useLibraryViewerPlayback";
-
+import { libraryItemMIME } from "./SpaceLibraryPrimitives";
+import { libraryEditStyle, normalizeLibraryEdit } from "./SpaceLibraryViewerUtils";
 const dialogClass =
   "grid h-[min(860px,calc(100dvh-32px))] min-h-0 w-[min(1320px,calc(100vw-32px))] max-w-none grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-xl border-charcoal-border/80 bg-charcoal-bg p-0 shadow-lg sm:max-w-none [&>button]:hidden";
-
 export function LibraryItemViewer(props: LibraryItemViewerProps) {
   if (!props.item) return null;
   return <LibraryItemViewerContent {...props} item={props.item} />;
 }
-
-function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceLibraryItem }) {
-  const mobile = useSurfacePresentation() !== "desktop";
+function LibraryItemViewerContent(
+  props: LibraryItemViewerProps & {
+    item: SpaceLibraryItem;
+  },
+) {
   const { spaceId, item, items, allItems, assetStack, reauthenticationToken } = props;
   const { canEdit, canCopy, onClose, onSelect } = props;
   const [editing, setEditing] = useState(false);
-  const [metadataOpen, setMetadataOpen] = useState(false);
-
   const index = items.findIndex((candidate) => candidate.id === item.id);
   const mimeType = libraryItemMIME(item);
   const metadata = item.file.intrinsic_metadata;
   const { isImage, isVideo } = libraryMediaKind(mimeType, metadata);
-
   const versions = useLibraryEditVersions({
     spaceId,
     item,
@@ -60,8 +44,11 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
   const { activeEdit, editVersions, editDraft, setEditDraft } = versions;
   const appliedEdit = editing ? editDraft : normalizeLibraryEdit(activeEdit?.edit_definition);
   const renditionReady = activeEdit?.rendition_state === "ready";
-
-  const stack = useLibraryStackMedia({ item, allItems, assetStack });
+  const stack = useLibraryStackMedia({
+    item,
+    allItems,
+    assetStack,
+  });
   const content = useLibraryItemContent({
     spaceId,
     item,
@@ -75,7 +62,6 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
     stackMediaVersion: stack.stackMediaItem?.version,
     renditionState: activeEdit?.rendition_state,
   });
-
   const edits = useLibraryEditActions({
     spaceId,
     item,
@@ -91,8 +77,10 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
     onReplaceItem: props.onReplaceItem,
     onRenditionReady: props.onRenditionReady,
   });
-
-  const playback = useLibraryViewerPlayback({ appliedEdit, assetStack });
+  const playback = useLibraryViewerPlayback({
+    appliedEdit,
+    assetStack,
+  });
   const goPrevious = () => index > 0 && onSelect(items[index - 1].id);
   const goNext = () => index >= 0 && index < items.length - 1 && onSelect(items[index + 1].id);
   useLibraryViewerKeyboard({
@@ -103,7 +91,6 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
     onPrevious: goPrevious,
     onNext: goNext,
   });
-
   const copyItem = async (target: SpaceLibraryItem = item) => {
     if (!canCopy) return;
     edits.setEditError("");
@@ -115,7 +102,6 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
       );
     }
   };
-
   if (isImage)
     return (
       <LibraryPhotoEditorView
@@ -132,15 +118,10 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
         onRenditionReady={props.onRenditionReady}
       />
     );
-
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className={cn(
-          mobile
-            ? "inset-0 grid h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-cols-1 grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-none border-0 bg-charcoal-bg p-0 [&>button]:hidden"
-            : dialogClass,
-        )}
+        className={cn(dialogClass)}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           props.returnFocusRef.current?.focus();
@@ -160,7 +141,7 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
         <header
           className={cn(
             "relative z-20 flex min-w-0 items-center justify-between gap-4 border-b border-charcoal-border/60 bg-charcoal-bg px-4",
-            !mobile && "col-span-2",
+            "col-span-2",
           )}
         >
           <div className="min-w-0">
@@ -173,17 +154,7 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
             </p>
           </div>
           <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-            {mobile ? (
-              <Button
-                className="size-11 shrink-0"
-                size="icon"
-                variant="outline"
-                onClick={() => setMetadataOpen(true)}
-                aria-label="Item details"
-              >
-                <Info className="size-4" />
-              </Button>
-            ) : null}
+            {null}
             <LibraryViewerToolbar
               item={item}
               assetStack={assetStack}
@@ -203,8 +174,16 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
               onCopyEdit={() => props.onCopyEdit(normalizeLibraryEdit(activeEdit?.edit_definition))}
               onSaveAsCopy={() => void edits.saveAsCopy()}
               onSaveEdit={() => void edits.saveEdit()}
-              onToggleFavorite={() => void props.onUpdate(item, { favorite: !item.favorite })}
-              onToggleHidden={() => void props.onUpdate(item, { hidden: !item.hidden })}
+              onToggleFavorite={() =>
+                void props.onUpdate(item, {
+                  favorite: !item.favorite,
+                })
+              }
+              onToggleHidden={() =>
+                void props.onUpdate(item, {
+                  hidden: !item.hidden,
+                })
+              }
               onBeginEditing={() => {
                 if (!canEdit) return;
                 setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
@@ -248,7 +227,7 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
           onNext={goNext}
         />
 
-        {!mobile ? (
+        {
           <LibraryViewerSidebar
             item={item}
             mimeType={mimeType}
@@ -274,44 +253,8 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
             onRenderVersion={(editID) => void edits.renderEdit(editID)}
             onDeleteVersion={(editID) => void edits.deleteEdit(editID)}
           />
-        ) : null}
-        {mobile ? (
-          <Sheet open={metadataOpen} onOpenChange={setMetadataOpen}>
-            <SheetContent
-              side="bottom"
-              className="h-[82dvh] rounded-t-2xl border-x-0 border-b-0 bg-charcoal-bg p-0 pb-[env(safe-area-inset-bottom)]"
-            >
-              <SheetHeader className="border-b border-charcoal-border p-4">
-                <SheetTitle>Item details</SheetTitle>
-              </SheetHeader>
-              <LibraryViewerSidebar
-                item={item}
-                mimeType={mimeType}
-                canEdit={canEdit}
-                isImage={isImage}
-                isVideo={isVideo}
-                durationSeconds={Number(metadata.duration ?? 1)}
-                editing={editing}
-                editDraft={editDraft}
-                setEditDraft={setEditDraft}
-                editSaving={edits.editSaving}
-                editError={edits.editError}
-                editingAvailable={versions.editingAvailable}
-                editVersions={editVersions}
-                activeEdit={activeEdit}
-                onUpdate={props.onUpdate}
-                onCancelEdit={() => {
-                  setEditing(false);
-                  setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
-                }}
-                onSaveEdit={() => void edits.saveEdit()}
-                onSelectVersion={(editID) => void edits.selectEdit(editID)}
-                onRenderVersion={(editID) => void edits.renderEdit(editID)}
-                onDeleteVersion={(editID) => void edits.deleteEdit(editID)}
-              />
-            </SheetContent>
-          </Sheet>
-        ) : null}
+        }
+        {null}
       </DialogContent>
     </Dialog>
   );
