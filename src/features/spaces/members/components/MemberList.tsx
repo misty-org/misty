@@ -117,7 +117,7 @@ function MemberActionsMenu({
           </>
         ) : null}
         <DropdownMenuItem
-          className="text-cream-bright focus:text-cream-bright"
+          variant="destructive"
           onSelect={() => onAction({ kind: "remove", member })}
         >
           <Trash2 className="mr-2 size-4" /> Remove member

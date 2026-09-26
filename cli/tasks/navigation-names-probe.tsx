@@ -9,7 +9,7 @@ import {
   setNavigationName,
   refreshNavigationNames,
 } from "../../src/features/navigation-names/store";
-import { providerNavigationTitles } from ".././apps/shared/navigationTitles";
+import { providerNavigationTitles } from "../../src/shared/toolAssets/navigationTitles";
 const nonce = new URLSearchParams(location.search).get("nonce")!;
 const account = JSON.stringify(["http://names-probe.invalid", nonce]);
 useNavigationNames.setState({ account, ready: true, names: {}, error: null });

@@ -1,7 +1,6 @@
+import { Button } from "@/shared/ui";
 import { CalendarClock, X } from "lucide-react";
 import type { AiRecapRecord } from "./api";
-import { useAiSurfaceStore } from "./store";
-import type { AiSurfaceAdapter } from "./types";
 
 export function isRecapSurface(surfaceId: string): surfaceId is AiRecapRecord["surface_id"] {
   return surfaceId === "global" || surfaceId === "home" || surfaceId === "activity";
@@ -24,18 +23,19 @@ export function AiRecapNudge({
   return (
     <aside className="misty-ai-proactive-nudge" aria-label="New Misty briefing">
       <CalendarClock className="size-3.5 shrink-0 text-sage-fg" aria-hidden />
-      <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
+      <Button variant="ghost" className="min-w-0 flex-1 text-left" onClick={onOpen}>
         <span className="block text-xs font-medium text-cream">Your Misty briefing is ready</span>
         <span className="block truncate text-[10px] text-cream-muted">{recap.last_result}</span>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
         className="rounded p-0.5 text-cream-muted hover:text-cream"
         aria-label="Dismiss Misty briefing"
         onClick={onDismiss}
       >
         <X className="size-3" />
-      </button>
+      </Button>
     </aside>
   );
 }

@@ -1,3 +1,6 @@
+import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
+import { useCompanionState } from "../companion/companionState";
+import { Button } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Square, X } from "lucide-react";
 import type { AgentProfile } from "@misty/contracts";
@@ -6,7 +9,6 @@ import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
-import { finishLocalExecution } from "@/features/agents/localExecution";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { AgentConversationView } from "./AgentConversationView";
 
@@ -28,7 +30,7 @@ const suggestions = [
 
 export function AgentWorkspaceConversation({
   agent,
-  spaceId,
+  spaceId: _legacySpaceId,
   accountId,
   onCreate,
   userName,
@@ -41,6 +43,7 @@ export function AgentWorkspaceConversation({
   userName?: string;
   onDraftStateChange?: (status: { dirty: boolean; busy: boolean }) => void;
 }) {
+  const spaceId = "";
   const state = useMistyStore();
   const [draft, setDraft] = useState("");
 
@@ -48,21 +51,13 @@ export function AgentWorkspaceConversation({
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scoped = state.conversations.filter(
-    (c) =>
-      (c.agentId === agent?.id || (!c.agentId && agent?.system_managed)) &&
-      (c.spaceId || "") === spaceId,
+    (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
   const conversation = scoped.find((c) => c.id === state.activeConversationId);
 
   const reportError = (error: string) => useMistyStore.setState({ error: error || null });
-  const executionMode = state.executionMode ?? "user";
+  const companion = useCompanionState((s) => s.presentation);
   const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
-
-  const handleModeChange = (mode: "user" | "agent" | "team") => {
-    void finishLocalExecution()
-      .then(() => useMistyStore.setState({ executionMode: mode }))
-      .catch((reason) => useMistyStore.setState({ error: String(reason) }));
-  };
 
   const voice = useAiVoiceRecorder({
     onTranscript: (text) => {
@@ -122,24 +117,22 @@ export function AgentWorkspaceConversation({
     )
       return;
     prepare();
-    await useMistyStore
-      .getState()
-      .submitAnswer(prompt, attachments.attachments, undefined, "workspace", [], {
+    await useMistyStore.getState().submitAnswer(
+      prompt,
+      attachments.attachments,
+      undefined,
+      "workspace",
+      [],
+      {
         conversationId: conversation?.id ?? "",
-        context: spaceId
-          ? [
-              {
-                kind: "space",
-                id: spaceId,
-                title: "Selected Space",
-                spaceId,
-                privacy: "shared",
-                source: "current",
-                attached: true,
-              },
-            ]
-          : [],
-      });
+        context: [],
+      },
+      {
+        executionMode: isDesktop ? "agent" : "user",
+        interactionMode: companion.mode,
+        model: companion.model,
+      },
+    );
     if (!useMistyStore.getState().error) {
       setDraft("");
       attachments.consume();
@@ -147,6 +140,7 @@ export function AgentWorkspaceConversation({
   };
   return (
     <section className="agent-conversation" aria-label={`${agent?.name || "Misty"} conversation`}>
+      <AgentCompanionPanel />
       <div className="agent-conversation-scroll" ref={scrollRef}>
         {conversation?.messages.length ? (
           <AgentConversationView
@@ -167,7 +161,7 @@ export function AgentWorkspaceConversation({
             </p>
             <p className="agent-introduction">
               {agent?.system_managed
-                ? "I can help you find answers, write and plan, work with the apps you connect, and keep track of ongoing tasks. Tell me what you’d like to take off your plate, and we’ll work through it together."
+                ? "Ask me about what you’re working on, or hand off a step. Use Team to work together, or Auto to let me carry a task through your tabs."
                 : agent
                   ? `I’m ${agent.name}. Tell me what you’d like help with, and we’ll take it from there.`
                   : "Create an agent to start a conversation."}
@@ -176,17 +170,20 @@ export function AgentWorkspaceConversation({
               <div className="agent-starters">
                 <div className="agent-starters-heading">
                   <h3>What can I take off your plate?</h3>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className="agent-icon-button"
                     aria-label="Dismiss suggestions"
                     onClick={() => setShowSuggestions(false)}
                   >
                     <X size={16} />
-                  </button>
+                  </Button>
                 </div>
                 <div className="agent-starter-options">
                   {suggestions.map(([label, prompt], index) => (
-                    <button
+                    <Button
+                      variant="ghost"
                       key={label}
                       disabled={!agent.enabled || state.working}
                       onClick={() => {
@@ -198,7 +195,7 @@ export function AgentWorkspaceConversation({
                         {String.fromCharCode(65 + index)}
                       </span>
                       <span>{label}</span>
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <input
@@ -218,9 +215,9 @@ export function AgentWorkspaceConversation({
               </div>
             )}
             {!agent && (
-              <button className="agent-create-action" onClick={onCreate}>
+              <Button variant="ghost" className="agent-create-action" onClick={onCreate}>
                 Create an agent
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -229,66 +226,21 @@ export function AgentWorkspaceConversation({
         {state.error && (
           <div role="alert" className="agent-compose-error">
             <p>{state.error}</p>
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               className="agent-icon-button"
               aria-label="Dismiss error"
               onClick={() => reportError("")}
             >
               <X size={16} />
-            </button>
+            </Button>
           </div>
         )}
         {agent && !agent.enabled && (
           <p className="agent-compose-hint">
             This agent is disabled. Enable it in Settings to start a conversation.
           </p>
-        )}
-        {isDesktop && (
-          <div className="agent-mode-bar">
-            <span className="agent-mode-label">Mode</span>
-            <div className="agent-mode-selector" role="radiogroup" aria-label="Work mode">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "user"}
-                className={`agent-mode-pill ${executionMode === "user" ? "active" : ""}`}
-                disabled={state.working}
-                onClick={() => handleModeChange("user")}
-                title="Discuss and draft — read-only apps"
-              >
-                User
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "agent"}
-                className={`agent-mode-pill ${executionMode === "agent" ? "active" : ""}`}
-                disabled={state.working}
-                onClick={() => handleModeChange("agent")}
-                title="Work in this window — full browser and connected app actions"
-              >
-                Agent
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={executionMode === "team"}
-                className={`agent-mode-pill ${executionMode === "team" ? "active" : ""}`}
-                disabled={state.working}
-                onClick={() => handleModeChange("team")}
-                title="Work in separate window — dedicated background worker"
-              >
-                Team
-              </button>
-            </div>
-            <span className="agent-mode-description">
-              {executionMode === "user"
-                ? "Discuss & draft"
-                : executionMode === "agent"
-                  ? "Work in this window (browser & apps)"
-                  : "Work in dedicated window"}
-            </span>
-          </div>
         )}
         <MistyComposer
           className="agent-workspace-composer"
@@ -312,7 +264,8 @@ export function AgentWorkspaceConversation({
           disabled={!agent?.enabled || !accountId}
           busy={state.working}
           voiceControl={
-            <button
+            <Button
+              variant="ghost"
               className="agent-voice-button"
               aria-label={voice.recording ? "Stop recording" : "Start voice input"}
               title={voice.recording ? "Stop recording" : "Voice input"}
@@ -326,11 +279,13 @@ export function AgentWorkspaceConversation({
               ) : (
                 <Mic size={18} />
               )}
-            </button>
+            </Button>
           }
           trailingControl={
             state.working ? (
-              <button
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 className="agent-icon-button"
                 aria-label="Stop response"
                 onClick={() => {
@@ -341,7 +296,7 @@ export function AgentWorkspaceConversation({
                 }}
               >
                 <Square size={16} />
-              </button>
+              </Button>
             ) : undefined
           }
         />

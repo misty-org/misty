@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useExplorerStore } from "@/features/files/explorer";
+import { useExplorerStore } from "@/features/files/workspace/explorer";
 import { dockTabs, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import type { GlobalSearchResult } from "./types";
 import { useGlobalMistyResults } from "./useGlobalMistyResults";

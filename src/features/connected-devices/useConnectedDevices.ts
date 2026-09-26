@@ -1,5 +1,5 @@
-import { useAppsStore } from "@/features/apps/useAppsStore";
-import { withNativeDocumentService } from "@/features/apps/nativeDocumentService";
+import { useAuth } from "@/features/auth";
+import { withBuiltinService } from "@/features/builtin-services";
 import { platform } from "@tauri-apps/plugin-os";
 import {
   connectedDevicesConnect,
@@ -54,13 +54,13 @@ const refreshIntervalMs = 30_000;
 
 export function useConnectedDevices() {
   const spaceId = "personal";
-  const installation = useAppsStore(state => state.installations.find(app => app.app_id === "files"));
-  const accountId = useAppsStore(state => state.accountId);
+  const { user } = useAuth();
+  const accountId = user?.id;
   const packaged = hasTauriInternals() && platform() === "macos";
   const [deviceInstance, setDeviceInstance] = useState("");
   const [serviceError, setServiceError] = useState("");
   useEffect(() => {
-    if (!packaged) return;
+    if (!packaged || !accountId) return;
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout> | undefined;
     setDeviceInstance("");
@@ -68,18 +68,32 @@ export function useConnectedDevices() {
       let detach = () => {};
       try {
         setServiceError("");
-        if (installation?.state !== "installed" || installation.consent_required) throw new Error("Install Files and review its permissions to connect devices.");
-        await withNativeDocumentService("files", spaceId, instance => new Promise<void>(resolve => {
-          if (controller.signal.aborted) { resolve(); return; }
-          setDeviceInstance(instance);
-          const stop = () => resolve();
-          controller.signal.addEventListener("abort", stop, {once:true});
-          detach = () => { controller.signal.removeEventListener("abort", stop); resolve(); };
-        }), controller.signal, "devices");
+        await withBuiltinService(
+          "files",
+          spaceId,
+          (instance) =>
+            new Promise<void>((resolve) => {
+              if (controller.signal.aborted) {
+                resolve();
+                return;
+              }
+              setDeviceInstance(instance);
+              const stop = () => resolve();
+              controller.signal.addEventListener("abort", stop, { once: true });
+              detach = () => {
+                controller.signal.removeEventListener("abort", stop);
+                resolve();
+              };
+            }),
+          controller.signal,
+          "devices",
+        );
       } catch (error) {
         if (!controller.signal.aborted) {
           setDeviceInstance("");
-          setServiceError(error instanceof Error ? error.message : "Files device service is unavailable.");
+          setServiceError(
+            error instanceof Error ? error.message : "Files device service is unavailable.",
+          );
         }
       } finally {
         detach();
@@ -87,8 +101,11 @@ export function useConnectedDevices() {
       }
     };
     void start();
-    return () => { controller.abort(); clearTimeout(retry); };
-  }, [packaged, accountId, spaceId, installation?.state, installation?.installed_version, installation?.authority_generation]);
+    return () => {
+      controller.abort();
+      clearTimeout(retry);
+    };
+  }, [packaged, accountId, spaceId]);
   const [snapshot, setSnapshot] = useState<ConnectedDevicesSnapshot | null>(null);
   const [peers, setPeers] = useState<ServerConnectedPeer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,13 +127,18 @@ export function useConnectedDevices() {
     }
     if (packaged && !deviceInstance) {
       localRef.current = null;
-      setSnapshot(null); setPeers([]); setReady(false); setLoading(false);
+      setSnapshot(null);
+      setPeers([]);
+      setReady(false);
+      setLoading(false);
       setError(serviceError || "Starting the Files device service…");
       return;
     }
     refreshInFlight.current = true;
     const origin = currentScope.current;
-    const check = () => { if (origin !== currentScope.current) throw new Error("Device session changed."); };
+    const check = () => {
+      if (origin !== currentScope.current) throw new Error("Device session changed.");
+    };
     try {
       const account = readActiveSavedAccountSession();
       const localSnapshot = await agentsDeviceSnapshot();

@@ -1,5 +1,5 @@
-@config "../../tailwind.config.js";
-@import "tailwindcss";
+@config "../../.config/tailwind.config.js";
+@import "tailwindcss" source("../../");
 @import "tw-animate-css";
 @import "./overflow-fade.css";
 
@@ -44,6 +44,18 @@
   ) {
   border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
   --tw-ring-shadow: 0 0 #0000;
+}
+
+:root
+  :is(
+    [data-slot="dialog-overlay"][data-state="closed"],
+    [data-slot="sheet-overlay"][data-state="closed"],
+    [data-slot="alert-dialog-overlay"][data-state="closed"],
+    [data-slot="dialog-content"][data-state="closed"],
+    [data-slot="sheet-content"][data-state="closed"],
+    [data-slot="alert-dialog-content"][data-state="closed"]
+  ) {
+  pointer-events: none !important;
 }
 
 @theme inline {

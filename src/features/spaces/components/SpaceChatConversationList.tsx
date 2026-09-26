@@ -12,7 +12,7 @@ import {
   cn,
 } from "@/shared/ui";
 import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
-import { BrandIcon } from "../../../.././apps/shared/BrandIcon";
+import { BrandIcon } from "../../../shared/toolAssets/BrandIcon";
 import { Link } from "react-router-dom";
 import { InstagramBrandIcon } from "../social/InstagramBrandIcon";
 import { MessengerBrandIcon, XBrandIcon } from "../social/SocialProviderBrandIcons";
@@ -139,7 +139,7 @@ export function SpaceChatConversationList({
                     {canRename && canDelete ? <ContextMenuSeparator /> : null}
                     {canDelete ? (
                       <ContextMenuItem
-                        className="text-cream-bright focus:bg-charcoal-active focus:text-cream-bright"
+                        variant="destructive"
                         onSelect={() => onDeleteConversation?.(conversation)}
                       >
                         <Trash2 />

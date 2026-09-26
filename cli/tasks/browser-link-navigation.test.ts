@@ -57,6 +57,7 @@ test('pointer focus reports over native messaging without navigating the page', 
 
 test('companion pointer tracking reports over native messaging without interrupting navigation', () => {
   const script = source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
+    .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
     .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
     .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
     .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', 'true');

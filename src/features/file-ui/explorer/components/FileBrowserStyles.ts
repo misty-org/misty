@@ -54,22 +54,14 @@ export const fileBrowserStyles = {
   tableNameText:
     "min-w-0 cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap",
   tableIconSlot: "grid size-5 flex-none place-items-center",
-  materialIcon: "block shrink-0 object-contain",
-  folderIcon: "text-cream-muted",
-  fileIcon: "text-cream-muted",
-  iconArchive: "text-cream-muted",
-  iconAudio: "text-cream-muted",
-  iconCode: "text-cream-muted",
-  iconImage: "text-cream-muted",
-  iconSpreadsheet: "text-cream-muted",
-  iconText: "text-cream-muted",
-  iconVideo: "text-cream-muted",
+  entryIcon:
+    "block shrink-0 text-cream-muted group-data-[state=selected]/file-row:text-cream group-aria-pressed/file-row:text-cream group-hover/file-row:text-cream",
   gridScroll:
     "misty-transient-scrollbar misty-file-browser-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   gridSizer: "relative min-w-0",
   grid: "absolute left-[3px] right-[3px] grid content-start gap-[18px] [[data-compact-mode=true]_&]:left-0.5 [[data-compact-mode=true]_&]:right-0.5 [[data-compact-mode=true]_&]:gap-2.5",
   gridItem:
-    "relative grid min-h-[156px] min-w-0 content-start cursor-default justify-items-center gap-3 rounded-md border border-transparent bg-transparent px-1.5 py-4 text-cream-muted outline-none hover:bg-charcoal-card hover:text-cream focus-visible:border-charcoal-active focus-visible:ring-1 focus-visible:ring-charcoal-active [[data-compact-mode=true]_&]:min-h-[132px] [[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:px-1 [[data-compact-mode=true]_&]:py-3",
+    "group/file-row relative grid min-h-[156px] min-w-0 content-start cursor-default justify-items-center gap-3 rounded-md border border-transparent bg-transparent px-1.5 py-4 text-cream-muted outline-none hover:bg-charcoal-card hover:text-cream focus-visible:border-charcoal-active focus-visible:ring-1 focus-visible:ring-charcoal-active [[data-compact-mode=true]_&]:min-h-[132px] [[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:px-1 [[data-compact-mode=true]_&]:py-3",
   gridItemSelected:
     "selected bg-charcoal-hover text-cream hover:bg-charcoal-hover hover:text-cream",
   gridItemDragging: "opacity-50",

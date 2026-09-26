@@ -97,6 +97,6 @@ export function paneViewLabel(view: WorkspaceTab | null | undefined): string {
 }
 export function layoutTabLabel(tab: WorkspaceLayoutTab): string {
   const view = activeLayoutView(tab);
-  if (view?.placeholder && tab.title === "New pane") return "New Tab";
+  if (view?.placeholder) return tab.title && tab.title !== "New pane" ? tab.title : "New Tab";
   return tab.title || paneViewLabel(view);
 }

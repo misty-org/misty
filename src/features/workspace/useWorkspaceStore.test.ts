@@ -53,7 +53,7 @@ describe("desktop dock store", () => {
     const firstHome = store.openSurface(homeRequest);
     expect(useWorkspaceStore.getState().closeTab(firstHome.id)).toBe(true);
     expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "space", title: "New Tab", route: "/home", placeholder: true },
+      { surfaceId: "space", title: "New Tab", route: "/spaces/family/new", placeholder: true },
     ]);
   });
 
@@ -112,7 +112,7 @@ describe("desktop dock store", () => {
 
   it("starts the global workspace on Choose app", () => {
     expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "home", title: "New Tab", route: "/home", placeholder: true },
+      { surfaceId: "home", title: "New Tab", route: "/new", placeholder: true },
     ]);
   });
 
@@ -231,7 +231,7 @@ describe("desktop dock store", () => {
 
     useWorkspaceStore.getState().setScope("space:work");
     expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "space", title: "New Tab", route: "/home", placeholder: true },
+      { surfaceId: "space", title: "New Tab", route: "/spaces/work/new", placeholder: true },
     ]);
 
     useWorkspaceStore.getState().setScope("space:family");

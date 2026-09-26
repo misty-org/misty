@@ -1,13 +1,13 @@
 import type { AgentProfile } from "@misty/contracts";
-import sky from "@/shared/assets/misty-cloud-expression-cycle.webp";
-import lavender from "@/shared/assets/agents/cloud-lavender.webp";
-import mint from "@/shared/assets/agents/cloud-mint.webp";
-import peach from "@/shared/assets/agents/cloud-peach.webp";
+import sky from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
+import lavender from "@/shared/assets/agents/cloud-lavender.webp?inline";
+import mint from "@/shared/assets/agents/cloud-mint.webp?inline";
+import peach from "@/shared/assets/agents/cloud-peach.webp?inline";
 
-import skyPoster from "@/shared/assets/agents/cloud-sky-poster.webp";
-import lavenderPoster from "@/shared/assets/agents/cloud-lavender-poster.webp";
-import mintPoster from "@/shared/assets/agents/cloud-mint-poster.webp";
-import peachPoster from "@/shared/assets/agents/cloud-peach-poster.webp";
+import skyPoster from "@/shared/assets/agents/cloud-sky-poster.webp?inline";
+import lavenderPoster from "@/shared/assets/agents/cloud-lavender-poster.webp?inline";
+import mintPoster from "@/shared/assets/agents/cloud-mint-poster.webp?inline";
+import peachPoster from "@/shared/assets/agents/cloud-peach-poster.webp?inline";
 
 export const agentCloudVariants = [
   { id: "sky", name: "Sky", expression: "Original", src: sky, poster: skyPoster },

@@ -1,42 +1,12 @@
-use tauri::{Emitter, Manager};
 
 #[cfg(target_os = "macos")]
 extern "C" {
     fn misty_context_main_focused();
-    fn misty_context_configure_window(pointer: *mut std::ffi::c_void);
-    fn misty_context_start(toggle: extern "C" fn());
     fn misty_context_status(request: bool) -> *mut std::ffi::c_char;
     fn misty_context_capture() -> *mut std::ffi::c_char;
 }
-#[cfg(target_os = "macos")]
-static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
-#[cfg(target_os = "macos")]
-extern "C" fn toggle() {
-    if let Some(app) = APP.get() {
-        if let Some(window) = app.get_webview_window("misty-bot-pet") {
-            let _ = window.show();
-            let _ = window.emit("misty://desktop-panel-toggle", ());
-        }
-    }
-}
-pub fn setup(app: &tauri::AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        if let Some(window) = app.get_webview_window("misty-bot-pet") {
-            if let Ok(pointer) = window.ns_window() {
-                unsafe {
-                    misty_context_configure_window(pointer);
-                }
-            }
-        }
-        let _ = APP.set(app.clone());
-        unsafe {
-            misty_context_start(toggle);
-        }
-    }
-}
 fn trusted(window: &tauri::Webview) -> Result<(), String> {
-    if matches!(window.label(), "main" | "misty-bot-pet") {
+    if window.label() == "main" {
         Ok(())
     } else {
         Err("Screen context is available only to Misty.".into())

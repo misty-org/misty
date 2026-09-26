@@ -1,3 +1,7 @@
+import {
+  initialWebsiteNavigation,
+  userWebsiteGroups,
+} from "@/features/browser-workspace/navigationDefaults";
 import { layoutTabs, selectLayoutTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
@@ -6,11 +10,7 @@ import {
   initialWorkspaceLayout,
   normalizeWorkspaceLayout,
 } from "./virtualWindows";
-import {
-  migrateRetiredWorkspaceTab,
-  migrateRetiredWorkspaceTabs,
-  migrateSpaceToolTabs,
-} from "./workspaceMigrations";
+import { migrateRetiredWorkspaceTab, migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
 import { migrateClosedWorkspaceTabs } from "./closedWorkspaceTabs";
 import type { WorkspaceScopeKey, WorkspaceVirtualWindow } from "./model";
 
@@ -34,13 +34,16 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
       Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
         scope,
         layout
-          ? normalizeWorkspaceLayout(migrateSpaceToolTabs(layout), scope as WorkspaceScopeKey)
+          ? normalizeWorkspaceLayout(
+              migrateRetiredWorkspaceTabs(layout),
+              scope as WorkspaceScopeKey,
+            )
           : layout,
       ]),
     ) as WorkspaceStore["layoutsByScope"];
     const activeScopeKey = state.activeScopeKey ?? "global";
     const activeLayout = normalizeWorkspaceLayout(
-      migrateSpaceToolTabs(
+      migrateRetiredWorkspaceTabs(
         state.layout ?? layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(),
       ),
       activeScopeKey,
@@ -69,14 +72,18 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     };
   }
 
-  return sanitizeRetiredWorkspaceSurfaces(migrated) as WorkspaceStore;
+  return {
+    ...initialWebsiteNavigation(),
+    ...sanitizeRetiredWorkspaceSurfaces(migrated),
+    websiteGroups: userWebsiteGroups(migrated.websiteGroups ?? [], migrated.savedWebsites ?? []),
+  } as WorkspaceStore;
 }
 
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
   const activeScopeKey = state.activeScopeKey ?? "global";
   const migrateLayout = (layout: WorkspaceLayout, scopeKey: WorkspaceScopeKey) => {
     const migrated = normalizeWorkspaceLayout(
-      migrateSpaceToolTabs(migrateRetiredWorkspaceTabs(layout, scopeKey)),
+      migrateRetiredWorkspaceTabs(layout, scopeKey),
       scopeKey,
     );
     const history = (node: WorkspaceDockNode): WorkspaceDockNode => {
@@ -149,6 +156,10 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
 
 export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceStore> {
   return {
+    websiteGroups: state.websiteGroups,
+    savedWebsites: state.savedWebsites,
+    expandedWebsiteGroups: state.expandedWebsiteGroups,
+    selectedWebsiteByGroup: state.selectedWebsiteByGroup,
     activeScopeKey: state.activeScopeKey,
     layout: state.layout,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: state.layout },

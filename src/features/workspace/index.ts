@@ -27,4 +27,6 @@ export * from "./MistyBrandIcon";
 export * from "./workspaceTabOperations";
 export * from "./WorkspaceTabRouteScope";
 export * from "./workspaceDefaultTab";
+export * from "./layoutTabs";
 export * from "./mobileWorkspaceProjection";
+export { useWindowDockingLayout } from "./useWindowDockingLayout";

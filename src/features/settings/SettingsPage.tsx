@@ -5,10 +5,10 @@ import {
   Bot,
   MonitorCog,
   SlidersHorizontal,
-  Blocks,
   Cpu,
   DownloadCloud,
   Eye,
+  LayoutTemplate,
   Keyboard,
   Lock,
   MessageCircle,
@@ -16,6 +16,7 @@ import {
   UserRound,
   Server,
   Settings2,
+  RefreshCw,
 } from "lucide-react";
 import { memo, type ComponentType } from "react";
 import { ComingSoonSurface } from "@/shared/ui";
@@ -23,6 +24,7 @@ import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
 import { AdvancedSection } from "./sections/AdvancedSection";
 import { AccountSection } from "./sections/AccountSection";
+import { LayoutSection } from "./sections/LayoutSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { MistySection } from "./sections/MistySection";
@@ -31,6 +33,7 @@ import { PrivacySection } from "./sections/PrivacySection";
 import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
+import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import type { LucideIcon } from "lucide-react";
 
@@ -65,7 +68,6 @@ export interface SettingsRegistryEntry {
 }
 
 const ModelsComingSoonSection = () => <SettingsComingSoon feature="Models" />;
-const ExtensionsComingSoonSection = () => <SettingsComingSoon feature="Extensions" />;
 
 function SettingsComingSoon({ feature }: { feature: string }) {
   return (
@@ -99,6 +101,13 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     Component: AppearanceSection,
   },
   {
+    id: "layout",
+    label: "Layout",
+    icon: LayoutTemplate,
+    group: "preferences",
+    Component: LayoutSection,
+  },
+  {
     id: "notifications",
     label: "Notifications",
     icon: Bell,
@@ -127,11 +136,11 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     Component: MistySection,
   },
   {
-    id: "extensions",
-    label: "Extensions",
-    icon: Blocks,
+    id: "sync",
+    label: "Sync",
+    icon: RefreshCw,
     group: "system",
-    Component: ExtensionsComingSoonSection,
+    Component: BrowserSyncSettings,
   },
   {
     id: "server",
@@ -173,11 +182,11 @@ const navItems = settingsRegistry.map(({ id, label, icon, group }) => ({
 }));
 
 const mobileExcludedSettings = new Set<SettingsSection>([
+  "layout",
   "shortcuts",
   "code",
   "terminal",
   "transfers",
-  "extensions",
   "server",
   "updates",
   "advanced",

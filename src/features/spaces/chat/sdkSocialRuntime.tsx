@@ -5,7 +5,7 @@ import {
   type MistyComponentContext,
   type MistySocialOperation,
 } from "@misty/sdk";
-import { createSdkLibraryRuntime } from "@/features/spaces/library/sdkLibraryRuntime";
+import { createSdkLibraryRuntime } from "@/features/library/library/sdkLibraryRuntime";
 import { MistyPickerShell } from "@/features/picker/MistyPickerShell";
 import { useSdkSpaceChatDraft } from "@/features/chat-composer/useSdkSpaceChatDraft";
 import {

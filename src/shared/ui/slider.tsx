@@ -32,11 +32,11 @@ const Slider = React.forwardRef<
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="relative h-1 w-full grow overflow-hidden rounded-full bg-charcoal-hover data-[disabled]:bg-charcoal-bg"
+        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-white/10 data-[disabled]:opacity-50"
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute h-full bg-cream-muted transition-colors data-[disabled]:bg-charcoal-border"
+          className="absolute h-full bg-cream-bright data-[disabled]:bg-cream-muted"
         />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb
@@ -46,11 +46,10 @@ const Slider = React.forwardRef<
         aria-describedby={ariaDescribedBy}
         aria-valuetext={ariaValueText}
         className={cn(
-          "relative block size-[18px] rounded-full border-2 border-charcoal-bg bg-cream-bright",
-          "shadow-sm ring-1 ring-cream/20 outline-none transition-[background-color,box-shadow,transform] duration-150 ease-out",
-          "after:absolute after:-inset-2 after:content-[''] hover:scale-105 focus-visible:ring-[3px]",
-          "focus-visible:ring-cream-muted/40 data-[disabled]:pointer-events-none data-[disabled]:border-charcoal-border",
-          "data-[disabled]:bg-charcoal-border data-[disabled]:ring-charcoal-border data-[disabled]:shadow-none",
+          "relative block size-4 shrink-0 rounded-full bg-cream-bright shadow-sm outline-none",
+          "transition-[box-shadow] duration-150 after:absolute after:-inset-2 after:content-['']",
+          "hover:ring-4 hover:ring-cream/15 focus-visible:ring-4 focus-visible:ring-cream/25",
+          "data-[disabled]:pointer-events-none data-[disabled]:bg-cream-muted",
         )}
       />
     </SliderPrimitive.Root>

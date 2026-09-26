@@ -58,4 +58,27 @@ describe("MistyComposer", () => {
     expect(screen.getByTestId("model-control")).toBeDefined();
     expect(screen.queryByText("Ask")).toBeNull();
   });
+  it("opens screen capture from the attachment menu", async () => {
+    const capture = vi.fn();
+    render(
+      <MistyComposer
+        value=""
+        onChange={vi.fn()}
+        mode="ask"
+        attachments={[]}
+        maxAttachments={10}
+        onAddFiles={vi.fn()}
+        onRemoveAttachment={vi.fn()}
+        onSubmit={vi.fn()}
+        onCapture={capture}
+      />,
+    );
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Add attachments" }), {
+      button: 0,
+      pointerType: "mouse",
+    });
+    expect(await screen.findByRole("menuitem", { name: "Attach files" })).toBeDefined();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Capture part of the screen" }));
+    expect(capture).toHaveBeenCalledOnce();
+  });
 });

@@ -1,4 +1,4 @@
-import type { UnifiedNote } from "@/features/notes";
+import type { UnifiedNote } from "@/features/journal/notes";
 import type {
   LibraryItemsResult,
   SpaceMember,

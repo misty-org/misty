@@ -1,5 +1,4 @@
 import { fetchCurrentInstanceDescriptor } from "@/api/deployment/api";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -9,7 +8,6 @@ import AuthField from "./components/AuthField";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
-import { markAccountCreating } from "@/features/onboarding";
 import { accountRegister } from "./store/useAccountStore";
 
 export default function RegisterPage() {
@@ -21,9 +19,7 @@ export default function RegisterPage() {
   const from =
     rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
       ? rawFrom
-      : isNativeMobileBuild
-        ? "/home"
-        : "/spaces";
+      : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount || user);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -55,12 +51,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const createdUser = await authenticateAccount(() =>
+      await authenticateAccount(() =>
         accountRegister(name, normalizedUsername, email, password, selfHostToken),
       );
-      if (createdUser?.id) {
-        markAccountCreating(createdUser.id);
-      }
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(
@@ -79,23 +72,19 @@ export default function RegisterPage() {
           ? bootstrapRequired
             ? "Create the first administrator with the 30-minute bootstrap token."
             : "Create an isolated account with an administrator enrollment invitation."
-          : addingAccount
-            ? "Your current account will remain signed in on this device."
-            : "Your Misty workspace begins with an account."
+          : undefined
       }
       onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
     >
       <AuthCard
         footer={
-          <div className="text-center text-sm text-cream-muted">
-            <NavLink
-              to="/signin"
-              state={{ from, addingAccount }}
-              className="transition hover:text-cream"
-            >
-              Already have an account? Sign in
-            </NavLink>
-          </div>
+          <NavLink
+            to="/signin"
+            state={{ from, addingAccount }}
+            className="text-sm font-medium text-cream underline-offset-4 hover:underline"
+          >
+            Already have an account? Sign in
+          </NavLink>
         }
       >
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>

@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/auth";
+import { CompanionAppearanceSettings } from "@/features/agents";
 import { personalAgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import { SystemErrorActivity } from "@/features/activity";
 import { publicBetaFeatureEnabled } from "@/features/launch";
@@ -192,6 +193,9 @@ export function MistySection(_props: SettingsContentProps) {
 
   return (
     <>
+      <div className="mb-6 empty:hidden">
+        <CompanionAppearanceSettings />
+      </div>
       <SettingsSectionBlock
         title="Misty everywhere"
         description="Misty is the built-in contextual copilot. Agents remains the destination for durable conversations, configuration, and delegated work."

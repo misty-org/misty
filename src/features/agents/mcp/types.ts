@@ -6,7 +6,7 @@ export interface McpConnection {
   name: string;
   endpoint_url: string;
   transport: "streamable_http";
-  provider?: "custom" | "activepieces";
+  provider?: "custom";
   status: McpConnectionStatus;
   last_error_code?: string;
   last_checked_at?: string | null;

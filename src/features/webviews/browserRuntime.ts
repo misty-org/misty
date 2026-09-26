@@ -120,6 +120,20 @@ let browserPointerTrackingQueue = Promise.resolve();
 
 export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
+/** Native handoff has closed the previous physical profile. Settle old runtime
+ * work before invalidating cached handles; visible panes then reopen normally. */
+export async function browserProfileChanged(
+  stillCurrent: () => boolean = () => true,
+): Promise<void> {
+  await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
+  if (!stillCurrent()) return;
+  createdRuntimeIds.clear();
+  visibleRuntimeIds.clear();
+  lastBounds.clear();
+  useBrowserRuntimeStore.setState({ grants: {}, errors: {}, loading: {} });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+}
+
 type BrowserRuntimeTab = Pick<WorkspaceTab, "id" | "instanceKey">;
 type BrowserSyncInput = {
   originSpaceId?: string;
@@ -217,6 +231,23 @@ export function browserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
   return createdRuntimeIds.has(sdkBrowserContexts.get(tab.id)?.runtimeId ?? browserRuntimeId(tab));
 }
 
+/** Apply a committed sync URL to an existing page without showing or focusing
+ * it. Unopened pages will use the projected URL when they are created. */
+export function navigateSyncedBrowserWebview(
+  tab: BrowserRuntimeTab,
+  url: string,
+  stillCurrent: () => boolean,
+): Promise<void> {
+  const id = browserRuntimeId(tab);
+  return enqueue(id, async () => {
+    // Creation/closing may still be queued, and a newer local or remote edit
+    // may have superseded this URL while we waited for the native view.
+    if (!createdRuntimeIds.has(id) || !stillCurrent()) return;
+    useBrowserRuntimeStore.getState().setLoading(tab.id, true);
+    await invoke("browser_webview_navigate", { request: { id, url } });
+  });
+}
+
 export function requestBrowserWebviewLayout(tab: BrowserRuntimeTab): void {
   lastBounds.delete(registerBrowserRuntime(tab));
   if (typeof window !== "undefined") {
@@ -282,6 +313,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     await invoke("browser_webview_create", {
       request: {
         id,
+        workspaceTabId: input.tab.id,
         url: input.url,
         scopeId: input.scopeId ?? browserScopeId(input.tab),
         originSpaceId: input.originSpaceId,

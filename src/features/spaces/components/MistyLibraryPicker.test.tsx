@@ -8,7 +8,7 @@ vi.mock("@/api/spaces/api", () => ({
   },
 }));
 
-import { MistyLibraryPicker } from "@/features/spaces/library";
+import { MistyLibraryPicker } from "@/features/library/library";
 
 describe("MistyLibraryPicker", () => {
   let container: HTMLDivElement;

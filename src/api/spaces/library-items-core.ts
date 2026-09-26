@@ -14,12 +14,28 @@ import type {
 } from "@/api/spaces/dto/interfaces/types";
 import type { BulkLibraryItemAction } from "@/api/spaces/dto/types/types";
 
-import {libraryPreviewPath,libraryReauthenticationHeaders} from "./library-transfer-paths";
-import type {LibraryUploadOptions} from "./library-upload";
-export type LibraryTransfers = Pick<typeof import("./library-upload"),"downloadProtectedFile"|"fetchProtectedBlob"|"replaceLibraryItemContent"|"uploadLibraryBlob"|"uploadLibraryPath">;
+import { libraryPreviewPath, libraryReauthenticationHeaders } from "./library-transfer-paths";
+import type { LibraryUploadOptions } from "./library-upload";
+export type LibraryTransfers = Pick<
+  typeof import("./library-upload"),
+  | "downloadProtectedFile"
+  | "fetchProtectedBlob"
+  | "replaceLibraryItemContent"
+  | "uploadLibraryBlob"
+  | "uploadLibraryPath"
+>;
 import type { SpaceRequest } from "./types";
-export function createSpaceLibraryItemsApi(spaceRequest: SpaceRequest, transfers:LibraryTransfers) {
-  const {downloadProtectedFile,fetchProtectedBlob,replaceLibraryItemContent,uploadLibraryBlob,uploadLibraryPath}=transfers;
+export function createSpaceLibraryItemsApi(
+  spaceRequest: SpaceRequest,
+  transfers: LibraryTransfers,
+) {
+  const {
+    downloadProtectedFile,
+    fetchProtectedBlob,
+    replaceLibraryItemContent,
+    uploadLibraryBlob,
+    uploadLibraryPath,
+  } = transfers;
   return {
     libraryItems: (spaceId: string, query: LibraryItemQuery = {}, reauthenticationToken = "") => {
       const values = new URLSearchParams();
@@ -143,8 +159,7 @@ export function createSpaceLibraryItemsApi(spaceRequest: SpaceRequest, transfers
     libraryUsage: (spaceId: string) =>
       spaceRequest<SpaceStorageUsage>(`/spaces/${encodeURIComponent(spaceId)}/library/usage`),
     /** Personal and per-Space quota usage, with legacy fields retained by the server. */
-    agentUsage: () =>
-      spaceRequest<BillingUsage>("/billing/usage", { cache: "no-store" }),
+    agentUsage: () => spaceRequest<BillingUsage>("/billing/usage", { cache: "no-store" }),
     libraryAssetStacks: (spaceId: string) =>
       spaceRequest<{ stacks: LibraryAssetStack[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks`,

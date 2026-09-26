@@ -170,10 +170,7 @@ function RemoteRow(props: {
               <DropdownMenuItem onClick={props.onRepair}>
                 <AssetIcon src={iconAssets.plus16} size={15} /> Import
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-cream-bright focus:text-cream-bright"
-                onClick={props.onDisconnect}
-              >
+              <DropdownMenuItem variant="destructive" onClick={props.onDisconnect}>
                 <AssetIcon src={iconAssets.trash24} size={15} /> Delete
               </DropdownMenuItem>
             </>
@@ -182,10 +179,7 @@ function RemoteRow(props: {
               <DropdownMenuItem onClick={props.onRepair}>
                 <AssetIcon src={iconAssets.gear24} size={15} /> Configure
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-cream-bright focus:text-cream-bright"
-                onClick={props.onDisconnect}
-              >
+              <DropdownMenuItem variant="destructive" onClick={props.onDisconnect}>
                 <AssetIcon src={iconAssets.trash24} size={15} /> Delete
               </DropdownMenuItem>
             </>

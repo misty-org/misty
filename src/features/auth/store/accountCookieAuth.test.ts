@@ -12,13 +12,13 @@ vi.mock("@/api/client/session", () => ({
   readApiAuthToken: async () => null,
   readApiSessionGeneration: () => 0,
   notifyApiSessionInvalid: mocks.notifyApiSessionInvalid,
+  isApiSignedOut: () => false,
 }));
 vi.mock("@/api/deployment/api", () => ({
   resolveApiBase: async () => "https://misty.example/v1",
   resolveHostedApiBase: () => "https://misty.example/v1",
   resolveDeploymentTarget: async () => ({ mode: "hosted" }),
 }));
-vi.mock("@/api/self-host/proof", () => ({ attachSelfHostEntitlementProof: async () => {} }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/telemetry/client", () => ({ analytics: { isAnalyticsEnabled: () => false } }));

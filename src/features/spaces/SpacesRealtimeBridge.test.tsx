@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   },
   spaces: {
     loading: false,
+    snapshotReady: true,
     error: null as string | null,
     load: vi.fn(async () => undefined),
     loadInbox: vi.fn(async () => undefined),
@@ -33,7 +34,7 @@ vi.mock("./store/useSpacesStore", () => ({
   ),
 }));
 
-vi.mock("@/features/files/explorer", () => ({
+vi.mock("@/features/files/workspace/explorer", () => ({
   useExplorerStore: (selector: (state: typeof mocks.explorer) => unknown) =>
     selector(mocks.explorer),
 }));

@@ -1,4 +1,4 @@
-import { libraryItemThumbnailEligible } from "@/features/spaces/library/libraryThumbnail";
+import { libraryItemThumbnailEligible } from "@/features/library/library/libraryThumbnail";
 import { describe, expect, it } from "vitest";
 
 describe("libraryItemThumbnailEligible", () => {

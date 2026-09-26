@@ -176,6 +176,10 @@ fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
 }
 
 pub(crate) fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    // Startup owns the first reveal, including native traffic-light layout.
+    if !crate::platform::plugins::mac_rounded_corners::main_window_ready() {
+        return Ok(());
+    }
     let window = app
         .get_webview_window("main")
         .or_else(|| app.webview_windows().into_values().next())

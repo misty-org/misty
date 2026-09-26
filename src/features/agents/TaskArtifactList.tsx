@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useTaskArtifacts } from "./taskArtifacts";
+import { Button } from "@/shared/ui";
 export function TaskArtifacts({ agentId, spaceId }: { agentId: string; spaceId: string }) {
   const items = useTaskArtifacts((s) => s.items).filter(
     (item) => item.agentId === agentId && item.spaceId === spaceId,
@@ -17,12 +18,13 @@ export function TaskArtifacts({ agentId, spaceId }: { agentId: string; spaceId: 
         <div key={item.id} className="flex items-center gap-2 py-1">
           <span className="min-w-0 flex-1 truncate">{item.name}</span>
           {item.state === "ready" ? (
-            <button
-              className="underline"
+            <Button
+              variant="link"
+              className="h-auto p-0 underline text-xs"
               onClick={() => void openPath(item.path).catch((reason) => setError(String(reason)))}
             >
               Open
-            </button>
+            </Button>
           ) : (
             <span>{item.state === "pending" ? "Downloading…" : "Failed"}</span>
           )}

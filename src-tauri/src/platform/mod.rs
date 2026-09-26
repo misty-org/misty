@@ -2,7 +2,5 @@
 
 pub mod app_command_policy;
 #[cfg(desktop)]
-pub mod extension_protocol;
-#[cfg(desktop)]
 pub mod mini_app;
 pub mod plugins;

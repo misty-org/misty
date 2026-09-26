@@ -1,3 +1,7 @@
+import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
+import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
+import { continueWithTemporaryWorkspace } from "@/features/workspace/nativeWorkspaceRecovery";
+import { readApiAuthToken } from "@/api/client/session";
 import { apiSessionInvalidEvent } from "@/api/client/session";
 import { useSetupStore } from "@/features/installer";
 import { removeSpaceReferenceCache } from "@/features/spaces";
@@ -8,6 +12,7 @@ import {
 } from "@/features/workspace";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { mobileCachePurgeAccount } from "@/native/mobile-cache";
+import { reportSystemError } from "@/features/activity";
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
 import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
@@ -29,7 +34,6 @@ import {
   isInvalidAccountSessionError,
   licenseFromMe,
   readInitialUser,
-  refreshAuthenticatedAccountState,
   resetAccountScopedState,
   shouldPersistAuthUser,
   writeStoredUser,
@@ -39,7 +43,7 @@ import {
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { restoreSavedSession, tryRestoreSavedSession } from "./sessionRecovery";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
-import { accountFetchMe } from "./store/useAccountStore";
+import { accountFetchMe, accountLogout } from "./store/useAccountStore";
 import {
   activateAccountSession,
   clearAccountAuthToken,
@@ -54,7 +58,7 @@ import { useUserStore } from "./store/useUserStore";
 export type { AuthContextValue, AuthUser } from "./authSession";
 const AuthContext = createContext<AuthContextValue>({
   user: null,
-  setUser: () => {},
+  setUser: async () => {},
   accounts: [],
   transitioning: false,
   refreshUser: async () => null,
@@ -74,7 +78,7 @@ export function OfficialAppAuthProvider(props: { user: AuthUser; children: React
   const value = useMemo<AuthContextValue>(
     () => ({
       user: props.user,
-      setUser: () => undefined,
+      setUser: async () => undefined,
       accounts: [],
       transitioning: false,
       refreshUser: async () => props.user,
@@ -120,25 +124,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Signs out the active account and returns to the sign-in chooser without
   // silently jumping to another saved account. Every account stays listed.
-  const deactivateToChooser = useCallback(async () => {
-    const accountId = activeUser?.id ?? "";
-    if (accountId) saveAccountWorkspace(accountId);
-    await deactivateActiveAccount();
-    await signOut();
-    if (isNativeMobileBuild && accountId) await removeSavedAccountSession(accountId);
-    resetAccountScopedState(accountId);
-    setUserState(null);
-    setAccounts(listSavedAccountSessions());
-    navigate("/signin", { replace: true });
-  }, [activeUser?.id, navigate, signOut]);
+  // Saving the workspace and clearing native identity are best-effort: a failed
+  // cleanup step is reported, but never leaves the person signed in.
+  const deactivateToChooser = useCallback(
+    async ({ endSession = false }: { endSession?: boolean } = {}) => {
+      const accountId = activeUser?.id ?? "";
+      const failures: unknown[] = [];
+      const attempt = async (step: () => unknown) => {
+        try {
+          await step();
+        } catch (error) {
+          failures.push(error);
+        }
+      };
+      await attempt(flushWorkspaceRecovery);
+      if (accountId) await attempt(() => saveAccountWorkspace(accountId));
+      // Signing out ends the server session: the account stays listed, but
+      // choosing it again asks for the password.
+      if (endSession && accountId) await attempt(() => accountLogout(accountId));
+      await attempt(deactivateActiveAccount);
+      await attempt(signOut);
+      if (isNativeMobileBuild && accountId)
+        await attempt(() => removeSavedAccountSession(accountId));
+      resetAccountScopedState(accountId);
+      setUserState(null);
+      setAccounts(listSavedAccountSessions());
+      navigate("/signin", { replace: true });
+      for (const error of failures) {
+        reportSystemError({
+          accountId,
+          scope: "account:sign-out",
+          title: "Part of signing out did not finish",
+          error,
+        });
+      }
+    },
+    [activeUser?.id, navigate, signOut],
+  );
 
   const setUser = useCallback(
-    (nextUser: AuthUser | null) => {
+    async (nextUser: AuthUser | null) => {
       const currentAccountId = activeUser?.id ?? "";
-      if (currentAccountId !== (nextUser?.id ?? null)) {
-        if (currentAccountId) saveAccountWorkspace(currentAccountId);
+      if (currentAccountId !== (nextUser?.id ?? "")) {
+        await flushWorkspaceRecovery();
+        if (currentAccountId) await saveAccountWorkspace(currentAccountId);
         resetAccountScopedState(currentAccountId);
-        if (nextUser?.id) restoreAccountWorkspace(nextUser.id);
+        if (nextUser?.id) await restoreAccountWorkspace(nextUser.id);
       }
       setUserState(nextUser);
       setAccounts(listSavedAccountSessions());
@@ -152,10 +183,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousUser = activeUser;
       const previousAccountId = previousUser?.id ?? "";
       const previousMe = useUserStore.getState().me;
-      let accountReady = false;
       beginAccountOperation();
       try {
-        if (previousAccountId) saveAccountWorkspace(previousAccountId);
+        await flushWorkspaceRecovery();
+        if (previousAccountId) await saveAccountWorkspace(previousAccountId);
         resetAccountScopedState(previousAccountId);
         const saved = await activateAccountSession(accountId);
         const me = await accountFetchMe();
@@ -166,31 +197,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // previous token without leaving the two account identities crossed.
         await updateSavedAccountSession(nextUser);
         await saveAuthenticatedUser(nextUser, licenseFromMe(me));
-        restoreAccountWorkspace(nextUser.id);
+        await restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
-        accountReady = true;
         if (window.location.pathname.startsWith("/spaces/")) {
-          navigate("/spaces", { replace: true });
+          navigate("/browser", { replace: true });
         }
       } catch (error) {
-        if (isInvalidAccountSessionError(error)) await clearAccountAuthToken();
+        // Keep the target account listed even when its session is dead: the
+        // caller sends the person to sign in again instead of deleting it.
         const restoredPreviousAccount = await tryRestoreSavedSession(previousAccountId);
         if (restoredPreviousAccount) {
-          if (previousAccountId) restoreAccountWorkspace(previousAccountId);
+          if (previousAccountId) await restoreAccountWorkspace(previousAccountId);
           if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
           if (previousUser?.id === previousAccountId) setUserState(previousUser);
-          accountReady = true;
         } else {
+          await deactivateActiveAccount().catch(() => undefined);
           useUserStore.getState().clear();
           setUserState(null);
         }
         setAccounts(listSavedAccountSessions());
-        throw error;
+        throw isInvalidAccountSessionError(error)
+          ? new SavedAccountSessionUnavailableError()
+          : error;
       } finally {
         finishAccountOperation();
-        if (accountReady) refreshAuthenticatedAccountState(accountId);
       }
     },
     [activeUser, beginAccountOperation, finishAccountOperation, navigate, saveAuthenticatedUser],
@@ -203,10 +235,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousMe = useUserStore.getState().me;
       const previousLicense = useSetupStore.getState().status?.current_license ?? null;
       let authenticated: AuthUser | null = null;
-      let accountReady = false;
       beginAccountOperation();
       try {
-        if (previousAccountId) saveAccountWorkspace(previousAccountId);
+        await flushWorkspaceRecovery();
+        if (previousAccountId) await saveAccountWorkspace(previousAccountId);
         resetAccountScopedState(previousAccountId);
         authenticated = await request();
         const me = await accountFetchMe();
@@ -217,13 +249,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         await updateSavedAccountSession(nextUser);
         await saveAuthenticatedUser(nextUser, licenseFromMe(me));
-        restoreAccountWorkspace(nextUser.id);
+        await restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
-        accountReady = true;
         if (window.location.pathname.startsWith("/spaces/")) {
-          navigate("/spaces", { replace: true });
+          navigate("/browser", { replace: true });
         }
         return nextUser;
       } catch (error) {
@@ -239,11 +270,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (previousUser && previousLicense) {
               await saveAuthenticatedUser(previousUser, previousLicense);
             }
-            if (previousAccountId) restoreAccountWorkspace(previousAccountId);
+            if (previousAccountId) await restoreAccountWorkspace(previousAccountId);
             if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
             if (previousUser?.id === previousAccountId) setUserState(previousUser);
             restoredPreviousAccount = true;
-            accountReady = true;
           } catch {
             // Restoring the previous native identity is best-effort. Preserve
             // the original sign-in error instead of replacing it with a
@@ -258,7 +288,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       } finally {
         finishAccountOperation();
-        if (accountReady) refreshAuthenticatedAccountState(authenticated?.id);
       }
     },
     [activeUser, beginAccountOperation, finishAccountOperation, navigate, saveAuthenticatedUser],
@@ -284,6 +313,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserState(nextUser);
     return nextUser;
   }, [activeUser]);
+
+  useEffect(() => {
+    if (!nativeWorkspaceRecoveryEnabled() || !activeUser?.id || accountOperationActive.current)
+      return;
+    const accountId = activeUser.id;
+    let canceled = false;
+    void (async () => {
+      // This restores the OS-held account cookies without requiring a network
+      // response. Local layout recovery also works while sync is locked/offline.
+      await readApiAuthToken();
+      if (canceled || accountOperationActive.current) return;
+      await restoreAccountWorkspace(accountId);
+    })().catch((error) => {
+      if (!canceled && !accountOperationActive.current)
+        continueWithTemporaryWorkspace(accountId, error);
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [activeUser?.id]);
 
   useEffect(() => {
     // Saved display metadata is not proof that the new server cookies work.
@@ -344,7 +393,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         startupValidationCompleted.current = true;
         beginAccountOperation();
         try {
-          resetAccountScopedState();
           // The restored account's token is no longer valid. Rather than silently
           // switching to a different saved account, send the user to the chooser
           // where they can pick another account or re-sign-in to this one.
@@ -410,34 +458,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [activeUser, beginAccountOperation, deactivateToChooser, finishAccountOperation]);
 
-  // Signing out no longer hops to another saved account. It deactivates the
-  // current one — leaving it (and every other account) listed on the sign-in
-  // chooser — and never revokes tokens, so the chooser can resume any account
-  // whose token is still valid, or prompt a re-login when it isn't.
+  // Signing out ends the current account's server session and returns to the
+  // chooser. The account stays listed, but resuming it requires its password;
+  // other saved accounts keep their sessions.
   const logout = useCallback(async () => {
     if (accountOperationActive.current) return;
-    const previousUser = activeUser;
-    const previousAccountId = previousUser?.id ?? "";
-    const previousMe = useUserStore.getState().me;
     beginAccountOperation();
     try {
-      if (previousAccountId) saveAccountWorkspace(previousAccountId);
-      resetAccountScopedState(previousAccountId);
-      await deactivateToChooser();
-    } catch (error) {
-      if (previousUser) {
-        await restoreSavedSession(previousUser.id);
-        if (previousAccountId) restoreAccountWorkspace(previousAccountId);
-        if (previousMe?.id === previousUser.id) useUserStore.getState().setMe(previousMe);
-        setUserState(previousUser);
-        refreshAuthenticatedAccountState(previousUser.id);
-      }
-      setAccounts(listSavedAccountSessions());
-      throw error;
+      await deactivateToChooser({ endSession: true });
     } finally {
       finishAccountOperation();
     }
-  }, [activeUser, beginAccountOperation, finishAccountOperation, deactivateToChooser]);
+  }, [beginAccountOperation, finishAccountOperation, deactivateToChooser]);
 
   // Resume a saved account chosen from the sign-in screen. Its token is validated
   // against /me; on failure the account stays listed and the error propagates so
@@ -446,9 +478,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (accountId: string) => {
       beginAccountOperation();
       const previousAccountId = activeUser?.id ?? "";
-      let accountReady = false;
       try {
-        if (previousAccountId) saveAccountWorkspace(previousAccountId);
+        await flushWorkspaceRecovery();
+        if (previousAccountId) await saveAccountWorkspace(previousAccountId);
         resetAccountScopedState(previousAccountId);
         const saved = await activateAccountSession(accountId);
         const me = await accountFetchMe();
@@ -456,13 +488,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const nextUser = authUserFromMe(me, saved);
         await updateSavedAccountSession(nextUser);
         await saveAuthenticatedUser(nextUser, licenseFromMe(me));
-        restoreAccountWorkspace(nextUser.id);
+        await restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
-        accountReady = true;
         if (window.location.pathname.startsWith("/spaces/")) {
-          navigate("/spaces", { replace: true });
+          navigate("/browser", { replace: true });
         }
       } catch (error) {
         // Keep the account listed so transient failures can be retried. Only
@@ -474,7 +505,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : error;
       } finally {
         finishAccountOperation();
-        if (accountReady) refreshAuthenticatedAccountState(accountId);
       }
     },
     [
@@ -487,9 +517,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const removeAccount = useCallback(async (accountId: string) => {
-    await removeSavedAccountSession(accountId);
+    if (!(await removeSavedAccountSession(accountId)))
+      throw new Error("Could not remove the saved account. Its workspace has been preserved.");
     await removeSpaceReferenceCache(accountId);
-    removeAccountWorkspace(accountId);
+    await removeAccountWorkspace(accountId);
     if (isNativeMobileBuild) await mobileCachePurgeAccount(accountId);
     setAccounts(listSavedAccountSessions());
   }, []);

@@ -24,7 +24,6 @@ vi.mock("./nativeNotifications", () => ({
 import { agentInterventionsApi } from "@/features/agent-interventions/api";
 import { useAgentInterventions } from "@/features/agent-interventions/store";
 import { publishNativeActivity } from "./nativeNotifications";
-import { useSpacesStore } from "@/features/spaces";
 import { ActivityBridge } from "./ActivityBridge";
 import { useActivityStore } from "./useActivityStore";
 
@@ -53,12 +52,6 @@ describe("ActivityBridge", () => {
       offline: false,
       error: null,
     });
-    useSpacesStore.setState({
-      inboxError: null,
-      inbox: { unreads: [], mentions: [] },
-      invitations: [],
-      loadInbox: vi.fn(async () => undefined),
-    });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -69,12 +62,7 @@ describe("ActivityBridge", () => {
     container.remove();
   });
 
-  it("loads independent requests when the Spaces inbox is unavailable", async () => {
-    useSpacesStore.setState({
-      loadInbox: vi.fn(async () => {
-        useSpacesStore.setState({ inboxError: "Offline" });
-      }),
-    });
+  it("loads browser requests directly from the account service", async () => {
     vi.mocked(agentInterventionsApi.list).mockResolvedValue({
       waits: [
         {

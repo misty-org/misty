@@ -1,125 +1,16 @@
-import {
-  type WorkspaceGroupKey,
-  type WorkspaceScopeKey,
-  type WorkspaceSurfaceId,
-  type WorkspaceTab,
-} from "./model";
+import { createBrowserTabState, type WorkspaceScopeKey, type WorkspaceTab } from "./model";
 
-const workspaceDefaultTabPreferenceKey = "misty:workspace-default-tab:v1";
-
-export const workspaceDefaultTabOptions = ["Choose app", "Discover", "Home"] as const;
-
-interface DefaultTabDescriptor {
-  surfaceId: WorkspaceSurfaceId;
-  title: string;
-  route: string;
-  state?: unknown;
-}
-
-let configuredDefaultTabIndex = readStoredDefaultTabIndex();
-
-export function configureWorkspaceDefaultTab(index: number): void {
-  configuredDefaultTabIndex = normalizeDefaultTabIndex(index);
-  try {
-    window.localStorage.setItem(
-      workspaceDefaultTabPreferenceKey,
-      String(configuredDefaultTabIndex),
-    );
-  } catch {
-    // Storage can be unavailable in private mode. The in-memory preference
-    // still applies to panels and windows created during this session.
-  }
-}
-
-export function workspaceDefaultTabIndex(): number {
-  return configuredDefaultTabIndex;
-}
-
-export function createDefaultWorkspaceTab(scopeKey: WorkspaceScopeKey): WorkspaceTab {
-  if (configuredDefaultTabIndex === 0) return createBlankWorkspaceTab(scopeKey);
-  const descriptor = defaultTabDescriptor(scopeKey, configuredDefaultTabIndex);
+export const workspaceDefaultTabOptions = ["Google"] as const;
+export function configureWorkspaceDefaultTab(_index: number): void {}
+export function workspaceDefaultTabIndex(): number { return 0; }
+export function createDefaultWorkspaceTab(_scopeKey: WorkspaceScopeKey): WorkspaceTab {
   const now = Date.now();
-  const id = `tab:${now.toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
+  const id = `tab:${crypto.randomUUID()}`;
   return {
-    id,
-    surfaceId: descriptor.surfaceId,
-    groupKey: defaultGroupKey(descriptor.surfaceId, scopeKey),
-    instanceKey: descriptor.surfaceId === "space" ? scopeKey.slice("space:".length) : id,
-    title: descriptor.title,
-    route: descriptor.route,
-    sidebarVisible: true,
-    state: descriptor.state ?? {},
-    createdAt: now,
-    lastFocusedAt: now,
+    id, surfaceId: "browser", groupKey: "tool:browser", instanceKey: id,
+    title: "Google", route: "/browser", sidebarVisible: false,
+    state: createBrowserTabState(), createdAt: now, lastFocusedAt: now,
   };
 }
-
-export function createHomeWorkspaceTab(scopeKey: WorkspaceScopeKey): WorkspaceTab {
-  const isSpace = scopeKey.startsWith("space:");
-  const spaceId = isSpace ? scopeKey.slice("space:".length) : "";
-  const now = Date.now();
-  const id = `tab:${now.toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
-  const surfaceId: WorkspaceSurfaceId = isSpace ? "space" : "home";
-  return {
-    id,
-    surfaceId,
-    groupKey: defaultGroupKey(surfaceId, scopeKey),
-    instanceKey: isSpace ? spaceId : id,
-    title: "Home",
-    route: isSpace ? `/spaces/${encodeURIComponent(spaceId)}/home` : "/home",
-    sidebarVisible: true,
-    state: {},
-    createdAt: now,
-    lastFocusedAt: now,
-  };
-}
-
-export function createBlankWorkspaceTab(scopeKey: WorkspaceScopeKey): WorkspaceTab {
-  return {
-    ...createHomeWorkspaceTab(scopeKey),
-    title: "New Tab",
-    route: "/home",
-    placeholder: true,
-  };
-}
-
-function defaultTabDescriptor(scopeKey: WorkspaceScopeKey, index: number): DefaultTabDescriptor {
-  const choice = workspaceDefaultTabOptions[normalizeDefaultTabIndex(index)];
-  if (choice === "Home") {
-    if (scopeKey.startsWith("space:")) {
-      const spaceId = scopeKey.slice("space:".length);
-      return {
-        surfaceId: "space",
-        title: "Home",
-        route: `/spaces/${encodeURIComponent(spaceId)}/home`,
-      };
-    }
-    return { surfaceId: "home", title: "Home", route: "/home" };
-  }
-  return { surfaceId: "marketplace", title: "Discover", route: "/discover" };
-}
-
-function defaultGroupKey(
-  surfaceId: WorkspaceSurfaceId,
-  scopeKey: WorkspaceScopeKey,
-): WorkspaceGroupKey {
-  return surfaceId === "space"
-    ? (scopeKey as WorkspaceGroupKey)
-    : (`tool:${surfaceId}` as WorkspaceGroupKey);
-}
-
-function readStoredDefaultTabIndex(): number {
-  try {
-    return normalizeDefaultTabIndex(
-      Number(window.localStorage.getItem(workspaceDefaultTabPreferenceKey)),
-    );
-  } catch {
-    return 0;
-  }
-}
-
-function normalizeDefaultTabIndex(index: number): number {
-  return Number.isInteger(index) && index >= 0 && index < workspaceDefaultTabOptions.length
-    ? index
-    : 0;
-}
+export const createHomeWorkspaceTab = createDefaultWorkspaceTab;
+export const createBlankWorkspaceTab = createDefaultWorkspaceTab;

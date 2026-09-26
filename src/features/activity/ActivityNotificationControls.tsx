@@ -7,6 +7,7 @@ import {
   DesktopSettingsSection,
 } from "@/features/settings/components/DesktopSettingsUI";
 import { SwitchControl } from "@/features/settings/settingsControls";
+import { Button } from "@/shared/ui";
 
 export function ActivityNotificationControls() {
   const state = useActivityStore();
@@ -46,13 +47,14 @@ export function ActivityNotificationControls() {
               : (item?.sourceLabel ?? "Muted Space");
             return (
               <DesktopSettingsRow key={source} label={label}>
-                <button
-                  type="button"
-                  className="min-h-11 px-3 text-sm text-cream-muted hover:text-cream-bright"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-11 px-3 text-cream-muted hover:text-cream-bright"
                   onClick={() => state.setSourceMuted(source, false)}
                 >
                   Unmute
-                </button>
+                </Button>
               </DesktopSettingsRow>
             );
           })

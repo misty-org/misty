@@ -8,7 +8,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Button,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -20,8 +19,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   cn,
+  Button,
 } from "@/shared/ui";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Cable, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -103,7 +103,7 @@ export function MistyConversationSidebar(props: {
                     "group/conversation relative flex min-h-11 items-center rounded-lg transition-colors",
                     active
                       ? "bg-charcoal-card text-cream-bright"
-                      : "text-cream hover:bg-charcoal-hover",
+                      : "text-cream hover:bg-charcoal-hover hover:text-cream-bright",
                   )}
                 >
                   {renamingId === conversation.id ? (
@@ -124,8 +124,9 @@ export function MistyConversationSidebar(props: {
                       )}
                     />
                   ) : (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+
                       className="min-w-0 flex-1 px-2.5 py-2 text-left"
                       onClick={() => props.onSelect(conversation.id)}
                     >
@@ -135,7 +136,7 @@ export function MistyConversationSidebar(props: {
                       <span className="mt-0.5 block text-[10px] text-cream-muted">
                         {relativeTime(conversation.updatedAt)}
                       </span>
-                    </button>
+                    </Button>
                   )}
                   {renamingId !== conversation.id ? (
                     <DropdownMenu>
@@ -161,7 +162,7 @@ export function MistyConversationSidebar(props: {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-notification-red focus:text-notification-red"
+                          variant="destructive"
                           onSelect={() => setDeleteTarget(conversation)}
                         >
                           <Trash2 className="size-3.5" /> Delete
@@ -177,7 +178,7 @@ export function MistyConversationSidebar(props: {
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
-                  className="text-notification-red focus:text-notification-red"
+                  variant="destructive"
                   onSelect={() => setDeleteTarget(conversation)}
                 >
                   <Trash2 className="size-3.5" /> Delete

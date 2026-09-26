@@ -1,5 +1,5 @@
 import { createHomeWorkspaceTab } from "./workspaceDefaultTab";
-import { setAppUnsaved } from "@/features/apps/appUpdateSafety";
+import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDockLeaf, dockLeaves, dockTabs, insertDockSplit } from "./dockTree";
 import { activeLayoutView, allLayoutViews, layoutTabs, layoutTabLabel } from "./layoutTabs";
@@ -206,28 +206,17 @@ it("keeps cross-app and route history in its pane with restorable state", () => 
   expect(state().navigatePane(-1)).toMatchObject({ id: first.id, route: "/apps/planner" });
   expect(state().navigatePane(-1)?.id).toBe(initial.id);
   expect(state().navigatePane(3)?.id).toBe(second.id);
-  const split = state().splitPane(paneId, "right")!;
-  expect(state().canNavigatePane(-1, split)).toBe(false);
-  expect(state().canNavigatePane(-1, paneId)).toBe(true);
 });
 
-it("creates blank tabs and splits, replacing the blank when choosing an app", () => {
-  expect(state().newLayoutTab()).toMatchObject({ title: "New Tab", placeholder: true });
+it("opens Google in new tabs and splits and navigates inside the selected split", () => {
+  expect(state().newLayoutTab()).toMatchObject({ title: "Google", surfaceId: "browser" });
   const tabId = state().layout.activeLayoutTabId;
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
-  expect(activeLayoutView(state().layout)).toMatchObject({ title: "New Tab", placeholder: true });
-  const view = state().openSurface({
-    surfaceId: "marketplace",
-    groupKey: "tool:marketplace",
-    title: "Discover",
-    route: "/discover",
-    paneId,
-    forceNew: true,
-  });
+  expect(activeLayoutView(state().layout)).toMatchObject({ title: "Google", surfaceId: "browser" });
+  const view = state().openBrowserTab({ url: "https://example.com", paneId });
   expect(state().layout.activeLayoutTabId).toBe(tabId);
   expect(dockTabs(state().layout.root)).toHaveLength(2);
   expect(activeLayoutView(state().layout)?.id).toBe(view.id);
-  expect(state().canNavigatePane(-1)).toBe(false);
 });
 
 it("updates automatic titles live while preserving custom names through history and reload", () => {
@@ -278,7 +267,7 @@ it("blocks replacement, tab closing, and cross-app Back while work is unsaved", 
     title: "Code",
     route: "/apps/code",
   });
-  setAppUnsaved(code.id, true);
+  setWorkspaceUnsaved(code.id, true);
   try {
     expect(
       state().openSurface({
@@ -291,7 +280,7 @@ it("blocks replacement, tab closing, and cross-app Back while work is unsaved", 
     expect(state().navigatePane(-1)).toBeNull();
     expect(state().closeLayoutTab(state().layout.activeLayoutTabId!)).toBe(false);
   } finally {
-    setAppUnsaved(code.id, false);
+    setWorkspaceUnsaved(code.id, false);
   }
   expect(state().navigatePane(-1)?.id).toBe(first.id);
 });

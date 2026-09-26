@@ -391,8 +391,7 @@ mod tests {
                 super::super::super::Instance {
                     root: std::path::PathBuf::new(),
                     permissions: app(owner, serde_json::json!(["files.read"])),
-                    _profile: None,
-                    pending: HashMap::new(),
+
                 },
             );
         }
@@ -517,8 +516,7 @@ mod tests {
             super::super::super::Instance {
                 root: std::path::PathBuf::new(),
                 permissions: app("alice", serde_json::json!(["files.read"])),
-                _profile: None,
-                pending: HashMap::new(),
+
             },
         );
         let (entered, waiting) = tokio::sync::oneshot::channel();

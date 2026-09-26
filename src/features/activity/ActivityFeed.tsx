@@ -6,6 +6,7 @@ import { useActivityStore } from "./useActivityStore";
 import { activityAccountKey } from "./activityState";
 import { activityTargetHref } from "./activityNavigation";
 import type { ActivityItem } from "./types";
+import { Button } from "@/shared/ui";
 
 export function ActivityFeed({
   items,
@@ -46,9 +47,9 @@ export function ActivityFeed({
       {state.error ? (
         <div role="status" className="flex items-center gap-2 px-4 py-2 text-sm text-cream-muted">
           <span>Activity couldn’t refresh. Your saved requests are still here.</span>
-          <button type="button" className="min-h-11 underline" onClick={() => void state.refresh()}>
+          <Button variant="link" className="min-h-11 underline" onClick={() => void state.refresh()}>
             Retry
-          </button>
+          </Button>
         </div>
       ) : null}
       <div className="min-h-0 flex-1 misty-transient-scrollbar overflow-y-auto overscroll-contain px-2 py-1">

@@ -1,4 +1,11 @@
-import { Button, cn } from "@/shared/ui";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  cn,
+} from "@/shared/ui";
 import { ArrowUp, Camera, ImagePlus, Loader2, Plus, Search, X } from "lucide-react";
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef, useState } from "react";
@@ -26,6 +33,7 @@ export function MistyComposer(props: {
   busy?: boolean;
   placeholder?: string;
   compact?: boolean;
+  inputFirst?: boolean;
   className?: string;
   onError?: (message: string) => void;
 }) {
@@ -60,7 +68,7 @@ export function MistyComposer(props: {
   return (
     <div
       className={cn(
-        "relative rounded-2xl border border-charcoal-border bg-charcoal-card/95 shadow-lg shadow-black/15 transition",
+        "relative flex flex-col rounded-2xl border border-charcoal-border bg-charcoal-card/95 shadow-lg shadow-black/15 transition",
         dragging && "border-blue-400 bg-blue-500/[0.06]",
         props.className,
       )}
@@ -87,7 +95,20 @@ export function MistyComposer(props: {
               key={attachment.id}
               className="group relative size-16 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/20"
             >
-              {attachment.mimeType.startsWith("image/")?<img src={attachment.previewUrl} alt={attachment.name} className="size-full object-cover"/>:<span className="grid size-full place-items-center break-all p-1 text-xs" title={attachment.name}>{attachment.name}</span>}
+              {attachment.mimeType.startsWith("image/") ? (
+                <img
+                  src={attachment.previewUrl}
+                  alt={attachment.name}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span
+                  className="grid size-full place-items-center break-all p-1 text-xs"
+                  title={attachment.name}
+                >
+                  {attachment.name}
+                </span>
+              )}
               {attachment.state !== "ready" ? (
                 <div className="absolute inset-0 grid place-items-center bg-black/60">
                   {attachment.state === "failed" ? (
@@ -97,8 +118,8 @@ export function MistyComposer(props: {
                   )}
                 </div>
               ) : null}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 className={cn(
                   "absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-black/75",
                   "text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100",
@@ -107,7 +128,7 @@ export function MistyComposer(props: {
                 onClick={() => void props.onRemoveAttachment(attachment)}
               >
                 <X className="size-3" />
-              </button>
+              </Button>
               {attachment.state === "uploading" ? (
                 <span className="absolute inset-x-0 bottom-0 h-0.5 bg-white/20">
                   <span
@@ -132,51 +153,72 @@ export function MistyComposer(props: {
           props.placeholder ??
           (props.mode === "search"
             ? "Search files, notes, and connected apps…"
-            : "Ask Misty anything or describe what you want done…")
+            : "Ask Misty anything…")
         }
         className={cn(
-          "max-h-40 min-h-12 w-full resize-none bg-transparent px-4 pb-2.5 pt-3 text-[15px] leading-6 text-cream outline-none placeholder:text-cream-muted",
+          "max-h-40 min-h-12 w-full resize-none overflow-x-hidden bg-transparent px-4 pb-2.5 pt-3 text-[15px] leading-6 text-cream outline-none placeholder:text-cream-muted",
           props.compact && "min-h-11 px-3.5 pb-2 pt-2.5 text-sm leading-5",
+          props.inputFirst && "min-h-20 px-4 pb-3 pt-3 text-base leading-6",
         )}
       />
-      <div className="flex min-h-10 items-center gap-1.5 border-t border-white/[0.06] px-2.5 py-1.5">
+      <div
+        className={cn(
+          "flex min-h-10 items-center gap-1 px-3 pb-3",
+          !props.inputFirst && "border-t border-charcoal-border pt-1.5",
+        )}
+      >
         <input
           ref={fileRef}
           hidden
           type="file"
-          accept={props.mode==="search"?"image/jpeg,image/png,image/webp":"image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"}
+          accept={
+            props.mode === "search"
+              ? "image/jpeg,image/png,image/webp"
+              : "image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"
+          }
           multiple={props.maxAttachments > 1}
           onChange={(event) => {
             accept(Array.from(event.target.files ?? []));
             event.target.value = "";
           }}
         />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7 rounded-lg text-cream-muted"
-          aria-label="Attach files"
-          onClick={() => fileRef.current?.click()}
-        >
-          {props.attachments.length ? (
-            <ImagePlus className="size-4" />
-          ) : (
-            <Plus className="size-4" />
-          )}
-        </Button>
         {props.onCapture ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="text-cream-muted"
+                aria-label="Add attachments"
+                title="Add attachments"
+                disabled={props.disabled}
+              >
+                <Plus className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" data-misty-layer-portal>
+              <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
+                <ImagePlus className="size-4" /> Attach files
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={props.onCapture}>
+                <Camera className="size-4" /> Capture part of the screen
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="size-7 rounded-lg text-cream-muted"
-            aria-label="Capture part of the screen"
-            onClick={props.onCapture}
+            size="icon-sm"
+            className="text-cream-muted"
+            aria-label="Attach files"
+            disabled={props.disabled}
+            onClick={() => fileRef.current?.click()}
           >
-            <Camera className="size-4" />
+            <Plus className="size-4" />
           </Button>
-        ) : null}
+        )}
         {props.onModeChange ? (
           <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
         ) : props.mode === "search" ? (
@@ -192,7 +234,7 @@ export function MistyComposer(props: {
         <Button
           type="button"
           size="icon"
-          className="size-8 shrink-0 rounded-xl"
+          className="size-8 shrink-0"
           disabled={
             props.disabled ||
             props.busy ||

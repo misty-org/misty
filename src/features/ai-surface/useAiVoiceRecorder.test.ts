@@ -50,10 +50,57 @@ describe("useAiVoiceRecorder", () => {
     act(() => result.current.stop());
     await waitFor(() => expect(onTranscript).toHaveBeenCalledWith("hello Misty"));
 
-    expect(transcribeVoice).toHaveBeenCalledWith(expect.any(Blob), expect.any(Number));
+    expect(transcribeVoice).toHaveBeenCalledWith(
+      expect.any(Blob),
+      expect.any(Number),
+      expect.any(AbortSignal),
+    );
     expect((transcribeVoice.mock.calls[0]?.[0] as Blob).type).toBe("audio/mp4;codecs=mp4a.40.2");
     expect(onActivityChange).toHaveBeenLastCalledWith(false);
     expect(trackStop).toHaveBeenCalled();
+  });
+
+  it("discards a permission result after cancellation", async () => {
+    let grant!: (stream: MediaStream) => void;
+    vi.mocked(navigator.mediaDevices.getUserMedia).mockReturnValueOnce(
+      new Promise((resolve) => {
+        grant = resolve;
+      }),
+    );
+    const onTranscript = vi.fn();
+    const { result } = renderHook(() => useAiVoiceRecorder({ onTranscript, onError: vi.fn() }));
+    let started!: Promise<void>;
+    act(() => {
+      started = result.current.start();
+    });
+    act(() => result.current.cancel());
+    await act(async () => {
+      grant({ getTracks: () => [{ stop: trackStop }] } as unknown as MediaStream);
+      await started;
+    });
+    expect(trackStop).toHaveBeenCalled();
+    expect(result.current.recording).toBe(false);
+    expect(transcribeVoice).not.toHaveBeenCalled();
+    expect(onTranscript).not.toHaveBeenCalled();
+  });
+
+  it("aborts transcription and ignores a late transcript after Stop", async () => {
+    let finish!: (value: { transcript: string }) => void;
+    transcribeVoice.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const onTranscript = vi.fn();
+    const { result } = renderHook(() => useAiVoiceRecorder({ onTranscript, onError: vi.fn() }));
+    await act(async () => result.current.start());
+    act(() => result.current.stop());
+    const signal = transcribeVoice.mock.calls[0][2] as AbortSignal;
+    act(() => result.current.cancel());
+    expect(signal.aborted).toBe(true);
+    await act(async () => finish({ transcript: "obsolete request" }));
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(result.current.transcribing).toBe(false);
   });
 
   it("explains a denied microphone permission", async () => {

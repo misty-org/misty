@@ -5,8 +5,7 @@ import {
   EmbeddedUniversalPreviewView,
   useEmbeddedDocument as useEmbeddedDocumentView,
 } from "./EmbeddedUniversalPreviewView";
-import { useContext } from "react";
-import { FilePreviewRenderersContext } from "@/features/apps/FilePdfPreview";
+import { extractDocumentText } from "@/features/files/workspace/previews";
 export function EmbeddedUniversalPreview(
   props: Omit<ComponentProps<typeof EmbeddedUniversalPreviewView>, "runtime">,
 ) {
@@ -16,7 +15,7 @@ export function EmbeddedUniversalPreview(
       runtime={{
         Error: SystemErrorActivity,
         readBytes: fetchPreviewBytes,
-        extractDocumentText: useContext(FilePreviewRenderersContext).extractDocumentText,
+        extractDocumentText: extractDocumentText,
       }}
     />
   );
@@ -33,6 +32,6 @@ export function useEmbeddedDocument(
     mimeType,
     enabled,
     fetchPreviewBytes,
-    useContext(FilePreviewRenderersContext).extractDocumentText,
+    extractDocumentText,
   );
 }

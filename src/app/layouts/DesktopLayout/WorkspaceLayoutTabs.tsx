@@ -1,0 +1,430 @@
+import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
+import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
+import { OverflowFadeText } from "@/shared/ui/overflow-fade-text";
+import {
+  Blocks,
+  Check,
+  ChevronDown,
+  PanelBottomDashed,
+  PanelRightDashed,
+  PanelTopClose,
+  PanelBottomClose,
+  PanelLeftClose,
+  PanelRightClose,
+  Plus,
+  X,
+} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Renameable } from "@/features/navigation-names/Renameable";
+import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  cn,
+  Button,
+} from "@/shared/ui";
+import {
+  activeLayoutView,
+  layoutTabs,
+  layoutTabLabel,
+  paneViewLabel,
+} from "@/features/workspace/layoutTabs";
+import { canFitDockSplit, dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
+import { minimumForWorkspaceTabs } from "./WorkspaceDockTree";
+import { TabIcon } from "./WorkspaceTabGroupButton";
+import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
+import { navigatorMotionClass } from "./styles";
+import {
+  dockActionClass,
+  WindowsWorkspaceTitlebarControls,
+} from "./WindowsWorkspaceTitlebarControls";
+
+const tabActionClass =
+  "grid size-6 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright active:bg-charcoal-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
+
+export function WorkspaceLayoutTabs(
+  props: Omit<WorkspaceDockTreeProps, "node"> & {
+    position?: DockPosition;
+    onNewTab(): void;
+    onCloseLayoutTab(id: string): void;
+  },
+) {
+  const position = props.position ?? "top";
+  const vertical = isSideDock(position);
+  const layout = useWorkspaceStore((state) => state.layout);
+  const tabs = layoutTabs(layout);
+  const ref = useRef<HTMLDivElement>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const [bounds, setBounds] = useState({ width: 0, height: 0 });
+  useLayoutEffect(() => {
+    const list = tabListRef.current;
+    if (!list || vertical) return;
+    const updateFade = () => {
+      list.style.setProperty("--tab-fade-start", list.scrollLeft > 1 ? "16px" : "0px");
+      list.style.setProperty(
+        "--tab-fade-end",
+        list.scrollWidth - list.clientWidth - list.scrollLeft > 1 ? "16px" : "0px",
+      );
+    };
+    updateFade();
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(list);
+    Array.from(list.children).forEach((child) => observer.observe(child));
+    list.addEventListener("scroll", updateFade, { passive: true });
+    return () => {
+      observer.disconnect();
+      list.removeEventListener("scroll", updateFade);
+    };
+  }, [vertical, tabs.length]);
+  const pane =
+    dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
+    dockLeaves(layout.root)[0];
+  useEffect(() => {
+    const paneSelector = typeof CSS !== "undefined" && CSS?.escape ? CSS.escape(pane.id) : pane.id;
+    const element = document.querySelector<HTMLElement>(`[data-workspace-pane="${paneSelector}"]`);
+    if (!element) return;
+    const update = () => {
+      const rect = element.getBoundingClientRect();
+      setBounds({ width: rect.width, height: rect.height });
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    update();
+    return () => observer.disconnect();
+  }, [pane.id, layout.root]);
+  const ClosePaneIcon = {
+    up: PanelTopClose,
+    down: PanelBottomClose,
+    left: PanelLeftClose,
+    right: PanelRightClose,
+  }[dockPaneCloseDirection(layout.root, pane.id) ?? "up"];
+  const canSplit = dockLeaves(layout.root).length < 4;
+  const canRight =
+    canSplit &&
+    canFitDockSplit(bounds, "right", minimumForWorkspaceTabs(pane.tabs), {
+      width: 280,
+      height: 180,
+    });
+  const canDown =
+    canSplit &&
+    canFitDockSplit(bounds, "down", minimumForWorkspaceTabs(pane.tabs), {
+      width: 280,
+      height: 180,
+    });
+  const reorder = usePointerReorder({
+    scope: "workspace-layout-tabs",
+    axis: vertical ? "y" : "x",
+    getDrag: (id) => {
+      const tab = tabs.find((tab) => tab.id === id);
+      return tab ? { id, label: layoutTabLabel(tab) } : null;
+    },
+    onDrop: (drag, target, after) =>
+      useWorkspaceStore.getState().reorderLayoutTabs(
+        reorderIds(
+          tabs.map((tab) => tab.id),
+          [drag.id],
+          target,
+          after,
+        ),
+      ),
+    onKeyboardMove: (id, direction) => {
+      const index = tabs.findIndex((tab) => tab.id === id),
+        target = tabs[index + direction];
+      if (target)
+        useWorkspaceStore.getState().reorderLayoutTabs(
+          reorderIds(
+            tabs.map((tab) => tab.id),
+            [id],
+            target.id,
+            direction > 0,
+          ),
+        );
+    },
+  });
+  useEffect(() => {
+    ref.current
+      ?.querySelector('[aria-selected="true"]')
+      ?.closest("[data-reorder-item]")
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [layout.activeLayoutTabId, position]);
+  const newTabButton = (
+    <Button
+      variant="ghost"
+      size="none"
+      className={cn(tabActionClass, vertical && "misty-side-new-tab")}
+      aria-label="New tab"
+      title="New tab"
+      onClick={props.onNewTab}
+    >
+      <Plus className="size-3.5" size={14} />
+      {vertical && <span>New tab</span>}
+    </Button>
+  );
+  const select = (id: string) => {
+    const view = useWorkspaceStore.getState().selectLayoutTab(id);
+    if (view) props.onOpen(view);
+  };
+  return (
+    <header
+      ref={ref}
+      data-tab-position={position}
+      className={cn(
+        "misty-workspace-tabs flex min-w-0 shrink-0 border-charcoal-border bg-charcoal-workspace",
+        props.titlebarInsets?.animate && cn("transition-[padding]", navigatorMotionClass),
+      )}
+      style={
+        vertical
+          ? undefined
+          : {
+              paddingLeft: props.titlebarInsets?.left ?? 0,
+              paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
+            }
+      }
+      data-misty-window-titlebar-region={props.titlebarInsets ? "true" : undefined}
+    >
+      {vertical && <div className="misty-side-tabs-heading">{newTabButton}</div>}
+      <div
+        {...reorder}
+        ref={tabListRef}
+        role="tablist"
+        aria-label="Window tabs"
+        aria-orientation={vertical ? "vertical" : "horizontal"}
+        data-tour-target="workspace-tab-bar"
+        className={cn(
+          "misty-workspace-tab-list flex min-w-0 flex-1 gap-1",
+          vertical
+            ? "min-h-0 flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:thin]"
+            : "items-center overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        )}
+      >
+        {tabs.map((tab) => {
+          const active = tab.id === layout.activeLayoutTabId,
+            view = activeLayoutView(tab),
+            label = layoutTabLabel(tab),
+            panes = dockLeaves(tab.root);
+          return (
+            <Renameable
+              key={tab.id}
+              nameKey={`layout-tab:${tab.id}`}
+              automatic={layoutTabLabel({ ...tab, title: undefined })}
+              customName={tab.title}
+              onRename={(name) => useWorkspaceStore.getState().renameLayoutTab(tab.id, name ?? "")}
+              resetLabel="Use active pane title"
+            >
+              <div
+                data-reorder-item={tab.id}
+                data-reorder-preview="true"
+                data-misty-window-drag-block="true"
+                className={cn(
+                  "group/tab flex items-center rounded-md border text-xs transition-colors duration-150 select-none focus-within:ring-1 focus-within:ring-cream-muted/50",
+                  vertical
+                    ? "h-9 w-full shrink-0"
+                    : "h-7 min-w-[80px] max-w-[160px] flex-[1_1_120px]",
+                  active
+                    ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
+                    : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
+                )}
+              >
+                <Button
+                  variant="ghost"
+                  size="none"
+                  justify="start"
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  title={label}
+                  data-reorder-handle="true"
+                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent pl-2 pr-1 text-left outline-none hover:bg-transparent focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
+                  onClick={() => select(tab.id)}
+                  onKeyDown={(event) => {
+                    const index = tabs.findIndex((item) => item.id === tab.id);
+                    const next =
+                      event.key === (vertical ? "ArrowDown" : "ArrowRight")
+                        ? (index + 1) % tabs.length
+                        : event.key === (vertical ? "ArrowUp" : "ArrowLeft")
+                          ? (index + tabs.length - 1) % tabs.length
+                          : event.key === "Home"
+                            ? 0
+                            : event.key === "End"
+                              ? tabs.length - 1
+                              : -1;
+                    if (event.altKey || event.ctrlKey || event.metaKey || next < 0) return;
+                    event.preventDefault();
+                    select(tabs[next].id);
+                    requestAnimationFrame(() => {
+                      const buttons =
+                        ref.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                      buttons?.item(next)?.focus();
+                    });
+                  }}
+                >
+                  <TabIcon
+                    tab={view?.placeholder ? undefined : (view ?? undefined)}
+                    icon={Blocks}
+                    isActive={active}
+                  />
+                  <OverflowFadeText className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                    {label}
+                  </OverflowFadeText>
+                  {panes.length > 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 text-[10px] text-cream-muted tabular-nums"
+                    >
+                      {panes.length}
+                    </span>
+                  ) : null}
+                </Button>
+                {panes.length > 1 ? (
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="none"
+                        aria-label={`Show panes in ${label}`}
+                        aria-description={`${panes.length} panes`}
+                        className={cn(
+                          tabActionClass,
+                          "mr-0.5 aria-expanded:bg-transparent data-[state=open]:bg-transparent",
+                        )}
+                      >
+                        <ChevronDown className="size-3" size={12} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[220px]">
+                      {panes.map((item) => {
+                        const itemView = item.tabs[0];
+                        if (!itemView) return null;
+                        const focused = item.id === tab.focusedPaneId;
+                        return (
+                          <div key={item.id} className="flex items-center gap-1">
+                            <DropdownMenuItem
+                              className="min-w-0 flex-1"
+                              aria-label={`${paneViewLabel(itemView)}${focused ? ", active pane" : ""}`}
+                              onSelect={() => {
+                                useWorkspaceStore.getState().focusTab(itemView.id);
+                                props.onOpen(itemView);
+                              }}
+                            >
+                              <TabIcon
+                                tab={itemView.placeholder ? undefined : itemView}
+                                icon={Blocks}
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {paneViewLabel(itemView)}
+                              </span>
+                              {focused ? <Check size={14} aria-hidden /> : null}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              aria-label={`Close pane ${paneViewLabel(itemView)}`}
+                              className="shrink-0 justify-center px-2"
+                              onSelect={() => {
+                                if (!useWorkspaceStore.getState().closeTab(itemView.id)) return;
+                                const current = activeLayoutView(
+                                  useWorkspaceStore.getState().layout,
+                                );
+                                if (current) props.onOpen(current);
+                              }}
+                            >
+                              <X size={14} aria-hidden />
+                            </DropdownMenuItem>
+                          </div>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="none"
+                    aria-label={`Close tab ${label}`}
+                    title={`Close tab ${label}`}
+                    className={cn(tabActionClass, "mr-0.5")}
+                    onClick={() => props.onCloseLayoutTab(tab.id)}
+                  >
+                    <X className="size-3.5" size={14} />
+                  </Button>
+                )}
+              </div>
+            </Renameable>
+          );
+        })}
+        {!vertical && newTabButton}
+      </div>
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1",
+          vertical ? "mt-2 border-t border-charcoal-border pt-2" : "ml-1.5 h-7",
+        )}
+      >
+        {!props.windowsTitlebarControls ? (
+          <>
+            <Button
+              variant="ghost"
+              size="none"
+              disabled={!canRight}
+              className={dockActionClass}
+              aria-label="Create split right"
+              title="Split right"
+              onClick={() => props.onSplitPane(pane.id, "right")}
+            >
+              <PanelRightDashed className="size-4" size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="none"
+              disabled={!canDown}
+              className={dockActionClass}
+              aria-label="Create split down"
+              title="Split down"
+              onClick={() => props.onSplitPane(pane.id, "down")}
+            >
+              <PanelBottomDashed className="size-4" size={16} />
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="none"
+          disabled={dockLeaves(layout.root).length <= 1}
+          className={dockActionClass}
+          aria-label="Close pane"
+          title="Close pane"
+          onClick={() => props.onClosePane(pane.id)}
+        >
+          <ClosePaneIcon className="size-4" size={16} />
+        </Button>
+        {!props.windowsTitlebarControls ? (
+          <WorkspaceWindowMenu
+            windows={props.virtualWindows}
+            activeWindowId={props.activeVirtualWindowId}
+            canReopen={props.canReopenVirtualWindow}
+            onSelect={props.onSelectVirtualWindow}
+            onCreate={props.onCreateVirtualWindow}
+            onClose={props.onCloseVirtualWindow}
+            onReopen={props.onReopenVirtualWindow}
+          />
+        ) : null}
+      </div>
+      <WindowsWorkspaceTitlebarControls
+        enabled={Boolean(props.windowsTitlebarControls)}
+        focused
+        paneId={pane.id}
+        canSplitSideways={canRight}
+        canSplitVertically={canDown}
+        windows={props.virtualWindows}
+        activeWindowId={props.activeVirtualWindowId}
+        canReopen={props.canReopenVirtualWindow}
+        canCloseWindow={() => props.virtualWindows.length > 1}
+        onSplitPane={props.onSplitPane}
+        onSelectWindow={props.onSelectVirtualWindow}
+        onCreateWindow={props.onCreateVirtualWindow}
+        onCloseWindow={props.onCloseVirtualWindow}
+        onReopenWindow={props.onReopenVirtualWindow}
+      />
+    </header>
+  );
+}

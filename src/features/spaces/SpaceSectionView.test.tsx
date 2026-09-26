@@ -18,25 +18,40 @@ vi.mock("@/features/auth", () => ({
 vi.mock("./store/useSpacesStore", () => ({
   useSpacesStore: (selector: (value: typeof state) => unknown) => selector(state),
 }));
-vi.mock("@/features/notes/SpaceNotes", () => ({
+vi.mock("@/features/journal/notes/SpaceNotes", () => ({
   SpaceNotes: ({ spaceId }: { spaceId: string }) => <div>Notes in {spaceId}</div>,
 }));
-vi.mock("@/features/drawings/SpaceDrawings", () => ({
+vi.mock("@/features/journal/drawings/SpaceDrawings", () => ({
   SpaceDrawings: ({ spaceId }: { spaceId: string }) => <div>Drawings in {spaceId}</div>,
 }));
-vi.mock("@/features/spaces/planner/SpacePlanner", () => ({
+vi.mock("@/features/planner/planner/SpacePlanner", () => ({
   SpacePlanner: ({ spaceId }: { spaceId: string }) => <div>Planner in {spaceId}</div>,
 }));
-vi.mock("@/features/spaces/library/SpaceLibrary", () => ({
-  SpaceLibrary: ({ spaceId }: { spaceId: string }) => <div>Library in {spaceId}</div>,
-}));
-vi.mock("./chat/SpaceChat", () => ({
-  SpaceSocial: ({ spaceId, provider }: { spaceId: string; provider: string }) => (
-    <div>
-      Chat in {spaceId} via {provider}
-    </div>
-  ),
-}));
+// Keep the real runtime guards and host initializers: a shallow tool mock used
+// to hide missing service setup in the restored built-in entry point.
+vi.mock("@/features/library/library/SpaceLibrary", async () => {
+  const { libraryRuntime } = await import("@/features/library/library/libraryRuntime");
+  return {
+    SpaceLibrary: ({ spaceId }: { spaceId: string }) => {
+      expect(libraryRuntime().api).toBeTruthy();
+      return <div>Library in {spaceId}</div>;
+    },
+  };
+});
+vi.mock("./chat/SpaceChat", async () => {
+  const { useSocialAuth } = await import("./chat/socialRuntime");
+  return {
+    SpaceSocial: ({ spaceId, provider }: { spaceId: string; provider: string }) => {
+      const { user } = useSocialAuth();
+      expect(user?.id).toBe("one");
+      return (
+        <div>
+          Chat in {spaceId} via {provider}
+        </div>
+      );
+    },
+  };
+});
 vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
 vi.mock("@/features/home", () => ({ HomeDashboard: () => null }));
 afterEach(() => {
@@ -55,7 +70,9 @@ it.each([
       <SpaceSectionView spaceId="family" section={section} />
     </MemoryRouter>,
   );
-  expect(await screen.findByText(new RegExp(`${label} in family`))).toBeTruthy();
+  expect(
+    await screen.findByText(new RegExp(`${label} in family`), {}, { timeout: 5000 }),
+  ).toBeTruthy();
 });
 it("retains Space permissions for direct links", () => {
   state.spaces[0].permissions = { "tasks.view": false };
