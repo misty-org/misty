@@ -1,6 +1,4 @@
 import { useAuth } from "@/features/auth";
-import { CompanionAppearanceSettings } from "@/features/agents";
-import { personalAgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import { SystemErrorActivity } from "@/features/activity";
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
@@ -32,7 +30,8 @@ import type { SettingsContentProps } from "../settingsTypes";
 import { MistyBriefingsSection } from "./MistyBriefingsSection";
 import { defaultRecap, managedSurfaces } from "./mistySettingsConfig";
 
-export function MistySection(_props: SettingsContentProps) {
+export function MistySection(_props: SettingsContentProps & { page?: "misty" | "memory" }) {
+  const memoryPage = _props.page === "memory";
   const { user } = useAuth();
   const [settings, setSettings] = useState<AiUserSettings | null>(null);
   const [preferences, setPreferences] = useState<Record<string, AiSurfacePreferenceRecord>>({});
@@ -45,11 +44,6 @@ export function MistySection(_props: SettingsContentProps) {
   const [provider, setProvider] = useState<{ configured: boolean; model_name: string } | null>(
     null,
   );
-  const [usage, setUsage] = useState<{
-    percentage_used: number;
-    available: boolean;
-    reset_at?: string;
-  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -86,10 +80,6 @@ export function MistySection(_props: SettingsContentProps) {
         })
         .catch(() => undefined);
     }
-    void aiSurfaceApi
-      .usage()
-      .then((result) => active && setUsage(personalAgentUsage(result)))
-      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -193,213 +183,207 @@ export function MistySection(_props: SettingsContentProps) {
 
   return (
     <>
-      <div className="mb-6 empty:hidden">
-        <CompanionAppearanceSettings />
-      </div>
-      <SettingsSectionBlock
-        title="Misty everywhere"
-        description="Misty is the built-in contextual copilot. Agents remains the destination for durable conversations, configuration, and delegated work."
-      >
-        <SettingsRow
-          label="Enable Misty"
-          description="Allow hosted AI in embedded surfaces and Global Misty. Lexical search continues when this is off."
+      {!memoryPage && (
+        <SettingsSectionBlock
+          title="Misty everywhere"
+          description="Misty is the built-in contextual copilot. Agents remains the destination for durable conversations, configuration, and delegated work."
         >
-          <Switch
-            aria-label="Enable Misty"
-            className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
-            checked={settings?.enabled ?? false}
-            disabled={!settings || working}
-            onCheckedChange={(value) => void updateSettings(value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Conversation retention"
-          description="Accepted work and required security audits follow their domain retention rules."
-          muted={!settings || !settings.enabled}
-        >
-          <Select
-            value={String(settings?.retention_days ?? 30)}
-            disabled={!settings || working || !settings.enabled}
-            onValueChange={(value) => void updateSettings(true, Number(value))}
+          <SettingsRow
+            label="Enable Misty"
+            description="Allow hosted AI in embedded surfaces and Global Misty. Lexical search continues when this is off."
           >
-            <SelectTrigger
-              aria-label="Conversation retention"
-              className={`w-40 ${settingsDisabledControlClass}`}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[7, 30, 90, 365].map((days) => (
-                <SelectItem key={days} value={String(days)}>
-                  {days} days
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsRow>
-        <SettingsRow
-          label="Hosted provider"
-          description="Embedded and shared Misty features use the administrator-configured hosted provider. Code BYOK stays isolated."
-        >
-          <span className="text-sm text-cream-muted">
-            {provider === null
-              ? "Checking…"
-              : provider.configured
-                ? provider.model_name
-                : "Unavailable — lexical search only"}
-          </span>
-        </SettingsRow>
-        <SettingsRow
-          label="Weekly hosted AI"
-          description="Your personal weekly allowance follows you across every Space; higher plans receive a larger allowance."
-        >
-          <span className="text-sm text-cream-muted">
-            {usage
-              ? `${Math.min(100, Math.max(0, usage.percentage_used)).toFixed(0)}% used${
-                  usage.reset_at ? ` · resets ${new Date(usage.reset_at).toLocaleDateString()}` : ""
-                }`
-              : "Usage unavailable"}
-          </span>
-        </SettingsRow>
-        <SettingsRow
-          label="Purge status"
-          description="Database deletion is transactional; device caches and object storage are verified by a high-priority cleanup job."
-          last
-        >
-          <span className="text-sm capitalize text-cream-muted">
-            {settings?.purge_state ?? "none"}
-          </span>
-        </SettingsRow>
-      </SettingsSectionBlock>
+            <Switch
+              aria-label="Enable Misty"
+              className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+              checked={settings?.enabled ?? false}
+              disabled={!settings || working}
+              onCheckedChange={(value) => void updateSettings(value)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Hosted provider"
+            description="Embedded and shared Misty features use the administrator-configured hosted provider. Code BYOK stays isolated."
+          >
+            <span className="text-sm text-cream-muted">
+              {provider === null
+                ? "Checking…"
+                : provider.configured
+                  ? provider.model_name
+                  : "Unavailable — lexical search only"}
+            </span>
+          </SettingsRow>
+          <SettingsRow
+            label="Purge status"
+            description="Database deletion is transactional; device caches and object storage are verified by a high-priority cleanup job."
+            last
+          >
+            <span className="text-sm capitalize text-cream-muted">
+              {settings?.purge_state ?? "none"}
+            </span>
+          </SettingsRow>
+        </SettingsSectionBlock>
+      )}
 
-      <SettingsSectionBlock
-        title="Context and privacy"
-        description={
-          "Pane Misty starts with only the visible object and explicitly attached context. Global Misty can retrieve " +
-          "across Spaces you can currently access. Content from pages, mail, files, chat, providers, and extensions " +
-          "is treated as untrusted data and cannot grant capabilities."
-        }
-      >
-        <SettingsRow
-          label="Personal by default"
-          description="Corrections, rankings, pinned Agents, and saved actions remain personal unless you explicitly share an action with a Space."
-        >
-          <span className="text-xs text-cream-muted">Never shared silently</span>
-        </SettingsRow>
-        <SettingsRow
-          label="Remembered context"
-          description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
-          muted={!settings || !settings.enabled}
-        >
-          <Switch
-            aria-label="Use remembered context"
-            className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
-            checked={settings?.memory_enabled ?? false}
-            disabled={!settings || working || !settings.enabled}
-            onCheckedChange={(value) =>
-              void updateSettings(true, settings?.retention_days ?? 30, value)
+      {memoryPage && (
+        <>
+          <SettingsSectionBlock
+            title="Memory"
+            description={
+              "Pane Misty starts with only the visible object and explicitly attached context. Global Misty can retrieve " +
+              "across Spaces you can currently access. Content from pages, mail, files, chat, providers, and extensions " +
+              "is treated as untrusted data and cannot grant capabilities."
             }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Dangerous actions"
-          description="External, destructive, permission-changing, and device actions always require exact review and confirmation."
-          last
-        >
-          <span className="text-xs text-cream-muted">Blanket approval disabled</span>
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock
-        title="Remembered details"
-        description="Review exactly what Misty can recall. Forgetting a detail removes it from future conversations."
-      >
-        {memories.length === 0 ? (
-          <div className="px-5 py-4 text-[13px] text-cream-muted">Nothing remembered yet.</div>
-        ) : (
-          memories.map((memory, index) => (
+          >
             <SettingsRow
-              key={memory.id}
-              label={
-                memory.kind === "instruction"
-                  ? "Standing instruction"
-                  : memory.kind === "preference"
-                    ? "Preference"
-                    : "Detail"
-              }
-              description={
-                memory.space_id
-                  ? "Private · used only in its Space"
-                  : "Private · available across Misty"
-              }
-              last={index === memories.length - 1}
+              label="Conversation retention"
+              description="Accepted work and required security audits follow their domain retention rules."
+              muted={!settings || !settings.enabled}
             >
-              <div className="flex w-full min-w-0 items-center justify-end gap-3 max-[760px]:justify-between">
-                <span className="min-w-0 flex-1 truncate text-right text-[13px] text-cream max-[760px]:text-left">
-                  {memory.content}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className={settingsDisabledControlClass}
-                  disabled={working}
-                  aria-label={`Forget ${memory.content}`}
-                  onClick={() => void forgetMemory(memory.id)}
+              <Select
+                value={String(settings?.retention_days ?? 30)}
+                disabled={!settings || working || !settings.enabled}
+                onValueChange={(value) => void updateSettings(true, Number(value))}
+              >
+                <SelectTrigger
+                  aria-label="Conversation retention"
+                  className={`w-40 ${settingsDisabledControlClass}`}
                 >
-                  Forget
-                </Button>
-              </div>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[7, 30, 90, 365].map((days) => (
+                    <SelectItem key={days} value={String(days)}>
+                      {days} days
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </SettingsRow>
-          ))
-        )}
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock
-        title="Per-surface behavior"
-        description={
-          "Proactive suggestions are off by default. When enabled, a quiet nudge explains " +
-          "why it appeared, respects cooldowns and snooze, and never starts work until you review it."
-        }
-      >
-        {managedSurfaces.map((surface, index) => {
-          const preference = preferences[surface.id];
-          return (
             <SettingsRow
-              key={surface.id}
-              label={surface.label}
-              muted={!settings || settings.enabled === false}
-              last={index === managedSurfaces.length - 1}
+              label="Personal by default"
+              description="Corrections, rankings, pinned Agents, and saved actions remain personal unless you explicitly share an action with a Space."
             >
-              <div className="flex w-full items-center justify-end gap-3 max-[760px]:justify-start">
-                <Switch
-                  aria-label={`Proactive suggestions in ${surface.label}`}
-                  className={
-                    "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg " +
-                    "disabled:opacity-100 " +
-                    "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
-                  }
-                  checked={preference?.proactive_enabled ?? false}
-                  disabled={working || !settings || settings.enabled === false}
-                  onCheckedChange={(value) =>
-                    void updatePreference(surface.id, { proactive_enabled: value })
-                  }
-                />
-              </div>
+              <span className="text-xs text-cream-muted">Never shared silently</span>
             </SettingsRow>
-          );
-        })}
-      </SettingsSectionBlock>
+            <SettingsRow
+              label="Remembered context"
+              description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
+              muted={!settings || !settings.enabled}
+            >
+              <Switch
+                aria-label="Use remembered context"
+                className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+                checked={settings?.memory_enabled ?? false}
+                disabled={!settings || working || !settings.enabled}
+                onCheckedChange={(value) =>
+                  void updateSettings(true, settings?.retention_days ?? 30, value)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Dangerous actions"
+              description="External, destructive, permission-changing, and device actions always require exact review and confirmation."
+              last
+            >
+              <span className="text-xs text-cream-muted">Blanket approval disabled</span>
+            </SettingsRow>
+          </SettingsSectionBlock>
 
-      <MistyBriefingsSection
-        working={working}
-        settings={settings}
-        recapSurface={recapSurface}
-        setRecapSurface={setRecapSurface}
-        recapDraft={recapDraft}
-        setRecapDraft={setRecapDraft}
-        onSave={() => void saveRecap()}
-      />
+          <SettingsSectionBlock
+            title="Remembered details"
+            description="Review exactly what Misty can recall. Forgetting a detail removes it from future conversations."
+          >
+            {memories.length === 0 ? (
+              <div className="px-5 py-4 text-[13px] text-cream-muted">Nothing remembered yet.</div>
+            ) : (
+              memories.map((memory, index) => (
+                <SettingsRow
+                  key={memory.id}
+                  label={
+                    memory.kind === "instruction"
+                      ? "Standing instruction"
+                      : memory.kind === "preference"
+                        ? "Preference"
+                        : "Detail"
+                  }
+                  description={
+                    memory.space_id
+                      ? "Private · used only in its Space"
+                      : "Private · available across Misty"
+                  }
+                  last={index === memories.length - 1}
+                >
+                  <div className="flex w-full min-w-0 items-center justify-end gap-3 max-[760px]:justify-between">
+                    <span className="min-w-0 flex-1 truncate text-right text-[13px] text-cream max-[760px]:text-left">
+                      {memory.content}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={settingsDisabledControlClass}
+                      disabled={working}
+                      aria-label={`Forget ${memory.content}`}
+                      onClick={() => void forgetMemory(memory.id)}
+                    >
+                      Forget
+                    </Button>
+                  </div>
+                </SettingsRow>
+              ))
+            )}
+          </SettingsSectionBlock>
+        </>
+      )}
+      {!memoryPage && (
+        <SettingsSectionBlock
+          title="Per-surface behavior"
+          description={
+            "Proactive suggestions are off by default. When enabled, a quiet nudge explains " +
+            "why it appeared, respects cooldowns and snooze, and never starts work until you review it."
+          }
+        >
+          {managedSurfaces.map((surface, index) => {
+            const preference = preferences[surface.id];
+            return (
+              <SettingsRow
+                key={surface.id}
+                label={surface.label}
+                muted={!settings || settings.enabled === false}
+                last={index === managedSurfaces.length - 1}
+              >
+                <div className="flex w-full items-center justify-end gap-3 max-[760px]:justify-start">
+                  <Switch
+                    aria-label={`Proactive suggestions in ${surface.label}`}
+                    className={
+                      "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg " +
+                      "disabled:opacity-100 " +
+                      "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+                    }
+                    checked={preference?.proactive_enabled ?? false}
+                    disabled={working || !settings || settings.enabled === false}
+                    onCheckedChange={(value) =>
+                      void updatePreference(surface.id, { proactive_enabled: value })
+                    }
+                  />
+                </div>
+              </SettingsRow>
+            );
+          })}
+        </SettingsSectionBlock>
+      )}
+
+      {!memoryPage && (
+        <MistyBriefingsSection
+          working={working}
+          settings={settings}
+          recapSurface={recapSurface}
+          setRecapSurface={setRecapSurface}
+          recapDraft={recapDraft}
+          setRecapDraft={setRecapDraft}
+          onSave={() => void saveRecap()}
+        />
+      )}
       {error ? (
         <SystemErrorActivity
           error={error}

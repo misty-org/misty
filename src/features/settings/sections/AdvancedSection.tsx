@@ -43,9 +43,6 @@ export function AdvancedSection(props: SettingsContentProps) {
             muted={!props.app?.storageRuntime.ready}
           />
         </SettingsRow>
-        <SettingsRow label="App version" description="The installed Misty build version.">
-          <ValueText value={props.app?.version ?? "Loading"} muted={!props.app?.version} />
-        </SettingsRow>
         <SettingsRow
           label="Config path"
           description="Where Misty stores local configuration files on this device."

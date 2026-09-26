@@ -1,21 +1,25 @@
 import {
   Button,
   cn,
+  navigationMenuGroupClass,
   NavigationSectionButton,
   NavigationTreeItem,
-  navigationMenuGroupClass,
 } from "@/shared/ui";
 import { type LucideIcon, X } from "lucide-react";
 import { createContext, Fragment, type ReactNode, useEffect, useState } from "react";
-
+import { SettingScope } from "../profiles/SettingScope";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
-
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
-  const mobile = props.presentation === "mobile";
   const activeGroup = props.items.find((item) => item.id === props.activeId)?.group;
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
-
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () =>
+      new Set(
+        props.items
+          .map((item) => item.group)
+          .filter((group): group is string => Boolean(group) && group !== activeGroup),
+      ),
+  );
   useEffect(() => {
     if (!activeGroup) return;
     setCollapsedGroups((current) => {
@@ -25,7 +29,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       return next;
     });
   }, [activeGroup]);
-
   const toggleGroup = (group: string) => {
     setCollapsedGroups((current) => {
       const next = new Set(current);
@@ -34,60 +37,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       return next;
     });
   };
-
-  if (mobile) {
-    return (
-      <div
-        aria-label={props.ariaLabel}
-        className="grid h-full min-h-0 grid-rows-[48px_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg"
-      >
-        <header className="flex items-center gap-3 border-b border-charcoal-border px-3">
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-cream-bright">
-            {props.title}
-          </h1>
-          <Button
-            aria-label={`Close ${props.ariaLabel.toLowerCase()}`}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-            onClick={props.onClose}
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </Button>
-        </header>
-        <nav
-          className="misty-transient-scrollbar flex min-h-14 gap-1 overflow-x-auto border-b border-charcoal-border bg-charcoal-sidebar px-2 py-1.5"
-          aria-label={props.navigationLabel}
-        >
-          {props.items.map((item) => {
-            const Icon = item.icon;
-            const active = item.id === props.activeId;
-            return (
-              <Button
-                variant="ghost"
-                key={item.id}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-normal justify-start",
-                  active
-                    ? "bg-charcoal-active text-cream-bright"
-                    : "text-cream-muted hover:bg-charcoal-hover active:bg-charcoal-hover",
-                )}
-                onClick={() => props.onSelect(item.id)}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-                {item.label}
-              </Button>
-            );
-          })}
-        </nav>
-        <div className="misty-scrollbar min-h-0 overflow-y-auto overscroll-contain p-4">
-          {props.children}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       aria-label={props.ariaLabel}
@@ -100,11 +49,17 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     >
       <aside
         className={cn(
-          "misty-scrollbar min-h-0 overflow-y-auto overscroll-contain bg-charcoal-sidebar px-3 py-3.5 text-cream-muted",
+          "flex min-h-0 flex-col overflow-hidden bg-charcoal-sidebar px-3 py-3.5 text-cream-muted",
           "[scrollbar-gutter:stable] max-[680px]:px-2",
         )}
       >
-        <nav className="flex min-h-0 flex-col" aria-label={props.navigationLabel}>
+        <div className="mb-5 max-h-[45%] shrink-0 space-y-4 overflow-y-auto">
+          {props.navigationHeader}
+        </div>
+        <nav
+          className="misty-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto"
+          aria-label={props.navigationLabel}
+        >
           <div className={navigationMenuGroupClass}>
             {props.items.map((item, index) => {
               const Icon = item.icon;
@@ -148,6 +103,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             })}
           </div>
         </nav>
+        {props.navigationFooter}
       </aside>
 
       <div aria-hidden="true" className="bg-charcoal-border" />
@@ -180,13 +136,13 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             overlay ? "max-w-[760px]" : "max-w-[860px]",
           )}
         >
+          {props.contentHeader}
           {props.children}
         </div>
       </main>
     </div>
   );
 }
-
 export function DesktopSettingsSection(props: {
   title: string;
   description?: string;
@@ -208,7 +164,6 @@ export function DesktopSettingsSection(props: {
     </section>
   );
 }
-
 export function DesktopSettingsRow(props: {
   label: string;
   description?: string;
@@ -218,6 +173,8 @@ export function DesktopSettingsRow(props: {
 }) {
   return (
     <div
+      data-setting-label={props.label}
+      tabIndex={-1}
       aria-disabled={props.muted || undefined}
       className={cn(
         "grid min-h-16 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5 border-b border-charcoal-border/70 px-5 py-3.5 last:border-b-0",
@@ -235,19 +192,22 @@ export function DesktopSettingsRow(props: {
         >
           {props.label}
         </strong>
+        <SettingScope label={props.label} />
         {props.description ? (
           <span className="text-[13px] leading-[18px] text-cream-muted">{props.description}</span>
         ) : null}
       </div>
       <SettingsControlLabelContext.Provider value={props.label}>
-        <div className="flex min-w-0 items-center justify-end max-[760px]:w-full max-[760px]:justify-start">
+        <div
+          data-setting-control
+          className="flex min-w-0 items-center justify-end max-[760px]:w-full max-[760px]:justify-start"
+        >
           {props.children}
         </div>
       </SettingsControlLabelContext.Provider>
     </div>
   );
 }
-
 export interface DesktopSettingsNavEntry<Id extends string = string> {
   id: Id;
   label: string;
@@ -258,7 +218,6 @@ export interface DesktopSettingsNavEntry<Id extends string = string> {
   groupLabel?: string;
   groupIcon?: LucideIcon;
 }
-
 export interface DesktopSettingsFrameProps<Id extends string> {
   activeId: Id;
   ariaLabel: string;
@@ -267,6 +226,9 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   navigationLabel: string;
   onClose?: () => void;
   onSelect: (id: Id) => void;
-  presentation?: "page" | "overlay" | "mobile";
+  presentation?: "page" | "overlay";
   title: ReactNode;
+  navigationHeader?: ReactNode;
+  navigationFooter?: ReactNode;
+  contentHeader?: ReactNode;
 }

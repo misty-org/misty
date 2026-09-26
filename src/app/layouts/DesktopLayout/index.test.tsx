@@ -1,5 +1,5 @@
-import { act } from "react";
 import type * as DeploymentApi from "@/api/deployment/api";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,7 +41,6 @@ vi.mock("./WorkspaceCanvas", () => ({
 
 vi.mock("./useDesktopWindowChrome", () => ({
   useDesktopWindowChrome: () => ({
-    usesNativeWindowChrome: true,
     shouldShowWindowsTitlebarControls: false,
     isWindowMaximized: false,
     startTitlebarDrag: vi.fn(),
@@ -133,11 +132,11 @@ vi.mock("@/features/files/workspace/explorer", () => ({ MediaSearchViewer: () =>
 vi.mock("@/features/activity", () => ({ ActivityBridge: () => null }));
 vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
 
-import { DesktopLayout } from "./index";
-import SignIn from "@/features/auth/SignInPage";
 import { SavedAccountSessionUnavailableError } from "@/features/auth/sessionErrors";
+import SignIn from "@/features/auth/SignInPage";
 import { notifyAccountScopeReset } from "@/features/auth/store/accountEvents";
 import { useNavigationNames } from "@/features/navigation-names/store";
+import { DesktopLayout } from "./index";
 
 describe("DesktopLayout on Auth Routes", () => {
   let container: HTMLDivElement;

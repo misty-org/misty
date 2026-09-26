@@ -1,3 +1,4 @@
+import { useSettingsStore } from "../store/useSettingsStore";
 import { formatDate } from "@/shared/lib/fileFormat";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
@@ -27,7 +28,7 @@ import {
 } from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
-export function SearchSection(props: SettingsContentProps) {
+export function SearchSection(props: SettingsContentProps & { page?: "search" | "indexing" }) {
   const { status, error, initialize, refreshStatus, startScan, cancelScan } = useSearchIndexStore(
     useShallow((state) => ({
       status: state.status,
@@ -78,144 +79,153 @@ export function SearchSection(props: SettingsContentProps) {
         />
       </div>
 
-      <SettingsSectionBlock title="Automatic upkeep">
-        <SettingsRow
-          label="Keep file search ready"
-          description="Misty checks for added, renamed, moved, or removed files while the app is open. Existing results stay searchable during updates."
-        >
-          <SwitchControl
-            checked={automaticFileDiscovery}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("search", "automatic_file_discovery_enabled", value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Check for changes every"
-          description="How often Misty looks for file changes while it is open."
-          muted={!automaticFileDiscovery}
-          last
-        >
-          <SelectControl
-            value={Math.max(
-              0,
-              discoveryIntervalOptions.indexOf(
-                numberSetting(props.document, "search", "discovery_interval_minutes", 15),
-              ),
-            )}
-            options={discoveryIntervalLabels}
-            disabled={props.working || !automaticFileDiscovery}
-            onChange={(value) =>
-              props.onSettingChange(
-                "search",
-                "discovery_interval_minutes",
-                discoveryIntervalOptions[value] ?? 15,
-              )
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Scan controls">
-        <SettingsRow
-          label="Max depth"
-          description="How many folder levels deep Misty walks. The default of 18 covers most project trees."
-        >
-          <SelectControl
-            value={Math.max(
-              0,
-              [8, 12, 18, 32, 64].indexOf(numberSetting(props.document, "search", "max_depth", 18)),
-            )}
-            options={["8 levels", "12 levels", "18 levels", "32 levels", "64 levels"]}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("search", "max_depth", [8, 12, 18, 32, 64][value] ?? 18)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Include hidden files"
-          description="Index dotfiles and hidden directories."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "search", "include_hidden", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("search", "include_hidden", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Excluded paths"
-          description="Newline- or comma-separated paths that Misty should skip during scans."
-          last
-        >
-          <TextAreaControl
-            value={stringSetting(props.document, "search", "ignored_paths", "")}
-            placeholder="node_modules, .git, dist"
-            rows={3}
-            disabled={props.working}
-            onCommit={(value) => props.onSettingChange("search", "ignored_paths", value)}
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Files available to search">
-        <div className="grid gap-4 px-5 py-4">
-          <div className="flex items-start justify-between gap-5">
-            <div className="flex min-w-0 gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-charcoal-bg text-cream-muted">
-                {scanActive ? (
-                  <Spinner label="Checking files" size="lg" />
-                ) : (
-                  <HardDrive size={18} />
-                )}
-              </div>
-              <div className="grid min-w-0 gap-1">
-                <strong className="text-sm font-medium text-cream">
-                  {scanActive
-                    ? "Checking for file changes"
-                    : indexedItems
-                      ? "Search is kept up to date"
-                      : "Ready for the first check"}
-                </strong>
-                <span className="text-sm leading-relaxed text-cream-muted">
-                  {scanActive
-                    ? `${scanProgress.toLocaleString()} items checked${status?.currentPath ? ` · ${shortPath(status.currentPath)}` : ""}`
-                    : status?.lastScanTimeMs
-                      ? `Last checked ${lastIndexed}. Misty found ${formatSearchChanges(status)}.`
-                      : "Run the first check to make filenames and folders available from Spotlight."}
-                </span>
-                {searchProblem ? (
-                  <SystemErrorActivity
-                    error={searchProblem}
-                    scope="settings:search"
-                    title="Search indexing needs attention"
-                  />
-                ) : null}
-              </div>
-            </div>
-            {scanActive ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className={settingsControlButtonCompactClass}
-                type="button"
-                onClick={() => void cancelScan()}
-              >
-                Stop
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className={settingsControlButtonClass}
-                type="button"
+      {props.page === "indexing" && (
+        <>
+          <SettingsSectionBlock title="Automatic upkeep">
+            <SettingsRow
+              label="Keep file search ready"
+              description="Misty checks for added, renamed, moved, or removed files while the app is open. Existing results stay searchable during updates."
+            >
+              <SwitchControl
+                checked={automaticFileDiscovery}
                 disabled={props.working}
-                onClick={() => void startScan("")}
-              >
-                Check now
-              </Button>
-            )}
-          </div>
+                onChange={(value) =>
+                  props.onSettingChange("search", "automatic_file_discovery_enabled", value)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Check for changes every"
+              description="How often Misty looks for file changes while it is open."
+              muted={!automaticFileDiscovery}
+              last
+            >
+              <SelectControl
+                value={Math.max(
+                  0,
+                  discoveryIntervalOptions.indexOf(
+                    numberSetting(props.document, "search", "discovery_interval_minutes", 15),
+                  ),
+                )}
+                options={discoveryIntervalLabels}
+                disabled={props.working || !automaticFileDiscovery}
+                onChange={(value) =>
+                  props.onSettingChange(
+                    "search",
+                    "discovery_interval_minutes",
+                    discoveryIntervalOptions[value] ?? 15,
+                  )
+                }
+              />
+            </SettingsRow>
+          </SettingsSectionBlock>
+
+          <SettingsSectionBlock title="Scan controls">
+            <SettingsRow
+              label="Max depth"
+              description="How many folder levels deep Misty walks. The default of 18 covers most project trees."
+            >
+              <SelectControl
+                value={Math.max(
+                  0,
+                  [8, 12, 18, 32, 64].indexOf(
+                    numberSetting(props.document, "search", "max_depth", 18),
+                  ),
+                )}
+                options={["8 levels", "12 levels", "18 levels", "32 levels", "64 levels"]}
+                disabled={props.working}
+                onChange={(value) =>
+                  props.onSettingChange("search", "max_depth", [8, 12, 18, 32, 64][value] ?? 18)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Include hidden files"
+              description="Index dotfiles and hidden directories."
+            >
+              <SwitchControl
+                checked={booleanSetting(props.document, "search", "include_hidden", false)}
+                disabled={props.working}
+                onChange={(value) => props.onSettingChange("search", "include_hidden", value)}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Excluded paths"
+              description="Newline- or comma-separated paths that Misty should skip during scans."
+              last
+            >
+              <TextAreaControl
+                value={stringSetting(props.document, "search", "ignored_paths", "")}
+                placeholder="node_modules, .git, dist"
+                rows={3}
+                disabled={props.working}
+                onCommit={(value) => props.onSettingChange("search", "ignored_paths", value)}
+              />
+            </SettingsRow>
+          </SettingsSectionBlock>
+        </>
+      )}
+      <SettingsSectionBlock
+        title={props.page === "indexing" ? "Scan status" : "Files available to search"}
+      >
+        <div className="grid gap-4 px-5 py-4">
+          {props.page === "indexing" && (
+            <div className="flex items-start justify-between gap-5">
+              <div className="flex min-w-0 gap-3">
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-charcoal-bg text-cream-muted">
+                  {scanActive ? (
+                    <Spinner label="Checking files" size="lg" />
+                  ) : (
+                    <HardDrive size={18} />
+                  )}
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <strong className="text-sm font-medium text-cream">
+                    {scanActive
+                      ? "Checking for file changes"
+                      : indexedItems
+                        ? "Search is kept up to date"
+                        : "Ready for the first check"}
+                  </strong>
+                  <span className="text-sm leading-relaxed text-cream-muted">
+                    {scanActive
+                      ? `${scanProgress.toLocaleString()} items checked${status?.currentPath ? ` · ${shortPath(status.currentPath)}` : ""}`
+                      : status?.lastScanTimeMs
+                        ? `Last checked ${lastIndexed}. Misty found ${formatSearchChanges(status)}.`
+                        : "Run the first check to make filenames and folders available from Spotlight."}
+                  </span>
+                  {searchProblem ? (
+                    <SystemErrorActivity
+                      error={searchProblem}
+                      scope="settings:search"
+                      title="Search indexing needs attention"
+                    />
+                  ) : null}
+                </div>
+              </div>
+              {scanActive ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={settingsControlButtonCompactClass}
+                  type="button"
+                  onClick={() => void cancelScan()}
+                >
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className={settingsControlButtonClass}
+                  type="button"
+                  disabled={props.working}
+                  onClick={() => void startScan("")}
+                >
+                  Check now
+                </Button>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-3 overflow-hidden rounded-md border border-charcoal-border/70 max-[720px]:grid-cols-1">
             <SearchStatCard label="Searchable" value={indexedItems.toLocaleString()} compact />
             <SearchStatCard
@@ -250,7 +260,15 @@ export function SearchSection(props: SettingsContentProps) {
         </div>
       </SettingsSectionBlock>
 
-      {status?.scanErrors.length ? (
+      {props.page !== "indexing" && (
+        <Button
+          variant="outline"
+          onClick={() => useSettingsStore.getState().setActiveSection("files-indexing")}
+        >
+          Manage indexing
+        </Button>
+      )}
+      {props.page === "indexing" && status?.scanErrors.length ? (
         <SystemErrorActivity
           error={status.scanErrors[0]?.message}
           scope="settings:search:scan"

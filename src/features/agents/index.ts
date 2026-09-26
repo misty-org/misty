@@ -8,7 +8,7 @@ export type {
 } from "./model/interfaces/personal";
 export * from "./modelSelection";
 export * from "./store/agentAccountLifecycle";
-export { agentsDeviceSnapshot } from "./store/useAgentsStore";
+export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgentsStore";
 export {
   browserDeviceSessionId,
   ensureServerAgentDevice,
@@ -18,3 +18,8 @@ export * from "./store/useAiServerStore";
 
 export { companionReply } from "./companion/companionReply";
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
+
+export { McpConnectionsView } from "./mcp/McpConnectionsSheet";
+export type { AgentScope } from "./model/interfaces/types";
+
+export type { DisplayCapture } from "./companion/protocol";

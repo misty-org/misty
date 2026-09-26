@@ -2,7 +2,7 @@ import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
 import { useSetupStore } from "@/features/installer";
-import { useDocumentAppAppearance } from "@/features/settings";
+import { SettingsProfilesBridge, useDocumentAppAppearance } from "@/features/settings";
 import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -53,6 +53,7 @@ export function RootLayout(props: {
   return (
     <>
       <AuthProvider>
+        <SettingsProfilesBridge />
         <ShortcutRuntime />
         <RenderErrorBoundary>
           <PointerDragProvider>

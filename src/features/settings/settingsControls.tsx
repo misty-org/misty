@@ -303,6 +303,8 @@ export function FilePathControl(props: {
   title: string;
   filters?: { name: string; extensions: string[] }[];
   emptyLabel?: string;
+  /** Choose a folder instead of a file. */
+  directory?: boolean;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
@@ -312,7 +314,7 @@ export function FilePathControl(props: {
     setChoosing(true);
     try {
       const selected = await open({
-        directory: false,
+        directory: props.directory ?? false,
         multiple: false,
         title: props.title,
         filters: props.filters,

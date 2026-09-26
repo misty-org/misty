@@ -1,10 +1,9 @@
-import { ActivityNotificationControls } from "@/features/activity/ActivityNotificationControls";
 import {
   nativeNotificationPermission,
   requestNativeNotificationPermission,
   type NativeNotificationPermission,
 } from "@/features/activity";
-import { notificationsDeviceKey } from "../store/preferences";
+import { ActivityNotificationControls } from "@/features/activity/ActivityNotificationControls";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -12,8 +11,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import { booleanSetting, SwitchControl } from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-
+import { notificationsDeviceKey } from "../store/preferences";
 export function NotificationsSection(props: SettingsContentProps) {
   const [permission, setPermission] = useState<NativeNotificationPermission>("prompt");
   const desktopEnabled = booleanSetting(
@@ -23,11 +21,9 @@ export function NotificationsSection(props: SettingsContentProps) {
     true,
   );
   const desktopNotificationsActive = desktopEnabled && permission === "granted";
-
   useEffect(() => {
     void nativeNotificationPermission().then(setPermission);
   }, []);
-
   const setDesktopEnabled = async (enabled: boolean) => {
     if (!enabled) {
       props.onSettingChange("notifications", notificationsDeviceKey, false);
@@ -39,22 +35,19 @@ export function NotificationsSection(props: SettingsContentProps) {
       props.onSettingChange("notifications", notificationsDeviceKey, true);
     }
   };
-
   return (
     <>
       <ActivityNotificationControls />
       <SettingsSectionBlock title="Delivery">
         <SettingsRow
-          label={isNativeMobileBuild ? "Push notifications" : "Desktop notifications"}
+          label={"Desktop notifications"}
           muted={permission === "unsupported" || permission === "denied"}
           description={
             permission === "unsupported"
-              ? `Available in packaged ${isNativeMobileBuild ? "mobile" : "desktop"} builds.`
+              ? "Available in the desktop app."
               : permission === "denied"
-                ? `Blocked by ${isNativeMobileBuild ? "iOS" : "macOS"}. Allow Misty in System Settings to receive banners.`
-                : isNativeMobileBuild
-                  ? "Show private, count-only updates while Misty is in the background."
-                  : "Show a native notification when Misty is running in the background."
+                ? "Blocked by your operating system. Allow Misty in system settings to receive banners."
+                : "Show a native notification when Misty is running in the background."
           }
         >
           <SwitchControl
@@ -82,7 +75,7 @@ export function NotificationsSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Badge count"
-          description={`Show contextual counts in Misty and an attention count on the ${isNativeMobileBuild ? "app icon" : "Dock"}.`}
+          description={"Show contextual counts in Misty and an attention count on the Dock."}
           last
         >
           <SwitchControl
@@ -98,7 +91,7 @@ export function NotificationsSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Attention">
         <SettingsRow
           label="Notification sound"
-          description={`Play a system sound with background ${isNativeMobileBuild ? "push" : "desktop"} notifications.`}
+          description={"Play a system sound with background desktop notifications."}
           muted={!desktopNotificationsActive}
         >
           <SwitchControl

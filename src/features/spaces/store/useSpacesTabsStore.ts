@@ -1,3 +1,4 @@
+import { useSettingsStore } from "@/features/settings";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -284,7 +285,11 @@ export function activeSpacesTab(session: SpacesTabsSession | undefined): SpacesT
 }
 
 export function defaultSpaceRoute(spaceId: string): string {
-  return `/spaces/${encodeURIComponent(spaceId)}/home`;
+  const preferences = useSettingsStore.getState().settings?.document.spaces as
+    Record<string, unknown> | undefined;
+  const tool = String(preferences?.opening_tool ?? "home");
+  const route = ["home", "chat", "journal", "planner", "library"].includes(tool) ? tool : "home";
+  return `/spaces/${encodeURIComponent(spaceId)}/${route}`;
 }
 
 export function normalizeSpacesTabRoute(route: string, spaceId?: string): string {

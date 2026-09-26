@@ -1,4 +1,5 @@
-import { useOperationQueueStore } from "@/features/transfers/store/useOperationQueueStore";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { useOperationQueueStore } from "@/features/transfers";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -39,7 +40,13 @@ export function TransfersSection(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
-      <TransferProfileSettings {...props} />
+      {hasTauriInternals() ? (
+        <TransferProfileSettings {...props} />
+      ) : (
+        <p className="text-sm text-cream-muted">
+          Transfer performance is configured in the native app on each device.
+        </p>
+      )}
     </>
   );
 }
@@ -75,7 +82,7 @@ function TransferProfileSettings(props: SettingsContentProps) {
     <>
       <SettingsSectionBlock title="Performance">
         <SettingsRow
-          label="Profile"
+          label="Transfer preset"
           description="How many files move at once, and whether transfers are bandwidth-limited or checksum-verified."
           last
         >
