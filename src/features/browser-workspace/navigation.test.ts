@@ -14,7 +14,11 @@ import {
   migrateWorkspaceStore,
 } from "@/features/workspace/workspaceStorePersistence";
 const state = () => useWorkspaceStore.getState();
-beforeEach(() => state().reset());
+beforeEach(() => {
+  state().reset();
+  createWebsiteGroup("Mail");
+  createWebsiteGroup("Social");
+});
 describe("website groups in a browser workspace", () => {
   it("accepts arbitrary website placement and keeps the launch URL after browsing", () => {
     const group = state().websiteGroups.find((group) => group.fields.label === "Social")!;

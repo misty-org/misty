@@ -1,9 +1,6 @@
 import { agentTaskDisplayState } from "@/features/agents/agentWorkState";
 import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
-import type {
-  SpaceMember,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, cn } from "@/shared/ui";
 import { useSurfacePresentation } from "@/shared/mobile";
@@ -51,7 +48,7 @@ const acceptsTask = (payload: PointerDragPayload) => payload.kind === TASK_DRAG_
 export function SpaceTaskBoard({
   tasks,
   members,
-  
+
   totals,
   busy,
   canManage,
@@ -63,7 +60,7 @@ export function SpaceTaskBoard({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
-  
+
   totals: Record<string, number>;
   busy: string;
   canManage: boolean;
@@ -98,7 +95,7 @@ export function SpaceTaskBoard({
             .filter((task) => task.status === column.id)
             .sort((left, right) => left.rank - right.rank)}
           members={members}
-          
+
           total={totals[column.id]}
           busy={busy}
           canManage={canManage}
@@ -136,7 +133,7 @@ function BoardColumn({
   column,
   tasks,
   members,
-  
+
   total,
   busy,
   canManage,
@@ -155,7 +152,7 @@ function BoardColumn({
   column: { id: SpaceTaskStatus; label: string };
   tasks: SpaceTask[];
   members: SpaceMember[];
-  
+
   total?: number;
   busy: string;
   canManage: boolean;
@@ -273,7 +270,7 @@ function BoardColumn({
           <TaskCard
             task={task}
             members={members}
-            
+
             busy={busy === task.id}
             canManage={canManage}
             onOpen={onOpen}
@@ -309,7 +306,7 @@ function BoardColumn({
 function TaskCard({
   task,
   members,
-  
+
   busy,
   canManage,
   onOpen,
@@ -319,7 +316,7 @@ function TaskCard({
 }: {
   task: SpaceTask;
   members: SpaceMember[];
-  
+
   busy: boolean;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;

@@ -1,3 +1,4 @@
+import { isGroupIconImage } from "./groupIconUpload";
 import {
   Mail,
   MessagesSquare,
@@ -184,6 +185,18 @@ export const groupIcons: Record<string, LucideIcon> = {
   hash: Hash,
 };
 export function GroupIcon({ name, size = 18 }: { name: string; size?: number }) {
+  if (isGroupIconImage(name)) {
+    return (
+      <img
+        src={name}
+        alt=""
+        aria-hidden="true"
+        width={size}
+        height={size}
+        className="shrink-0 rounded-sm object-contain"
+      />
+    );
+  }
   const Icon = groupIcons[name] ?? Globe;
   return <Icon size={size} aria-hidden="true" className="shrink-0 size-[18px]" />;
 }

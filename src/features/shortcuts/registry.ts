@@ -261,7 +261,7 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
     scope: "workspace",
   }),
   command("navigation.back", "Go back", {
-    description: "Go back in the focused tool, then Misty navigation history.",
+    description: "Go back in the focused tool.",
     category: "Navigation",
     scope: "workspace",
     mac: "Cmd+LeftBracket",
@@ -270,7 +270,7 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
     repeatable: true,
   }),
   command("navigation.forward", "Go forward", {
-    description: "Go forward in the focused tool, then Misty navigation history.",
+    description: "Go forward in the focused tool.",
     category: "Navigation",
     scope: "workspace",
     mac: "Cmd+RightBracket",

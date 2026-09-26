@@ -3,7 +3,7 @@ import type {
   GlobalAiConversation,
   GlobalAiMessage,
 } from "@/features/global-search/types";
-import {AgentsError as SystemErrorActivity} from "@/features/agents/agentsRuntime";
+import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRuntime";
 
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
   resumeAccount: vi.fn(),
+  titlebarPointerDown: vi.fn(),
 }));
 
 vi.mock("@/features/auth", () => ({
@@ -18,16 +19,8 @@ vi.mock("@/features/auth", () => ({
 
 vi.mock("@/features/workspace", () => ({
   useWindowDockingLayout: () => ({ navigation: "left", tabs: "top" }),
-  useWorkspaceStore: (
-    selector: (state: {
-      canNavigatePane: (delta: number) => boolean;
-      navigatePane: (delta: number) => { route: string } | null;
-      openSurface: () => void;
-    }) => unknown,
-  ) =>
+  useWorkspaceStore: (selector: (state: { openSurface: () => void }) => unknown) =>
     selector({
-      canNavigatePane: () => false,
-      navigatePane: () => null,
       openSurface: vi.fn(),
     }),
   workspaceSurfaceFromRoute: () => null,
@@ -39,7 +32,11 @@ vi.mock("./GlobalNavigator", () => ({
 }));
 
 vi.mock("./WorkspaceCanvas", () => ({
-  WorkspaceCanvas: () => <div data-testid="workspace-canvas">Workspace Canvas</div>,
+  WorkspaceCanvas: (props: { titlebarInsets?: { left: number } }) => (
+    <div data-testid="workspace-canvas" data-tab-inset={props.titlebarInsets?.left}>
+      Workspace Canvas
+    </div>
+  ),
 }));
 
 vi.mock("./useDesktopWindowChrome", () => ({
@@ -48,7 +45,7 @@ vi.mock("./useDesktopWindowChrome", () => ({
     shouldShowWindowsTitlebarControls: false,
     isWindowMaximized: false,
     startTitlebarDrag: vi.fn(),
-    handleDesktopTitlebarPointerDown: vi.fn(),
+    handleDesktopTitlebarPointerDown: mocks.titlebarPointerDown,
     toggleTitlebarMaximize: vi.fn(),
     minimizeTitlebarWindow: vi.fn(),
     closeTitlebarWindow: vi.fn(),
@@ -125,7 +122,9 @@ vi.mock("@/features/browser/workspace", () => ({
   setBrowserWebviewsSuspended: vi.fn(),
 }));
 vi.mock("@/features/webviews/BrowserRuntimeBridge", () => ({ BrowserRuntimeBridge: () => null }));
-vi.mock("@/features/browser-workspace/BrowserSearchDialog", () => ({ BrowserSearchDialog: () => null }));
+vi.mock("@/features/browser-workspace/BrowserSearchDialog", () => ({
+  BrowserSearchDialog: () => null,
+}));
 vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: vi.fn() }));
 vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({
   BrowserContextMenuBridge: () => null,
@@ -256,6 +255,63 @@ describe("DesktopLayout on Auth Routes", () => {
     expect((container.querySelector("[data-misty-route-shell]") as HTMLElement).style.gridRow).toBe(
       row,
     );
+  });
+
+  it("anchors tabs to the content while resizing without shell history buttons", async () => {
+    await act(async () =>
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+        </MemoryRouter>,
+      ),
+    );
+    const frame = container.querySelector<HTMLElement>("[data-misty-desktop-frame]")!;
+    const before = frame.style.gridTemplateColumns;
+    const dragRegion = container.querySelector<HTMLElement>(".misty-docking-titlebar-drag-region")!;
+    expect(dragRegion.style.width).toBe(before.split(" ")[0]);
+    const handle = container.querySelector('[role="separator"]')!;
+    await act(async () =>
+      handle.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })),
+    );
+    expect(frame.style.gridTemplateColumns).not.toBe(before);
+    expect(dragRegion.style.width).toBe(frame.style.gridTemplateColumns.split(" ")[0]);
+    await act(async () => {
+      dragRegion.dispatchEvent(new MouseEvent("pointerdown", { button: 0, bubbles: true }));
+    });
+    expect(mocks.titlebarPointerDown).toHaveBeenCalledTimes(1);
+    expect(
+      container.querySelector('[data-testid="workspace-canvas"]')?.getAttribute("data-tab-inset"),
+    ).toBe("0");
+    expect(container.querySelector('button[aria-label="Go back"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Go forward"]')).toBeNull();
+  });
+
+  it("keeps the workspace mounted and reserves titlebar space when navigation is toggled", async () => {
+    await act(async () =>
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+        </MemoryRouter>,
+      ),
+    );
+    const frame = container.querySelector<HTMLElement>("[data-misty-desktop-frame]")!;
+    const canvas = container.querySelector<HTMLElement>('[data-testid="workspace-canvas"]')!;
+    const originalColumns = frame.style.gridTemplateColumns;
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[aria-label="Hide navigation"]')!.click(),
+    );
+    expect(frame.style.gridTemplateColumns).toBe("0px minmax(0, 1fr)");
+    expect(Number(canvas.dataset.tabInset)).toBeGreaterThan(16);
+    expect(container.querySelector('[data-testid="workspace-canvas"]')).toBe(canvas);
+    // Both changing lengths must use the same timeline; an instant grid jump
+    // followed by animated padding sends the tabs underneath the window controls.
+    expect(frame.className).toContain("transition-[grid-template-columns,grid-template-rows]");
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[aria-label="Show navigation"]')!.click(),
+    );
+    expect(frame.style.gridTemplateColumns).toBe(originalColumns);
+    expect(canvas.dataset.tabInset).toBe("0");
+    expect(container.querySelector('[data-testid="workspace-canvas"]')).toBe(canvas);
   });
 
   it("suppresses the sidebar navigator and renders Outlet directly on /signin", async () => {

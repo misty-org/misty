@@ -51,13 +51,13 @@ const navIslandItemVariants = cva(
 );
 
 export interface NavIslandProps
-  extends React.HTMLAttributes<HTMLElement>,
-    VariantProps<typeof navIslandVariants> {
+  extends React.HTMLAttributes<HTMLElement>, VariantProps<typeof navIslandVariants> {
   asChild?: boolean;
 }
 
 export interface NavIslandItemProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof navIslandItemVariants> {
   asChild?: boolean;
   active?: boolean;

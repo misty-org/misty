@@ -568,14 +568,16 @@ pub(super) fn account_api(api_base: &str, account_id: &str) -> Result<SyncApi, S
     client.require_account(&url, account_id)?;
     let refresh_client = client.clone();
     let refresh_url = url.clone();
+    let refresh_lock = client.refresh_lock.clone();
     SyncApi::new(api_base, client.http.clone())
         .map(|api| {
-            api.with_refresh_hook(move || {
-                refresh_client
-                    .persist(&refresh_url)
-                    .map(|_| ())
-                    .map_err(|_| misty_browser_sync::Error::SecureStorage)
-            })
+            api.with_refresh_lock(refresh_lock)
+                .with_refresh_hook(move || {
+                    refresh_client
+                        .persist(&refresh_url)
+                        .map(|_| ())
+                        .map_err(|_| misty_browser_sync::Error::SecureStorage)
+                })
         })
         .map_err(issue)
 }

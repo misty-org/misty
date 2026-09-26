@@ -1,4 +1,7 @@
-import { initialWebsiteNavigation } from "@/features/browser-workspace/navigationDefaults";
+import {
+  initialWebsiteNavigation,
+  userWebsiteGroups,
+} from "@/features/browser-workspace/navigationDefaults";
 import { layoutTabs, selectLayoutTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
@@ -72,6 +75,7 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
   return {
     ...initialWebsiteNavigation(),
     ...sanitizeRetiredWorkspaceSurfaces(migrated),
+    websiteGroups: userWebsiteGroups(migrated.websiteGroups ?? [], migrated.savedWebsites ?? []),
   } as WorkspaceStore;
 }
 

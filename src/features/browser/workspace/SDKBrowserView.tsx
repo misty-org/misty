@@ -1,3 +1,4 @@
+import { browserToolbarButtonClass, browserToolbarStyles } from "./browserToolbarStyles";
 import { Notification } from "@/shared/ui/notification";
 import "../../../shared/toolAssets/browserChrome.css";
 import { WebsiteLoader } from "../../../shared/toolAssets/WebsiteLoader";
@@ -17,8 +18,9 @@ import { BrowserOmniboxView } from "@/features/browser/workspace/BrowserOmniboxV
 import { BrowserMenuView } from "@/features/browser/workspace/BrowserMenuView";
 import {
   BrowserViewportMenuView,
-  browserViewportWidths,
-  type BrowserViewport,
+  browserViewportFrameStyle,
+  browserViewportStageStyle,
+  useBrowserViewport,
 } from "@/features/browser/workspace/BrowserViewportMenuView";
 import { BrowserAnnotationLayerView } from "@/features/browser/workspace/BrowserAnnotationLayerView";
 import { BrowserOfflinePage } from "@/features/browser/workspace/BrowserOfflinePage";
@@ -52,8 +54,7 @@ const emptyState: RuntimeState = {
   error: null,
   notice: null,
 };
-const iconClass =
-  "grid size-[30px] shrink-0 place-items-center rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream disabled:pointer-events-none disabled:opacity-35";
+const iconClass = browserToolbarButtonClass();
 export { normalizeSdkBrowserAddress } from "./browserAddress";
 
 export function SDKBrowserView({
@@ -84,7 +85,7 @@ export function SDKBrowserView({
   const [runtime, setRuntime] = useState(emptyState);
   const [message, setMessage] = useState<string | null>(null);
   const [compatibility, setCompatibility] = useState<string | null>(null);
-  const [viewport, setViewport] = useState<BrowserViewport>("responsive");
+  const { viewport, setViewport, sizes, setSize, size: viewportSize } = useBrowserViewport();
   const [annotations, setAnnotations] = useState(false);
   const [page, setPage] = useState<MistyBrowserInspection | null>(null);
   const [reading, setReading] = useState(false);
@@ -416,10 +417,13 @@ export function SDKBrowserView({
           toolbar
         ) : (
           <div
-            className="browser-toolbar relative z-10 flex items-center gap-1 border-b border-charcoal-border bg-charcoal-bg px-[10px]"
+            className={cn(
+              "browser-toolbar border-charcoal-border bg-charcoal-bg",
+              browserToolbarStyles.bar,
+            )}
             data-browser-toolbar
           >
-            <div className="flex shrink-0 gap-1">
+            <div className={browserToolbarStyles.group}>
               <button
                 className={iconClass}
                 aria-label="Back"
@@ -429,7 +433,7 @@ export function SDKBrowserView({
                   void misty.browser.back(handle!).catch(report);
                 }}
               >
-                <ArrowLeft size={16} />
+                <ArrowLeft {...browserToolbarStyles.icon} />
               </button>
               <button
                 className={iconClass}
@@ -440,7 +444,7 @@ export function SDKBrowserView({
                   void misty.browser.forward(handle!).catch(report);
                 }}
               >
-                <ArrowRight size={16} />
+                <ArrowRight {...browserToolbarStyles.icon} />
               </button>
               <button
                 className={iconClass}
@@ -448,7 +452,13 @@ export function SDKBrowserView({
                 disabled={!handle}
                 onClick={() => void reload().catch(report)}
               >
-                <RotateCw size={16} className={runtime.loading ? "animate-spin" : undefined} />
+                <RotateCw
+                  {...browserToolbarStyles.roundIcon}
+                  className={cn(
+                    browserToolbarStyles.roundIcon.className,
+                    runtime.loading && "animate-spin",
+                  )}
+                />
               </button>
             </div>
             <BrowserOmniboxView
@@ -460,7 +470,10 @@ export function SDKBrowserView({
               onNavigate={navigate}
             />
             <div
-              className={cn("flex shrink-0 gap-1", !handle && "pointer-events-none opacity-40")}
+              className={cn(
+                browserToolbarStyles.group,
+                !handle && "pointer-events-none opacity-40",
+              )}
               inert={!handle}
             >
               <button
@@ -469,11 +482,13 @@ export function SDKBrowserView({
                 aria-pressed={annotations}
                 onClick={() => setAnnotations((value) => !value)}
               >
-                <Pencil size={16} />
+                <Pencil {...browserToolbarStyles.icon} />
               </button>
               <BrowserViewportMenuView
                 value={viewport}
                 onChange={setViewport}
+                sizes={sizes}
+                onSizeChange={setSize}
                 iconButtonClass={iconClass}
                 lightChrome={false}
                 suspensionReason="viewport"
@@ -485,7 +500,7 @@ export function SDKBrowserView({
                     className={iconClass}
                     aria-label={`Agent access: ${runtime.agentAccess ? "On" : "Off"}`}
                   >
-                    <MessageCirclePlus size={16} />
+                    <MessageCirclePlus {...browserToolbarStyles.icon} />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -576,20 +591,23 @@ export function SDKBrowserView({
             )}
           </Notification>
         )}
-        <div className="relative min-h-0 flex-1 overflow-hidden" data-browser-page-stage>
+        <div
+          className={cn(
+            "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden",
+            viewport !== "responsive" && "p-3",
+          )}
+          style={browserViewportStageStyle}
+          data-browser-page-stage
+        >
           <div
             ref={host}
             data-browser-page-host
             data-browser-viewport={viewport}
             className={cn(
-              "relative mx-auto h-full overflow-hidden",
+              "relative overflow-hidden",
               viewport !== "responsive" && "rounded-xl shadow-2xl ring-1 ring-black/15",
             )}
-            style={{
-              width: browserViewportWidths[viewport]
-                ? `min(100%, ${browserViewportWidths[viewport]}px)`
-                : "100%",
-            }}
+            style={browserViewportFrameStyle(viewportSize)}
           >
             {initialLoading && !offline && !notice && <WebsiteLoader />}
             {offline && (

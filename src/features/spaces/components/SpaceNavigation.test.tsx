@@ -42,9 +42,9 @@ describe("SpaceSectionNavigation", () => {
 
     const links = [...container.querySelectorAll("a")];
     expect(links.map((link) => link.textContent?.trim())).toEqual([
-      "Journal",
-      "Planner",
       "Chat",
+      "Planner",
+      "Journal",
       "Library",
     ]);
     expect(container.querySelector("nav")?.className).toContain("grid");
@@ -174,8 +174,8 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Journal",
       "Chat",
+      "Journal",
     ]);
   });
 
@@ -203,9 +203,9 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Journal",
-      "Planner",
       "Chat",
+      "Planner",
+      "Journal",
       "Library",
     ]);
   });

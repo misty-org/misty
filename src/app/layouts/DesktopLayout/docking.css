@@ -21,6 +21,13 @@
 .misty-docking-titlebar[data-shared-tabs="true"] {
   pointer-events: none;
 }
+.misty-docking-titlebar-drag-region {
+  /* Catch the exposed inset while the shared overlay lets tab clicks through. */
+  position: absolute;
+  inset: 0 auto 0 0;
+  max-width: 100%;
+  pointer-events: auto;
+}
 .misty-docking-titlebar-controls {
   position: absolute;
   top: 0;
@@ -96,6 +103,16 @@
   border-top-width: 1px;
   border-bottom-width: 0;
 }
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-list {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--tab-fade-start, 0px),
+    black calc(100% - var(--tab-fade-end, 0px)),
+    transparent
+  );
+}
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
   height: auto;
   width: 200px;
@@ -136,4 +153,69 @@
   background: var(--misty-theme-workspace);
   pointer-events: none;
   z-index: -1;
+}
+
+/* The workspace owns the curved seam beside a left navigator. */
+.misty-docking-frame[data-navigation-position="left"][data-tab-position="top"] {
+  & .misty-global-navigator[data-dock-position="left"] {
+    border-right-width: 0;
+  }
+
+  & [data-workspace-panes] {
+    background: var(--misty-theme-workspace);
+  }
+
+  & .misty-workspace-tabs[data-tab-position="top"] {
+    border-bottom-width: 0;
+  }
+
+  & [data-workspace-panes] > [role="tabpanel"] {
+    position: relative;
+    isolation: isolate;
+    padding-top: 1px;
+    padding-left: 1px;
+    overflow: clip;
+  }
+
+  /* WebKit does not reliably clip surface toolbars (browser, Files) to the
+     rounded corner, so the corner is masked instead: paint the workspace
+     colour outside the curve above everything in the pane. The seam below
+     sits one layer higher and draws the curve itself. Keep the pane square
+     so it does not clip away the mask outside that curve. */
+  & [data-workspace-panes] > [role="tabpanel"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2147483646;
+    width: 12px;
+    height: 12px;
+    background: radial-gradient(
+      circle at 100% 100%,
+      transparent 11.5px,
+      var(--misty-theme-workspace) 12px
+    );
+    pointer-events: none;
+  }
+
+  /* Paint the seam above clipped pane backgrounds, including at the corner.
+     Surfaces stack their own toolbars (z-10 in Files and the browser), so the
+     seam takes the top of the pane's isolated stacking context; otherwise a
+     toolbar fill hides the straight edge and the curve looks disconnected. */
+  & [data-workspace-panes] > [role="tabpanel"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2147483647;
+    border-top: 1px solid var(--color-charcoal-border);
+    border-left: 1px solid var(--color-charcoal-border);
+    border-top-left-radius: 12px;
+    pointer-events: none;
+  }
+
+  &
+    .route-shell:has(.misty-workspace-tabs[data-tab-position="top"])
+    > .misty-workspace-resize-handle {
+    top: 38px;
+  }
 }

@@ -71,8 +71,8 @@ describe("MobileNavigation account entry", () => {
     expect(baseProps.onNavigate).toHaveBeenCalledWith("/files");
     fireEvent.click(within(phoneNav).getByRole("button", { name: "Menu" }));
     const menu = screen.getByRole("dialog", { name: "Workspace navigation" });
-    expect(within(menu).getByRole("button", { name: "Inbox" })).toBeTruthy();
-    expect(within(menu).queryByText("Spaces")).toBeNull();
+    expect(within(menu).getByRole("button", { name: "Configure groups" })).toBeTruthy();
+    expect(within(menu).getByRole("link", { name: "Spaces" })).toBeTruthy();
     expect(within(menu).getByRole("button", { name: /sign in to misty/i })).toBeTruthy();
   });
 });

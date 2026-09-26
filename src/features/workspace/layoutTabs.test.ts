@@ -206,9 +206,6 @@ it("keeps cross-app and route history in its pane with restorable state", () => 
   expect(state().navigatePane(-1)).toMatchObject({ id: first.id, route: "/apps/planner" });
   expect(state().navigatePane(-1)?.id).toBe(initial.id);
   expect(state().navigatePane(3)?.id).toBe(second.id);
-  const split = state().splitPane(paneId, "right")!;
-  expect(state().canNavigatePane(-1, split)).toBe(false);
-  expect(state().canNavigatePane(-1, paneId)).toBe(true);
 });
 
 it("opens Google in new tabs and splits and navigates inside the selected split", () => {
@@ -220,7 +217,6 @@ it("opens Google in new tabs and splits and navigates inside the selected split"
   expect(state().layout.activeLayoutTabId).toBe(tabId);
   expect(dockTabs(state().layout.root)).toHaveLength(2);
   expect(activeLayoutView(state().layout)?.id).toBe(view.id);
-  expect(state().canNavigatePane(-1)).toBe(true);
 });
 
 it("updates automatic titles live while preserving custom names through history and reload", () => {

@@ -1,7 +1,4 @@
-import type {
-  SpaceMember,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
 import {
   Button,
@@ -33,7 +30,7 @@ export interface SpaceTaskDrawerProps {
   setDraft: Dispatch<SetStateAction<TaskDraft>> | ((draft: TaskDraft) => void);
   editing: SpaceTask | null;
   members: SpaceMember[];
-  
+
   busy: boolean;
   canManage: boolean;
   onClose: () => void;
@@ -148,7 +145,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                       {props.onArchive ? (
                         <DropdownMenuItem
                           disabled={busy}
-                          className="text-cream-bright focus:text-cream-bright"
+                          variant="destructive"
                           onSelect={props.onArchive}
                         >
                           <Trash2 className="mr-2 size-4" />
@@ -181,7 +178,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               draft={draft}
               setDraft={setDraft}
               members={props.members}
-              
+
               canManage={canManage}
             />
           </div>

@@ -53,6 +53,8 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
       useAppStore.getState().setError(message);
     };
     const stop = () => {
+      // Account reset can stop the bridge before React unmounts it.
+      if (!active) return;
       active = false;
       controller?.stop();
       detach?.();

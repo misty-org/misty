@@ -35,7 +35,6 @@ it("replaces the focused pane without jumping to another app instance", () => {
   );
   expect(layoutTabs(state().layout)).toHaveLength(3);
   expect(allLayoutViews(state().layout).some((view) => view.id === home.id)).toBe(false);
-  expect(state().canNavigatePane(-1)).toBe(false);
 });
 it("targets the requested Space and its default route", () => {
   const { result } = navigator("/apps/planner?space=one");

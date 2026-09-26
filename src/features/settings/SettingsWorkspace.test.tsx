@@ -277,7 +277,7 @@ describe("SettingsWorkspace", () => {
     expect(groupToggle?.querySelector('[data-chevron-placement="inline"]')).not.toBeNull();
   });
 
-  it("draws an indented hierarchy rail beside grouped settings", async () => {
+  it("indents grouped settings slightly without hierarchy lines", async () => {
     await renderWorkspace("general");
 
     const general = container.querySelector('[data-settings-nav-entry="general"]');
@@ -286,27 +286,10 @@ describe("SettingsWorkspace", () => {
       general?.querySelector('[data-settings-nav-surface="true"]')?.className ?? ""
     ).split(/\s+/);
 
-    expect(classes).toContain("ml-[27px]");
-    expect(classes).toContain("mr-2");
-    expect(classes).toContain("h-7");
-    expect(classes).toContain("text-[13px]");
-    expect(surfaceClasses).toContain("ml-1");
-    expect(surfaceClasses).toContain("gap-2");
-    expect(surfaceClasses).toContain("px-2");
-    expect(general?.querySelector('[data-tree-branch="true"]')).not.toBeNull();
-    expect(general?.querySelector('[data-tree-branch="true"]')?.className.split(/\s+/)).toContain(
-      "-left-2",
-    );
-    expect(
-      general?.querySelector('[data-settings-nav-surface="true"] > span')?.className.split(/\s+/),
-    ).toContain("size-5");
-    expect(
-      general?.querySelector('[data-settings-nav-surface="true"] > span')?.className,
-    ).toContain("[&_svg]:!size-[18px]");
-    expect(
-      container
-        .querySelector('[data-settings-nav-entry="shortcuts"] [data-tree-branch="true"]')
-        ?.getAttribute("data-tree-branch-end"),
-    ).toBe("true");
+    expect(classes).toContain("ml-3");
+    expect(classes).toContain("h-[var(--navigation-row-height,32px)]");
+    expect(surfaceClasses).toContain("gap-2.5");
+    expect(surfaceClasses).toContain("px-2.5");
+    expect(container.querySelector("[data-tree-branch]")).toBeNull();
   });
 });

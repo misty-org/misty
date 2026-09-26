@@ -1,4 +1,4 @@
-import { useAuth, useUserStore } from "@/features/auth";
+import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
 import { reportSystemError } from "@/features/activity";
 import { useSetupStore } from "@/features/installer";
 import { Button } from "@/shared/ui";
@@ -213,6 +213,14 @@ export function ProfilePopover(props: {
       props.onClose();
       await switchAccount(accountId);
     } catch (error) {
+      if (error instanceof SavedAccountSessionUnavailableError) {
+        // The account stays listed; its session just needs a password again.
+        const email = accounts.find((saved) => saved.id === accountId)?.email ?? "";
+        navigate("/signin", {
+          state: { from: props.currentPath, addingAccount: true, reauthenticateEmail: email },
+        });
+        return;
+      }
       setSwitchError("The account could not be switched. Try selecting it again.");
       reportSystemError({
         accountId: account?.id,
@@ -235,7 +243,14 @@ export function ProfilePopover(props: {
   const signOut = () => {
     if (transitioning) return;
     props.onClose();
-    void logout();
+    void logout().catch((error: unknown) =>
+      reportSystemError({
+        accountId: account?.id,
+        scope: "account:sign-out",
+        title: "Could not sign out",
+        error,
+      }),
+    );
   };
 
   return createPortal(

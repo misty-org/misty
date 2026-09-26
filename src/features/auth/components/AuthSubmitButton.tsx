@@ -7,7 +7,11 @@ export default function AuthSubmitButton({
   disabled,
 }: AuthSubmitButtonProps) {
   return (
-    <Button type="submit" disabled={disabled || loading} className="h-11 w-full">
+    <Button
+      type="submit"
+      disabled={disabled || loading}
+      className="h-11 w-full bg-cream-bright text-charcoal-bg hover:bg-cream"
+    >
       {loading ? loadingLabel : idleLabel}
     </Button>
   );

@@ -1,7 +1,4 @@
-import type {
-  SpaceMember,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import {
   Button,
@@ -27,7 +24,7 @@ import {
 export function SpaceTaskList({
   tasks,
   members,
-  
+
   busy,
   canManage,
   onOpen,
@@ -36,7 +33,7 @@ export function SpaceTaskList({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
-  
+
   busy: string;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
@@ -180,11 +177,7 @@ export function SpaceTaskList({
                   <TaskInlineSelect
                     label={`Assignee for ${task.title}`}
                     disabled={!canManage || taskBusy}
-                    value={
-                      task.assignee_user_id
-                          ? `person:${task.assignee_user_id}`
-                          : ""
-                    }
+                    value={task.assignee_user_id ? `person:${task.assignee_user_id}` : ""}
                     onChange={(value) =>
                       onUpdate(task, {
                         assignee_user_id: value.startsWith("person:") ? value.slice(7) : undefined,
@@ -195,7 +188,6 @@ export function SpaceTaskList({
                       ...members.map(
                         (member) => [`person:${member.user_id}`, member.name] as [string, string],
                       ),
-
                     ]}
                   />
                 </TableCell>
@@ -243,13 +235,6 @@ export function SpaceTaskList({
 export type TaskPatch = Partial<
   Pick<
     SpaceTask,
-    | "title"
-    | "notes"
-    | "status"
-    | "priority"
-    | "assignee_user_id"
-   
-    | "due_at"
-    | "due_timezone"
+    "title" | "notes" | "status" | "priority" | "assignee_user_id" | "due_at" | "due_timezone"
   >
 >;

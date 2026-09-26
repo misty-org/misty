@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import type { MistyAppSDK, MistyFileSource } from "@misty/sdk";
-import { Button, TreeBranch } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { MonitorSmartphone, Plus } from "lucide-react";
 import type { SdkFilesWorkspace } from "./sdkFilesWorkspace";
 import type { SdkFilesWorkspaceServices } from "./SdkFilesWorkspaceView";
@@ -172,7 +172,6 @@ export async function createSdkFilesServices(
           title="Network"
           open={open}
           onOpenChange={setOpen}
-          last
           actions={
             <Button
               variant="ghost"
@@ -186,16 +185,11 @@ export async function createSdkFilesServices(
         >
           {items.length ? (
             <div className={sidebarStyles.list}>
-              {items.map((item, index) => (
+              {items.map((item) => (
                 <div
                   className={sidebarStyles.deviceNestedTreeRow}
                   key={item.id}
                 >
-                  <TreeBranch
-                    anchor={16}
-                    className={sidebarStyles.treeBranch}
-                    last={index === items.length - 1}
-                  />
                   <Button
                     variant="ghost"
                     className={`${sidebarStyles.treeSurface} ${sidebarStyles.deviceButton}`}

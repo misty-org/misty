@@ -43,7 +43,7 @@
   cursor: pointer;
 }
 .provider-workspace button:hover:where(:not(:disabled)) {
-  background: var(--misty-theme-hover, #2b2b2b);
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .provider-workspace button:disabled {
   opacity: 0.5;

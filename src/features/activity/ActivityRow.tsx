@@ -80,7 +80,12 @@ export function ActivityRow({
         {keys.length || (item.dismissible && pending) ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className={actionClass} aria-label={`Options for ${source}`}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={actionClass}
+                aria-label={`Options for ${source}`}
+              >
                 <MoreHorizontal size={14} />
               </Button>
             </DropdownMenuTrigger>

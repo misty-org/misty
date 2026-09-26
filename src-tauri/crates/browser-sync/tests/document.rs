@@ -391,3 +391,38 @@ fn space_routes_survive_native_sync_round_trip() {
     );
     assert!(fields["profile_id"].is_null());
 }
+
+#[test]
+fn group_icons_accept_small_pngs_and_reject_other_payloads() {
+    use misty_browser_sync::document::entities::{validate, Fields};
+    let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6mWQAAAAASUVORK5CYII=";
+    let fields = |icon: &str| -> Fields {
+        serde_json::from_value(json!({"label":"My group","icon":icon,"order":0,"hidden":false}))
+            .unwrap()
+    };
+    assert!(validate(Kind::Group, &fields(png)).is_ok());
+    assert!(validate(Kind::Group, &fields("rocket")).is_ok());
+    for value in [
+        "data:image/svg+xml;base64,PHN2Zz4=",
+        "https://example.com/icon.png",
+        "data:image/png;base64,bm90LXBuZw==",
+    ] {
+        assert!(validate(Kind::Group, &fields(value)).is_err());
+    }
+    assert!(validate(
+        Kind::Group,
+        &fields(&format!("data:image/png;base64,{}", "A".repeat(32768)))
+    )
+    .is_err());
+    let initial = apply(
+        &Document::default(),
+        changes(json!([
+            {"action":"create","kind":"group","id":"group:custom","fields":fields(png)}
+        ])),
+        MAC,
+    );
+    assert_eq!(
+        initial.live(Kind::Group, "group:custom").unwrap().values()["icon"],
+        png
+    );
+}

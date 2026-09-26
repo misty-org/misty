@@ -9,14 +9,8 @@ export function HelpMenu({ className }: { className: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className={className}
-          aria-label="Help"
-          title="Help"
-        >
-          <CircleHelp size={18} strokeWidth={1.75} aria-hidden="true" />
+        <Button variant="ghost" size="icon-sm" className={className} aria-label="Help" title="Help">
+          <CircleHelp aria-hidden="true" />
         </Button>
       </DialogTrigger>
       <DialogContent

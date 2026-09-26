@@ -5,14 +5,14 @@ const pluginTabMenuStyles = {
   headerTitle: "flex min-w-0 items-center gap-2",
   headerMeta: "text-xs font-semibold text-cream-muted",
   iconButton:
-    "grid size-7 flex-none place-items-center rounded-md border-0 bg-transparent text-cream-muted hover:bg-transparent hover:text-cream",
+    "grid size-7 flex-none place-items-center rounded-md border-0 bg-transparent text-cream-muted hover:bg-charcoal-hover hover:text-cream",
   searchLabel: "block px-1.5 py-2",
   searchInput:
     "h-8 w-full rounded-md border border-charcoal-border bg-charcoal-bg px-2.5 text-[13px] text-cream outline-none placeholder:text-cream-muted",
   sections: "grid gap-1 py-1",
   section: "grid gap-0.5",
   sectionLabel: "px-2.5 pb-1 pt-1.5 text-[10px] font-bold capitalize text-cream-muted",
-  item: "grid min-h-11 w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 py-2 text-left text-cream-muted hover:bg-transparent hover:text-cream",
+  item: "grid min-h-11 w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-transparent bg-transparent px-2.5 py-2 text-left text-cream-muted hover:bg-charcoal-hover hover:text-cream",
   itemUsable: "border-charcoal-border/60 bg-charcoal-card text-cream",
   itemSelected: "border-charcoal-border bg-charcoal-hover text-cream border-l-2 border-cream",
   itemText:
@@ -25,7 +25,7 @@ const pluginTabMenuStyles = {
   selection:
     "grid min-w-0 gap-1 rounded-md bg-charcoal-card px-3 py-2 [&>span]:text-[10px] [&>span]:font-bold [&>span]:capitalize [&>span]:text-cream-muted [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:font-mono [&>strong]:text-[11px] [&>strong]:font-medium [&>strong]:text-cream/80",
   footerItem:
-    "mt-1 flex h-9 w-full items-center gap-2 rounded-md border-0 border-t border-charcoal-border/60 bg-transparent px-2.5 text-left text-xs font-semibold text-cream/80 hover:bg-transparent hover:text-cream",
+    "mt-1 flex h-9 w-full items-center gap-2 rounded-md border-0 border-t border-charcoal-border/60 bg-transparent px-2.5 text-left text-xs font-semibold text-cream/80 hover:bg-charcoal-hover hover:text-cream",
 } as const;
 
 const extensionsPanelStyles = {
@@ -41,12 +41,12 @@ const extensionsPanelStyles = {
     "h-8 w-full rounded-md border border-charcoal-border bg-charcoal-card px-2.5 text-[13px] text-cream outline-none placeholder:text-cream-muted",
   body: "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
   list: "flex min-w-0 gap-0 overflow-x-auto border-b border-charcoal-border/60 bg-charcoal-bg px-2 pt-2",
-  item: "relative -mb-px grid min-h-11 w-[164px] shrink-0 grid-cols-[24px_minmax(0,1fr)_22px] items-center gap-2 rounded-t-md border border-transparent border-b-border/60 px-2 py-1.5 text-left text-cream-muted hover:bg-transparent hover:text-cream",
+  item: "relative -mb-px grid min-h-11 w-[164px] shrink-0 grid-cols-[24px_minmax(0,1fr)_22px] items-center gap-2 rounded-t-md border border-transparent border-b-border/60 px-2 py-1.5 text-left text-cream-muted hover:bg-charcoal-hover hover:text-cream",
   itemSelected: "z-[1] border-charcoal-border/60 border-b-transparent bg-transparent text-cream",
   itemText:
     "grid min-w-0 gap-0.5 [&>small]:min-w-0 [&>small]:overflow-hidden [&>small]:text-ellipsis [&>small]:whitespace-nowrap [&>small]:text-[11px] [&>small]:font-medium [&>small]:text-cream-muted [&>strong]:min-w-0 [&>strong]:overflow-hidden [&>strong]:text-ellipsis [&>strong]:whitespace-nowrap [&>strong]:text-[13px]",
   tabClose:
-    "grid size-[19px] place-items-center rounded-full text-cream-muted hover:bg-transparent hover:text-cream",
+    "grid size-[19px] place-items-center rounded-full text-cream-muted hover:bg-charcoal-hover hover:text-cream",
   host: "grid min-h-0 content-start gap-3 overflow-auto p-3",
   selectedHeader: "grid min-w-0 grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5",
   selectedTitle:
@@ -62,7 +62,7 @@ const extensionsPanelStyles = {
 const explorerTrayStyles = {
   triggerWrap: "relative grid place-items-center",
   trigger:
-    "relative grid h-[26px] w-[30px] place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-transparent hover:text-cream disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted aria-expanded:bg-charcoal-hover aria-expanded:text-cream max-[720px]:h-7 max-[720px]:w-8",
+    "relative grid h-[26px] w-[30px] place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted aria-expanded:bg-charcoal-hover aria-expanded:text-cream max-[720px]:h-7 max-[720px]:w-8",
   triggerActive: "bg-charcoal-hover text-cream",
   badge:
     "pointer-events-none absolute right-0 top-0 grid h-[14px] min-w-[14px] translate-x-1/3 -translate-y-1/4 place-items-center rounded-full bg-charcoal-active px-[3px] text-[9px] font-bold leading-none text-cream-bright ring-2 ring-charcoal-bg",

@@ -40,6 +40,13 @@ pub fn up(workspace: &Workspace, detach: bool, build: bool, verbose: bool) -> Re
     }
     validate_development_secrets(workspace)?;
     ports(workspace)?;
+    CommandSpec::new("sh")
+        .arg("scripts/docker/consolidate-workflow.sh")
+        .run_logged(
+            &workspace.server,
+            &workspace.server.join(".misty/logs/workflow-migration.log"),
+            &diagnostic_secrets(workspace)?,
+        )?;
     println!("Starting server containers…");
     let command = development_up_command(detach, build);
     let log = workspace.server.join(".misty/logs/startup.log");
@@ -251,13 +258,21 @@ pub fn status(workspace: &Workspace) -> Result<()> {
         let service = row["Service"].as_str().unwrap_or("unknown");
         let state = row["State"].as_str().unwrap_or("unknown");
         let health = row["Health"].as_str().unwrap_or("");
-        let status = if state == "exited" && row["ExitCode"].as_i64() == Some(0) {
-            "complete"
-        } else if !health.is_empty() {
-            health
-        } else {
-            state
-        };
+        // Successful setup/deployment jobs are not ongoing server services.
+        // Keep incomplete or failed jobs visible so their logs remain discoverable.
+        let is_job = matches!(
+            service,
+            "setup"
+                | "dev-init"
+                | "migrate"
+                | "database-permissions"
+                | "agent-runtime-setup"
+                | "cloudflare-deploy"
+        );
+        if is_job && state == "exited" && row["ExitCode"].as_i64() == Some(0) {
+            continue;
+        }
+        let status = if !health.is_empty() { health } else { state };
         println!("{service:<27} {status}");
     }
     if rows.is_empty() {
@@ -407,7 +422,7 @@ pub fn deploy_development(workspace: &Workspace) -> Result<()> {
     environment::check(workspace, Target::Dev)?;
     println!("Deploying development collaboration Worker…");
     development_compose()
-        .args(["run", "--rm", "--no-deps", "--build", "cloudflare-deploy"])
+        .args(["run", "--rm", "--no-deps", "--build", "setup", "deploy"])
         .run_logged(
             &workspace.server,
             &workspace.server.join(".misty/logs/deploy.log"),
@@ -1161,7 +1176,7 @@ mod tests {
             json!({"Service":"postgres","State":"running","Health":"healthy"}),
             json!({"Service":"misty-api","State":"running","Health":"healthy"}),
             json!({"Service":"tunnel","State":"running","Health":"healthy"}),
-            json!({"Service":"migrate","State":"exited","ExitCode":0}),
+            json!({"Service":"setup","State":"exited","ExitCode":0}),
         ];
         assert!(validate_health(&rows).is_ok());
         rows[3]["ExitCode"] = json!(1);

@@ -139,7 +139,7 @@ export function SpaceChatConversationList({
                     {canRename && canDelete ? <ContextMenuSeparator /> : null}
                     {canDelete ? (
                       <ContextMenuItem
-                        className="text-cream-bright focus:bg-charcoal-active focus:text-cream-bright"
+                        variant="destructive"
                         onSelect={() => onDeleteConversation?.(conversation)}
                       >
                         <Trash2 />

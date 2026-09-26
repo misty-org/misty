@@ -1,4 +1,4 @@
-export const browserWorkspaceStoreVersion = 14;
+export const browserWorkspaceStoreVersion = 15;
 export const workspaceRecoveryKey = (name: string) => `${name}:before-browser-workspace:v14`;
 
 /** Preserve the exact pre-migration record before Zustand can replace retired views. */

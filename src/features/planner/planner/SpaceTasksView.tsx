@@ -37,7 +37,7 @@ export function SpaceTasksView({
   canManage: boolean;
   runtime: PlannerTaskRuntime;
 }) {
-  const { api, members,  userId } = runtime;
+  const { api, members, userId } = runtime;
   const navigate = useNavigate();
   const location = useLocation();
   const presentation = useSurfacePresentation();
@@ -212,7 +212,7 @@ export function SpaceTasksView({
         filters={
           <TaskFilters
             members={members}
-            
+
             status={filters.status}
             assignee={filters.assignee}
             priority={filters.priority}
@@ -229,7 +229,7 @@ export function SpaceTasksView({
         renderError={runtime.renderError}
         view={effectiveView}
         members={members}
-        
+
         canManage={canManage}
         assignee={filters.assignee}
         due={filters.due}
@@ -244,7 +244,7 @@ export function SpaceTasksView({
           setDraft={actions.setDraft}
           editing={actions.editing}
           members={members}
-          
+
           busy={actions.busy === "task" || actions.busy === actions.editing?.id}
           canManage={canManage}
           onClose={() => actions.setEditing(undefined)}

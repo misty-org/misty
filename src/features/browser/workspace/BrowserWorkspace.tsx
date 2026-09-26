@@ -1,3 +1,4 @@
+import { browserToolbarButtonClass, browserToolbarStyles } from "./browserToolbarStyles";
 import { Notification } from "@/shared/ui/notification";
 import {
   blankBrowserUrl,
@@ -49,9 +50,10 @@ import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
 import { BrowserOfflinePage } from "./BrowserOfflinePage";
 import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
 import {
-  browserViewportWidths,
+  browserViewportFrameStyle,
+  browserViewportStageStyle,
   BrowserViewportMenu,
-  type BrowserViewport,
+  useBrowserViewport,
 } from "./BrowserViewportMenu";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
@@ -103,7 +105,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
   const [addressFocusRequest, setAddressFocusRequest] = useState(0);
-  const [viewport, setViewport] = useState<BrowserViewport>("responsive");
+  const { viewport, setViewport, sizes, setSize, size: viewportSize } = useBrowserViewport();
   const [mistyPage, setMistyPage] = useState<BrowserMistyPage | null>(null);
   const [mistyPageLoading, setMistyPageLoading] = useState(false);
   const storedGrants = useBrowserRuntimeStore((runtime) => runtime.grants[tab.id]);
@@ -122,12 +124,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   );
   const lightChrome = false;
   const browserChromeBackground = "#18191c";
-  const iconButtonClass = codexIconButtonClass(lightChrome);
+  const iconButtonClass = browserToolbarButtonClass(lightChrome);
   const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
   const agentMenuSuspensionReason = `browser-agent-menu:${browserRuntimeId(tab)}`;
   const viewportMenuSuspensionReason = `browser-viewport-menu:${browserRuntimeId(tab)}`;
-  const viewportWidth = browserViewportWidths[viewport];
   const agentMenuOverlay = useBrowserOverlayControl(agentMenuSuspensionReason);
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const scopeId = browserScopeId(tab);
@@ -472,14 +473,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     >
       <div
         className={cn(
-          "relative z-10 flex items-center gap-2 border-b px-4",
-          isNativeMobileBuild && "gap-1 px-1",
+          browserToolbarStyles.bar,
           lightChrome ? "border-black/[0.08]" : "border-white/[0.055]",
         )}
         style={{ backgroundColor: browserChromeBackground }}
         data-browser-toolbar
       >
-        <div className="flex shrink-0 items-center gap-1">
+        <div className={browserToolbarStyles.group}>
           <button
             type="button"
             className={iconButtonClass}
@@ -487,7 +487,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             disabled={history.index === 0}
             onClick={() => travel(-1)}
           >
-            <ArrowLeft size={20} strokeWidth={1.6} />
+            <ArrowLeft {...browserToolbarStyles.icon} />
           </button>
           <button
             type="button"
@@ -496,7 +496,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             disabled={history.index >= history.entries.length - 1}
             onClick={() => travel(1)}
           >
-            <ArrowRight size={20} strokeWidth={1.6} />
+            <ArrowRight {...browserToolbarStyles.icon} />
           </button>
           <button
             type="button"
@@ -511,7 +511,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               }
             }}
           >
-            <RotateCw size={20} strokeWidth={1.7} />
+            <RotateCw {...browserToolbarStyles.roundIcon} />
           </button>
         </div>
 
@@ -529,7 +529,14 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           </span>
         ) : null}
 
-        {supportsSitePermissions() && /^https?:/.test(state.url) ? <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} iconButtonClass={iconButtonClass} /> : null}
+        {supportsSitePermissions() && /^https?:/.test(state.url) ? (
+          <BrowserSiteInfo
+            id={browserRuntimeId(tab)}
+            url={state.url}
+            active={active}
+            iconButtonClass={iconButtonClass}
+          />
+        ) : null}
         <BrowserOmnibox
           compact={Boolean(state.websiteId)}
           pageTitle={tab.title}
@@ -541,7 +548,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           onNavigate={navigateActiveTab}
         />
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className={browserToolbarStyles.group}>
           {!isNativeMobileBuild ? (
             <>
               <button
@@ -558,11 +565,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
                 title={annotationsActive ? "Exit annotation mode" : "Annotate page"}
                 onClick={() => setAnnotationsActive((active) => !active)}
               >
-                <Pencil size={20} strokeWidth={1.7} />
+                <Pencil {...browserToolbarStyles.icon} />
               </button>
               <BrowserViewportMenu
                 value={viewport}
                 onChange={setViewport}
+                sizes={sizes}
+                onSizeChange={setSize}
                 iconButtonClass={iconButtonClass}
                 lightChrome={lightChrome}
                 suspensionReason={viewportMenuSuspensionReason}
@@ -582,7 +591,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
                 )}
                 aria-label={`Agent access: ${agentAccess ? "On" : "Off"}`}
               >
-                <MessageCirclePlus size={20} strokeWidth={1.7} />
+                <MessageCirclePlus {...browserToolbarStyles.icon} />
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -592,8 +601,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             >
               <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
               <p className="mb-3 mt-1 text-xs text-cream-muted">
-                Attach this tab when you ask an Agent to work. Access belongs only to that run
-                and expires automatically.
+                Attach this tab when you ask an Agent to work. Access belongs only to that run and
+                expires automatically.
               </p>
               <p className="m-0 text-xs text-cream-muted">
                 {agentAccess
@@ -687,24 +696,27 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
 
       <div
         className={cn(
-          "flex min-h-0 min-w-0 justify-center overflow-hidden",
+          "flex min-h-0 min-w-0 items-center justify-center overflow-hidden",
           viewport === "responsive" ? "p-0" : "p-3",
           viewport === "responsive" ? undefined : lightChrome ? "bg-[#e8e8e8]" : "bg-[#101010]",
         )}
-        style={viewport === "responsive" ? { backgroundColor: browserChromeBackground } : undefined}
+        style={{
+          ...browserViewportStageStyle,
+          backgroundColor: viewport === "responsive" ? browserChromeBackground : undefined,
+        }}
         data-browser-page-stage
       >
         <div
           ref={pageHostRef}
           className={cn(
-            "relative h-full min-h-0 min-w-0 overflow-hidden transition-[width,border-radius,box-shadow] duration-200",
+            "relative min-h-0 min-w-0 overflow-hidden transition-[border-radius,box-shadow] duration-200",
             viewport === "responsive"
               ? "rounded-none shadow-none"
               : "rounded-xl shadow-2xl ring-1 ring-black/15",
             annotationsActive && "bg-transparent",
           )}
           style={{
-            width: viewportWidth ? `min(100%, ${viewportWidth}px)` : "100%",
+            ...browserViewportFrameStyle(viewportSize),
             backgroundColor: annotationsActive ? "transparent" : browserChromeBackground,
           }}
           data-browser-page-host
@@ -775,15 +787,4 @@ function setBrowserError(tabId: string, error: unknown) {
   useBrowserRuntimeStore
     .getState()
     .setError(tabId, error instanceof Error ? error.message : String(error));
-}
-
-function codexIconButtonClass(light: boolean): string {
-  return cn(
-    "grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
-    "transition-colors focus-visible:outline-none focus-visible:ring-2",
-    light
-      ? "text-[#6d6d6d] hover:bg-black/[0.045] hover:text-[#222] focus-visible:ring-black/15 disabled:text-[#b9b9b9]"
-      : "text-[#8f8f8f] hover:bg-white/[0.045] hover:text-[#dddddd] focus-visible:ring-white/15 disabled:text-[#4e4e4e]",
-    "disabled:pointer-events-none",
-  );
 }

@@ -591,6 +591,9 @@ function tokenDebugEnabled(): boolean {
 
 configureApiSession({
   isTransitioning: isAccountSessionTransitioning,
+  // Desktop only: the browser's own cookies decide there. Unknown until the
+  // keystore has been read, so startup requests still go out and restore it.
+  isSignedOut: () => hasTauriInternals() && !isNativeMobileBuild && cachedToken === null,
   readGeneration: readAccountSessionGeneration,
   readToken: async () => {
     await readAccountAuthToken();

@@ -1,0 +1,3 @@
+# Native services have their own Cargo output directories. Watching their
+# generated files causes native rebuilds to trigger further rebuilds.
+**/target/**

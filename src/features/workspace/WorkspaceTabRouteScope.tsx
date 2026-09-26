@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   createPath,
   NavigationType,
@@ -92,6 +92,11 @@ function recordWorkspaceTabRoute(tabId: string, route: string, replace: boolean)
 export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: ReactNode }) {
   const outerNavigate = useNavigate();
   const route = props.tab.route || "/";
+  const [routeState, setRouteState] = useState<{
+    tabId: string;
+    route: string;
+    value: unknown;
+  } | null>(null);
   useEffect(() => syncWorkspaceTabRouteHistory(props.tab.id, route), [props.tab.id, route]);
   const location = useMemo(() => {
     const parsed = parsePath(route);
@@ -99,10 +104,11 @@ export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: Rea
       pathname: parsed.pathname || "/",
       search: parsed.search || "",
       hash: parsed.hash || "",
-      state: null,
+      state:
+        routeState?.tabId === props.tab.id && routeState.route === route ? routeState.value : null,
       key: props.tab.id,
     };
-  }, [props.tab.id, route]);
+  }, [props.tab.id, route, routeState]);
 
   const navigator = useMemo<Navigator>(() => {
     const apply = (
@@ -113,6 +119,7 @@ export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: Rea
     ) => {
       const workspace = useWorkspaceStore.getState();
       if (record) recordWorkspaceTabRoute(props.tab.id, nextRoute, Boolean(options?.replace));
+      setRouteState({ tabId: props.tab.id, route: nextRoute, value: state });
       workspace.updateTabRoute(props.tab.id, nextRoute, Boolean(options?.replace));
       const focusedPane = dockLeaves(workspace.layout.root).find(
         (pane) => pane.id === workspace.layout.focusedPaneId,

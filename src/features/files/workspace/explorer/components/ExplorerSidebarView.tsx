@@ -9,7 +9,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  TreeBranch,
   cn,
 } from "@/shared/ui";
 import {
@@ -220,7 +219,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
             <div className={sidebarStyles.muted}>No remotes connected</div>
           ) : (
             <div className={sidebarStyles.list}>
-              {props.remotes.map((remote, index) => {
+              {props.remotes.map((remote) => {
                 const path = joinPath(props.mountRoot, remote.name);
                 const providerIcon = providerIconForType(remote.type);
                 const selected =
@@ -236,11 +235,6 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                     onSpringLoad={() => props.onNavigate(path)}
                   >
                     <div className={sidebarStyles.treeRow}>
-                      <TreeBranch
-                        className={sidebarStyles.treeBranch}
-                        first={index === 0}
-                        last={index === props.remotes.length - 1}
-                      />
                       <Button
                         type="button"
                         variant="ghost"
@@ -283,7 +277,6 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
             title="Local"
             open={localDevicesOpen}
             onOpenChange={setLocalDevicesOpen}
-            last={false}
           >
             {deviceEntries.length === 0 ? (
               <div className={sidebarStyles.deviceGroupEmpty}>
@@ -293,7 +286,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
               </div>
             ) : (
               <div className={sidebarStyles.list}>
-                {deviceEntries.map((device, index) => {
+                {deviceEntries.map((device) => {
                   const usedBytes = Math.max(
                     0,
                     device.totalBytes - device.freeBytes,
@@ -309,12 +302,6 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                     <ContextMenu key={device.id}>
                       <ContextMenuTrigger asChild>
                         <div className={sidebarStyles.deviceNestedTreeRow}>
-                          <TreeBranch
-                            anchor={16}
-                            className={sidebarStyles.treeBranch}
-                            first={index === 0}
-                            last={index === deviceEntries.length - 1}
-                          />
                           <div className={sidebarStyles.deviceRow}>
                             <props.runtime.DropTarget
                               id={`sidebar:device:${device.id}`}

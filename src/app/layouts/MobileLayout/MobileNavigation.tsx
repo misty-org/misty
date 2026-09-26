@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { WebsiteGroupNavigator } from "@/features/browser-workspace/WebsiteGroupNavigator";
+import { WorkspaceSpaceNavigation } from "@/features/spaces";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
 import {
@@ -11,7 +13,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/shared/ui";
-import { PanelsTopLeft, ChevronRight, Settings, Activity, UserRound, Menu } from "lucide-react";
+import { ChevronRight, Settings, Activity, UserRound, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 type Destination = { id: string; label: string; path: string; icon: LucideIcon };
@@ -25,6 +27,7 @@ export function MobileNavigation(props: {
   onNavigate: (path: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [props.activePath]);
   useEffect(() => {
     requestEmbeddedBrowserSuspension(menuOpen, "mobile-navigation");
     return () => requestEmbeddedBrowserSuspension(false, "mobile-navigation");
@@ -85,6 +88,11 @@ export function MobileNavigation(props: {
 function NavigationContent(
   props: Parameters<typeof MobileNavigation>[0] & { onWebsiteOpen?: () => void },
 ) {
+  const activeTab = useWorkspaceStore((state) => {
+    const panes = dockLeaves(state.layout.root);
+    const pane = panes.find((candidate) => candidate.id === state.layout.focusedPaneId) ?? panes[0];
+    return pane?.tabs.find((tab) => tab.id === pane.activeTabId);
+  });
   return (
     <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
       <Button
@@ -109,11 +117,14 @@ function NavigationContent(
         </span>
         <ChevronRight size={18} className="shrink-0 text-cream-muted" aria-hidden="true" />
       </Button>
+      <div className="mb-4 [&_button]:min-h-11 [&_a]:min-h-11">
+        <WorkspaceSpaceNavigation activeTab={activeTab} onOpen={props.onWebsiteOpen} />
+      </div>
       <div className="[&_button]:min-h-11">
         <WebsiteGroupNavigator onOpen={props.onWebsiteOpen} />
       </div>
       <div className="mt-3 border-t border-charcoal-border/60 pt-2 grid grid-cols-1 gap-1.5">
-        {[...props.core, { id: "spaces", label: "Spaces", path: "/spaces", icon: PanelsTopLeft }, ...props.more].map((item) => {
+        {[...props.core, ...props.more].map((item) => {
           const Icon = item.icon;
           const active = routeIsActive(props.activePath, item.path);
           return (

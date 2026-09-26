@@ -2,6 +2,11 @@ import { dockLeaves, useWorkspaceStore, type MultiPanelStoreHook } from "@/featu
 import { useCallback, useEffect, useRef } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import { useExplorerStore } from "../../store";
+import {
+  revealSearchResultInPane,
+  searchResultNavigationTarget,
+} from "../../utils/searchNavigation";
+import { takeFilesTabReveal } from "./filesTabReveal";
 
 interface FilesDockWorkspaceOptions {
   workspaceId?: string;
@@ -47,6 +52,11 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
     if (restoredTabRef.current === options.workspaceId) return;
     restoredTabRef.current = options.workspaceId;
 
+    const reveal = takeFilesTabReveal(options.workspaceId);
+    if (reveal) {
+      void revealSearchResultInPane(options.activePaneId, searchResultNavigationTarget(reveal));
+      return;
+    }
     const desiredPath = dockTabPath;
     if (desiredPath && desiredPath !== options.activePath) {
       void useExplorerStore.getState().navigatePane(options.activePaneId, desiredPath);

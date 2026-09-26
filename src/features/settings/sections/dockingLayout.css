@@ -82,7 +82,6 @@
   font-size: 12px;
 }
 .misty-docking-positions > button[aria-pressed="true"] {
-  background: var(--misty-theme-active);
   color: var(--misty-theme-text-bright);
 }
 .misty-docking-positions > button:disabled {

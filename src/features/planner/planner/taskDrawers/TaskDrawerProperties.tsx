@@ -22,13 +22,13 @@ export function TaskDrawerProperties({
   draft,
   setDraft,
   members,
-  
+
   canManage,
 }: {
   draft: TaskDraft;
   setDraft: Dispatch<SetStateAction<TaskDraft>> | ((draft: TaskDraft) => void);
   members: SpaceMember[];
-  
+
   canManage: boolean;
 }) {
   const currentStatusLabel = taskStatusOptions.find(([s]) => s === draft.status)?.[1] ?? "To do";
@@ -79,10 +79,7 @@ export function TaskDrawerProperties({
                 <DropdownMenuItem
                   key={statusKey}
                   onClick={() => setDraft({ ...draft, status: statusKey })}
-                  className={cn(
-                    "flex items-center gap-2 text-xs",
-                    draft.status === statusKey && "font-semibold text-cream-bright",
-                  )}
+                  className={cn(draft.status === statusKey && "font-semibold text-cream-bright")}
                 >
                   <span className={`size-2 shrink-0 rounded-full ${statusDot(statusKey)}`} />
                   {label}
@@ -129,7 +126,6 @@ export function TaskDrawerProperties({
                   key={priorityKey}
                   onClick={() => setDraft({ ...draft, priority: priorityKey })}
                   className={cn(
-                    "flex items-center gap-2 text-xs",
                     draft.priority === priorityKey && "font-semibold text-cream-bright",
                   )}
                 >
@@ -179,7 +175,7 @@ export function TaskDrawerProperties({
             <DropdownMenuContent align="start" className="w-56 max-h-60 overflow-y-auto">
               <DropdownMenuItem
                 onClick={() => setDraft({ ...draft, assignee_user_id: "" })}
-                className="flex items-center gap-2 text-xs text-cream-muted"
+                className="text-cream-muted"
               >
                 <User className="size-3.5 opacity-60" />
                 Unassigned
@@ -199,7 +195,6 @@ export function TaskDrawerProperties({
                         })
                       }
                       className={cn(
-                        "flex items-center gap-2 text-xs",
                         draft.assignee_user_id === member.user_id &&
                           "font-semibold text-cream-bright bg-charcoal-hover",
                       )}
