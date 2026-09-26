@@ -10,6 +10,25 @@ import type {
 import { type LucideIcon } from "lucide-react";
 
 export type SettingsSection =
+  | "profiles"
+  | "devices"
+  | "about"
+  | "diagnostics"
+  | "browser-downloads"
+  | "browser-privacy"
+  | "browser-permissions"
+  | "browser-handoff"
+  | "spaces-defaults"
+  | "spaces-agenda"
+  | "spaces-manage"
+  | "files-locations"
+  | "files-connections"
+  | "files-indexing"
+  | "agents-defaults"
+  | "agents-memory"
+  | "agents-connections"
+  | "agents-permissions"
+  | "agents-companion"
   | "account"
   | "general"
   | "sync"
@@ -54,6 +73,7 @@ export interface SettingsContentProps {
   working: boolean;
   onSettingChange: (section: string, key: string, value: SettingValue) => void;
   onLoad: () => Promise<void>;
+  onOpenResource?: (path: string) => void;
   onShortcutChange: (request: UpdateShortcutRequest) => Promise<void>;
   onShortcutReassign: (request: ReassignShortcutRequest) => Promise<void>;
   onResetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;

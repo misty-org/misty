@@ -15,6 +15,10 @@ export async function agentsRegisterFolderScope(request: { path: string }): Prom
   return invoke<AgentScope>("agents_register_folder_scope", { request });
 }
 
+export async function agentsRevokeFolderScope(scopeId: string): Promise<void> {
+  await invoke("agents_revoke_folder_scope", { scopeId });
+}
+
 export async function agentsOpenCitation(request: { citation: AgentCitation }): Promise<void> {
   await invoke("agents_open_citation", { request });
 }

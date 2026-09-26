@@ -4,7 +4,7 @@ export interface FrontierModel {
   provider_id: string;
   provider_name: string;
   capabilities: string[];
-  reasoning_levels: Array<"default" | "low" | "medium" | "high">;
+  reasoning_levels: Array<"default" | "low" | "medium" | "high" | "xhigh">;
 }
 
 export interface FrontierModelCatalog {
@@ -22,7 +22,7 @@ export interface AssistantTurnInput<TContext extends object = Record<string, unk
 
 export function createAssistantApi(
   apiRequest: <T = void>(path: string, init?: RequestInit) => Promise<T>,
-  apiBlobRequest: (path: string) => Promise<Blob> = async () => {
+  _apiBlobRequest: (path: string) => Promise<Blob> = async () => {
     throw new Error("Use the binary operation.");
   },
 ) {
@@ -50,10 +50,15 @@ export function createAssistantApi(
       apiRequest<{ conversations: T[] }>(
         `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
       ),
-    createConversation: <T>(title: string, spaceId?: string, agentId?: string) =>
+    createConversation: <T>(
+      title: string,
+      spaceId?: string,
+      agentId?: string,
+      defaults?: { model_id?: string; reasoning_effort?: string },
+    ) =>
       apiRequest<T>("/misty/conversations", {
         method: "POST",
-        body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId }),
+        body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId, ...defaults }),
       }),
     deleteConversation: (conversationId: string) =>
       apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {

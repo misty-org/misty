@@ -171,7 +171,7 @@ export function GlobalMistySurface(props: {
         registration.accountId === props.accountId && registration.paneId === aiPaneId,
     ),
   );
-  // An SDK adapter may be denied, revoked or closed while its pane is mounted.
+  // A surface adapter may be denied, revoked or closed while its pane is mounted.
   // Optional context must never throw through the workspace render boundary.
   const surfaceSnapshot = useMemo(
     () => readOptionalSurfaceContext(includeCurrentContext ? aiRegistration?.adapter : undefined),
@@ -428,6 +428,7 @@ export function GlobalMistySurface(props: {
             state.accountId !== props.accountId
               ? state
               : {
+                  thinkingModeExplicit: true,
                   thinkingMode:
                     state.activeConversationId === activeConversationId
                       ? settings.reasoningEffort === "xhigh"

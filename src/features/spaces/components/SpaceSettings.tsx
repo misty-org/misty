@@ -1,5 +1,5 @@
-import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SystemErrorActivity } from "@/features/activity";
+import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SpaceMembers } from "@/features/spaces/members";
 import {
   AlertDialog,
@@ -27,14 +27,19 @@ import { useShallow } from "zustand/react/shallow";
 import { canManageSpaceLifecycle, preferredDefaultSpace } from "../defaultSpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
-
 type SpaceSettingsSection = "general" | "members";
-
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
-  { id: "general", label: "General", icon: Settings2 },
-  { id: "members", label: "Members", icon: UsersRound },
+  {
+    id: "general",
+    label: "General",
+    icon: Settings2,
+  },
+  {
+    id: "members",
+    label: "Members",
+    icon: UsersRound,
+  },
 ];
-
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,7 +65,9 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const canLeave = !isOwner && canManageSpaceLifecycle(space, "leave");
   const canDelete = isOwner && canManageSpaceLifecycle(space, "delete");
   const encodedSpaceId = encodeURIComponent(spaceId);
-  const locationState = location.state as { spaceSettingsReturnTo?: string } | null;
+  const locationState = location.state as {
+    spaceSettingsReturnTo?: string;
+  } | null;
   const fallbackReturnPath = `/spaces/${encodedSpaceId}/home`;
   const closeSettings = () => {
     const destination = locationState?.spaceSettingsReturnTo;
@@ -68,18 +75,18 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
       destination?.startsWith(`/spaces/${encodedSpaceId}/`) && !destination.includes("/settings/")
         ? destination
         : fallbackReturnPath,
-      { replace: true },
+      {
+        replace: true,
+      },
     );
   };
   const dismissSettings = () => {
     if (leaveOpen || deleteOpen || dangerBusy) return;
     closeSettings();
   };
-
   useEffect(() => {
     setName(space?.name ?? "");
   }, [space?.name]);
-
   const saveName = async (event: FormEvent) => {
     event.preventDefault();
     const nextName = name.trim();
@@ -102,7 +109,9 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
       const fallback = preferredDefaultSpace(remainingSpaces);
       navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
         replace: true,
-        state: { spaceSwitch: true },
+        state: {
+          spaceSwitch: true,
+        },
       });
     } catch {
       /* The shared store error remains visible in the dialog. */
@@ -120,7 +129,9 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
       const fallback = preferredDefaultSpace(remainingSpaces);
       navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
         replace: true,
-        state: { spaceSwitch: true },
+        state: {
+          spaceSwitch: true,
+        },
       });
     } catch {
       /* The shared store error remains visible in the dialog. */
@@ -128,14 +139,12 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
       setDangerBusy(false);
     }
   };
-
   if (!space)
     return (
       <div className="grid h-full place-items-center text-sm text-cream-muted">
         Loading Space settings…
       </div>
     );
-
   return (
     <WorkspaceOverlay open ariaLabel={`${space.name} settings`} onClose={dismissSettings}>
       <>
@@ -198,7 +207,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                       error={error}
                       scope={`spaces:settings:${spaceId}`}
                       title="Space settings need attention"
-                      target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
+                      target={{
+                        kind: "route",
+                        href: `/spaces/${encodeURIComponent(spaceId)}`,
+                      }}
                     />
                   ) : null}
                   <Separator className="my-5" />
@@ -355,7 +367,6 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     </WorkspaceOverlay>
   );
 }
-
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg bg-charcoal-card px-3 py-2.5">
@@ -373,7 +384,6 @@ function DangerError({ message }: { message: string }) {
     />
   );
 }
-
 function isSpaceSettingsSection(value: string): value is SpaceSettingsSection {
   return settingsItems.some((item) => item.id === value);
 }

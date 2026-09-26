@@ -1,17 +1,10 @@
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { appZoomBaseline, appZoomFromStoredScale } from "@/shared/hooks/useAppZoom";
 import { booleanSetting, numberSetting, sectionRecord, stringSetting } from "../settingsControls";
-
 export const settingsBoolean = booleanSetting;
 export const settingsNumber = numberSetting;
 export const settingsString = stringSetting;
-
-const deviceNotificationsKey = "device_notifications_enabled";
 const legacyDesktopNotificationsKey = ["desktop", "notifications", "enabled"].join("_");
-export const notificationsDeviceKey = isNativeMobileBuild
-  ? deviceNotificationsKey
-  : legacyDesktopNotificationsKey;
-
+export const notificationsDeviceKey = legacyDesktopNotificationsKey;
 export function selectAppearancePreferences(
   document: Record<string, unknown> | null | undefined,
 ): AppearancePreferences {
@@ -37,7 +30,6 @@ export function selectAppearancePreferences(
     wallpaperPath: settingsString(source, "appearance", "wallpaper_path", ""),
   };
 }
-
 export function selectFilePreferences(
   document: Record<string, unknown> | null | undefined,
 ): FilePreferences {
@@ -47,7 +39,6 @@ export function selectFilePreferences(
     showHiddenFiles: settingsBoolean(source, "files", "show_hidden_files", false),
   };
 }
-
 export function selectTerminalPreferences(
   document: Record<string, unknown> | null | undefined,
 ): TerminalPreferences {
@@ -64,7 +55,6 @@ export function selectTerminalPreferences(
     ),
   };
 }
-
 export function selectEditorPreferences(
   document: Record<string, unknown> | null | undefined,
 ): EditorPreferences {
@@ -88,7 +78,6 @@ export function selectEditorPreferences(
     wordWrap: settingsBoolean(source, "editor", "word_wrap", true),
   };
 }
-
 export function selectNotificationPreferences(
   document: Record<string, unknown> | null | undefined,
 ): NotificationPreferences {
@@ -96,8 +85,8 @@ export function selectNotificationPreferences(
   const deviceNotificationsEnabled = settingsBoolean(
     source,
     "notifications",
-    isNativeMobileBuild ? deviceNotificationsKey : legacyDesktopNotificationsKey,
-    settingsBoolean(source, "notifications", legacyDesktopNotificationsKey, true),
+    legacyDesktopNotificationsKey,
+    true,
   );
   return {
     badgeCountEnabled: settingsBoolean(source, "notifications", "badge_count_enabled", true),
@@ -123,7 +112,6 @@ export function selectNotificationPreferences(
     ),
   };
 }
-
 export function selectGeneralPreferences(
   document: Record<string, unknown> | null | undefined,
 ): GeneralPreferences {
@@ -150,7 +138,6 @@ export function selectGeneralPreferences(
     workspaceDefaultTabIndex: settingsNumber(source, "general", "workspace_default_tab_index", 0),
   };
 }
-
 export function selectAgentPreferences(
   document: Record<string, unknown> | null | undefined,
 ): AgentPreferences {
@@ -176,7 +163,6 @@ export function selectAgentPreferences(
     },
   };
 }
-
 export function selectShortcutPreferences(
   document: Record<string, unknown> | null | undefined,
 ): ShortcutPreferences {
@@ -185,7 +171,6 @@ export function selectShortcutPreferences(
     shortcutHintsEnabled: settingsBoolean(source, "shortcuts", "shortcut_hints_enabled", true),
   };
 }
-
 export function selectAdvancedPreferences(
   document: Record<string, unknown> | null | undefined,
 ): AdvancedPreferences {
@@ -194,7 +179,6 @@ export function selectAdvancedPreferences(
     mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
   };
 }
-
 export function selectSearchMaintenancePreferences(
   document: Record<string, unknown> | null | undefined,
 ): SearchMaintenancePreferences {
@@ -224,11 +208,9 @@ export function parsePathList(value: string): string[] {
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
-
 function clampSettingsNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
-
 export interface AppearancePreferences {
   appZoom: number;
   compactModeEnabled: boolean;
@@ -238,12 +220,10 @@ export interface AppearancePreferences {
   thumbnailPreviewsEnabled: boolean;
   wallpaperPath: string;
 }
-
 export interface FilePreferences {
   defaultViewModeIndex: number;
   showHiddenFiles: boolean;
 }
-
 export interface TerminalPreferences {
   cursorBlink: boolean;
   cursorStyleIndex: number;
@@ -251,7 +231,6 @@ export interface TerminalPreferences {
   fontSize: number;
   scrollback: number;
 }
-
 export interface EditorPreferences {
   autosaveDelayMs: number;
   fontFamily: string;
@@ -263,7 +242,6 @@ export interface EditorPreferences {
   theme: string;
   wordWrap: boolean;
 }
-
 export interface NotificationPreferences {
   badgeCountEnabled: boolean;
   desktopNotificationsEnabled: boolean;
@@ -272,7 +250,6 @@ export interface NotificationPreferences {
   quietHoursEnabled: boolean;
   soundNotificationsEnabled: boolean;
 }
-
 export interface GeneralPreferences {
   confirmDestructiveActions: boolean;
   defaultFileActionIndex: number;
@@ -284,7 +261,6 @@ export interface GeneralPreferences {
   startupViewIndex: number;
   workspaceDefaultTabIndex: number;
 }
-
 export interface AgentPreferences {
   enabled: boolean;
   scopes: {
@@ -293,15 +269,12 @@ export interface AgentPreferences {
     searchAllowed: boolean;
   };
 }
-
 export interface ShortcutPreferences {
   shortcutHintsEnabled: boolean;
 }
-
 export interface AdvancedPreferences {
   mountPath: string;
 }
-
 export interface SearchMaintenancePreferences {
   automaticFileDiscoveryEnabled: boolean;
   discoveryIntervalMinutes: number;

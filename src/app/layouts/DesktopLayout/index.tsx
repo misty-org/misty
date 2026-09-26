@@ -1,42 +1,40 @@
-import { dockingGeometry } from "./dockingGeometry";
-import { isSideDock } from "@/features/app-shell/dockingLayout";
-import "./docking.css";
-import { CursorCompanionController } from "@/features/agents/companion/CursorCompanionController";
-import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
-import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
+import { CursorCompanionController } from "@/features/agents/companion/CursorCompanionController";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
+import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { useAuth } from "@/features/auth";
-import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
+import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
+import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
+import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import { AppTour, isTourCompletedForAccount, useTourStore } from "@/features/tour";
+import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
 import {
-  useWindowDockingLayout,
   activeLayoutView,
   allLayoutViews,
+  useWindowDockingLayout,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
 } from "@/features/workspace";
-import { cn, Button } from "@/shared/ui";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, cn } from "@/shared/ui";
 import { Minus, Square, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
+import "./docking.css";
+import { dockingGeometry } from "./dockingGeometry";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { ProfilePopover } from "./ProfilePopover";
-import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { GlobalNavigator } from "./GlobalNavigator";
-import { WorkspaceCanvas } from "./WorkspaceCanvas";
-import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
+import { settingsFallbackRoute } from "./helpers";
 import { NavigatorControls } from "./NavigatorControls";
 import {
   navigatorPixelWidth,
@@ -44,16 +42,18 @@ import {
   writeNavigatorLayout,
   type NavigatorLayout,
 } from "./navigatorMode";
+import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
+import { ProfilePopover } from "./ProfilePopover";
+import { RestoreGlyph } from "./RestoreGlyph";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
-import { RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
-import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
-import { settingsFallbackRoute } from "./helpers";
+import { SettingsOverlay } from "./SettingsOverlays";
 import * as styles from "./styles";
+import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
-import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
-import { RestoreGlyph } from "./RestoreGlyph";
+import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
+import { WorkspaceCanvas } from "./WorkspaceCanvas";
 export type {
   AppNoticeEntry,
   AppNoticeKind,
@@ -83,7 +83,6 @@ export function DesktopLayout(props: {
     routeId,
   } = useDesktopBootstrap({ getRouteId: props.getRouteId });
   const {
-    usesNativeWindowChrome,
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
     startTitlebarDrag,
@@ -118,7 +117,6 @@ export function DesktopLayout(props: {
   }, []);
   const navigatorHidden = navigatorLayout.visibility === "hidden";
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [remotesOpen, setRemotesOpen] = useState(false);
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
   const applyNavigatorLayout = useCallback((next: NavigatorLayout) => {
     setBrowserWebviewsSuspended(true, "navigator-layout");
@@ -139,7 +137,7 @@ export function DesktopLayout(props: {
   }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
     setSettingsOpen(true);
-    if (hasTauriInternals()) void settingsLoad();
+    if (hasTauriInternals() && !useSettingsStore.getState().loaded) void settingsLoad();
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
@@ -162,12 +160,9 @@ export function DesktopLayout(props: {
     });
   }, []);
   const openRemotesOverlay = useCallback(() => {
-    setSettingsOpen(false);
-    setRemotesOpen(true);
-  }, []);
-  const closeRemotesOverlay = useCallback(() => {
-    setRemotesOpen(false);
-  }, []);
+    useSettingsStore.getState().setActiveSection("files-connections");
+    openSettingsOverlay();
+  }, [openSettingsOverlay]);
 
   useEffect(() => {
     if (!user?.id || transitioning) return;
@@ -294,9 +289,9 @@ export function DesktopLayout(props: {
   }, [navigatorHidden, navigatorRevealed]);
 
   useEffect(() => {
-    setBrowserWebviewsSuspended(profileOpen || settingsOpen || remotesOpen, "shell-overlay");
+    setBrowserWebviewsSuspended(profileOpen || settingsOpen, "shell-overlay");
     return () => setBrowserWebviewsSuspended(false, "shell-overlay");
-  }, [profileOpen, remotesOpen, settingsOpen]);
+  }, [profileOpen, settingsOpen]);
 
   useEffect(() => {
     setNavigatorRevealed(false);
@@ -339,7 +334,7 @@ export function DesktopLayout(props: {
     observer.observe(controls);
     return () => observer.disconnect();
   }, [isAuthRoute]);
-  const titlebarControlsLeft = usesNativeWindowChrome ? titlebarNavigationGeometry.left : 8;
+  const titlebarControlsLeft = titlebarNavigationGeometry.left;
   const tabsFollowNavigator = docking.navigation === "left" && !navigatorHidden;
   const titlebarReservedWidth =
     titlebarControlsLeft + (titlebarControlsWidth || 112) * titlebarNavigationGeometry.scale + 16;
@@ -370,11 +365,10 @@ export function DesktopLayout(props: {
       suppressActiveTool={Boolean(standaloneRouteTitle)}
       onProfileClick={() => {
         setSettingsOpen(false);
-        setRemotesOpen(false);
         setProfileOpen((open) => !open);
       }}
       onSettingsClick={openSettingsOverlay}
-      onStartWindowDrag={usesNativeWindowChrome ? startTitlebarDrag : undefined}
+      onStartWindowDrag={startTitlebarDrag}
     />
   );
   return (
@@ -439,7 +433,7 @@ export function DesktopLayout(props: {
                   key={user?.id}
                   accountId={user?.id ?? ""}
                   onOpenSettings={() => {
-                    useSettingsStore.getState().setActiveSection("sync");
+                    useSettingsStore.getState().setActiveSection("browser-handoff");
                     openSettingsOverlay();
                   }}
                 />
@@ -593,7 +587,6 @@ export function DesktopLayout(props: {
               onClose={() => setProfileOpen(false)}
               onOpenAccountSettings={openAccountSettings}
             />
-            <RemotesOverlay open={remotesOpen} onClose={closeRemotesOverlay} />
             <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
             {user?.id ? (
               <GlobalMisty

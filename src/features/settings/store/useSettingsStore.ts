@@ -1,3 +1,15 @@
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { mutateState, readState } from "../profiles/persistence";
+import {
+  definitionForLegacy,
+  validPreference,
+  projectPreferences,
+  runtimeAdapters,
+  type PreferenceValues,
+} from "../profiles/registry";
+import { writeProfilePreference } from "../profiles/bridge";
+import { configureTabHistoryBudget } from "@/features/webviews/tabHistory";
+import { configurePageRestore } from "@/features/browser-workspace/pageRestoreSettings";
 import {
   settingsApplyLaunchOnLogin,
   settingsLaunchOnLoginSnapshot,
@@ -19,24 +31,42 @@ import type {
   ShortcutsSnapshot,
   UpdateShortcutRequest,
 } from "@/native/contracts";
-import { configureStartupPreference } from "@/features/app-shell";
+import {
+  publishNavigatorLayout,
+  readNavigatorLayout,
+  configureStartupPreference,
+} from "@/features/app-shell";
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
-import { configureBrowserSearchEngine } from "@/features/workspace/browserSearchEngine";
+import {
+  configureBrowserSearchEngine,
+  configureBrowserSearchSuggestions,
+} from "@/features/workspace/browserSearchEngine";
 import { configureWorkspaceDefaultTab } from "@/features/workspace/workspaceDefaultTab";
+import {
+  setBrowserDownloadDirectory,
+  setBrowserDownloadPrompt,
+  setBrowserStatusBubbleEnabled,
+} from "@/features/webviews/browserRuntime";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
-import {
-  selectGeneralPreferences,
-  settingsBoolean,
-  settingsNumber,
-  settingsString,
-} from "./preferences";
+import { settingsBoolean, settingsNumber, settingsString } from "./preferences";
 export type { SettingsSection, SettingValue } from "../types/store";
 export * from "./preferences";
 
+let settingsLoad: Promise<void> | null = null;
 let settingsSaveSequence = 0;
+let settingsWriteQueue: Promise<unknown> = Promise.resolve();
+async function saveLocalDocument(document: Record<string, unknown>): Promise<SettingsSnapshot> {
+  if (hasTauriInternals()) return settingsSave({ document });
+  await mutateState(
+    "device-settings",
+    () => ({}) as Record<string, unknown>,
+    () => document,
+  );
+  return { path: "", document };
+}
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeSection: "general",
@@ -50,35 +80,82 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   message: null,
 
   load: async () => {
-    set({ working: true, error: null });
-    try {
-      const [settings, shortcuts, openWithAssociations, launchOnLogin] = await Promise.all([
-        settingsSnapshot(),
-        shortcutsSnapshot(),
-        settingsOpenWithAssociations(),
-        settingsLaunchOnLoginSnapshot(),
-      ]);
-      const normalizedSettings = settingsWithLaunchOnLoginSnapshot(settings, launchOnLogin);
-      applySettingsSideEffects(normalizedSettings.document);
-      set({
-        settings: normalizedSettings,
-        launchOnLogin,
-        openWithAssociations,
-        shortcuts,
-      });
-      if (normalizedSettings !== settings) {
-        void settingsSave({ document: normalizedSettings.document }).catch(() => undefined);
+    if (settingsLoad) return settingsLoad;
+    settingsLoad = (async () => {
+      set({ working: true, error: null });
+      try {
+        const [settings, shortcuts, openWithAssociations, launchOnLogin] = await Promise.all([
+          hasTauriInternals()
+            ? settingsSnapshot()
+            : readState<Record<string, unknown>>("device-settings").then((s) => ({
+                path: "",
+                document: s.state ?? {},
+              })),
+          hasTauriInternals() ? shortcutsSnapshot() : Promise.resolve(null),
+          hasTauriInternals() ? settingsOpenWithAssociations() : Promise.resolve([]),
+          hasTauriInternals()
+            ? settingsLaunchOnLoginSnapshot()
+            : Promise.resolve({
+                supported: false,
+                enabled: false,
+                target: "web",
+                detail: "Native app required",
+              }),
+        ]);
+        const normalizedSettings = settingsWithLaunchOnLoginSnapshot(settings, launchOnLogin);
+        applySettingsSideEffects(normalizedSettings.document, false);
+        set({
+          settings: normalizedSettings,
+          launchOnLogin,
+          openWithAssociations,
+          shortcuts,
+        });
+        if (normalizedSettings !== settings) {
+          void saveLocalDocument(normalizedSettings.document).catch(() => undefined);
+        }
+      } catch (error) {
+        set({ error: errorText(error) });
+      } finally {
+        set({ working: false, loaded: true });
       }
-    } catch (error) {
-      set({ error: errorText(error) });
-    } finally {
-      set({ working: false, loaded: true });
-    }
+    })().finally(() => {
+      settingsLoad = null;
+    });
+    return settingsLoad;
   },
 
   setActiveSection: (activeSection) => set({ activeSection }),
 
+  applyProfileValues: async (values, valid = () => true) => {
+    const apply = async () => {
+      if (!valid()) return;
+      const current = get().settings;
+      const document = projectPreferences(current?.document ?? {}, values);
+      const saved = await saveLocalDocument(document);
+      if (!valid()) return;
+      applySettingsSideEffects(saved.document);
+      set({ settings: saved });
+    };
+    settingsWriteQueue = settingsWriteQueue.catch(() => {}).then(apply);
+    await settingsWriteQueue;
+  },
+
   updateSetting: (section, key, value) => {
+    const definition = definitionForLegacy(section, key);
+    if (definition?.owner === "profile") {
+      const converted =
+        definition.legacyValues && typeof value === "number"
+          ? definition.legacyValues[value]
+          : value;
+      if (!validPreference(definition, converted)) {
+        set({ error: `Invalid value for ${definition.label}` });
+        return;
+      }
+      void writeProfilePreference(definition.id, converted).catch((error) =>
+        set({ error: errorText(error) }),
+      );
+      return;
+    }
     const requestId = ++settingsSaveSequence;
     const current = get().settings;
     const document = cloneDocument(current?.document ?? {});
@@ -103,7 +180,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
     void applyNativeSetting
       .then((launchOnLogin) =>
-        settingsSave({ document }).then((settings) => ({ settings, launchOnLogin })),
+        (settingsWriteQueue = settingsWriteQueue
+          .catch(() => {})
+          .then(() => {
+            const latest = cloneDocument(get().settings?.document ?? document);
+            latest[section] = {
+              ...((latest[section] as Record<string, unknown>) ?? {}),
+              [key]: value,
+            };
+            return saveLocalDocument(latest);
+          })).then((settings) => ({ settings: settings as SettingsSnapshot, launchOnLogin })),
       )
       .then(({ settings, launchOnLogin }) => {
         if (requestId !== settingsSaveSequence) return;
@@ -128,7 +214,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const settings = await settingsRemoveOpenWithAssociation(key);
       set({
         settings,
-        openWithAssociations: await settingsOpenWithAssociations(),
+        openWithAssociations: hasTauriInternals() ? await settingsOpenWithAssociations() : [],
         message: `Removed Open With association for ${key}.`,
       });
     } catch (error) {
@@ -247,18 +333,42 @@ function settingsWithLaunchOnLoginSnapshot(
   return { ...settings, document };
 }
 
-function applySettingsSideEffects(document: Record<string, unknown>): void {
+function applySettingsSideEffects(
+  document: Record<string, unknown>,
+  applyPortableLayout = true,
+): void {
+  const appearance = document.appearance as Record<string, unknown> | undefined;
+  if (applyPortableLayout && typeof appearance?.navigator_auto_hide === "boolean") {
+    const layout = readNavigatorLayout();
+    const visibility = appearance.navigator_auto_hide ? "hidden" : "sticky";
+    if (layout.visibility !== visibility) publishNavigatorLayout({ ...layout, visibility });
+  }
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
     settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
   );
+  configurePageRestore({
+    enabled: settingsBoolean(document, "privacy", "page_state_restore", true),
+    agent: settingsBoolean(document, "privacy", "page_state_agent_restore", true),
+    excludedSites: settingsString(document, "privacy", "page_state_excluded_sites", ""),
+  });
+  configureTabHistoryBudget(settingsNumber(document, "general", "browser_tab_history_kb", 256));
   configureBrowserHomeUrl(settingsString(document, "general", "browser_homepage", ""));
-  configureBrowserSearchEngine(
-    settingsNumber(document, "general", "browser_search_engine_index", 0),
+  // The document stores the engine's legacy index; the registry resolves the id.
+  configureBrowserSearchEngine(String(runtimeAdapters.get("browser.searchEngine")!.read(document)));
+  configureBrowserSearchSuggestions(
+    settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
   configureWorkspaceDefaultTab(
     settingsNumber(document, "general", "workspace_default_tab_index", 0),
   );
+  setBrowserStatusBubbleEnabled(
+    settingsBoolean(document, "general", "browser_status_bubble", true),
+  );
+  setBrowserDownloadDirectory(
+    settingsString(document, "general", "browser_download_directory", ""),
+  );
+  setBrowserDownloadPrompt(settingsBoolean(document, "general", "browser_download_prompt", false));
   // Mirrored to localStorage: the index route redirects before this document
   // has loaded, so it cannot read the preference from here directly.
   configureStartupPreference({
@@ -279,6 +389,7 @@ export interface SettingsStore {
   message: string | null;
   setActiveSection: (section: SettingsSection) => void;
   load: () => Promise<void>;
+  applyProfileValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
   removeOpenWithAssociation: (key: string) => Promise<void>;
   updateShortcut: (request: UpdateShortcutRequest) => Promise<void>;

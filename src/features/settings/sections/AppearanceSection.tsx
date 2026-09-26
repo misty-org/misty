@@ -1,4 +1,4 @@
-import { publishNavigatorLayout, useNavigatorLayoutValue } from "@/features/app-shell";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   appZoomDefault,
   appZoomRenderScale,
@@ -29,7 +29,6 @@ const wallpaperFilters = [{ name: "Video", extensions: ["mp4", "mov", "m4v"] }];
 
 export function AppearanceSection(props: SettingsContentProps) {
   const wallpaperPath = stringSetting(props.document, "appearance", "wallpaper_path", "");
-  const navigatorLayout = useNavigatorLayoutValue();
   const appZoom = useAppZoomValue();
   const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
   const displayedAppZoom = appZoomDraft ?? appZoom;
@@ -39,14 +38,18 @@ export function AppearanceSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Wallpaper">
         <SettingsRow
           label="Wallpaper video"
-          description="Plays on a native layer behind Misty. Leave unset for a solid background."
+          description={
+            hasTauriInternals()
+              ? "Plays behind Misty. Leave unset for a solid background."
+              : "Wallpaper files are available in the native app."
+          }
         >
           <FilePathControl
             value={wallpaperPath}
             title="Choose wallpaper video"
             filters={wallpaperFilters}
             emptyLabel="None"
-            disabled={props.working}
+            disabled={props.working || !hasTauriInternals()}
             onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
           />
         </SettingsRow>
@@ -119,15 +122,9 @@ export function AppearanceSection(props: SettingsContentProps) {
           last
         >
           <SwitchControl
-            checked={navigatorLayout.visibility === "hidden"}
+            checked={booleanSetting(props.document, "appearance", "navigator_auto_hide", false)}
             disabled={props.working}
-            onChange={(value) =>
-              publishNavigatorLayout({
-                ...navigatorLayout,
-                width: "full",
-                visibility: value ? "hidden" : "sticky",
-              })
-            }
+            onChange={(value) => props.onSettingChange("appearance", "navigator_auto_hide", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>

@@ -61,7 +61,6 @@ export function ServerSection(props: SettingsContentProps) {
     void switchTo({ mode: "self_hosted", url });
   };
 
-
   return (
     <>
       <SettingsSectionBlock
@@ -154,8 +153,6 @@ export function ServerSection(props: SettingsContentProps) {
           </div>
         </SettingsRow>
       </SettingsSectionBlock>
-
-
 
       {notice ? (
         <p className="-mt-2 mb-6 text-[13px] leading-[18px] text-cream-muted" role="status">
