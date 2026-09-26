@@ -198,6 +198,14 @@ pub async fn agents_register_folder_scope(
 }
 
 #[tauri::command]
+pub async fn agents_revoke_folder_scope(
+    scope_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.agents.revoke_folder_scope(scope_id).await
+}
+
+#[tauri::command]
 pub async fn agents_open_citation(
     request: OpenAgentCitationRequest,
     state: State<'_, MistyRuntime>,
@@ -2546,4 +2554,30 @@ pub async fn navigation_names_update(
         return Err("Only the trusted Misty shell can rename navigation.".into());
     }
     state.navigation_names.update(account, key, name).await
+}
+
+#[tauri::command]
+pub async fn settings_profile_state(
+    webview: tauri::Webview,
+    scope: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
+    if webview.label() != "main" {
+        return Err(ApiError::Unavailable("Only the trusted Misty shell can read settings profiles.".into()));
+    }
+    state.settings.profile_state(scope, None).await
+}
+
+#[tauri::command]
+pub async fn settings_profile_commit(
+    webview: tauri::Webview,
+    scope: String,
+    revision: i64,
+    document: serde_json::Value,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
+    if webview.label() != "main" {
+        return Err(ApiError::Unavailable("Only the trusted Misty shell can save settings profiles.".into()));
+    }
+    state.settings.profile_state(scope, Some((revision, document))).await
 }
