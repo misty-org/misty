@@ -74,7 +74,7 @@ mod tests {
             "package.json",
             "src-tauri/tauri.conf.json",
             "cli/Cargo.toml",
-            "packages/sdk/package.json",
+            "src/shared/contracts/index.ts",
         ] {
             let file = checkout.join(name);
             fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -83,7 +83,7 @@ mod tests {
         for path in [
             &checkout,
             &checkout.join("cli"),
-            &checkout.join("packages/sdk"),
+            &checkout.join("src/shared/contracts"),
         ] {
             let workspace = Workspace::from_root(path.clone()).unwrap();
             workspace.validate().unwrap();

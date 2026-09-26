@@ -45,7 +45,7 @@ export async function ensureServerAgentDevice(
   local: AgentDevice,
   connected?: {
     endpointId: string;
-    platform: "ios" | "macos" | "windows" | "unknown";
+    platform: "macos" | "windows" | "linux" | "unknown";
     scope?: { assertCurrent(): void; signal: AbortSignal };
   },
 ): Promise<ServerTrustedDevice> {
@@ -119,7 +119,7 @@ async function registerServerDevice(
   publicKey: string,
   connected?: {
     endpointId: string;
-    platform: "ios" | "macos" | "windows" | "unknown";
+    platform: "macos" | "windows" | "linux" | "unknown";
     scope?: { assertCurrent(): void; signal: AbortSignal };
   },
 ): Promise<ServerTrustedDevice> {

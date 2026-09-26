@@ -95,9 +95,12 @@ jobs:
             server/package-lock.json
             server/apps/agent-runtime/package-lock.json
             server/apps/journal-collab/package-lock.json
-      - name: Install SDK contract tooling
+      - name: Install shared schema dependencies
+        working-directory: .
+        run: npm ci --ignore-scripts
+      - name: Install internal contract tooling
         run: npm ci
-      - name: Server Verify Go routes against the SDK contract snapshot
+      - name: Verify Go routes against internal contracts
         run: npm run contracts:check
       - run: npm ci
         working-directory: server/apps/journal-collab

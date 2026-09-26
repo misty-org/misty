@@ -1,5 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from "react";
-import { commandsForApp } from "@misty/sdk";
+import { commandsForApp } from "@/shared/contracts";
 import { spacesApi } from "@/api/spaces/api";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";

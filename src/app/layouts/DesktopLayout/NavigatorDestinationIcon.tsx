@@ -23,7 +23,7 @@ import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
 import { MailProviderIcon } from "@/shared/ui/mail-provider-icon";
 import { Link2, Plug } from "lucide-react";
 import { BotMessageSquare, Workflow } from "lucide-react";
-import type { MistyNavigationItem } from "@misty/sdk";
+import type { NavigationItem as MistyNavigationItem } from "@/shared/navigation/NavigationItem";
 import { FileText } from "lucide-react";
 import type { NavigatorAppId } from "@/features/workspace";
 

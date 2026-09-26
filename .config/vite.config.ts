@@ -3,7 +3,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
-import { publicSdkDevelopmentUpdates } from "../cli/tasks/vite-public-sdk.ts";
 import { resolve } from "node:path";
 
 export default defineConfig(({ command, mode }) => {
@@ -37,7 +36,6 @@ export default defineConfig(({ command, mode }) => {
     envDir: false,
     plugins: [
       appEnvironmentUpdates(process.cwd()),
-      publicSdkDevelopmentUpdates(process.cwd()),
       react(),
       tailwindcss(),
       ...(uploadSourceMaps
@@ -87,19 +85,9 @@ export default defineConfig(({ command, mode }) => {
       // probes in cli/tasks/. A probe-only unresolved import aborts Vite's scan;
       // opening Explorer then discovers dependencies late and reloads the host.
       entries: ["index.html"],
-      // Local SDK snapshots change during development without a version bump.
-      // Serve their ESM directly so WebKit cannot retain an older bundled API.
-      exclude: ["@misty/sdk", "@misty/contracts"],
-      // The public contracts own Zod 4; host modules still use Zod 3. Preserve
-      // this nested dependency when serving excluded SDK modules directly.
-      include: ["@misty/contracts > zod"],
     },
     resolve: {
       alias: {
-        "@misty/browser-view": resolve(
-          process.cwd(),
-          "src/features/browser/workspace/SDKBrowserView.tsx",
-        ),
         "@/app/platform-layout": platformLayoutPath,
         "@": new URL("../src", import.meta.url).pathname,
       },
@@ -132,8 +120,6 @@ export default defineConfig(({ command, mode }) => {
           }
         : undefined,
       watch: {
-        // Ignore this Host's build output, not the linked public SDK's dist.
-        // Ignoring every dist directory leaves SDK exports stale during dev.
         // Backend tsconfigs and generated review HTML are outside the frontend
         // graph. Watching them makes Vite reload every open development app.
         ignored: [

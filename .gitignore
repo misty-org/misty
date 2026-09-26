@@ -119,7 +119,6 @@ proxy/dist/
 *.zip
 *.tar
 *.tgz
-!/vendor/misty-sdk/*.tgz
 *.tar.gz
 *.tar.bz2
 *.tar.xz
@@ -151,14 +150,6 @@ proxy/dist/
 *.woff
 *.woff2
 
-# Versioned, copyright-safe Product Research demo fixtures.
-!demo/
-!demo/**/
-!demo/**/*.png
-!demo/**/*.svg
-!demo/**/*.mp4
-!demo/**/*.pdf
-demo/**/research-session-frame.png
 *.xcarchive
 *.app
 *.asar
@@ -181,13 +172,6 @@ demo/**/research-session-frame.png
 *.parquet
 *.arrow
 
-# Generated and test-only artifacts from the embedded storage service
-/service/rclone/
-service/MANUAL.*
-service/lib/encoder/encoder_cases_test.go
-service/cmd/bisync/testdata/bisync_vscode_debuggers_launch.json
-service/cmd/lsf/testfiles/file[23]
-service/cmd/lsf/testfiles/subdir/file[23]
 .ds-sync/
 ds-bundle/
 .design-sync/.cache/

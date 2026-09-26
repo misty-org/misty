@@ -7,20 +7,23 @@ import { test } from "node:test";
 const root = resolve(import.meta.dirname, "../..");
 const json = (path: string) => JSON.parse(readFileSync(resolve(root, path), "utf8"));
 
-test("built-in tools share the host React runtime and local public packages", () => {
+test("built-in tools share the host runtime without public app packages", () => {
   const host = json("package.json");
   assert.equal(existsSync(resolve(root, "apps/package.json")), false);
-  assert.deepEqual(host.workspaces, ["packages/*"]);
+  for (const retired of [
+    "packages/sdk/package.json",
+    "packages/contracts/package.json",
+    "examples/habit-tracker/package.json",
+    "src-tauri/src/platform/mini_app_bridge.js",
+  ]) assert.equal(existsSync(resolve(root, retired)), false, retired);
+  assert.equal(host.workspaces, undefined);
+  assert.equal(host.dependencies["@misty/sdk"], undefined);
+  assert.equal(host.dependencies["@misty/contracts"], undefined);
   for (const name of ["react", "react-dom"]) {
     assert.match(host.dependencies[name], /^19\./);
     const hostRequire = createRequire(resolve(root, "package.json"));
     const appRequire = createRequire(resolve(root, "src/app/hostMain.tsx"));
     assert.equal(hostRequire.resolve(name), appRequire.resolve(name));
-  }
-  for (const name of ["sdk", "contracts"]) {
-    const version = json(`packages/${name}/package.json`).version;
-    assert.equal(host.dependencies[`@misty/${name}`], version);
-    assert.equal(json("package-lock.json").packages[`node_modules/@misty/${name}`].link, true);
   }
 });
 
@@ -36,5 +39,5 @@ test("owned tooling is TypeScript and the checkout has no app submodule", () => 
       else assert.equal(entry.name.endsWith(".mjs"), false, path);
     }
   };
-  for (const name of ["cli", "packages", "examples"]) inspect(resolve(root, name));
+  for (const name of ["cli"]) inspect(resolve(root, name));
 });

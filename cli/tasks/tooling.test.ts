@@ -18,7 +18,7 @@ test("Prettier keeps generated files ignored after relocating its ignore file", 
   ]);
   for (const file of [
     "dist/entry.js",
-    "packages/sdk/dist/entry.js",
+    "server/apps/agent-runtime/dist/entry.js",
     "coverage/report.js",
     "src-tauri/gen/apple/generated.ts",
     "src/features/extensions/generated/index.ts",

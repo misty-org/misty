@@ -1,15 +1,14 @@
-import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { spacesApi } from "@/api/spaces/api";
-import type { useSpacesStore } from "@/features/spaces";
+import type { SystemErrorActivity } from "@/features/activity";
+import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { useAuth } from "@/features/auth";
+import type { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import type { useSetupStore } from "@/features/installer";
 import type { useConnectionsStore } from "@/features/integrations";
 import type { MistyPicker } from "@/features/picker";
-import type { SystemErrorActivity } from "@/features/activity";
-import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
+import type { useSpacesStore } from "@/features/spaces";
 import type { useWorkspaceTabTitle } from "@/features/workspace";
-import type { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import type { queueMobileChatSubmission } from "@/features/chat-composer/mobileChatQueue";
+import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 export interface SocialRuntime {
   events: Pick<EventTarget, "addEventListener" | "removeEventListener">;
@@ -23,7 +22,6 @@ export interface SocialRuntime {
   useAiSurfaceAdapter: typeof useAiSurfaceAdapter;
   useWorkspaceTabTitle: typeof useWorkspaceTabTitle;
   useSpaceChatDraft: typeof useSpaceChatDraft;
-  queueMobileChatSubmission: typeof queueMobileChatSubmission;
   openProviderAuthorizationLink: typeof openProviderAuthorizationLink;
 }
 let current: SocialRuntime | undefined;
@@ -38,11 +36,17 @@ export function socialRuntime() {
   return current;
 }
 export const socialApi = new Proxy({} as typeof spacesApi, {
-  get: (target, key) => runtimeProperty(target, key, () => socialRuntime().api[key as keyof typeof spacesApi]),
+  get: (target, key) =>
+    runtimeProperty(target, key, () => socialRuntime().api[key as keyof typeof spacesApi]),
 });
 function hook<K extends keyof SocialRuntime>(name: K): SocialRuntime[K] {
   return new Proxy((...args: unknown[]) => (socialRuntime()[name] as Function)(...args), {
-    get: (target, key) => runtimeProperty(target, key, () => (socialRuntime()[name] as unknown as Record<string | symbol, unknown>)[key]),
+    get: (target, key) =>
+      runtimeProperty(
+        target,
+        key,
+        () => (socialRuntime()[name] as unknown as Record<string | symbol, unknown>)[key],
+      ),
   }) as SocialRuntime[K];
 }
 export const useSocialSpaces = hook("useSpacesStore"),
@@ -52,7 +56,6 @@ export const useSocialSpaces = hook("useSpacesStore"),
   useSocialAi = hook("useAiSurfaceAdapter"),
   useSocialTitle = hook("useWorkspaceTabTitle"),
   useSocialDraft = hook("useSpaceChatDraft"),
-  queueSocialSubmission = hook("queueMobileChatSubmission"),
   openSocialAuthorization = hook("openProviderAuthorizationLink");
 export const SocialPicker = (props: React.ComponentProps<typeof MistyPicker>) => {
   const View = socialRuntime().Picker;
@@ -68,7 +71,6 @@ export const socialErrorMessage = (error: unknown) =>
     : typeof error === "string"
       ? error
       : "Something went wrong.";
-
 export const socialEvents = {
   addEventListener: (...args: Parameters<EventTarget["addEventListener"]>) =>
     socialRuntime().events.addEventListener(...args),

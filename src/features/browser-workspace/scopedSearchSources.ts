@@ -1,4 +1,4 @@
-import type { AgentProfile } from "@misty/contracts";
+import type { AgentProfile } from "@/shared/contracts";
 import { searchApi } from "@/api/search/api";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {

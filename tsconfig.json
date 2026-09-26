@@ -4,6 +4,7 @@
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ES2020"],
     "allowJs": false,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -19,7 +20,6 @@
       "react-dom/*": ["./node_modules/@types/react-dom/*"],
       "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"],
       "react-router-dom": ["./node_modules/react-router-dom/dist/index.d.mts"],
-      "@misty/sdk": ["./node_modules/@misty/sdk/dist/index.d.ts"],
       "lucide-react": ["./node_modules/lucide-react/dist/lucide-react.d.ts"],
       "vitest": ["./node_modules/vitest/dist/index.d.ts"],
       "@xyflow/react": ["./node_modules/@xyflow/react/dist/esm/index.d.ts"],
@@ -51,7 +51,6 @@
       "react-resizable-panels": [
         "./node_modules/react-resizable-panels/dist/react-resizable-panels.cjs.d.mts"
       ],
-      "@misty/contracts": ["./node_modules/@misty/contracts/dist/index.d.ts"],
       "qrcode.react": ["./node_modules/qrcode.react/lib/index.d.mts"],
       "react-pdf": ["./node_modules/react-pdf/dist/esm/index.d.ts"],
       "konva": ["./node_modules/konva/lib/index-types.d.ts"],
@@ -72,7 +71,6 @@
       "@excalidraw/excalidraw/data/reconcile": [
         "./node_modules/@excalidraw/excalidraw/dist/types/excalidraw/data/reconcile.d.ts"
       ],
-      "@misty/sdk/yjs": ["./node_modules/@misty/sdk/dist/yjs.d.ts"],
       "@tiptap/extension-collaboration": [
         "./node_modules/@tiptap/extension-collaboration/dist/index.d.ts"
       ],
