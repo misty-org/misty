@@ -14,7 +14,7 @@ Enrollment invitations and Space membership remain separate. Keep account authen
 
 ## Billing migration status
 
-The optional billing adapter contract is documented in `../docs/billing-adapter.md`. The current Go billing paths and self-host enrollment entitlement checks have not yet completed their cutover. Do not treat this intermediate checkout as an independently self-hostable release until the migration acceptance checklist is complete.
+The optional billing adapter contract is documented in the [wiki](https://github.com/misty-org/misty/wiki/Server-billing-adapter). The current Go billing paths and self-host enrollment entitlement checks have not yet completed their cutover. Do not treat this intermediate checkout as an independently self-hostable release until the migration acceptance checklist is complete.
 
 ## Recovery
 

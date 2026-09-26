@@ -58,5 +58,6 @@ for table in sorted(set(re.findall(r'^CREATE TABLE public\.(\w+)',schema,re.M)))
 run=(server/'internal/app/run.go').read_text()
 workers=re.findall(r'WorkerFunc\(func\(ctx context.Context\) \{ (.+?) \}\)',run)
 output={'schema_version':int(baseline.name.split('_')[0]),'caveat':'Static candidate inventory, not a proof of unused code. Unmatched callers require manual review before deletion.','routes':routes,'tables':tables,'workers':[{'call':w,'source':'server/internal/app/run.go','domain':domain(w)} for w in workers], 'services':{'Go API':['Accounts','Spaces','Agents','Sync'],'agent-runtime':['Agents'],'journal-collab':['Spaces'],'self-host-collab':['Spaces'],'external billing adapter':['Accounts','Agents','Spaces']}}
-(server/'docs/migration/dependency-inventory.json').write_text(json.dumps(output,indent=2)+'\n')
+(server/'migration').mkdir(exist_ok=True)
+(server/'migration/dependency-inventory.json').write_text(json.dumps(output,indent=2)+'\n')
 print(f'{len(routes)} route registrations; {len(tables)} tables; {len(workers)} workers')
