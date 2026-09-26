@@ -26,7 +26,7 @@ use app::commands::{
 };
 use app::commands::{
     agents_device_snapshot, agents_open_citation,
-    agents_prepare_scoped_document, agents_register_folder_scope, app_configure_server,
+    agents_prepare_scoped_document, agents_register_folder_scope, agents_revoke_folder_scope, app_configure_server,
     app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
     claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
@@ -66,7 +66,7 @@ use app::commands::{
     search_start_scan,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
-    settings_snapshot, smart_library_apply_results, smart_library_assets_page,
+    settings_snapshot, settings_profile_state, settings_profile_commit, smart_library_apply_results, smart_library_assets_page,
     smart_library_delete, smart_library_import_files, smart_library_preflight_import,
     smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
     smart_library_search, smart_library_set_server_folder_id, smart_library_snapshot,
@@ -358,6 +358,7 @@ pub fn run() {
                     mail_cache_remove,
                     agents_device_snapshot,
                     agents_register_folder_scope,
+                    agents_revoke_folder_scope,
                     agents_open_citation,
                     #[cfg(not(target_os = "macos"))]
                     agents_prepare_document,
@@ -688,6 +689,8 @@ pub fn run() {
                     workspaces_snapshot,
                     workspaces_save,
                     settings_snapshot,
+                    settings_profile_state,
+                    settings_profile_commit,
                     settings_save,
                     settings_launch_on_login_snapshot,
                     settings_apply_launch_on_login,

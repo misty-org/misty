@@ -143,3 +143,4 @@ pub mod cursor_companion;
 #[cfg(target_os = "macos")]
 pub mod browser_site_permissions;
 
+pub mod settings_profile_store;

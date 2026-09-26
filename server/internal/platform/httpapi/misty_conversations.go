@@ -46,9 +46,11 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]any{"conversations": items})
 		case http.MethodPost:
 			var body struct {
-				AgentID string `json:"agent_id,omitempty"`
-				Title   string `json:"title"`
-				SpaceID string `json:"space_id,omitempty"`
+				AgentID         string `json:"agent_id,omitempty"`
+				ModelID         string `json:"model_id,omitempty"`
+				ReasoningEffort string `json:"reasoning_effort,omitempty"`
+				Title           string `json:"title"`
+				SpaceID         string `json:"space_id,omitempty"`
 			}
 			if err := decodeAIJSON(w, r, &body); err != nil {
 				http.Error(w, "invalid request", http.StatusBadRequest)
@@ -66,6 +68,20 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 				writePersonalAgentError(w, identityErr)
 				return
 			}
+			modelID := agent.FrontierDefaultModelID()
+			reasoning := agent.ManagedReasoning("", body.ReasoningEffort)
+			requestedModel := strings.TrimSpace(body.ModelID)
+			if identity.ModelMode == "pinned" && !identity.SystemManaged {
+				requestedModel = identity.ModelID
+				reasoning = agent.ManagedReasoning("", identity.ReasoningEffort)
+			}
+			if requestedModel != "" {
+				if !agent.FrontierModelAvailable(r.Context(), requestedModel) {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_model", "message": "Choose an available default model in Settings."})
+					return
+				}
+				modelID = requestedModel
+			}
 			var conversationID string
 			var err error
 			conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, "", identity.ID)
@@ -79,11 +95,13 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 				return
 			}
 			now := time.Now().UTC().Format(time.RFC3339Nano)
-			modelID := agent.FrontierDefaultModelID()
-			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, "high", agent.FrontierModelCatalogVersion)
+			if err := s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion); err != nil {
+				TestingWriteAIError(w, err)
+				return
+			}
 			writeJSON(w, http.StatusCreated, mistyConversation{
 				ID: conversationID, AgentID: identity.ID, Title: title, CreatedAt: now, UpdatedAt: now,
-				SpaceID: body.SpaceID, Kind: "misty", ModelID: modelID, Reasoning: "high",
+				SpaceID: body.SpaceID, Kind: "misty", ModelID: modelID, Reasoning: reasoning,
 				Messages: []mistyConversationMessage{}, Remote: true,
 			})
 		default:
