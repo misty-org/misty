@@ -1,4 +1,9 @@
-import { blankBrowserUrl, browserSearchUrl } from "@/features/workspace/model";
+import {
+  blankBrowserUrl,
+  browserInternalPage,
+  browserInternalUrl,
+  browserSearchUrl,
+} from "@/features/workspace/model";
 
 const LOCAL_TLD_RE = /\.(?:local|internal|lan|localhost)$/i;
 const IPV4_SEGMENT_RE = /^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$/;
@@ -75,6 +80,8 @@ export function resolveDirectAddress(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return blankBrowserUrl;
   if (trimmed === blankBrowserUrl || /^about:/i.test(trimmed)) return trimmed;
+  const internal = browserInternalPage(trimmed);
+  if (internal) return browserInternalUrl(internal);
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.includes(" ")) return null;
 
@@ -112,5 +119,3 @@ export function normalizeBrowserAddress(value: string): string {
   if (direct) return direct;
   return browserSearchUrl(value.trim());
 }
-
-export const normalizeSdkBrowserAddress = normalizeBrowserAddress;

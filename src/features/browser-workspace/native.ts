@@ -1,14 +1,38 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Resume, WorkspaceChange, WorkspaceView } from "./model";
+import type { Resume, SharedRecord, WorkspaceChange, WorkspaceView } from "./model";
 
 export interface SyncDeviceInfo {
   device_id: string;
   display_name: string;
   platform: string;
+  os_version?: string;
+  created_at?: string | null;
   control_version: number;
   full_sync: boolean;
   revoked_at?: string | null;
+}
+/** One device's workspace tree and its single-driver seat. */
+export interface SyncTree {
+  tree_id: string;
+  shared: boolean;
+  driver_device_id: string | null;
+  driver_epoch: string | null;
+  driver_seen_at: number | null;
+  version: number;
+}
+export interface SyncTreeView {
+  device_id: string;
+  shared_tree_id: string;
+  /** The tree this device drives; null after another device took it. */
+  driving_tree: string | null;
+  trees: SyncTree[];
+  workspaces: Record<
+    string,
+    { version: number; records: SharedRecord[]; resume: Resume | null; author: string | null }
+  >;
+  pending: string[];
+  displaced_with_edits: boolean;
 }
 export interface NativeSyncView {
   session_id: string;
@@ -33,6 +57,8 @@ export interface NativeSyncView {
   presence: { device_id: string; online: boolean; ready: boolean; applied_sequence: number }[];
   workspace: WorkspaceView;
   pending_operation_ids: string[];
+  /** Per-device trees; absent before this workspace switched to them. */
+  trees?: SyncTreeView | null;
 }
 export interface SyncAccount {
   apiBase: string;
@@ -57,6 +83,11 @@ export const saveNativeResume = (
 ) => invoke<string>("browser_sync_resume", { sessionId, operationId, resume, activeEpoch });
 export const activateNativeDevice = (sessionId: string) =>
   invoke<string>("browser_sync_activate", { sessionId });
+export const renameNativeDevice = (sessionId: string, deviceId: string, name: string) =>
+  invoke<void>("browser_sync_rename_device", { sessionId, deviceId, name });
+/** Drive `treeId` on this device; whoever drove it is displaced. */
+export const claimNativeTree = (sessionId: string, treeId: string) =>
+  invoke<void>("browser_sync_claim", { sessionId, treeId });
 export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
   session.full_sync !== false && session.workspace.active_device?.device_id === session.device_id
     ? session.workspace.active_device.epoch
@@ -87,4 +118,12 @@ export const controlNativeDevice = (
   deviceId: string,
   fullSync: boolean | null,
   activate = false,
-) => invoke<string>("browser_sync_control_device", { sessionId, deviceId, fullSync, activate });
+  treeId: string | null = null,
+) =>
+  invoke<string>("browser_sync_control_device", {
+    sessionId,
+    deviceId,
+    fullSync,
+    activate,
+    treeId,
+  });

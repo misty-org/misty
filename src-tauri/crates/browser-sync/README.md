@@ -33,6 +33,15 @@ encrypted fixture. The identical file is kept by the server under
 independently check native signing bytes and Ed25519 signatures. The fixture
 generator is a development example, not a production enrollment path.
 
+For the per-device tree protocol, build `--example live_tree_fixture` and set
+`MISTY_BROWSER_SYNC_TREE_FIXTURE` to its absolute path when running the server's
+`TestBrowserSyncNativeTreesAgainstGo` (with `MISTY_BROWSER_SYNC_TEST_DSN` as
+below). Two real workers publish, claim, get displaced and take a tree back.
+
+The older `live_protocol_fixture` below predates tree mode: it asserts the
+shared-workspace log's exact sequence numbers, which the one-time tree-mode
+event now shifts, so it fails against a tree-protocol client until reworked.
+
 For the opt-in live native/server test, build `--example live_protocol_fixture`
 and set `MISTY_BROWSER_SYNC_NATIVE_FIXTURE` to its absolute binary path when running
 the server's `TestBrowserSyncNativeWorkerAgainstGo`. Also set

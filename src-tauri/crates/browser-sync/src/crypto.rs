@@ -36,7 +36,7 @@ impl VaultScope {
         Ok(())
     }
 
-    fn aad(&self, domain: &str, identity: &impl serde::Serialize) -> Result<Vec<u8>> {
+    pub(crate) fn aad(&self, domain: &str, identity: &impl serde::Serialize) -> Result<Vec<u8>> {
         self.validate()?;
         Ok(serde_json::to_vec(&(
             domain,
@@ -147,7 +147,7 @@ impl VaultRoot {
         Ok(Self(root))
     }
 
-    fn derive(
+    pub(crate) fn derive(
         &self,
         domain: &str,
         identity: &impl serde::Serialize,
@@ -383,7 +383,7 @@ impl DeviceKey {
         STANDARD.encode(SigningKey::from_bytes(&self.0).verifying_key().as_bytes())
     }
 
-    fn sign(&self, data: &[u8]) -> String {
+    pub(crate) fn sign(&self, data: &[u8]) -> String {
         STANDARD.encode(SigningKey::from_bytes(&self.0).sign(data).to_bytes())
     }
 

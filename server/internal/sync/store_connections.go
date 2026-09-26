@@ -19,6 +19,11 @@ type SyncDevice struct {
 	FullSync            bool       `json:"full_sync"`
 	ActivationRequest   *string    `json:"activation_request"`
 	ActivationExpiresAt int64      `json:"activation_expires_at"`
+	OSVersion           string     `json:"os_version"`
+	ActivationTreeID    *string    `json:"activation_tree_id"`
+	TreeLastCounter     int64      `json:"tree_last_counter"`
+	// Enrollment time, so clients number unnamed devices stably.
+	CreatedAt time.Time `json:"created_at"`
 }
 type SyncConnectionIdentity struct {
 	UserID, WorkspaceID, DeviceID string
@@ -34,7 +39,7 @@ type SyncPresence struct {
 }
 
 func (db *Store) BrowserSyncDevices(ctx context.Context, userID, workspaceID string) ([]SyncDevice, error) {
-	rows, err := db.Conn.QueryContext(ctx, `SELECT d.device_id,d.public_key,d.grant_epoch,d.grant_signature,d.last_counter,d.revoked_at,d.display_name,d.platform,d.control_version,d.full_sync,d.activation_request,COALESCE((EXTRACT(EPOCH FROM d.activation_expires_at)*1000)::bigint,0) FROM browser_sync_devices d JOIN browser_sync_workspaces w USING(workspace_id) WHERE w.user_id=$1 AND w.workspace_id=$2 ORDER BY d.device_id`, userID, workspaceID)
+	rows, err := db.Conn.QueryContext(ctx, `SELECT d.device_id,d.public_key,d.grant_epoch,d.grant_signature,d.last_counter,d.revoked_at,d.display_name,d.platform,d.control_version,d.full_sync,d.activation_request,COALESCE((EXTRACT(EPOCH FROM d.activation_expires_at)*1000)::bigint,0),d.os_version,d.activation_tree_id,d.tree_last_counter,d.created_at FROM browser_sync_devices d JOIN browser_sync_workspaces w USING(workspace_id) WHERE w.user_id=$1 AND w.workspace_id=$2 ORDER BY d.created_at,d.device_id`, userID, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +48,7 @@ func (db *Store) BrowserSyncDevices(ctx context.Context, userID, workspaceID str
 	for rows.Next() {
 		d := SyncDevice{}
 		d.WorkspaceID = workspaceID
-		if err = rows.Scan(&d.DeviceID, &d.PublicKey, &d.KeyEpoch, &d.Signature, &d.LastCounter, &d.RevokedAt, &d.DisplayName, &d.Platform, &d.ControlVersion, &d.FullSync, &d.ActivationRequest, &d.ActivationExpiresAt); err != nil {
+		if err = rows.Scan(&d.DeviceID, &d.PublicKey, &d.KeyEpoch, &d.Signature, &d.LastCounter, &d.RevokedAt, &d.DisplayName, &d.Platform, &d.ControlVersion, &d.FullSync, &d.ActivationRequest, &d.ActivationExpiresAt, &d.OSVersion, &d.ActivationTreeID, &d.TreeLastCounter, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

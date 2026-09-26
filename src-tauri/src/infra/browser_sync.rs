@@ -30,6 +30,7 @@ use zeroize::Zeroizing;
 mod capture;
 mod control_advertisement;
 pub mod handoff;
+mod trees;
 
 struct Session {
     id: String,
@@ -37,6 +38,7 @@ struct Session {
     _database_lock: std::fs::File,
     cached_workspace: WorkspaceView,
     cached_pending: Vec<String>,
+    tree_projection: trees::TreeProjection,
     device_id: String,
     api: SyncApi,
     handle: WorkerHandle,
@@ -426,6 +428,8 @@ pub struct SyncView {
     traffic: misty_browser_sync::transport::TrafficSnapshot,
     workspace: WorkspaceView,
     pending_operation_ids: Vec<String>,
+    /// Per-device trees (roster, seat, pending). `None` before tree mode.
+    trees: Option<misty_browser_sync::tree::sync::TreeView>,
 }
 
 async fn view(active: &mut Session) -> Result<SyncView, String> {
@@ -454,6 +458,14 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
             // and last safe projection must remain visible to the user.
         }
         Err(error) => return Err(issue(error)),
+    }
+    // Tree mode: project the driven tree plus the shared tree instead of the
+    // legacy shared workspace, which now only carries credentials.
+    let tree_view = active.handle.trees.borrow().clone();
+    let tree_mode = trees::tree_mode(&tree_view);
+    if tree_mode {
+        active.cached_workspace = trees::synthesize(&mut active.tree_projection, &active.device_id, &tree_view);
+        active.cached_pending = Vec::new();
     }
     // A local website-storage failure does not stop workspace transport.
     let status = active.handle.status.borrow().clone();
@@ -488,6 +500,7 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
         traffic: active.handle.traffic.snapshot(),
         workspace: active.cached_workspace.clone(),
         pending_operation_ids: active.cached_pending.clone(),
+        trees: tree_mode.then_some(tree_view),
     })
 }
 
@@ -796,18 +809,19 @@ async fn open_vault(
     .map_err(issue)?;
     let advertise_api = api.clone();
     let advertise_device = device_id.clone();
-    let advertise_name = control_device_name(&device_id);
+    let advertise_os = tokio::task::spawn_blocking(os_version).await.unwrap_or_default();
     let advertise_status = handle.status.clone();
     let task = tokio::spawn(worker.run());
     let mut status = handle.status.clone();
     let mut presence = handle.presence.clone();
     let mut devices = handle.devices.clone();
+    let mut tree_changes = handle.trees.clone();
     let notify_workspace = scope.workspace_id.clone();
     let notify_app = app.clone();
     let notifications = tokio::spawn(async move {
         let advertisement = control_advertisement::advertise(
             advertise_status,
-            || advertise_api.advertise_controls(&advertise_device, &advertise_name),
+            || advertise_api.advertise_controls(&advertise_device, &advertise_os),
             std::time::Duration::from_secs(30),
         );
         tokio::pin!(advertisement);
@@ -818,6 +832,7 @@ async fn open_vault(
                 result = status.changed() => result.is_ok(),
                 result = presence.changed() => result.is_ok(),
                 result = devices.changed() => result.is_ok(),
+                result = tree_changes.changed() => result.is_ok(),
             };
             if !alive {
                 break;
@@ -835,6 +850,7 @@ async fn open_vault(
         _database_lock: database_lock,
         cached_workspace,
         cached_pending: pending.operation_ids,
+        tree_projection: Default::default(),
         scope,
         device_id,
         api,
@@ -869,6 +885,9 @@ pub async fn browser_sync_edit(
     active_epoch: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
+    if let Some(result) = tree_edit(&session_id, &active_epoch, TreeEdit::Changes(changes.clone())).await {
+        return result.map(|()| operation_id);
+    }
     enqueue(
         &session_id,
         operation_id,
@@ -881,6 +900,68 @@ pub async fn browser_sync_edit(
     .await
 }
 
+enum TreeEdit {
+    Changes(Vec<Change>),
+    Resume(Resume),
+}
+
+/// Routes a renderer edit to the driven tree. `None` means the workspace is
+/// not in tree mode yet and the legacy path applies. Edits captured under a
+/// previous seat (a stale epoch) are refused, like the legacy tenure check.
+async fn tree_edit(session_id: &str, epoch: &str, edit: TreeEdit) -> Option<Result<(), String>> {
+    let current = session().lock().await;
+    let active = match current.as_ref() {
+        Some(active) => active,
+        None => return Some(Err("Unlock browser sync first.".into())),
+    };
+    let view = active.handle.trees.borrow().clone();
+    if !trees::tree_mode(&view) {
+        return None;
+    }
+    let result = async {
+        require_session(active, session_id)?;
+        if !full_sync_enabled(active) {
+            return Err("Full sync is off for this device.".to_string());
+        }
+        if trees::driver_epoch(&view) != Some(epoch) {
+            return Err("Another device is using this workspace now.".to_string());
+        }
+        match edit {
+            TreeEdit::Changes(changes) => active.handle.tree_changes(changes).await,
+            TreeEdit::Resume(resume) => active.handle.tree_resume(resume).await,
+        }
+        .map_err(issue)
+    }
+    .await;
+    Some(result)
+}
+
+/// Makes this device drive `tree_id` (its own tree to take it back, or
+/// another device's to continue there). The previous driver is displaced.
+#[tauri::command]
+pub async fn browser_sync_claim(
+    webview: tauri::Webview,
+    session_id: String,
+    tree_id: String,
+) -> Result<(), String> {
+    require_main(&webview)?;
+    let handle = {
+        let current = session().lock().await;
+        let active = current.as_ref().ok_or("Connect device sync first.")?;
+        require_session(active, &session_id)?;
+        if !full_sync_enabled(active) {
+            return Err("Enable Full sync before switching devices.".into());
+        }
+        let view = active.handle.trees.borrow().clone();
+        if !view.trees.iter().any(|t| t.tree_id == tree_id && !t.shared) {
+            return Err("That device's workspace is not available.".into());
+        }
+        active.handle.clone()
+    };
+    // Do not hold the session lock across the network round trip.
+    handle.claim_tree(tree_id).await.map_err(issue)
+}
+
 #[tauri::command]
 pub async fn browser_sync_resume(
     webview: tauri::Webview,
@@ -890,6 +971,9 @@ pub async fn browser_sync_resume(
     active_epoch: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
+    if let Some(result) = tree_edit(&session_id, &active_epoch, TreeEdit::Resume(resume.clone())).await {
+        return result.map(|()| operation_id);
+    }
     enqueue(
         &session_id,
         operation_id,
@@ -910,6 +994,14 @@ pub async fn browser_sync_activate(
     if !full_sync_enabled(session) {
         return Err("Enable Full sync before switching to this device.".into());
     }
+    // Tree mode: waking takes back this device's own tree.
+    if trees::tree_mode(&session.handle.trees.borrow()) {
+        let handle = session.handle.clone();
+        let tree = session.device_id.clone();
+        drop(current);
+        handle.claim_tree(tree).await.map_err(issue)?;
+        return Ok(uuid::Uuid::new_v4().to_string());
+    }
     let status = session.handle.status.borrow().clone();
     if !matches!(status.phase, Phase::Ready | Phase::CatchingUp) {
         return Err("Waiting for a sync connection. Try waking Misty again in a moment.".into());
@@ -927,37 +1019,120 @@ pub async fn browser_sync_activate(
     session.handle.enqueue(bytes).await.map_err(issue)
 }
 
-fn control_device_name(device_id: &str) -> String {
-    #[cfg(unix)]
-    let host = {
-        let mut bytes = [0u8; 256];
-        // gethostname writes at most the supplied length. Reserve a terminator.
-        let ok = unsafe { libc::gethostname(bytes.as_mut_ptr().cast(), bytes.len() - 1) } == 0;
-        ok.then(|| {
-            String::from_utf8_lossy(
-                &bytes[..bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len())],
-            )
-            .into_owned()
-        })
+/// Names a device on the account. Names are shown to the user only.
+#[tauri::command]
+pub async fn browser_sync_rename_device(
+    webview: tauri::Webview,
+    session_id: String,
+    device_id: String,
+    name: String,
+) -> Result<(), String> {
+    require_main(&webview)?;
+    let name = name.trim().to_owned();
+    if name.is_empty() || name.chars().count() > 60 || name.chars().any(char::is_control) {
+        return Err("Use a name of 1 to 60 characters.".into());
+    }
+    let api = {
+        let current = session().lock().await;
+        let active = current.as_ref().ok_or("Connect device sync first.")?;
+        require_session(active, &session_id)?;
+        if !active.handle.devices.borrow().iter().any(|d| d.grant.device_id == device_id && d.revoked_at.is_none()) {
+            return Err("That device is not on this account.".into());
+        }
+        active.api.clone()
     };
-    #[cfg(not(unix))]
-    let host = std::env::var("COMPUTERNAME").ok();
-    let host = host
-        .filter(|v| !v.trim().is_empty())
-        .unwrap_or_else(|| std::env::consts::OS.into());
-    // Development profiles are separate sync devices on the same computer.
-    // Advertise their launcher names so the control panel can distinguish them.
-    #[cfg(debug_assertions)]
-    let host = std::env::var("MISTY_DESKTOP_PROFILE")
-        .ok()
-        .filter(|profile| !profile.is_empty())
-        .map(|profile| format!("{profile} · {host}"))
-        .unwrap_or(host);
-    format!(
-        "{} · {}",
-        host.chars().take(32).collect::<String>(),
-        device_id.chars().take(8).collect::<String>()
-    )
+    api.rename_device(&device_id, &name).await.map_err(issue)
+}
+
+/// Best-effort OS version for the device list; empty when unknown.
+fn os_version() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        let mut buffer = [0u8; 64];
+        let mut size = buffer.len();
+        let name = b"kern.osproductversion\0";
+        // SAFETY: the name is NUL-terminated and size bounds the buffer.
+        let ok = unsafe {
+            libc::sysctlbyname(name.as_ptr().cast(), buffer.as_mut_ptr().cast(), &mut size, std::ptr::null_mut(), 0)
+        } == 0;
+        if ok {
+            let end = buffer[..size].iter().position(|b| *b == 0).unwrap_or(size);
+            return String::from_utf8_lossy(&buffer[..end]).into_owned();
+        }
+        String::new()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::fs::read_to_string("/etc/os-release")
+            .ok()
+            .and_then(|text| {
+                text.lines()
+                    .find_map(|line| line.strip_prefix("PRETTY_NAME="))
+                    .map(|v| v.trim_matches('"').to_owned())
+            })
+            .unwrap_or_default()
+    }
+    #[cfg(windows)]
+    {
+        // `ver` prints "Microsoft Windows [Version 10.0.22631.4317]"; build
+        // 22000 and later is Windows 11 despite the 10.0 kernel version.
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let output = std::process::Command::new("cmd")
+            .args(["/C", "ver"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        let text = output.map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+        let version = text
+            .split("Version")
+            .nth(1)
+            .map(|rest| rest.trim_matches(|c: char| c == ' ' || c == ']' || c == '\r' || c == '\n'))
+            .unwrap_or("");
+        let build = version.split('.').nth(2).and_then(|b| b.parse::<u32>().ok());
+        match build {
+            Some(build) if build >= 22000 => format!("11 ({version})"),
+            Some(_) => format!("10 ({version})"),
+            None => String::new(),
+        }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+    {
+        String::new()
+    }
+}
+
+/// Worker handle for page-state writes: only while this device drives a
+/// tree with Full sync on, since slots belong to the driven tree.
+pub(crate) async fn page_state_worker() -> Result<WorkerHandle, String> {
+    page_state_reader().await.map(|(handle, _)| handle)
+}
+
+/// Worker handle and the tree this device drives, for page-state reads.
+pub(crate) async fn page_state_reader() -> Result<(WorkerHandle, String), String> {
+    let current = session().lock().await;
+    let active = current.as_ref().ok_or("Device sync is locked.")?;
+    if !full_sync_enabled(active) {
+        return Err("Full sync is off for this device.".into());
+    }
+    let tree = active
+        .handle
+        .trees
+        .borrow()
+        .driving_tree
+        .clone()
+        .ok_or("This device is not using a workspace right now.")?;
+    Ok((active.handle.clone(), tree))
+}
+
+/// Which device captures website sign-ins. Legacy: the single active device.
+/// Tree mode: any device currently driving a tree; incoming changes from
+/// other drivers are restored first by the capture loop.
+fn may_capture(document: &Document, active: &Session) -> bool {
+    if document.tree_mode {
+        active.handle.trees.borrow().driving_tree.is_some()
+    } else {
+        document.is_active(&active.device_id)
+    }
 }
 
 fn full_sync_enabled(active: &Session) -> bool {
@@ -977,9 +1152,10 @@ pub async fn browser_sync_control_device(
     device_id: String,
     full_sync: Option<bool>,
     activate: bool,
+    tree_id: Option<String>,
 ) -> Result<String, String> {
     require_main(&webview)?;
-    if activate == full_sync.is_some() {
+    if activate == full_sync.is_some() || (tree_id.is_some() && !activate) {
         return Err("Choose one device action.".into());
     }
     let current = session().lock().await;
@@ -996,7 +1172,7 @@ pub async fn browser_sync_control_device(
     }
     active
         .api
-        .control_device(&device_id, full_sync, activate)
+        .control_device(&device_id, full_sync, activate, tree_id.as_deref())
         .await
         .map_err(issue)
 }
@@ -1225,6 +1401,7 @@ mod tests {
             _database_lock: lock_database(&path).unwrap(),
             cached_workspace,
             cached_pending: vec![],
+            tree_projection: Default::default(),
             handle,
             task: tokio::spawn(worker.run()),
             notifications: tokio::spawn(std::future::pending()),
@@ -1351,6 +1528,7 @@ mod tests {
             _database_lock: database_lock,
             cached_workspace: initial.workspace_view().unwrap(),
             cached_pending: vec![],
+            tree_projection: Default::default(),
             handle,
             task: tokio::spawn(worker.run()),
             notifications: tokio::spawn(std::future::pending()),

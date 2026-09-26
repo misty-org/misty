@@ -59,7 +59,7 @@ pub struct RejectedCredentials {
     pub areas: Vec<credentials::Area>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Resume {
     pub active_window_id: String,
@@ -111,6 +111,10 @@ pub struct Document {
     pub resumes: BTreeMap<String, ResumeRecord>,
     #[serde(default)]
     pub active_device: Option<ActiveDevice>,
+    /// Set by the first `TreeMode` event. Workspaces then live in per-device
+    /// trees; this log carries only account-wide credentials, from any device.
+    #[serde(default)]
+    pub tree_mode: bool,
 }
 
 /// This is the renderer boundary. Credential payloads and encryption/signing
@@ -127,7 +131,7 @@ pub struct WorkspaceView {
     pub active_device: Option<ActiveDevice>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ViewRecord {
     pub kind: Kind,
@@ -145,6 +149,7 @@ impl Default for Document {
             rejected_credentials_by_device: BTreeMap::new(),
             resumes: BTreeMap::new(),
             active_device: None,
+            tree_mode: false,
         }
     }
 }
@@ -192,6 +197,9 @@ pub enum Payload {
     Resume {
         version: u8,
         resume: Resume,
+    },
+    TreeMode {
+        version: u8,
     },
 }
 
@@ -260,6 +268,7 @@ impl Payload {
             }
             Self::Credentials { version: 1, batch } => batch.validate(),
             Self::Resume { version: 1, resume } => resume.validate(),
+            Self::TreeMode { version: 1 } => Ok(()),
             _ => Err(Error::Invalid),
         }
     }
@@ -315,6 +324,19 @@ impl Document {
         }
         payload.validate()?;
         let sequence = context.sequence;
+        // Tree mode is one-way and deterministic: every device reduces the same
+        // event. Afterwards only credentials change this document; any device
+        // may send them, and base-version checks resolve concurrent batches.
+        if matches!(payload, Payload::TreeMode { .. }) {
+            self.tree_mode = true;
+            self.active_device = None;
+            self.sequence = sequence;
+            return Ok(());
+        }
+        if self.tree_mode && !matches!(payload, Payload::Credentials { .. }) {
+            self.sequence = sequence;
+            return Ok(());
+        }
         // Legacy events still replay before the first explicit selection. Once
         // selected, an old sender or a previous tenure cannot change the state.
         let payload = match payload {
@@ -349,14 +371,16 @@ impl Document {
                 }
                 *payload
             }
-            other if self.active_device.is_none() => other,
+            other if self.active_device.is_none() || self.tree_mode => other,
             _ => {
                 self.sequence = sequence;
                 return Ok(());
             }
         };
         match payload {
-            Payload::ActiveDevice { .. } | Payload::Published { .. } => return Err(Error::Invalid),
+            Payload::ActiveDevice { .. } | Payload::Published { .. } | Payload::TreeMode { .. } => {
+                return Err(Error::Invalid)
+            }
             Payload::Workspace { changes, .. } => {
                 for change in changes {
                     match change {
@@ -466,7 +490,11 @@ impl Document {
     }
 
     pub fn can_publish(&self, device_id: &str, payload: &Payload) -> bool {
+        if self.tree_mode {
+            return matches!(payload, Payload::Credentials { .. } | Payload::TreeMode { .. });
+        }
         match payload {
+            Payload::TreeMode { .. } => true,
             Payload::ActiveDevice { .. } => true,
             Payload::Published { active_epoch, .. } => {
                 self.is_active(device_id)

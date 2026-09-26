@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"github.com/kannachi323/misty/server/internal/platform/security"
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	browsersync "github.com/kannachi323/misty/server/internal/sync"
 	"net/http"
 	"time"
@@ -93,6 +94,12 @@ func (s *Server) MountHandlers() error {
 	healthHandler := s.HealthMonitor.Handler()
 	instanceHandler := api.Instance(s.Database)
 	browserSync := browsersync.NewBrowserSyncService(s.Database)
+	if s.AIAgent != nil {
+		browserSync.SetRestoreCompleter(func(ctx context.Context, userID, prompt string) (string, error) {
+			text, _, err := s.AIAgent.CompleteWithTierContext(ctx, userID, prompt, "assistant_ai", serveragent.TierLow)
+			return text, err
+		})
+	}
 	mountPublicRoutes := func(prefix string) {
 		s.Router.Get(prefix+"/health", healthHandler)
 		s.Router.Get(prefix+"/instance", instanceHandler)
@@ -118,6 +125,7 @@ func (s *Server) MountHandlers() error {
 		s.Router.Post(prefix+"/sync/control", browserSync.ControlDevice())
 		s.Router.Post(prefix+"/sync/ticket", browserSync.Ticket())
 		s.Router.Get(prefix+"/sync/ws", browserSync.Connect())
+		s.Router.Post(prefix+"/sync/restore/step", browserSync.RestoreStep())
 		s.Router.Put(prefix+"/me/profile", api.UpdateProfile(s.Database))
 		s.Router.Post(prefix+"/me/export", s.Spaces.AccountExportManifest())
 		s.Router.Post(prefix+"/me/deletion", s.Spaces.BeginAccountDeletion())

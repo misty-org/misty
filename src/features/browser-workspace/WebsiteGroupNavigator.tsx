@@ -212,7 +212,7 @@ function WebsiteGroupRow(props: {
           title="Drag to reorder · Alt+Shift+↑/↓"
           onClick={() => expandWebsiteGroup(group.id, !props.open)}
         />
-        <CollapsibleContent id={`websites-${group.id}`}>
+        <CollapsibleContent id={`websites-${group.id}`} className="grid gap-1 pt-1">
           {websites.map((website) => (
             <ContextMenu key={website.id}>
               <ContextMenuTrigger asChild>
@@ -235,9 +235,7 @@ function WebsiteGroupRow(props: {
             </ContextMenu>
           ))}
           {!websites.length && (
-            <p className="ml-3 px-2.5 py-2 text-xs text-cream-muted/60">
-              No sites
-            </p>
+            <p className="ml-3 px-2.5 py-2 text-xs text-cream-muted/60">No sites</p>
           )}
         </CollapsibleContent>
       </Collapsible>
