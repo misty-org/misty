@@ -1,31 +1,33 @@
+import { useAiSurfaceStore } from "@/features/ai-surface";
+import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
+import { useBrowserDownloadsStore } from "@/features/browser/library/downloadsStore";
+import { browserTabUrl, recordBrowserVisitTitle } from "@/features/browser/library/historyRecorder";
+import { useBrowserMediaStore } from "@/features/browser/library/mediaStore";
+import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
 import {
   dockLeaves,
   useRecentToolsStore,
   useWorkspaceStore,
   type WorkspaceDockNode,
 } from "@/features/workspace";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
+  browserTabShowsInternalPage,
   captureNativeBrowserRegion,
   parkAllBrowserWebviews,
+  reconcileBrowserOverlayState,
   requestBrowserWebviewLayoutByRuntimeId,
   setBrowserPointerGestureActive,
-  reconcileBrowserOverlayState,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
-import { providerWebsiteFromRoute } from "./providers";
 import { openBrowserPopup } from "./openBrowserPopup";
-import { useAiSurfaceStore } from "@/features/ai-surface";
-import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
-import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
-
+import { providerWebsiteFromRoute } from "./providers";
 const browserBlockingOverlaySelector = [
   '[data-misty-notification="true"]',
   '[data-slot="dropdown-menu-content"][data-state="open"]',
@@ -38,11 +40,9 @@ const browserBlockingOverlaySelector = [
   '[role="dialog"][data-state="open"]',
   '[role="listbox"][data-state="open"]',
 ].join(",");
-
 export function browserBlockingOverlayOpen(root: ParentNode = document): boolean {
   return root.querySelector(browserBlockingOverlaySelector) !== null;
 }
-
 export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
     const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId);
@@ -67,61 +67,58 @@ export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
     );
   });
 }
-
 interface BrowserPageEvent {
   id: string;
   url: string;
   phase: "started" | "finished";
 }
-
 interface BrowserTitleEvent {
   id: string;
   title: string;
 }
-
 interface BrowserFaviconEvent {
   id: string;
   url: string;
 }
-
 interface BrowserCompatibilityEvent {
   id: string;
   kind: "cloudflare_challenge";
   url: string;
 }
-
 interface BrowserPopupEvent {
   sourceId: string;
   url: string;
   popupInstanceKey?: string;
 }
-
 interface BrowserPointerEvent {
   id: string;
   x: number;
   y: number;
   inside: boolean;
 }
-
 interface BrowserFocusEvent {
   id: string;
 }
-
 export function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
   if (!tabId || !useWorkspaceStore.getState().focusTab(tabId)) return false;
-  window.dispatchEvent(new CustomEvent("misty:focus-workspace-tab", { detail: { tabId } }));
+  window.dispatchEvent(
+    new CustomEvent("misty:focus-workspace-tab", {
+      detail: {
+        tabId,
+      },
+    }),
+  );
   return true;
 }
-
 interface BrowserDownloadEvent {
+  downloadId: string;
   tabId: string;
   path: string;
   state: "requested" | "finished" | "failed";
   success: boolean;
   error?: string;
 }
-
 interface BrowserCompanionEvent {
   id: string;
   kind: "submit" | "action" | "capture";
@@ -132,21 +129,6 @@ interface BrowserCompanionEvent {
   width: number;
   height: number;
 }
-
-interface IosBrowserEvent {
-  kind: "page" | "title" | "popup" | "download" | "error";
-  id?: string;
-  sourceId?: string;
-  phase?: "started" | "finished";
-  url?: string;
-  title?: string;
-  path?: string;
-  state?: "requested" | "finished" | "failed";
-  success?: boolean;
-  error?: string;
-  message?: string;
-}
-
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
   const browserSurfaceActive = useWorkspaceStore((state) =>
@@ -167,54 +149,6 @@ export function BrowserRuntimeBridge() {
     const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
     return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);
-
-  useEffect(() => {
-    if (!isNativeMobileBuild) return;
-    const onIosBrowserEvent = (event: Event) => {
-      const payload = (event as CustomEvent<IosBrowserEvent>).detail;
-      if (payload.kind === "popup" && payload.url) {
-        useWorkspaceStore.getState().openBrowserTab({
-          url: payload.url,
-          sourceTabId: payload.sourceId
-            ? (browserTabIdForRuntime(payload.sourceId) ?? undefined)
-            : undefined,
-        });
-        navigate("/browser");
-        return;
-      }
-      if (!payload.id) return;
-      const tabId = browserTabIdForRuntime(payload.id);
-      if (!tabId) return;
-      if (payload.kind === "page" && payload.url && payload.phase) {
-        useBrowserRuntimeStore.getState().setLoading(tabId, payload.phase === "started");
-        useWorkspaceStore.getState().updateBrowserTab(tabId, { url: payload.url });
-        if (payload.phase === "finished") {
-          useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
-          requestBrowserWebviewLayoutByRuntimeId(payload.id);
-        }
-      } else if (payload.kind === "title" && payload.title?.trim()) {
-        useWorkspaceStore.getState().updateBrowserTab(tabId, { title: payload.title.trim() });
-      } else if (payload.kind === "download" && payload.state !== "requested") {
-        if (payload.success) {
-          const name = payload.path?.split(/[\\/]/).pop() || "download";
-          useBrowserRuntimeStore
-            .getState()
-            .setNotice(tabId, `Downloaded ${name}. Use Share or Export to save it in Files.`);
-        } else {
-          useBrowserRuntimeStore
-            .getState()
-            .setError(tabId, payload.error || "The download failed.");
-        }
-      } else if (payload.kind === "error") {
-        useBrowserRuntimeStore
-          .getState()
-          .setError(tabId, payload.message || "The page could not be loaded.");
-      }
-    };
-    window.addEventListener("misty:ios-browser-event", onIosBrowserEvent);
-    return () => window.removeEventListener("misty:ios-browser-event", onIosBrowserEvent);
-  }, [navigate]);
-
   useEffect(() => {
     const reorder = (event: Event) =>
       setBrowserWebviewsSuspended((event as CustomEvent<boolean>).detail, "pointer-reorder");
@@ -246,7 +180,6 @@ export function BrowserRuntimeBridge() {
       setBrowserPointerGestureActive(false);
     };
   }, []);
-
   useEffect(() => {
     const reason = "dom-overlay";
     // This observer is a fallback for app overlays outside Browser chrome.
@@ -276,7 +209,6 @@ export function BrowserRuntimeBridge() {
       setBrowserWebviewsSuspended(false, reason);
     };
   }, []);
-
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let disposed = false;
@@ -303,9 +235,15 @@ export function BrowserRuntimeBridge() {
       clearTimeout(backgroundTimer);
       backgroundTimer = setTimeout(restorePageBackgrounds, 120);
     });
-    backgroundHosts.observe(document.body, { childList: true, subtree: true });
+    backgroundHosts.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
     const listeners = Promise.all([
-      listen<{ id: string; color: string }>("misty://browser-background", ({ payload }) => {
+      listen<{
+        id: string;
+        color: string;
+      }>("misty://browser-background", ({ payload }) => {
         if (disposed || typeof payload.color !== "string" || !/^#[\da-f]{6}$/i.test(payload.color))
           return;
         pageBackgrounds.set(payload.id, payload.color);
@@ -315,6 +253,7 @@ export function BrowserRuntimeBridge() {
         if (disposed) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
+        if (browserTabShowsInternalPage(tabId)) return;
         if (payload.phase === "started") {
           pageBackgrounds.delete(payload.id);
           const host = document.querySelector<HTMLElement>(
@@ -324,7 +263,9 @@ export function BrowserRuntimeBridge() {
           useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
           useBrowserRuntimeStore.getState().setLoading(tabId, true);
         }
-        useWorkspaceStore.getState().updateBrowserTab(tabId, { url: payload.url });
+        useWorkspaceStore.getState().updateBrowserTab(tabId, {
+          url: payload.url,
+        });
         if (payload.phase === "finished") {
           useBrowserRuntimeStore.getState().setLoading(tabId, false);
           useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
@@ -333,18 +274,39 @@ export function BrowserRuntimeBridge() {
           requestBrowserWebviewLayoutByRuntimeId(payload.id);
         }
       }),
+      listen<{
+        id: string;
+        audible: boolean;
+      }>("misty://browser-media", ({ payload }) => {
+        if (disposed) return;
+        const tabId = browserTabIdForRuntime(payload.id);
+        if (tabId) useBrowserMediaStore.getState().setAudible(tabId, payload.audible);
+      }),
+      listen<{
+        id: string;
+      }>("misty://browser-stopped", ({ payload }) => {
+        if (disposed) return;
+        const tabId = browserTabIdForRuntime(payload.id);
+        if (tabId) useBrowserRuntimeStore.getState().setLoading(tabId, false);
+      }),
       listen<BrowserTitleEvent>("misty://browser-title", ({ payload }) => {
         if (disposed || !payload.title.trim()) return;
         const tabId = browserTabIdForRuntime(payload.id);
-        if (tabId) {
-          useWorkspaceStore.getState().updateBrowserTab(tabId, { title: payload.title.trim() });
+        if (tabId && !browserTabShowsInternalPage(tabId)) {
+          useWorkspaceStore.getState().updateBrowserTab(tabId, {
+            title: payload.title.trim(),
+          });
+          const url = browserTabUrl(tabId);
+          if (url) recordBrowserVisitTitle(tabId, url, payload.title.trim());
         }
       }),
       listen<BrowserFaviconEvent>("misty://browser-favicon", ({ payload }) => {
         if (disposed || !/^https?:\/\//i.test(payload.url)) return;
         const tabId = browserTabIdForRuntime(payload.id);
-        if (tabId) {
-          useWorkspaceStore.getState().updateBrowserTab(tabId, { faviconUrl: payload.url });
+        if (tabId && !browserTabShowsInternalPage(tabId)) {
+          useWorkspaceStore.getState().updateBrowserTab(tabId, {
+            faviconUrl: payload.url,
+          });
         }
       }),
       listen<BrowserCompatibilityEvent>("misty://browser-compatibility", ({ payload }) => {
@@ -388,7 +350,11 @@ export function BrowserRuntimeBridge() {
         const y = Math.min(rect.bottom, Math.max(rect.top, rect.top + payload.y));
         window.dispatchEvent(
           new CustomEvent("misty:browser-pointer", {
-            detail: { x, y, paneId: pane.id },
+            detail: {
+              x,
+              y,
+              paneId: pane.id,
+            },
           }),
         );
       }),
@@ -473,7 +439,9 @@ export function BrowserRuntimeBridge() {
       }),
       listen<string>("misty://open-web-url", ({ payload }) => {
         if (disposed || !/^https?:\/\//i.test(payload)) return;
-        const tab = useWorkspaceStore.getState().openBrowserTab({ url: payload });
+        const tab = useWorkspaceStore.getState().openBrowserTab({
+          url: payload,
+        });
         if (tab) navigate(tab.route);
       }),
       listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
@@ -485,25 +453,28 @@ export function BrowserRuntimeBridge() {
         navigate(tab.route);
       }),
       listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {
-        if (disposed || payload.state === "requested") return;
+        if (disposed) return;
+        const downloads = useBrowserDownloadsStore.getState();
+        if (payload.state === "requested") {
+          void downloads.refresh();
+          return;
+        }
         const tabId = browserTabIdForRuntime(payload.tabId);
-        if (!tabId) return;
-        if (payload.success) {
-          const name = payload.path.split(/[\\/]/).pop() || "download";
-          useBrowserRuntimeStore
+        void downloads.refresh().then(() => {
+          if (payload.success) {
+            useBrowserDownloadsStore.getState().markFinished();
+
+            return;
+          }
+          // Cancelling is the user's choice, not a failure worth reporting.
+          const entry = useBrowserDownloadsStore
             .getState()
-            .setNotice(
-              tabId,
-              isNativeMobileBuild
-                ? `Downloaded ${name}. Use Share or Export to save it in Files.`
-                : `Saved ${name} to Downloads.`,
-            );
-          window.setTimeout(() => useBrowserRuntimeStore.getState().setNotice(tabId, null), 5_000);
-        } else {
+            .entries.find((item) => item.id === payload.downloadId);
+          if (entry?.state === "cancelled" || !tabId) return;
           useBrowserRuntimeStore
             .getState()
             .setError(tabId, payload.error || "The download failed.");
-        }
+        });
       }),
     ]);
     return () => {
@@ -513,6 +484,5 @@ export function BrowserRuntimeBridge() {
       void listeners.then((unlisten) => unlisten.forEach((stop) => stop()));
     };
   }, [navigate]);
-
   return null;
 }

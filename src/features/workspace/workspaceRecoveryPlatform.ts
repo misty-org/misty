@@ -1,17 +1,20 @@
 import { deploymentStorageKey } from "@/api/deployment/api";
-import { workspaceRecoveryKey } from "./workspaceRecoveryStorage";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-
+import { workspaceRecoveryKey } from "./workspaceRecoveryStorage";
 export const workspaceStoreStorageKey = "misty:desktop-dock:space-apps-v1";
-
 export function nativeWorkspaceRecoveryEnabled() {
-  return hasTauriInternals() && !isNativeMobileBuild;
+  return hasTauriInternals();
 }
 
 // Freeze ownership before AuthProvider updates display metadata for another
 // account. Kept outside the workspace store's import cycle.
-let candidate: { owner: string; raw: string; backup: string | null } | undefined;
+let candidate:
+  | {
+      owner: string;
+      raw: string;
+      backup: string | null;
+    }
+  | undefined;
 let captured = false;
 export function captureLegacyWorkspaceOwner() {
   if (captured) return;

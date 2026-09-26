@@ -9,7 +9,7 @@ pub fn allows(label: &str, command: &str) -> bool {
         _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => {
             true
         }
-        _ => label.starts_with("misty-mini-app-") && command == "mini_app_rpc",
+        _ => false,
     }
 }
 
@@ -30,6 +30,7 @@ mod tests {
             "browser_sync_edit",
             "browser_sync_resume",
             "browser_sync_activate",
+            "browser_sync_claim",
             "browser_sync_lock",
             "browser_sync_forget_key",
             "browser_recovery_open",
@@ -56,8 +57,8 @@ mod tests {
                 "ensure_local_access_token",
                 "code_read_text_file",
                 "terminal_create",
-                "mini_app_open",
-                "mini_app_reply",
+                "builtin_service_open",
+                "mini_app_close",
                 "save_authenticated_user",
                 "auth_cookie_restore",
                 "auth_cookie_capture",
@@ -69,9 +70,9 @@ mod tests {
                 assert!(!allows(label, command), "{label}: {command}");
             }
         }
-        assert!(allows("main", "mini_app_open"));
+        assert!(allows("main", "builtin_service_open"));
         assert!(!allows("misty-bot-pet", "app_snapshot"));
-        assert!(allows("misty-mini-app-a", "mini_app_rpc"));
+        assert!(!allows("misty-mini-app-a", "mini_app_rpc"));
         assert!(!allows("browser-a", "mini_app_rpc"));
     }
 }

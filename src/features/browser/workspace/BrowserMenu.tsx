@@ -9,11 +9,13 @@ import {
 } from "./browserRuntime";
 import { BrowserMenuView } from "./BrowserMenuView";
 import { useCallback } from "react";
+import type { BrowserPageCommands } from "./useBrowserPageCommands";
 export function BrowserMenu(props: {
   iconButtonClass: string;
   nativeRuntime: boolean;
   tab: WorkspaceTab;
   url: string;
+  commands?: BrowserPageCommands;
 }) {
   const setOverlay = useCallback(
     async (reason: string, active: boolean) => {
@@ -44,7 +46,6 @@ export function BrowserMenu(props: {
       }}
       reportError={reportError}
       openExternal={openSystemExternalLink}
-
     />
   );
 }

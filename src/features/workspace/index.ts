@@ -1,4 +1,13 @@
+export * from "./dockRegistry";
+export * from "./dockTree";
+export * from "./layoutTabs";
+export * from "./MistyBrandIcon";
+export * from "./model";
 export type { MultiPanelClosedPane, MultiPanelPane, MultiPanelTab } from "./model/interfaces/types";
+export * from "./navigatorApps";
+export * from "./paneNavigation";
+export * from "./privateBrowsing";
+export * from "./routeSurface";
 export {
   activeMultiPanelTab,
   createMultiPanelStore,
@@ -12,21 +21,12 @@ export type {
   MultiPanelStoreHook,
   MultiPanelStoreOptions,
 } from "./useMultiPanelStore";
-export * from "./model";
-export * from "./dockTree";
-export * from "./dockRegistry";
-export * from "./paneNavigation";
-export * from "./routeSurface";
+export * from "./useNavigatorAppsStore";
+export * from "./useRecentToolsStore";
+export { useWindowDockingLayout } from "./useWindowDockingLayout";
 export * from "./useWorkspaceStore";
 export * from "./useWorkspaceTabTitle";
-export * from "./useRecentToolsStore";
-export * from "./navigatorApps";
-export * from "./useNavigatorAppsStore";
 export * from "./WorkspaceAppIcon";
-export * from "./MistyBrandIcon";
+export * from "./workspaceDefaultTab";
 export * from "./workspaceTabOperations";
 export * from "./WorkspaceTabRouteScope";
-export * from "./workspaceDefaultTab";
-export * from "./layoutTabs";
-export * from "./mobileWorkspaceProjection";
-export { useWindowDockingLayout } from "./useWindowDockingLayout";

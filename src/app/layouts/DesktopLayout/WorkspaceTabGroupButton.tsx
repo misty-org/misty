@@ -1,46 +1,46 @@
 import { Renameable } from "@/features/navigation-names/Renameable";
 import {
-  useNavigationNames,
-  useNavigationName,
+  groupNameKey,
   navigationName,
   tabNameKey,
-  groupNameKey,
+  useNavigationName,
+  useNavigationNames,
 } from "@/features/navigation-names/store";
-import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import type { ReactNode } from "react";
-import { BrandIcon } from "../../../shared/toolAssets/BrandIcon";
-import { brandIconAsset } from "../../../shared/toolAssets/brandIcons";
-import { DestinationIcon } from "./NavigatorDestinationIcon";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import type { NavigatorAppId } from "@/features/workspace";
-import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
 import {
-  websiteIntegrations,
-  type WebsiteIntegrationId,
-} from "../../../shared/toolAssets/websiteIntegrations";
-import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
-import { providers, providerFromRoute } from "../../../shared/toolAssets/providers";
-import { appIconStrokeWidth } from "@/shared/ui/app-icons";
-import {
+  dockLeaves,
   parseBrowserTabState,
   spaceWorkspaceToolFromRoute,
+  useWorkspaceStore,
   type WorkspaceGroupKey,
   type WorkspaceSurfaceId,
   type WorkspaceTab,
 } from "@/features/workspace";
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
-import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import {
+  Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  cn,
-  Button,
 } from "@/shared/ui";
-import { Blocks, ChevronDown, LoaderCircle, X, type LucideIcon } from "lucide-react";
+import { appIconStrokeWidth } from "@/shared/ui/app-icons";
+import { Blocks, ChevronDown, LoaderCircle, VenetianMask, X, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-
+import { BrandIcon } from "../../../shared/toolAssets/BrandIcon";
+import { brandIconAsset } from "../../../shared/toolAssets/brandIcons";
+import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
+import { providerFromRoute, providers } from "../../../shared/toolAssets/providers";
+import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
+import {
+  websiteIntegrations,
+  type WebsiteIntegrationId,
+} from "../../../shared/toolAssets/websiteIntegrations";
+import { DestinationIcon } from "./NavigatorDestinationIcon";
 export interface TabGroup {
   instanceId?: string;
   key: string;
@@ -50,7 +50,6 @@ export interface TabGroup {
   tabs: WorkspaceTab[];
   storeGroupKey: WorkspaceGroupKey | null;
 }
-
 interface Props {
   group: TabGroup;
   icon?: LucideIcon | null;
@@ -63,7 +62,6 @@ interface Props {
   onMoveTab: (tabId: string, dropIndex: number) => void;
   paneTabs?: WorkspaceTab[];
 }
-
 function getTabAppId(tab: WorkspaceTab | undefined): string {
   if (!tab) return "";
   if (tab.surfaceId === "official-app" || tab.surfaceId === "extension") {
@@ -77,13 +75,11 @@ function getTabAppId(tab: WorkspaceTab | undefined): string {
   }
   return tab.surfaceId;
 }
-
 function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): LucideIcon {
   return (
     workspaceAppIcon(getTabAppId(tab), tab?.surfaceId === "space" ? "space" : "app") ?? fallback
   );
 }
-
 export function TabIcon({
   tab,
   icon: DefaultIcon,
@@ -102,9 +98,17 @@ export function TabIcon({
     tab?.id ? Boolean(state.loading[tab.id]) : false,
   );
   const faviconUrl = browserState?.faviconUrl;
-
   useEffect(() => setFaviconFailed(false), [faviconUrl]);
-
+  if (browserState?.private && !isLoading) {
+    return (
+      <VenetianMask
+        className={cn("shrink-0", isActive ? "text-cream-bright" : "text-cream-muted")}
+        size={size}
+        strokeWidth={2}
+        aria-label="Private tab"
+      />
+    );
+  }
   if (isBrowser && isLoading) {
     return (
       <LoaderCircle
@@ -114,7 +118,6 @@ export function TabIcon({
       />
     );
   }
-
   if (isBrowser && faviconUrl && !faviconFailed) {
     return (
       <img
@@ -131,7 +134,6 @@ export function TabIcon({
       />
     );
   }
-
   const appId = getTabAppId(tab);
   if (brandIconAsset(appId)) return <BrandIcon brand={appId} size={size} />;
   const provider =
@@ -181,7 +183,11 @@ export function TabIcon({
       <span className="inline-flex shrink-0 [&_svg]:!size-4">
         <DestinationIcon
           appId={appId as NavigatorAppId}
-          item={{ id: section, label: section, route: tab.route }}
+          item={{
+            id: section,
+            label: section,
+            route: tab.route,
+          }}
         />
       </span>
     );
@@ -189,7 +195,6 @@ export function TabIcon({
     appId === "files" && tab?.route.includes("view=transfers")
       ? workspaceAppIcon("transfers")!
       : getTabIcon(tab, DefaultIcon);
-
   return (
     <ResolvedIcon
       size={size}
@@ -198,7 +203,6 @@ export function TabIcon({
     />
   );
 }
-
 export function WorkspaceTabGroupButton({
   group,
   icon,
@@ -231,7 +235,6 @@ export function WorkspaceTabGroupButton({
   const displayTab = containsActive
     ? (group.tabs.find((tab) => tab.id === activeTabId) ?? preferredTab)
     : preferredTab;
-
   const displayLabel = groupLabel;
   const contextLabel = group.contextLabel || group.label;
   const specificTitle = workspaceTabDisplayTitle(displayTab, group);
@@ -244,7 +247,6 @@ export function WorkspaceTabGroupButton({
   const canCloseDisplayedTab = Boolean(
     displayTab && canClose && (!canCloseTab || canCloseTab(displayTab)),
   );
-
   return (
     <Renameable nameKey={nameKey} automatic={group.label}>
       <div
@@ -391,9 +393,10 @@ export function WorkspaceTabGroupButton({
     </Renameable>
   );
 }
-
 function WorkspaceTabMenuList(
-  props: Pick<Props, "group" | "onMoveTab" | "paneTabs"> & { children: ReactNode },
+  props: Pick<Props, "group" | "onMoveTab" | "paneTabs"> & {
+    children: ReactNode;
+  },
 ) {
   const pane = () =>
     dockLeaves(useWorkspaceStore.getState().layout.root).find((leaf) =>
@@ -405,7 +408,12 @@ function WorkspaceTabMenuList(
     getDrag: (id) => {
       const tab = props.group.tabs.find((tab) => tab.id === id);
       return tab
-        ? { id, ids: [id], label: workspaceTabDisplayTitle(tab, props.group), paneId: pane()?.id }
+        ? {
+            id,
+            ids: [id],
+            label: workspaceTabDisplayTitle(tab, props.group),
+            paneId: pane()?.id,
+          }
         : null;
     },
     onDrop: (drag, target, after) => {
@@ -444,7 +452,6 @@ function WorkspaceTabMenuList(
   });
   return <div {...reorder}>{props.children}</div>;
 }
-
 export function workspaceTabDropIndex(
   paneTabs: WorkspaceTab[],
   movingTabId: string,
@@ -455,7 +462,6 @@ export function workspaceTabDropIndex(
   const sourceIndex = paneTabs.findIndex((tab) => tab.id === movingTabId);
   return sourceIndex >= 0 && sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
 }
-
 export function workspaceTabDisplayTitle(
   tab: WorkspaceTab | undefined,
   group: Pick<TabGroup, "surfaceId" | "label" | "contextLabel">,
@@ -464,7 +470,6 @@ export function workspaceTabDisplayTitle(
     ? navigationName(tabNameKey(tab.id), workspaceTabAutomaticTitle(tab, group))
     : group.label;
 }
-
 export function workspaceTabAutomaticTitle(
   tab: WorkspaceTab | undefined,
   group: Pick<TabGroup, "surfaceId" | "label" | "contextLabel">,
@@ -495,11 +500,29 @@ export function workspaceTabAutomaticTitle(
     const service = providerFromRoute(tab.route, appId === "inbox" ? "inbox" : "chat");
     if (service && ["inbox", "social", "chat"].includes(appId)) return providers[service].label;
     const sections: Record<string, Record<string, string>> = {
-      planner: { "": "Tasks", tasks: "Tasks", agenda: "Agenda", roadmaps: "Roadmaps" },
-      journal: { "": "Notes", notes: "Notes", drawings: "Drawings" },
-      files: { "": "Explorer", transfers: "Transfers" },
-      inbox: { "": "Misty Inbox", misty: "Misty Inbox" },
-      social: { "": "Misty Social", misty: "Misty Social" },
+      planner: {
+        "": "Tasks",
+        tasks: "Tasks",
+        agenda: "Agenda",
+        roadmaps: "Roadmaps",
+      },
+      journal: {
+        "": "Notes",
+        notes: "Notes",
+        drawings: "Drawings",
+      },
+      files: {
+        "": "Explorer",
+        transfers: "Transfers",
+      },
+      inbox: {
+        "": "Misty Inbox",
+        misty: "Misty Inbox",
+      },
+      social: {
+        "": "Misty Social",
+        misty: "Misty Social",
+      },
       library: {
         "": "All items",
         recent: "All items",
@@ -508,7 +531,11 @@ export function workspaceTabAutomaticTitle(
         albums: "Albums",
         deleted: "Deleted",
       },
-      agents: { "": "Conversations", conversations: "Conversations", automations: "Automations" },
+      agents: {
+        "": "Conversations",
+        conversations: "Conversations",
+        automations: "Automations",
+      },
     };
     if (appId === "browser") {
       const url = parseBrowserTabState(tab.state).url;
@@ -521,7 +548,6 @@ export function workspaceTabAutomaticTitle(
     return sections[appId]?.[view] ?? title;
   }
   if (group.surfaceId !== "space") return title;
-
   const contextLabel = group.contextLabel || "";
   const separatorIndex = contextLabel.lastIndexOf(" · ");
   const spaceName = separatorIndex >= 0 ? contextLabel.slice(0, separatorIndex) : "";

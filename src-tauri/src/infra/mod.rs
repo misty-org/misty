@@ -9,17 +9,20 @@ pub mod app_menu;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
-#[cfg(target_os = "ios")]
-#[path = "browser_ios.rs"]
-pub mod browser;
-#[cfg(any(desktop, target_os = "ios"))]
+
+#[cfg(desktop)]
 pub(crate) mod browser_macos;
+#[cfg(desktop)]
+pub mod browser_library;
+#[cfg(desktop)]
+pub mod browser_history;
+pub mod browser_search_suggest;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 mod browser_scripts;
 pub mod browser_shortcuts;
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 mod browser_theme;
 pub mod claude;
 pub(crate) mod cloud_handoff;

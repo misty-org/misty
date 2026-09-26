@@ -1,11 +1,11 @@
-import { mistyBrowserProviders, type MistyBrowserProvider } from "@misty/sdk";
+import { mistyBrowserProviders, type MistyBrowserProvider } from "@/shared/contracts";
 
 type ProviderId = MistyBrowserProvider["id"];
 const googleLogin = (destination: string) =>
   `https://accounts.google.com/ServiceLogin?continue=${encodeURIComponent(destination)}`;
 
 /** Stable sign-in entry points, never captured OAuth URLs with state or PKCE.
- * Keep product destinations in the SDK navigation policy; these are app launch defaults.
+ * Keep product destinations in the shared navigation policy; these are app launch defaults.
  * Existing cookies let providers resume signed-in sessions themselves.
  */
 export const providerLoginUrls: Record<ProviderId, string> = {

@@ -1,15 +1,14 @@
-import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   cn,
-  menuItemClass,
   menuLabelClass,
   menuListClass,
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/shared/ui";
-import { Check, Laptop, MonitorSmartphone, Smartphone, Tablet } from "lucide-react";
+import { Check, Laptop, RectangleHorizontal } from "lucide-react";
 import type { ComponentType } from "react";
+import { browserToolbarStyles } from "./browserToolbarStyles";
 import type {
   BrowserViewport,
   BrowserViewportDevice,
@@ -17,20 +16,26 @@ import type {
 } from "./browserViewport";
 import { BrowserViewportSizeSliders } from "./BrowserViewportSizeSliders";
 import { useBrowserOverlay } from "./useBrowserOverlay";
-
 export * from "./browserViewport";
-
 const viewportOptions: Array<{
   id: BrowserViewport;
   label: string;
-  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+  }>;
 }> = [
-  { id: "responsive", label: "Responsive", icon: MonitorSmartphone },
-  { id: "desktop", label: "Desktop", icon: Laptop },
-  { id: "tablet", label: "Tablet", icon: Tablet },
-  { id: "mobile", label: "Mobile", icon: Smartphone },
+  {
+    id: "responsive",
+    label: "Responsive",
+    icon: RectangleHorizontal,
+  },
+  {
+    id: "desktop",
+    label: "Desktop",
+    icon: Laptop,
+  },
 ];
-
 export function BrowserViewportMenuView(props: {
   value: BrowserViewport;
   onChange: (value: BrowserViewport) => void;
@@ -44,7 +49,6 @@ export function BrowserViewportMenuView(props: {
   const active = viewportOptions.find((option) => option.id === props.value) ?? viewportOptions[0];
   const ActiveIcon = active.icon;
   const overlay = useBrowserOverlay(props.suspensionReason, props.setOverlay);
-
   return (
     <Popover open={overlay.open} onOpenChange={overlay.onOpenChange}>
       <PopoverTrigger asChild>

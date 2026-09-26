@@ -1,4 +1,5 @@
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
+import { BrowserTabAudioButton } from "@/features/browser/workspace/BrowserTabAudioButton";
 import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
 import { OverflowFadeText } from "@/shared/ui/overflow-fade-text";
 import {
@@ -278,6 +279,10 @@ export function WorkspaceLayoutTabs(
                     </span>
                   ) : null}
                 </Button>
+                <BrowserTabAudioButton
+                  tabs={panes.flatMap((pane) => pane.tabs)}
+                  className={tabActionClass}
+                />
                 {panes.length > 1 ? (
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
