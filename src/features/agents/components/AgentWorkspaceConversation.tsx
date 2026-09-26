@@ -1,17 +1,16 @@
+import { aiSurfaceApi } from "@/features/ai-surface/api";
+import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
+import { MistyComposer } from "@/features/global-search/MistyComposer";
+import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile } from "@/shared/contracts";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button } from "@/shared/ui";
+import { Loader2, Mic, Square, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
 import { useCompanionState } from "../companion/companionState";
-import { Button } from "@/shared/ui";
-import { useEffect, useRef, useState } from "react";
-import { Loader2, Mic, Square, X } from "lucide-react";
-import type { AgentProfile } from "@misty/contracts";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { MistyComposer } from "@/features/global-search/MistyComposer";
-import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
-import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
-import { aiSurfaceApi } from "@/features/ai-surface/api";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { AgentConversationView } from "./AgentConversationView";
-
 const suggestions = [
   [
     "Catch me up on my projects",
@@ -27,7 +26,6 @@ const suggestions = [
     "Help me think through a decision. Ask me about the options and what matters most.",
   ],
 ];
-
 export function AgentWorkspaceConversation({
   agent,
   spaceId: _legacySpaceId,
@@ -46,7 +44,6 @@ export function AgentWorkspaceConversation({
   const spaceId = "";
   const state = useMistyStore();
   const [draft, setDraft] = useState("");
-
   const [showSuggestions, setShowSuggestions] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -54,11 +51,12 @@ export function AgentWorkspaceConversation({
     (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
   const conversation = scoped.find((c) => c.id === state.activeConversationId);
-
-  const reportError = (error: string) => useMistyStore.setState({ error: error || null });
+  const reportError = (error: string) =>
+    useMistyStore.setState({
+      error: error || null,
+    });
   const companion = useCompanionState((s) => s.presentation);
   const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
-
   const voice = useAiVoiceRecorder({
     onTranscript: (text) => {
       setDraft((previous) => (previous ? `${previous} ${text}` : text));
@@ -67,7 +65,6 @@ export function AgentWorkspaceConversation({
     onError: reportError,
   });
   const [openedAt] = useState(() => new Date());
-
   useEffect(() => {
     const store = useMistyStore.getState();
     store.setAccount(accountId);
@@ -105,8 +102,15 @@ export function AgentWorkspaceConversation({
     voice.transcribing ||
     attachments.attachments.some((a) => a.state === "uploading");
   useEffect(() => {
-    onDraftStateChange?.({ dirty: hasDraft, busy: composingBusy });
-    return () => onDraftStateChange?.({ dirty: false, busy: false });
+    onDraftStateChange?.({
+      dirty: hasDraft,
+      busy: composingBusy,
+    });
+    return () =>
+      onDraftStateChange?.({
+        dirty: false,
+        busy: false,
+      });
   }, [hasDraft, composingBusy, onDraftStateChange]);
   const send = async (prompt = draft) => {
     if (
@@ -154,7 +158,11 @@ export function AgentWorkspaceConversation({
         ) : (
           <div className="agent-welcome">
             <time className="agent-conversation-date" dateTime={openedAt.toISOString()}>
-              Today {openedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+              Today{" "}
+              {openedAt.toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
             </time>
             <p className="agent-greeting">
               Hi{userName ? ` ${userName.split(" ")[0]}` : " there"}!
