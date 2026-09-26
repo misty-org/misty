@@ -216,7 +216,10 @@ fn launch_only_streams_map_onto_runner_events() {
 }
 
 #[test]
-fn http_hosted_tools_are_reported_as_not_supported() {
-    assert!(runner_for(EngineId::Opencode).is_none());
-    assert!(runner_for(EngineId::Dsh).is_none());
+fn http_hosted_tools_run_through_their_local_server() {
+    assert!(
+        runner_for(EngineId::Opencode).is_none()
+            && super::http_host::hosted_for(EngineId::Opencode).is_some()
+    );
+    assert!(super::supported(EngineId::Dsh));
 }

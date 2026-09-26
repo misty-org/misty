@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Record Mockup</title>
+<style>
+/* Monochrome only. The Record picker and the recording state on the island. */
+:root {
+  --bg: #0b0b0c; --panel: #151517; --card: #19191b; --line: #2c2c30; --ink: #ececee; --muted: #8e8e93;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+.wrap { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 18px; }
+h1 { margin: 0; font-size: 22px; font-weight: 600; }
+p { margin: 0; color: var(--muted); max-width: 72ch; }
+.seg { display: inline-flex; gap: 2px; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: var(--panel); justify-self: start; }
+.seg button { font: 500 13px var(--sans); color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.picker { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 14px; display: grid; gap: 12px; }
+.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.targets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.target { border: 1px solid var(--line); border-radius: 9px; padding: 10px; display: grid; gap: 6px; font-size: 12.5px; cursor: pointer; }
+.target .thumb { height: 52px; border-radius: 6px; background: #232326; }
+.target[aria-checked="true"] { border-color: var(--ink); }
+.row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.check { width: 16px; height: 16px; display: grid; place-items: center; }
+.check svg { width: 14px; height: 14px; }
+.btn { font: 500 13px var(--sans); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: #222225; color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.island { display: inline-flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 14px; border: 1px solid #3a3a3f; background: rgba(24, 24, 26, 0.96); font-size: 13px; }
+.ring { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); }
+@media (prefers-reduced-motion: no-preference) { .ring { animation: pulse 2s ease-in-out infinite; } @keyframes pulse { 50% { opacity: 0.35; } } }
+.notes { color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Record</h1>
+  <p>On-demand screen recording from the island or the toolbar. Pick what to record and which audio. While it runs, the island and the mist show a steady recording ring; Mute is always there.</p>
+  <div class="seg" role="group" aria-label="State">
+    <button data-state="pick" aria-pressed="true">Pick</button>
+    <button data-state="recording" aria-pressed="false">Recording</button>
+  </div>
+  <section class="picker" id="pick" aria-label="Record">
+    <div class="label">Record</div>
+    <div class="targets" role="radiogroup" aria-label="What to record">
+      <div class="target" role="radio" aria-checked="false"><div class="thumb"></div>Display</div>
+      <div class="target" role="radio" aria-checked="false"><div class="thumb"></div>Window</div>
+      <div class="target" role="radio" aria-checked="true"><div class="thumb"></div>Misty tab</div>
+    </div>
+    <div class="label">Audio</div>
+    <div>
+      <div class="row">Microphone<span class="check" aria-label="On"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></span></div>
+      <div class="row">This tab<span class="check" aria-label="On"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></span></div>
+      <div class="row">System audio<span class="check" aria-label="Off"></span></div>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end"><button class="btn">Cancel</button><button class="btn primary">Record</button></div>
+  </section>
+  <div id="recording" hidden>
+    <div class="island" role="status"><span class="ring" aria-hidden="true"></span>Recording · 03:12<button class="btn">Mute</button><button class="btn primary">Stop</button></div>
+  </div>
+  <div class="notes">
+    <div>macOS records with ScreenCaptureKit and AVAssetWriter; Windows with Windows.Graphics.Capture and a Media Foundation sink writer. No ffmpeg.</div>
+    <div>Stop uploads the video to the Library, then adds the diarized transcript and a chapter summary, and adds a memory event.</div>
+  </div>
+</main>
+<script>
+const buttons = document.querySelectorAll('.seg button');
+buttons.forEach(b => b.addEventListener('click', () => {
+  document.getElementById('pick').hidden = b.dataset.state !== 'pick';
+  document.getElementById('recording').hidden = b.dataset.state !== 'recording';
+  buttons.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+document.querySelectorAll('.target').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.target').forEach(x => x.setAttribute('aria-checked', String(x === t)));
+}));
+</script>
+</body>
+</html>

@@ -43,6 +43,8 @@ major model built in.
 2. Workflow parity: C1, C2, C8 (built 2026-10-12, uncommitted; see "Built" in §2)
 3. One extension system for Chrome and Firefox add-ons (built 2026-10-12 on macOS,
    uncommitted; see §3)
+4. Voice, notes and memory: dictation everywhere, voice to notes, capture sessions
+   and browser-scoped recall (approved 2026-10-14; see §4)
 
 Done: unlimited sync (2026-10-11, uncommitted; see the end).
 
@@ -245,6 +247,42 @@ Still open:
   SHA-256 from Mozilla's API over pinned hosts is.
 - Mozilla's blocklist and a Misty-run deny-list are not consulted yet.
 - Windows (WebView2), C12 and C13.
+
+---
+
+## 4. Voice, notes and memory
+Approved 2026-10-14. The design is
+[docs/design/voice-memory/BRIEF.md](../design/voice-memory/BRIEF.md) (revision 1,
+with mockups). The work happens on `voice-memory/audeeo-soniox`, which builds on
+the agent permissions branch (`agents/permissions-coding-clis`).
+
+- **On demand only.** Nothing records the whole computer. The microphone is open
+  only while you hold the dictation key, run a capture you started, or talk to
+  the agent at your cursor. Agents never open it.
+- **Speech runs in the cloud, through Audeeo's pipeline.** Live audio goes to
+  Soniox realtime with diarization, through a relay in the agent runtime. Files
+  go through the AI SDK `transcribe` with the Soniox provider. Notes and
+  summaries go through the Gateway. Everything runs on Misty's keys.
+- **Capture comes from `audeeo-core`**, extracted from Audeeo (branch
+  `audeeo-core` there): one Rust crate for the mic, system audio and per-process
+  audio, and one TS package for segments with speakers.
+- **Memory is browser-scoped, on by default, with exclusions.** It covers pages,
+  agent turns, voice, recordings, notes, drawings and downloads. The tools are
+  `recall.*`, because `memory.*` already means agent preferences.
+
+Phases, each behind a flag:
+0. Brief, mockups and the `audeeo-core` extraction.
+1. Audio foundation: `audeeo-core` in the desktop app, the runtime relay and
+   `transcribe-diarized`, tickets, the voice meter and senses, and
+   `global_hotkey.rs`.
+2. Dictation everywhere.
+3. Voice to notes: the tab-audio spike, four sources, Mute, speaker lanes,
+   `voice-notes`, and the `voice.*` tools.
+4. Memory: the recorder and its privacy rules, `memory_events`, the retrieval
+   kinds, `recall.*` and `recall.read`, the Journal day, and the backlog.
+5. Capture sessions (screen recording).
+6. Cursor agent upgrades, and Windows parity rows in
+   [windows-parity-ledger.md](windows-parity-ledger.md).
 
 ---
 

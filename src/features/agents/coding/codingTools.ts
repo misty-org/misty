@@ -11,8 +11,6 @@ export interface CodingTool {
   fullAccessOnly?: boolean;
   /** Reports how much of its own usage limit it used. */
   reportsUsage: boolean;
-  /** Runs as a local server Misty can't host yet. */
-  unsupported?: boolean;
 }
 
 export const codingTools: CodingTool[] = [
@@ -21,13 +19,13 @@ export const codingTools: CodingTool[] = [
   { id: "minimax", name: "MiniMax Code", asks: true, reportsUsage: false },
   { id: "kimi", name: "Kimi Code", asks: true, reportsUsage: false },
   { id: "omp", name: "Oh My Pi", asks: true, reportsUsage: false },
-  { id: "opencode", name: "OpenCode", asks: true, reportsUsage: false, unsupported: true },
-  { id: "dsh", name: "DeepSeek Shell", asks: true, reportsUsage: false, unsupported: true },
+  { id: "opencode", name: "OpenCode", asks: true, reportsUsage: false },
   { id: "pi", name: "Pi", asks: false, reportsUsage: false },
   { id: "agy", name: "Antigravity", asks: false, reportsUsage: false },
   { id: "qoder", name: "Qoder", asks: false, reportsUsage: false },
   { id: "qoder-cn", name: "Qoder (China)", asks: false, reportsUsage: false },
   { id: "grok", name: "Grok", asks: false, fullAccessOnly: true, reportsUsage: false },
+  { id: "dsh", name: "DeepSeek Shell", asks: false, fullAccessOnly: true, reportsUsage: false },
 ];
 
 export const codingToolName = (id: string) =>
@@ -58,12 +56,11 @@ export const codingAllowance = () =>
 /** One line on what a tool can do and whether it's ready. */
 export function codingToolStatusText(tool: CodingTool, status?: CodingToolStatus) {
   if (!status?.installed) return "Not installed on this computer.";
-  if (tool.unsupported) return "Installed. Misty can’t hand work to it yet.";
   const ready = status.signed_in
     ? `Signed in${status.version ? ` · ${status.version}` : ""}.`
     : "Signed out. Sign in to it in a terminal.";
   const asks = tool.fullAccessOnly
-    ? " Grok can’t ask before acting."
+    ? ` ${tool.name} can’t ask before acting, so it runs only in Auto.`
     : tool.asks
       ? ""
       : " Can’t ask before acting, so in Ask it only plans.";

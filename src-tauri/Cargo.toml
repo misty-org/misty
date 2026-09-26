@@ -76,6 +76,7 @@ ed25519-dalek = "2"
 # approved device, the control channel socket, and LAN discovery.
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 futures-util = { version = "0.3", features = ["sink"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
 # Deflate through flate2's Rust backend only; zip's "deflate" also builds zopfli and zlib-rs.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }

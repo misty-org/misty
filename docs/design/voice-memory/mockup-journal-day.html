@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journal Day Mockup</title>
+<style>
+/* Monochrome surfaces. Only item-type glyphs may take the shared item tones in the app;
+   this mockup keeps them gray. */
+:root {
+  --bg: #0f0f10; --line: #262629; --ink: #ececee; --muted: #8e8e93; --dim: #5d5d62;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+.page { max-width: 820px; margin: 0 auto; padding: 28px 16px 60px; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+h1 { margin: 0; font-size: 22px; font-weight: 600; flex: 1; }
+.btn { font: 500 12.5px var(--sans); padding: 6px 12px; border-radius: 7px; border: 1px solid var(--line); background: #1c1c1f; color: var(--ink); }
+.search { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color: var(--muted); font-size: 13px; }
+.summary { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; color: #d6d6d8; display: grid; gap: 6px; }
+.summary .label, .hour { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.hour { margin-top: 8px; }
+.ev { display: grid; grid-template-columns: 22px 54px 1fr auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); }
+.ev svg { width: 16px; height: 16px; color: #b5b5ba; margin-top: 2px; }
+.ev time { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ev .what { display: grid; gap: 1px; }
+.ev .what span { color: var(--muted); font-size: 12.5px; }
+.forget { color: var(--dim); font-size: 12px; background: none; border: 0; cursor: pointer; }
+.ev:hover .forget { color: var(--muted); }
+.skeleton { display: grid; gap: 8px; }
+.skeleton i { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #1c1c1f, #26262a, #1c1c1f); background-size: 200% 100%; }
+@media (prefers-reduced-motion: no-preference) { .skeleton i { animation: shimmer 1.4s linear infinite; } @keyframes shimmer { to { background-position: -200% 0; } } }
+.seg { display: inline-flex; gap: 2px; border: 1px solid var(--line); border-radius: 9px; padding: 3px; justify-self: start; }
+.seg button { font: 500 13px var(--sans); color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+</style>
+</head>
+<body>
+<main class="page">
+  <div class="seg" role="group" aria-label="State">
+    <button data-state="ready" aria-pressed="true">Day</button>
+    <button data-state="loading" aria-pressed="false">First load</button>
+  </div>
+  <header>
+    <h1>Tuesday, October 14</h1>
+    <button class="btn">Export</button>
+  </header>
+  <div class="search" role="search">Search this day…</div>
+  <section id="ready">
+    <div class="summary">
+      <div class="label">Summary</div>
+      <div>You reviewed the dictation design with Dana and Sam, read two articles on WASAPI process loopback, and asked Juniper to draft the Windows parity notes. One recording: the design review (18 min).</div>
+    </div>
+    <div class="hour">9 AM</div>
+    <div class="ev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><time>9:12</time><div class="what">Capturing audio from a process tree<span>learn.microsoft.com · Page</span></div><button class="forget">Forget this</button></div>
+    <div class="ev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><time>9:40</time><div class="what">"Draft the Windows parity notes for dictation"<span>Juniper · Agent conversation · on the WASAPI page</span></div><button class="forget">Forget this</button></div>
+    <div class="hour">11 AM</div>
+    <div class="ev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg><time>11:00</time><div class="what">Design review<span>Recording · 18 min · transcript and chapters</span></div><button class="forget">Forget this</button></div>
+    <div class="ev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10a7 7 0 0 1-14 0M12 17v5"/></svg><time>11:24</time><div class="what">"Let's move the review to Thursday afternoon and invite Sam."<span>Dictation · into Mail</span></div><button class="forget">Forget this</button></div>
+  </section>
+  <section id="loading" class="skeleton" hidden aria-label="Loading the day">
+    <i style="width:90%"></i><i style="width:72%"></i><i style="width:40%; margin-top:14px"></i><i style="width:84%"></i><i style="width:66%"></i><i style="width:78%"></i>
+  </section>
+</main>
+<script>
+const buttons = document.querySelectorAll('.seg button');
+buttons.forEach(b => b.addEventListener('click', () => {
+  document.getElementById('ready').hidden = b.dataset.state !== 'ready';
+  document.getElementById('loading').hidden = b.dataset.state !== 'loading';
+  buttons.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+}));
+</script>
+</body>
+</html>

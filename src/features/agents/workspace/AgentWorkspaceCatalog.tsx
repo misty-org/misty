@@ -39,7 +39,6 @@ export function AgentWorkspaceCatalog({
   agentId,
   onConversation,
   onStartWork,
-  onCompanion,
 }: {
   agentName: string;
   agentId: string;
@@ -48,7 +47,6 @@ export function AgentWorkspaceCatalog({
   onUse(prompt: string): void;
   onConversation(id: string): void;
   onStartWork(action: () => void): void;
-  onCompanion(): void;
 }) {
   const [category, setCategory] = useState("All");
   const [detail, setDetail] = useState<Template | null>(null);

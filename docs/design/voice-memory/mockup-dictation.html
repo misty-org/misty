@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dictation Pill Mockup</title>
+<style>
+/* Monochrome only: black, white and grays. The pill sits under the caret in another app. */
+:root {
+  --bg: #0b0b0c; --panel: #151517; --line: #2c2c30; --ink: #ececee; --muted: #8e8e93; --dim: #5d5d62;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 18px; }
+h1 { margin: 0; font-size: 22px; font-weight: 600; }
+p { margin: 0; color: var(--muted); max-width: 72ch; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: var(--panel); justify-self: start; }
+.seg button { font: 500 13px var(--sans); color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.stage { overflow-x: auto; }
+.app { position: relative; width: 900px; height: 420px; margin: 0 auto; border-radius: 12px; border: 1px solid var(--line); background: #1a1a1c; overflow: hidden; }
+.bar { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-bottom: 1px solid var(--line); background: #202023; }
+.dot { width: 11px; height: 11px; border-radius: 50%; background: #3a3a3e; }
+.bar span { margin-left: 10px; color: var(--muted); font-size: 12px; }
+.doc { padding: 28px 40px; font-size: 15px; color: #d6d6d8; }
+.doc .caret { display: inline-block; width: 1px; height: 18px; background: var(--ink); vertical-align: -3px; }
+.pill { position: absolute; left: 252px; top: 112px; display: flex; align-items: center; gap: 10px; min-width: 240px; max-width: 520px;
+  padding: 8px 10px 8px 12px; border-radius: 999px; background: rgba(24, 24, 26, 0.96); border: 1px solid #3a3a3f;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font-size: 13.5px; }
+.meter { display: flex; align-items: center; gap: 2px; height: 16px; }
+.meter i { width: 3px; border-radius: 2px; background: var(--ink); display: block; }
+.text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.text .prov { color: var(--dim); }
+.iconbtn { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid #3a3a3f; background: #222225; color: var(--ink); }
+.iconbtn svg { width: 14px; height: 14px; }
+.lock { font-size: 11px; color: var(--muted); border: 1px solid #3a3a3f; border-radius: 999px; padding: 1px 7px; }
+.spin { width: 14px; height: 14px; border: 2px solid #3a3a3f; border-top-color: var(--ink); border-radius: 50%; }
+@media (prefers-reduced-motion: no-preference) { .spin { animation: spin 0.9s linear infinite; } @keyframes spin { to { transform: rotate(1turn); } } }
+.route { color: var(--muted); font-size: 12px; }
+.notes { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Dictation pill</h1>
+  <p>Hold the dictation key (Fn/Globe on macOS, Right Alt on Windows) and speak; release to insert. Double-tap locks it hands-free. The pill is monochrome, follows the caret and never shows "Loading…" text.</p>
+  <div class="seg" role="group" aria-label="State">
+    <button data-state="talking" aria-pressed="true">Talking</button>
+    <button data-state="locked" aria-pressed="false">Hands-free</button>
+    <button data-state="finishing" aria-pressed="false">Finishing</button>
+    <button data-state="handoff" aria-pressed="false">Hey agent</button>
+    <button data-state="muted" aria-pressed="false">Muted</button>
+  </div>
+  <div class="stage">
+    <div class="app" aria-label="Another app's text field">
+      <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>Mail — New message</span></div>
+      <div class="doc">Hi Dana,<br><br>Thanks for the notes. <span class="caret"></span></div>
+      <div class="pill" id="pill" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+  <div class="notes">
+    <div>Partials come from the live relay; provisional words are dimmed until Soniox finalizes them.</div>
+    <div>On release the text is cleaned up (punctuation, fillers, personal dictionary, style) and inserted: directly in Misty fields, by clipboard and paste elsewhere, then the clipboard is restored unless it changed.</div>
+    <div>"Hey Juniper, …" at the start routes the rest to that agent instead of typing it.</div>
+  </div>
+</main>
+<script>
+const mic = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10a7 7 0 0 1-14 0M12 17v5"/></svg>';
+const micOff = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 2l20 20M9 9v1a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M19 10a7 7 0 0 1-.9 3.4M5 10a7 7 0 0 0 11.2 5.6M12 17v5"/></svg>';
+const meter = (on) => '<span class="meter" aria-hidden="true">' + [6, 12, 16, 9, 13, 7].map(h => `<i style="height:${on ? h : 2}px"></i>`).join('') + '</span>';
+const states = {
+  talking: `${meter(true)}<span class="text">Let's move the review to <span class="prov">Thursday afternoon</span></span><button class="iconbtn" aria-label="Mute">${mic}</button>`,
+  locked: `${meter(true)}<span class="text">Let's move the review to Thursday afternoon <span class="prov">and invite Sam</span></span><span class="lock">Hands-free</span><button class="iconbtn" aria-label="Mute">${mic}</button>`,
+  finishing: `<span class="spin" aria-hidden="true"></span><span class="text">Let's move the review to Thursday afternoon and invite Sam.</span>`,
+  handoff: `${meter(true)}<span class="text">Find a time with Sam on Thursday</span><span class="route">→ Juniper</span>`,
+  muted: `${meter(false)}<span class="text" style="color:var(--muted)">Muted</span><button class="iconbtn" aria-label="Unmute">${micOff}</button>`,
+};
+const pill = document.getElementById('pill');
+const buttons = document.querySelectorAll('.seg button');
+function show(state) {
+  pill.innerHTML = states[state];
+  buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.state === state)));
+}
+buttons.forEach(b => b.addEventListener('click', () => show(b.dataset.state)));
+show('talking');
+</script>
+</body>
+</html>

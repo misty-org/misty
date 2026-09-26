@@ -50,8 +50,7 @@ export default function NativeAgentsPage() {
     recipientInputRef,
   } = state;
   const { change, setEditorStatus } = guard;
-  const { openSettingsModal, select, closeSettings, saveProfile, removeProfile, openApps } =
-    actions;
+  const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
   const profileSection = (onDone: () => void) =>
     profile && (
       <AgentProfileSection
@@ -98,7 +97,6 @@ export default function NativeAgentsPage() {
               action();
             })
           }
-          onCompanion={() => openSettingsModal("companion")}
         >
           {taskContent}
         </AgentWorkspaceFrame>
