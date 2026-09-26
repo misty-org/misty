@@ -11,6 +11,14 @@ const store = vi.hoisted(() => ({
   chooseProject: vi.fn(async () => ({ id: "scope_new", displayName: "new" })),
 }));
 vi.mock("../store/useAgentsStore", () => store);
+const github = vi.hoisted(() => ({
+  projectRemote: vi.fn(async () => null as string | null),
+  githubRepos: vi.fn(async () => []),
+  createGitHubRepo: vi.fn(),
+  publishProject: vi.fn(),
+  cloneProject: vi.fn(),
+}));
+vi.mock("../store/projectGitHub", () => github);
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 
 import { useConversationProject } from "../store/useConversationProject";
@@ -42,4 +50,25 @@ it("adds a project from the menu and picks it", async () => {
   await open();
   fireEvent.click(await screen.findByRole("menuitem", { name: /Add an existing folder/ }));
   await waitFor(() => expect(useConversationProject.getState().draft).toBe("scope_new"));
+});
+
+it("offers From GitHub, and Publish to GitHub for a chosen project without a remote", async () => {
+  useConversationProject.setState({ byConversation: { c1: "scope_site" }, draft: null });
+  render(<AgentProjectMenu conversationId="c1" />);
+  await waitFor(() => expect(github.projectRemote).toHaveBeenCalledWith("scope_site"));
+  await open();
+  expect(await screen.findByRole("menuitem", { name: /From GitHub/ })).toBeTruthy();
+  expect(
+    await screen.findByRole("menuitem", { name: /Publish to GitHub.*Push site/ }),
+  ).toBeTruthy();
+});
+
+it("hides Publish for a project that already has a GitHub remote", async () => {
+  github.projectRemote.mockResolvedValueOnce("ana/site");
+  useConversationProject.setState({ byConversation: { c1: "scope_site" }, draft: null });
+  render(<AgentProjectMenu conversationId="c1" />);
+  await waitFor(() => expect(github.projectRemote).toHaveBeenCalled());
+  await open();
+  await screen.findByRole("menuitem", { name: /From GitHub/ });
+  expect(screen.queryByRole("menuitem", { name: /Publish to GitHub/ })).toBeNull();
 });

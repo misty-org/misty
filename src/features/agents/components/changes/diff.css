@@ -175,3 +175,32 @@
   gap: 4px;
   margin-left: auto;
 }
+
+/* Runs a project can still undo, in its review. */
+.misty-project-runs {
+  display: grid;
+  margin-top: 16px;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+
+.misty-project-runs > h3 {
+  padding: 10px 0 4px;
+  color: var(--color-cream);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.misty-project-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+  color: var(--color-cream);
+  font-size: 13px;
+}
+
+.misty-project-run > span {
+  flex: 1;
+  min-width: 0;
+}

@@ -36,9 +36,37 @@ export async function projectGitDiff(scopeId: string): Promise<DiffSet> {
   return invoke<DiffSet>("project_git_diff", { scopeId });
 }
 
+/** What one delegated coding run changed in its project. */
+export async function projectRunDiff(scopeId: string, runId: string): Promise<DiffSet> {
+  return invoke<DiffSet>("project_run_diff", { scopeId, runId });
+}
+
+/** The result of undoing a run: files put back and removed, and commits. */
+export interface UndoResult {
+  restored: number;
+  removed: number;
+  commitsRemoved: number;
+  commitsPushed: number;
+}
+
+/** Puts the project back the way it was before a delegated coding run. */
+export async function projectUndo(scopeId: string, runId: string): Promise<UndoResult> {
+  return invoke<UndoResult>("project_undo", { scopeId, runId });
+}
+
+/** The runs in a project that can still be undone, newest first. */
+export async function projectCheckpoints(
+  scopeId: string,
+): Promise<Array<{ runId: string; createdAt: number; complete: boolean }>> {
+  const result = await invoke<{
+    checkpoints: Array<{ runId: string; createdAt: number; complete: boolean }>;
+  }>("project_checkpoints", { scopeId });
+  return result.checkpoints;
+}
+
 /** This device's signed policy lists its shared folders (names only, never
  * paths) so the person's other devices can offer them to agents. */
-async function republishDeviceFolders(): Promise<void> {
+export async function republishDeviceFolders(): Promise<void> {
   const { deviceAccount } = await import("./useAgentDeviceStore");
   const { devicesNative } = await import("@/native/devices");
   await devicesNative.publishFolders(await deviceAccount()).catch(() => {});

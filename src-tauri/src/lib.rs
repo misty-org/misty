@@ -460,7 +460,19 @@ pub fn run() {
                     #[cfg(desktop)]
                     app::project_commands::project_remove,
                     #[cfg(desktop)]
+                    app::project_commands::project_publish,
+                    #[cfg(desktop)]
+                    app::project_commands::project_clone,
+                    #[cfg(desktop)]
                     app::project_commands::project_git_diff,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_checkpoints,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_run_diff,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_undo,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_snapshot,
                     #[cfg(desktop)]
                     app::project_commands::project_legacy_flags,
                     #[cfg(desktop)]

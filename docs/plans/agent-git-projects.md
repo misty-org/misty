@@ -1,6 +1,6 @@
 # Git for projects: build in Misty, publish to GitHub
 
-> **Superseded (2026-10-14).** Misty no longer edits projects or runs commands itself: agents hand coding to the person's own coding tools (`code.delegate`, docs/plans/coding-runner-capabilities.md), git changes are read with `git diff`, and the sandbox, checkpoints and GitHub proxy described here were removed. Kept for history.
+> **Superseded (2026-10-14).** Misty no longer edits projects or runs commands itself: agents hand coding to the person's own coding tools (`code.delegate`, docs/plans/coding-runner-capabilities.md), git changes are read with `git diff`, and the sandbox, checkpoints and GitHub proxy described here were removed. From GitHub and Publish to GitHub came back on 2026-10-15 in a simpler form: the connected GitHub account (through Composio) only lists and creates repositories (`/integrations/github/repos`), and git on the person's computer clones and pushes with their own git sign-in. Kept for history.
 
 Status: built 2026-10-11, all phases, and checked live against GitHub (see As built at the end). This builds on
 code projects (`docs/plans/agent-code-projects.md`, on `main` as `a9e7d3e0f`).

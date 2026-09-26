@@ -4,11 +4,14 @@ import { Button, Skeleton } from "@/shared/ui";
 import { projectGitDiff } from "../../store/useAgentsStore";
 import { DiffCounts, DiffView } from "./DiffView";
 import type { DiffSet } from "./diffTypes";
+import { ProjectRuns } from "./ProjectRuns";
+import { plainFailure } from "./undoText";
 
 /**
  * One project's uncommitted changes, from git: what the coding tool changed
- * since the last commit, file by file. Committing and pushing happen in the
- * person's coding tool, which asks before pushing.
+ * since the last commit, file by file, and the coding runs that can still be
+ * undone. Committing and pushing happen in the person's coding tool, which
+ * asks before pushing.
  */
 export function ProjectReview({ scopeId, name }: { scopeId: string; name: string }) {
   const [diff, setDiff] = useState<DiffSet>();
@@ -20,9 +23,7 @@ export function ProjectReview({ scopeId, name }: { scopeId: string; name: string
     try {
       setDiff(await projectGitDiff(scopeId));
     } catch (problem) {
-      const text =
-        typeof problem === "string" ? problem : problem instanceof Error ? problem.message : "";
-      setError(text && !text.includes("_") ? text : "Misty couldn’t read this project’s changes.");
+      setError(plainFailure(problem, "Misty couldn’t read this project’s changes."));
     } finally {
       setLoading(false);
     }
@@ -57,6 +58,7 @@ export function ProjectReview({ scopeId, name }: { scopeId: string; name: string
         ) : (
           <p className="misty-diff-note">No uncommitted changes.</p>
         )}
+        <ProjectRuns scopeId={scopeId} name={name} onChanged={() => void load()} />
       </div>
     </div>
   );

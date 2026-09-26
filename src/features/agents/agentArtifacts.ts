@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { personalAgentsApi } from "@/api/agents/native";
+import { agentArtifactsApi } from "@/api/spaces/agent-artifacts";
 import { uploadLibraryPath, type AgentArtifactProvenance } from "@/api/spaces/library-upload";
 import { useSpacesStore } from "@/features/spaces";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
@@ -39,4 +40,33 @@ export async function saveAgentArtifact(input: AgentArtifactInput) {
     },
   });
   return { space, itemId: result.item?.id };
+}
+
+/** Zips a project after a coding run and saves it to the agent's Space. */
+export async function saveProjectSnapshot(input: {
+  agentId: string;
+  scopeId: string;
+  runId: string;
+  conversationId?: string;
+}) {
+  const snapshot = await invoke<{ path: string; name: string; files: number }>("project_snapshot", {
+    scopeId: input.scopeId,
+    runId: input.runId,
+  });
+  return saveAgentArtifact({
+    agentId: input.agentId,
+    path: snapshot.path,
+    kind: "code",
+    conversationId: input.conversationId,
+    runId: input.runId,
+  });
+}
+
+/** The Space holding a run's project snapshot, when one was saved. */
+export async function runSnapshotSpace(agentId: string, runId: string): Promise<string | null> {
+  const space = await agentHomeSpace(agentId);
+  const { artifacts } = await agentArtifactsApi.list(space.id, agentId);
+  return artifacts.some((item) => item.run_id === runId && item.kind === "code")
+    ? space.name
+    : null;
 }

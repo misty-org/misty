@@ -8,14 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-  Skeleton,
-  Pressable,
 } from "@/shared/ui";
 import { newProject } from "../store/useAgentsStore";
 
 type Created = { id: string; displayName: string };
 
-function failure(error: unknown, fallback: string) {
+export function failure(error: unknown, fallback: string) {
   const text = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   return text && !text.includes("_") ? text : fallback;
 }
