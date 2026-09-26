@@ -110,7 +110,7 @@ export function LibraryItemContextMenu(props: {
                 <MenuItem icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
                 {props.albums.length ? (
                   <ContextMenuSub>
-                    <ContextMenuSubTrigger className="gap-2 text-xs">
+                    <ContextMenuSubTrigger>
                       <FolderPlus className="size-4" /> Add to album
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent className="w-52">
@@ -120,7 +120,6 @@ export function LibraryItemContextMenu(props: {
                       <ContextMenuSeparator />
                       {props.albums.map((album) => (
                         <ContextMenuItem
-                          className="gap-2 text-xs"
                           key={album.id}
                           onSelect={() => props.onAddToAlbum(album.id)}
                         >
@@ -159,10 +158,7 @@ function MenuItem({
   onSelect: () => void;
 }) {
   return (
-    <ContextMenuItem
-      className={`gap-2 text-xs ${danger ? "text-cream-bright focus:text-cream-bright" : ""}`}
-      onSelect={onSelect}
-    >
+    <ContextMenuItem variant={danger ? "destructive" : "default"} onSelect={onSelect}>
       <span className="[&_svg]:size-4">{icon}</span>
       {label}
     </ContextMenuItem>

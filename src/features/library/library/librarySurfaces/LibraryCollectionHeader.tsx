@@ -72,7 +72,7 @@ export function LibraryCollectionHeader() {
                 Edit album
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-cream-bright focus:text-cream-bright"
+                variant="destructive"
                 onSelect={() => void collectionActions.deleteCurrentAlbum()}
               >
                 <Trash2 size={13} />

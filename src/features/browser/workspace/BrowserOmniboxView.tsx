@@ -1,5 +1,5 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, menuItemClass, menuListClass, popupSurfaceClass } from "@/shared/ui";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { ArrowUpRight, Globe2, History, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -116,7 +116,7 @@ export function BrowserOmniboxView(props: {
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          "w-full min-w-0 rounded-md border bg-transparent px-[9px] text-center outline-none transition-colors",
+          "w-full min-w-0 rounded-md border bg-transparent px-2 text-center outline-none transition-colors",
           isNativeMobileBuild ? "h-11 text-base" : "h-[30px] text-xs",
           props.lightChrome
             ? "border-black/[0.06] text-[#252525] hover:bg-black/[0.025] focus:border-black/[0.11] focus:bg-[#ededed] focus:text-left"
@@ -128,10 +128,9 @@ export function BrowserOmniboxView(props: {
           id="browser-omnibox-suggestions"
           role="listbox"
           className={cn(
-            "absolute left-0 right-0 top-[calc(100%+7px)] overflow-hidden rounded-xl border p-1.5 text-left shadow-2xl",
-            props.lightChrome
-              ? "border-black/10 bg-[#f5f5f5] text-[#252525]"
-              : "border-white/10 bg-[#282828] text-[#eeeeee]",
+            "absolute left-0 right-0 top-[calc(100%+7px)] overflow-hidden",
+            popupSurfaceClass,
+            menuListClass,
           )}
         >
           {suggestions.map((suggestion, index) => (
@@ -139,7 +138,6 @@ export function BrowserOmniboxView(props: {
               key={suggestion.id}
               suggestion={suggestion}
               selected={index === selectedIndex}
-              lightChrome={props.lightChrome}
               onChoose={() => choose(suggestion)}
               onPoint={() => setSelectedIndex(index)}
             />
@@ -153,7 +151,6 @@ export function BrowserOmniboxView(props: {
 function SuggestionRow(props: {
   suggestion: BrowserSuggestion;
   selected: boolean;
-  lightChrome: boolean;
   onChoose: () => void;
   onPoint: () => void;
 }) {
@@ -169,18 +166,15 @@ function SuggestionRow(props: {
       type="button"
       role="option"
       aria-selected={props.selected}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left",
-        props.selected && (props.lightChrome ? "bg-black/[0.07]" : "bg-white/[0.09]"),
-      )}
+      className={cn(menuItemClass, "gap-3", props.selected && "bg-charcoal-hover")}
       onPointerEnter={props.onPoint}
       onPointerDown={(event) => event.preventDefault()}
       onClick={props.onChoose}
     >
-      <Icon size={19} strokeWidth={1.7} className="shrink-0 opacity-70" />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{props.suggestion.title}</span>
+      <Icon strokeWidth={1.7} className="opacity-70" />
+      <span className="min-w-0 flex-1 truncate font-medium">{props.suggestion.title}</span>
       <span className="max-w-[48%] truncate text-xs opacity-55">{props.suggestion.detail}</span>
-      {props.suggestion.kind === "site" ? <ArrowUpRight size={15} className="opacity-55" /> : null}
+      {props.suggestion.kind === "site" ? <ArrowUpRight className="opacity-55" /> : null}
     </button>
   );
 }

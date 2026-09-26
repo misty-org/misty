@@ -130,22 +130,99 @@
   transition: none;
 }
 
-/* Islands provide the sidebar's surfaces. Navigation feedback uses text
-   brightness, including shared tree rows, without changing other app trees. */
-[data-navigator-section-scroll] :is(.misty-navigator-row-target, [data-tree-row-surface]) {
-  background-color: transparent;
+/* One glyph size for every navbar icon: primary rows, utility actions, the
+   Misty logo, the profile avatar, and the Space rail. Portaled menus retain
+   their own sizing. */
+.misty-navigation-icons {
+  --misty-navigation-icon-size: 16px;
+  --navigation-primary-icon-size: var(--misty-navigation-icon-size);
 }
 
-[data-navigator-section-scroll]
-  :is(
-    .misty-navigator-row-target:hover,
-    .misty-navigator-row-target:focus-visible,
-    .misty-navigator-row-target[aria-current="page"],
-    .misty-navigator-row-target[data-active="true"],
-    [data-tree-row-surface]:hover,
-    [data-tree-row-surface]:focus-within,
-    [data-selected="true"] > [data-tree-row-surface]
-  ) {
+.misty-navigation-icons :is(svg, img, [data-slot="avatar"]) {
+  width: var(--misty-navigation-icon-size) !important;
+  height: var(--misty-navigation-icon-size) !important;
+  flex-shrink: 0;
+}
+
+.misty-navigation-icons svg {
+  stroke-width: 2;
+}
+
+/* Every navbar row and action shares one rounded highlight shape and one
+   horizontal inset, so fills line up down the whole rail. */
+.misty-global-navigator :is(.misty-navigator-row-target, .misty-navigator-icon-target),
+.misty-global-navigator [data-tree-row-surface],
+.misty-space-rail-control {
+  border-radius: 8px;
+}
+
+.misty-global-navigator .misty-navigator-row-target:not(:has(> [data-tree-row-surface])) {
+  padding-inline: 10px;
+}
+
+/* Hover is paint-only: no fades and no promoted icon layers. Fading a fill
+   under a composited glyph makes WebKit re-rasterize it every frame, which
+   reads as the icon wiggling. */
+.misty-global-navigator :is(a, button, [data-tree-row-surface]),
+.misty-space-rail-control {
+  transition: none !important;
+}
+
+.misty-global-navigator :is(svg, img, [data-app-icon]) {
+  transform: none;
+  backface-visibility: visible;
+}
+
+/* Row icon slots match the glyph exactly so every row icon, the Misty logo
+   included, starts on the same x. Square actions and Space rail tiles share
+   one 32px box, matching the row height. */
+.misty-navigation-icons {
+  --navigation-primary-icon-slot: var(--misty-navigation-icon-size);
+}
+
+/* The Space avatar is identity, not a glyph: it fills most of its tile. */
+.misty-navigation-icons
+  .misty-space-rail-avatar
+  :is([data-slot="avatar"], [data-slot="avatar"] img) {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.misty-global-navigator .misty-navigator-icon-target,
+.misty-space-rail-control {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px;
+}
+
+/* Navigation feedback fills the row or action behind the brightened label
+   and icon, matching every other button in the app. */
+.misty-global-navigator
+  :is(.misty-navigator-row-target, .misty-navigator-icon-target):not(
+    :has(> [data-tree-row-surface])
+  ):is(
+    :hover,
+    :focus-visible,
+    [aria-current="page"],
+    [data-active="true"],
+    [data-state="open"],
+    :active
+  ),
+.misty-global-navigator
+  .misty-navigator-row-target:is(:hover, :focus-visible, [aria-current="page"], :active)
+  > [data-tree-row-surface] {
+  background-color: var(--misty-theme-hover);
+  color: var(--misty-theme-text-bright);
+}
+
+.misty-space-rail-control:is(
+  :hover,
+  :focus-visible,
+  [aria-current="page"],
+  [data-state="open"],
+  :active
+) {
+  background-color: var(--misty-theme-hover);
   color: var(--misty-theme-text-bright);
 }
 
@@ -161,12 +238,6 @@
   [data-tour-target="navigation"] button:focus-visible [data-chevron-placement="inline"] {
     opacity: 1;
   }
-}
-
-.app-pages-root [data-tour-target="navigation"] [data-app-icon],
-.app-pages-root [data-tour-target="navigation"] .misty-navigator-subsection-icon {
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 
 html[data-pointer-dragging="true"],

@@ -12,6 +12,7 @@ import {
 } from "@/features/workspace";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { mobileCachePurgeAccount } from "@/native/mobile-cache";
+import { reportSystemError } from "@/features/activity";
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
 import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
@@ -42,7 +43,7 @@ import {
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { restoreSavedSession, tryRestoreSavedSession } from "./sessionRecovery";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
-import { accountFetchMe } from "./store/useAccountStore";
+import { accountFetchMe, accountLogout } from "./store/useAccountStore";
 import {
   activateAccountSession,
   clearAccountAuthToken,
@@ -123,18 +124,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Signs out the active account and returns to the sign-in chooser without
   // silently jumping to another saved account. Every account stays listed.
-  const deactivateToChooser = useCallback(async () => {
-    const accountId = activeUser?.id ?? "";
-    await flushWorkspaceRecovery();
-    if (accountId) await saveAccountWorkspace(accountId);
-    await deactivateActiveAccount();
-    await signOut();
-    if (isNativeMobileBuild && accountId) await removeSavedAccountSession(accountId);
-    resetAccountScopedState(accountId);
-    setUserState(null);
-    setAccounts(listSavedAccountSessions());
-    navigate("/signin", { replace: true });
-  }, [activeUser?.id, navigate, signOut]);
+  // Saving the workspace and clearing native identity are best-effort: a failed
+  // cleanup step is reported, but never leaves the person signed in.
+  const deactivateToChooser = useCallback(
+    async ({ endSession = false }: { endSession?: boolean } = {}) => {
+      const accountId = activeUser?.id ?? "";
+      const failures: unknown[] = [];
+      const attempt = async (step: () => unknown) => {
+        try {
+          await step();
+        } catch (error) {
+          failures.push(error);
+        }
+      };
+      await attempt(flushWorkspaceRecovery);
+      if (accountId) await attempt(() => saveAccountWorkspace(accountId));
+      // Signing out ends the server session: the account stays listed, but
+      // choosing it again asks for the password.
+      if (endSession && accountId) await attempt(() => accountLogout(accountId));
+      await attempt(deactivateActiveAccount);
+      await attempt(signOut);
+      if (isNativeMobileBuild && accountId)
+        await attempt(() => removeSavedAccountSession(accountId));
+      resetAccountScopedState(accountId);
+      setUserState(null);
+      setAccounts(listSavedAccountSessions());
+      navigate("/signin", { replace: true });
+      for (const error of failures) {
+        reportSystemError({
+          accountId,
+          scope: "account:sign-out",
+          title: "Part of signing out did not finish",
+          error,
+        });
+      }
+    },
+    [activeUser?.id, navigate, signOut],
+  );
 
   const setUser = useCallback(
     async (nextUser: AuthUser | null) => {
@@ -179,18 +205,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           navigate("/browser", { replace: true });
         }
       } catch (error) {
-        if (isInvalidAccountSessionError(error)) await clearAccountAuthToken();
+        // Keep the target account listed even when its session is dead: the
+        // caller sends the person to sign in again instead of deleting it.
         const restoredPreviousAccount = await tryRestoreSavedSession(previousAccountId);
         if (restoredPreviousAccount) {
           if (previousAccountId) await restoreAccountWorkspace(previousAccountId);
           if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
           if (previousUser?.id === previousAccountId) setUserState(previousUser);
         } else {
+          await deactivateActiveAccount().catch(() => undefined);
           useUserStore.getState().clear();
           setUserState(null);
         }
         setAccounts(listSavedAccountSessions());
-        throw error;
+        throw isInvalidAccountSessionError(error)
+          ? new SavedAccountSessionUnavailableError()
+          : error;
       } finally {
         finishAccountOperation();
       }
@@ -428,31 +458,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [activeUser, beginAccountOperation, deactivateToChooser, finishAccountOperation]);
 
-  // Signing out no longer hops to another saved account. It deactivates the
-  // current one — leaving it (and every other account) listed on the sign-in
-  // chooser — and never revokes tokens, so the chooser can resume any account
-  // whose token is still valid, or prompt a re-login when it isn't.
+  // Signing out ends the current account's server session and returns to the
+  // chooser. The account stays listed, but resuming it requires its password;
+  // other saved accounts keep their sessions.
   const logout = useCallback(async () => {
     if (accountOperationActive.current) return;
-    const previousUser = activeUser;
-    const previousAccountId = previousUser?.id ?? "";
-    const previousMe = useUserStore.getState().me;
     beginAccountOperation();
     try {
-      await deactivateToChooser();
-    } catch (error) {
-      if (previousUser) {
-        await restoreSavedSession(previousUser.id);
-        if (previousAccountId) await restoreAccountWorkspace(previousAccountId);
-        if (previousMe?.id === previousUser.id) useUserStore.getState().setMe(previousMe);
-        setUserState(previousUser);
-      }
-      setAccounts(listSavedAccountSessions());
-      throw error;
+      await deactivateToChooser({ endSession: true });
     } finally {
       finishAccountOperation();
     }
-  }, [activeUser, beginAccountOperation, finishAccountOperation, deactivateToChooser]);
+  }, [beginAccountOperation, finishAccountOperation, deactivateToChooser]);
 
   // Resume a saved account chosen from the sign-in screen. Its token is validated
   // against /me; on failure the account stays listed and the error propagates so

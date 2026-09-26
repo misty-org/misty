@@ -31,7 +31,6 @@ vi.mock("./store/useAccountStore", () => ({
   accountRegister: mocks.accountRegister,
 }));
 
-
 vi.mock("@/api/deployment/api", () => ({
   fetchCurrentInstanceDescriptor: mocks.fetchCurrentInstanceDescriptor,
 }));
@@ -39,7 +38,10 @@ vi.mock("@/api/deployment/api", () => ({
 import RegisterPage from "./RegisterPage";
 
 function setInputValue(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+  const valueSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value",
+  )?.set;
   valueSetter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -88,7 +90,9 @@ describe("RegisterPage", () => {
     await act(async () => {
       root.render(
         <MemoryRouter
-          initialEntries={[{ pathname: "/register", state: { from: "/spaces/main", addingAccount: true } }]}
+          initialEntries={[
+            { pathname: "/register", state: { from: "/spaces/main", addingAccount: true } },
+          ]}
         >
           <RegisterPage />
         </MemoryRouter>,
@@ -96,12 +100,18 @@ describe("RegisterPage", () => {
     });
 
     expect(container.textContent).toContain("Create another account");
-    expect(container.textContent).toContain("Your current account will remain signed in on this device.");
+    expect(container.textContent).not.toContain(
+      "Your current account will remain signed in on this device.",
+    );
 
     const nameInput = container.querySelector<HTMLInputElement>('input[id="register-name"]');
-    const usernameInput = container.querySelector<HTMLInputElement>('input[id="register-username"]');
+    const usernameInput = container.querySelector<HTMLInputElement>(
+      'input[id="register-username"]',
+    );
     const emailInput = container.querySelector<HTMLInputElement>('input[id="register-email"]');
-    const passwordInput = container.querySelector<HTMLInputElement>('input[id="register-password"]');
+    const passwordInput = container.querySelector<HTMLInputElement>(
+      'input[id="register-password"]',
+    );
     expect(nameInput).not.toBeNull();
     expect(usernameInput).not.toBeNull();
     expect(emailInput).not.toBeNull();
@@ -121,13 +131,19 @@ describe("RegisterPage", () => {
   });
 
   it("submits registration and authenticates when adding another account", async () => {
-    mocks.accountRegister.mockResolvedValue({ id: "acc-3", email: "carol@example.com", name: "Carol" });
+    mocks.accountRegister.mockResolvedValue({
+      id: "acc-3",
+      email: "carol@example.com",
+      name: "Carol",
+    });
     mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
 
     await act(async () => {
       root.render(
         <MemoryRouter
-          initialEntries={[{ pathname: "/register", state: { from: "/spaces/main", addingAccount: true } }]}
+          initialEntries={[
+            { pathname: "/register", state: { from: "/spaces/main", addingAccount: true } },
+          ]}
         >
           <RegisterPage />
         </MemoryRouter>,
@@ -135,9 +151,13 @@ describe("RegisterPage", () => {
     });
 
     const nameInput = container.querySelector<HTMLInputElement>('input[id="register-name"]')!;
-    const usernameInput = container.querySelector<HTMLInputElement>('input[id="register-username"]')!;
+    const usernameInput = container.querySelector<HTMLInputElement>(
+      'input[id="register-username"]',
+    )!;
     const emailInput = container.querySelector<HTMLInputElement>('input[id="register-email"]')!;
-    const passwordInput = container.querySelector<HTMLInputElement>('input[id="register-password"]')!;
+    const passwordInput = container.querySelector<HTMLInputElement>(
+      'input[id="register-password"]',
+    )!;
     const form = container.querySelector<HTMLFormElement>("form")!;
 
     await act(async () => {

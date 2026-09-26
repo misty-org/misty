@@ -114,8 +114,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               // treatment so the two rails read as the same component.
               const startsGroup =
                 item.group !== undefined && item.group !== props.items[index - 1]?.group;
-              const endsGroup =
-                item.group !== undefined && item.group !== props.items[index + 1]?.group;
               const groupCollapsed = item.group ? collapsedGroups.has(item.group) : false;
               return (
                 <Fragment key={item.id}>
@@ -139,7 +137,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
                       icon={<Icon aria-hidden="true" />}
                       label={item.label}
                       selected={active}
-                      last={endsGroup}
                       nested={Boolean(item.group)}
                       settings
                       data-settings-nav-entry={item.id}

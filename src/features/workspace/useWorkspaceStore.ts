@@ -3,7 +3,7 @@ import {
   initialWebsiteNavigation,
   type WebsiteNavigationState,
 } from "@/features/browser-workspace/navigationDefaults";
-import { paneHistory, pushPaneView, traversePaneHistory } from "./paneHistory";
+import { pushPaneView, traversePaneHistory } from "./paneHistory";
 import {
   activeLayoutView,
   allLayoutViews,
@@ -100,7 +100,6 @@ export interface WorkspaceStore extends VirtualWorkspaceState, WebsiteNavigation
   closedTabs: ClosedWorkspaceTab[];
   closedVirtualWindowsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceVirtualWindow[]>>;
   newLayoutTab: () => WorkspaceTab;
-  canNavigatePane: (delta: number, paneId?: string) => boolean;
   navigatePane: (delta: number, paneId?: string) => WorkspaceTab | null;
   detachPaneToTab: (viewId: string) => boolean;
   selectLayoutTab: (id: string) => WorkspaceTab | null;
@@ -241,14 +240,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           view = createBlankWorkspaceTab(current.activeScopeKey);
         set(withLayout(current, appendLayoutTab(current.layout, singleViewLayoutTab(view))));
         return view;
-      },
-      canNavigatePane: (delta, paneId) => {
-        const current = get(),
-          pane = findDockLeaf(current.layout.root, paneId ?? current.layout.focusedPaneId);
-        if (!pane) return false;
-        const history = paneHistory(pane),
-          index = history.index + delta;
-        return index >= 0 && index < history.entries.length;
       },
       navigatePane: (delta, paneId) => {
         const current = get(),

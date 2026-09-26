@@ -1,3 +1,4 @@
+import { fireEvent, screen } from "@testing-library/react";
 import { act, type ReactNode, type ButtonHTMLAttributes } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,8 +58,10 @@ const info = {
 describe("Browser site permissions", () => {
   let container: HTMLDivElement;
   let root: Root;
+  const scrollIntoView = HTMLElement.prototype.scrollIntoView;
   beforeEach(() => {
     invoke.mockReset();
+    HTMLElement.prototype.scrollIntoView = vi.fn();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -66,6 +69,7 @@ describe("Browser site permissions", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
   });
   async function open(url = info.url) {
     await act(async () =>
@@ -73,22 +77,28 @@ describe("Browser site permissions", () => {
     );
     await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   }
+  async function choosePermission(kind: "Camera" | "Microphone", choice: string) {
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole("combobox", { name: `${kind} permission` }), {
+        key: "ArrowDown",
+      });
+    });
+    await act(async () => fireEvent.click(screen.getByRole("option", { name: choice })));
+  }
   it("uses the native origin when changing one permission and preserves the other", async () => {
     invoke
       .mockResolvedValueOnce(info)
       .mockResolvedValueOnce({ ...info, permissions: { camera: "block", microphone: "ask" } });
     await open();
-    const select = container.querySelector<HTMLSelectElement>('[aria-label="Camera permission"]')!;
-    await act(async () => {
-      select.value = "block";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await choosePermission("Camera", "Block");
     expect(invoke).toHaveBeenLastCalledWith("browser_site_permissions_set", {
       id: "tab-one",
       origin: "https://example.com",
       permissions: { camera: "block", microphone: "ask" },
     });
-    expect(select.value).toBe("block");
+    expect(screen.getByRole("combobox", { name: "Camera permission" }).textContent).toContain(
+      "Block",
+    );
   });
   it("closes on navigation and ignores an old site's pending response", async () => {
     let resolve!: (value: typeof info) => void;
@@ -113,15 +123,11 @@ describe("Browser site permissions", () => {
       .mockRejectedValueOnce("The page changed. Reopen site settings and try again.")
       .mockResolvedValueOnce(info);
     await open();
-    const select = container.querySelector<HTMLSelectElement>(
-      '[aria-label="Microphone permission"]',
-    )!;
-    await act(async () => {
-      select.value = "allow";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await choosePermission("Microphone", "Allow");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("The page changed");
-    expect(select.value).toBe("ask");
+    expect(screen.getByRole("combobox", { name: "Microphone permission" }).textContent).toContain(
+      "Ask",
+    );
   });
   it("refreshes a saved policy when stopping capture fails afterward", async () => {
     invoke
@@ -131,14 +137,10 @@ describe("Browser site permissions", () => {
       )
       .mockResolvedValueOnce({ ...info, permissions: { camera: "block", microphone: "ask" } });
     await open();
-    const select = container.querySelector<HTMLSelectElement>('[aria-label="Camera permission"]')!;
-    await act(async () => {
-      select.value = "block";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    expect(
-      container.querySelector<HTMLSelectElement>('[aria-label="Camera permission"]')?.value,
-    ).toBe("block");
+    await choosePermission("Camera", "Block");
+    expect(screen.getByRole("combobox", { name: "Camera permission" }).textContent).toContain(
+      "Block",
+    );
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Permission saved");
   });
 });

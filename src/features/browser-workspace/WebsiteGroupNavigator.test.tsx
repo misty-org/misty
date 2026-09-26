@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { allLayoutViews, useWorkspaceStore } from "@/features/workspace";
-import { addWebsite } from "./navigation";
+import { addWebsite, createWebsiteGroup } from "./navigation";
 import { WebsiteGroupNavigator } from "./WebsiteGroupNavigator";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
 
 beforeEach(() => {
   cleanup();
   useWorkspaceStore.getState().reset();
+  createWebsiteGroup("Videos");
 });
 
 describe("saved website navigation", () => {

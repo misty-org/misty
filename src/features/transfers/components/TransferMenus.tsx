@@ -55,7 +55,7 @@ export function TransferSortMenu(props: {
           <ArrowUpDown />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 border-charcoal-border/70 shadow-md">
+      <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="text-xs text-cream-muted">Sort transfers</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {transferSortOptions.map((option) => {
@@ -89,7 +89,7 @@ export function TransferToolbarActions(props: TransferActionMenuProps) {
           <MoreHorizontal />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-charcoal-border/70 shadow-md">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="text-xs text-cream-muted">History actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownActionEntries entries={entries} />
@@ -116,7 +116,7 @@ export function TransferRowActionsMenu(
           <MoreHorizontal />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-charcoal-border/70 shadow-md">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownActionEntries entries={entries} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -133,7 +133,7 @@ export function TransferRowContextMenu(
   return (
     <ContextMenu onOpenChange={props.onOpenChange}>
       <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56 border-charcoal-border/70 shadow-md">
+      <ContextMenuContent className="w-56">
         <ContextActionEntries entries={entries} />
       </ContextMenuContent>
     </ContextMenu>
@@ -148,7 +148,7 @@ function DropdownActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
       <DropdownMenuItem
         key={`${entry.label}-${index}`}
         disabled={entry.disabled}
-        className={entry.danger ? "text-cream-bright focus:text-cream-bright" : undefined}
+        variant={entry.danger ? "destructive" : "default"}
         onSelect={entry.run}
       >
         {entry.icon}
@@ -166,7 +166,7 @@ function ContextActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
       <ContextMenuItem
         key={`${entry.label}-${index}`}
         disabled={entry.disabled}
-        className={entry.danger ? "gap-2 text-cream-bright focus:text-cream-bright" : "gap-2"}
+        variant={entry.danger ? "destructive" : "default"}
         onSelect={entry.run}
       >
         {entry.icon}

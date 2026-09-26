@@ -1,7 +1,4 @@
-import type {
-  SpaceMember,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
@@ -79,16 +76,9 @@ export function TaskMemberAvatar({
   size?: "sm" | "md";
 }) {
   return (
-    <Avatar
-      className={size === "md" ? "size-9" : "size-6"}
-      title={member?.name ?? "Unassigned"}
-    >
+    <Avatar className={size === "md" ? "size-9" : "size-6"} title={member?.name ?? "Unassigned"}>
       <AvatarFallback className={size === "md" ? "text-xs" : "text-[9px]"}>
-        {member ? (
-          memberInitials(member.name)
-        ) : (
-          "—"
-        )}
+        {member ? memberInitials(member.name) : "—"}
       </AvatarFallback>
     </Avatar>
   );
@@ -157,10 +147,7 @@ export function memberName(members: SpaceMember[], id?: string) {
     : "Unassigned";
 }
 
-export function taskAssigneeName(
-  members: SpaceMember[],
-  task: SpaceTask,
-) {
+export function taskAssigneeName(members: SpaceMember[], task: SpaceTask) {
   return memberName(members, task.assignee_user_id);
 }
 

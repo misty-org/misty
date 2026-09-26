@@ -130,15 +130,11 @@
   transition: background-color 140ms ease-out;
 }
 .provider-directory .platform-action:hover:not(:disabled) {
-  background: color-mix(
-    in srgb,
-    var(--misty-theme-text-bright, #f1f1f1) 85%,
-    var(--misty-theme-bg, #131313)
-  );
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .provider-directory .platform-entry:hover,
 .provider-directory .platform-entry:active {
-  background: transparent;
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .provider-integration-actions {
   display: flex;

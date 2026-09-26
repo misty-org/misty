@@ -14,7 +14,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
 import {
@@ -42,6 +42,9 @@ import {
   WindowsWorkspaceTitlebarControls,
 } from "./WindowsWorkspaceTitlebarControls";
 
+const tabActionClass =
+  "grid size-6 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright active:bg-charcoal-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
+
 export function WorkspaceLayoutTabs(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
     position?: DockPosition;
@@ -54,7 +57,28 @@ export function WorkspaceLayoutTabs(
   const layout = useWorkspaceStore((state) => state.layout);
   const tabs = layoutTabs(layout);
   const ref = useRef<HTMLDivElement>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: 0, height: 0 });
+  useLayoutEffect(() => {
+    const list = tabListRef.current;
+    if (!list || vertical) return;
+    const updateFade = () => {
+      list.style.setProperty("--tab-fade-start", list.scrollLeft > 1 ? "16px" : "0px");
+      list.style.setProperty(
+        "--tab-fade-end",
+        list.scrollWidth - list.clientWidth - list.scrollLeft > 1 ? "16px" : "0px",
+      );
+    };
+    updateFade();
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(list);
+    Array.from(list.children).forEach((child) => observer.observe(child));
+    list.addEventListener("scroll", updateFade, { passive: true });
+    return () => {
+      observer.disconnect();
+      list.removeEventListener("scroll", updateFade);
+    };
+  }, [vertical, tabs.length]);
   const pane =
     dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
     dockLeaves(layout.root)[0];
@@ -123,18 +147,19 @@ export function WorkspaceLayoutTabs(
   useEffect(() => {
     ref.current
       ?.querySelector('[aria-selected="true"]')
+      ?.closest("[data-reorder-item]")
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeLayoutTabId, position]);
   const newTabButton = (
     <Button
       variant="ghost"
       size="none"
-      className={cn(dockActionClass, vertical && "misty-side-new-tab")}
+      className={cn(tabActionClass, vertical && "misty-side-new-tab")}
       aria-label="New tab"
       title="New tab"
       onClick={props.onNewTab}
     >
-      <Plus className="size-[15px]" size={15} />
+      <Plus className="size-3.5" size={14} />
       {vertical && <span>New tab</span>}
     </Button>
   );
@@ -154,7 +179,7 @@ export function WorkspaceLayoutTabs(
         vertical
           ? undefined
           : {
-              paddingLeft: 8 + (props.titlebarInsets?.left ?? 0),
+              paddingLeft: props.titlebarInsets?.left ?? 0,
               paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
             }
       }
@@ -163,15 +188,16 @@ export function WorkspaceLayoutTabs(
       {vertical && <div className="misty-side-tabs-heading">{newTabButton}</div>}
       <div
         {...reorder}
+        ref={tabListRef}
         role="tablist"
         aria-label="Window tabs"
         aria-orientation={vertical ? "vertical" : "horizontal"}
         data-tour-target="workspace-tab-bar"
         className={cn(
-          "misty-workspace-tab-list flex min-w-0 flex-1 gap-1 [scrollbar-width:thin]",
+          "misty-workspace-tab-list flex min-w-0 flex-1 gap-1",
           vertical
-            ? "min-h-0 flex-col overflow-x-hidden overflow-y-auto"
-            : "items-center overflow-x-auto overflow-y-hidden",
+            ? "min-h-0 flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:thin]"
+            : "items-center overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         )}
       >
         {tabs.map((tab) => {
@@ -211,7 +237,7 @@ export function WorkspaceLayoutTabs(
                   tabIndex={active ? 0 : -1}
                   title={label}
                   data-reorder-handle="true"
-                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden border-0 pl-2 pr-1 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
+                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent pl-2 pr-1 text-left outline-none hover:bg-transparent focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
                   onClick={() => select(tab.id)}
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);
@@ -240,7 +266,7 @@ export function WorkspaceLayoutTabs(
                     icon={Blocks}
                     isActive={active}
                   />
-                  <OverflowFadeText className="min-w-0 overflow-hidden whitespace-nowrap">
+                  <OverflowFadeText className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
                     {label}
                   </OverflowFadeText>
                   {panes.length > 1 ? (
@@ -260,7 +286,10 @@ export function WorkspaceLayoutTabs(
                         size="none"
                         aria-label={`Show panes in ${label}`}
                         aria-description={`${panes.length} panes`}
-                        className="flex h-6 shrink-0 items-center gap-0.5 rounded border-0 px-1 text-cream-muted hover:bg-charcoal-active hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
+                        className={cn(
+                          tabActionClass,
+                          "mr-0.5 aria-expanded:bg-transparent data-[state=open]:bg-transparent",
+                        )}
                       >
                         <ChevronDown className="size-3" size={12} />
                       </Button>
@@ -313,10 +342,10 @@ export function WorkspaceLayoutTabs(
                     size="none"
                     aria-label={`Close tab ${label}`}
                     title={`Close tab ${label}`}
-                    className="mr-0.5 grid size-5 shrink-0 place-items-center rounded border-0 text-cream-muted hover:bg-charcoal-active hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
+                    className={cn(tabActionClass, "mr-0.5")}
                     onClick={() => props.onCloseLayoutTab(tab.id)}
                   >
-                    <X className="size-3" size={12} />
+                    <X className="size-3.5" size={14} />
                   </Button>
                 )}
               </div>

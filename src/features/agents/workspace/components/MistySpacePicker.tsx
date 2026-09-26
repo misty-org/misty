@@ -47,11 +47,7 @@ export function MistySpacePicker({
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>Work in Space</DropdownMenuLabel>
         {spaces.map((space) => (
-          <DropdownMenuItem
-            key={space.id}
-            className="min-h-9 gap-2"
-            onSelect={() => onSelect(space.id)}
-          >
+          <DropdownMenuItem key={space.id} onSelect={() => onSelect(space.id)}>
             <PanelsTopLeft size={14} className="shrink-0 text-cream-muted" />
             <span className="min-w-0 flex-1 truncate">{spaceNavigationName(space)}</span>
             {space.id === activeSpaceId ? <Check size={14} className="shrink-0" /> : null}

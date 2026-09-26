@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Monitor } from "lucide-react";
+import { Check, LoaderCircle, Monitor, MousePointer2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Switch } from "@/shared/ui/switch";
+import { cn } from "@/shared/ui/utils";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import {
   activateNativeDevice,
@@ -10,14 +11,16 @@ import {
   type NativeSyncView,
 } from "./native";
 import { useBrowserSyncStore } from "./store";
-import { deviceRows, formatRate, transferRate } from "./deviceControl";
+import { deviceRows } from "./deviceControl";
 
 type Pending = { deviceId: string; fullSync: boolean | null; started: number };
-export function DeviceControlContent({ session }: { session: NativeSyncView }) {
-  const [rates, setRates] = useState<{ up: number | null; down: number | null }>({
-    up: null,
-    down: null,
-  });
+export function DeviceControlContent({
+  session,
+  onOpenSyncSettings,
+}: {
+  session: NativeSyncView;
+  onOpenSyncSettings: () => void;
+}) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
@@ -26,7 +29,6 @@ export function DeviceControlContent({ session }: { session: NativeSyncView }) {
     mounted.current = true;
     let stopped = false;
     let reading = false;
-    let sample: { uploaded: number; downloaded: number; at: number } | null = null;
     const generation = readApiSessionGeneration();
     const valid = () =>
       !stopped &&
@@ -44,31 +46,10 @@ export function DeviceControlContent({ session }: { session: NativeSyncView }) {
           latest.account_id !== session.account_id
         )
           return;
-        const at = performance.now();
-        if (latest.traffic) {
-          setRates({
-            up: transferRate(
-              sample && { bytes: sample.uploaded, at: sample.at },
-              latest.traffic.uploaded_bytes,
-              at,
-            ),
-            down: transferRate(
-              sample && { bytes: sample.downloaded, at: sample.at },
-              latest.traffic.downloaded_bytes,
-              at,
-            ),
-          });
-          sample = {
-            uploaded: latest.traffic.uploaded_bytes,
-            downloaded: latest.traffic.downloaded_bytes,
-            at,
-          };
-        }
         setError((current) => (current === "Could not refresh device status." ? null : current));
         useBrowserSyncStore.setState({ session: latest });
       } catch {
         if (valid()) {
-          setRates({ up: null, down: null });
           setError("Could not refresh device status.");
         }
       } finally {
@@ -99,7 +80,7 @@ export function DeviceControlContent({ session }: { session: NativeSyncView }) {
     const timer = window.setTimeout(
       () => {
         setPending(null);
-        setError("The device did not confirm the change. Check its connection and try again.");
+        setError("Device did not respond. Try again.");
       },
       Math.max(0, 35000 - (Date.now() - pending.started)),
     );
@@ -115,112 +96,116 @@ export function DeviceControlContent({ session }: { session: NativeSyncView }) {
       if (fullSync === null && deviceId === session.device_id)
         await activateNativeDevice(session.session_id);
       else await controlNativeDevice(session.session_id, deviceId, fullSync, fullSync === null);
-    } catch (failure) {
+    } catch {
       if (mounted.current && generation === readApiSessionGeneration()) {
         setPending(null);
-        setError(failure instanceof Error ? failure.message : String(failure));
+        setError("Could not update device. Try again.");
       }
     } finally {
       requesting.current = false;
     }
   };
   return (
-    <section aria-label="Device controls" className="space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold">Devices</h2>
-        <p className="mt-1 text-xs text-cream-muted">
-          Choose where you work and which devices follow along.
-        </p>
+    <section aria-label="Device controls">
+      <div className="flex items-center justify-between gap-3 pb-2 text-sm">
+        <h2 className="font-semibold">Devices</h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-auto w-14 p-0 text-cream-muted hover:underline"
+          aria-label="Sync settings"
+          onClick={onOpenSyncSettings}
+        >
+          Sync
+        </Button>
       </div>
-      <ul className="max-h-64 space-y-3 overflow-y-auto">
+      <ul className="divide-y divide-charcoal-border">
         {deviceRows(session).map((device) => (
-          <li key={device.device_id} className="border-t border-charcoal-border pt-3">
-            <div className="flex items-center gap-2">
+          <li key={device.device_id} className="group/device py-3">
+            <div className="flex items-center gap-3">
               <Monitor className="size-4 shrink-0 text-cream-muted" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium" title={device.name}>
+              <div className="min-w-0 flex-1 text-sm">
+                <div className="truncate font-medium" title={device.name}>
                   {device.name}
                 </div>
-                <div className="text-xs text-cream-muted">
-                  {device.connection}
-                  {device.active ? " · Active" : ""}
-                </div>
+                <div className="text-cream-muted">{device.connection}</div>
               </div>
-              {!device.active && (
-                <Button
-                  size="sm"
-                  variant="outline"
+              {device.active ? (
+                <span
+                  role="img"
+                  aria-label={`Active device: ${device.name}`}
+                  title="Active device"
+                  className="flex size-8 shrink-0 items-center justify-center text-cream"
+                >
+                  <Check aria-hidden className="size-4" />
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    "flex size-8 shrink-0 items-center justify-center",
+                    !(pending?.deviceId === device.device_id && pending.fullSync === null) &&
+                      "pointer-events-none opacity-0 group-hover/device:pointer-events-auto group-hover/device:opacity-100 group-focus-within/device:pointer-events-auto group-focus-within/device:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100",
+                  )}
+                >
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="size-8 shrink-0 p-0"
+                    disabled={
+                      Boolean(pending) ||
+                      device.connection !== "Connected" ||
+                      !device.full_sync ||
+                      (!device.local && device.control_version < 1)
+                    }
+                    onClick={() => void change(device.device_id, null)}
+                    aria-label={`Switch to ${device.name}`}
+                    title={`Switch to ${device.name}`}
+                    aria-busy={pending?.deviceId === device.device_id && pending.fullSync === null}
+                  >
+                    {pending?.deviceId === device.device_id && pending.fullSync === null ? (
+                      <>
+                        <LoaderCircle
+                          aria-hidden
+                          className="size-4 animate-spin motion-reduce:animate-none"
+                        />
+                        <span className="sr-only">Switching…</span>
+                      </>
+                    ) : (
+                      <MousePointer2 aria-hidden className="size-4" />
+                    )}
+                  </Button>
+                </span>
+              )}
+              <span
+                className="flex w-14 shrink-0 justify-center"
+                title={
+                  device.control_version < 1
+                    ? "Update this device and server to enable sync controls"
+                    : undefined
+                }
+              >
+                <Switch
+                  checked={device.full_sync}
                   disabled={
                     Boolean(pending) ||
                     device.connection !== "Connected" ||
-                    !device.full_sync ||
-                    (!device.local && device.control_version < 1)
+                    device.control_version < 1
                   }
-                  onClick={() => void change(device.device_id, null)}
-                  aria-label={`Switch to ${device.name}`}
-                >
-                  {pending?.deviceId === device.device_id && pending.fullSync === null
-                    ? "Switching…"
-                    : device.local
-                      ? "Use here"
-                      : "Switch"}
-                </Button>
-              )}
+                  aria-label={`Full sync for ${device.name}`}
+                  onCheckedChange={(checked) => void change(device.device_id, checked)}
+                />
+              </span>
             </div>
-            <label className="mt-2 flex items-center justify-between gap-3 pl-6 text-xs">
-              <span>Full sync</span>
-              <Switch
-                checked={device.full_sync}
-                disabled={
-                  Boolean(pending) ||
-                  device.connection !== "Connected" ||
-                  device.control_version < 1
-                }
-                aria-label={`Full sync for ${device.name}`}
-                onCheckedChange={(checked) => void change(device.device_id, checked)}
-              />
-            </label>
             {pending?.deviceId === device.device_id && pending.fullSync !== null && (
-              <p role="status" aria-live="polite" className="mt-1 pl-6 text-xs text-cream-muted">
+              <p role="status" aria-live="polite" className="mt-2 pl-7 text-sm text-cream-muted">
                 Turning Full sync {pending.fullSync ? "on" : "off"}…
-              </p>
-            )}
-            {device.control_version < 1 && (
-              <p className="mt-1 pl-6 text-xs text-cream-muted">
-                Update the server and this device to enable sync controls.
               </p>
             )}
           </li>
         ))}
       </ul>
-      <p className="text-xs text-cream-muted">
-        Full sync off keeps a device’s workspace independent and connected. Turning it on joins the
-        shared workspace.
-      </p>
-      <div className="border-t border-charcoal-border pt-3">
-        <h3 className="text-xs font-medium">Sync traffic · this device</h3>
-        <dl className="mt-2 grid grid-cols-2 gap-3 text-sm tabular-nums">
-          <div>
-            <dt className="flex items-center gap-1 text-xs text-cream-muted">
-              <ArrowUp className="size-3" aria-hidden />
-              Upload
-            </dt>
-            <dd>{formatRate(rates.up)}</dd>
-          </div>
-          <div>
-            <dt className="flex items-center gap-1 text-xs text-cream-muted">
-              <ArrowDown className="size-3" aria-hidden />
-              Download
-            </dt>
-            <dd>{formatRate(rates.down)}</dd>
-          </div>
-        </dl>
-        <p className="mt-1 text-xs text-cream-muted">
-          Live sync payloads, excluding website traffic and connection overhead.
-        </p>
-      </div>
       {error && (
-        <p role="alert" className="break-words text-xs text-avatar-red">
+        <p role="alert" className="mt-2 break-words text-sm text-avatar-red">
           {error}
         </p>
       )}

@@ -7,7 +7,7 @@ import { navigatorFocusRingClass } from "./styles";
 
 const controlButtonClass = [
   "misty-navigator-icon-target grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
-  "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
+  "transition-colors hover:bg-charcoal-hover hover:text-cream-bright aria-pressed:bg-transparent aria-pressed:hover:bg-charcoal-hover",
   navigatorFocusRingClass,
 ].join(" ");
 

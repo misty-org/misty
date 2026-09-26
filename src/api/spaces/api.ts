@@ -275,13 +275,7 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     ),
-  runStudio: (
-    spaceId: string,
-    kind: "workflows",
-    id: string,
-    prompt = "",
-    capabilityId = "",
-  ) =>
+  runStudio: (spaceId: string, kind: "workflows", id: string, prompt = "", capabilityId = "") =>
     spaceRequest<SpaceRun>(
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}/runs`,
       {

@@ -450,7 +450,7 @@ function DrawingRows(props: {
             {isPinned ? "Unpin" : "Pin"}
           </ContextMenuItem>
           {drawing.can_delete ? (
-            <ContextMenuItem className="text-red-300" onSelect={() => props.onDelete(drawing)}>
+            <ContextMenuItem variant="destructive" onSelect={() => props.onDelete(drawing)}>
               <Trash2 />
               Delete
             </ContextMenuItem>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pathData } from "./BrowserAnnotationLayer";
-import { browserViewportWidths } from "./BrowserViewportMenu";
+import { browserViewportDefaults, browserViewportFrameStyle } from "./BrowserViewportMenu";
 
 describe("browser annotation paths", () => {
   it("creates an SVG path through each captured point", () => {
@@ -19,12 +19,19 @@ describe("browser annotation paths", () => {
 });
 
 describe("browser viewport presets", () => {
-  it("uses practical responsive design widths", () => {
-    expect(browserViewportWidths).toEqual({
-      responsive: null,
-      desktop: 1280,
-      tablet: 820,
-      mobile: 390,
+  it("uses practical device sizes with a 1080p desktop", () => {
+    expect(browserViewportDefaults).toEqual({
+      desktop: { width: 1920, height: 1080 },
+      tablet: { width: 820, height: 1180 },
+      mobile: { width: 390, height: 844 },
+    });
+  });
+
+  it("fits device sizes to the pane while keeping their aspect ratio", () => {
+    expect(browserViewportFrameStyle(null)).toEqual({ width: "100%", height: "100%" });
+    expect(browserViewportFrameStyle({ width: 1920, height: 1080 })).toEqual({
+      width: "min(100cqw, 1920px, calc(100cqh * 1920 / 1080))",
+      height: "min(100cqh, 1080px, calc(100cqw * 1080 / 1920))",
     });
   });
 });

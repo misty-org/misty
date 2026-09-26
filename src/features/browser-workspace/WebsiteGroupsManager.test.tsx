@@ -1,23 +1,34 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace";
 import { WebsiteGroupsManager } from "./WebsiteGroupsManager";
+import { createWebsiteGroup } from "./navigation";
 import { groupIcons } from "./groupIcons";
-beforeEach(() => useWorkspaceStore.getState().reset());
+const { readIcon } = vi.hoisted(() => ({ readIcon: vi.fn() }));
+vi.mock("./groupIconUpload", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./groupIconUpload")>()),
+  readGroupIcon: readIcon,
+}));
+beforeEach(() => {
+  readIcon.mockReset();
+  useWorkspaceStore.getState().reset();
+  createWebsiteGroup("Reading");
+  createWebsiteGroup("Work");
+});
 afterEach(cleanup);
 const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 const fill = (name: string, value: string) =>
   fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } });
 it("switches groups without back navigation and persists a searchable icon choice", () => {
   render(<WebsiteGroupsManager />);
-  click("Social");
+  click("Work");
   expect(screen.queryByRole("button", { name: /Back/ })).toBeNull();
   expect(Object.keys(groupIcons).length).toBeGreaterThan(50);
   click("Choose group icon");
   fill("Search group icons", "rocket");
   click("rocket");
   expect(
-    useWorkspaceStore.getState().websiteGroups.find((group) => group.fields.label === "Social")
+    useWorkspaceStore.getState().websiteGroups.find((group) => group.fields.label === "Work")
       ?.fields.icon,
   ).toBe("rocket");
 });
@@ -70,22 +81,41 @@ it("keeps groups and sites until deletion is confirmed", () => {
   expect(useWorkspaceStore.getState().websiteGroups).toEqual(before);
 });
 
-it("shows predefined sites and adds them once to the selected group", () => {
+it("starts with no suggestions and lets users create their first group", () => {
+  useWorkspaceStore.getState().reset();
   render(<WebsiteGroupsManager />);
-  click("Social");
-  fill("Search available sites", "Gmail");
-  click("Add Gmail");
-  const saved = useWorkspaceStore.getState().savedWebsites;
-  expect(saved).toHaveLength(1);
-  expect(saved[0].fields.group_id).toBe("group:default:social");
-  expect((screen.getByRole("button", { name: "Gmail added" }) as HTMLButtonElement).disabled).toBe(
-    true,
-  );
+  expect(screen.queryByText("Suggested groups")).toBeNull();
+  expect(screen.queryByText("Discover sites")).toBeNull();
+  expect(useWorkspaceStore.getState().websiteGroups).toEqual([]);
+  click("Add group");
+  fill("New group name", "My bookmarks");
+  click("Add");
+  expect(useWorkspaceStore.getState().websiteGroups[0].fields.label).toBe("My bookmarks");
+  expect(screen.getByRole("button", { name: "Choose group icon" })).toBeTruthy();
 });
-it("offers predefined groups when all groups have been removed", () => {
-  useWorkspaceStore.setState({ websiteGroups: [], savedWebsites: [] });
+
+it("stores an uploaded icon and lets a built-in icon replace it", async () => {
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6mWQAAAAASUVORK5CYII=";
+  readIcon.mockResolvedValue(png);
   render(<WebsiteGroupsManager />);
-  click("Add Inbox group");
-  expect(useWorkspaceStore.getState().websiteGroups[0].fields.label).toBe("Inbox");
-  expect(screen.getByRole("button", { name: "Add Gmail" })).toBeTruthy();
+  click("Choose group icon");
+  fireEvent.change(screen.getByLabelText("Upload group icon"), {
+    target: { files: [new File(["png"], "icon.png", { type: "image/png" })] },
+  });
+  await waitFor(() => expect(useWorkspaceStore.getState().websiteGroups[0].fields.icon).toBe(png));
+  click("Choose group icon");
+  click("rocket");
+  expect(useWorkspaceStore.getState().websiteGroups[0].fields.icon).toBe("rocket");
+});
+
+it("keeps the previous icon when an upload fails", async () => {
+  readIcon.mockRejectedValue(new Error("This image could not be opened. Try another file."));
+  render(<WebsiteGroupsManager />);
+  click("Choose group icon");
+  fireEvent.change(screen.getByLabelText("Upload group icon"), {
+    target: { files: [new File(["bad"], "icon.png", { type: "image/png" })] },
+  });
+  expect((await screen.findByRole("alert")).textContent).toContain("could not be opened");
+  expect(useWorkspaceStore.getState().websiteGroups[0].fields.icon).toBe("globe");
 });

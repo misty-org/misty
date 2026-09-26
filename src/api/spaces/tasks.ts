@@ -45,9 +45,7 @@ export function createSpaceTasksApi(request: SpaceRequest) {
     createTask: (
       spaceId: string,
       task: Pick<SpaceTask, "title" | "notes" | "status" | "priority" | "due_timezone"> &
-        Partial<
-          Pick<SpaceTask, "assignee_user_id" | "due_at" | "source_refs">
-        >,
+        Partial<Pick<SpaceTask, "assignee_user_id" | "due_at" | "source_refs">>,
     ) =>
       request<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks`, {
         method: "POST",
@@ -64,7 +62,6 @@ export function createSpaceTasksApi(request: SpaceRequest) {
           | "status"
           | "priority"
           | "assignee_user_id"
-
           | "due_at"
           | "due_timezone"
           | "source_refs"

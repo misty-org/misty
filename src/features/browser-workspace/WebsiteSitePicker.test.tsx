@@ -4,7 +4,16 @@ import { useWorkspaceStore } from "@/features/workspace";
 import { WebsiteSitePicker } from "./WebsiteSitePicker";
 import { addWebsite } from "./navigation";
 
-beforeEach(() => useWorkspaceStore.getState().reset());
+beforeEach(() => {
+  useWorkspaceStore.getState().reset();
+  useWorkspaceStore.setState({
+    websiteGroups: ["Inbox", "Social", "Journal", "Planner", "Library"].map((label, order) => ({
+      kind: "group",
+      id: `group:test:${label.toLowerCase()}`,
+      fields: { label, icon: "globe", order, hidden: false },
+    })),
+  });
+});
 afterEach(cleanup);
 function setup(initialGroupId?: string) {
   const state = useWorkspaceStore.getState();
@@ -30,7 +39,7 @@ describe("Sites picker", () => {
     expect(screen.getByRole("heading", { name: "Add to group" })).toBeTruthy();
     click("Add to Social");
     expect(useWorkspaceStore.getState().savedWebsites[0].fields).toMatchObject({
-      group_id: "group:default:social",
+      group_id: "group:test:social",
       title: "Gmail",
       url: "https://mail.google.com/mail/u/0/#inbox",
     });
@@ -58,7 +67,7 @@ describe("Sites picker", () => {
     click("Add to Library");
     expect(useWorkspaceStore.getState().savedWebsites[0].fields).toMatchObject({
       url: "https://example.com/",
-      group_id: "group:default:library",
+      group_id: "group:test:library",
     });
   });
   it("creates a new destination with its pending site", () => {
@@ -72,13 +81,9 @@ describe("Sites picker", () => {
     expect(state.savedWebsites[0].fields.title).toBe("Notion");
   });
   it("edits group names and contents while preserving retained site identities", () => {
-    const keep = addWebsite(
-      "group:default:inbox",
-      "Gmail",
-      "https://mail.google.com/mail/u/0/#inbox",
-    );
-    addWebsite("group:default:inbox", "Example", "https://example.com/");
-    setup("group:default:inbox");
+    const keep = addWebsite("group:test:inbox", "Gmail", "https://mail.google.com/mail/u/0/#inbox");
+    addWebsite("group:test:inbox", "Example", "https://example.com/");
+    setup("group:test:inbox");
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Group name" })).toBeNull();
     click("Edit group name");
@@ -91,8 +96,8 @@ describe("Sites picker", () => {
     expect(state.websiteGroups[0].fields.label).toBe("Personal mail");
   });
   it("renames sites inline and deletes the group", () => {
-    const id = addWebsite("group:default:inbox", "Example", "https://example.com/");
-    const { onDone } = setup("group:default:inbox");
+    const id = addWebsite("group:test:inbox", "Example", "https://example.com/");
+    const { onDone } = setup("group:test:inbox");
     click("Edit Example");
     fill("Site name", "Reference");
     click("Save site name");
@@ -104,15 +109,13 @@ describe("Sites picker", () => {
     expect(screen.getByRole("alertdialog")).toBeTruthy();
     click("Delete");
     expect(
-      useWorkspaceStore
-        .getState()
-        .websiteGroups.some((group) => group.id === "group:default:inbox"),
+      useWorkspaceStore.getState().websiteGroups.some((group) => group.id === "group:test:inbox"),
     ).toBe(false);
     expect(useWorkspaceStore.getState().savedWebsites).toHaveLength(0);
     expect(onDone).toHaveBeenCalledOnce();
   });
   it("cancels inline changes and provides a labeled back button", () => {
-    setup("group:default:inbox");
+    setup("group:test:inbox");
     click("Edit group name");
     fill("Group name", "Discard this");
     click("Cancel editing");
@@ -122,7 +125,7 @@ describe("Sites picker", () => {
     expect(screen.getByRole("textbox", { name: "Search sites or paste a URL" })).toBeTruthy();
   });
   it("does not duplicate a destination already in a group", () => {
-    const id = addWebsite("group:default:inbox", "Mail", "https://mail.google.com/mail/u/0/#inbox");
+    const id = addWebsite("group:test:inbox", "Mail", "https://mail.google.com/mail/u/0/#inbox");
     setup();
     click("Add Gmail");
     click("Add to Inbox");

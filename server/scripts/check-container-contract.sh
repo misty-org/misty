@@ -59,14 +59,20 @@ fi
 cloudflare_env_consumers="$(grep -c 'path: .env/dev/integrations/cloudflare.env' compose.dev.yml)"
 [ "$cloudflare_env_consumers" -ge 2 ] ||
   fail "the development tunnel and Worker deploy must load the Cloudflare environment bundle"
-grep -q 'container_name: misty-cloudflare-deploy' compose.dev.yml ||
-  fail "the development Worker deploy needs a stable container name so the CLI can wait for completion"
+grep -q '^  setup:' compose.dev.yml ||
+  fail "development must have one startup service"
+if grep -Eq '^  (dev-init|migrate|database-permissions|agent-runtime-setup|agent-runtime-postgres|cloudflare-deploy):' compose.dev.yml; then
+  fail "development must consolidate startup jobs and PostgreSQL; deployment reuses setup"
+fi
 grep -q 'unset CLOUDFLARE_TUNNEL_TOKEN' compose.dev.yml ||
   fail "the development tunnel must remove the source credential before cloudflared logs its environment"
 
-development_image_consumers="$(grep -c '<<: \*api-image' compose.dev.yml)"
-[ "$development_image_consumers" -ge 2 ] ||
-  fail "development migrations and API must consume the same API image anchor"
+grep -q 'api: service:misty-api' compose.dev.yml ||
+  fail "setup must obtain migrations from the same image as the API"
+grep -q 'agent: service:agent-runtime' compose.dev.yml ||
+  fail "setup must use the same workflow dependencies as the agent runtime"
+grep -q 'COPY --from=api /app/migrations' scripts/docker/setup.Dockerfile ||
+  fail "setup must copy canonical API migrations"
 
 grep -q 'MISTY_API_IMAGE' compose.prod.yml ||
   fail "production must select an immutable MISTY_API_IMAGE"

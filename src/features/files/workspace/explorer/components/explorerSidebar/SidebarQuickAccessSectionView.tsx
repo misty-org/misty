@@ -8,7 +8,6 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  TreeBranch,
   cn,
 } from "@/shared/ui";
 import { Check, ExternalLink, Folder, PinOff, Plus, RefreshCcw, X } from "lucide-react";
@@ -88,7 +87,7 @@ export function SidebarQuickAccessSectionView({
       </ContextMenu>
       <CollapsibleContent>
         <div className={sidebarStyles.list}>
-          {quick.visibleQuickAccess.map((item, index) => {
+          {quick.visibleQuickAccess.map((item) => {
             const Icon = item.icon;
             const grantedPath = item.grantRequest?.grantedPath;
             const selected = grantedPath
@@ -99,11 +98,6 @@ export function SidebarQuickAccessSectionView({
               <ContextMenu key={`quick:${item.path}`}>
                 <ContextMenuTrigger asChild>
                   <div className={sidebarStyles.treeRow}>
-                    <TreeBranch
-                      className={sidebarStyles.treeBranch}
-                      first={index === 0}
-                      last={index === branchCount - 1}
-                    />
                     <div
                       className={cn(
                         sidebarStyles.treeSurface,
@@ -197,17 +191,11 @@ export function SidebarQuickAccessSectionView({
               </ContextMenu>
             );
           })}
-          {quick.visiblePinnedPaths.map((path, pinnedIndex) => {
-            const index = quick.visibleQuickAccess.length + pinnedIndex;
+          {quick.visiblePinnedPaths.map((path) => {
             return (
               <ContextMenu key={`pin:${path}`}>
                 <ContextMenuTrigger asChild>
                   <div className={sidebarStyles.treeRow}>
-                    <TreeBranch
-                      className={sidebarStyles.treeBranch}
-                      first={index === 0}
-                      last={index === branchCount - 1}
-                    />
                     <div
                       className={cn(
                         sidebarStyles.treeSurface,

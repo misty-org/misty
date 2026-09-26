@@ -4,12 +4,12 @@ import type { RefObject } from "react";
 import { HelpMenu } from "./HelpMenu";
 import { ProfileNavButton } from "./NavRail";
 import {
-  navigatorFloatingIslandClass,
+  navigatorHeaderRowClass,
   navigatorHierarchyTriggerClass,
   navigatorIslandActionClass,
 } from "./styles";
 
-/** Fixed account island below the navigation scroll area. */
+/** Fixed account row below the navigation scroll area, styled like the Misty header row. */
 export function NavigatorProfileBar(props: {
   compact?: boolean;
   profileAnchorRef: RefObject<HTMLButtonElement | null>;
@@ -20,22 +20,22 @@ export function NavigatorProfileBar(props: {
 }) {
   return (
     <div
-      className={cn("relative z-20 shrink-0", props.compact ? "mx-2" : "mx-3 mb-2 mt-1")}
+      className={cn("relative z-20 shrink-0", props.compact ? "px-2" : "px-3 pb-2 pt-1")}
       data-navigator-profile-bar="fixed"
       data-misty-window-drag-block="true"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <div className={navigatorFloatingIslandClass}>
+      <div className={navigatorHeaderRowClass}>
         <ProfileNavButton
           ref={props.profileAnchorRef}
           open={props.profileOpen}
           onClick={props.onProfileClick}
           className={cn(
             navigatorHierarchyTriggerClass,
-            "group/profile relative flex-1 justify-start text-sm font-semibold tracking-[-0.015em] hover:bg-charcoal-active focus-visible:bg-charcoal-active",
-            props.profileOpen && "bg-charcoal-active text-cream-bright",
+            "group/profile relative min-w-0 flex-1 justify-start text-[length:var(--navigation-row-font-size,14px)] font-medium text-cream-muted",
+            props.profileOpen && "text-cream-bright",
           )}
-          avatarClassName="size-6 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
+          avatarClassName="border-0 bg-transparent ring-0 group-hover/profile:ring-0 [&>*]:!text-[8px]"
           showAccountName={!props.compact}
         />
         <TooltipProvider delayDuration={450}>
@@ -46,12 +46,12 @@ export function NavigatorProfileBar(props: {
                 size="icon-sm"
                 className={cn(
                   navigatorIslandActionClass,
-                  props.settingsOpen && "bg-charcoal-active text-cream-bright",
+                  props.settingsOpen && "bg-charcoal-hover text-cream-bright",
                 )}
                 aria-label="Settings"
                 onClick={props.onSettingsClick}
               >
-                <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
+                <Settings aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>

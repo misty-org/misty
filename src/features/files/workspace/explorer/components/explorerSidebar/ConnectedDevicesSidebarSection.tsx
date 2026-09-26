@@ -9,7 +9,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  TreeBranch,
   cn,
 } from "@/shared/ui";
 import {
@@ -46,7 +45,6 @@ export function ConnectedDevicesSidebarSection(
         title="Network"
         open={networkOpen}
         onOpenChange={setNetworkOpen}
-        last
         actions={
           <Button
             type="button"
@@ -79,7 +77,7 @@ export function ConnectedDevicesSidebarSection(
           </div>
         ) : (
           <div className={sidebarStyles.list}>
-            {connectedDevices.peers.map((peer, index) => {
+            {connectedDevices.peers.map((peer) => {
               const native = connectedDevices.snapshot?.peers.find(
                 (item) => item.deviceId === peer.deviceId,
               );
@@ -96,12 +94,6 @@ export function ConnectedDevicesSidebarSection(
                 <ContextMenu key={peer.pairId}>
                   <ContextMenuTrigger asChild>
                     <div className={sidebarStyles.deviceNestedTreeRow}>
-                      <TreeBranch
-                        anchor={16}
-                        className={sidebarStyles.treeBranch}
-                        first={index === 0}
-                        last={index === connectedDevices.peers.length - 1}
-                      />
                       <Button
                         type="button"
                         variant="ghost"

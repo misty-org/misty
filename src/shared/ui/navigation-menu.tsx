@@ -9,19 +9,17 @@ import {
 } from "react";
 import { cn } from "./utils";
 import {
-  TreeBranch,
-  navigationTreeBranchClass,
   navigationTreeGroupClass,
   navigationTreeIconClass,
   navigationTreeRowClass,
   navigationTreeSurfaceClass,
-} from "./tree-branch";
+} from "./navigation-tree";
 
 export const navigationMenuGroupClass = navigationTreeGroupClass;
 export const navigationMenuPrimaryLayoutClass =
   "grid grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)] items-center gap-2.5";
 export const navigationMenuPrimaryIconClass =
-  "flex size-[var(--navigation-primary-icon-slot,18px)] shrink-0 items-center justify-center [&_[data-app-icon]]:!size-[18px] [&_svg]:!size-[18px] [&_img]:!size-[18px]";
+  "flex size-[var(--navigation-primary-icon-slot,18px)] shrink-0 items-center justify-center [&_[data-app-icon]]:!size-[var(--navigation-primary-icon-size,18px)] [&_svg]:!size-[var(--navigation-primary-icon-size,18px)] [&_img]:!size-[var(--navigation-primary-icon-size,18px)]";
 
 const focusClass =
   "focus-visible:underline focus-visible:decoration-cream-muted focus-visible:underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-cream-muted";
@@ -29,9 +27,9 @@ const iconClass = navigationTreeIconClass;
 
 /** One row rhythm and permanently visible action treatment for the navigator. */
 export const navigationMenuRowClass =
-  "misty-navigator-row-target box-border h-8 min-w-0 rounded-md border-0 bg-transparent text-left text-[13px] font-medium tracking-normal text-cream-muted no-underline transition-none hover:bg-charcoal-card hover:text-cream-bright";
+  "misty-navigator-row-target box-border h-[var(--navigation-row-height,32px)] min-w-0 rounded-md border-0 bg-transparent text-left text-[length:var(--navigation-row-font-size,13px)] font-medium tracking-normal text-cream-muted no-underline transition-none hover:bg-charcoal-hover hover:text-cream-bright aria-[current=page]:bg-charcoal-hover aria-[current=page]:text-cream-bright";
 export const navigationMenuActionClass =
-  "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted opacity-100 visible focus-visible:underline focus-visible:decoration-cream-muted focus-visible:underline-offset-4 outline-none hover:bg-charcoal-card hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted";
+  "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted opacity-100 visible focus-visible:underline focus-visible:decoration-cream-muted focus-visible:underline-offset-4 outline-none hover:bg-charcoal-hover hover:text-cream-bright data-[state=open]:bg-charcoal-hover focus-visible:ring-2 focus-visible:ring-cream-muted";
 // A disclosure belongs to its row's surface, including when that row is selected.
 export const navigationMenuDisclosureActionClass = `${navigationMenuActionClass} !w-6 !bg-transparent`;
 export const navigationMenuDisclosureLayoutClass =
@@ -95,7 +93,6 @@ export const NavigationTreeItem = forwardRef<
     icon: ReactNode;
     label: string;
     selected: boolean;
-    last?: boolean;
     nested?: boolean;
     settings?: boolean;
     action?: ReactNode;
@@ -109,7 +106,6 @@ export const NavigationTreeItem = forwardRef<
       icon,
       label,
       selected,
-      last,
       nested = true,
       settings,
       action,
@@ -124,14 +120,14 @@ export const NavigationTreeItem = forwardRef<
         <div
           className={cn(
             navigationTreeRowClass,
-            "h-7 min-w-0",
+            "min-w-0",
             "font-medium text-cream-muted",
+            !nested && "ml-0",
             selected && "text-cream-bright",
             className,
           )}
           data-selected={selected ? "true" : undefined}
         >
-          {nested ? <TreeBranch className={navigationTreeBranchClass} last={last} /> : null}
           <button
             ref={ref as React.Ref<HTMLButtonElement>}
             {...props}
@@ -167,14 +163,14 @@ export const NavigationTreeItem = forwardRef<
         <div
           className={cn(
             navigationTreeRowClass,
-            "h-7 min-w-0",
+            "min-w-0",
             "font-medium text-cream-muted",
+            !nested && "ml-0",
             selected && "text-cream-bright",
             className,
           )}
           data-selected={selected ? "true" : undefined}
         >
-          {nested ? <TreeBranch className={navigationTreeBranchClass} last={last} /> : null}
           <div
             data-tree-row-surface="true"
             data-reorder-preview="true"
@@ -185,7 +181,7 @@ export const NavigationTreeItem = forwardRef<
               {...props}
               aria-current={selected ? "page" : undefined}
               className={cn(
-                "grid h-full min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md pl-2 text-inherit no-underline",
+                "grid h-full min-w-0 flex-1 grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)] items-center gap-2.5 rounded-md pl-2.5 text-inherit no-underline",
                 focusClass,
               )}
             >
@@ -205,7 +201,6 @@ export const NavigationTreeItem = forwardRef<
     }
     const content = (
       <>
-        {nested ? <TreeBranch className={navigationTreeBranchClass} last={last} /> : null}
         <span
           data-tree-row-surface="true"
           data-reorder-preview="true"
@@ -229,10 +224,10 @@ export const NavigationTreeItem = forwardRef<
         aria-current={selected ? "page" : undefined}
         className={cn(
           navigationTreeRowClass,
-          "misty-navigator-row-target h-7 min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
+          "misty-navigator-row-target min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
           "font-medium text-cream-muted",
           focusClass,
-          !nested && "mx-0",
+          !nested && "ml-0",
           selected && "text-cream-bright",
           className,
         )}

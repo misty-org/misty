@@ -13,6 +13,9 @@ static CLIENTS: OnceLock<Mutex<HashMap<String, Arc<AccountClient>>>> = OnceLock:
 
 pub(super) struct AccountClient {
     pub http: reqwest::Client,
+    /// Held for every /auth/refresh sent through this jar, from the renderer or
+    /// from browser sync, so no two requests ever present the same refresh cookie.
+    pub refresh_lock: Arc<tokio::sync::Mutex<()>>,
     jar: Arc<Jar>,
     account_id: Mutex<Option<String>>,
 }
@@ -54,6 +57,7 @@ impl AccountClient {
             .map_err(|_| "Could not initialize account HTTP client")?;
         Ok(Arc::new(Self {
             http,
+            refresh_lock: Default::default(),
             jar,
             account_id: Mutex::new(None),
         }))

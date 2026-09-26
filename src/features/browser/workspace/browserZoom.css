@@ -3,8 +3,8 @@
   align-items: center;
   gap: 0;
   min-height: 32px;
-  padding: 0 9px;
-  font-size: 13px;
+  padding: 0 8px;
+  font-size: 14px;
   line-height: 20px;
 }
 .browser-zoom-label {
@@ -28,13 +28,12 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
-.browser-zoom-controls
-  button.browser-zoom-button[aria-label="Reset zoom to 100%"] {
+.browser-zoom-controls button.browser-zoom-button[aria-label="Reset zoom to 100%"] {
   min-width: 48px;
 }
 .browser-zoom-controls button.browser-zoom-button:hover,
 .browser-zoom-controls button.browser-zoom-button[data-highlighted] {
-  background: var(--misty-theme-hover, #303030);
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .browser-zoom-controls button.browser-zoom-button:focus-visible {
   outline: 2px solid currentColor;
@@ -43,10 +42,4 @@
 .browser-zoom-controls button.browser-zoom-button:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-.browser-zoom-menu-item {
-  min-height: 28px;
-  padding: 0 8px;
-  font-size: 14px;
 }

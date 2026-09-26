@@ -1,4 +1,11 @@
-import { cn, navigationMenuPrimaryLayoutClass, navigationMenuLinkClass } from "@/shared/ui";
+import {
+  cn,
+  menuItemClass,
+  menuListClass,
+  navigationMenuLinkClass,
+  navigationMenuPrimaryLayoutClass,
+  popupSurfaceClass,
+} from "@/shared/ui";
 import type { FramePacingState } from "@/app/layouts/model/types";
 
 export const desktopFrameClass = [
@@ -84,12 +91,6 @@ export const navigatorPrimaryRowLayoutClass = navigationMenuPrimaryLayoutClass;
 export const navigatorSubsectionIconClass =
   "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0 place-items-center text-cream-bright [contain:layout_paint] [&_img]:!size-5 [&_svg]:!size-5";
 
-// Every navigation identity uses the same surface, inset, and control sizing.
-export const navigatorFloatingIslandClass = [
-  "flex min-w-0 items-center gap-0.5 rounded-xl border border-charcoal-border/60 bg-charcoal-hover px-1.25 py-0.5",
-  "shadow-[0_12px_30px_rgba(0,0,0,0.5)]",
-].join(" ");
-
 export const navigatorIslandActionClass = [
   "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
   "text-cream-muted no-underline outline-none transition-colors",
@@ -97,10 +98,10 @@ export const navigatorIslandActionClass = [
   navigatorFocusRingClass,
 ].join(" ");
 
-export const navigatorHierarchyIslandClass = navigatorFloatingIslandClass;
+export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
 
 export const navigatorIslandIdentityLayoutClass =
-  "box-border flex h-8 min-w-0 items-center gap-2.5 px-1 py-1";
+  "box-border flex h-[var(--navigation-row-height,32px)] min-w-0 items-center gap-2.5 px-2.5 py-0";
 
 export const navigatorHierarchyTriggerClass = [
   navigatorIslandIdentityLayoutClass,
@@ -122,21 +123,21 @@ export function navigatorRowClass(active: boolean): string {
 }
 
 export const profilePopoverClass = [
-  "pointer-events-auto fixed z-[2147482900] grid max-h-[calc(100dvh-44px)] w-[256px] overflow-y-auto rounded-xl",
-  "border border-charcoal-border bg-charcoal-card p-1 text-cream shadow-2xl",
+  "pointer-events-auto fixed z-[2147482900] max-h-[calc(100dvh-44px)] w-[256px] overflow-y-auto",
+  popupSurfaceClass,
+  menuListClass,
 ].join(" ");
 
 export const accountChooserPopoverClass = [
-  "pointer-events-auto fixed z-[2147482910] grid max-h-[calc(100dvh-44px)] w-[280px] overflow-y-auto rounded-xl",
-  "border border-charcoal-border bg-charcoal-card p-1 text-cream shadow-2xl",
+  "pointer-events-auto fixed z-[2147482910] max-h-[calc(100dvh-44px)] w-[280px] overflow-y-auto",
+  popupSurfaceClass,
+  menuListClass,
 ].join(" ");
 
-export const profileMenuItemClass = [
-  "grid h-8 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border-0 bg-transparent",
-  "px-2 py-1 text-left text-sm text-cream-muted transition-colors",
-  "hover:bg-charcoal-hover hover:text-cream-bright",
-  "focus-visible:outline-none focus-visible:bg-charcoal-hover focus-visible:text-cream-bright",
-].join(" ");
+export const profileMenuItemClass = cn(
+  menuItemClass,
+  "grid h-8 grid-cols-[20px_minmax(0,1fr)_auto] border-0 bg-transparent",
+);
 
 export const workStatusToastDurationMs = 3500;
 
@@ -179,14 +180,6 @@ export const navigatorTitlebarStripClass =
 
 export const desktopWallpaperLayerClass = "hidden";
 
-export const desktopTitlebarNavigationClass =
-  "pointer-events-auto absolute top-0 z-[55] flex h-[38px] items-center gap-1";
-export const desktopTitlebarNavigationButtonClass = [
-  "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
-  "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
-  "disabled:pointer-events-none disabled:text-cream-muted/35",
-].join(" ");
 export const windowsTitlebarControlsClass =
   "pointer-events-auto absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 

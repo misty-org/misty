@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   resumeAccount: vi.fn(),
   removeAccount: vi.fn(),
   accountSignIn: vi.fn(),
+  accountForgotPassword: vi.fn(),
 }));
 
 let mockAccounts: Array<{ id: string; email: string; name: string }> = [];
@@ -37,8 +38,8 @@ vi.mock("./AuthContext", () => ({
 
 vi.mock("./store/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
+  accountForgotPassword: mocks.accountForgotPassword,
 }));
-
 
 import SignIn from "./SignInPage";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
@@ -86,11 +87,10 @@ describe("SignInPage", () => {
       );
     });
 
-    expect(container.textContent).toContain("Welcome to Misty");
-    expect(container.textContent).toContain("Sign in to begin.");
+    expect(container.textContent).toContain("Welcome back");
     expect(container.querySelector('input[type="email"]')).not.toBeNull();
     expect(container.querySelector('input[type="password"]')).not.toBeNull();
-    expect(container.textContent).toContain("Don't have an account? Sign up");
+    expect(container.textContent).toContain("Don't have an account? Create one");
     expect(container.textContent).not.toContain("Sign in on the website");
   });
 
@@ -130,9 +130,9 @@ describe("SignInPage", () => {
       );
     });
 
-    // Verify title and description
+    // Verify title, with no subheading
     expect(container.textContent).toContain("Add another account");
-    expect(container.textContent).toContain(
+    expect(container.textContent).not.toContain(
       "Your current account will remain signed in on this device.",
     );
 
@@ -269,5 +269,77 @@ describe("SignInPage", () => {
     expect(mocks.authenticateAccount).toHaveBeenCalled();
     expect(mocks.accountSignIn).toHaveBeenCalledWith("new@example.com", "secret123");
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
+  });
+
+  it("sends a reset link from the forgot-password form and returns to sign-in", async () => {
+    mocks.accountForgotPassword.mockResolvedValue(undefined);
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/signin"]}>
+          <SignIn />
+        </MemoryRouter>,
+      );
+    });
+
+    await act(async () => {
+      setInputValue(
+        container.querySelector<HTMLInputElement>('input[type="email"]')!,
+        "alice@example.com",
+      );
+    });
+    const forgot = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Forgot your password?",
+    )!;
+    await act(async () => {
+      forgot.click();
+    });
+
+    expect(container.textContent).toContain("Send reset link");
+    const emailInput = container.querySelector<HTMLInputElement>('input[type="email"]')!;
+    expect(emailInput.value).toBe("alice@example.com");
+
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(mocks.accountForgotPassword).toHaveBeenCalledWith("alice@example.com");
+    expect(container.textContent).toContain("Check your email for the reset link.");
+    expect(container.textContent).toContain("Resend in 60s");
+
+    const back = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Back to sign in",
+    )!;
+    await act(async () => {
+      back.click();
+    });
+    expect(container.textContent).toContain("Welcome back");
+  });
+
+  it("asks for a fresh sign-in when a saved account's session expired", async () => {
+    mockAccounts = [{ id: "acc-1", email: "alice@example.com", name: "Alice" }];
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: "/signin",
+              state: { addingAccount: true, reauthenticateEmail: "alice@example.com" },
+            },
+          ]}
+        >
+          <SignIn />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).toContain("Sign in again");
+    expect(container.textContent).toContain("Your saved sign-in for alice@example.com has expired");
+    expect(container.querySelector<HTMLInputElement>('input[type="email"]')!.value).toBe(
+      "alice@example.com",
+    );
   });
 });

@@ -4,7 +4,15 @@ import {
   type WorkspaceTabProjection,
   type WorkspaceWindowProjection,
 } from "@/features/workspace/core";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn, Button } from "@/shared/ui";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  cn,
+  Button,
+} from "@/shared/ui";
 import { Layers3, Plus, X } from "lucide-react";
 
 export function MobileTabOverview(props: {

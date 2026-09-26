@@ -189,7 +189,8 @@ describe("BrowserWorkspace", () => {
     expect(mobile).toBeDefined();
     expect(document.body.textContent).toContain("Desktop");
     expect(document.body.textContent).toContain("Tablet");
-    expect(document.body.textContent).toContain("390 px");
+    expect(document.body.textContent).toContain("390 × 844");
+    expect(document.body.textContent).toContain("1920 × 1080");
   });
 
   it("selects the complete address when the omnibox receives focus", async () => {
@@ -241,9 +242,9 @@ describe("BrowserWorkspace", () => {
       await settleBrowserOverlay();
     });
 
-    const menuItems = [...document.body.querySelectorAll<HTMLElement>('.website-header-menu button')].map(
-      (item) => item.textContent?.trim(),
-    );
+    const menuItems = [
+      ...document.body.querySelectorAll<HTMLElement>(".website-header-menu button"),
+    ].map((item) => item.textContent?.trim());
     expect(menuItems).toContain("Open link");
     expect(menuItems).not.toContain("Reload");
     expect(menuItems).not.toContain("Copy address");
@@ -272,13 +273,13 @@ describe("BrowserWorkspace", () => {
       trigger?.click();
       await new Promise<void>((resolve) => window.setTimeout(resolve, 20));
     });
-    expect(document.body.querySelector('.website-header-menu')).toBeNull();
+    expect(document.body.querySelector(".website-header-menu")).toBeNull();
 
     await act(async () => {
       releaseRestack?.();
       await settleBrowserOverlay();
     });
-    expect(document.body.querySelector('.website-header-menu')).not.toBeNull();
+    expect(document.body.querySelector(".website-header-menu")).not.toBeNull();
   });
 });
 

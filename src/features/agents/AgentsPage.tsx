@@ -8,7 +8,6 @@ import {
   DropdownMenuTrigger,
   Button,
   NavigationChevron,
-  TreeBranch,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -79,9 +78,7 @@ export default function NativeAgentsPage() {
   const [newChat, setNewChat] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [params] = useSearchParams();
-  const [activity, setActivity] = useState(
-    () => params.get("view") === "activity",
-  );
+  const [activity, setActivity] = useState(() => params.get("view") === "activity");
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
   const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
@@ -109,6 +106,16 @@ export default function NativeAgentsPage() {
     }
     return observeAccountChanges(user.id, ["agents"], () => load(user.id));
   }, [user?.id, load]);
+  // Global search links here with ?agent=; it sets the conversation in the store first.
+  const linkedAgentId = params.get("agent");
+  useEffect(() => {
+    if (!linkedAgentId) return;
+    setSelected(linkedAgentId);
+    setNewChat(false);
+    setActivity(false);
+    setMobileList(false);
+    setChatRevision((n) => n + 1);
+  }, [linkedAgentId, params]);
   const profile =
     agents.find((a) => a.id === selected) ??
     (selected === "new" ? undefined : (agents.find((a) => a.system_managed) ?? agents[0]));
@@ -326,21 +333,18 @@ export default function NativeAgentsPage() {
                       data-agent-branch={agent.id}
                     >
                       {agentConversations.length === 0 ? (
-                        <div className="relative flex items-center h-6 pl-5 text-[11px] text-cream-muted/60 italic">
-                          <TreeBranch className="left-2" last={true} />
+                        <div className="relative flex items-center h-6 pl-2 text-[11px] text-cream-muted/60 italic">
                           <span>No conversations yet</span>
                         </div>
                       ) : (
-                        agentConversations.map((c, idx) => {
-                          const isLast = idx === agentConversations.length - 1;
+                        agentConversations.map((c) => {
                           const isActiveConvo =
                             activeConversationId === c.id && isAgentSelected && !activity;
                           return (
                             <div
                               key={c.id}
-                              className="relative flex items-center h-7 pl-5 pr-1 text-[12px] group/branch-row"
+                              className="relative flex items-center h-7 pr-1 text-[12px] group/branch-row"
                             >
-                              <TreeBranch className="left-2" last={isLast} />
                               <button
                                 type="button"
                                 className={cn(

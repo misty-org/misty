@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
   session: {} as unknown,
   acknowledge: vi.fn(),
   controller: vi.fn(),
+  stop: vi.fn(),
+  detach: vi.fn(),
+  detachProfile: vi.fn(),
+  release: vi.fn(),
+  removeFlush: vi.fn(),
   changed: undefined as (() => void) | undefined,
   flush: vi.fn(),
   values: new Map<string, string>(),
@@ -36,7 +41,9 @@ vi.mock("./controller", () => ({
     constructor(...args: unknown[]) {
       mocks.controller(...args);
     }
-    stop() {}
+    stop() {
+      mocks.stop();
+    }
     refresh() {}
     async flushLocal() {}
   },
@@ -45,9 +52,9 @@ vi.mock("./native", () => ({
   readNativeSync: async () => mocks.session,
   watchNativeSync: async (changed: () => void) => {
     mocks.changed = changed;
-    return () => {};
+    return mocks.detach;
   },
-  watchNativeProfile: async () => () => {},
+  watchNativeProfile: async () => mocks.detachProfile,
   activeDeviceEpoch: (session: { active: boolean }) => (session.active ? "epoch" : null),
   editNativeWorkspace: vi.fn(),
   saveNativeResume: vi.fn(),
@@ -61,11 +68,11 @@ vi.mock("./recovery", () => ({
       },
       flush: mocks.flush,
     },
-    release: vi.fn(),
+    release: mocks.release,
   }),
   migrateRecoveryRecord: async () => {},
   recoveryKey: async () => "edits",
-  registerRecoveryFlush: () => () => {},
+  registerRecoveryFlush: () => mocks.removeFlush,
 }));
 import { BrowserSyncBridge } from "./BrowserSyncBridge";
 let root: Root;
@@ -93,6 +100,23 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+});
+it("releases native listeners only once when account reset is followed by unmount", async () => {
+  await act(async () => root.render(<BrowserSyncBridge accountId="a" />));
+  await act(async () => {
+    window.dispatchEvent(new Event("reset-account"));
+    window.dispatchEvent(new Event("reset-account"));
+    root.render(null);
+  });
+  for (const cleanup of [
+    mocks.stop,
+    mocks.detach,
+    mocks.detachProfile,
+    mocks.release,
+    mocks.removeFlush,
+  ]) {
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  }
 });
 it("queues recovered tabs before a controller may project cloud data and saves before acknowledging", async () => {
   await act(async () => root.render(<BrowserSyncBridge accountId="a" />));

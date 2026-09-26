@@ -4,125 +4,57 @@ import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspa
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
 import { PanelsTopLeft, Search } from "lucide-react";
 import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
-const { home: House, agents: AgentIcon, files: FilesIcon } = appIcons;
+const { browser: BrowserIcon, agents: AgentIcon, files: FilesIcon } = appIcons;
 import { Link } from "react-router-dom";
 import { navigationMenuLinkClass } from "@/shared/ui";
 import { navigatorFocusRingClass } from "./styles";
 
 const navigatorHeaderActionClass = `${navigationMenuLinkClass} w-full`;
 
-export function NavigatorHeaderHomeButton(props: { path: string; active: boolean }) {
+type NavigatorIcon = typeof BrowserIcon;
+
+function NavigatorPrimaryLink(props: {
+  path: string;
+  active: boolean;
+  label: string;
+  icon: NavigatorIcon;
+}) {
+  const Icon = props.icon;
   return (
-    <TooltipProvider delayDuration={450}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            to={props.path}
-            className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
-            onClick={(event) => {
-              const surface = workspaceSurfaceFromRoute(props.path);
-              if (
-                surface &&
-                useWorkspaceStore.getState().openSurface(surface).route !== surface.route
-              )
-                event.preventDefault();
-            }}
-            data-reorder-handle="true"
-            data-reorder-header="true"
-            title="Drag to reorder · Alt+Shift+↑/↓"
-            aria-label="Home"
-            aria-current={props.active ? "page" : undefined}
-            data-misty-window-drag-block="true"
-          >
-            <House
-              className="shrink-0 justify-self-center"
-              size={18}
-              strokeWidth={appIconStrokeWidth}
-              aria-hidden="true"
-            />
-            <span>Home</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent>Home</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Link
+      to={props.path}
+      className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
+      onClick={(event) => {
+        const surface = workspaceSurfaceFromRoute(props.path);
+        if (surface && useWorkspaceStore.getState().openSurface(surface).route !== surface.route)
+          event.preventDefault();
+      }}
+      data-reorder-handle="true"
+      data-reorder-header="true"
+      aria-label={props.label}
+      aria-current={props.active ? "page" : undefined}
+      data-misty-window-drag-block="true"
+    >
+      <Icon
+        className="shrink-0 justify-self-center"
+        strokeWidth={appIconStrokeWidth}
+        aria-hidden="true"
+      />
+      <span>{props.label}</span>
+    </Link>
   );
+}
+
+export function NavigatorHeaderHomeButton(props: { path: string; active: boolean }) {
+  return <NavigatorPrimaryLink {...props} label="Browser" icon={BrowserIcon} />;
 }
 
 export function NavigatorHeaderAgentsButton(props: { path: string; active: boolean }) {
-  return (
-    <TooltipProvider delayDuration={450}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            to={props.path}
-            className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
-            onClick={(event) => {
-              const surface = workspaceSurfaceFromRoute(props.path);
-              if (
-                surface &&
-                useWorkspaceStore.getState().openSurface(surface).route !== surface.route
-              )
-                event.preventDefault();
-            }}
-            data-reorder-handle="true"
-            data-reorder-header="true"
-            title="Drag to reorder · Alt+Shift+↑/↓"
-            aria-label="Agents"
-            aria-current={props.active ? "page" : undefined}
-            data-misty-window-drag-block="true"
-          >
-            <AgentIcon
-              className="shrink-0 justify-self-center"
-              size={18}
-              strokeWidth={appIconStrokeWidth}
-              aria-hidden="true"
-            />
-            <span>Agents</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent>Agents</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+  return <NavigatorPrimaryLink {...props} label="Agents" icon={AgentIcon} />;
 }
 
 export function NavigatorHeaderFilesButton(props: { path: string; active: boolean }) {
-  return (
-    <TooltipProvider delayDuration={450}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            to={props.path}
-            className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
-            onClick={(event) => {
-              const surface = workspaceSurfaceFromRoute(props.path);
-              if (
-                surface &&
-                useWorkspaceStore.getState().openSurface(surface).route !== surface.route
-              )
-                event.preventDefault();
-            }}
-            data-reorder-handle="true"
-            data-reorder-header="true"
-            title="Drag to reorder · Alt+Shift+↑/↓"
-            aria-label="Files"
-            aria-current={props.active ? "page" : undefined}
-            data-misty-window-drag-block="true"
-          >
-            <FilesIcon
-              className="shrink-0 justify-self-center"
-              size={18}
-              strokeWidth={appIconStrokeWidth}
-              aria-hidden="true"
-            />
-            <span>Files</span>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent>Files</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+  return <NavigatorPrimaryLink {...props} label="Files" icon={FilesIcon} />;
 }
 
 export function NavigatorHeaderSearchButton(props?: { className?: string }) {
@@ -142,7 +74,12 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
             aria-label="Search"
             data-misty-window-drag-block="true"
           >
-            <Search className="shrink-0" size={18} strokeWidth={1.85} aria-hidden="true" />
+            <Search
+              className="size-4 shrink-0"
+              size={16}
+              strokeWidth={appIconStrokeWidth}
+              aria-hidden="true"
+            />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{searchShortcutTitle}</TooltipContent>
@@ -164,7 +101,11 @@ export function NavigatorHeaderSpacesButton({ active }: { active: boolean }) {
       className={cn(navigatorHeaderActionClass, active && "text-cream-bright")}
       data-misty-window-drag-block="true"
     >
-      <PanelsTopLeft size={18} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
+      <PanelsTopLeft
+        className="shrink-0 justify-self-center"
+        strokeWidth={appIconStrokeWidth}
+        aria-hidden="true"
+      />
       <span>Spaces</span>
     </Link>
   );

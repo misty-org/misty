@@ -1,4 +1,12 @@
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import {
+  Button,
+  cn,
+  menuItemClass,
+  menuListClass,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/shared/ui";
 import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AiSuggestedAction } from "./types";
@@ -22,16 +30,16 @@ export function AiSelectionMenu({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-1" align="start">
+      <PopoverContent className={cn("w-56", menuListClass)} align="start">
         {actions.map((action) => (
-          <Button
-            variant="ghost"
+          <button
+            type="button"
             key={action.id}
-            className="flex w-full rounded-md px-2.5 py-2 text-left text-xs hover:bg-charcoal-hover"
+            className={menuItemClass}
             onClick={() => onAction(action)}
           >
             {action.label}
-          </Button>
+          </button>
         ))}
       </PopoverContent>
     </Popover>

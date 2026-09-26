@@ -72,23 +72,19 @@ export default function RegisterPage() {
           ? bootstrapRequired
             ? "Create the first administrator with the 30-minute bootstrap token."
             : "Create an isolated account with an administrator enrollment invitation."
-          : addingAccount
-            ? "Your current account will remain signed in on this device."
-            : "Your Misty workspace begins with an account."
+          : undefined
       }
       onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
     >
       <AuthCard
         footer={
-          <div className="text-center text-sm text-cream-muted">
-            <NavLink
-              to="/signin"
-              state={{ from, addingAccount }}
-              className="transition hover:text-cream"
-            >
-              Already have an account? Sign in
-            </NavLink>
-          </div>
+          <NavLink
+            to="/signin"
+            state={{ from, addingAccount }}
+            className="text-sm font-medium text-cream underline-offset-4 hover:underline"
+          >
+            Already have an account? Sign in
+          </NavLink>
         }
       >
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>

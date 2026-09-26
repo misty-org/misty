@@ -120,11 +120,7 @@ function NoteListItem(props: NoteListItemProps) {
           Archive
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          disabled={!props.onDelete}
-          className="text-red-300"
-          onSelect={props.onDelete}
-        >
+        <ContextMenuItem disabled={!props.onDelete} variant="destructive" onSelect={props.onDelete}>
           <Trash2 />
           Delete
         </ContextMenuItem>

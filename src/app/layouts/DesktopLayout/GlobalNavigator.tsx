@@ -6,17 +6,17 @@ import { dockLeaves, parseBrowserTabState, useWorkspaceStore } from "@/features/
 import { cn, Button, Popover, PopoverTrigger, PopoverContent } from "@/shared/ui";
 import {
   NavigatorHeaderHomeButton,
-  NavigatorHeaderSpacesButton,
   NavigatorHeaderAgentsButton,
   NavigatorHeaderFilesButton,
   NavigatorHeaderSearchButton,
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
+import { WorkspaceSpaceNavigation } from "@/features/spaces";
 import { ActivityMenu } from "./ActivityMenu";
 import { NavigatorServerMenu } from "./NavigatorServerMenu";
 import {
   navigatorTitlebarStripClass,
-  navigatorHierarchyIslandClass,
+  navigatorHeaderRowClass,
   navigatorHierarchyActionClass,
 } from "./styles";
 
@@ -42,7 +42,7 @@ export function GlobalNavigator(props: {
   return (
     <nav
       className={cn(
-        "relative z-20 flex h-full min-h-0 w-full select-none flex-col items-stretch [--navigation-primary-icon-slot:24px]",
+        "misty-navigation-icons relative z-20 flex h-full min-h-0 w-full select-none flex-col items-stretch [--navigation-row-height:32px] [--navigation-row-font-size:14px]",
         "misty-global-navigator overflow-hidden border-charcoal-border bg-charcoal-workspace",
       )}
       data-dock-position={props.position ?? "left"}
@@ -68,9 +68,9 @@ export function GlobalNavigator(props: {
         data-navigator-header="true"
         data-misty-window-drag-block="true"
       >
-        <div className={navigatorHierarchyIslandClass} data-navigator-server-row="true">
+        <div className={navigatorHeaderRowClass} data-navigator-server-row="true">
           <NavigatorServerMenu onSettingsClick={props.onSettingsClick} />
-          <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          <div className="ml-auto flex shrink-0 items-center">
             <NavigatorHeaderSearchButton className={navigatorHierarchyActionClass} />
             <ActivityMenu className={navigatorHierarchyActionClass} />
           </div>
@@ -81,7 +81,7 @@ export function GlobalNavigator(props: {
         className="misty-navigator-body flex min-h-0 flex-1 flex-col overflow-hidden"
         data-misty-window-drag-block="true"
       >
-        <div className="misty-navigator-items grid content-start gap-1 overflow-y-auto px-3 pb-2">
+        <div className="misty-navigator-items grid content-start gap-0.5 overflow-y-auto px-3 pb-2">
           <NavigatorHeaderHomeButton
             path="/browser"
             active={
@@ -90,7 +90,7 @@ export function GlobalNavigator(props: {
           />
           <NavigatorHeaderAgentsButton path="/agents" active={activeTab?.surfaceId === "agents"} />
           <NavigatorHeaderFilesButton path="/files" active={activeTab?.surfaceId === "files"} />
-          <NavigatorHeaderSpacesButton active={activeTab?.surfaceId === "space"} />
+          <WorkspaceSpaceNavigation activeTab={activeTab} />
           {horizontal ? (
             <Popover open={groupsOpen} onOpenChange={setGroupsOpen}>
               <PopoverTrigger asChild>

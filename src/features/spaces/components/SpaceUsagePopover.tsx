@@ -29,7 +29,15 @@ import { useSpaceLibraryUsage } from "./spacePanel/useSpaceLibraryUsage";
  * Quotas are something you check, not something you watch, so they load only
  * once this opens.
  */
-export function SpaceUsagePopover({ space, trigger }: { space: Space; trigger?: ReactElement }) {
+export function SpaceUsagePopover({
+  space,
+  trigger,
+  side,
+}: {
+  space: Space;
+  trigger?: ReactElement;
+  side?: "bottom" | "right";
+}) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const storage = useSpaceLibraryUsage({
@@ -66,7 +74,7 @@ export function SpaceUsagePopover({ space, trigger }: { space: Space; trigger?: 
         )}
       </PopoverTrigger>
 
-      <PopoverContent sideOffset={8} className="w-80 overflow-hidden border-charcoal-border/70 p-0">
+      <PopoverContent side={side} sideOffset={8} className="w-80 overflow-hidden p-0">
         <div className="border-b border-charcoal-border/60 px-2 py-2.5">
           <p className="m-0 truncate text-sm font-semibold">Usage</p>
           <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">

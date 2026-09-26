@@ -1,6 +1,14 @@
 "use client";
 
-import { menuContentClass, menuItemClass } from "./menu-styles";
+import {
+  menuContentClass,
+  menuIndicatorClass,
+  menuIndicatorItemClass,
+  menuItemClass,
+  menuLabelClass,
+  menuSeparatorClass,
+  menuShortcutClass,
+} from "./menu-styles";
 
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
@@ -28,15 +36,13 @@ const ContextMenuSubTrigger = React.forwardRef<
 >(({ className, inset, children, ...props }, ref) => (
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
-    className={cn(
-      "flex cursor-default select-none items-center gap-2 rounded-md px-2.5 py-2 text-sm outline-none focus:bg-charcoal-hover focus:text-cream data-[state=open]:bg-charcoal-hover data-[state=open]:text-cream [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-      inset && "pl-8",
-      className,
-    )}
+    data-slot="context-menu-sub-trigger"
+    data-inset={inset}
+    className={cn(menuItemClass, className)}
     {...props}
   >
     {children}
-    <ChevronRight className="ml-auto h-4 w-4" />
+    <ChevronRight className="ml-auto" />
   </ContextMenuPrimitive.SubTrigger>
 ));
 ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
@@ -47,10 +53,8 @@ const ContextMenuSubContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.SubContent
     ref={ref}
-    className={cn(
-      "z-[2147483400] min-w-[8rem] origin-center overflow-hidden rounded-lg bg-charcoal-card p-1.5 text-cream shadow-lg ring-1 ring-cream/10 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-      className,
-    )}
+    data-slot="context-menu-sub-content"
+    className={cn(menuContentClass, className)}
     {...props}
   />
 ));
@@ -63,6 +67,7 @@ const ContextMenuContent = React.forwardRef<
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content
       ref={ref}
+      data-slot="context-menu-content"
       className={cn(menuContentClass, className)}
       {...props}
     />
@@ -74,12 +79,15 @@ const ContextMenuItem = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
     inset?: boolean;
+    variant?: "default" | "destructive";
   }
->(({ className, inset, ...props }, ref) => (
+>(({ className, inset, variant = "default", ...props }, ref) => (
   <ContextMenuPrimitive.Item
     ref={ref}
     data-slot="context-menu-item"
-    className={cn(menuItemClass, inset && "pl-8", className)}
+    data-inset={inset}
+    data-variant={variant}
+    className={cn(menuItemClass, className)}
     {...props}
   />
 ));
@@ -91,16 +99,14 @@ const ContextMenuCheckboxItem = React.forwardRef<
 >(({ className, children, checked, ...props }, ref) => (
   <ContextMenuPrimitive.CheckboxItem
     ref={ref}
-    className={cn(
-      "relative flex min-h-9 cursor-default select-none items-center rounded-md py-2 pl-10 pr-2.5 text-sm outline-none focus:bg-charcoal-hover focus:text-cream data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-      className,
-    )}
+    data-slot="context-menu-checkbox-item"
+    className={cn(menuIndicatorItemClass, className)}
     checked={checked}
     {...props}
   >
-    <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+    <span className={menuIndicatorClass}>
       <ContextMenuPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Check />
       </ContextMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -114,15 +120,13 @@ const ContextMenuRadioItem = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <ContextMenuPrimitive.RadioItem
     ref={ref}
-    className={cn(
-      "relative flex min-h-9 cursor-default select-none items-center rounded-md py-2 pl-10 pr-2.5 text-sm outline-none focus:bg-charcoal-hover focus:text-cream data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-      className,
-    )}
+    data-slot="context-menu-radio-item"
+    className={cn(menuIndicatorItemClass, className)}
     {...props}
   >
-    <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+    <span className={menuIndicatorClass}>
       <ContextMenuPrimitive.ItemIndicator>
-        <Circle className="h-4 w-4 fill-current" />
+        <Circle className="size-2 fill-current" />
       </ContextMenuPrimitive.ItemIndicator>
     </span>
     {children}
@@ -138,7 +142,9 @@ const ContextMenuLabel = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Label
     ref={ref}
-    className={cn("px-2.5 py-1.5 text-xs font-medium text-cream-muted", inset && "pl-8", className)}
+    data-slot="context-menu-label"
+    data-inset={inset}
+    className={cn(menuLabelClass, className)}
     {...props}
   />
 ));
@@ -150,7 +156,8 @@ const ContextMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1.5 my-1.5 h-px bg-charcoal-hover", className)}
+    data-slot="context-menu-separator"
+    className={cn(menuSeparatorClass, className)}
     {...props}
   />
 ));
@@ -159,7 +166,8 @@ ContextMenuSeparator.displayName = ContextMenuPrimitive.Separator.displayName;
 const ContextMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
     <span
-      className={cn("ml-auto text-xs tracking-widest text-cream-muted", className)}
+      data-slot="context-menu-shortcut"
+      className={cn(menuShortcutClass, className)}
       {...props}
     />
   );

@@ -59,18 +59,14 @@ export function SpaceSwitcherMenu({
           <ChevronDown className="shrink-0 text-cream-muted" size={15} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        className="w-[240px] min-w-[240px] bg-charcoal-card before:hidden"
-        align="start"
-        sideOffset={6}
-      >
+      <DropdownMenuContent className="w-[240px]" align="start" sideOffset={6}>
         <div className="misty-transient-scrollbar max-h-60 overflow-y-auto">
           {spaces.map((space) => {
             const active = space.id === activeSpaceId;
             return (
               <DropdownMenuItem
                 key={space.id}
-                className={`min-h-9 gap-2 ${active ? "bg-charcoal-hover text-cream" : ""}`}
+                className={active ? "bg-charcoal-hover text-cream-bright" : undefined}
                 aria-current={active ? "true" : undefined}
                 onSelect={() => {
                   if (!active) onSwitchSpace(space.id);
@@ -95,7 +91,6 @@ export function SpaceSwitcherMenu({
 
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="min-h-9 gap-2"
           disabled={!canAddSpace}
           title={canAddSpace ? undefined : "You’ve reached your Space limit"}
           onSelect={() => onAddSpace()}

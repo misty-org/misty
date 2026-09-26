@@ -279,7 +279,11 @@ export function DrawingPreviewView(props: {
         <BackgroundChoices value={previewSurface} onChange={setPreviewSurface} />
       </div>
       <div className="min-h-0 transition-colors" style={{ backgroundColor: previewSurface }}>
-        {exportError ? <p role="alert" className="px-3 text-sm text-cream-muted">{exportError}</p> : null}
+        {exportError ? (
+          <p role="alert" className="px-3 text-sm text-cream-muted">
+            {exportError}
+          </p>
+        ) : null}
         {content}
       </div>
     </div>

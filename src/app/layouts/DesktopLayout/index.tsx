@@ -16,11 +16,7 @@ import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchD
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
-import {
-  registerShortcutHandler,
-  useShortcutHandler,
-  useShortcutTitle,
-} from "@/features/shortcuts";
+import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import { AppTour, isTourCompletedForAccount, useTourStore } from "@/features/tour";
 import {
   useWindowDockingLayout,
@@ -32,8 +28,8 @@ import {
 import { cn, Button } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
-import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Minus, Square, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { ProfilePopover } from "./ProfilePopover";
@@ -123,19 +119,6 @@ export function DesktopLayout(props: {
   const navigatorHidden = navigatorLayout.visibility === "hidden";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
-  const canGoBack = useWorkspaceStore((state) => state.canNavigatePane(-1));
-  const canGoForward = useWorkspaceStore((state) => state.canNavigatePane(1));
-  const navigateFocusedTabRoute = useCallback(
-    (delta: -1 | 1) => {
-      const view = useWorkspaceStore.getState().navigatePane(delta);
-      if (view) navigate(view.route, { replace: true });
-    },
-    [navigate],
-  );
-  const goBack = useCallback(() => navigateFocusedTabRoute(-1), [navigateFocusedTabRoute]);
-  const goForward = useCallback(() => navigateFocusedTabRoute(1), [navigateFocusedTabRoute]);
-  const backTitle = useShortcutTitle("Back", "navigation.back");
-  const forwardTitle = useShortcutTitle("Forward", "navigation.forward");
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
   const applyNavigatorLayout = useCallback((next: NavigatorLayout) => {
     setBrowserWebviewsSuspended(true, "navigator-layout");
@@ -278,8 +261,6 @@ export function DesktopLayout(props: {
   );
   useShortcutHandler("app.open_settings", openSettingsOverlay);
   useShortcutHandler("app.toggle_navigator", toggleNavigatorVisibility);
-  useShortcutHandler("navigation.back", goBack, canGoBack);
-  useShortcutHandler("navigation.forward", goForward, canGoForward);
   useShortcutHandler(
     "navigation.refresh",
     useCallback(() => window.dispatchEvent(new Event("misty:refresh-focused-tool")), []),
@@ -349,7 +330,7 @@ export function DesktopLayout(props: {
   );
   const titlebarControlsRef = useRef<HTMLDivElement>(null);
   const [titlebarControlsWidth, setTitlebarControlsWidth] = useState(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const controls = titlebarControlsRef.current;
     if (!controls) return;
     const measure = () => setTitlebarControlsWidth(controls.offsetWidth);
@@ -359,17 +340,24 @@ export function DesktopLayout(props: {
     return () => observer.disconnect();
   }, [isAuthRoute]);
   const titlebarControlsLeft = usesNativeWindowChrome ? titlebarNavigationGeometry.left : 8;
-  const contentLeft = docking.navigation === "left" && !navigatorHidden ? navigatorWidth : 0;
+  const tabsFollowNavigator = docking.navigation === "left" && !navigatorHidden;
+  const titlebarReservedWidth =
+    titlebarControlsLeft + (titlebarControlsWidth || 112) * titlebarNavigationGeometry.scale + 16;
+  const resizeWorkspaceEdge =
+    docking.navigation === "left" &&
+    docking.tabs === "top" &&
+    !navigatorHidden &&
+    !standaloneRouteTitle;
   const topTabInsets =
     docking.tabs === "top"
       ? {
           animate: !navigatorResizing,
-          left: Math.max(
-            0,
-            titlebarControlsLeft +
-              (titlebarControlsWidth || 188) * titlebarNavigationGeometry.scale -
-              contentLeft,
-          ),
+          // The grid column and this inset transition together, keeping tabs
+          // between their two endpoints and clear of the fixed Sync controls.
+          // Beside the navigator, the first tab lines up with the pane's edge.
+          left: tabsFollowNavigator
+            ? Math.max(0, titlebarReservedWidth - navigatorWidth)
+            : Math.max(8, titlebarReservedWidth),
           right: shouldShowWindowsControls ? 140 / appZoom : 0,
         }
       : undefined;
@@ -392,13 +380,23 @@ export function DesktopLayout(props: {
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <main
-        className="misty-docking-frame"
+        className={cn(
+          "misty-docking-frame",
+          !navigatorResizing &&
+            cn(
+              "transition-[grid-template-columns,grid-template-rows]",
+              styles.navigatorMotionClass,
+            ),
+        )}
         style={
           isAuthRoute
             ? { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "38px minmax(0, 1fr)" }
             : geometry.frame
         }
         data-misty-desktop-frame
+        data-navigation-position={docking.navigation}
+        data-tab-position={docking.tabs}
+        data-navigation-resizing={navigatorResizing}
         onPointerDown={(event) => {
           const target = event.target instanceof Element ? event.target : null;
           if (!target?.closest("[data-misty-window-titlebar-region='true']")) return;
@@ -410,6 +408,16 @@ export function DesktopLayout(props: {
           data-shared-tabs={sharedTitlebar}
           onPointerDown={handleDesktopTitlebarPointerDown}
         >
+          {sharedTitlebar ? (
+            <div
+              className={cn(
+                "misty-docking-titlebar-drag-region",
+                !navigatorResizing && cn("transition-[width]", styles.navigatorMotionClass),
+              )}
+              aria-hidden="true"
+              style={{ width: tabsFollowNavigator ? navigatorWidth : topTabInsets?.left }}
+            />
+          ) : null}
           {!isAuthRoute ? (
             <div
               ref={titlebarControlsRef}
@@ -426,39 +434,16 @@ export function DesktopLayout(props: {
                 onToggleVisibility={toggleNavigatorVisibility}
                 iconSize={16 * appZoom}
               />
-              <div
-                className="flex items-center gap-1.5"
-                data-misty-window-drag-block="true"
-                data-misty-desktop-navigation-history="true"
-              >
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={styles.desktopTitlebarNavigationButtonClass}
-                  aria-label="Go back"
-                  title={backTitle}
-                  disabled={!canGoBack}
-                  onClick={goBack}
-                >
-                  <ArrowLeft size={16 * appZoom} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={styles.desktopTitlebarNavigationButtonClass}
-                  aria-label="Go forward"
-                  title={forwardTitle}
-                  disabled={!canGoForward}
-                  onClick={goForward}
-                >
-                  <ArrowRight size={16 * appZoom} />
-                </Button>
+              <div className="flex shrink-0" data-misty-window-drag-block="true">
+                <BrowserSyncBadge
+                  key={user?.id}
+                  accountId={user?.id ?? ""}
+                  onOpenSettings={() => {
+                    useSettingsStore.getState().setActiveSection("sync");
+                    openSettingsOverlay();
+                  }}
+                />
               </div>
-              <BrowserSyncBadge
-                key={user?.id}
-                accountId={user?.id ?? ""}
-                onOpenSettings={openSettingsOverlay}
-              />
               {shouldShowWindowsControls ? (
                 <div
                   id="misty-windows-workspace-controls"
@@ -531,7 +516,7 @@ export function DesktopLayout(props: {
             }}
           >
             {navigatorContent}
-            {isSideDock(docking.navigation) && (
+            {isSideDock(docking.navigation) && !resizeWorkspaceEdge && (
               <NavigatorResizeHandle
                 side={docking.navigation as "left" | "right"}
                 width={navigatorWidth}
@@ -556,6 +541,15 @@ export function DesktopLayout(props: {
           style={isAuthRoute ? { gridColumn: 1, gridRow: 2 } : geometry.content}
           data-misty-route-shell
         >
+          {!isAuthRoute && resizeWorkspaceEdge && (
+            <NavigatorResizeHandle
+              workspaceEdge
+              width={navigatorWidth}
+              zoom={appZoom}
+              onChange={resizeNavigator}
+              onResizingChange={changeNavigatorResizing}
+            />
+          )}
           {!isAuthRoute ? <AppNoticePublisher /> : null}
           {!isAuthRoute ? <RouteNotice routeId={routeId} /> : null}
 

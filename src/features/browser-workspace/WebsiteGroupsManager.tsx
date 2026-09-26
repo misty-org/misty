@@ -1,8 +1,5 @@
-import { useState } from "react";
-import { Plus, Check } from "lucide-react";
-import { mistyBrowserProviders } from "@misty/sdk";
-import { providers, type ProviderId } from "@/features/webviews/providers";
-import { defaultWebsiteGroups } from "./navigationDefaults";
+import { useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
   Dialog,
@@ -19,6 +16,7 @@ import {
 import { EditableGroupRow } from "./WebsiteSitePicker";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
 import { GroupIcon, groupIcons } from "./groupIcons";
+import { readGroupIcon } from "./groupIconUpload";
 import {
   addWebsite,
   createWebsiteGroup,
@@ -32,7 +30,6 @@ const reveal =
 export function WebsiteGroupsManager() {
   const groups = useWorkspaceStore((state) => state.websiteGroups);
   const websites = useWorkspaceStore((state) => state.savedWebsites);
-  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string>();
   const [creating, setCreating] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -43,29 +40,6 @@ export function WebsiteGroupsManager() {
   const ordered = [...groups]
     .filter((group) => !group.fields.hidden)
     .sort((a, b) => a.fields.order - b.fields.order);
-  const templates = defaultWebsiteGroups().filter(
-    (template) =>
-      !ordered.some(
-        (item) =>
-          item.id === template.id ||
-          item.fields.label.toLowerCase() === template.fields.label.toLowerCase(),
-      ),
-  );
-  const restoreGroup = (template: ReturnType<typeof defaultWebsiteGroups>[number]) => {
-    useWorkspaceStore.setState((state) => ({
-      websiteGroups: [
-        ...state.websiteGroups.filter((item) => item.id !== template.id),
-        {
-          ...template,
-          fields: {
-            ...template.fields,
-            order: Math.max(-1, ...state.websiteGroups.map((item) => item.fields.order)) + 1,
-          },
-        },
-      ],
-    }));
-    setSelected(template.id);
-  };
   const group = ordered.find((item) => item.id === selected) ?? ordered[0];
   const sites = websites
     .filter((site) => site.fields.group_id === group?.id)
@@ -103,26 +77,6 @@ export function WebsiteGroupsManager() {
               </Button>
             ))}
           </nav>
-          {templates.length > 0 && (
-            <div className="mt-6 grid gap-1">
-              <h3 className="mb-1 text-xs text-cream-muted">Suggested groups</h3>
-              {templates.map((template) => (
-                <Button
-                  key={template.id}
-                  variant="ghost"
-                  size="sm"
-                  justify="start"
-                  className="min-w-0 gap-2 px-0 text-cream-muted"
-                  aria-label={`Add ${template.fields.label} group`}
-                  onClick={() => restoreGroup(template)}
-                >
-                  <GroupIcon name={template.fields.icon} />
-                  <span className="min-w-0 flex-1 truncate text-left">{template.fields.label}</span>
-                  <Plus className="size-4" />
-                </Button>
-              ))}
-            </div>
-          )}
           <div className="mt-auto pt-6">
             <Button
               variant="ghost"
@@ -185,6 +139,7 @@ export function WebsiteGroupsManager() {
             <div key={group.id}>
               <div className="flex min-w-0 items-center gap-2">
                 <GroupIconPicker
+                  key={group.id}
                   value={group.fields.icon}
                   onChange={(icon) =>
                     useWorkspaceStore.setState((state) => ({
@@ -282,65 +237,9 @@ export function WebsiteGroupsManager() {
                   </div>
                 </form>
               )}
-              <section
-                aria-label="Site catalog"
-                className="mt-6 border-t border-charcoal-border pt-4"
-              >
-                <h3 className="mb-3 text-sm font-medium">Discover sites</h3>
-                <Input
-                  aria-label="Search available sites"
-                  placeholder="Search sites"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  className="mb-3"
-                />
-                <div className="grid gap-x-5 sm:grid-cols-2">
-                  {(Object.keys(providers) as ProviderId[])
-                    .filter((id) =>
-                      `${providers[id].label} ${mistyBrowserProviders[id].url}`
-                        .toLowerCase()
-                        .includes(search.trim().toLowerCase()),
-                    )
-                    .map((id) => {
-                      const provider = providers[id];
-                      const address = mistyBrowserProviders[id].url;
-                      const saved = sites.some((site) => site.fields.url === address);
-                      return (
-                        <div
-                          key={id}
-                          className="group/manager-row flex min-h-10 min-w-0 items-center gap-2"
-                        >
-                          <SavedWebsiteIcon url={address} />
-                          <span className="min-w-0 flex-1 truncate text-sm">{provider.label}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            disabled={saved}
-                            aria-label={saved ? `${provider.label} added` : `Add ${provider.label}`}
-                            className={`text-cream-muted ${saved ? "" : reveal}`}
-                            onClick={() => run(() => addWebsite(group.id, provider.label, address))}
-                          >
-                            {saved ? <Check className="size-4" /> : <Plus className="size-4" />}
-                          </Button>
-                        </div>
-                      );
-                    })}
-                </div>
-                {!(Object.keys(providers) as ProviderId[]).some((id) =>
-                  `${providers[id].label} ${mistyBrowserProviders[id].url}`
-                    .toLowerCase()
-                    .includes(search.trim().toLowerCase()),
-                ) && (
-                  <p className="py-2 text-sm text-cream-muted">
-                    No matching sites. Use the plus beside Sites to add a custom URL.
-                  </p>
-                )}
-              </section>
             </div>
           ) : (
-            <p className="text-sm text-cream-muted">
-              Choose a suggested group or add your own to browse available sites.
-            </p>
+            <p className="text-sm text-cream-muted">Create a group to organize your saved sites.</p>
           )}
         </div>
       </div>
@@ -355,6 +254,10 @@ export function WebsiteGroupsManager() {
 function GroupIconPicker({ value, onChange }: { value: string; onChange(value: string): void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploadRequest = useRef(0);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -369,6 +272,50 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3" aria-label="Group icons">
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          aria-label="Upload group icon"
+          className="hidden"
+          onChange={async (event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            if (!file) return;
+            const request = ++uploadRequest.current;
+            setUploading(true);
+            setUploadError("");
+            try {
+              const icon = await readGroupIcon(file);
+              if (request !== uploadRequest.current) return;
+              onChange(icon);
+              setOpen(false);
+              setQuery("");
+            } catch (error) {
+              if (request === uploadRequest.current)
+                setUploadError(
+                  error instanceof Error ? error.message : "Could not load this image.",
+                );
+            } finally {
+              if (request === uploadRequest.current) setUploading(false);
+            }
+          }}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="mb-2 w-full"
+          disabled={uploading}
+          onClick={() => fileInput.current?.click()}
+        >
+          {uploading ? "Loading image…" : "Upload image"}
+        </Button>
+        <p className="mb-3 text-xs text-cream-muted">PNG, JPG, or WebP · Up to 5 MB</p>
+        {uploadError && (
+          <p role="alert" className="mb-3 text-xs text-destructive">
+            {uploadError}
+          </p>
+        )}
         <Input
           autoFocus
           aria-label="Search group icons"
@@ -392,6 +339,9 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
                   value === id ? "text-cream-bright ring-1 ring-cream-muted" : "text-cream-muted"
                 }
                 onClick={() => {
+                  uploadRequest.current++;
+                  setUploading(false);
+                  setUploadError("");
                   onChange(id);
                   setOpen(false);
                   setQuery("");

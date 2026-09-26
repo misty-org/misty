@@ -46,9 +46,9 @@ describe("httpRequest", () => {
       .spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new TypeError("Load failed"));
 
-    await expect(
-      httpRequest("https://misty.example/api/apps", { method: "POST" }),
-    ).rejects.toThrow("Could not reach https://misty.example/api/apps: Load failed");
+    await expect(httpRequest("https://misty.example/api/apps", { method: "POST" })).rejects.toThrow(
+      "Could not reach https://misty.example/api/apps: Load failed",
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

@@ -87,7 +87,7 @@ afterEach(cleanup);
 it("shows green for confirmed healthy sync and live work, with no warning outside the popover", () => {
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
   expect(
-    screen.getByRole("button", { name: "Control: Up to date" }).getAttribute("data-sync-status"),
+    screen.getByRole("button", { name: "Sync: Up to date" }).getAttribute("data-sync-status"),
   ).toBe("green");
   expect(screen.queryByRole("dialog")).toBeNull();
   const pending = session();
@@ -102,14 +102,14 @@ it.each(["offline", "attention", "stopped"] as const)(
     expect(status(native).tone).toBe("red");
   },
 );
-it("gives local save failures priority over a healthy cloud connection and opens retry details", async () => {
+it("gives local save failures priority and preserves the essential recovery warning", async () => {
   useWorkspaceRecoveryState.setState({ issue: "Disk unavailable" });
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  const trigger = screen.getByRole("button", { name: "Control: Local saving needs attention" });
+  const trigger = screen.getByRole("button", { name: "Sync: Local saving needs attention" });
   expect(trigger.getAttribute("data-sync-status")).toBe("red");
   fireEvent.click(trigger);
   expect(screen.getByRole("dialog", { name: "Device control center" })).toBeTruthy();
-  expect(screen.getByText(/may be lost if you close Misty/)).toBeTruthy();
+  expect(screen.getByText("Keep Misty open until saved.")).toBeTruthy();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Retry now" })));
   expect(mocks.retry).toHaveBeenCalledWith("a", expect.any(Function));
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
@@ -129,9 +129,10 @@ it("shows profile failures as red and closes the popover before opening settings
   useBrowserSyncStore.setState({ session: native });
   const settings = vi.fn();
   render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
-  fireEvent.click(screen.getByRole("button", { name: "Control: Sync needs attention" }));
-  expect(screen.getByText("Website storage unavailable")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
+  expect(screen.getByRole("heading", { name: "Sync needs attention" })).toBeTruthy();
+  expect(screen.queryByText("Website storage unavailable")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Sync settings" }));
   expect(settings).toHaveBeenCalledOnce();
   expect(screen.queryByRole("dialog")).toBeNull();
 });
@@ -147,7 +148,7 @@ it("does not dispatch a cloud retry after an account change during local recover
   const request = vi.fn();
   window.addEventListener(browserSyncRetryEvent, request);
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Control: Local saving needs attention" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sync: Local saving needs attention" }));
   fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
   mocks.generation++;
   await act(async () => finish());
@@ -188,9 +189,7 @@ it("routes a remote switch and waits for signed activation rather than the HTTP 
   view.workspace.active_device = { device_id: "d", epoch: "old", sequence: 1 };
   useBrowserSyncStore.setState({ session: view });
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  await act(async () =>
-    fireEvent.click(screen.getByRole("button", { name: "Control: Up to date" })),
-  );
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sync: Up to date" })));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Switch to Office" })));
   expect(mocks.control).toHaveBeenCalledWith("s", "remote", null, true);
   expect(screen.getByText("Switching…")).toBeTruthy();
@@ -210,6 +209,7 @@ it("routes a remote switch and waits for signed activation rather than the HTTP 
   );
   expect(screen.queryByText("Switching…")).toBeNull();
   expect(screen.queryByRole("button", { name: "Switch to Office" })).toBeNull();
+  expect(screen.getByRole("img", { name: "Active device: Office" })).toBeTruthy();
   await act(async () =>
     fireEvent.click(screen.getByRole("switch", { name: "Full sync for Office" })),
   );
@@ -225,9 +225,7 @@ it("does not let a delayed device poll replace a new account's state", async () 
       }),
   );
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  await act(async () =>
-    fireEvent.click(screen.getByRole("button", { name: "Control: Up to date" })),
-  );
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sync: Up to date" })));
   const other = { ...session(), account_id: "b", session_id: "other" };
   mocks.generation++;
   act(() => useBrowserSyncStore.setState({ session: other }));

@@ -1,8 +1,4 @@
-import type {
-  SpaceCalendarEvent,
-  SpaceMember,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceCalendarEvent, SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { Badge, Button, Card } from "@/shared/ui";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { taskAssigneeName } from "./SpaceTaskPrimitives";
@@ -14,7 +10,7 @@ export function SpaceTaskCalendar({
   tasks,
   events,
   members,
-  
+
   onMonth,
   onOpenTask,
   onOpenEvent,
@@ -23,7 +19,7 @@ export function SpaceTaskCalendar({
   tasks: SpaceTask[];
   events: SpaceCalendarEvent[];
   members: SpaceMember[];
-  
+
   onMonth: (month: Date) => void;
   onOpenTask: (task: SpaceTask) => void;
   onOpenEvent: (event: SpaceCalendarEvent) => void;

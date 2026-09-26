@@ -71,9 +71,7 @@ export function BrowserWorkspace({
       setBusy(false);
     }
   };
-  const pinId = new URL(context.route, "https://misty.local").searchParams.get(
-    "pin",
-  );
+  const pinId = new URL(context.route, "https://misty.local").searchParams.get("pin");
   const destination = pins.find((pin) => pin.id === pinId)?.url;
   if (!ready) return <WebsiteLoader />;
   return (
@@ -104,9 +102,7 @@ export function BrowserWorkspace({
           initialUrl={destination}
           renderPin={({ url, title }) => (
             <PagePinButton
-              pinned={pins.some(
-                (pin) => browserPinUrl(pin.url) === browserPinUrl(url),
-              )}
+              pinned={pins.some((pin) => browserPinUrl(pin.url) === browserPinUrl(url))}
               disabled={!loaded || !browserPinUrl(url)}
               busy={busy}
               onClick={() => void toggle(url, title)}

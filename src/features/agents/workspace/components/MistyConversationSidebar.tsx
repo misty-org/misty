@@ -103,7 +103,7 @@ export function MistyConversationSidebar(props: {
                     "group/conversation relative flex min-h-11 items-center rounded-lg transition-colors",
                     active
                       ? "bg-charcoal-card text-cream-bright"
-                      : "text-cream hover:bg-charcoal-hover",
+                      : "text-cream hover:bg-charcoal-hover hover:text-cream-bright",
                   )}
                 >
                   {renamingId === conversation.id ? (
@@ -161,7 +161,7 @@ export function MistyConversationSidebar(props: {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-notification-red focus:text-notification-red"
+                          variant="destructive"
                           onSelect={() => setDeleteTarget(conversation)}
                         >
                           <Trash2 className="size-3.5" /> Delete
@@ -177,7 +177,7 @@ export function MistyConversationSidebar(props: {
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
-                  className="text-notification-red focus:text-notification-red"
+                  variant="destructive"
                   onSelect={() => setDeleteTarget(conversation)}
                 >
                   <Trash2 className="size-3.5" /> Delete

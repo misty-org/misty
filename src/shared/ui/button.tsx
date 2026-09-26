@@ -17,20 +17,20 @@ const buttonVariants = cva(
         default: "bg-charcoal-active text-cream-bright hover:bg-[#494949]",
         destructive:
           "border-charcoal-active bg-charcoal-card text-cream-bright hover:bg-charcoal-active focus-visible:border-charcoal-active focus-visible:ring-charcoal-active/40",
-        // Unfilled variants brighten on hover rather than growing a background:
-        // a button that already carries a fill keeps it and lightens, one that
-        // does not stays flat. Anything overriding this should have a reason.
+        // Every variant fills on hover and while open/pressed, so interactive
+        // controls read the same across the app.
         outline:
-          "border-charcoal-border bg-charcoal-bg shadow-none hover:border-charcoal-active hover:text-cream-bright aria-expanded:text-cream-bright",
+          "border-charcoal-border bg-charcoal-bg shadow-none hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream-bright aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
         secondary:
-          "bg-charcoal-card text-cream hover:text-cream-bright aria-expanded:text-cream-bright",
-        ghost: "hover:text-cream-bright aria-expanded:text-cream-bright",
+          "bg-charcoal-card text-cream hover:bg-charcoal-hover hover:text-cream-bright aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
+        ghost:
+          "hover:bg-charcoal-hover hover:text-cream-bright aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover data-[state=open]:bg-charcoal-hover",
         link: "text-cream-bright underline-offset-4 hover:underline",
         pill: "rounded-full border-0 bg-charcoal-hover text-cream hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card",
         "pill-subtle":
-          "rounded-full border-charcoal-border bg-transparent text-cream-muted hover:border-charcoal-active hover:text-cream-bright",
+          "rounded-full border-charcoal-border bg-transparent text-cream-muted hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream-bright",
         "nav-action":
-          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-card hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted disabled:cursor-wait",
+          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright aria-pressed:bg-charcoal-hover aria-expanded:bg-charcoal-hover data-[state=open]:bg-charcoal-hover focus-visible:ring-2 focus-visible:ring-cream-muted disabled:cursor-wait",
       },
       size: {
         default:

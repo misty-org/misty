@@ -1,5 +1,14 @@
+import { browserToolbarStyles } from "./browserToolbarStyles";
 import { useEffect } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import {
+  cn,
+  menuItemClass,
+  menuListClass,
+  menuSeparatorClass,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/shared/ui";
 import { ExternalLink, MoreVertical } from "lucide-react";
 import { BrowserZoomControls, useBrowserZoom } from "./BrowserZoomControls";
 import { useBrowserOverlay } from "./useBrowserOverlay";
@@ -21,15 +30,8 @@ export interface BrowserMenuViewProps {
 
 /** The same compact menu for Browser and every embedded website. */
 export function BrowserMenuView(props: BrowserMenuViewProps) {
-  const zoom = useBrowserZoom(
-    props.zoomId,
-    props.setZoom ?? (async () => {}),
-    props.reportError,
-  );
-  const overlay = useBrowserOverlay(
-    props.overlayReason ?? "menu",
-    props.setOverlay,
-  );
+  const zoom = useBrowserZoom(props.zoomId, props.setZoom ?? (async () => {}), props.reportError);
+  const overlay = useBrowserOverlay(props.overlayReason ?? "menu", props.setOverlay);
   useEffect(() => {
     if (props.active === false) overlay.onOpenChange(false);
   }, [props.active, overlay.onOpenChange]);
@@ -42,20 +44,28 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
           aria-label={props.label ?? "Browser menu"}
           title="More"
         >
-          <MoreVertical size={16} strokeWidth={1.8} />
+          <MoreVertical {...browserToolbarStyles.icon} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="website-header-menu">
+      <PopoverContent
+        align="end"
+        className={cn(
+          "website-header-menu max-h-[calc(100dvh-80px)] w-60 overflow-y-auto",
+          menuListClass,
+        )}
+      >
         <BrowserZoomControls zoom={zoom} />
-        <hr />
+        <div role="separator" className={menuSeparatorClass} />
         <button
+          type="button"
+          className={menuItemClass}
           disabled={!(props.canOpenExternal ?? /^https?:\/\//i.test(props.url))}
           onClick={() => {
             overlay.onOpenChange(false);
             void props.openExternal(props.url).catch(props.reportError);
           }}
         >
-          <ExternalLink size={15} />
+          <ExternalLink />
           Open link
         </button>
       </PopoverContent>

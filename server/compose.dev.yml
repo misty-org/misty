@@ -6,37 +6,7 @@ x-api-image: &api-image
     context: .
     dockerfile: Dockerfile
 
-x-cloudflare-image: &cloudflare-image
-  image: misty-journal-collab-dev:local
-  build:
-    context: apps/journal-collab
-    dockerfile_inline: |
-      FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
-
-      WORKDIR /app
-
-      COPY package.json package-lock.json ./
-      RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
-
-      COPY tsconfig.json vitest.config.ts wrangler.jsonc ./
-      COPY src ./src
-      COPY test ./test
-      COPY --chmod=0555 docker/cloudflare-init.sh /usr/local/bin/misty-cloudflare-init
-      COPY --chmod=0555 docker/cloudflare-deploy.sh /usr/local/bin/misty-cloudflare-deploy
-
-      CMD ["npm", "run", "build"]
-
 services:
-  dev-init:
-    <<: *cloudflare-image
-    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
-    restart: "no"
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-cloudflare-init"]
-    volumes:
-      - ./apps/journal-collab:/workspace
-      - dev_runtime:/run/misty
-    networks: [edge]
-
   postgres:
     image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
     logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
@@ -59,37 +29,47 @@ services:
       retries: 20
     networks: [database, edge]
 
-  agent-runtime-postgres:
-    image: postgres:18-alpine
-    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: workflow
-      POSTGRES_PASSWORD: ${AGENT_RUNTIME_DB_PASSWORD:-workflow}
-      POSTGRES_DB: workflow
-    volumes:
-      - agent_runtime_pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U workflow -d workflow"]
-      interval: 3s
-      timeout: 5s
-      retries: 20
-    networks: [agent-runtime-database]
-
-  agent-runtime-setup:
+  setup:
+    image: misty-server-setup-dev:local
     build:
       context: .
-      dockerfile: apps/agent-runtime/Dockerfile
-      target: setup
+      dockerfile: scripts/docker/setup.Dockerfile
+      additional_contexts:
+        api: service:misty-api
+        agent: service:agent-runtime
     logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
     restart: "no"
+    env_file:
+      - path: .env/dev/integrations/cloudflare.env
+        required: true
     environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${DB_NAME:-misty_server}
+      PGUSER: ${DB_MIGRATION_USER:-misty}
+      PGPASSWORD: ${DB_MIGRATION_PASSWORD:-misty}
+      MISTY_APP_DB_USER: ${DB_USER:-misty_app}
+      MISTY_APP_DB_PASSWORD: ${DB_PASSWORD:-misty}
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: >-
+        host=postgres port=5432
+        user=${DB_MIGRATION_USER:-misty}
+        password=${DB_MIGRATION_PASSWORD:-misty}
+        dbname=${DB_NAME:-misty_server}
+        sslmode=disable
+      GOOSE_MIGRATION_DIR: /app/migrations
+      AGENT_RUNTIME_DB_PASSWORD: ${AGENT_RUNTIME_DB_PASSWORD:-workflow}
       WORKFLOW_TARGET_WORLD: "@workflow/world-postgres"
-      WORKFLOW_POSTGRES_URL: postgres://workflow:${AGENT_RUNTIME_DB_PASSWORD:-workflow}@agent-runtime-postgres:5432/workflow
+      WORKFLOW_POSTGRES_URL: postgres://workflow:${AGENT_RUNTIME_DB_PASSWORD:-workflow}@postgres:5432/workflow
+      MISTY_CLOUDFLARE_WORKER_NAME: ${MISTY_CLOUDFLARE_WORKER_NAME:-misty-journal-collab-dev}
+      MISTY_DEV_API_ORIGIN: ${MISTY_DEV_API_ORIGIN:?run misty setup cloudflare}
+    volumes:
+      - ./apps/journal-collab:/workspace:ro
+      - dev_runtime:/run/misty
     depends_on:
-      agent-runtime-postgres:
+      postgres:
         condition: service_healthy
-    networks: [agent-runtime-database]
+    networks: [database, edge]
 
   agent-runtime:
     image: misty-agent-runtime-dev:local
@@ -102,60 +82,20 @@ services:
     environment:
       PORT: "3000"
       WORKFLOW_TARGET_WORLD: "@workflow/world-postgres"
-      WORKFLOW_POSTGRES_URL: postgres://workflow:${AGENT_RUNTIME_DB_PASSWORD:-workflow}@agent-runtime-postgres:5432/workflow
+      WORKFLOW_POSTGRES_URL: postgres://workflow:${AGENT_RUNTIME_DB_PASSWORD:-workflow}@postgres:5432/workflow
       MISTY_INTERNAL_API_BASE: http://misty-api:8080
       MISTY_AGENT_RUNTIME_CONTROL_SECRET: ${MISTY_AGENT_RUNTIME_CONTROL_SECRET:-bWlzdHktYWdlbnQtcnVudGltZS1kZXYtc2VjcmV0ISE=}
       MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS: ${MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS:-}
       AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
     depends_on:
-      agent-runtime-setup:
+      setup:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/health >/dev/null"]
       interval: 3s
       timeout: 5s
       retries: 30
-    networks: [edge, agent-runtime-database]
-
-  migrate:
-    <<: *api-image
-    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
-    restart: "no"
-    environment:
-      GOOSE_DRIVER: postgres
-      GOOSE_DBSTRING: >-
-        host=postgres port=5432
-        user=${DB_MIGRATION_USER:-misty}
-        password=${DB_MIGRATION_PASSWORD:-misty}
-        dbname=${DB_NAME:-misty_server}
-        sslmode=disable
-      GOOSE_MIGRATION_DIR: /app/migrations
-    depends_on:
-      postgres:
-        condition: service_healthy
-    entrypoint: ["/usr/local/bin/goose"]
-    command: ["up"]
-    networks: [database]
-
-  database-permissions:
-    image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
-    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
-    restart: "no"
-    environment:
-      PGHOST: postgres
-      PGPORT: "5432"
-      PGDATABASE: ${DB_NAME:-misty_server}
-      PGUSER: ${DB_MIGRATION_USER:-misty}
-      PGPASSWORD: ${DB_MIGRATION_PASSWORD:-misty}
-      MISTY_APP_DB_USER: ${DB_USER:-misty_app}
-      MISTY_APP_DB_PASSWORD: ${DB_PASSWORD:-misty}
-    volumes:
-      - ./scripts/docker/postgres-grant-app-role.sh:/usr/local/bin/misty-grant-app-role:ro
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-grant-app-role"]
-    networks: [database]
+    networks: [edge, database]
 
   misty-api:
     <<: *api-image
@@ -230,11 +170,9 @@ services:
     volumes:
       - dev_runtime:/run/misty:ro
     depends_on:
-      database-permissions:
+      setup:
         condition: service_completed_successfully
         restart: true
-      dev-init:
-        condition: service_completed_successfully
       agent-runtime:
         condition: service_healthy
     healthcheck:
@@ -294,34 +232,11 @@ services:
     networks:
       - edge
 
-  cloudflare-deploy:
-    profiles: [deployment]
-    <<: *cloudflare-image
-    container_name: misty-cloudflare-deploy
-    logging: {driver: local, options: {max-size: "10m", max-file: "3"}}
-    restart: "no"
-    env_file:
-      - path: .env/dev/integrations/cloudflare.env
-        required: true
-    environment:
-      MISTY_CLOUDFLARE_WORKER_NAME: ${MISTY_CLOUDFLARE_WORKER_NAME:-misty-journal-collab-dev}
-      MISTY_DEV_API_ORIGIN: ${MISTY_DEV_API_ORIGIN:?run misty setup cloudflare}
-    volumes:
-      - ./apps/journal-collab:/workspace:ro
-    depends_on:
-      tunnel:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "/usr/local/bin/misty-cloudflare-deploy"]
-    networks: [edge]
-
 volumes:
   pgdata:
-  agent_runtime_pgdata:
   dev_runtime:
 
 networks:
   edge:
   database:
-    internal: true
-  agent-runtime-database:
     internal: true

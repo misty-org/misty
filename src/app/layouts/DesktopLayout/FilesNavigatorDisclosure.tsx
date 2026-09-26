@@ -94,7 +94,7 @@ export function FilesNavigatorDisclosure(props: {
       </Renameable>
       <CollapsibleContent id={contentId}>
         <div className={navigationMenuGroupClass} role="group" aria-label="Files destinations">
-          {destinations.map(({ id, label, icon: Icon, path }, index) => {
+          {destinations.map(({ id, label, icon: Icon, path }) => {
             const selected = id === activeDestination;
             return (
               <Renameable key={id} nameKey={itemNameKey("files", [id])} automatic={label}>
@@ -103,7 +103,6 @@ export function FilesNavigatorDisclosure(props: {
                   icon={<Icon aria-hidden />}
                   label={navigationName(itemNameKey("files", [id]), label)}
                   selected={selected}
-                  last={index === destinations.length - 1}
                 >
                   <Link
                     to={path}

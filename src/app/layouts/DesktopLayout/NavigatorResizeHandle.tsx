@@ -8,6 +8,7 @@ import {
 
 export function NavigatorResizeHandle(props: {
   side?: "left" | "right";
+  workspaceEdge?: boolean;
   width: number;
   zoom: number;
   onChange: (width: number) => void;
@@ -31,7 +32,7 @@ export function NavigatorResizeHandle(props: {
       aria-description="Drag to resize. Double-click to reset."
       onDoubleClick={() => props.onChange(navigatorWidths.full)}
       data-misty-window-drag-block="true"
-      className={`group absolute inset-y-0 ${props.side === "right" ? "left-0" : "right-0"} z-30 w-1.5 touch-none cursor-col-resize focus-visible:outline-none`}
+      className={`absolute inset-y-0 ${props.workspaceEdge ? "misty-workspace-resize-handle left-0" : props.side === "right" ? "left-0" : "right-0"} z-30 w-1.5 touch-none cursor-col-resize focus-visible:outline-none`}
       onKeyDown={(event) => {
         const width =
           event.key === "ArrowLeft"
@@ -100,11 +101,6 @@ export function NavigatorResizeHandle(props: {
         handle.addEventListener("lostpointercapture", stop);
         handle.setPointerCapture?.(pointerId);
       }}
-    >
-      <span
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-y-0 ${props.side === "right" ? "left-0" : "right-0"} w-px bg-transparent transition-none group-hover:bg-cream-bright group-focus-visible:bg-cream-bright group-active:bg-cream-bright`}
-      />
-    </div>
+    ></div>
   );
 }

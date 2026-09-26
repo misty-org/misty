@@ -2,7 +2,7 @@ import { nativeAccountFetch } from "./native-account-fetch";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { resolveApiBase, resolveHostedApiBase } from "@/api/deployment/api";
-import { readApiSessionGeneration } from "./session";
+import { isApiSignedOut, readApiSessionGeneration } from "./session";
 
 const refreshes = new Map<string, Promise<boolean>>();
 const refreshResults = new Map<string, { generation: number; revision: number; valid: boolean }>();
@@ -105,6 +105,21 @@ function assertGeneration(generation: number): void {
   if (readApiSessionGeneration() !== generation) throw new Error("The active account changed.");
 }
 
+// Routes that work without a session, used by sign-in, registration, enrollment
+// and password reset while no account is active.
+const signedOutPaths = new Set([
+  "/login",
+  "/register",
+  "/self-host/bootstrap",
+  "/self-host/enroll",
+  "/auth/forgot",
+  "/auth/reset",
+  "/auth/reset/start",
+  "/auth/reset/validate",
+  "/instance",
+  "/health",
+]);
+
 export async function cookieSessionFetch(
   input: RequestInfo | URL,
   init: RequestInit,
@@ -121,6 +136,15 @@ export async function cookieSessionFetch(
   const options: RequestInit = { credentials: "include", ...init, headers };
   const revision = refreshRevision;
   const path = url.slice(base.length).split("?")[0];
+  // A signed-out desktop has an empty cookie jar. Answer account requests
+  // locally instead of sending them, and never try to refresh a session.
+  const signedOut = isApiSignedOut();
+  if (signedOut && !signedOutPaths.has(path)) {
+    return new Response(JSON.stringify({ code: "not_authenticated" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const changesSession = [
     "/login",
     "/register",
@@ -137,6 +161,7 @@ export async function cookieSessionFetch(
   const response = await (changesSession ? withSessionLock(base, send) : send());
   if (
     response.status !== 401 ||
+    signedOut ||
     headers.has("Authorization") ||
     options.credentials === "omit" ||
     [

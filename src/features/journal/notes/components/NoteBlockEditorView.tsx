@@ -828,7 +828,7 @@ function BlockHandle(props: {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={!range}
-            className="text-red-300"
+            variant="destructive"
             onSelect={() => range && editor.chain().focus().deleteRange(range).run()}
           >
             <Trash2 />

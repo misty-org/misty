@@ -97,5 +97,4 @@ describe("self-hosted deployment routing", () => {
     );
     expect(readDeploymentScope()).toMatch(/^self-hosted-/);
   });
-
 });

@@ -1,3 +1,4 @@
+use base64::Engine as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -207,17 +208,41 @@ pub fn profile_id(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
+// Uploaded icons are bounded static PNGs; ordinary icon names keep their old limit.
+fn group_icon(value: &str) -> Result<()> {
+    if let Some(encoded) = value.strip_prefix("data:image/png;base64,") {
+        if value.len() > 32_768 {
+            return Err(Error::TooLarge);
+        }
+        let png = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|_| Error::Invalid)?;
+        if png.len() < 24 || &png[..8] != b"\x89PNG\r\n\x1a\n" || &png[12..16] != b"IHDR" {
+            return Err(Error::Invalid);
+        }
+        let width = u32::from_be_bytes(png[16..20].try_into().map_err(|_| Error::Invalid)?);
+        let height = u32::from_be_bytes(png[20..24].try_into().map_err(|_| Error::Invalid)?);
+        if !(1..=64).contains(&width) || !(1..=64).contains(&height) {
+            return Err(Error::Invalid);
+        }
+        Ok(())
+    } else {
+        text(value, 48, false)?;
+        if !valid_id(value) {
+            return Err(Error::Invalid);
+        }
+        Ok(())
+    }
+}
+
 pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
     let value = serde_json::to_value(fields)?;
     match kind {
         Kind::Group => {
             let v: Group = serde_json::from_value(value)?;
             text(&v.label, 160, false)?;
-            text(&v.icon, 48, false)?;
+            group_icon(&v.icon)?;
             order(v.order)?;
-            if !valid_id(&v.icon) {
-                return Err(Error::Invalid);
-            }
         }
         Kind::Website => {
             let v: Website = serde_json::from_value(value)?;

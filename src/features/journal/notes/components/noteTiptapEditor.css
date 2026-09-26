@@ -32,7 +32,6 @@
 .misty-tiptap-tool.is-active,
 .misty-tiptap-tool[aria-pressed="true"] {
   color: var(--color-cream-bright);
-  background: var(--color-charcoal-active);
 }
 
 .misty-tiptap-search {
@@ -163,7 +162,6 @@
   cursor: pointer;
 }
 .misty-tiptap-block-handle button:hover {
-  background: var(--color-charcoal-active);
   color: var(--color-cream-bright);
 }
 
@@ -198,7 +196,7 @@
   text-align: left;
 }
 .misty-tiptap-suggestion button:hover {
-  background: var(--color-charcoal-active);
+  color: var(--misty-theme-text-bright, #f1f1f1);
 }
 .misty-tiptap-suggestion span {
   padding: 8px;

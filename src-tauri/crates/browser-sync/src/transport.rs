@@ -61,6 +61,7 @@ pub struct SyncApi {
     base: Url,
     http: reqwest::Client,
     refreshed: Option<Arc<dyn Fn() -> Result<()> + Send + Sync>>,
+    refresh_lock: Option<Arc<tokio::sync::Mutex<()>>>,
     traffic: Arc<TrafficCounters>,
 }
 
@@ -86,6 +87,7 @@ impl SyncApi {
             base,
             http,
             refreshed: None,
+            refresh_lock: None,
             traffic: Arc::new(TrafficCounters::default()),
         })
     }
@@ -97,6 +99,15 @@ impl SyncApi {
         refreshed: impl Fn() -> Result<()> + Send + Sync + 'static,
     ) -> Self {
         self.refreshed = Some(Arc::new(refreshed));
+        self
+    }
+
+    /// Serializes refreshes with every other user of the same cookie jar. The
+    /// server treats two concurrent uses of one refresh cookie as a replay and
+    /// revokes the whole session; sequential refreshes each send the current
+    /// cookie and rotate cleanly.
+    pub fn with_refresh_lock(mut self, lock: Arc<tokio::sync::Mutex<()>>) -> Self {
+        self.refresh_lock = Some(lock);
         self
     }
 
@@ -159,6 +170,10 @@ impl SyncApi {
     }
 
     async fn refresh_session(&self) -> Result<()> {
+        let _refresh_guard = match &self.refresh_lock {
+            Some(lock) => Some(lock.lock().await),
+            None => None,
+        };
         let mut endpoint = self.base.clone();
         endpoint.set_path(&format!(
             "{}/auth/refresh",

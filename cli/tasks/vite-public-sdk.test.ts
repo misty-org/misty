@@ -31,7 +31,10 @@ test(
       );
       await writeFile(join(sdk, "index.js"), "export const original = 1;");
       await writeFile(manifest, JSON.stringify({ revision: "first" }));
-      await writeFile(join(appRoot, "index.html"), '<script type="module" src="/entry.js"></script>');
+      await writeFile(
+        join(appRoot, "index.html"),
+        '<script type="module" src="/entry.js"></script>',
+      );
       await writeFile(
         join(appRoot, "entry.js"),
         'import * as sdk from "@misty/sdk"; console.log(sdk);',
@@ -42,9 +45,12 @@ test(
         logLevel: "error",
         plugins: [publicSdkDevelopmentUpdates(root)],
         optimizeDeps: { exclude: ["@misty/sdk"] },
-        server: { host: "127.0.0.1", port: 0, fs: { allow: [root] } },
+        // This test only transforms modules. Vite treats port 0 as its default
+        // dev port, so a listening fixture can replace an app's stopped server
+        // and send its waiting webview into this temporary SDK project.
+        server: { middlewareMode: true, hmr: false, fs: { allow: [root] } },
       });
-      await server.listen();
+      assert.equal(server.httpServer, null, "SDK fixtures must not bind an app's dev port");
       const before = (await server.transformRequest("/entry.js")).code;
       const dependencyUrl = (code) => code.match(/"([^"\n]*node_modules\/[^"\n]+)"/)?.[1];
       const firstUrl = dependencyUrl(before);
@@ -71,6 +77,7 @@ test(
       assert.ok(after && after !== firstUrl, `Expected new dependency URL, got ${after}`);
       const response = await server.transformRequest(after);
       assert.match(response.code, /export const MistyWorkspaceSnapshotSchema/);
+      assert.equal(server.httpServer, null, "SDK refresh must keep the fixture listener-free");
     } finally {
       await server?.close();
       await rm(root, { recursive: true, force: true });

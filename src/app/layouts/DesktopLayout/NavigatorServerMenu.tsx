@@ -69,16 +69,16 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
           aria-label={`Misty server menu, current server: ${currentName}`}
           data-misty-window-drag-block="true"
         >
-          <span className="grid size-6 shrink-0 place-items-center">
-            <img
-              src={mistyLogo}
-              alt=""
-              aria-hidden="true"
-              className="block size-6 object-contain p-px"
-            />
-          </span>
+          <img
+            src={mistyLogo}
+            alt=""
+            aria-hidden="true"
+            className="block size-[var(--misty-navigation-icon-size)] shrink-0 object-contain"
+          />
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="text-sm font-semibold tracking-[-0.015em] text-inherit">Misty</span>
+            <span className="text-[length:calc(var(--navigation-row-font-size,14px)+2px)] font-semibold tracking-[-0.015em] text-inherit">
+              Misty
+            </span>
             <NavigationChevron open={open} />
           </span>
         </Button>
