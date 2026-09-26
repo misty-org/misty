@@ -1,17 +1,17 @@
-import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
-import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { agentsApi } from "@/api/agents/api";
 import { assistantApi } from "@/api/assistant/api";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect } from "react";
+import { companionReply, resolvePoint } from "./companionReply";
+import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
 import {
-  useCompanionState,
   initialCompanionPresentation,
+  useCompanionState,
   type CompanionControl,
 } from "./companionState";
-import { companionReply, resolvePoint } from "./companionReply";
 import {
   controlEvent,
   spokenMode,
@@ -19,12 +19,15 @@ import {
   type DisplayCapture,
   type Presentation,
 } from "./protocol";
-
 let nativeLifecycle = Promise.resolve<unknown>(undefined);
 const nativeConfiguration = (accountId: string) => {
   const next = nativeLifecycle
     .catch(() => {})
-    .then(() => invoke<number>("cursor_companion_configure", { accountId }));
+    .then(() =>
+      invoke<number>("cursor_companion_configure", {
+        accountId,
+      }),
+    );
   nativeLifecycle = next;
   return next;
 };
@@ -70,25 +73,44 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       !disposed && turn === generation && useMistyStore.getState().accountId === accountId;
     const publish = () => {
       if (disposed) return;
-      useCompanionState.setState({ accountId, presentation: state });
+      useCompanionState.setState({
+        accountId,
+        presentation: state,
+      });
       const published = state;
       if (nativeReady)
-        void invoke("cursor_companion_present", { turn, presentation: published }).catch(
-          (reason) => {
-            if (!disposed && active(published.generation))
-              useCompanionState.setState({ presentation: { ...state, error: String(reason) } });
-          },
-        );
+        void invoke("cursor_companion_present", {
+          turn,
+          presentation: published,
+        }).catch((reason) => {
+          if (!disposed && active(published.generation))
+            useCompanionState.setState({
+              presentation: {
+                ...state,
+                error: String(reason),
+              },
+            });
+        });
     };
     const change = (patch: Partial<Presentation>) => {
-      state = { ...state, ...patch, generation: turn, enabled: nativeReady, showCompanion: show };
+      state = {
+        ...state,
+        ...patch,
+        generation: turn,
+        enabled: nativeReady,
+        showCompanion: show,
+      };
       publish();
     };
     const persist = () => {
       try {
         localStorage.setItem(
           preferenceKey,
-          JSON.stringify({ visible: show, model: state.model, size: state.size }),
+          JSON.stringify({
+            visible: show,
+            model: state.model,
+            size: state.size,
+          }),
         );
       } catch {
         /* optional preference */
@@ -105,7 +127,10 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       const expected = turn;
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
-        if (active(expected) && !show) change({ visible: false });
+        if (active(expected) && !show)
+          change({
+            visible: false,
+          });
       }, 1000);
     };
     const stopAudio = () => {
@@ -129,7 +154,11 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       pointPending = false;
       const shouldCancel = owned;
       owned = false;
-      change({ point: undefined, phase: "idle", error: nativeReady ? undefined : state.error });
+      change({
+        point: undefined,
+        phase: "idle",
+        error: nativeReady ? undefined : state.error,
+      });
       // Serialize cancellation with the next admission; never cancel an unrelated drawer turn.
       barrier = barrier
         .catch(() => {})
@@ -147,7 +176,9 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         point: undefined,
         error: reason instanceof Error ? reason.message : String(reason),
       });
-      void invoke<number>("cursor_companion_interrupt", { expectedTurn: generation })
+      void invoke<number>("cursor_companion_interrupt", {
+        expectedTurn: generation,
+      })
         .then((next) => {
           if (active(generation)) {
             turn = next;
@@ -161,7 +192,9 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
     const interruptNative = async () => {
       const previous = turn;
       const next = nativeReady
-        ? await invoke<number>("cursor_companion_interrupt", { expectedTurn: previous })
+        ? await invoke<number>("cursor_companion_interrupt", {
+            expectedTurn: previous,
+          })
         : previous;
       if (!active(previous)) return false;
       turn = next;
@@ -172,7 +205,11 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       return active(next);
     };
     const switchMode = async (mode: CompanionMode) => {
-      if (state.mode !== mode && (await interruptNative())) change({ mode, visible: show });
+      if (state.mode !== mode && (await interruptNative()))
+        change({
+          mode,
+          visible: show,
+        });
     };
     const speak = async (invocationId: string, generation: number) => {
       voicePending = true;
@@ -186,7 +223,9 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         audio.onended = () => {
           if (active(generation)) {
             stopAudio();
-            change({ phase: "idle" });
+            change({
+              phase: "idle",
+            });
             maybeHide();
           }
         };
@@ -196,7 +235,10 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
             "The answer was saved, but speech could not play. Hold the shortcut to try again.",
           );
         await audio.play();
-        if (active(generation)) change({ phase: "responding" });
+        if (active(generation))
+          change({
+            phase: "responding",
+          });
       } catch (error) {
         if (!controller.signal.aborted) fail(generation, error);
       }
@@ -230,14 +272,19 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       const parsed = companionReply(reply.content);
       const point = resolvePoint(parsed.point, captures);
       pointPending = !!point;
-      change({ phase: "idle", point });
+      change({
+        phase: "idle",
+        point,
+      });
       if (point) {
         const expected = turn;
         // Handles display removal or an overlay reload before its animation completion event.
         pointTimer = setTimeout(() => {
           if (active(expected)) {
             pointPending = false;
-            change({ point: undefined });
+            change({
+              point: undefined,
+            });
             maybeHide();
           }
         }, 15_000);
@@ -256,37 +303,56 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
     };
     const setup = async () => {
       useMistyStore.getState().setAccount(accountId);
-      listen<{ turn: number; held: boolean }>("misty://cursor-shortcut", (payload) => {
+      listen<{
+        turn: number;
+        held: boolean;
+      }>("misty://cursor-shortcut", (payload) => {
         if (payload.turn < turn) return;
         if (payload.held) {
           turn = payload.turn;
           captures = [];
           invocationId = undefined;
           void interrupt().catch((e) => fail(turn, e));
-          change({ visible: true, phase: "listening" });
-        } else if (payload.turn === turn) change({ phase: "processing" });
+          change({
+            visible: true,
+            phase: "listening",
+          });
+        } else if (payload.turn === turn)
+          change({
+            phase: "processing",
+          });
       });
-      listen<{ turn: number; captures: DisplayCapture[] }>("misty://cursor-captures", (payload) => {
+      listen<{
+        turn: number;
+        captures: DisplayCapture[];
+      }>("misty://cursor-captures", (payload) => {
         if (active(payload.turn)) captures = payload.captures;
       });
-      listen<{ error: string }>("misty://cursor-renderer-error", (payload) =>
-        fail(turn, payload.error),
-      );
-      listen<{ turn: number; error: string }>("misty://cursor-error", (payload) =>
-        fail(payload.turn, payload.error),
-      );
-      listen<{ generation: number }>("misty://cursor-point-finished", (payload) => {
+      listen<{
+        error: string;
+      }>("misty://cursor-renderer-error", (payload) => fail(turn, payload.error));
+      listen<{
+        turn: number;
+        error: string;
+      }>("misty://cursor-error", (payload) => fail(payload.turn, payload.error));
+      listen<{
+        generation: number;
+      }>("misty://cursor-point-finished", (payload) => {
         if (payload.generation === turn) {
           pointPending = false;
           clearTimeout(pointTimer);
-          change({ point: undefined });
+          change({
+            point: undefined,
+          });
           maybeHide();
         }
       });
       listen("misty://cursor-displays-changed", () => {
         if (pointPending) {
           pointPending = false;
-          change({ point: undefined });
+          change({
+            point: undefined,
+          });
           maybeHide();
         }
       });
@@ -295,9 +361,13 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         if (control.kind === "visibility") {
           show = control.visible;
           persist();
-          change({ visible: show || state.phase !== "idle" || pointPending });
+          change({
+            visible: show || state.phase !== "idle" || pointPending,
+          });
         } else if (control.kind === "size") {
-          change({ size: normalizeCompanionSize(control.size) });
+          change({
+            size: normalizeCompanionSize(control.size),
+          });
           persist();
         } else if (control.kind === "mode") {
           await switchMode(control.mode);
@@ -306,100 +376,128 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
           (control.model === "" || state.models?.some((m) => m.id === control.model))
         ) {
           if (await interruptNative()) {
-            change({ model: control.model });
+            change({
+              model: control.model,
+            });
             persist();
           }
         } else if (control.kind === "stop") {
-          if (await interruptNative()) change({ visible: show });
+          if (await interruptNative())
+            change({
+              visible: show,
+            });
         } else if (control.kind === "retry") {
           if (!(await interruptNative())) return;
           turn = await nativeConfiguration(accountId);
           if (disposed) return;
           nativeReady = true;
-          change({ error: undefined, visible: show });
+          change({
+            error: undefined,
+            visible: show,
+          });
         }
       };
-      useCompanionState.setState({ accountId, presentation: state, control });
+      useCompanionState.setState({
+        accountId,
+        presentation: state,
+        control,
+      });
       listen<CompanionControl>(controlEvent, (request) => {
         void control(request).catch((e) => fail(turn, e));
       });
-      listen<{ turn: number; audio: string; durationMs: number }>(
-        "misty://cursor-recorded",
-        (payload) => {
-          const generation = payload.turn;
+      listen<{
+        turn: number;
+        audio: string;
+        durationMs: number;
+      }>("misty://cursor-recorded", (payload) => {
+        const generation = payload.turn;
+        if (!active(generation)) return;
+        if (payload.durationMs < 150) {
+          change({
+            phase: "idle",
+          });
+          maybeHide();
+          return;
+        }
+        change({
+          phase: "processing",
+        });
+        const controller = new AbortController();
+        abort = controller;
+        void (async () => {
+          await barrier;
           if (!active(generation)) return;
-          if (payload.durationMs < 150) {
-            change({ phase: "idle" });
+          const bytes = Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0));
+          const [transcription, screens] = await Promise.all([
+            agentsApi.transcribeVoice(
+              new Blob([bytes], {
+                type: "audio/wav",
+              }),
+              payload.durationMs,
+              controller.signal,
+            ),
+            invoke<DisplayCapture[]>("cursor_companion_capture", {
+              turn: generation,
+            }),
+          ]);
+          if (!active(generation)) return;
+          const text = transcription.transcript.trim();
+          if (!text) {
+            change({
+              phase: "idle",
+            });
             maybeHide();
             return;
           }
-          change({ phase: "processing" });
-          const controller = new AbortController();
-          abort = controller;
-          void (async () => {
-            await barrier;
-            if (!active(generation)) return;
-            const bytes = Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0));
-            const [transcription, screens] = await Promise.all([
-              agentsApi.transcribeVoice(
-                new Blob([bytes], { type: "audio/wav" }),
-                payload.durationMs,
-                controller.signal,
-              ),
-              invoke<DisplayCapture[]>("cursor_companion_capture", { turn: generation }),
-            ]);
-            if (!active(generation)) return;
-            const text = transcription.transcript.trim();
-            if (!text) {
-              change({ phase: "idle" });
-              maybeHide();
-              return;
-            }
-            const mode = spokenMode(text);
-            if (mode) {
-              await switchMode(mode);
-              change({ phase: "idle" });
-              maybeHide();
-              return;
-            }
-            if (useMistyStore.getState().working)
-              throw new Error(
-                "An Agent conversation is already running. Stop it before starting a companion request.",
-              );
-            captures = screens;
-            submittedTurn = generation;
-            owned = true;
-            const current = useMistyStore.getState();
-            await current.submitAnswer(
-              text,
-              [],
-              undefined,
-              "workspace",
-              [],
-              { conversationId: current.activeConversationId, context: [] },
-              {
-                turn: generation,
-                executionMode: "agent",
-                interactionMode: state.mode,
-                displayCaptures: screens,
-                model: state.model,
-              },
+          const mode = spokenMode(text);
+          if (mode) {
+            await switchMode(mode);
+            change({
+              phase: "idle",
+            });
+            maybeHide();
+            return;
+          }
+          if (useMistyStore.getState().working)
+            throw new Error(
+              "An Agent conversation is already running. Stop it before starting a companion request.",
             );
-            if (!active(generation)) return;
-            invocationId = useMistyStore.getState().invocationId;
-            if (!invocationId) {
-              owned = false;
-              throw new Error(
-                useMistyStore.getState().error ||
-                  "The companion could not start. Hold the shortcut to retry.",
-              );
-            }
-            settle();
-          })().catch((e) => {
-            if (!controller.signal.aborted) fail(generation, e);
-          });
-        },
-      );
+          captures = screens;
+          submittedTurn = generation;
+          owned = true;
+          const current = useMistyStore.getState();
+          await current.submitAnswer(
+            text,
+            [],
+            undefined,
+            "workspace",
+            [],
+            {
+              conversationId: current.activeConversationId,
+              context: [],
+            },
+            {
+              turn: generation,
+              executionMode: "agent",
+              interactionMode: state.mode,
+              displayCaptures: screens,
+              model: state.model,
+            },
+          );
+          if (!active(generation)) return;
+          invocationId = useMistyStore.getState().invocationId;
+          if (!invocationId) {
+            owned = false;
+            throw new Error(
+              useMistyStore.getState().error ||
+                "The companion could not start. Hold the shortcut to retry.",
+            );
+          }
+          settle();
+        })().catch((e) => {
+          if (!controller.signal.aborted) fail(generation, e);
+        });
+      });
       await Promise.all(removers);
       if (disposed) return;
       turn = Math.max(turn, await nativeConfiguration(accountId));
@@ -415,7 +513,10 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
             change({
               models: catalog.models
                 .filter((m) => m.id.startsWith("openai/"))
-                .map((m) => ({ id: m.id, name: m.name })),
+                .map((m) => ({
+                  id: m.id,
+                  name: m.name,
+                })),
             });
         })
         .catch(() => {});

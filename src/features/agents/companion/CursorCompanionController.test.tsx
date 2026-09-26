@@ -1,5 +1,7 @@
 import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { companionControl, useCompanionState } from "./companionState";
+import { CursorCompanionController } from "./CursorCompanionController";
 const mocks = vi.hoisted(() => ({
   listeners: new Map<string, (e: { payload: unknown }) => void>(),
   invoke: vi.fn(),
@@ -17,7 +19,9 @@ const mocks = vi.hoisted(() => ({
   },
   subscribers: new Set<() => void>(),
 }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: mocks.invoke,
+}));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     listen: async (name: string, cb: (e: { payload: unknown }) => void) => {
@@ -28,12 +32,21 @@ vi.mock("@tauri-apps/api/window", () => ({
     },
   }),
 }));
-vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
+vi.mock("@/shared/platform/tauri", () => ({
+  hasTauriInternals: () => true,
+}));
 vi.mock("@/api/agents/api", () => ({
-  agentsApi: { transcribeVoice: mocks.transcribe, speech: mocks.speech },
+  agentsApi: {
+    transcribeVoice: mocks.transcribe,
+    speech: mocks.speech,
+  },
 }));
 vi.mock("@/api/assistant/api", () => ({
-  assistantApi: { frontierModels: async () => ({ models: [] }) },
+  assistantApi: {
+    frontierModels: async () => ({
+      models: [],
+    }),
+  },
 }));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: {
@@ -51,11 +64,11 @@ vi.mock("@/features/misty/useMistyStore", () => ({
     },
   },
 }));
-import { useCompanionState, companionControl } from "./companionState";
-import { CursorCompanionController } from "./CursorCompanionController";
 const emit = (event: string, payload: unknown) =>
   act(() => {
-    mocks.listeners.get(`misty://cursor-${event}`)?.({ payload });
+    mocks.listeners.get(`misty://cursor-${event}`)?.({
+      payload,
+    });
   });
 const presentations = () =>
   mocks.invoke.mock.calls
@@ -76,19 +89,30 @@ beforeEach(() => {
   mocks.state.error = null;
   mocks.state.invocationId = undefined;
   mocks.state.conversations = [];
-  Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
-  mocks.invoke.mockImplementation(async (name: string, args: { expectedTurn?: number }) =>
-    name === "cursor_companion_configure"
-      ? 1
-      : name === "cursor_companion_interrupt"
-        ? (args.expectedTurn ?? 1) + 1
-        : name === "cursor_companion_capture"
-          ? []
-          : undefined,
+  Object.defineProperty(navigator, "platform", {
+    configurable: true,
+    value: "MacIntel",
+  });
+  mocks.invoke.mockImplementation(
+    async (
+      name: string,
+      args: {
+        expectedTurn?: number;
+      },
+    ) =>
+      name === "cursor_companion_configure"
+        ? 1
+        : name === "cursor_companion_interrupt"
+          ? (args.expectedTurn ?? 1) + 1
+          : name === "cursor_companion_capture"
+            ? []
+            : undefined,
   );
   mocks.submit.mockReset();
   mocks.cancel.mockResolvedValue(undefined);
-  mocks.transcribe.mockResolvedValue({ transcript: "What is this?" });
+  mocks.transcribe.mockResolvedValue({
+    transcript: "What is this?",
+  });
   mocks.speech.mockResolvedValue(new Blob(["audio"]));
 });
 afterEach(() => {
@@ -99,14 +123,27 @@ describe("native companion lifecycle", () => {
   it("restores visibility and size, resizes without interrupting, and persists across remounts", async () => {
     localStorage.setItem(
       "misty.cursor-companion:account",
-      JSON.stringify({ visible: true, size: 150 }),
+      JSON.stringify({
+        visible: true,
+        size: 150,
+      }),
     );
     let view = await mounted();
-    expect(presentations().slice(-1)[0]).toMatchObject({ visible: true, showCompanion: true, size: 150 });
-    await act(async () => {
-      await companionControl({ kind: "size", size: 200 });
+    expect(presentations().slice(-1)[0]).toMatchObject({
+      visible: true,
+      showCompanion: true,
+      size: 150,
     });
-    expect(presentations().slice(-1)[0]).toMatchObject({ size: 200, visible: true });
+    await act(async () => {
+      await companionControl({
+        kind: "size",
+        size: 200,
+      });
+    });
+    expect(presentations().slice(-1)[0]).toMatchObject({
+      size: 200,
+      visible: true,
+    });
     expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_interrupt")).toBe(
       false,
     );
@@ -125,22 +162,42 @@ describe("native companion lifecycle", () => {
     );
     view.unmount();
   });
-
   it("rapid release returns to idle without a provider request", async () => {
     const mountedView = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("shortcut", { turn: 2, held: false });
-    emit("recorded", { turn: 2, audio: "", durationMs: 0 });
-    expect(presentations().slice(-1)[0]).toMatchObject({ phase: "idle", point: undefined });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("shortcut", {
+      turn: 2,
+      held: false,
+    });
+    emit("recorded", {
+      turn: 2,
+      audio: "",
+      durationMs: 0,
+    });
+    expect(presentations().slice(-1)[0]).toMatchObject({
+      phase: "idle",
+      point: undefined,
+    });
     expect(mocks.transcribe).not.toHaveBeenCalled();
     mountedView.unmount();
   });
   it("microphone denial clears the indicator and interrupts the native recorder", async () => {
     const view = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("error", { turn: 2, error: "Microphone denied" });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("error", {
+      turn: 2,
+      error: "Microphone denied",
+    });
     await waitFor(() =>
-      expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_interrupt", { expectedTurn: 2 }),
+      expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_interrupt", {
+        expectedTurn: 2,
+      }),
     );
     expect(presentations().slice(-1)[0]).toMatchObject({
       phase: "idle",
@@ -157,13 +214,27 @@ describe("native companion lifecycle", () => {
         }),
     );
     const view = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("recorded", { turn: 2, audio: "YQ==", durationMs: 1000 });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("recorded", {
+      turn: 2,
+      audio: "YQ==",
+      durationMs: 1000,
+    });
     await waitFor(() => expect(mocks.transcribe).toHaveBeenCalled());
     const signal = mocks.transcribe.mock.calls[0][2] as AbortSignal;
-    emit("shortcut", { turn: 3, held: true });
+    emit("shortcut", {
+      turn: 3,
+      held: true,
+    });
     expect(signal.aborted).toBe(true);
-    await act(async () => resolve({ transcript: "open that page" }));
+    await act(async () =>
+      resolve({
+        transcript: "open that page",
+      }),
+    );
     expect(mocks.submit).not.toHaveBeenCalled();
     view.unmount();
   });
@@ -176,25 +247,47 @@ describe("native companion lifecycle", () => {
         }),
     );
     const view = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("recorded", { turn: 2, audio: "YQ==", durationMs: 1000 });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("recorded", {
+      turn: 2,
+      audio: "YQ==",
+      durationMs: 1000,
+    });
     await waitFor(() => expect(mocks.transcribe).toHaveBeenCalled());
     const signal = mocks.transcribe.mock.calls[0][2] as AbortSignal;
     view.unmount();
     expect(signal.aborted).toBe(true);
     mocks.state.accountId = "other";
-    await act(async () => resolve({ transcript: "private question" }));
+    await act(async () =>
+      resolve({
+        transcript: "private question",
+      }),
+    );
     expect(mocks.submit).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_configure", { accountId: "" }),
+      expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_configure", {
+        accountId: "",
+      }),
     );
   });
   it("changing mode interrupts before publishing the new mode", async () => {
     const view = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("control", { kind: "mode", mode: "auto" });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("control", {
+      kind: "mode",
+      mode: "auto",
+    });
     await waitFor(() =>
-      expect(presentations().slice(-1)[0]).toMatchObject({ mode: "auto", phase: "idle" }),
+      expect(presentations().slice(-1)[0]).toMatchObject({
+        mode: "auto",
+        phase: "idle",
+      }),
     );
     const stop = mocks.invoke.mock.calls.findIndex(
       ([name]) => name === "cursor_companion_interrupt",
@@ -211,8 +304,15 @@ describe("native companion lifecycle", () => {
       throw new Error("Provider unavailable");
     });
     const view = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("recorded", { turn: 2, audio: "YQ==", durationMs: 1000 });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("recorded", {
+      turn: 2,
+      audio: "YQ==",
+      durationMs: 1000,
+    });
     await waitFor(() => expect(mocks.cancel).toHaveBeenCalledTimes(1));
     expect(presentations().slice(-1)[0]).toMatchObject({
       phase: "idle",
@@ -224,7 +324,10 @@ describe("native companion lifecycle", () => {
     const pause = vi.fn(),
       removeAttribute = vi.fn(),
       revoke = vi.fn();
-    let player!: { onended: null | (() => void); onerror: null | (() => void) };
+    let player!: {
+      onended: null | (() => void);
+      onerror: null | (() => void);
+    };
     vi.stubGlobal(
       "Audio",
       class {
@@ -247,21 +350,40 @@ describe("native companion lifecycle", () => {
       mocks.state.conversations = [
         {
           id: "conversation",
-          messages: [{ role: "assistant", state: "completed", content: "here is the answer" }],
+          messages: [
+            {
+              role: "assistant",
+              state: "completed",
+              content: "here is the answer",
+            },
+          ],
         },
       ];
     });
     const view = await mounted();
-    emit("shortcut", { turn: 2, held: true });
-    emit("recorded", { turn: 2, audio: "YQ==", durationMs: 1000 });
+    emit("shortcut", {
+      turn: 2,
+      held: true,
+    });
+    emit("recorded", {
+      turn: 2,
+      audio: "YQ==",
+      durationMs: 1000,
+    });
     await waitFor(() => expect(presentations().slice(-1)[0]?.phase).toBe("responding"));
-    emit("shortcut", { turn: 3, held: true });
+    emit("shortcut", {
+      turn: 3,
+      held: true,
+    });
     expect(pause).toHaveBeenCalledOnce();
     expect(removeAttribute).toHaveBeenCalledWith("src");
     expect(revoke).toHaveBeenCalledWith("blob:companion-speech");
     expect(player.onended).toBeNull();
     expect(mocks.state.conversations).toHaveLength(1);
-    expect(presentations().slice(-1)[0]).toMatchObject({ phase: "listening", generation: 3 });
+    expect(presentations().slice(-1)[0]).toMatchObject({
+      phase: "listening",
+      generation: 3,
+    });
     view.unmount();
     vi.restoreAllMocks();
   });
@@ -274,11 +396,16 @@ describe("native companion lifecycle", () => {
       expect(useCompanionState.getState().presentation.error).toBe("Native overlay failed"),
     );
     await act(async () => {
-      await companionControl({ kind: "mode", mode: "auto" });
+      await companionControl({
+        kind: "mode",
+        mode: "auto",
+      });
     });
     expect(useCompanionState.getState().presentation.error).toBe("Native overlay failed");
     await act(async () => {
-      await companionControl({ kind: "retry" });
+      await companionControl({
+        kind: "retry",
+      });
     });
     expect(useCompanionState.getState().presentation.error).toBeUndefined();
     expect(useCompanionState.getState().presentation.enabled).toBe(true);
@@ -291,7 +418,10 @@ describe("native companion lifecycle", () => {
       mocks.state.working = false;
     });
     await act(async () => {
-      await companionControl({ kind: "mode", mode: "auto" });
+      await companionControl({
+        kind: "mode",
+        mode: "auto",
+      });
     });
     expect(mocks.cancel).toHaveBeenCalledOnce();
     expect(useCompanionState.getState().presentation.mode).toBe("auto");

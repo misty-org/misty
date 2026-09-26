@@ -1,12 +1,28 @@
 import { create } from "zustand";
 import type { CompanionMode, Presentation } from "./protocol";
 export type CompanionControl =
-  | { kind: "size"; size: number }
-  | { kind: "visibility"; visible: boolean }
-  | { kind: "mode"; mode: CompanionMode }
-  | { kind: "model"; model: string }
-  | { kind: "stop" }
-  | { kind: "retry" };
+  | {
+      kind: "size";
+      size: number;
+    }
+  | {
+      kind: "visibility";
+      visible: boolean;
+    }
+  | {
+      kind: "mode";
+      mode: CompanionMode;
+    }
+  | {
+      kind: "model";
+      model: string;
+    }
+  | {
+      kind: "stop";
+    }
+  | {
+      kind: "retry";
+    };
 export const initialCompanionPresentation: Presentation = {
   generation: 0,
   phase: "idle",

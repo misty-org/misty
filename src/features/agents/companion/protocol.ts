@@ -30,9 +30,17 @@ export interface Presentation {
   size?: number;
   mode: CompanionMode;
   model: string;
-  models?: { id: string; name: string }[];
+  models?: {
+    id: string;
+    name: string;
+  }[];
   error?: string;
-  point?: { x: number; y: number; displayId: number; label: string };
+  point?: {
+    x: number;
+    y: number;
+    displayId: number;
+    label: string;
+  };
 }
 export const cursorEvent = "misty://cursor-sample";
 export const presentationEvent = "misty://cursor-presentation";

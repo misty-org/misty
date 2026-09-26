@@ -26,14 +26,9 @@
   font-size: 28px;
 }
 
-.agent-cloud-image {
+.agent-brand-image {
   display: block;
   flex-shrink: 0;
-}
-.agent-avatar > .agent-cloud-image {
   width: 100%;
   height: 100%;
-}
-.agent-cloud-image > img {
-  display: block;
 }

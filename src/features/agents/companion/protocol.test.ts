@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { spokenMode, type DisplayCapture } from "./protocol";
 import { companionReply, resolvePoint } from "./companionReply";
-import { flight, spring, recordingPower, waveformHeight } from "./motion";
+import { flight, recordingPower, spring, waveformHeight } from "./motion";
+import { spokenMode, type DisplayCapture } from "./protocol";
 const capture = (
   screen: string,
   x: number,
@@ -18,7 +18,14 @@ const capture = (
   height: 720,
   screen,
   primary,
-  display: { id: Number(screen.slice(6)), x, y, width: 2560, height: 1440, scale },
+  display: {
+    id: Number(screen.slice(6)),
+    x,
+    y,
+    width: 2560,
+    height: 1440,
+    scale,
+  },
 });
 describe("Clicky companion protocol", () => {
   it("changes mode only for explicit complete commands", () => {
@@ -38,7 +45,12 @@ describe("Clicky companion protocol", () => {
   it("strips presentation tags from speech and honors POINT:none", () => {
     expect(companionReply("right here [POINT:1250,700:the save button:screen2]")).toEqual({
       text: "right here",
-      point: { x: 1250, y: 700, label: "the save button", screen: "screen2" },
+      point: {
+        x: 1250,
+        y: 700,
+        label: "the save button",
+        screen: "screen2",
+      },
     });
     expect(companionReply("[POINT:20,30:button:screen1] nope [POINT:none]").point).toBeUndefined();
     expect(companionReply("answer [POINT:invalid]").text).toBe("answer");
@@ -63,15 +75,51 @@ describe("Clicky companion protocol", () => {
       resolvePoint(companionReply("[POINT:640,360:button]").point, [
         capture("screen1", 0, 0, 2, true),
       ]),
-    ).toMatchObject({ x: 1280, y: 720 });
+    ).toMatchObject({
+      x: 1280,
+      y: 720,
+    });
   });
   it("ports distance-based timing, the upward arc, and scale pulse", () => {
-    const from = { x: 0, y: 0 },
-      to = { x: 800, y: 0 };
-    expect(flight(from, to, 500)).toMatchObject({ x: 400, y: -40, scale: 1.3, done: false });
-    expect(flight(from, to, 1000)).toMatchObject({ x: 800, y: 0, done: true });
-    expect(flight(from, { x: 100, y: 0 }, 599).done).toBe(false);
-    expect(flight(from, { x: 5000, y: 0 }, 1400).done).toBe(true);
+    const from = {
+        x: 0,
+        y: 0,
+      },
+      to = {
+        x: 800,
+        y: 0,
+      };
+    expect(flight(from, to, 500)).toMatchObject({
+      x: 400,
+      y: -40,
+      scale: 1.3,
+      done: false,
+    });
+    expect(flight(from, to, 1000)).toMatchObject({
+      x: 800,
+      y: 0,
+      done: true,
+    });
+    expect(
+      flight(
+        from,
+        {
+          x: 100,
+          y: 0,
+        },
+        599,
+      ).done,
+    ).toBe(false);
+    expect(
+      flight(
+        from,
+        {
+          x: 5000,
+          y: 0,
+        },
+        1400,
+      ).done,
+    ).toBe(true);
   });
   it("keeps the recording dead zone, source gain, decay and bounded bar profile", () => {
     expect(recordingPower(0.01, 0)).toBeCloseTo(0.102);
@@ -82,9 +130,18 @@ describe("Clicky companion protocol", () => {
     expect(waveformHeight(1, 0, 0) - waveformHeight(0, 0, 0)).toBe(4);
   });
   it("settles the source spring and stays finite after a suspended frame", () => {
-    const position = { x: 0, y: 0 },
-      velocity = { x: 0, y: 0 },
-      target = { x: 500, y: -250 };
+    const position = {
+        x: 0,
+        y: 0,
+      },
+      velocity = {
+        x: 0,
+        y: 0,
+      },
+      target = {
+        x: 500,
+        y: -250,
+      };
     spring(position, velocity, target, 600);
     for (let i = 0; i < 100; i++) spring(position, velocity, target, 0.016);
     expect(position.x).toBeCloseTo(target.x, 3);
