@@ -5,6 +5,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex, OnceLock},
 };
+use tauri::Manager;
 use tokio::sync::{Mutex as AsyncMutex, Notify};
 
 struct RequestSlot {
@@ -49,6 +50,7 @@ pub async fn auth_http_start(
     webview: tauri::Webview,
     request: tauri::ipc::Request<'_>,
 ) -> Result<ResponseHead, String> {
+    let app = webview.app_handle().clone();
     let meta = request
         .headers()
         .get("x-misty-request")
@@ -86,6 +88,7 @@ pub async fn auth_http_start(
         ]
         .iter()
         .any(|path| url.path().ends_with(path));
+    let refresh = method == reqwest::Method::POST && url.path().ends_with("/auth/refresh");
     // A failed attempt to add another account must not change the active jar.
     let client = if login {
         AccountClient::new()?
@@ -138,14 +141,26 @@ pub async fn auth_http_start(
         map.active.insert(request_id.clone(), slot.clone());
     }
     let outcome = async {
+        // Hold the jar's refresh lock until the rotated cookies are persisted.
+        let _refresh_guard = if refresh {
+            Some(client.refresh_lock.clone().lock_owned().await)
+        } else {
+            None
+        };
         let response = tokio::select! {
             response = builder.send() => response.map_err(|_| "Could not reach the Misty server")?,
             _ = slot.cancel.notified() => return Err("Request aborted".to_string()),
         };
         if response.headers().contains_key(reqwest::header::SET_COOKIE) {
             let account = client.persist(&url)?;
-            if login && response.status().is_success() && account.is_some() {
-                auth_cookies::activate(&url, client.clone())?;
+            if account.is_none() || (login && response.status().is_success()) {
+                super::browser_sync::change_account(Some(&app), || {
+                    if login && response.status().is_success() && account.is_some() {
+                        auth_cookies::activate(&url, client.clone())?;
+                    }
+                    Ok(())
+                })
+                .await?;
             }
         }
         let head = ResponseHead {

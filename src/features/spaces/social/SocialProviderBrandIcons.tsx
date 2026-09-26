@@ -1,4 +1,4 @@
-import { BrandIcon, type BrandIconProps } from "../../../.././apps/shared/BrandIcon";
+import { BrandIcon, type BrandIconProps } from "../../../shared/toolAssets/BrandIcon";
 
 export function MessengerBrandIcon(props: Omit<BrandIconProps, "brand">) {
   return <BrandIcon {...props} brand="messenger" />;

@@ -53,7 +53,7 @@ vi.mock("@/api/spaces/api", () => ({
   },
 }));
 
-import { SpaceAgenda } from "@/features/spaces/planner/SpaceAgenda";
+import { SpaceAgenda } from "@/features/planner/planner/SpaceAgenda";
 
 describe("SpaceAgenda", () => {
   let container: HTMLDivElement;

@@ -23,44 +23,27 @@ describe("SpaceManagementNavigation", () => {
     container.remove();
   });
 
-  it("places member presence and Settings in a compact accessible management group", async () => {
+  it("offers members and usage, with no Space settings entry", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
-          <SpaceManagementNavigation space={spaceFixture()} section="chat" />
+          <SpaceManagementNavigation space={spaceFixture()} />
         </MemoryRouter>,
       );
     });
 
     const management = container.querySelector('nav[aria-label="Space management"]');
-    const links = [...(management?.querySelectorAll("a") ?? [])];
-    expect(container.querySelector('button[aria-label="Space team"]')).not.toBeNull();
-    expect(links.map((link) => link.getAttribute("aria-label"))).toEqual(["Settings"]);
-    expect(links.map((link) => link.textContent?.trim())).toEqual([""]);
-    expect(links[0]?.getAttribute("href")).toBe("/spaces/space-1/settings/general");
-    expect(container.querySelector('[aria-label="More Space actions"]')).toBeNull();
-  });
-
-  it("can sit inside the Spaces navbar header without extra header spacing", async () => {
-    await act(async () => {
-      root.render(
-        <MemoryRouter>
-          <SpaceManagementNavigation space={spaceFixture()} section="chat" placement="navbar" />
-        </MemoryRouter>,
-      );
-    });
-
-    const management = container.querySelector('nav[aria-label="Space management"]');
-    expect(management?.parentElement?.className).toContain("ml-0");
-    expect(management?.parentElement?.className).not.toContain("pl-3");
-    expect(container.querySelector(".bg-status-green")).toBeNull();
+    expect(management?.querySelector('button[aria-label="Members"]')).not.toBeNull();
+    expect(management?.querySelector('button[aria-label="Usage"]')).not.toBeNull();
+    expect(management?.querySelectorAll("a")).toHaveLength(0);
+    expect(container.querySelector('[aria-label="Settings"]')).toBeNull();
   });
 
   it("keeps Space management available to members", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
-          <SpaceManagementNavigation space={spaceFixture({ role: "member" })} section="chat" />
+          <SpaceManagementNavigation space={spaceFixture({ role: "member" })} />
         </MemoryRouter>,
       );
     });

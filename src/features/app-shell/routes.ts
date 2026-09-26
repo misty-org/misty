@@ -22,6 +22,7 @@ export const routes = {
   inbox: "/inbox",
   invite: "/invite",
   library: "/library",
+  newTab: "/new",
   spaces: "/spaces",
   studio: "/studio",
   studioAgents: "/studio/agents",

@@ -47,6 +47,31 @@ describe("JWT cookie transport", () => {
     });
   });
 
+  it("answers account requests locally while signed out, without refreshing", async () => {
+    native.enabled = true;
+    native.fetch.mockImplementation(async () => new Response(null, { status: 204 }));
+    const { configureApiSession } = await import("./session");
+    configureApiSession({
+      isTransitioning: () => false,
+      readGeneration: () => 0,
+      readToken: async () => null,
+      isSignedOut: () => true,
+    });
+    const { cookieSessionFetch } = await import("./cookie-session");
+
+    const spaces = await cookieSessionFetch("https://misty.example/v1/spaces", {});
+    expect(spaces.status).toBe(401);
+    await cookieSessionFetch("https://misty.example/v1/login", { method: "POST", body: "{}" });
+    await cookieSessionFetch("https://misty.example/v1/auth/forgot", {
+      method: "POST",
+      body: "{}",
+    });
+    expect(native.fetch.mock.calls.map(([url]) => url)).toEqual([
+      "https://misty.example/v1/login",
+      "https://misty.example/v1/auth/forgot",
+    ]);
+  });
+
   it("keeps desktop scoped credentials and anonymous requests outside the native account jar", async () => {
     native.enabled = true;
     const browserFetch = vi

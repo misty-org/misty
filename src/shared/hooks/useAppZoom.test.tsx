@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { setNativeZoom } = vi.hoisted(() => ({
@@ -13,10 +13,11 @@ import { appZoomDefault, getAppliedAppZoom, setAppZoom, useAppZoom } from "./use
 
 describe("app zoom", () => {
   afterEach(() => {
+    cleanup();
+    delete (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
     setAppZoom(1);
     window.localStorage.clear();
     document.body.style.zoom = "";
-    delete (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
     setNativeZoom.mockClear();
   });
 
@@ -69,5 +70,31 @@ describe("app zoom", () => {
     expect(getAppliedAppZoom()).toBe(0.9);
     expect(document.body.style.zoom).toBe("");
     await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(0.99));
+  });
+  it("reconciles child geometry after native zoom resolves", async () => {
+    (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
+      invoke: () => undefined,
+    };
+    let finishZoom!: () => void;
+    setNativeZoom.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishZoom = resolve;
+        }),
+    );
+    const onZoom = vi.fn();
+    window.addEventListener("misty:app-zoom-changed", onZoom);
+    try {
+      setAppZoom(1.2);
+      expect(onZoom).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(1.32));
+      expect(onZoom).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finishZoom();
+      });
+      expect(onZoom).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener("misty:app-zoom-changed", onZoom);
+    }
   });
 });

@@ -1,92 +1,94 @@
 import { describe, expect, it } from "vitest";
 import { createDockLeaf, dockTabs } from "./dockTree";
-import type { WorkspaceTab } from "./model";
-import { migrateRetiredWorkspaceTabs, migrateSpaceToolTabs } from "./workspaceMigrations";
+import { createBrowserTabState, type WorkspaceTab } from "./model";
+import { migrateRetiredWorkspaceTab, migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
 import { migrateWorkspaceStore } from "./workspaceStorePersistence";
 
-function legacyHomeTab(): WorkspaceTab {
+function legacyTab(overrides: Partial<WorkspaceTab> = {}): WorkspaceTab {
   return {
-    id: "tab:legacy-home",
+    id: "saved-tab",
+    instanceKey: "saved-tab",
     surfaceId: "home",
     groupKey: "tool:home",
-    instanceKey: "home",
     title: "Home",
     route: "/home",
     sidebarVisible: false,
     state: {},
     createdAt: 1,
-    lastFocusedAt: 1,
+    lastFocusedAt: 2,
+    ...overrides,
   };
 }
 
-function retiredSearchTab(): WorkspaceTab {
-  return {
-    ...legacyHomeTab(),
-    id: "tab:legacy-search",
-    surfaceId: "search",
-    groupKey: "tool:search",
-    instanceKey: "search",
-    title: "Search",
-    route: "/search",
-  } as unknown as WorkspaceTab;
-}
-
-describe("workspace surface migration", () => {
-  it.each(["transfers", "official-app"] as const)(
-    "moves saved %s tabs into Files without losing their identity",
+describe("browser workspace migration", () => {
+  it.each(["home", "space", "code", "terminal", "marketplace"] as const)(
+    "replaces retired %s views without changing tab identity",
     (surfaceId) => {
-      const tab = {
-        ...legacyHomeTab(),
-        surfaceId,
-        groupKey: "app:transfers" as const,
-        instanceKey: "transfers",
-        title: "Transfers",
-        route: "/apps/transfers",
-        state: { filter: "failed" },
-      };
-      const pane = createDockLeaf([tab]);
-      const migrated = migrateRetiredWorkspaceTabs({ root: pane, focusedPaneId: pane.id });
-      expect(dockTabs(migrated.root)[0]).toMatchObject({
+      const tab = legacyTab({ surfaceId, state: { savedDocument: "recovery-data" } });
+      expect(migrateRetiredWorkspaceTab(tab, "space:family")).toMatchObject({
         id: tab.id,
-        groupKey: "app:files",
-        instanceKey: "files",
-        route: "/apps/files?view=transfers",
-        state: tab.state,
+        surfaceId: "browser",
+        route: "/browser",
+        groupKey: "tool:browser",
+        state: { url: "https://www.google.com" },
+        createdAt: 1,
+        lastFocusedAt: 2,
       });
+      expect(tab.state).toEqual({ savedDocument: "recovery-data" });
     },
   );
-  it("keeps a restored Home tab intact", () => {
-    const pane = createDockLeaf([legacyHomeTab()]);
-    const migrated = migrateRetiredWorkspaceTabs({ root: pane, focusedPaneId: pane.id }, "global");
-
-    expect(dockTabs(migrated.root)[0]).toMatchObject({
-      id: "tab:legacy-home",
-      surfaceId: "home",
-      groupKey: "tool:home",
-      title: "Home",
-      route: "/home",
+  it.each(["files", "official-app"] as const)(
+    "preserves %s Files state and selections",
+    (surfaceId) => {
+      const tab = legacyTab({
+        surfaceId,
+        groupKey: "app:files",
+        route: "/apps/files?path=%2FUsers%2Fada&select=notes.txt",
+        title: "Documents",
+        state: { directory: "/Users/ada", selected: ["notes.txt"] },
+      });
+      const migrated = migrateRetiredWorkspaceTab(tab);
+      expect(migrated).toMatchObject({
+        ...tab,
+        surfaceId: "files",
+        groupKey: "tool:files",
+        route: "/files?path=%2FUsers%2Fada&select=notes.txt",
+      });
+      expect(migrateRetiredWorkspaceTab(migrated)).toEqual(migrated);
+    },
+  );
+  it("preserves browser URLs and website identity", () => {
+    const tab = legacyTab({
+      surfaceId: "browser",
+      groupKey: "app:browser",
+      state: { ...createBrowserTabState("https://example.com/report"), websiteId: "saved-website" },
+      title: "Report",
+    });
+    expect(migrateRetiredWorkspaceTab(tab)).toMatchObject({
+      id: tab.id,
+      state: tab.state,
+      title: "Report",
     });
   });
-
-  it("moves an unknown legacy surface in a Space to the Space placeholder", () => {
-    const pane = createDockLeaf([retiredSearchTab()]);
-    const migrated = migrateRetiredWorkspaceTabs(
-      { root: pane, focusedPaneId: pane.id },
-      "space:family",
-    );
-
-    expect(dockTabs(migrated.root)[0]).toMatchObject({
-      id: "tab:legacy-search",
-      surfaceId: "space",
-      groupKey: "space:family",
-      instanceKey: "family",
-      title: "Space",
-      route: "/spaces/family/home",
-    });
+  it("preserves saved agent run links", () => {
+    expect(
+      migrateRetiredWorkspaceTab(
+        legacyTab({
+          surfaceId: "official-app",
+          groupKey: "app:agents",
+          route: "/apps/agents?run=run-1",
+        }),
+      ),
+    ).toMatchObject({ surfaceId: "agents", route: "/agents?run=run-1" });
   });
-
-  it("rewrites retired surfaces while upgrading the persisted dock store", () => {
-    const pane = createDockLeaf([retiredSearchTab()]);
+  it("upgrades persisted layout contents while preserving focus and Files data", () => {
+    const tab = legacyTab({
+      surfaceId: "files",
+      groupKey: "app:files",
+      state: { path: "/Users/ada" },
+      route: "/apps/files",
+    });
+    const pane = createDockLeaf([tab]);
     const layout = { root: pane, focusedPaneId: pane.id };
     const migrated = migrateWorkspaceStore(
       {
@@ -99,90 +101,21 @@ describe("workspace surface migration", () => {
       },
       6,
     );
-
-    expect(dockTabs(migrated.layout.root)[0].surfaceId).toBe("home");
-    expect(dockTabs(migrated.layoutsByScope.global!.root)[0].surfaceId).toBe("home");
-  });
-
-  it("moves bundled tools onto the App runtime", () => {
-    const pane = createDockLeaf([
-      {
-        ...legacyHomeTab(),
-        id: "tab:legacy-files",
-        surfaceId: "files",
-        groupKey: "app:files",
-        instanceKey: "files",
-        title: "Files",
-        route: "/apps/files",
-      },
-    ]);
-    const migrated = migrateRetiredWorkspaceTabs({ root: pane, focusedPaneId: pane.id });
-
-    expect(dockTabs(migrated.root)[0]).toMatchObject({
-      surfaceId: "official-app",
-      groupKey: "app:files",
-      instanceKey: "files",
-      title: "Files",
-      route: "/apps/files",
-      state: {},
+    expect(dockTabs(migrated.layout.root)[0]).toMatchObject({
+      id: tab.id,
+      surfaceId: "files",
+      state: tab.state,
     });
+    expect(migrated.layout.focusedPaneId).toBe(pane.id);
+    expect(dockTabs(migrateRetiredWorkspaceTabs(layout).root)[0].surfaceId).toBe("files");
   });
+});
 
-  it("moves saved Chat tabs into the Social group and canonical route", () => {
-    const pane = createDockLeaf([
-      {
-        ...legacyHomeTab(),
-        id: "tab:legacy-chat",
-        surfaceId: "space",
-        groupKey: "space:family:chat",
-        instanceKey: "family:chat",
-        title: "Chat",
-        route: "/spaces/family/chat?conversation=one",
-      },
-    ]);
-    const migrated = migrateSpaceToolTabs({ root: pane, focusedPaneId: pane.id });
-    expect(dockTabs(migrated.root)[0]).toMatchObject({
-      surfaceId: "official-app",
-      groupKey: "app:chat",
-      instanceKey: "chat",
-      title: "Social",
-      route: "/apps/social?space=family&conversation=one",
-    });
+it("preserves restored Space tabs during persistence migration", () => {
+  const tab = legacyTab({
+    surfaceId: "space",
+    route: "/spaces/project/notes?note=one",
+    groupKey: "space:project:notes",
   });
-
-  it("moves saved Social provider queries onto separate provider pages", () => {
-    const pane = createDockLeaf([
-      {
-        ...legacyHomeTab(),
-        id: "tab:legacy-instagram",
-        surfaceId: "space",
-        groupKey: "space:family:social",
-        instanceKey: "family:social",
-        title: "Chat",
-        route: "/spaces/family/social?provider=instagram&conversation=one",
-      },
-    ]);
-    const migrated = migrateSpaceToolTabs({ root: pane, focusedPaneId: pane.id });
-    expect(dockTabs(migrated.root)[0]?.route).toBe(
-      "/apps/social?space=family&provider=instagram&conversation=one",
-    );
-  });
-
-  it("preserves prepared Messenger and X provider pages", () => {
-    const pane = createDockLeaf([
-      {
-        ...legacyHomeTab(),
-        id: "tab:x",
-        surfaceId: "space",
-        groupKey: "space:family:social",
-        instanceKey: "family:social",
-        title: "Chat",
-        route: "/spaces/family/social/x?conversation=direct-one",
-      },
-    ]);
-    const migrated = migrateSpaceToolTabs({ root: pane, focusedPaneId: pane.id });
-    expect(dockTabs(migrated.root)[0]?.route).toBe(
-      "/apps/social?space=family&conversation=direct-one&provider=x",
-    );
-  });
+  expect(migrateRetiredWorkspaceTab(tab)).toEqual(tab);
 });

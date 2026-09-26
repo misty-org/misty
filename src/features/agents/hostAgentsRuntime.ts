@@ -3,10 +3,8 @@ import { useActivityStore } from "@/features/activity/useActivityStore";
 import { agentsApi } from "@/api/agents/api";
 import { assistantApi } from "@/api/assistant/api";
 import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
-import { automationsApi } from "./automations/api";
 import { mcpConnectionsApi } from "./mcp/api";
 import { useAuth, useAccountAvatarUrl } from "@/features/auth";
-import { useSpacesStore } from "@/features/spaces";
 import { useWorkspaceStore } from "@/features/workspace";
 import { SystemErrorActivity } from "@/features/activity";
 import {
@@ -41,19 +39,17 @@ export function initializeHostAgentsRuntime() {
         body: event.body,
         target: {
           kind: "route",
-          href: `/apps/agents?run=${encodeURIComponent(event.operationId)}`,
+          href: `/agents?run=${encodeURIComponent(event.operationId)}`,
         },
       });
     },
     agentsApi,
     assistantApi,
     aiSurfaceApi,
-    automationsApi,
     mcpConnectionsApi,
     subscribeToAiInvocation,
     useAuth,
     useAccountAvatarUrl,
-    useSpacesStore,
     useWorkspaceStore,
     Error: SystemErrorActivity,
     executeGlobalSearch,

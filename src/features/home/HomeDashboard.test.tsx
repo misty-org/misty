@@ -2,7 +2,6 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { spacesApi } from "@/api/spaces/api";
-import { useAppsStore } from "@/features/apps";
 import { homeApi } from "@/api/home/api";
 import { useSpacesStore } from "@/features/spaces";
 import { GlobalHomeDashboard } from "./GlobalHomeDashboard";
@@ -15,7 +14,6 @@ vi.mock("@/features/auth", () => ({
 }));
 
 beforeEach(() => {
-  useAppsStore.setState({ installations: [] });
   window.sessionStorage.clear();
   window.localStorage.clear();
   vi.stubEnv("DEV", true);
@@ -125,21 +123,16 @@ it("keeps global Home independent of Spaces while retaining Space shortcuts", as
   expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:home-space");
 });
 
-it("renders Home and personal app shortcuts without any Space", async () => {
+it("renders Home and built-in shortcuts without any Space", async () => {
   useSpacesStore.setState({ spaces: [], loading: false });
   const agenda = vi.spyOn(spacesApi, "agenda");
-  useAppsStore.setState({
-    installations: [{ app_id: "files", state: "installed" }] as ReturnType<
-      typeof useAppsStore.getState
-    >["installations"],
-  });
   const ui = render(
     <MemoryRouter>
       <GlobalHomeDashboard />
     </MemoryRouter>,
   );
   expect(ui.getByRole("heading", { level: 1 }).textContent).toContain("Alex");
-  expect(ui.getByRole("link", { name: /Files/ }).getAttribute("href")).toBe("/apps/files");
+  expect(ui.getByRole("link", { name: /Files/ }).getAttribute("href")).toBe("/files");
   expect(ui.getByRole("link", { name: "Create a Space" }).getAttribute("href")).toBe("/spaces");
   await waitFor(() => expect(ui.getByText("1-day streak")).toBeTruthy());
   expect(agenda).not.toHaveBeenCalled();

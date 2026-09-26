@@ -67,13 +67,7 @@ export function appConfigureServer(
   });
 }
 
-export function selfHostEntitlementStore(token: string): Promise<void> {
-  return invoke("self_host_entitlement_store", { token });
-}
 
-export function selfHostEntitlementLoad(): Promise<string | null> {
-  return invoke("self_host_entitlement_load");
-}
 
 export function storageSnapshot(): Promise<StorageSnapshot> {
   return invoke("storage_snapshot");

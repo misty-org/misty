@@ -3,6 +3,8 @@ export interface ApiSessionProvider {
   readGeneration: () => number;
   readToken: (path?: string) => Promise<string | null>;
   requestCredentials?: () => RequestCredentials;
+  /** True only when it is known that no account is signed in. */
+  isSignedOut?: () => boolean;
 }
 
 export const apiSessionInvalidEvent = "misty:account-session-invalid";
@@ -27,6 +29,10 @@ export function readApiSessionGeneration(): number {
 
 export function readApiAuthToken(path?: string): Promise<string | null> {
   return provider.readToken(path);
+}
+
+export function isApiSignedOut(): boolean {
+  return provider.isSignedOut?.() ?? false;
 }
 
 export function apiRequestCredentials(): RequestCredentials {

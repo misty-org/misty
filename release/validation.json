@@ -1,0 +1,8 @@
+{
+  "version": "0.1.0-beta.1",
+  "appleSiliconInstall": false,
+  "intelInstall": false,
+  "twoVersionUpdate": false,
+  "notes": "Record real packaged-app checks here before feed promotion. Build and notarization checks are recorded separately in the draft assets.",
+  "builtinToolsSmokeCheck": false
+}

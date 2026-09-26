@@ -30,10 +30,6 @@ pub mod commands;
 #[cfg(any(desktop, target_os = "ios"))]
 pub mod connected_devices;
 pub mod credential_store;
-#[cfg(desktop)]
-mod declarative_panel;
-#[cfg(desktop)]
-pub mod desktop_pet;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
@@ -60,13 +56,10 @@ pub mod peer_files;
 #[cfg(any(desktop, target_os = "ios"))]
 pub mod peer_identity;
 #[cfg(desktop)]
-pub mod plugin_commands;
-#[cfg(desktop)]
 mod plugin_routes;
 pub mod power_pack;
 pub mod providers;
 pub mod search;
-pub mod self_host_entitlement;
 pub mod settings;
 mod settings_migration;
 pub mod smart_library;
@@ -117,3 +110,30 @@ pub mod auth_http;
 
 #[cfg(windows)]
 mod browser_capture_windows;
+
+pub mod workspace_autopilot;
+
+pub mod browser_sync;
+pub mod workspace_recovery;
+
+#[cfg(target_os = "macos")]
+pub(crate) mod browser_cookie_store;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_cookie_restore;
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) mod browser_website_storage;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_storage_restore;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_session_storage;
+#[cfg(any(windows, test))]
+mod browser_cookie_cdp;
+#[cfg(windows)]
+#[path = "browser_cookie_store_windows.rs"]
+pub(crate) mod browser_cookie_store;
+
+#[cfg(desktop)]
+pub mod cursor_companion;
+
+#[cfg(target_os = "macos")]
+pub mod browser_site_permissions;

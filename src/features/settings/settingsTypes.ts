@@ -12,7 +12,9 @@ import { type LucideIcon } from "lucide-react";
 export type SettingsSection =
   | "account"
   | "general"
+  | "sync"
   | "appearance"
+  | "layout"
   | "notifications"
   | "shortcuts"
   | "inbox"
@@ -29,7 +31,6 @@ export type SettingsSection =
   | "models"
   | "misty"
   | "agents"
-  | "extensions"
   | "privacy"
   | "server"
   | "updates"

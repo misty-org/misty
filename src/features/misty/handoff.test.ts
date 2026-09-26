@@ -43,60 +43,27 @@ describe("openMisty", () => {
   it("opens in-app Misty panel without throwing when desktop companion window is unavailable", async () => {
     windowMocks.getByLabel.mockResolvedValue(null);
 
-    await expect(
-      openMisty({ prompt: "What is the status of my tasks?" }),
-    ).resolves.toBeUndefined();
+    await expect(openMisty({ prompt: "What is the status of my tasks?" })).resolves.toBeUndefined();
 
     const state = useMistyStore.getState();
     expect(state.panel).toBe("answer");
     expect(state.query).toBe("What is the status of my tasks?");
   });
 
-  it("delegates to companion window when companion window is available", async () => {
-    const companionMock = {
-      emit: vi.fn().mockResolvedValue(undefined),
-      show: vi.fn().mockResolvedValue(undefined),
-    };
-    windowMocks.getByLabel.mockResolvedValue(companionMock);
-
-    let listener: ((event: { payload: { requestId: string; error?: string } }) => void) | undefined;
-    windowMocks.getCurrentWindow.mockReturnValue({
-      label: "main",
-      listen: vi.fn(async (_event, callback) => {
-        listener = callback;
-        return () => {};
-      }),
+  it("keeps handoffs in-app even if a legacy companion window exists", async () => {
+    const companion = { emit: vi.fn(), show: vi.fn() };
+    windowMocks.getByLabel.mockResolvedValue(companion);
+    await openMisty({
+      prompt: "Hello Misty",
+      context: [{ kind: "file", id: "file-1", title: "Notes", source: "local" }],
     });
-
-    companionMock.emit.mockImplementation(async (_event, payload: { requestId: string }) => {
-      queueMicrotask(() => {
-        listener?.({ payload: { requestId: payload.requestId } });
-      });
-    });
-
-    await openMisty({ prompt: "Hello companion" });
-
-    expect(companionMock.emit).toHaveBeenCalledOnce();
-    expect(companionMock.show).toHaveBeenCalledOnce();
-  });
-
-  it("falls back to in-app panel if companion handoff fails", async () => {
-    const companionMock = {
-      emit: vi.fn().mockRejectedValue(new Error("RPC failed")),
-      show: vi.fn().mockResolvedValue(undefined),
-    };
-    windowMocks.getByLabel.mockResolvedValue(companionMock);
-
-    windowMocks.getCurrentWindow.mockReturnValue({
-      label: "main",
-      listen: vi.fn(async () => () => {}),
-    });
-
-    await expect(openMisty({ prompt: "Fallback test" })).resolves.toBeUndefined();
-
-    const state = useMistyStore.getState();
-    expect(state.panel).toBe("answer");
-    expect(state.query).toBe("Fallback test");
+    expect(windowMocks.getByLabel).not.toHaveBeenCalled();
+    expect(companion.emit).not.toHaveBeenCalled();
+    expect(useMistyStore.getState().panel).toBe("answer");
+    expect(useMistyStore.getState().query).toBe("Hello Misty");
+    expect(useMistyStore.getState().context).toEqual([
+      { kind: "file", id: "file-1", title: "Notes", source: "local" },
+    ]);
   });
 
   it("opens in-app panel directly when running outside Tauri", async () => {

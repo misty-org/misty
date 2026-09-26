@@ -17,6 +17,23 @@ describe("shortcut dispatcher", () => {
     useWorkspaceStore.getState().reset();
   });
 
+  it("does not dispatch workspace shortcuts underneath the sleeping device overlay", () => {
+    const overlay = document.createElement("div");
+    overlay.dataset.deviceSyncSleep = "";
+    document.body.appendChild(overlay);
+    const handler = vi.fn();
+    const remove = registerShortcutHandler("search.toggle", handler);
+    expect(
+      dispatchShortcutEvent(
+        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
+      ),
+    ).toBe(false);
+    expect(invokeShortcutCommand("search.toggle")).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+    remove();
+    overlay.remove();
+  });
+
   it("prefers the focused tool over broader scopes", () => {
     useWorkspaceStore.getState().openSurface({
       surfaceId: "terminal",
@@ -84,7 +101,7 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("does not open Search while typing in Agent chat", () => {
+  it("opens global browser search from Agent chat", () => {
     const agentChat = document.createElement("main");
     agentChat.dataset.mistyAgentChat = "";
     const textarea = document.createElement("textarea");
@@ -100,9 +117,9 @@ describe("shortcut dispatcher", () => {
     });
     Object.defineProperty(event, "target", { value: textarea });
 
-    expect(dispatchShortcutEvent(event)).toBe(false);
-    expect(invokeShortcutCommand("search.toggle")).toBe(false);
-    expect(handler).not.toHaveBeenCalled();
+    expect(dispatchShortcutEvent(event)).toBe(true);
+    expect(invokeShortcutCommand("search.toggle")).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(2);
 
     remove();
     agentChat.remove();

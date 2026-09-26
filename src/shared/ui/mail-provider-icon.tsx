@@ -1,4 +1,4 @@
-import { BrandIcon } from "../../.././apps/shared/BrandIcon";
+import { BrandIcon } from "../toolAssets/BrandIcon";
 
 export type MailProviderType = "google" | "microsoft";
 

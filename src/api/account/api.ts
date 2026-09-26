@@ -5,7 +5,6 @@ import {
   readApiAuthToken,
   readApiSessionGeneration,
 } from "@/api/client/session";
-import { attachSelfHostEntitlementProof } from "@/api/self-host/proof";
 import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import type { AccountHandoffPath, AccountMeResponse, LoginResponse } from "./types";
@@ -22,6 +21,9 @@ export const accountApi = {
     requestJson<LoginResponse>("POST", "/login", { email, password }),
   register: (path: "/register" | "/self-host/bootstrap" | "/self-host/enroll", body: unknown) =>
     requestJson<LoginResponse>("POST", path, body),
+  logout: () => requestJson<{ status?: string }>("POST", "/logout"),
+  forgotPassword: (email: string) =>
+    requestJson<{ message?: string }>("POST", "/auth/forgot", { email }),
   me: () => requestJson<AccountMeResponse>("GET", "/me"),
   handoff: (path?: AccountHandoffPath) =>
     requestJson<{ url: string }>("POST", "/auth/handoff", path ? { path } : {}),
@@ -48,7 +50,6 @@ async function requestJson<T>(method: AccountMethod, path: string, body?: unknow
     assertAccountGeneration(accountGeneration);
     const headers = addRequestCorrelation(requestHeaders(body, token) ?? new Headers());
     if (path === "/login" || path.startsWith("/self-host/")) {
-      await attachSelfHostEntitlementProof(headers);
     }
     const response = await httpRequest(url, {
       method,
@@ -177,7 +178,14 @@ function accountClientPlatform(): "windows" | "macos" | "linux" | "android" | "i
 }
 
 function shouldAttachAuthToken(path: string): boolean {
-  return !["/login", "/register", "/self-host/bootstrap", "/self-host/enroll"].includes(path);
+  return ![
+    "/login",
+    "/register",
+    "/self-host/bootstrap",
+    "/self-host/enroll",
+    "/auth/forgot",
+    "/logout",
+  ].includes(path);
 }
 
 function recordAccountApiDebugEvent(event: {

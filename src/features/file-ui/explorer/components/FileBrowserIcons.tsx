@@ -1,37 +1,100 @@
 import type { FileEntry } from "@/native/contracts";
-import { File, Folder } from "lucide-react";
-import materialIconTheme from "material-icon-theme/dist/material-icons.json";
+import {
+  File,
+  FileArchive,
+  FileAudio,
+  FileCode,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  FileVideo,
+  Folder,
+  FolderOpen,
+  type LucideIcon,
+} from "lucide-react";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
-const materialTheme = materialIconTheme as MaterialIconTheme;
-const materialIconBaseUrl = import.meta.env.MISTY_PACKAGED_ICONS
-  ? new URL("./assets/material-icon-theme/", import.meta.env.MISTY_PACKAGE_BASE_URL).href
-  : `${import.meta.env.BASE_URL}assets/material-icon-theme/`;
+// Group by content rather than assigning a different brand/color to every format.
+const fileTypes: ReadonlyArray<readonly [LucideIcon, ReadonlySet<string>]> = [
+  [FileArchive, new Set("zip rar 7z tar gz bz2 xz tgz zst".split(" "))],
+  [FileAudio, new Set("mp3 wav flac aac m4a ogg opus aiff aif mid midi".split(" "))],
+  [FileVideo, new Set("mp4 mov webm mkv avi m4v wmv mpg mpeg".split(" "))],
+  [
+    FileImage,
+    new Set("png jpg jpeg gif webp avif svg ico bmp tiff tif heic heif raw psd".split(" ")),
+  ],
+  [FileSpreadsheet, new Set("csv tsv xls xlsx ods numbers".split(" "))],
+  [FileText, new Set("txt md mdx markdown pdf doc docx odt rtf pages log epub".split(" "))],
+  [
+    FileCode,
+    new Set(
+      "js jsx ts tsx mjs cjs json jsonc html htm css scss sass less vue svelte py rs go java kt swift c h cpp hpp cs rb php sh bash zsh fish sql xml yaml yml toml ini conf env".split(
+        " ",
+      ),
+    ),
+  ],
+];
+const codeNames = new Set([
+  "dockerfile",
+  "containerfile",
+  "makefile",
+  "gemfile",
+  "rakefile",
+  ".gitignore",
+  ".gitattributes",
+  ".gitmodules",
+  ".editorconfig",
+  ".npmrc",
+  ".nvmrc",
+]);
+
+function fileIconFor(name: string, extension?: string, mimeType?: string | null): LucideIcon {
+  const normalizedName = name.toLowerCase();
+  if (
+    codeNames.has(normalizedName) ||
+    normalizedName === ".env" ||
+    normalizedName.startsWith(".env.")
+  ) {
+    return FileCode;
+  }
+  const dot = normalizedName.lastIndexOf(".");
+  const suffix =
+    extension?.replace(/^\./, "").toLowerCase() || (dot > 0 ? normalizedName.slice(dot + 1) : "");
+  for (const [Icon, extensions] of fileTypes) {
+    if (extensions.has(suffix)) return Icon;
+  }
+  // Remote and extensionless files can still supply a useful content type.
+  const mime = mimeType?.toLowerCase();
+  if (mime?.startsWith("image/")) return FileImage;
+  if (mime?.startsWith("audio/")) return FileAudio;
+  if (mime?.startsWith("video/")) return FileVideo;
+  if (mime?.startsWith("text/") || mime === "application/pdf") return FileText;
+  return File;
+}
+
+function EntryIcon(props: { icon: LucideIcon; size?: number; className?: string }) {
+  const Icon = props.icon;
+  return (
+    <Icon
+      aria-hidden="true"
+      focusable="false"
+      size={props.size ?? 20}
+      strokeWidth={1.75}
+      className={props.className ?? fileBrowserStyles.entryIcon}
+    />
+  );
+}
 
 export function FileIcon(props: { entry: FileEntry; size?: number; variant?: "table" | "grid" }) {
-  const size = props.size ?? 20;
-  const iconUrl = materialIconUrlForEntry(props.entry);
-
-  if (iconUrl) {
-    return (
-      <img
-        alt=""
-        aria-hidden="true"
-        className={fileBrowserStyles.materialIcon}
-        draggable={false}
-        height={size}
-        src={iconUrl}
-        style={{ width: size, height: size }}
-        width={size}
-      />
-    );
-  }
-
-  if (props.entry.kind === "folder") {
-    return <Folder size={size} className={fileBrowserStyles.folderIcon} />;
-  }
-
-  return <File size={size} className={fileBrowserStyles.fileIcon} />;
+  const { entry } = props;
+  return (
+    <EntryIcon
+      icon={
+        entry.kind === "folder" ? Folder : fileIconFor(entry.name, entry.extension, entry.mimeType)
+      }
+      size={props.size}
+    />
+  );
 }
 
 export function FileNameIcon(props: {
@@ -41,123 +104,15 @@ export function FileNameIcon(props: {
   size?: number;
   className?: string;
 }) {
-  const kind = props.kind ?? "file";
-  const size = props.size ?? 20;
-  const iconUrl = materialIconUrlForName(props.name, kind, props.open ?? false);
-  if (iconUrl) {
-    return (
-      <img
-        alt=""
-        aria-hidden="true"
-        className={props.className ?? fileBrowserStyles.materialIcon}
-        draggable={false}
-        height={size}
-        src={iconUrl}
-        width={size}
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  return kind === "folder" ? (
-    <Folder size={size} className={props.className ?? fileBrowserStyles.folderIcon} />
-  ) : (
-    <File size={size} className={props.className ?? fileBrowserStyles.fileIcon} />
+  return (
+    <EntryIcon
+      icon={props.kind === "folder" ? (props.open ? FolderOpen : Folder) : fileIconFor(props.name)}
+      size={props.size}
+      className={props.className}
+    />
   );
 }
 
 export function GenericFileIcon(props: { kind: "file" | "folder"; size?: number }) {
-  const size = props.size ?? 20;
-  const iconUrl = materialIconUrl(
-    props.kind === "folder" ? materialTheme.folder : materialTheme.file,
-  );
-  if (iconUrl) {
-    return (
-      <img
-        alt=""
-        aria-hidden="true"
-        className={fileBrowserStyles.materialIcon}
-        draggable={false}
-        height={size}
-        src={iconUrl}
-        style={{ width: size, height: size }}
-        width={size}
-      />
-    );
-  }
-
-  return props.kind === "folder" ? (
-    <Folder size={size} className={fileBrowserStyles.folderIcon} />
-  ) : (
-    <File size={size} className={fileBrowserStyles.fileIcon} />
-  );
+  return <EntryIcon icon={props.kind === "folder" ? Folder : File} size={props.size} />;
 }
-
-function materialIconUrlForEntry(entry: FileEntry): string | null {
-  if (entry.kind === "folder") return materialIconUrlForName(entry.name, "folder", false);
-
-  const name = entry.name.toLowerCase();
-  const exactNameIcon = materialTheme.fileNames[name];
-  if (exactNameIcon) return materialIconUrl(exactNameIcon);
-
-  const extension = normalizedExtension(entry);
-  if (extension) {
-    const extensionIcon = materialTheme.fileExtensions[extension];
-    if (extensionIcon) return materialIconUrl(extensionIcon);
-  }
-
-  return materialIconUrl(materialTheme.file);
-}
-
-function materialIconUrlForName(
-  rawName: string,
-  kind: "file" | "folder",
-  open: boolean,
-): string | null {
-  const name = rawName.toLowerCase();
-  if (kind === "folder") {
-    const expandedName = open
-      ? (materialTheme.folderNamesExpanded?.[name] ?? materialTheme.folderNames[name])
-      : materialTheme.folderNames[name];
-    return materialIconUrl(
-      expandedName ?? (open ? materialTheme.folderExpanded : undefined) ?? materialTheme.folder,
-    );
-  }
-
-  const exactNameIcon = materialTheme.fileNames[name];
-  if (exactNameIcon) return materialIconUrl(exactNameIcon);
-  const index = name.lastIndexOf(".");
-  const extension = index > 0 && index < name.length - 1 ? name.slice(index + 1) : "";
-  if (extension) {
-    const extensionIcon = materialTheme.fileExtensions[extension];
-    if (extensionIcon) return materialIconUrl(extensionIcon);
-  }
-  return materialIconUrl(materialTheme.file);
-}
-
-function normalizedExtension(entry: FileEntry): string {
-  const extension = entry.extension.replace(/^\./, "").toLowerCase();
-  if (extension) return extension;
-
-  const index = entry.name.lastIndexOf(".");
-  if (index <= 0 || index === entry.name.length - 1) return "";
-  return entry.name.slice(index + 1).toLowerCase();
-}
-
-function materialIconUrl(iconName: string | undefined): string | null {
-  if (!iconName) return null;
-  const definition = materialTheme.iconDefinitions[iconName];
-  const fileName = definition?.iconPath?.split("/").pop();
-  if (!fileName) return null;
-  return `${materialIconBaseUrl}${encodeURIComponent(fileName)}`;
-}
-
-export type MaterialIconTheme = {
-  iconDefinitions: Record<string, { iconPath?: string }>;
-  fileExtensions: Record<string, string>;
-  fileNames: Record<string, string>;
-  folderNames: Record<string, string>;
-  folderNamesExpanded?: Record<string, string>;
-  folderExpanded?: string;
-  folder: string;
-  file: string;
-};

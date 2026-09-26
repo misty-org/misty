@@ -1,10 +1,7 @@
 import { MistyBrandIcon } from "@/features/workspace";
 import { Button } from "@/shared/ui";
 
-export function TourWelcomeModal(props: {
-  onStart: () => void;
-  onSkip: () => void;
-}) {
+export function TourWelcomeModal(props: { onStart: () => void; onSkip: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-150"
@@ -17,15 +14,13 @@ export function TourWelcomeModal(props: {
           <MistyBrandIcon size={24} />
         </div>
 
-        <h2
-          id="tour-welcome-title"
-          className="mt-5 text-base font-semibold text-cream-bright"
-        >
+        <h2 id="tour-welcome-title" className="mt-5 text-base font-semibold text-cream-bright">
           Welcome to Misty
         </h2>
 
         <p className="mt-2 text-sm leading-relaxed text-cream-muted">
-          A guided walkthrough to explore where everything is, how apps dock to your navbar, and how to work across spaces and virtual windows.
+          Find your websites, organize tabs and splits, and work with Agents in your browser
+          workspace.
         </p>
 
         <div className="mt-7 space-y-2">

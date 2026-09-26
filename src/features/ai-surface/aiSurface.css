@@ -272,7 +272,6 @@
 
 .misty-input-suggestions button:hover {
   border-color: color-mix(in srgb, var(--color-cream-muted) 45%, transparent);
-  background: var(--color-charcoal-hover);
   color: var(--color-cream-bright);
 }
 

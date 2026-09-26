@@ -1,4 +1,3 @@
-import "@/features/marketplace/components/discover.css";
 import { useRef, useState } from "react";
 import { ArrowDownUp, Search, SlidersHorizontal, X } from "lucide-react";
 import {
@@ -11,6 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  Button,
+  NavIsland,
+  NavIslandItem,
 } from "@/shared/ui";
 import {
   activitySections,
@@ -19,8 +21,10 @@ import {
   type ActivityView,
   type ActivitySection,
 } from "./activityView";
+
 const iconButton =
-  "discover-refresh relative focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright";
+  "relative rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright data-[active]:bg-charcoal-hover data-[active]:text-cream-bright";
+
 export function ActivityPanelToolbar({
   view,
   counts,
@@ -36,34 +40,28 @@ export function ActivityPanelToolbar({
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const active = view.types.length > 0 || view.statuses.length > 0;
   return (
-    <div className="discover-surface shrink-0" style={{ height: "auto", overflow: "visible" }}>
-      <div className="discover-search-band" style={{ borderBottom: "none" }}>
-        <nav aria-label="Activity sections" className="discover-nav misty-transient-scrollbar">
-          <div className="contents">
-            {Object.entries(activitySections).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-current={view.section === key ? "page" : undefined}
-                onClick={() => onChange({ ...view, section: key as ActivitySection })}
-                className={`discover-nav-item focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright ${view.section === key ? "bg-charcoal-hover" : "bg-transparent"}`}
-              >
-                {label}
-                <span className="text-[10px] tabular-nums text-cream-muted">
-                  {counts[key as ActivitySection]}
-                </span>
-              </button>
-            ))}
-          </div>
-        </nav>
-        <div
-          className="discover-search-controls"
-          style={{ flex: "0 0 auto", minWidth: 0, marginLeft: "auto" }}
-        >
+    <div className="shrink-0">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-1.5">
+        <NavIsland aria-label="Activity sections" className="misty-transient-scrollbar">
+          {Object.entries(activitySections).map(([key, label]) => (
+            <NavIslandItem
+              key={key}
+              active={view.section === key}
+              onClick={() => onChange({ ...view, section: key as ActivitySection })}
+            >
+              <span>{label}</span>
+              <span className="text-[10px] tabular-nums text-cream-muted">
+                {counts[key as ActivitySection]}
+              </span>
+            </NavIslandItem>
+          ))}
+        </NavIsland>
+        <div className="ml-auto flex shrink-0 items-center gap-1 min-w-0">
           <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 className={iconButton}
                 aria-label="Filter activity"
                 title="Filter activity"
@@ -73,7 +71,7 @@ export function ActivityPanelToolbar({
                 {active && (
                   <span className="absolute right-1 top-1 size-1 rounded-full bg-cream-bright" />
                 )}
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               onEscapeKeyDown={(event) => {
@@ -137,14 +135,15 @@ export function ActivityPanelToolbar({
           </DropdownMenu>
           <DropdownMenu open={sortOpen} onOpenChange={setSortOpen}>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 className={iconButton}
                 aria-label="Sort activity"
                 title="Sort activity"
               >
                 <ArrowDownUp size={16} />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
@@ -165,9 +164,10 @@ export function ActivityPanelToolbar({
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             ref={searchTrigger}
-            type="button"
             className={iconButton}
             aria-label="Search activity"
             title="Search activity"
@@ -178,18 +178,18 @@ export function ActivityPanelToolbar({
             {view.query && (
               <span className="absolute right-1 top-1 size-1 rounded-full bg-cream-bright" />
             )}
-          </button>
+          </Button>
         </div>
       </div>
       {searchOpen && (
-        <div className="discover-search mx-3 mb-1">
+        <div className="mx-3 mb-1.5 flex h-7 items-center gap-2 rounded-md border border-charcoal-border bg-charcoal-card px-2 text-cream-muted">
           <Search size={16} className="shrink-0 text-cream-muted" aria-hidden="true" />
           <input
             autoFocus
             type="search"
             aria-label="Search activity text"
             placeholder="Search activity"
-            className="flex-1"
+            className="flex-1 min-w-0 bg-transparent text-sm text-cream outline-none placeholder:text-cream-muted caret-cream-bright"
             value={view.query}
             onChange={(event) => onChange({ ...view, query: event.target.value })}
             onKeyDown={(event) => {
@@ -201,14 +201,15 @@ export function ActivityPanelToolbar({
               }
             }}
           />
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             className={iconButton}
             aria-label="Clear search"
             onClick={() => onChange({ ...view, query: "" })}
           >
             <X size={14} />
-          </button>
+          </Button>
         </div>
       )}
     </div>

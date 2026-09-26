@@ -1,0 +1,21 @@
+{
+  "name": "@misty/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "contracts:sync": "node scripts/contracts/sync-contracts.ts && node scripts/contracts/sync-go-contracts.ts",
+    "contracts:check": "node scripts/contracts/sync-go-contracts.ts --check",
+    "contracts:check-source": "node scripts/contracts/sync-contracts.ts --check"
+  },
+  "dependencies": {
+    "@misty/contracts": "file:third-party/misty-contracts"
+  },
+  "workspaces": [],
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "devDependencies": {
+    "zod": "4.4.3"
+  }
+}

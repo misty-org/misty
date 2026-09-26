@@ -63,12 +63,12 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             const Icon = item.icon;
             const active = item.id === props.activeId;
             return (
-              <button
+              <Button
+                variant="ghost"
                 key={item.id}
-                type="button"
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm",
+                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-normal justify-start",
                   active
                     ? "bg-charcoal-active text-cream-bright"
                     : "text-cream-muted hover:bg-charcoal-hover active:bg-charcoal-hover",
@@ -77,7 +77,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               >
                 <Icon className="size-4" aria-hidden="true" />
                 {item.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -114,8 +114,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               // treatment so the two rails read as the same component.
               const startsGroup =
                 item.group !== undefined && item.group !== props.items[index - 1]?.group;
-              const endsGroup =
-                item.group !== undefined && item.group !== props.items[index + 1]?.group;
               const groupCollapsed = item.group ? collapsedGroups.has(item.group) : false;
               return (
                 <Fragment key={item.id}>
@@ -139,7 +137,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
                       icon={<Icon aria-hidden="true" />}
                       label={item.label}
                       selected={active}
-                      last={endsGroup}
                       nested={Boolean(item.group)}
                       settings
                       data-settings-nav-entry={item.id}

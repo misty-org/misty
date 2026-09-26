@@ -67,6 +67,7 @@ const mocks = vi.hoisted(() => {
     readActiveSavedAccountSession: vi.fn(),
     activateAccountSession: vi.fn(),
     accountFetchMe: vi.fn(),
+    accountLogout: vi.fn().mockResolvedValue(undefined),
     clearAccountAuthToken: vi.fn().mockResolvedValue(null),
     deactivateActiveAccount: vi.fn().mockResolvedValue(undefined),
     updateSavedAccountSession: vi.fn(),
@@ -85,6 +86,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/shared/platform/buildTarget", () => ({ isNativeMobileBuild: false }));
 vi.mock("./store/useAccountStore", () => ({
   accountFetchMe: mocks.accountFetchMe,
+  accountLogout: mocks.accountLogout,
   isAccountUnauthorizedError: (error: { status?: number }) => error?.status === 401,
 }));
 vi.mock("./store/useAuthTokenStore", () => ({
@@ -128,10 +130,10 @@ vi.mock("@/features/app-shell", () => {
     }),
   };
 });
-vi.mock("@/features/files/explorer", () => ({
+vi.mock("@/features/files/workspace/explorer", () => ({
   useExplorerStore: { setState: mocks.explorerSetState },
 }));
-vi.mock("@/features/files/search", () => ({
+vi.mock("@/features/files/workspace/search", () => ({
   resetSearchAccountState: mocks.resetSearchAccountState,
 }));
 vi.mock("@/features/spaces", () => ({
@@ -150,7 +152,7 @@ vi.mock("@/features/agents", () => ({
     void mocks.agentRefresh();
   },
 }));
-vi.mock("@/features/notes", () => ({
+vi.mock("@/features/journal/notes", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
 }));
 vi.mock("@/telemetry/lifecycle", () => ({ setAnalyticsAuthenticationState: vi.fn() }));
@@ -320,7 +322,9 @@ describe("AuthProvider account switching", () => {
       await Promise.resolve();
     });
 
-    act(() => auth!.setUser(null));
+    await act(async () => {
+      await auth!.setUser(null);
+    });
 
     expect(auth?.user).toBeNull();
     expect(mocks.userStore.clear).toHaveBeenCalled();
@@ -582,7 +586,7 @@ describe("AuthProvider account switching", () => {
             <Routes>
               <Route element={<AccountOutlet />}>
                 <Route path="/signin" element={<SignIn />} />
-                <Route path="/spaces" element={<Workspace />} />
+                <Route path="/browser" element={<Workspace />} />
               </Route>
             </Routes>
           </AuthProvider>
@@ -627,7 +631,7 @@ describe("AuthProvider account switching", () => {
     );
   });
 
-  it("swaps over active account identity and force-reloads spaces on successful switch", async () => {
+  it("swaps verified account identity without reloading retired Spaces", async () => {
     mocks.updateSavedAccountSession.mockReset().mockResolvedValue(undefined);
 
     function Probe() {
@@ -658,6 +662,70 @@ describe("AuthProvider account switching", () => {
       expect.objectContaining({ id: mocks.accountB.id }),
       expect.anything(),
     );
-    expect(mocks.spacesLoad).toHaveBeenCalledWith({ force: true, accountId: mocks.accountB.id });
+    expect(mocks.spacesLoad).not.toHaveBeenCalled();
+  });
+
+  it("keeps a switch target whose session expired and restores the previous account", async () => {
+    mocks.updateSavedAccountSession.mockReset().mockResolvedValue(undefined);
+    mocks.accountFetchMe.mockReset().mockImplementation(async () => {
+      if (mocks.activeAccountId === mocks.accountB.id) throw { status: 401 };
+      return mocks.meA;
+    });
+
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+
+    await expect(
+      act(async () => {
+        await auth!.switchAccount(mocks.accountB.id);
+      }),
+    ).rejects.toMatchObject({ name: "SavedAccountSessionUnavailableError" });
+
+    expect(mocks.clearAccountAuthToken).not.toHaveBeenCalled();
+    expect(auth?.user?.id).toBe(mocks.accountA.id);
+    expect(auth?.accounts.map((account) => account.id)).toContain(mocks.accountB.id);
+  });
+
+  it("finishes signing out even when a cleanup step fails", async () => {
+    mocks.signOut.mockRejectedValueOnce(new Error("native sign-out failed"));
+
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await auth!.logout();
+    });
+
+    expect(mocks.accountLogout).toHaveBeenCalledWith(mocks.accountA.id);
+    expect(mocks.deactivateActiveAccount).toHaveBeenCalled();
+    expect(mocks.activateAccountSession).not.toHaveBeenCalled();
+    expect(auth?.user).toBeNull();
+    expect(auth?.transitioning).toBe(false);
   });
 });

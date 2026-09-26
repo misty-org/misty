@@ -1,3 +1,4 @@
+import { loadPdfPreview } from "@/features/files/workspace/previews";
 import type { PreviewErrorComponent } from "../file-ui/explorer/components/globalPreview/PreviewRuntime";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion, Loader2 } from "lucide-react";
@@ -14,7 +15,7 @@ import {
 import { PreviewMessage } from "./previewPrimitives";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
-const PdfViewer = lazy(() => import("@/features/apps/FilePdfPreview"));
+const PdfViewer = lazy(loadPdfPreview);
 
 export function EmbeddedUniversalPreviewView(props: {
   runtime: EmbeddedPreviewRuntime;
@@ -170,7 +171,7 @@ export function useEmbeddedDocument(
       .then(async (buffer) => {
         const bytes = new Uint8Array(buffer);
         if (officeExtensions.has(extension)) {
-          if (!extractDocumentText) throw new Error("The app's document reader is unavailable.");
+          if (!extractDocumentText) throw new Error("The document reader is unavailable.");
           return {
             kind: "document" as const,
             text: await extractDocumentText(extension, bytes),

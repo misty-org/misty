@@ -1,9 +1,10 @@
+import { observeAccountChanges } from "@/api/accountEvents";
+import { Button } from "@/shared/ui";
 import { useCallback, useEffect, useState, useRef } from "react";
 import {
   runtimeAiApi as ai,
   runtimeAgentsApi as agents,
   useAgentsAuth,
-  useAgentsWorkspace,
   openAgentsMisty as openMisty,
 } from "../agentsRuntime";
 import { activityParent, type MistyActivityEntry } from "@/features/misty/activity";
@@ -19,8 +20,7 @@ export function MistyDashboard({
   spaceId?: string;
 }) {
   const { user } = useAgentsAuth();
-  const scope = useAgentsWorkspace((s) => s.activeScopeKey);
-  const spaceId = requestedSpaceId ?? (scope.startsWith("space:") ? scope.slice(6) : "");
+  const spaceId = requestedSpaceId ?? "";
   const identity = useRef("");
   identity.current = `${user?.id}:${spaceId}:${agentId}`;
   const [entries, setEntries] = useState<MistyActivityEntry[]>([]);
@@ -29,7 +29,7 @@ export function MistyDashboard({
   const [detail, setDetail] = useState<PersonalAgentRunDetail>();
   const [busy, setBusy] = useState(false);
   const refresh = useCallback(async () => {
-    if (!user?.id || !spaceId) {
+    if (!user?.id) {
       setLoading(false);
       return;
     }
@@ -50,10 +50,8 @@ export function MistyDashboard({
     setError("");
     setEntries([]);
     setDetail(undefined);
-    void refresh();
-    const timer = setInterval(() => void refresh(), 5000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+    return observeAccountChanges(user?.id ?? "", ["runs", "invocations"], refresh);
+  }, [refresh, user?.id]);
   const action = async (run: () => Promise<unknown>) => {
     const requestIdentity = identity.current;
     setBusy(true);
@@ -77,34 +75,34 @@ export function MistyDashboard({
             Your private tasks, delegated work, and approvals.
           </p>
         </div>
-        <button
+        <Button
+          variant="ghost"
           className="rounded-md border border-charcoal-border px-3 py-2 text-sm"
           onClick={onManageConnections}
         >
           Connections
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           className="rounded-md bg-charcoal-active px-3 py-2 text-sm"
           onClick={() => void openMisty({ spaceId }).catch((reason) => setError(String(reason)))}
         >
           Open Misty
-        </button>
+        </Button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {error && (
           <p role="alert">
             {error}{" "}
-            <button className="underline" onClick={() => void refresh()}>
+            <Button variant="ghost" className="underline" onClick={() => void refresh()}>
               Retry
-            </button>
+            </Button>
           </p>
         )}
         {loading ? (
           <p role="status">Loading activity…</p>
         ) : !entries.length ? (
-          <p className="text-sm text-cream-muted">
-            No activity yet. Open Misty to start a task in this Space.
-          </p>
+          <p className="text-sm text-cream-muted">No activity yet. Open Misty to start a task.</p>
         ) : null}
         {entries.map((entry) => (
           <section key={entry.id} className="border-b border-charcoal-border py-4">
@@ -122,7 +120,8 @@ export function MistyDashboard({
                 </p>
               </div>
               {entry.conversation_id && (
-                <button
+                <Button
+                  variant="ghost"
                   className="text-xs underline"
                   onClick={() =>
                     void openMisty({
@@ -133,10 +132,11 @@ export function MistyDashboard({
                   }
                 >
                   Conversation
-                </button>
+                </Button>
               )}
               {entry.run_id && (
-                <button
+                <Button
+                  variant="ghost"
                   className="text-xs underline"
                   onClick={() =>
                     void agents
@@ -149,12 +149,13 @@ export function MistyDashboard({
                   }
                 >
                   Details
-                </button>
+                </Button>
               )}
               {!["completed", "failed", "canceled", "completed_with_errors"].includes(
                 entry.state,
               ) && (
-                <button
+                <Button
+                  variant="ghost"
                   disabled={busy}
                   className="text-xs underline"
                   onClick={() =>
@@ -166,7 +167,7 @@ export function MistyDashboard({
                   }
                 >
                   Cancel
-                </button>
+                </Button>
               )}
             </div>
             {entry.result && entry.result !== "{}" && (
@@ -204,7 +205,8 @@ export function MistyDashboard({
                 <div key={approval.id} className="mt-3">
                   <p>{approval.summary}</p>
                   {(["approve", "deny"] as const).map((decision) => (
-                    <button
+                    <Button
+                      variant="ghost"
                       key={decision}
                       disabled={busy}
                       className="mr-3 underline"
@@ -215,16 +217,20 @@ export function MistyDashboard({
                       }
                     >
                       {decision === "approve" ? "Approve" : "Deny"}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               ))}
             <pre className="mt-3 whitespace-pre-wrap text-xs">
               {JSON.stringify(detail.result, null, 2)}
             </pre>
-            <button className="mt-2 text-xs underline" onClick={() => setDetail(undefined)}>
+            <Button
+              variant="ghost"
+              className="mt-2 text-xs underline"
+              onClick={() => setDetail(undefined)}
+            >
               Close details
-            </button>
+            </Button>
           </section>
         )}
       </div>

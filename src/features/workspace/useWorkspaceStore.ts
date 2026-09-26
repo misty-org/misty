@@ -1,8 +1,12 @@
-import { paneHistory, pushPaneView, traversePaneHistory } from "./paneHistory";
+import { validDockingLayout, type DockingLayout } from "@/features/app-shell/dockingLayout";
+import {
+  initialWebsiteNavigation,
+  type WebsiteNavigationState,
+} from "@/features/browser-workspace/navigationDefaults";
+import { pushPaneView, traversePaneHistory } from "./paneHistory";
 import {
   activeLayoutView,
   allLayoutViews,
-  allLayoutPanes,
   appendLayoutTab,
   layoutTabs,
   selectLayoutTab,
@@ -10,7 +14,13 @@ import {
 } from "./layoutTabs";
 import { reconcileGroupIdentities } from "./groupIdentity";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import {
+  captureLegacyWorkspaceOwner,
+  nativeWorkspaceRecoveryEnabled,
+  workspaceStoreStorageKey,
+} from "./workspaceRecoveryPlatform";
+import { browserWorkspaceStoreVersion, workspaceRecoveryStorage } from "./workspaceRecoveryStorage";
 import {
   collapseEmptyDockLeaves,
   createDockId,
@@ -57,11 +67,7 @@ import {
   withActiveVirtualWindowLayout,
   type VirtualWorkspaceState,
 } from "./virtualWindows";
-import {
-  migrateBrowserTabs,
-  migrateRetiredWorkspaceTabs,
-  migrateSpaceToolTabs,
-} from "./workspaceMigrations";
+import { migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
 import {
   canCloseWorkspaceTab,
   canCloseWorkspaceWindow,
@@ -86,16 +92,14 @@ import {
   parseBrowserTabState,
   sanitizeBrowserTitle,
 } from "./model";
-import { officialAppRoute } from "@/features/apps/appRoute";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 import { createDefaultWorkspaceTab, createBlankWorkspaceTab } from "./workspaceDefaultTab";
 
-export interface WorkspaceStore extends VirtualWorkspaceState {
+export interface WorkspaceStore extends VirtualWorkspaceState, WebsiteNavigationState {
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedTabs: ClosedWorkspaceTab[];
   closedVirtualWindowsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceVirtualWindow[]>>;
   newLayoutTab: () => WorkspaceTab;
-  canNavigatePane: (delta: number, paneId?: string) => boolean;
   navigatePane: (delta: number, paneId?: string) => WorkspaceTab | null;
   detachPaneToTab: (viewId: string) => boolean;
   selectLayoutTab: (id: string) => WorkspaceTab | null;
@@ -110,6 +114,7 @@ export interface WorkspaceStore extends VirtualWorkspaceState {
     url?: string;
     paneId?: string;
     sourceTabId?: string;
+    websiteId?: string;
   }) => WorkspaceTab;
   updateBrowserTab: (tabId: string, patch: Partial<BrowserTabState> & { title?: string }) => void;
   renameTab: (tabId: string, title: string) => void;
@@ -130,6 +135,7 @@ export interface WorkspaceStore extends VirtualWorkspaceState {
   closePane: (paneId: string) => void;
   swapPanes: (firstPaneId: string, secondPaneId: string) => boolean;
   movePane: (paneId: string, direction: DockSplitDirection, targetPaneId?: string) => boolean;
+  setWindowDockingLayout: (layout: DockingLayout) => void;
   createVirtualWindow: (title?: string) => WorkspaceVirtualWindow;
   switchVirtualWindow: (windowId: string) => boolean;
   closeVirtualWindow: (windowId: string) => boolean;
@@ -148,10 +154,13 @@ function withLayout(state: WorkspaceStore, layout: WorkspaceLayout) {
   return withActiveVirtualWindowLayout(state, reconcileGroupIdentities(layout, state.layout));
 }
 
+if (nativeWorkspaceRecoveryEnabled()) captureLegacyWorkspaceOwner();
+
 export const useWorkspaceStore = create<WorkspaceStore>()(
   persist(
     (set, get) => ({
       ...initialVirtualWorkspace(),
+      ...initialWebsiteNavigation(),
       lastUsedTabByGroup: {},
       closedTabs: [],
       closedVirtualWindowsByScope: {},
@@ -171,9 +180,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           findDockLeaf(current.layout.root, request.paneId ?? current.layout.focusedPaneId) ??
           dockLeaves(current.layout.root)[0];
         const previous = pane.tabs[0];
-        const replacePane = !request.forceNew || (Boolean(request.paneId) && previous?.placeholder);
+        const replacePane = !request.forceNew || Boolean(request.paneId);
         if (
           replacePane &&
+          !request.forceNew &&
           !previous?.placeholder &&
           previous?.route === request.route &&
           previous.groupKey === request.groupKey
@@ -188,7 +198,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return previous;
         const now = nextWorkspaceFocusTimestamp(current.virtualWindowsByScope);
         const sameApp =
-          replacePane && previous?.groupKey === request.groupKey && !previous.placeholder;
+          replacePane &&
+          !request.forceNew &&
+          previous?.groupKey === request.groupKey &&
+          !previous.placeholder;
         const tab: WorkspaceTab = {
           id: sameApp ? previous.id : createDockId("tab"),
           surfaceId: request.surfaceId,
@@ -228,14 +241,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         set(withLayout(current, appendLayoutTab(current.layout, singleViewLayoutTab(view))));
         return view;
       },
-      canNavigatePane: (delta, paneId) => {
-        const current = get(),
-          pane = findDockLeaf(current.layout.root, paneId ?? current.layout.focusedPaneId);
-        if (!pane) return false;
-        const history = paneHistory(pane),
-          index = history.index + delta;
-        return index >= 0 && index < history.entries.length;
-      },
       navigatePane: (delta, paneId) => {
         const current = get(),
           pane = findDockLeaf(current.layout.root, paneId ?? current.layout.focusedPaneId);
@@ -254,20 +259,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
       openBrowserTab: (request = {}) => {
         const url = request.url?.trim() || browserHomeUrl();
-        const sourcePane = request.sourceTabId
-          ? allLayoutPanes(get().layout).find((candidate) =>
-              candidate.tabs.some((candidateTab) => candidateTab.id === request.sourceTabId),
-            )
-          : undefined;
         const tab = get().openSurface({
-          surfaceId: "official-app",
-          groupKey: "app:browser",
+          surfaceId: "browser",
+          groupKey: "tool:browser",
+          scopeKey: "global",
           title: browserTabTitle(url),
-          route: officialAppRoute("browser"),
-          state: createBrowserTabState(url),
+          route: "/browser",
+          state: { ...createBrowserTabState(url), websiteId: request.websiteId },
           instancePolicy: "multiple",
           forceNew: true,
-          paneId: request.paneId ?? sourcePane?.id,
+          paneId: request.paneId,
         });
         get().focusTab(tab.id);
         return tab;
@@ -286,7 +287,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             const nextUrl = statePatch.url ?? existing.url;
             const defaults =
               statePatch.url && statePatch.url !== existing.url
-                ? { ...createBrowserTabState(statePatch.url), agentOwned: existing.agentOwned }
+                ? { ...existing, ...createBrowserTabState(statePatch.url) }
                 : existing;
             const resolvedTitle =
               title !== undefined
@@ -694,13 +695,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (dockLeaves(current.layout.root).length >= maxWorkspacePanels) return null;
         const pane = findDockLeaf(current.layout.root, paneId);
         if (!pane) return null;
-        const leaf = createDockLeaf([
-          {
-            ...createBlankWorkspaceTab(current.activeScopeKey),
-            title: "New Tab",
-            placeholder: true,
-          },
-        ]);
+        const leaf = createDockLeaf([createDefaultWorkspaceTab(current.activeScopeKey)]);
         set({
           ...withLayout(current, {
             ...current.layout,
@@ -734,6 +729,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (root === current.layout.root) return false;
         set({ ...withLayout(current, { ...current.layout, root, focusedPaneId: secondPaneId }) });
         return true;
+      },
+      setWindowDockingLayout: (dockingLayout) => {
+        if (!validDockingLayout(dockingLayout)) return;
+        set((state) => ({
+          virtualWindowsByScope: {
+            ...state.virtualWindowsByScope,
+            [state.activeScopeKey]: currentVirtualWindows(state).map((window) =>
+              window.id === state.activeVirtualWindowId
+                ? {
+                    ...window,
+                    dockingLayout: {
+                      navigation: dockingLayout.navigation,
+                      tabs: dockingLayout.tabs,
+                    },
+                  }
+                : window,
+            ),
+          },
+        }));
       },
       createVirtualWindow: (title) => {
         const { window, update } = addVirtualWindow(get(), title);
@@ -804,20 +818,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           ? snapshot.virtualWindows.map((window) => ({
               ...window,
               layout: normalizeWorkspaceLayout(
-                migrateRetiredWorkspaceTabs(
-                  migrateSpaceToolTabs(migrateBrowserTabs(window.layout)),
-                  current.activeScopeKey,
-                ),
+                migrateRetiredWorkspaceTabs(window.layout, current.activeScopeKey),
                 current.activeScopeKey,
               ),
             }))
           : [
               createWorkspaceVirtualWindow(
                 normalizeWorkspaceLayout(
-                  migrateRetiredWorkspaceTabs(
-                    migrateSpaceToolTabs(migrateBrowserTabs(snapshot.layout)),
-                    current.activeScopeKey,
-                  ),
+                  migrateRetiredWorkspaceTabs(snapshot.layout, current.activeScopeKey),
                   current.activeScopeKey,
                 ),
                 undefined,
@@ -857,6 +865,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       reset: () => {
         set({
           ...initialVirtualWorkspace(),
+          ...initialWebsiteNavigation(),
           lastUsedTabByGroup: {},
           closedTabs: [],
           closedVirtualWindowsByScope: {},
@@ -864,20 +873,22 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
     }),
     {
-      name: import.meta.env.MISTY_OFFICIAL_APP_ID
-        ? `misty:official-app:${import.meta.env.MISTY_OFFICIAL_APP_ID}:dock:v1`
-        : "misty:desktop-dock:space-apps-v1",
-      version: 11,
+      name: workspaceStoreStorageKey,
+      version: browserWorkspaceStoreVersion,
+      // Native snapshots are captured and batched by the account-bound writer.
+      // Avoid serializing the entire layout through Zustand on every resize.
+      storage: nativeWorkspaceRecoveryEnabled()
+        ? { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+        : createJSONStorage(() => workspaceRecoveryStorage(localStorage)),
+      skipHydration: nativeWorkspaceRecoveryEnabled(),
       migrate: migrateWorkspaceStore,
       partialize: partialWorkspaceStore,
     },
   ),
 );
 
-function scopeKeyForSurface(request: OpenWorkspaceSurfaceRequest): WorkspaceScopeKey {
-  if (request.scopeKey) return request.scopeKey;
-  const spaceId = request.groupKey.split(":")[1];
-  return spaceId ? (`space:${spaceId}` as WorkspaceScopeKey) : "global";
+function scopeKeyForSurface(_request: OpenWorkspaceSurfaceRequest): WorkspaceScopeKey {
+  return "global";
 }
 
 function mapDockLeafForView(

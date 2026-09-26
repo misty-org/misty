@@ -1,8 +1,4 @@
-import type {
-  SpaceMessage,
-  SpaceRun,
-  SpaceRunDetail,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage, SpaceRun, SpaceRunDetail } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 
 import type { SpaceRequest } from "./types";

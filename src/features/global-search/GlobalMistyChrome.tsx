@@ -1,8 +1,8 @@
+import { MistyAgentPicker } from "./MistyAgentPicker";
 import { VoiceInputMenu, type useAiVoiceRecorder } from "@/features/ai-surface";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
 import { Button, cn } from "@/shared/ui";
-import { GripHorizontal, Mic, Square, X } from "lucide-react";
-import type { KeyboardEvent, PointerEvent, RefObject } from "react";
+import { Mic, Plus, Settings2, Square, X } from "lucide-react";
+import type { KeyboardEvent, RefObject, ReactNode } from "react";
 import { ConversationMenu } from "./GlobalMistyPanelContent";
 import { MistyComposer } from "./MistyComposer";
 import { MistyModelPicker } from "./MistyModelPicker";
@@ -11,6 +11,10 @@ import type { GlobalAiConversation, GlobalAiMode, MistyImageAttachment } from ".
 type VoiceRecorder = ReturnType<typeof useAiVoiceRecorder>;
 
 export function GlobalMistyComposerBar(props: {
+  headerControls?: ReactNode;
+  accountId: string;
+  showSettings?: boolean;
+  onToggleSettings?: () => void;
   query: string;
   onQuery: (value: string) => void;
   mode: GlobalAiMode;
@@ -26,30 +30,40 @@ export function GlobalMistyComposerBar(props: {
   busy: boolean;
   working: boolean;
   conversation?: GlobalAiConversation;
+  reasoningEffort: string;
   activeConversationId: string;
   voice: VoiceRecorder;
   onError: (message: string) => void;
   onClose: () => void;
-  onRequestDrag?: (event: PointerEvent) => void;
-  onSwitchToPet?: () => void;
-  onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
-  onModelChange: (settings: {
-    modelId: string;
-    reasoningEffort: "" | "low" | "medium" | "high";
-  }) => void;
+  onModelChange: (settings: { modelId: string; reasoningEffort: "high" | "xhigh" }) => void;
 }) {
   return (
-    <div
-      onPointerDown={!props.conversationActive ? props.onPointerDown : undefined}
-      className={cn(
-        "relative",
-        !props.conversationActive && props.onRequestDrag && "cursor-grab active:cursor-grabbing",
+    <div className="relative">
+      {props.headerControls && (
+        <header className="flex items-center gap-2 px-4 pt-3 pb-1">
+          <MistyAgentPicker accountId={props.accountId} />
+          {props.conversationActive && (
+            <span className="min-w-0 truncate text-xs text-cream-muted">
+              {props.conversation?.title}
+            </span>
+          )}
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 text-cream-muted">
+            {props.headerControls}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Close Misty"
+              title="Close Misty"
+              onClick={props.onClose}
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+        </header>
       )}
-    >
-      {!props.conversationActive ? (
-        <MistyPanelDragHandle inset onRequestDrag={props.onRequestDrag} />
-      ) : null}
       <MistyComposer
+        inputFirst={!!props.headerControls}
         value={props.query}
         onChange={props.onQuery}
         mode={props.mode}
@@ -64,61 +78,85 @@ export function GlobalMistyComposerBar(props: {
         onCapture={props.onCapture}
         busy={props.busy}
         compact={props.conversationActive}
-        placeholder={props.conversationActive ? "Ask a follow-up…" : undefined}
-        className={cn(
-          props.conversationActive ? "m-3" : "rounded-none border-x-0 border-t-0 shadow-none",
-        )}
-        onError={props.onError}
-        modelControl={props.mode !== "search" &&
-          <MistyModelPicker
-            conversationId={props.activeConversationId}
-            modelId={props.conversation?.modelId}
-            reasoningEffort={props.conversation?.reasoningEffort}
-            disabled={props.working}
-            onChange={props.onModelChange}
-          />
+        placeholder={
+          props.conversationActive
+            ? "Ask a follow-up…"
+            : props.headerControls
+              ? "What would you like to do?"
+              : undefined
         }
-        voiceControl={props.mode !== "search" && <ComposerVoiceControls voice={props.voice} />}
+        className={cn("rounded-none border-0 shadow-none")}
+        onError={props.onError}
+        modelControl={
+          props.headerControls ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-cream-muted"
+              aria-label="Thinking options"
+              title="Thinking options"
+              aria-expanded={props.showSettings}
+              aria-controls="misty-settings"
+              onClick={props.onToggleSettings}
+            >
+              <Settings2 className="size-4" />
+            </Button>
+          ) : props.mode !== "search" ? (
+            <MistyModelPicker
+              conversationId={props.activeConversationId}
+              modelId={props.conversation?.modelId}
+              reasoningEffort={props.reasoningEffort}
+              disabled={props.working}
+              onChange={props.onModelChange}
+            />
+          ) : undefined
+        }
+        voiceControl={
+          props.mode !== "search" && <ComposerVoiceControls voice={props.voice} showInputMenu />
+        }
         trailingControl={
-          props.conversationActive ? undefined : (
-            <div className="flex items-center gap-0.5">
-              {props.onSwitchToPet ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 rounded-lg text-cream-muted"
-                  aria-label="Collapse Misty"
-                  title="Collapse Misty"
-                  onClick={props.onSwitchToPet}
-                >
-                  <img
-                    src={mistyCompanion}
-                    alt=""
-                    className="size-5 object-contain"
-                    draggable={false}
-                  />
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7 text-cream-muted"
-                aria-label="Close Misty"
-                onClick={props.onClose}
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
+          !props.headerControls && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-cream-muted"
+              aria-label="Close Misty"
+              onClick={props.onClose}
+            >
+              <X className="size-4" />
+            </Button>
           )
         }
       />
+      {props.headerControls && props.showSettings && (
+        <section
+          id="misty-settings"
+          aria-label="Misty options"
+          className="max-h-[40dvh] overflow-y-auto border-t border-charcoal-border px-4 py-3 text-xs"
+        >
+          <MistyModelPicker
+            inline
+            conversationId={props.activeConversationId}
+            modelId={props.conversation?.modelId}
+            reasoningEffort={props.reasoningEffort}
+            disabled={props.working}
+            onChange={props.onModelChange}
+          />
+        </section>
+      )}
     </div>
   );
 }
 
-function ComposerVoiceControls({ voice }: { voice: VoiceRecorder }) {
+function ComposerVoiceControls({
+  voice,
+  showInputMenu,
+}: {
+  voice: VoiceRecorder;
+  showInputMenu?: boolean;
+}) {
   return (
     <div className="flex items-center">
       <Button
@@ -128,84 +166,38 @@ function ComposerVoiceControls({ voice }: { voice: VoiceRecorder }) {
         className={cn("size-7 text-cream-muted", voice.recording && "text-red-300")}
         disabled={voice.requesting || voice.transcribing}
         onClick={voice.recording ? voice.stop : () => void voice.start()}
-        aria-label={voice.recording ? "Stop voice recording" : "Transcribe voice into prompt"}
+        aria-label={voice.recording ? "Stop voice recording" : "Talk to Misty"}
+        title={voice.recording ? "Stop voice recording" : "Talk to Misty"}
       >
         {voice.recording ? <Square className="size-3 fill-current" /> : <Mic className="size-4" />}
       </Button>
-      <VoiceInputMenu
-        compact
-        devices={voice.inputDevices}
-        selectedDeviceId={voice.selectedInputDeviceId}
-        disabled={voice.requesting || voice.recording || voice.transcribing}
-        onRefresh={() => void voice.refreshInputDevices()}
-        onSelect={voice.selectInputDevice}
-      />
+      {showInputMenu && (
+        <VoiceInputMenu
+          compact
+          devices={voice.inputDevices}
+          selectedDeviceId={voice.selectedInputDeviceId}
+          disabled={voice.requesting || voice.recording || voice.transcribing}
+          onRefresh={() => void voice.refreshInputDevices()}
+          onSelect={voice.selectInputDevice}
+        />
+      )}
     </div>
   );
 }
 
-export function GlobalMistyVoiceIsland(props: {
-  voice: VoiceRecorder;
+export function GlobalMistyConversationControls(props: {
   conversations: GlobalAiConversation[];
   activeConversationId: string;
   loading: boolean;
-  mode: GlobalAiMode;
-  onModeChange: (mode: GlobalAiMode) => void;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
-  onClose: () => void;
-  onRequestDrag?: (event: PointerEvent) => void;
-  onSwitchToPet?: () => void;
-  onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
-    <div
-      className={cn(
-        "group/misty-island pointer-events-auto relative flex h-11 items-center gap-1.5 rounded-full border border-white/10",
-        "bg-[#17171a]/[0.98] p-1.5 text-cream shadow-[0_10px_30px_rgba(0,0,0,0.5)]",
-        props.onRequestDrag && "cursor-grab active:cursor-grabbing",
-      )}
-      data-misty-voice-island
-      onPointerDown={props.onPointerDown}
-    >
-      <MistyPanelDragHandle onRequestDrag={props.onRequestDrag} />
-      <button
-        type="button"
-        className={cn(
-          "relative grid size-8 shrink-0 place-items-center rounded-full bg-white/[0.05]",
-          "outline-none ring-offset-1 ring-offset-[#17171a] focus-visible:ring-2 focus-visible:ring-blue-400",
-          props.voice.recording && "ring-2 ring-red-400/70",
-        )}
-        aria-label={
-          props.onSwitchToPet
-            ? "Collapse Misty"
-            : props.voice.recording
-              ? "Stop voice recording"
-              : "Start voice recording"
-        }
-        title={props.onSwitchToPet ? "Collapse Misty" : undefined}
-        disabled={props.onSwitchToPet ? false : props.voice.requesting || props.voice.transcribing}
-        onClick={
-          props.onSwitchToPet ??
-          (props.voice.recording ? props.voice.stop : () => void props.voice.start())
-        }
-      >
-        <img src={mistyCompanion} alt="" className="size-7 object-contain" draggable={false} />
-        {props.voice.recording ? (
-          <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-red-400" />
-        ) : null}
-      </button>
-      <VoiceInputMenu
-        compact
-        devices={props.voice.inputDevices}
-        selectedDeviceId={props.voice.selectedInputDeviceId}
-        disabled={props.voice.requesting || props.voice.recording || props.voice.transcribing}
-        onRefresh={() => void props.voice.refreshInputDevices()}
-        onSelect={props.voice.selectInputDevice}
-      />
+    <div className="flex shrink-0 items-center gap-0.5" aria-label="Misty conversations">
       <ConversationMenu
+        compact
         conversations={props.conversations}
         activeId={props.activeConversationId}
         loading={props.loading}
@@ -214,47 +206,15 @@ export function GlobalMistyVoiceIsland(props: {
         onDelete={props.onDelete}
         onRename={props.onRename}
       />
-      <span className="px-2 text-sm font-medium">Misty</span>
       <Button
-        type="button"
         variant="ghost"
-        size="icon"
-        className="size-8 rounded-full text-cream-muted hover:bg-white/[0.06]"
-        aria-label="Close Misty"
-        onClick={props.onClose}
+        size="icon-sm"
+        aria-label="New conversation"
+        title="New conversation"
+        onClick={props.onNew}
       >
-        <X className="size-4" />
+        <Plus className="size-4" />
       </Button>
     </div>
-  );
-}
-
-function MistyPanelDragHandle(props: {
-  onRequestDrag?: (event: PointerEvent) => void;
-  inset?: boolean;
-}) {
-  if (!props.onRequestDrag) return null;
-  return (
-    <button
-      type="button"
-      aria-label="Move Misty window"
-      title="Drag to move Misty"
-      data-misty-panel-drag-handle="true"
-      className={cn(
-        "absolute left-1/2 z-20 flex h-4 w-11 -translate-x-1/2 items-center justify-center rounded-full",
-        props.inset ? "top-1" : "top-0 -translate-y-1/2",
-        "pointer-events-auto touch-none select-none cursor-grab border border-white/10 bg-[#25252a]/95 text-white/65 shadow-[0_3px_10px_rgba(0,0,0,0.32)] active:cursor-grabbing",
-        "opacity-100 transition-[color,background-color] duration-150 hover:bg-[#303036] hover:text-white/85",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
-      )}
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-        event.stopPropagation();
-        props.onRequestDrag?.(event);
-      }}
-    >
-      <GripHorizontal className="size-3.5" aria-hidden />
-    </button>
   );
 }

@@ -1,3 +1,6 @@
+import { deploymentStorageKey } from "@/api/deployment/api";
+import { workspaceRecoveryKey } from "./workspaceRecoveryStorage";
+import { partialWorkspaceStore } from "./workspaceStorePersistence";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import {
@@ -87,4 +90,22 @@ describe("workspaceAccountState per-account isolation", () => {
     restoreAccountWorkspace("deleted-user");
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
   });
+});
+
+it("backs up each legacy account before migration and removes its backup on account removal", () => {
+  localStorage.clear();
+  useWorkspaceStore.getState().reset();
+  const key = deploymentStorageKey("misty:workspace-account:legacy-owner");
+  const raw = JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState()));
+  localStorage.setItem(key, raw);
+  restoreAccountWorkspace("legacy-owner");
+  saveAccountWorkspace("legacy-owner");
+  expect(localStorage.getItem(workspaceRecoveryKey(key))).toBe(raw);
+  expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
+    version: 14,
+    state: { activeScopeKey: "global" },
+  });
+  removeAccountWorkspace("legacy-owner");
+  expect(localStorage.getItem(key)).toBeNull();
+  expect(localStorage.getItem(workspaceRecoveryKey(key))).toBeNull();
 });

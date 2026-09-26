@@ -58,11 +58,6 @@ use crate::infra::media_search::{
     SetMediaAssetStateRequest,
 };
 use crate::infra::metadata::FileMetadataSnapshot;
-#[cfg(desktop)]
-use crate::infra::plugin_commands::{
-    PluginCommandRunResult, PluginCommandsSnapshot, PluginDiagnosticsSnapshot,
-    PluginPanelRenderResult, RenderPluginPanelRequest, RunPluginCommandRequest,
-};
 use crate::infra::power_pack::{
     ArchiveActionResult, ArchiveCreateRequest, ArchiveExtractRequest, ArchiveListRequest,
     ArchiveListResult, CompareFilesRequest, CompareFilesResult, CompareFoldersRequest,
@@ -231,16 +226,6 @@ pub fn mobile_cache_purge_account(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<()> {
     crate::infra::mobile_cache::purge_account(&state.environment.cache_dir(), &account_id)
-}
-
-#[tauri::command]
-pub async fn self_host_entitlement_store(token: String) -> ApiResult<()> {
-    crate::infra::self_host_entitlement::store(&token)
-}
-
-#[tauri::command]
-pub async fn self_host_entitlement_load() -> ApiResult<Option<String>> {
-    crate::infra::self_host_entitlement::load()
 }
 
 #[tauri::command]
@@ -1795,68 +1780,6 @@ pub fn coding_ai_clear_api_key(provider_id: String) -> ApiResult<()> {
     crate::infra::credentials::clear_coding_ai_key(&provider_id)
 }
 
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn plugin_commands_snapshot(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PluginCommandsSnapshot> {
-    state.plugin_commands.snapshot().await
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn plugin_commands_snapshot() -> ApiResult<serde_json::Value> {
-    Err(mobile_plugins_unavailable())
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn plugin_command_run(
-    request: RunPluginCommandRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PluginCommandRunResult> {
-    state.plugin_commands.run_command(request).await
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn plugin_command_run(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
-    Err(mobile_plugins_unavailable())
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn plugin_panel_render(
-    request: RenderPluginPanelRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PluginPanelRenderResult> {
-    state.plugin_commands.render_panel(request).await
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn plugin_panel_render(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
-    Err(mobile_plugins_unavailable())
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn plugin_diagnostics_snapshot(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<PluginDiagnosticsSnapshot> {
-    state.plugin_commands.diagnostics().await
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn plugin_diagnostics_snapshot() -> ApiResult<serde_json::Value> {
-    Err(mobile_plugins_unavailable())
-}
-
-#[cfg(mobile)]
-fn mobile_plugins_unavailable() -> ApiError {
-    ApiError::Unavailable("Extensions are not available in Misty mobile.".to_owned())
-}
 
 #[tauri::command]
 pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<DeviceSnapshot> {

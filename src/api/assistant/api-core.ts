@@ -50,10 +50,10 @@ export function createAssistantApi(
       apiRequest<{ conversations: T[] }>(
         `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
       ),
-    createConversation: <T>(title: string, spaceId?: string,agentId?:string) =>
+    createConversation: <T>(title: string, spaceId?: string, agentId?: string) =>
       apiRequest<T>("/misty/conversations", {
         method: "POST",
-        body: JSON.stringify({ title, space_id: spaceId,agent_id:agentId }),
+        body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId }),
       }),
     deleteConversation: (conversationId: string) =>
       apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {
@@ -71,7 +71,7 @@ export function createAssistantApi(
       ),
     updateConversationSettings: (
       conversationId: string,
-      settings: { model_id: string; reasoning_effort: "" | "low" | "medium" | "high" },
+      settings: { thinking_mode: "normal" | "deep" },
     ) =>
       apiRequest<{ id: string; model_id: string; reasoning_effort: string }>(
         `/misty/conversations/${encodeURIComponent(conversationId)}`,

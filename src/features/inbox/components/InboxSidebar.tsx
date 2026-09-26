@@ -128,9 +128,7 @@ export function InboxSidebar(props: {
             aria-label="Accounts controls"
           >
             <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className={cn(
+              <Button variant="ghost" className={cn(
                   "flex h-9 min-w-0 flex-1 items-center gap-1 rounded-md px-1 text-left",
                   "text-[13px] font-semibold text-cream-bright outline-none",
                   "focus-visible:ring-2 focus-visible:ring-cream-muted focus-visible:ring-offset-1 focus-visible:ring-offset-charcoal-sidebar",
@@ -145,7 +143,7 @@ export function InboxSidebar(props: {
                   )}
                   aria-hidden="true"
                 />
-              </button>
+              </Button>
             </CollapsibleTrigger>
 
             <Button
@@ -212,9 +210,7 @@ function ScopeButton(props: {
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className={cn(
+    <Button variant="ghost" className={cn(
         "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] text-cream-muted transition-colors hover:text-cream",
         props.active && "bg-charcoal-card font-medium text-cream-bright",
       )}
@@ -232,7 +228,7 @@ function ScopeButton(props: {
           {props.count}
         </span>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
@@ -255,8 +251,8 @@ function AccountButton(props: {
   return (
     <div className="min-w-0">
       <div className="group/account relative min-w-0">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           aria-label={`${providerName} account ${accountLabel}`}
           className={cn(
             "misty-sidebar-row-target flex w-full min-w-0 items-center gap-3 rounded-lg px-3 py-2 pr-12 text-left",
@@ -275,7 +271,7 @@ function AccountButton(props: {
               {props.account.unread}
             </span>
           ) : null}
-        </button>
+        </Button>
 
         <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
           <PopoverTrigger asChild>

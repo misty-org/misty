@@ -13,12 +13,10 @@ export interface TourState {
   isOpen: boolean;
   currentStep: TourStep;
   completedAccounts: Record<string, boolean>;
-  mockInstalledApps: string[];
   startTour: (step?: TourStep) => void;
   setStep: (step: TourStep) => void;
   nextStep: () => void;
   prevStep: () => void;
-  toggleMockInstall: (appId: string) => void;
   skipTour: (accountId?: string | null) => void;
   finishTour: (accountId?: string | null) => void;
   resetTour: (accountId?: string | null) => void;
@@ -34,12 +32,9 @@ export function isTourCompletedForAccount(
 export const STEP_SEQUENCE: readonly TourStep[] = [
   "welcome",
   "navigation",
-  "apps-toggle",
-  "apps-browse",
-  "store-explore",
+  "website-groups",
   "canvas-tabs",
   "virtual-windows",
-  "space-share",
   "complete",
 ];
 
@@ -49,7 +44,6 @@ export const useTourStore = create<TourState>()(
       isOpen: false,
       currentStep: "closed",
       completedAccounts: {},
-      mockInstalledApps: ["github-assistant"],
 
       startTour: (step = "welcome") =>
         set({
@@ -81,13 +75,6 @@ export const useTourStore = create<TourState>()(
         }
       },
 
-      toggleMockInstall: (appId: string) =>
-        set((state) => ({
-          mockInstalledApps: state.mockInstalledApps.includes(appId)
-            ? state.mockInstalledApps.filter((id) => id !== appId)
-            : [...state.mockInstalledApps, appId],
-        })),
-
       skipTour: (accountId) =>
         set((state) => ({
           isOpen: false,
@@ -116,7 +103,6 @@ export const useTourStore = create<TourState>()(
             isOpen: true,
             currentStep: "welcome",
             completedAccounts: updated,
-            mockInstalledApps: ["github-assistant"],
           };
         }),
     }),

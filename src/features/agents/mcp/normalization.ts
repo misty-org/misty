@@ -72,7 +72,7 @@ export function publicMcpConnection(value: McpConnection): McpConnection {
     name: value.name,
     endpoint_url: value.endpoint_url,
     transport: "streamable_http",
-    provider: value.provider === "activepieces" ? "activepieces" : "custom",
+    provider: "custom",
     status: value.status,
     last_error_code: value.last_error_code,
     last_checked_at: value.last_checked_at,
