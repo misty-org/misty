@@ -80,6 +80,8 @@ pdf-extract = "0.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
+# The vendored copy (see [patch.crates-io]); used for download progress and cancel.
+wry = { version = "=0.55.1", default-features = false }
 cocoa = "0.26"
 core-graphics = "0.24"
 core-foundation = "0.10"

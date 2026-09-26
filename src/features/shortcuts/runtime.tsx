@@ -244,6 +244,19 @@ export function useShortcutTitle(label: string, commandId: string): string {
   return hintsEnabled && shortcutLabel ? `${label} (${shortcutLabel})` : label;
 }
 
+/** A command's shortcut as plain text (such as "⇧⌘T"), for menus. */
+export function ShortcutText(props: { commandId: string; className?: string }) {
+  const hintsEnabled = useSettingsStore((state) =>
+    settingsBoolean(state.settings?.document ?? {}, "shortcuts", "shortcut_hints_enabled", true),
+  );
+  const binding = useEffectiveShortcut(props.commandId);
+  const platform =
+    useSettingsStore((state) => state.shortcuts?.detectedPlatform) ?? detectShortcutPlatform();
+  const label = formatShortcutLabel(binding.primary, platform);
+  if (!hintsEnabled || !label) return null;
+  return <span className={props.className}>{label}</span>;
+}
+
 export function ShortcutHint(props: {
   commandId: string;
   className?: string;

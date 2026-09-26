@@ -1,31 +1,71 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
-import { Button, cn, menuItemClass, menuListClass, popupSurfaceClass } from "@/shared/ui";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import { ArrowUpRight, Globe2, History, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { buildBrowserSuggestions, type BrowserSuggestion } from "./browserSuggestions";
+import { Button, cn, menuListClass, popupSurfaceClass } from "@/shared/ui";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { OmniboxRow } from "./omnibox/OmniboxRow";
+import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "./omnibox/types";
+import { inlineCompletion } from "./omnibox/urlText";
+import { useOmniboxAutocomplete } from "./omnibox/useOmniboxAutocomplete";
 import { useBrowserOverlay } from "./useBrowserOverlay";
+
+export type OmniboxContext = Omit<OmniboxInput, "text" | "currentUrl">;
 
 export function BrowserOmniboxView(props: {
   currentUrl: string;
   compact?: boolean;
   pageTitle?: string;
   focusRequest?: number;
-  historyEntries: string[];
+  context: OmniboxContext;
+  providers: readonly OmniboxProvider[];
   lightChrome: boolean;
   suspensionReason: string;
   setOverlay: (reason: string, active: boolean) => Promise<void>;
-  onNavigate: (value: string) => void;
+  /** `typed` is true when the person chose a page by its address rather than a search. */
+  onNavigate: (value: string, options: { typed: boolean }) => void;
+  onSwitchTab: (tabId: string) => void;
+  /** Opens a place inside Misty, such as a note, by its app route. */
+  onOpenInApp: (route: string) => void;
+  onRemove?: (match: OmniboxMatch) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(() => displayBrowserAddress(props.currentUrl));
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Deleting must not bring the completion straight back.
+  const [inlineSuppressed, setInlineSuppressed] = useState(false);
+  const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(new Set());
   const overlay = useBrowserOverlay(props.suspensionReason, props.setOverlay);
-  const suggestions = useMemo(
-    () => buildBrowserSuggestions(draft, props.historyEntries),
-    [draft, props.historyEntries],
+
+  // Unedited, the address bar shows the page's own address: suggest before typing.
+  const text = draft === displayBrowserAddress(props.currentUrl) ? "" : draft;
+  const input = useMemo<OmniboxInput | null>(
+    () => (focused ? { ...props.context, text, currentUrl: props.currentUrl } : null),
+    [focused, props.context, props.currentUrl, text],
   );
+  const results = useOmniboxAutocomplete(input, props.providers);
+  const matches = useMemo(
+    () => results.filter((match) => !removedIds.has(match.id)),
+    [removedIds, results],
+  );
+  const selectedIndex = Math.max(
+    0,
+    matches.findIndex((match) => match.id === selectedId),
+  );
+  // Before typing or arrowing, only a default-eligible row may be picked by Enter.
+  const selected =
+    selectedId === null && !text && !matches[0]?.allowedToBeDefault
+      ? undefined
+      : matches[selectedIndex];
+  // Recomputed from the draft: a slower provider's row may predate the last keystroke.
+  const completion =
+    selectedIndex === 0 && selected?.inlineCompletion !== undefined && !inlineSuppressed
+      ? inlineCompletion(draft, selected.target.url)
+      : undefined;
+  const shown = focused ? draft + (completion ?? "") : toolbarAddress(props.currentUrl);
+
+  useLayoutEffect(() => {
+    if (completion && inputRef.current === document.activeElement)
+      inputRef.current?.setSelectionRange(draft.length, draft.length + completion.length);
+  }, [completion, draft]);
 
   useEffect(() => {
     if (!focused) setDraft(displayBrowserAddress(props.currentUrl));
@@ -38,11 +78,33 @@ export function BrowserOmniboxView(props: {
     return () => window.cancelAnimationFrame(frame);
   }, [props.focusRequest]);
 
-  const choose = (suggestion?: BrowserSuggestion) => {
-    props.onNavigate(suggestion?.destination ?? draft);
+  const close = () => {
     setFocused(false);
     overlay.onOpenChange(false);
     inputRef.current?.blur();
+  };
+  const choose = (match: OmniboxMatch | undefined) => {
+    if (match?.target.type === "switch-tab") props.onSwitchTab(match.target.tabId);
+    else if (match?.target.type === "open-in-app") props.onOpenInApp(match.target.url);
+    else if (match) {
+      const typed = match.kind !== "search" && match.kind !== "suggestion";
+      props.onNavigate(match.target.url, { typed });
+    } else if (draft.trim()) props.onNavigate(draft, { typed: false });
+    close();
+  };
+  const remove = (match: OmniboxMatch) => {
+    setRemovedIds((ids) => new Set(ids).add(match.id));
+    void props.onRemove?.(match).catch(() =>
+      setRemovedIds((ids) => {
+        const next = new Set(ids);
+        next.delete(match.id);
+        return next;
+      }),
+    );
+  };
+  const moveSelection = (delta: number) => {
+    if (!matches.length) return;
+    setSelectedId(matches[(selectedIndex + delta + matches.length) % matches.length].id);
   };
 
   return (
@@ -50,7 +112,7 @@ export function BrowserOmniboxView(props: {
       className="relative z-50 min-w-0 flex-1"
       onSubmit={(event) => {
         event.preventDefault();
-        choose(suggestions[selectedIndex]);
+        choose(selected);
       }}
     >
       {props.compact && !focused && (
@@ -72,18 +134,21 @@ export function BrowserOmniboxView(props: {
       <input
         hidden={props.compact && !focused}
         ref={inputRef}
-        value={focused ? draft : toolbarAddress(props.currentUrl)}
+        value={shown}
         onChange={(event) => {
+          const inputType = (event.nativeEvent as InputEvent).inputType ?? "";
+          setInlineSuppressed(inputType.startsWith("delete"));
           setDraft(event.target.value);
-          setSelectedIndex(0);
+          setSelectedId(null);
+          setRemovedIds(new Set());
         }}
         onFocus={(event) => {
-          const input = event.currentTarget;
+          const element = event.currentTarget;
           setFocused(true);
           setDraft(displayBrowserAddress(props.currentUrl));
-          setSelectedIndex(0);
+          setSelectedId(null);
           overlay.onOpenChange(true);
-          window.requestAnimationFrame(() => input.select());
+          window.requestAnimationFrame(() => element.select());
         }}
         onPointerDown={(event) => {
           if (document.activeElement === event.currentTarget) return;
@@ -95,35 +160,43 @@ export function BrowserOmniboxView(props: {
           overlay.onOpenChange(false);
         }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown" && suggestions.length) {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            setSelectedIndex((index) => (index + 1) % suggestions.length);
-          } else if (event.key === "ArrowUp" && suggestions.length) {
+            moveSelection(event.key === "ArrowDown" ? 1 : -1);
+          } else if ((event.key === "ArrowRight" || event.key === "End") && completion) {
+            // Accept the completion as if typed, and keep editing after it.
             event.preventDefault();
-            setSelectedIndex((index) => (index - 1 + suggestions.length) % suggestions.length);
+            setDraft(draft + completion);
+          } else if (
+            // Shift+Delete, or Shift+Backspace on a Mac keyboard, once a row is highlighted.
+            (event.key === "Delete" || event.key === "Backspace") &&
+            event.shiftKey &&
+            selectedId !== null &&
+            selected?.removable
+          ) {
+            event.preventDefault();
+            remove(selected);
           } else if (event.key === "Escape") {
             event.preventDefault();
-            setFocused(false);
-            overlay.onOpenChange(false);
-            event.currentTarget.blur();
+            if (completion) setInlineSuppressed(true);
+            else close();
           }
         }}
         aria-label="Search or enter address"
-        aria-autocomplete="list"
+        aria-autocomplete="both"
         aria-controls="browser-omnibox-suggestions"
-        aria-expanded={focused && overlay.open && suggestions.length > 0}
-        aria-activedescendant={suggestions[selectedIndex]?.id}
+        aria-expanded={focused && overlay.open && matches.length > 0}
+        aria-activedescendant={focused && matches.length ? selected?.id : undefined}
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          "w-full min-w-0 rounded-md border bg-transparent px-2 text-center outline-none transition-colors",
-          isNativeMobileBuild ? "h-11 text-base" : "h-[30px] text-xs",
+          "h-[30px] w-full min-w-0 rounded-md border bg-transparent px-2 text-center text-xs outline-none transition-colors",
           props.lightChrome
             ? "border-black/[0.06] text-[#252525] hover:bg-black/[0.025] focus:border-black/[0.11] focus:bg-[#ededed] focus:text-left"
             : "border-white/[0.07] text-[#e7e7e7] hover:bg-white/[0.025] focus:border-white/[0.12] focus:bg-[#222] focus:text-left",
         )}
       />
-      {focused && overlay.open && suggestions.length ? (
+      {focused && overlay.open && matches.length ? (
         <div
           id="browser-omnibox-suggestions"
           role="listbox"
@@ -133,49 +206,23 @@ export function BrowserOmniboxView(props: {
             menuListClass,
           )}
         >
-          {suggestions.map((suggestion, index) => (
-            <SuggestionRow
-              key={suggestion.id}
-              suggestion={suggestion}
-              selected={index === selectedIndex}
-              onChoose={() => choose(suggestion)}
-              onPoint={() => setSelectedIndex(index)}
+          {matches.map((match, index) => (
+            <OmniboxRow
+              key={match.id}
+              match={match}
+              selected={match === selected}
+              onChoose={() => choose(match)}
+              onPoint={() => setSelectedId(match.id)}
+              onSwitchTab={(tabId) => {
+                props.onSwitchTab(tabId);
+                close();
+              }}
+              onRemove={match.removable && props.onRemove ? () => remove(match) : undefined}
             />
           ))}
         </div>
       ) : null}
     </form>
-  );
-}
-
-function SuggestionRow(props: {
-  suggestion: BrowserSuggestion;
-  selected: boolean;
-  onChoose: () => void;
-  onPoint: () => void;
-}) {
-  const Icon =
-    props.suggestion.kind === "search"
-      ? Search
-      : props.suggestion.kind === "history"
-        ? History
-        : Globe2;
-  return (
-    <button
-      id={props.suggestion.id}
-      type="button"
-      role="option"
-      aria-selected={props.selected}
-      className={cn(menuItemClass, "gap-3", props.selected && "bg-charcoal-hover")}
-      onPointerEnter={props.onPoint}
-      onPointerDown={(event) => event.preventDefault()}
-      onClick={props.onChoose}
-    >
-      <Icon strokeWidth={1.7} className="opacity-70" />
-      <span className="min-w-0 flex-1 truncate font-medium">{props.suggestion.title}</span>
-      <span className="max-w-[48%] truncate text-xs opacity-55">{props.suggestion.detail}</span>
-      {props.suggestion.kind === "site" ? <ArrowUpRight className="opacity-55" /> : null}
-    </button>
   );
 }
 

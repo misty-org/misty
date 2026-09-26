@@ -14,7 +14,7 @@
  document.querySelector('#image').href=URL.createObjectURL(new Blob([png],{type:'image/png'}));
  document.querySelector('#pdf').href=URL.createObjectURL(new Blob(['%PDF-1.7\n% Native transfer fixture\n%%EOF'],{type:'application/pdf'}));
  document.querySelector('#popup').onclick=()=>window.open(location.pathname+'?popupDownload=1','_blank');
- document.querySelector('#attachment').onclick=()=>{const frame=document.createElement('iframe');frame.hidden=true;frame.src='/cli/tasks/sdk-browser-download.pdf';document.body.append(frame);};
+ document.querySelector('#attachment').onclick=()=>{const frame=document.createElement('iframe');frame.hidden=true;frame.src=URL.createObjectURL(new Blob(['%PDF-1.7\n% Native transfer fixture\n%%EOF'],{type:'application/octet-stream'}));document.body.append(frame);};
  if(new URLSearchParams(location.search).has('popupDownload')) setTimeout(()=>document.querySelector('#pdf').click(),100);
  document.querySelector('input').addEventListener('change',async event=>{
   const file=event.target.files[0];

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-mod download;
+pub(crate) mod download;
 #[cfg(target_os = "macos")]
 mod drag_drop;
 mod navigation;
@@ -232,6 +232,9 @@ impl InnerWebView {
           custom_data_store_available,
           pl_attrs.data_store_identifier,
         ) {
+          // A private webview with no named store joins the shared private
+          // session, so private tabs see each other's sign-ins.
+          (true, _, None) => private_data_store(mtm),
           (true, _, _) => WKWebsiteDataStore::nonPersistentDataStore(mtm),
           // if data_store_identifier is given and custom data stores are available, use custom store
           (false, true, Some(data_store)) => {
@@ -1474,4 +1477,25 @@ unsafe fn wait_for_blocking_operation<T>(rx: std::sync::mpsc::Receiver<T>) -> Re
 
     rl.acceptInputForMode_beforeDate(mode, &limit_date);
   }
+}
+
+thread_local! {
+  static PRIVATE_DATA_STORE: std::cell::RefCell<Option<Retained<WKWebsiteDataStore>>> =
+    const { std::cell::RefCell::new(None) };
+}
+
+fn private_data_store(mtm: MainThreadMarker) -> Retained<WKWebsiteDataStore> {
+  PRIVATE_DATA_STORE.with(|store| {
+    store
+      .borrow_mut()
+      .get_or_insert_with(|| unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) })
+      .clone()
+  })
+}
+
+/// Ends the shared private session: the next private webview starts with no
+/// cookies or site data. Must be called on the main thread once every private
+/// webview has closed.
+pub fn reset_private_data_store() {
+  PRIVATE_DATA_STORE.with(|store| store.borrow_mut().take());
 }

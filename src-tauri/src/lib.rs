@@ -99,14 +99,30 @@ use infra::browser::{
     browser_webview_set_bounds, browser_webview_set_theme, browser_webview_set_zoom,
     browser_webview_show, browser_webviews_hide_all, browser_webviews_park_all,
     browser_webview_set_pane_dim, browser_webviews_set_companion, browser_webviews_set_overlay_active,
-    browser_webviews_set_pointer_tracking, BrowserSessionState,
+    browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble, BrowserSessionState,
+};
+use infra::browser_search_suggest::browser_search_suggest;
+#[cfg(desktop)]
+use infra::browser_history::{
+    browser_history_clear, browser_history_delete, browser_history_query, browser_history_record,
+    browser_history_forget, browser_history_set_title, browser_history_suggest,
+};
+#[cfg(desktop)]
+use infra::browser_library::{
+    browser_download_cancel, browser_download_open, browser_download_reveal,
+    browser_downloads_list, browser_downloads_progress, browser_downloads_remove,
+};
+#[cfg(desktop)]
+use infra::browser::{
+    browser_clear_website_data, browser_set_download_directory, browser_set_download_prompt, browser_webview_set_muted, browser_webview_developer_tools, browser_webview_find, browser_webview_print,
+    browser_webview_save_page, browser_webview_stop,
 };
 #[cfg(desktop)]
 use infra::browser_agent_control::{
     browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew,
     BrowserExecutionState,
 };
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(all(desktop, not(target_os = "macos")))]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
@@ -526,28 +542,75 @@ pub fn run() {
                     #[cfg(target_os = "macos")]
                     infra::browser_site_permissions::browser_site_permissions_reset,
                     browser_webview_set_zoom,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_show,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webviews_set_overlay_active,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webviews_set_pointer_tracking,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
+                    browser_webviews_set_status_bubble,
+                    #[cfg(desktop)]
+                    browser_webview_stop,
+                    #[cfg(desktop)]
+                    browser_webview_find,
+                    #[cfg(desktop)]
+                    browser_webview_print,
+                    #[cfg(desktop)]
+                    browser_webview_save_page,
+                    #[cfg(desktop)]
+                    browser_webview_developer_tools,
+                    #[cfg(desktop)]
+                    browser_clear_website_data,
+                    #[cfg(desktop)]
+                    browser_set_download_directory,
+                    #[cfg(desktop)]
+                    browser_set_download_prompt,
+                    #[cfg(desktop)]
+                    browser_webview_set_muted,
+                    #[cfg(desktop)]
+                    browser_history_clear,
+                    #[cfg(desktop)]
+                    browser_history_delete,
+                    #[cfg(desktop)]
+                    browser_history_query,
+                    #[cfg(desktop)]
+                    browser_history_record,
+                    #[cfg(desktop)]
+                    browser_history_set_title,
+                    #[cfg(desktop)]
+                    browser_history_suggest,
+                    #[cfg(desktop)]
+                    browser_history_forget,
+                    browser_search_suggest,
+                    #[cfg(desktop)]
+                    browser_download_cancel,
+                    #[cfg(desktop)]
+                    browser_download_open,
+                    #[cfg(desktop)]
+                    browser_download_reveal,
+                    #[cfg(desktop)]
+                    browser_downloads_list,
+                    #[cfg(desktop)]
+                    browser_downloads_progress,
+                    #[cfg(desktop)]
+                    browser_downloads_remove,
+                    #[cfg(desktop)]
                     browser_webview_set_pane_dim,
                     browser_webviews_set_companion,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_hide,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webviews_hide_all,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webviews_park_all,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_webview_close,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_agent_grant_register,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_agent_grant_revoke,
-                    #[cfg(any(desktop, target_os = "ios"))]
+                    #[cfg(desktop)]
                     browser_agent_execute,
                     #[cfg(desktop)]
                     browser_agent_execute_bounded,

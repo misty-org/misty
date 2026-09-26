@@ -2,14 +2,16 @@ import {
   initialWebsiteNavigation,
   userWebsiteGroups,
 } from "@/features/browser-workspace/navigationDefaults";
-import { layoutTabs, selectLayoutTab } from "./layoutTabs";
+import { layoutTabs, mapLayoutViews, selectLayoutTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import {
   createWorkspaceVirtualWindow,
   initialWorkspaceLayout,
+  mapAllVirtualWorkspaceTabs,
   normalizeWorkspaceLayout,
 } from "./virtualWindows";
+import { isPrivateBrowserTab, scrubPrivateTab } from "./privateBrowsing";
 import { migrateRetiredWorkspaceTab, migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
 import { migrateClosedWorkspaceTabs } from "./closedWorkspaceTabs";
 import type { WorkspaceScopeKey, WorkspaceVirtualWindow } from "./model";
@@ -155,6 +157,15 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
 }
 
 export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceStore> {
+  // Private tabs are never written anywhere with their pages or titles.
+  const scrubbed = mapAllVirtualWorkspaceTabs(state, scrubPrivateTab);
+  const closedVirtualWindowsByScope = Object.fromEntries(
+    Object.entries(state.closedVirtualWindowsByScope).map(([scope, windows]) => [
+      scope,
+      windows?.map((window) => ({ ...window, layout: mapLayoutViews(window.layout, scrubPrivateTab) })),
+    ]),
+  ) as WorkspaceStore["closedVirtualWindowsByScope"];
+  state = { ...state, ...scrubbed, closedVirtualWindowsByScope };
   return {
     websiteGroups: state.websiteGroups,
     savedWebsites: state.savedWebsites,
@@ -167,7 +178,7 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
     activeVirtualWindowIdByScope: state.activeVirtualWindowIdByScope,
     activeVirtualWindowId: state.activeVirtualWindowId,
     lastUsedTabByGroup: state.lastUsedTabByGroup,
-    closedTabs: state.closedTabs,
+    closedTabs: state.closedTabs.filter((closed) => !isPrivateBrowserTab(closed.tab)),
     closedVirtualWindowsByScope: state.closedVirtualWindowsByScope,
   };
 }

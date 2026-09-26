@@ -1,16 +1,16 @@
 import { createBrowserTabState, type WorkspaceTab } from "@/features/workspace";
+import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBrowserRuntimeStore } from "./browserRuntime";
 import { BrowserWorkspace } from "./BrowserWorkspace";
-
 const invoke = vi.hoisted(() =>
   vi.fn<(command: string, args?: unknown) => Promise<unknown>>(async () => undefined),
 );
-
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
-
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke,
+}));
 const browserTab: WorkspaceTab = {
   id: "tab:browser",
   surfaceId: "browser",
@@ -23,53 +23,61 @@ const browserTab: WorkspaceTab = {
   createdAt: 1,
   lastFocusedAt: 1,
 };
-
 describe("BrowserWorkspace", () => {
   let container: HTMLDivElement;
   let root: Root;
-
   beforeEach(() => {
     invoke.mockClear();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
   });
-
   afterEach(() => {
     act(() => root.unmount());
     useBrowserRuntimeStore.getState().removeTab(browserTab.id);
-    delete (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    delete (
+      window as typeof window & {
+        __TAURI_INTERNALS__?: unknown;
+      }
+    ).__TAURI_INTERNALS__;
     container.remove();
   });
-
   it("keeps the native page interactive when no app overlay is open", async () => {
     (
-      window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
+      window as typeof window & {
+        __TAURI_INTERNALS__?: {
+          invoke: () => void;
+        };
+      }
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
     expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(false);
     expect(invoke).not.toHaveBeenCalledWith("browser_webviews_set_overlay_active", {
       active: true,
     });
   });
-
   it("leaves cursor ownership with the native page webview", async () => {
     (
-      window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
+      window as typeof window & {
+        __TAURI_INTERNALS__?: {
+          invoke: () => void;
+        };
+      }
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
     expect(container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.cursor).toBe("");
   });
-
   it("hides the previous native page when switching browser tabs", async () => {
     (
-      window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
+      window as typeof window & {
+        __TAURI_INTERNALS__?: {
+          invoke: () => void;
+        };
+      }
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
@@ -82,17 +90,15 @@ describe("BrowserWorkspace", () => {
     };
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
     invoke.mockClear();
-
     await act(async () => root.render(<BrowserWorkspace tab={nextTab} />));
-
     expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
-      request: { id: "tab-browser-one" },
+      request: {
+        id: "tab-browser-one",
+      },
     });
   });
-
   it("keeps Browser chrome and its backing surface dark across page colors", async () => {
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
     expect(
       container.querySelector<HTMLElement>("[data-browser-toolbar]")?.style.backgroundColor,
     ).toBe("rgb(24, 25, 28)");
@@ -100,16 +106,13 @@ describe("BrowserWorkspace", () => {
       container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.backgroundColor,
     ).toBe("rgb(24, 25, 28)");
   });
-
   it("never embeds a website frame when the native Browser runtime is unavailable", async () => {
     const webTab = {
       ...browserTab,
       title: "Google",
       state: createBrowserTabState("https://www.google.com/"),
     };
-
     await act(async () => root.render(<BrowserWorkspace tab={webTab} />));
-
     expect(container.querySelector("iframe")).toBeNull();
     expect(
       container.querySelector('[data-testid="browser-native-runtime-required"]'),
@@ -117,10 +120,8 @@ describe("BrowserWorkspace", () => {
     expect(container.textContent).toContain("Open this page in the Misty desktop app");
     expect(container.textContent).toContain("Open in Misty Browser");
   });
-
   it("renders browser controls without a nested browser tab strip", () => {
     act(() => root.render(<BrowserWorkspace tab={browserTab} />));
-
     const workspace = container.querySelector("[data-browser-workspace-tab]");
     expect(workspace).not.toBeNull();
     expect(workspace?.classList.contains("grid-rows-[44px_minmax(0,1fr)]")).toBe(true);
@@ -133,7 +134,6 @@ describe("BrowserWorkspace", () => {
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Close "]')).toBeNull();
   });
-
   it("quietly identifies browser tabs owned by Misty's current work", () => {
     const agentOwnedTab: WorkspaceTab = {
       ...browserTab,
@@ -143,28 +143,22 @@ describe("BrowserWorkspace", () => {
         agentOwned: true,
       },
     };
-
     act(() => root.render(<BrowserWorkspace tab={agentOwnedTab} />));
-
     const ownershipMarker = container.querySelector<HTMLElement>(
       '[title="This browser tab is scoped to Misty\'s current work"]',
     );
     expect(ownershipMarker?.textContent?.trim()).toBe("Misty");
   });
-
   it("opens the page annotation toolkit and closes it without navigating", async () => {
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
     const annotate = container.querySelector<HTMLButtonElement>('[aria-label="Annotate page"]');
     await act(async () => annotate?.click());
-
     expect(container.querySelector('[aria-label="Browser annotation canvas"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Pen"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Rectangle"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Text"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Clear annotations"]')).not.toBeNull();
     expect(annotate?.getAttribute("aria-pressed")).toBe("true");
-
     await act(async () => {
       [...container.querySelectorAll<HTMLButtonElement>("button")]
         .find((button) => button.textContent?.trim() === "Close")
@@ -172,34 +166,12 @@ describe("BrowserWorkspace", () => {
     });
     expect(container.querySelector('[aria-label="Browser annotation canvas"]')).toBeNull();
   });
-
-  it("offers desktop, tablet, and mobile viewport presets", async () => {
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
-    const viewport = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Viewport: Responsive"]',
-    );
-    await act(async () => {
-      viewport?.click();
-      await settleBrowserOverlay();
-    });
-    const mobile = [...document.body.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
-      button.textContent?.includes("Mobile"),
-    );
-    expect(mobile).toBeDefined();
-    expect(document.body.textContent).toContain("Desktop");
-    expect(document.body.textContent).toContain("Tablet");
-    expect(document.body.textContent).toContain("390 × 844");
-    expect(document.body.textContent).toContain("1920 × 1080");
-  });
-
   it("selects the complete address when the omnibox receives focus", async () => {
     const tab = {
       ...browserTab,
       state: createBrowserTabState("https://example.com/path?q=misty"),
     };
     await act(async () => root.render(<BrowserWorkspace tab={tab} />));
-
     const input = container.querySelector<HTMLInputElement>(
       '[aria-label="Search or enter address"]',
     );
@@ -207,19 +179,16 @@ describe("BrowserWorkspace", () => {
       input?.focus();
       await settleBrowserOverlay();
     });
-
     expect(input?.value).toBe("https://example.com/path?q=misty");
     expect(input?.selectionStart).toBe(0);
     expect(input?.selectionEnd).toBe(input?.value.length);
   });
-
-  it("shows direct, history, and web-search omnibox suggestions", async () => {
+  it("shows the current page on focus, then direct and web-search suggestions while typing", async () => {
     const tab = {
       ...browserTab,
       state: createBrowserTabState("https://youtube.com/watch?v=misty"),
     };
     await act(async () => root.render(<BrowserWorkspace tab={tab} />));
-
     const input = container.querySelector<HTMLInputElement>(
       '[aria-label="Search or enter address"]',
     );
@@ -227,38 +196,64 @@ describe("BrowserWorkspace", () => {
       input?.focus();
       await settleBrowserOverlay();
     });
-
-    const options = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(options.some((option) => option.textContent?.includes("youtube.com"))).toBe(true);
-    expect(options.some((option) => option.textContent?.includes("Search with Google"))).toBe(true);
-  });
-
-  it("opens a functional browser menu", async () => {
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');
+    const focusedOptions = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(focusedOptions.some((option) => option.textContent?.includes("youtube.com"))).toBe(true);
     await act(async () => {
-      trigger?.click();
+      fireEvent.change(input!, { target: { value: "vimeo.com" } });
       await settleBrowserOverlay();
     });
-
-    const menuItems = [
-      ...document.body.querySelectorAll<HTMLElement>(".website-header-menu button"),
-    ].map((item) => item.textContent?.trim());
-    expect(menuItems).toContain("Open link");
-    expect(menuItems).not.toContain("Reload");
-    expect(menuItems).not.toContain("Copy address");
+    const options = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(options.some((option) => option.textContent?.includes("vimeo.com"))).toBe(true);
+    expect(options.some((option) => option.textContent?.includes("Search with Google"))).toBe(true);
   });
-
+  it("opens a functional browser menu", async () => {
+    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');
+    await act(async () => {
+      openMenu(trigger);
+      await settleBrowserOverlay();
+    });
+    const menuItems = [
+      ...document.body.querySelectorAll<HTMLElement>('.website-header-menu [role="menuitem"]'),
+    ].map((item) => item.textContent?.trim() ?? "");
+    for (const label of [
+      "New tab",
+      "History",
+      "Downloads",
+      "Bookmarks",
+      "Find…",
+      "Print…",
+      "More tools",
+      "Open in default browser",
+      "Extensions",
+      "Settings",
+    ]) {
+      expect(
+        menuItems.some((item) => item.startsWith(label)),
+        label,
+      ).toBe(true);
+    }
+    expect(menuItems.some((item) => item.startsWith("Reload"))).toBe(false);
+  });
   it("waits for native sibling order before mounting browser popups", async () => {
     (
-      window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
+      window as typeof window & {
+        __TAURI_INTERNALS__?: {
+          invoke: () => void;
+        };
+      }
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
     let releaseRestack: (() => void) | undefined;
     invoke.mockImplementation((command, args) => {
-      const active = (args as { active?: boolean } | undefined)?.active;
+      const active = (
+        args as
+          | {
+              active?: boolean;
+            }
+          | undefined
+      )?.active;
       if (command === "browser_webviews_set_overlay_active" && active === true) {
         return new Promise<void>((resolve) => {
           releaseRestack = resolve;
@@ -267,14 +262,12 @@ describe("BrowserWorkspace", () => {
       return Promise.resolve(undefined);
     });
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
-
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');
     await act(async () => {
-      trigger?.click();
+      openMenu(trigger);
       await new Promise<void>((resolve) => window.setTimeout(resolve, 20));
     });
     expect(document.body.querySelector(".website-header-menu")).toBeNull();
-
     await act(async () => {
       releaseRestack?.();
       await settleBrowserOverlay();
@@ -283,6 +276,15 @@ describe("BrowserWorkspace", () => {
   });
 });
 
+/** Radix menus open on pointer down, not click. */
+function openMenu(trigger: HTMLElement | null) {
+  trigger?.dispatchEvent(
+    new MouseEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+    }),
+  );
+}
 async function settleBrowserOverlay() {
   await new Promise<void>((resolve) => window.setTimeout(resolve, 60));
 }

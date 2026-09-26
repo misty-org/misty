@@ -2,12 +2,23 @@ import type { BrowserBounds, BrowserTheme } from "./types";
 import type { ActiveBrowserAgentGrant } from "./browserAgentAccess";
 import { revokeBrowserAgentGrant } from "./browserAgentAccess";
 import type { WorkspaceTab } from "@/features/workspace";
+import { parseBrowserTabState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 
-interface BrowserHistory {
+export interface BrowserHistory {
   entries: string[];
   index: number;
+  /** Entries the webview's own history also holds. Misty's back/forward uses
+   * the webview inside this range and loads the URL directly outside it
+   * (entries synced from another device, or from before a restart). */
+  native?: { lo: number; hi: number };
+}
+
+/** Where a back/forward step goes, and whether the webview can take it. */
+export interface HistoryStep {
+  url: string;
+  native: boolean;
 }
 
 export interface BrowserCompatibilityIssue {
@@ -26,6 +37,9 @@ interface BrowserRuntimeUiState {
   ensureHistory: (tabId: string, url: string) => void;
   pushHistory: (tabId: string, url: string) => void;
   moveHistory: (tabId: string, direction: -1 | 1) => string | null;
+  travelHistory: (tabId: string, direction: -1 | 1) => HistoryStep | null;
+  replaceHistory: (tabId: string, history: BrowserHistory) => void;
+  resetNativeHistory: (tabId: string) => void;
   setError: (tabId: string, error: string | null) => void;
   setNotice: (tabId: string, notice: string | null) => void;
   setCompatibilityIssue: (tabId: string, issue: BrowserCompatibilityIssue | null) => void;
@@ -52,12 +66,19 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
       const current = state.histories[tabId] ?? { entries: [url], index: 0 };
       if (current.entries[current.index] === url) return state;
       const existingIndex = current.entries.lastIndexOf(url);
+      const index = current.index + 1;
+      const native = current.native;
       const next =
         existingIndex >= 0 && Math.abs(existingIndex - current.index) === 1
           ? { ...current, index: existingIndex }
           : {
               entries: [...current.entries.slice(0, current.index + 1), url],
-              index: current.index + 1,
+              index,
+              // The webview pushed this entry too.
+              native:
+                native && native.lo <= current.index && current.index <= native.hi
+                  ? { lo: native.lo, hi: index }
+                  : { lo: index, hi: index },
             };
       return { histories: { ...state.histories, [tabId]: next } };
     }),
@@ -71,6 +92,47 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
     }));
     return current.entries[index] ?? null;
   },
+  travelHistory: (tabId, direction) => {
+    const current = get().histories[tabId];
+    if (!current) return null;
+    const index = current.index + direction;
+    const url = current.entries[index];
+    if (index < 0 || url === undefined) return null;
+    const range = current.native;
+    const native = Boolean(
+      range &&
+      range.lo <= current.index &&
+      current.index <= range.hi &&
+      range.lo <= index &&
+      index <= range.hi,
+    );
+    set((state) => ({
+      histories: {
+        ...state.histories,
+        // A direct load leaves the webview knowing only the loaded entry.
+        [tabId]: { ...current, index, native: native ? range : { lo: index, hi: index } },
+      },
+    }));
+    return { url, native };
+  },
+  replaceHistory: (tabId, history) =>
+    set((state) => ({
+      histories: {
+        ...state.histories,
+        [tabId]: { ...history, native: { lo: history.index, hi: history.index } },
+      },
+    })),
+  resetNativeHistory: (tabId) =>
+    set((state) => {
+      const current = state.histories[tabId];
+      if (!current) return state;
+      return {
+        histories: {
+          ...state.histories,
+          [tabId]: { ...current, native: { lo: current.index, hi: current.index } },
+        },
+      };
+    }),
   setError: (tabId, error) =>
     set((state) => ({
       errors: { ...state.errors, [tabId]: error },
@@ -137,9 +199,9 @@ export async function browserProfileChanged(
 type BrowserRuntimeTab = Pick<WorkspaceTab, "id" | "instanceKey">;
 type BrowserSyncInput = {
   originSpaceId?: string;
-  /** Opaque host-issued context used by SDK and agent browser grants. */
+  /** Opaque host-issued context used by agent browser grants. */
   scopeId?: string;
-  /** Host-derived account/deployment profile for SDK-owned browser views. */
+  /** Host-derived account/deployment profile for native browser views. */
   profileId?: string;
   providerId?: string;
   profileProviderId?: string;
@@ -161,18 +223,7 @@ export function browserRuntimeId(tab: BrowserRuntimeTab): string {
 }
 
 export function browserScopeId(tab: BrowserRuntimeTab): string {
-  return sdkBrowserContexts.get(tab.id)?.contextId ?? `scope-${browserRuntimeId(tab)}`;
-}
-
-const sdkBrowserContexts = new Map<string, { runtimeId: string; contextId: string }>();
-
-/** A lease prevents an old component's cleanup from retiring its replacement. */
-export function registerSdkBrowserContext(tabId: string, runtimeId: string, contextId: string) {
-  const lease = { runtimeId, contextId };
-  sdkBrowserContexts.set(tabId, lease);
-  return () => {
-    if (sdkBrowserContexts.get(tabId) === lease) sdkBrowserContexts.delete(tabId);
-  };
+  return `scope-${browserRuntimeId(tab)}`;
 }
 
 export function browserTabIdForRuntime(runtimeId: string): string | null {
@@ -180,8 +231,6 @@ export function browserTabIdForRuntime(runtimeId: string): string | null {
 }
 
 export function browserRuntimeIdForTabId(tabId: string): string | null {
-  const sdkContext = sdkBrowserContexts.get(tabId);
-  if (sdkContext) return sdkContext.runtimeId;
   for (const [runtimeId, candidate] of runtimeTabIds) {
     if (candidate === tabId) return runtimeId;
   }
@@ -189,11 +238,7 @@ export function browserRuntimeIdForTabId(tabId: string): string | null {
 }
 
 export function browserRuntimeIdForScope(scopeId: string): string | null {
-  for (const context of sdkBrowserContexts.values()) {
-    if (context.contextId === scopeId) return context.runtimeId;
-  }
-  // Legacy embedded views use named scopes. Opaque SDK contexts must resolve
-  // through a live host lease and must never be interpreted as native IDs.
+  // Resolve only live native browser scopes.
   if (scopeId.startsWith("scope-")) {
     const id = scopeId.slice("scope-".length);
     if (runtimeTabIds.has(id)) return id;
@@ -228,7 +273,7 @@ export function registerBrowserRuntime(tab: BrowserRuntimeTab): string {
 }
 
 export function browserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
-  return createdRuntimeIds.has(sdkBrowserContexts.get(tab.id)?.runtimeId ?? browserRuntimeId(tab));
+  return createdRuntimeIds.has(browserRuntimeId(tab));
 }
 
 /** Apply a committed sync URL to an existing page without showing or focusing
@@ -320,12 +365,15 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
         ...(input.profileId ? { profileId: input.profileId } : {}),
+        ...(parseBrowserTabState(input.tab.state).private ? { private: true } : {}),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,
       },
     });
     createdRuntimeIds.add(id);
+    // A new webview's own history holds only the page it opened with.
+    useBrowserRuntimeStore.getState().resetNativeHistory(input.tab.id);
   }
   // Frontend caches can outlive a crashed, detached, or hot-reloaded native
   // child. Reconcile after creation, a real bounds change, or an explicit
@@ -346,12 +394,14 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
         ...(input.profileId ? { profileId: input.profileId } : {}),
+        ...(parseBrowserTabState(input.tab.state).private ? { private: true } : {}),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,
       },
     });
     createdRuntimeIds.add(id);
+    useBrowserRuntimeStore.getState().resetNativeHistory(input.tab.id);
     exists = await invoke<boolean>("browser_webview_reconcile", {
       request: { id, nativeLiveResize: Boolean(input.nativeLiveResize), ...input.bounds },
     });
@@ -438,6 +488,49 @@ export function setBrowserPointerTrackingEnabled(enabled: boolean): void {
     .then(() =>
       invoke<void>("browser_webviews_set_pointer_tracking", { enabled }).catch(() => undefined),
     );
+}
+
+const internalPageTabs = new Set<string>();
+
+/**
+ * Marks a tab as showing a Misty-drawn page (misty://history and so on). Its
+ * native page stays alive but hidden, and must not overwrite the tab's
+ * address, title or icon while it sits behind the internal page.
+ */
+export function setBrowserTabShowsInternalPage(tabId: string, internal: boolean): void {
+  if (internal) internalPageTabs.add(tabId);
+  else internalPageTabs.delete(tabId);
+}
+
+export function browserTabShowsInternalPage(tabId: string): boolean {
+  return internalPageTabs.has(tabId);
+}
+
+let browserDownloadDirectory: string | null = null;
+
+/** Where website downloads are saved; empty means the Downloads folder. */
+export function setBrowserDownloadDirectory(directory: string): void {
+  if (browserDownloadDirectory === directory) return;
+  browserDownloadDirectory = directory;
+  void invoke<void>("browser_set_download_directory", { directory }).catch(() => undefined);
+}
+
+let browserDownloadPrompt: boolean | null = null;
+
+/** Ask where to save each website download instead of saving automatically. */
+export function setBrowserDownloadPrompt(enabled: boolean): void {
+  if (browserDownloadPrompt === enabled) return;
+  browserDownloadPrompt = enabled;
+  void invoke<void>("browser_set_download_prompt", { enabled }).catch(() => undefined);
+}
+
+let browserStatusBubbleEnabled: boolean | null = null;
+
+/** Shows or hides the hovered-link and loading bubble inside browser pages. */
+export function setBrowserStatusBubbleEnabled(enabled: boolean): void {
+  if (browserStatusBubbleEnabled === enabled) return;
+  browserStatusBubbleEnabled = enabled;
+  void invoke<void>("browser_webviews_set_status_bubble", { enabled }).catch(() => undefined);
 }
 
 function scheduleBrowserOverlayResume(): void {

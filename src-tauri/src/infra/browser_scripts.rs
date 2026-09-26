@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
 use url::Url;
 
@@ -184,6 +185,27 @@ pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bo
             "__MISTY_POINTER_TRACKING_PLACEHOLDER__",
             if pointer_tracking { "true" } else { "false" },
         )
+}
+
+static STATUS_BUBBLE_ENABLED: AtomicBool = AtomicBool::new(true);
+
+/// Whether pages show the hovered-link and loading bubble. Misty's settings
+/// push the user's preference; pages created afterwards start with it.
+pub(super) fn set_status_bubble_enabled(enabled: bool) {
+    STATUS_BUBBLE_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+pub(super) fn browser_status_script() -> String {
+    include_str!("browser_status.js").replace(
+        "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
+        if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) { "true" } else { "false" },
+    )
+}
+
+pub(super) const BROWSER_MEDIA_SCRIPT: &str = include_str!("browser_media.js");
+
+pub(super) fn browser_status_update_script(state: &serde_json::Value) -> String {
+    format!("window.__MISTY_SET_STATUS__?.({state});")
 }
 
 pub(super) const BROWSER_FAVICON_SCRIPT: &str = r#"

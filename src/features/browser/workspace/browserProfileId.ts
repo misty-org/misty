@@ -9,6 +9,7 @@ export async function browserProfileId(
   base.hash = "";
   const bytes = new TextEncoder().encode(
     JSON.stringify([
+      // Persisted namespace: keep existing website cookies across the app-system removal.
       "misty-sdk-browser-v1",
       base.href.replace(/\/+$/, ""),
       accountId,

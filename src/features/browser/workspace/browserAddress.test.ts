@@ -4,7 +4,6 @@ import {
   isIpv6Address,
   isLocalHostOrDomain,
   normalizeBrowserAddress,
-  normalizeSdkBrowserAddress,
   parseAuthority,
   resolveDirectAddress,
 } from "./browserAddress";
@@ -133,18 +132,18 @@ describe("browser address parsing and normalization", () => {
     });
   });
 
-  describe("normalizeBrowserAddress & normalizeSdkBrowserAddress", () => {
+  describe("normalizeBrowserAddress & normalizeBrowserAddress", () => {
     it("delegates both to the same resolution and falls back to search", () => {
       expect(normalizeBrowserAddress("localhost:3000")).toBe("http://localhost:3000");
-      expect(normalizeSdkBrowserAddress("localhost:3000")).toBe("http://localhost:3000");
+      expect(normalizeBrowserAddress("localhost:3000")).toBe("http://localhost:3000");
 
       expect(normalizeBrowserAddress("127.0.0.1:8080")).toBe("http://127.0.0.1:8080");
-      expect(normalizeSdkBrowserAddress("127.0.0.1:8080")).toBe("http://127.0.0.1:8080");
+      expect(normalizeBrowserAddress("127.0.0.1:8080")).toBe("http://127.0.0.1:8080");
 
       expect(normalizeBrowserAddress("human agent workspace")).toBe(
         "https://www.google.com/search?q=human%20agent%20workspace",
       );
-      expect(normalizeSdkBrowserAddress("human agent workspace")).toBe(
+      expect(normalizeBrowserAddress("human agent workspace")).toBe(
         "https://www.google.com/search?q=human%20agent%20workspace",
       );
     });
