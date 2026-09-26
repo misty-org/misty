@@ -28,8 +28,12 @@ cli/tasks/.signing.env
 **/.cache/
 **/.DS_Store
 **/.vscode
+# Personal agent tools and generated design-review metadata stay local.
+**/.agents/
 **/.claude
 **/.codex
+**/.cursor/
+**/.impeccable/
 **/.zed
 **.log
 *.tmp
