@@ -23,6 +23,8 @@ import {
 } from "./native";
 import { useBrowserSyncStore } from "./store";
 import { SyncVaultForm } from "./SyncVaultForm";
+import { DeviceNameSettings } from "./DeviceNameSettings";
+import { viewingName } from "./treeControl";
 
 function statusLabel(session: NativeSyncView) {
   if (session.status.issue) return "Needs attention";
@@ -155,9 +157,17 @@ export function BrowserSyncSettings() {
           <SettingsNote>Sign in to Misty before setting up sync.</SettingsNote>
         ) : session?.account_id === accountId ? (
           <>
-            <SettingsRow label="Active device">
+            <SettingsRow label="Workspace">
               <span className="text-sm text-cream-muted">
-                {activeDeviceEpoch(session) ? "This device" : "Wake Misty to use this device"}
+                {session.trees
+                  ? session.trees.driving_tree === session.device_id
+                    ? "This device’s workspace"
+                    : session.trees.driving_tree
+                      ? `${viewingName(session, user?.name)}’s workspace`
+                      : "Choose a workspace to continue"
+                  : activeDeviceEpoch(session)
+                    ? "This device"
+                    : "Wake Misty to use this device"}
               </span>
             </SettingsRow>
             <SettingsRow label="Workspace status">
@@ -214,6 +224,11 @@ export function BrowserSyncSettings() {
           </SettingsNote>
         )}
       </SettingsSection>
+      {native && session && session.account_id === accountId && (
+        <SettingsSection title="Device names">
+          <DeviceNameSettings session={session} />
+        </SettingsSection>
+      )}
       {available &&
         available.account.accountId === accountId &&
         !transitioning &&

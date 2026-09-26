@@ -20,10 +20,12 @@ import (
 type BrowserSyncService struct {
 	database *db.Database
 	store    *Store
+	trees    *treeCache
+	restore  RestoreCompleter
 }
 
 func NewBrowserSyncService(database *db.Database) *BrowserSyncService {
-	return &BrowserSyncService{database: database, store: NewStore(database.Conn)}
+	return &BrowserSyncService{database: database, store: NewStore(database.Conn), trees: newTreeCache(64 << 20)}
 }
 
 func syncErrorCode(err error) (string, int) {
@@ -44,6 +46,10 @@ func syncErrorCode(err error) (string, int) {
 		return "sync_operation_compacted", 409
 	case errors.Is(err, ErrSyncCursor):
 		return "sync_cursor_invalid", 409
+	case errors.Is(err, ErrSyncTreeMode):
+		return "sync_tree_mode", 426
+	case errors.Is(err, ErrSyncTreeSnapshot):
+		return "sync_tree_snapshot_required", 409
 	default:
 		return "sync_unavailable", 503
 	}
@@ -155,9 +161,16 @@ func (s *BrowserSyncService) Ticket() http.HandlerFunc {
 			writeSyncError(w, err)
 			return
 		}
-		if body.ProtocolVersion != 1 {
+		if body.ProtocolVersion != 1 && body.ProtocolVersion != 2 {
 			transport.WriteJSON(w, 426, map[string]string{"code": "sync_protocol_unsupported"})
 			return
+		}
+		// A tree-protocol workspace no longer accepts legacy clients.
+		if body.ProtocolVersion == 1 {
+			if mode, err := s.store.BrowserSyncTreeMode(r.Context(), user, body.WorkspaceID); err == nil && mode {
+				transport.WriteJSON(w, 426, map[string]string{"code": "sync_protocol_unsupported"})
+				return
+			}
 		}
 		token, err := security.GenerateSecureToken()
 		if err != nil {
@@ -191,6 +204,15 @@ type syncClientFrame struct {
 	Ready           bool          `json:"ready,omitempty"`
 	ActiveEpoch     string        `json:"active_epoch,omitempty"`
 	Activation      *SyncMutation `json:"activation,omitempty"`
+	// Tree protocol (v2) fields.
+	RequestID  string         `json:"request_id,omitempty"`
+	TreeOp     *SyncTreeOp    `json:"tree_op,omitempty"`
+	Claim      *SyncTreeClaim `json:"claim,omitempty"`
+	TreeID     string         `json:"tree_id,omitempty"`
+	TabNodeID  string         `json:"tab_node_id,omitempty"`
+	Slot       int16          `json:"slot,omitempty"`
+	Blob       *SyncBlob      `json:"blob,omitempty"`
+	BlobHashes [][]byte       `json:"blob_hashes,omitempty"`
 }
 
 func (s *BrowserSyncService) Connect() http.HandlerFunc {
@@ -202,6 +224,11 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 			return
 		}
 		token := r.URL.Query().Get("ticket")
+		protocol := r.URL.Query().Get("protocol")
+		if protocol != "" && protocol != "1" && protocol != "2" {
+			transport.WriteJSON(w, 426, map[string]string{"code": "sync_protocol_unsupported"})
+			return
+		}
 		if len(token) < 32 || len(token) > 128 {
 			writeSyncError(w, ErrSyncForbidden)
 			return
@@ -209,6 +236,16 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 		identity, err := s.store.ConsumeBrowserSyncTicket(r.Context(), security.HashToken(token))
 		if err != nil {
 			writeSyncError(w, err)
+			return
+		}
+		version := 1
+		if protocol == "2" {
+			version = 2
+		} else if mode, err := s.store.BrowserSyncTreeMode(r.Context(), identity.UserID, identity.WorkspaceID); err != nil {
+			writeSyncError(w, err)
+			return
+		} else if mode {
+			transport.WriteJSON(w, 426, map[string]string{"code": "sync_protocol_unsupported"})
 			return
 		}
 		conn, err := browserSyncUpgrader.Upgrade(w, r, nil)
@@ -223,7 +260,7 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 		conn.SetReadLimit(4096)
 		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		if conn.WriteJSON(map[string]any{"type": "challenge", "protocol_version": 1, "challenge": challenge}) != nil {
+		if conn.WriteJSON(map[string]any{"type": "challenge", "protocol_version": version, "challenge": challenge}) != nil {
 			return
 		}
 		kind, raw, err := conn.ReadMessage()
@@ -235,6 +272,13 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Device proof required"), time.Now().Add(time.Second))
 			return
 		}
-		s.serveConnection(r.Context(), conn, *identity, auth.After)
+		if version == 2 {
+			// The first tree-protocol connection turns away legacy clients, which
+			// would otherwise keep publishing the old shared workspace.
+			if s.store.EnableBrowserSyncTreeMode(r.Context(), identity.UserID, identity.WorkspaceID) != nil {
+				return
+			}
+		}
+		s.serveConnection(r.Context(), conn, *identity, auth.After, version)
 	}
 }

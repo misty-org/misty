@@ -110,6 +110,8 @@ type SyncReceipt struct {
 	OperationID string `json:"operation_id"`
 	Sequence    int64  `json:"sequence"`
 	Discarded   bool   `json:"discarded,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	TreeVersion int64  `json:"tree_version,omitempty"`
 }
 type SyncEvent struct {
 	SyncMutation
@@ -157,6 +159,9 @@ func (db *Store) CreateBrowserSyncWorkspace(ctx context.Context, userID string, 
 	if err != nil {
 		return err
 	}
+	if err = ensureBrowserSyncTrees(ctx, tx, grant.WorkspaceID, grant.DeviceID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 func (db *Store) EnrollBrowserSyncDevice(ctx context.Context, userID string, g SyncDeviceGrant) error {
@@ -194,6 +199,9 @@ func (db *Store) EnrollBrowserSyncDevice(ctx context.Context, userID string, g S
 	if n != 1 {
 		return ErrSyncForbidden
 	}
+	if err = ensureBrowserSyncTrees(ctx, tx, g.WorkspaceID, g.DeviceID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -217,14 +225,16 @@ func (db *Store) PublishBrowserSync(ctx context.Context, userID string, m SyncMu
 	defer tx.Rollback()
 	var head, epoch int64
 	var activeDevice, activeEpoch sql.NullString
+	var treeMode bool
 	// Selection and publication share a lock, so a takeover cannot race a write.
-	err = tx.QueryRowContext(ctx, `SELECT head_sequence,key_epoch,active_device_id,active_epoch FROM browser_sync_workspaces WHERE user_id=$1 AND workspace_id=$2 FOR UPDATE`, userID, m.WorkspaceID).Scan(&head, &epoch, &activeDevice, &activeEpoch)
+	err = tx.QueryRowContext(ctx, `SELECT head_sequence,key_epoch,active_device_id,active_epoch,tree_mode FROM browser_sync_workspaces WHERE user_id=$1 AND workspace_id=$2 FOR UPDATE`, userID, m.WorkspaceID).Scan(&head, &epoch, &activeDevice, &activeEpoch, &treeMode)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSyncForbidden
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	var public []byte
 	var counter int64
 	var fullSync bool
@@ -272,7 +282,13 @@ func (db *Store) PublishBrowserSync(ctx context.Context, userID string, m SyncMu
 			return nil, err
 		}
 	}
-	if !fullSync || staleRequest || (!intent.Activate && activeDevice.Valid && (activeDevice.String != m.DeviceID || activeEpoch.String != intent.ActiveEpoch)) {
+	// In tree mode the log carries only account-wide credentials; per-tree
+	// claims replace the single active device, and legacy clients are refused
+	// at connect time, so any full-sync device may publish. Activation is gone.
+	if treeMode && intent.Activate {
+		staleRequest = true
+	}
+	if !fullSync || staleRequest || (!treeMode && !intent.Activate && activeDevice.Valid && (activeDevice.String != m.DeviceID || activeEpoch.String != intent.ActiveEpoch)) {
 		// Consume the signed device counter and preserve its receipt, without
 		// broadcasting stale follower data or creating a gap in the event log.
 		_, err = tx.ExecContext(ctx, `INSERT INTO browser_sync_receipts(workspace_id,operation_id,sequence,device_id,device_counter,content_hash,discarded) VALUES($1,$2,$3,$4,$5,$6,true)`, m.WorkspaceID, m.OperationID, head, m.DeviceID, m.DeviceCounter, digest[:])

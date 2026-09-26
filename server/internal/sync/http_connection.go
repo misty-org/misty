@@ -12,7 +12,7 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-func (s *BrowserSyncService) serveConnection(parent context.Context, conn *websocket.Conn, identity SyncConnectionIdentity, after int64) {
+func (s *BrowserSyncService) serveConnection(parent context.Context, conn *websocket.Conn, identity SyncConnectionIdentity, after int64, version int) {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	connectionID := uuid.NewString()
@@ -31,8 +31,12 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 	}
 	defer unsubscribe()
 	_ = s.store.NotifyBrowserSyncPresence(ctx, identity)
-	outgoing := make(chan any, 16)
+	outgoing := make(chan any, 32)
 	resume := make(chan int64, 1)
+	var watches chan treeWatch
+	if version == 2 {
+		watches = make(chan treeWatch, 8)
+	}
 	done := make(chan struct{})
 	send := func(frame any) bool {
 		select {
@@ -50,7 +54,7 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 		defer close(done)
 		defer cancel()
 		defer conn.Close()
-		s.writeConnection(ctx, conn, identity, connectionID, after, events, outgoing, resume)
+		s.writeConnection(ctx, conn, identity, connectionID, after, events, outgoing, resume, watches)
 	}()
 	defer func() { cancel(); _ = conn.Close(); <-done }()
 	applied, ready := after, false
@@ -61,9 +65,14 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 		if err := s.store.BrowserSyncHeartbeat(bounded, identity, connectionID, applied, ready, activeEpoch); err != nil {
 			return err
 		}
+		if version == 2 {
+			if err := s.store.TouchBrowserSyncDriver(bounded, identity); err != nil {
+				return err
+			}
+		}
 		return conn.SetReadDeadline(time.Now().Add(45 * time.Second))
 	}
-	conn.SetReadLimit(1500 << 10)
+	conn.SetReadLimit(SyncTreeMaxOpBytes*4/3 + 64<<10)
 	_ = conn.SetReadDeadline(time.Now().Add(45 * time.Second))
 	conn.SetPongHandler(func(string) error { return heartbeat() })
 	windowStart := time.Now()
@@ -78,12 +87,21 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 			messages = 0
 		}
 		messages++
-		if messages > 64 || kind != websocket.TextMessage {
+		if messages > 96 || kind != websocket.TextMessage {
 			return
 		}
 		var frame syncClientFrame
 		if err = decodeSync(bytes.NewReader(raw), &frame); err != nil {
 			send(map[string]any{"type": "error", "code": "invalid_sync_frame"})
+			continue
+		}
+		if version == 2 && isTreeFrame(frame.Type) {
+			bounded, stop := context.WithTimeout(ctx, 10*time.Second)
+			ok := s.handleTreeFrame(bounded, identity, frame, send, watches)
+			stop()
+			if !ok {
+				return
+			}
 			continue
 		}
 		switch frame.Type {
@@ -154,7 +172,7 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 	}
 }
 
-func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocket.Conn, identity SyncConnectionIdentity, connectionID string, cursor int64, events <-chan db.AccountEvent, outgoing <-chan any, resume <-chan int64) {
+func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocket.Conn, identity SyncConnectionIdentity, connectionID string, cursor int64, events <-chan db.AccountEvent, outgoing <-chan any, resume <-chan int64, watches <-chan treeWatch) {
 	write := func(value any) error {
 		if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
 			return err
@@ -165,9 +183,15 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 	if err != nil || workspace == nil {
 		return
 	}
-	if write(map[string]any{"type": "welcome", "workspace": workspace, "connection_id": connectionID}) != nil {
+	welcome := map[string]any{"type": "welcome", "workspace": workspace, "connection_id": connectionID}
+	if watches != nil {
+		welcome["protocol_version"] = 2
+	}
+	if write(welcome) != nil {
 		return
 	}
+	trees := &treePusher{service: s, identity: identity, write: write, watched: map[string]int64{}}
+	var lastTrees []byte
 	var lastDevices, lastPresence []byte
 	presence := func() error {
 		bounded, stop := context.WithTimeout(ctx, 5*time.Second)
@@ -202,6 +226,20 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 				return err
 			}
 			lastPresence = raw
+		}
+		if watches == nil {
+			return nil
+		}
+		roster, err := s.store.BrowserSyncTrees(bounded, identity.UserID, identity.WorkspaceID)
+		if err != nil {
+			return err
+		}
+		raw, _ = json.Marshal(roster)
+		if !bytes.Equal(raw, lastTrees) {
+			if err = write(map[string]any{"type": "trees", "trees": roster}); err != nil {
+				return err
+			}
+			lastTrees = raw
 		}
 		return nil
 	}
@@ -269,9 +307,13 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 			if write(frame) != nil {
 				return
 			}
+		case w := <-watches:
+			if trees.watch(ctx, w) != nil {
+				return
+			}
 		case event := <-events:
 			if event.Topic == "reset" || event.Topic == "browser-sync" {
-				if replay() != nil {
+				if replay() != nil || trees.refresh(ctx) != nil {
 					return
 				}
 			}
@@ -287,7 +329,7 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 				}
 			}
 		case <-reconcile.C:
-			if replay() != nil {
+			if replay() != nil || trees.refresh(ctx) != nil {
 				return
 			}
 			if blocked && presence() != nil {

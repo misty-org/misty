@@ -185,7 +185,7 @@ async fn reconcile(
     let document: Document =
         serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
             .map_err(|_| "Could not read the workspace")?;
-    if !document.is_active(&active.device_id) {
+    if !super::may_capture(&document, active) {
         active.capture_view = None;
         if !connected {
             return Ok(None);

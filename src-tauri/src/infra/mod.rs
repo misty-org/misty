@@ -79,6 +79,9 @@ pub mod workspaces;
 
 mod browser_profile;
 
+#[cfg(desktop)]
+pub mod page_state;
+
 pub mod browser_provider;
 
 #[cfg(all(debug_assertions, target_os = "macos"))]

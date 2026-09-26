@@ -40,6 +40,9 @@ vi.mock("@/features/settings/desktop", () => ({
 }));
 vi.mock("@/features/settings/settingsControls", () => ({
   SettingsNote: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+  TextControl: ({ value, placeholder }: { value: string; placeholder?: string }) => (
+    <input readOnly value={value} placeholder={placeholder} />
+  ),
 }));
 vi.mock("./native", () => ({
   vaultAvailability: mocks.availability,

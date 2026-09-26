@@ -1,5 +1,6 @@
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { layoutTabs } from "@/features/workspace/layoutTabs";
+import { layoutTabs, mapLayoutViews } from "@/features/workspace/layoutTabs";
+import { scrubPrivateTab } from "@/features/workspace/privateBrowsing";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { parseBrowserTabState, type WorkspaceVirtualWindow } from "@/features/workspace/model";
 import {
@@ -37,7 +38,11 @@ export const workspaceSource: WorkspaceSource = {
   read() {
     const state = useWorkspaceStore.getState();
     return {
-      windows: state.virtualWindowsByScope.global ?? [],
+      // Private tabs travel only as placeholders, never with their pages.
+      windows: (state.virtualWindowsByScope.global ?? []).map((window) => ({
+        ...window,
+        layout: mapLayoutViews(window.layout, scrubPrivateTab),
+      })),
       activeWindowId: state.activeVirtualWindowIdByScope.global ?? "",
       groups: state.websiteGroups,
       websites: state.savedWebsites,

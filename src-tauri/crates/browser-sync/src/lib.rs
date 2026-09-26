@@ -8,6 +8,7 @@ pub mod recovery;
 pub mod secure_store;
 pub mod store;
 pub mod transport;
+pub mod tree;
 pub mod worker;
 
 #[derive(Debug, thiserror::Error)]

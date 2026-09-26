@@ -10,10 +10,13 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
+mod trees;
+
 use crate::{
     crypto::{DeviceKey, VaultRoot, VaultScope},
     document::CredentialRecord,
     protocol::*,
+    tree::sync::{Outgoing, TreeSync, TreeView},
     store::{
         BrowserCaptureState, BrowserImportJournal, BrowserObservation, BrowserProfileBinding,
         PendingSnapshot, Store,
@@ -94,6 +97,11 @@ enum Command {
         String,
         oneshot::Sender<Result<BrowserImportJournal>>,
     ),
+    TreeChanges(Vec<crate::document::Change>, oneshot::Sender<Result<()>>),
+    TreeResume(crate::document::Resume, oneshot::Sender<Result<()>>),
+    TreeClaim(String, oneshot::Sender<Result<()>>),
+    TreeSlotWrite(String, i16, Option<Vec<u8>>, oneshot::Sender<Result<()>>),
+    TreeSlotRead(String, String, i16, oneshot::Sender<Result<Option<Vec<u8>>>>),
 }
 
 #[derive(Clone)]
@@ -104,6 +112,8 @@ pub struct WorkerHandle {
     pub status: watch::Receiver<Status>,
     pub presence: watch::Receiver<Vec<Presence>>,
     pub devices: watch::Receiver<Vec<Device>>,
+    /// Per-device trees: roster, the driven tree and the shared tree.
+    pub trees: watch::Receiver<TreeView>,
     pub traffic: Arc<crate::transport::TrafficCounters>,
     events: broadcast::Sender<AccountEvent>,
 }
@@ -382,6 +392,36 @@ impl WorkerHandle {
         receive.await.map_err(|_| Error::Network)?
     }
 
+    async fn call<T>(&self, command: impl FnOnce(oneshot::Sender<Result<T>>) -> Command) -> Result<T> {
+        let (send, receive) = oneshot::channel();
+        self.commands.send(command(send)).await.map_err(|_| Error::Network)?;
+        receive.await.map_err(|_| Error::Network)?
+    }
+
+    /// Queues renderer edits durably. Groups and websites go to the shared
+    /// tree; windows, layouts and tabs to the tree this device drives.
+    pub async fn tree_changes(&self, changes: Vec<crate::document::Change>) -> Result<()> {
+        self.call(|reply| Command::TreeChanges(changes, reply)).await
+    }
+
+    pub async fn tree_resume(&self, resume: crate::document::Resume) -> Result<()> {
+        self.call(|reply| Command::TreeResume(resume, reply)).await
+    }
+
+    /// Moves this device's driver seat to `tree_id`. Requires a connection.
+    pub async fn claim_tree(&self, tree_id: String) -> Result<()> {
+        self.call(|reply| Command::TreeClaim(tree_id, reply)).await
+    }
+
+    /// Native-only: slot plaintext (page state, history) may hold form data.
+    pub async fn write_tab_slot(&self, tab_record: String, slot: i16, plaintext: Option<Vec<u8>>) -> Result<()> {
+        self.call(|reply| Command::TreeSlotWrite(tab_record, slot, plaintext, reply)).await
+    }
+
+    pub async fn read_tab_slot(&self, tree_id: String, tab_record: String, slot: i16) -> Result<Option<Vec<u8>>> {
+        self.call(|reply| Command::TreeSlotRead(tree_id, tab_record, slot, reply)).await
+    }
+
     pub fn account_events(&self) -> broadcast::Receiver<AccountEvent> {
         self.events.subscribe()
     }
@@ -409,6 +449,12 @@ pub struct Worker<F> {
     imported_through: Option<u64>,
     roster: HashMap<String, DeviceGrant>,
     head: u64,
+    trees: TreeSync,
+    tree_view: watch::Sender<TreeView>,
+    /// Frames produced by commands, sent by the connected loop.
+    tree_outbox: Vec<Outgoing>,
+    connected_now: bool,
+    claimed_requests: std::collections::HashSet<String>,
 }
 
 impl<F> Worker<F>
@@ -445,6 +491,12 @@ where
         let (presence, presence_rx) = watch::channel(Vec::new());
         let (devices, devices_rx) = watch::channel(Vec::new());
         let (events, _) = broadcast::channel(32);
+        let mut trees = TreeSync::new(&scope, store.grant());
+        trees.load(
+            &store,
+            &crate::tree::state::Verifier { root: &root, scope: &scope, grants: &HashMap::new() },
+        )?;
+        let (tree_view, trees_rx) = watch::channel(trees.view(&store)?);
         let handle = WorkerHandle {
             browser_imports: Arc::new(tokio::sync::Mutex::new(())),
             commands: commands_tx,
@@ -452,6 +504,7 @@ where
             status: status_rx,
             presence: presence_rx,
             devices: devices_rx,
+            trees: trees_rx,
             traffic: api.traffic(),
             events: events.clone(),
         };
@@ -472,6 +525,11 @@ where
                 imported_through: None,
                 roster: HashMap::new(),
                 head,
+                trees,
+                tree_view,
+                tree_outbox: Vec::new(),
+                connected_now: false,
+                claimed_requests: std::collections::HashSet::new(),
             },
             handle,
         ))
@@ -547,7 +605,11 @@ where
                     self.store.confirm_enrollment(&socket.workspace)?;
                     self.store.observe_head(socket.workspace.head_sequence)?;
                     self.head = self.head.max(socket.workspace.head_sequence);
-                    self.connected(&mut socket).await
+                    self.connected_now = true;
+                    let result = self.connected(&mut socket).await;
+                    self.connected_now = false;
+                    self.trees_disconnected();
+                    result
                 }
                 Err(error) => Err(error),
             };
@@ -655,6 +717,37 @@ where
                     .quarantine_browser_import(&self.root, &profile, revision, &id);
                 let _ = reply.send(result);
                 self.refresh_status()?;
+            }
+            Command::TreeChanges(changes, reply) => {
+                let result = self.trees.apply_changes(&mut self.store, &self.root, changes);
+                let _ = reply.send(result);
+                self.publish_tree_view()?;
+            }
+            Command::TreeResume(resume, reply) => {
+                let result = self.trees.set_resume(&mut self.store, &self.root, resume);
+                let _ = reply.send(result);
+            }
+            Command::TreeSlotWrite(tab, slot, plaintext, reply) => {
+                let _ = reply.send(self.trees.write_slot(&mut self.store, &self.root, &tab, slot, plaintext));
+            }
+            Command::TreeClaim(tree, reply) => {
+                if !self.connected_now {
+                    let _ = reply.send(Err(Error::Network));
+                } else {
+                    let grant = self.store.grant().clone();
+                    match self.trees.claim(&mut self.store, &self.scope, &grant, &self.device, &tree, None, Some(reply)) {
+                        Ok(frame) => self.tree_outbox.push(frame),
+                        Err(error) => return Err(error),
+                    }
+                }
+            }
+            Command::TreeSlotRead(tree, tab, slot, reply) => {
+                if self.connected_now {
+                    let frame = self.trees.read_slot(&tree, &tab, slot, reply);
+                    self.tree_outbox.push(frame);
+                } else {
+                    let _ = reply.send(Err(Error::Network));
+                }
             }
             Command::Enqueue(operation_id, payload, reply) => {
                 // Reject invalid edits before they acquire an irreversible device
@@ -832,19 +925,25 @@ where
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis() as u64;
+            if self.trees.idle() {
+                self.store.resync_tree_counter(own.tree_last_counter)?;
+            } else {
+                self.store.observe_tree_counter(own.tree_last_counter)?;
+            }
+            // Tree protocol: the target signs a claim reusing the request ID,
+            // which the server checks against the request's tree and expiry.
             if own.full_sync && own.activation_expires_at > now {
                 if let Some(request) = own.activation_request.as_deref().filter(|id| valid_id(id)) {
-                    let payload = crate::document::Payload::ActiveDevice {
-                        version: 1,
-                        active: true,
-                        previous_epoch: None,
-                    };
-                    self.store.enqueue_identified(
-                        &self.root,
-                        &self.device,
-                        request,
-                        &serde_json::to_vec(&payload)?,
-                    )?;
+                    if self.claimed_requests.insert(request.to_owned()) {
+                        let tree = own
+                            .activation_tree_id
+                            .clone()
+                            .filter(|id| valid_id(id))
+                            .unwrap_or_else(|| own.grant.device_id.clone());
+                        let grant = self.store.grant().clone();
+                        let frame = self.trees.claim(&mut self.store, &self.scope, &grant, &self.device, &tree, Some(request.to_owned()), None)?;
+                        self.tree_outbox.push(frame);
+                    }
                 }
             }
         }
@@ -854,6 +953,7 @@ where
 
     async fn connected(&mut self, socket: &mut SyncSocket) -> Result<()> {
         self.report(Phase::CatchingUp, None)?;
+        self.trees_connected(socket).await?;
         let mut tick = interval(Duration::from_millis(250));
         tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let mut heartbeat = interval(Duration::from_secs(15));
@@ -911,6 +1011,14 @@ where
                             if in_flight.as_ref().is_some_and(|(id, _)| page.iter().any(|(e, _)| e.mutation.operation_id == *id)) { in_flight = None; }
                         },
                         ServerFrame::AccountEvent { event } => { let _ = self.events.send(event); },
+                        ServerFrame::Trees { trees } => self.tree_roster(socket, trees).await?,
+                        ServerFrame::TreeDelta { delta } => self.tree_delta(socket, delta).await?,
+                        ServerFrame::TreeSnapshot { snapshot } => self.tree_snapshot(snapshot)?,
+                        ServerFrame::TreeCurrent { tree_id, version } => self.tree_current(socket, &tree_id, version).await?,
+                        ServerFrame::TreeAck { request_id, receipt } => self.tree_ack(request_id.as_deref(), receipt)?,
+                        ServerFrame::TreeError { code, request_id, operation_id, .. } => self.tree_error(request_id.as_deref(), operation_id.as_deref(), &code)?,
+                        ServerFrame::Slot { request_id, slot } => self.trees.on_slot(&self.root, &self.scope, request_id.as_deref(), slot),
+                        ServerFrame::Blobs { .. } | ServerFrame::BlobAck { .. } => {},
                         ServerFrame::CheckpointRequired { .. } => return Err(Error::Recovery),
                         ServerFrame::Error { code, .. } if code == "sync_unavailable" => return Err(Error::Network),
                         ServerFrame::Error { code, .. } if code == "sync_device_forbidden" => return Err(Error::Authentication),
@@ -922,12 +1030,13 @@ where
                 _ = heartbeat.tick() => {
                     let status = self.status.borrow().clone();
                     let document = serde_json::from_slice::<crate::document::Document>(&self.store.committed_snapshot(&self.root)?).ok();
-                    let active_epoch = document.as_ref().filter(|v| v.is_active(&self.store.grant().device_id))
+                    let active_epoch = document.as_ref().filter(|v| !v.tree_mode && v.is_active(&self.store.grant().device_id))
                         .and_then(|v| v.active_device.as_ref()).map(|v| v.epoch.as_str());
                     socket.send(&ClientFrame::Heartbeat { applied_sequence: status.applied_sequence, ready: status.phase == Phase::Ready, active_epoch, activation: None }).await?;
                 },
                 _ = tick.tick() => {
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
+                    self.tree_tick(socket).await?;
                     // Catch up before publishing offline credentials; the reducer
                     // will enforce their base-version preconditions atomically.
                     if in_flight.is_none() && self.devices.borrow().iter().any(|d| d.grant.device_id == self.store.grant().device_id && d.full_sync) && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {
@@ -1026,7 +1135,7 @@ mod control_tests {
     }
 
     #[test]
-    fn remote_activation_is_signed_once_and_ignores_expired_or_independent_requests() {
+    fn remote_activation_claims_once_and_ignores_expired_or_independent_requests() {
         let directory = tempfile::tempdir().unwrap();
         let _ = rustls::crypto::ring::default_provider().install_default();
         let api = SyncApi::new("http://127.0.0.1", reqwest::Client::new()).unwrap();
@@ -1063,7 +1172,7 @@ mod control_tests {
         worker
             .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
             .unwrap();
-        assert!(worker.store.pending(true, 10).unwrap().is_empty());
+        assert!(worker.tree_outbox.is_empty());
         json["activation_expires_at"] = (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -1074,7 +1183,7 @@ mod control_tests {
         worker
             .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
             .unwrap();
-        assert!(worker.store.pending(true, 10).unwrap().is_empty());
+        assert!(worker.tree_outbox.is_empty());
         assert!(!handle.devices.borrow()[0].full_sync);
         json["full_sync"] = true.into();
         // Existing clients ignore the additive metadata, including the flattened grant.
@@ -1094,16 +1203,16 @@ mod control_tests {
                 .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
                 .unwrap();
         }
-        let pending = worker.store.pending(true, 10).unwrap();
-        assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].operation_id, request);
-        let bytes = worker
-            .root
-            .open_mutation(&worker.scope, &grant, &pending[0])
-            .unwrap();
-        assert!(matches!(
-            serde_json::from_slice::<crate::document::Payload>(&bytes).unwrap(),
-            crate::document::Payload::ActiveDevice { active: true, .. }
-        ));
+        // One signed claim reusing the request ID; the device's own tree is
+        // the default target when the request names none.
+        assert_eq!(worker.tree_outbox.len(), 1);
+        match &worker.tree_outbox[0] {
+            Outgoing::Claim { claim, .. } => {
+                assert_eq!(claim.operation_id, request);
+                assert_eq!(claim.tree_id, grant.device_id);
+            }
+            _ => panic!("expected a tree claim"),
+        }
+        assert!(worker.store.pending(true, 10).unwrap().is_empty());
     }
 }

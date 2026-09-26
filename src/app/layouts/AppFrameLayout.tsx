@@ -4,6 +4,7 @@ import { useWorkspaceRecoveryRetry } from "@/features/workspace/useWorkspaceReco
 import { BrowserSyncStartup } from "@/features/browser-workspace/BrowserSyncStartup";
 import { BrowserSyncSleepOverlay } from "@/features/browser-workspace/BrowserSyncSleepOverlay";
 import { BrowserSyncBridge } from "@/features/browser-workspace/BrowserSyncBridge";
+import { PageStateBridge } from "@/features/browser-workspace/PageStateBridge";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui/loading-screen";
 import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
@@ -67,6 +68,7 @@ export function AppFrameLayout() {
         </Suspense>
       </BrowserSyncStartup>
       <BrowserSyncBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
+      <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
       <AgentExecutionSurface />
       <ActivityPanel />

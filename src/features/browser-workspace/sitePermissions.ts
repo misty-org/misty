@@ -1,6 +1,4 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-
 export type SitePermissionDecision = "ask" | "allow" | "block";
 export interface SitePermissions {
   camera: SitePermissionDecision;
@@ -21,9 +19,13 @@ export interface SavedSitePermission {
 export function supportsSitePermissions() {
   return (
     hasTauriInternals() &&
-    !isNativeMobileBuild &&
-    ((window as Window & { __TAURI_OS_PLUGIN_INTERNALS__?: { platform?: string } })
-      .__TAURI_OS_PLUGIN_INTERNALS__?.platform === "macos" ||
+    ((
+      window as Window & {
+        __TAURI_OS_PLUGIN_INTERNALS__?: {
+          platform?: string;
+        };
+      }
+    ).__TAURI_OS_PLUGIN_INTERNALS__?.platform === "macos" ||
       /Mac/i.test(navigator.platform))
   );
 }
