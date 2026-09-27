@@ -7,10 +7,7 @@ import {
   useBrowserDownloadsStore,
 } from "../library/downloadsStore";
 import { browserLibrary, type BrowserDownloadEntry } from "../library/native";
-import {
-  InternalPageEmpty,
-  InternalPageFrame,
-} from "./InternalPageFrame";
+import { InternalPageEmpty, InternalPageFrame } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 
 const revealLabel =
@@ -76,7 +73,9 @@ export function DownloadsPage(props: BrowserInternalPageProps) {
       icon={Download}
       search={{ value: text, placeholder: "Search downloads", onChange: setText }}
       actions={
-        <Button variant="toolbar" size="xs"
+        <Button
+          variant="toolbar"
+          size="xs"
           disabled={!entries.some((entry) => entry.state !== "in_progress")}
           onClick={() => run(() => browserLibrary.removeDownloads({}))}
         >
@@ -156,14 +155,18 @@ function DownloadRow(props: {
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {active ? (
-          <Button variant="toolbar" size="xs"
+          <Button
+            variant="toolbar"
+            size="xs"
             onClick={() => run(() => browserLibrary.cancelDownload(entry.id))}
           >
             Cancel
           </Button>
         ) : null}
         {entry.state === "finished" && entry.exists ? (
-          <Button variant="toolbar" size="xs"
+          <Button
+            variant="toolbar"
+            size="xs"
             onClick={() => run(() => browserLibrary.revealDownload(entry.id))}
           >
             {revealLabel}
@@ -175,7 +178,9 @@ function DownloadRow(props: {
           </Button>
         ) : null}
         {!active ? (
-          <Button variant="toolbar" size="xs"
+          <Button
+            variant="toolbar"
+            size="xs"
             aria-label={`Remove ${entry.fileName || "download"} from the list`}
             title="Remove from list"
             onClick={() => run(() => browserLibrary.removeDownloads({ ids: [entry.id] }))}

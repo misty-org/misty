@@ -88,7 +88,9 @@ export function OverlaysSection() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete this note?</AlertDialogTitle>
-              <AlertDialogDescription>It moves to Recently Deleted for 30 days.</AlertDialogDescription>
+              <AlertDialogDescription>
+                It moves to Recently Deleted for 30 days.
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>

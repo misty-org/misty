@@ -34,12 +34,20 @@ export function libraryRuntime(): LibraryRuntime {
   return current;
 }
 export const libraryApi = new Proxy({} as typeof spacesApi, {
-  get: (target, key) => runtimeProperty(target, key, () => libraryRuntime().api[key as keyof typeof spacesApi]),
+  get: (target, key) =>
+    runtimeProperty(target, key, () => libraryRuntime().api[key as keyof typeof spacesApi]),
 });
 export const useLibrarySpaces = new Proxy(
   ((selector: Parameters<typeof useSpacesStore>[0]) =>
     libraryRuntime().useSpacesStore(selector)) as typeof useSpacesStore,
-  { get: (target, key) => runtimeProperty(target, key, () => libraryRuntime().useSpacesStore[key as keyof typeof useSpacesStore]) },
+  {
+    get: (target, key) =>
+      runtimeProperty(
+        target,
+        key,
+        () => libraryRuntime().useSpacesStore[key as keyof typeof useSpacesStore],
+      ),
+  },
 );
 export const useLibraryTitle: typeof useWorkspaceTabTitle = (...args) =>
   libraryRuntime().useWorkspaceTabTitle(...args);

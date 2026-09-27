@@ -40,9 +40,7 @@ export function McpConnectionsSheet(props: {
   );
 }
 
-export function McpConnectionsView(props: {
-  showCustomConnections?: boolean;
-}) {
+export function McpConnectionsView(props: { showCustomConnections?: boolean }) {
   const showCustomConnections =
     props.showCustomConnections ?? publicBetaFeatureEnabled("mcpConnections");
   const { user } = useAuth();

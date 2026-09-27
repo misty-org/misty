@@ -7,6 +7,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  IconButton,
 } from "@/shared/ui";
 import { HardDrive, Pencil, Plus, Search, Unplug } from "lucide-react";
 import { memo, useMemo, useState } from "react";
@@ -79,11 +80,10 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
           collapsed={collapsedSections.smartFolders}
           onToggle={() => toggleSection("smartFolders")}
           actions={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="New collection"
+            <IconButton
+              size="xs"
+              tooltip={false}
+              label="New collection"
               className={sidebarStyles.sectionActionButton}
               onClick={(event) => {
                 event.stopPropagation();
@@ -91,7 +91,7 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
               }}
             >
               <Plus size={15} />
-            </Button>
+            </IconButton>
           }
         />
         {!collapsedSections.smartFolders ? (

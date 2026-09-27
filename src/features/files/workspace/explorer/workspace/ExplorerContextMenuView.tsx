@@ -1,19 +1,18 @@
-import { createPortal, flushSync } from "react-dom";
+import { flushSync } from "react-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  MenuItem,
+  MenuSubmenu,
+  Portal,
 } from "@/shared/ui";
 import type {
   ContextMenuEntry,
   ContextMenuLeafItem,
 } from "../model/types/workspace/ExplorerContextMenu";
 
+/** Right-click menu for explorer entries, anchored to the pointer position. */
 export function ExplorerContextMenuView({
   open,
   x,
@@ -28,8 +27,11 @@ export function ExplorerContextMenuView({
   onClose: () => void;
 }) {
   const renderLeaf = (item: ContextMenuLeafItem) => (
-    <DropdownMenuItem
+    <MenuItem
       key={item.id}
+      icon={item.icon}
+      label={item.label}
+      shortcut={item.shortcut}
       disabled={item.disabled}
       title={item.disabled ? item.disabledReason : undefined}
       onSelect={() => {
@@ -37,15 +39,7 @@ export function ExplorerContextMenuView({
         flushSync(onClose);
         item.onRun();
       }}
-    >
-      <span className="inline-flex w-[19px] items-center justify-center text-cream-muted">
-        {item.icon}
-      </span>
-      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-        {item.label}
-      </span>
-      {item.shortcut ? <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut> : null}
-    </DropdownMenuItem>
+    />
   );
 
   return open ? (
@@ -55,38 +49,32 @@ export function ExplorerContextMenuView({
         if (!next) onClose();
       }}
     >
-      {createPortal(
+      <Portal>
         <DropdownMenuTrigger asChild>
           <span aria-hidden="true" className="fixed size-0" style={{ left: x, top: y }} />
-        </DropdownMenuTrigger>,
-        document.body,
-      )}
+        </DropdownMenuTrigger>
+      </Portal>
       <DropdownMenuContent
         align="start"
         side="bottom"
         sideOffset={0}
         collisionPadding={8}
-        className="max-h-[min(560px,calc(100dvh-2rem))] w-[250px] overflow-y-auto"
+        width="lg"
+        className="max-h-[min(560px,calc(100dvh-2rem))]"
         onPointerDown={(event) => event.stopPropagation()}
       >
         {menuEntries.map((item) =>
           "items" in item ? (
-            <DropdownMenuSub key={item.id}>
-              <DropdownMenuSubTrigger
-                disabled={item.disabled}
-                title={item.disabled ? item.disabledReason : undefined}
-              >
-                <span className="inline-flex w-[19px] items-center justify-center text-cream-muted">
-                  {item.icon}
-                </span>
-                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {item.label}
-                </span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-[min(560px,calc(100dvh-2rem))] w-[246px] overflow-y-auto">
-                {item.items.map(renderLeaf)}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <MenuSubmenu
+              key={item.id}
+              icon={item.icon}
+              label={item.label}
+              width="lg"
+              disabled={item.disabled}
+              title={item.disabled ? item.disabledReason : undefined}
+            >
+              {item.items.map(renderLeaf)}
+            </MenuSubmenu>
           ) : (
             renderLeaf(item)
           ),

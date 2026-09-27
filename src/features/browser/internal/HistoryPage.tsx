@@ -2,11 +2,7 @@ import { History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Checkbox, ListRow, ListRowButton } from "@/shared/ui";
 import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
-import {
-  InternalPageEmpty,
-  InternalPageFrame,
-  SiteIcon,
-} from "./InternalPageFrame";
+import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 
 const pageSize = 150;
@@ -105,9 +101,7 @@ export function HistoryPage(props: BrowserInternalPageProps) {
       actions={
         <div className="flex items-center gap-1">
           {selected.size ? (
-            <Button variant="toolbar" size="xs"
-              onClick={() => void remove([...selected])}
-            >
+            <Button variant="toolbar" size="xs" onClick={() => void remove([...selected])}>
               Delete {selected.size} selected
             </Button>
           ) : null}
@@ -148,7 +142,6 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                 </span>
                 <SiteIcon url={visit.url} />
                 <ListRowButton
-                 
                   title={visit.url}
                   onClick={(event) =>
                     event.metaKey || event.ctrlKey
@@ -166,7 +159,9 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                     {hostOf(visit.url)}
                   </span>
                 </ListRowButton>
-                <Button variant="toolbar" size="xs"
+                <Button
+                  variant="toolbar"
+                  size="xs"
                   className="opacity-0 group-hover/row:opacity-100 focus:opacity-100"
                   aria-label={`Remove ${visit.title || visit.url} from history`}
                   title="Remove from history"
@@ -180,7 +175,9 @@ export function HistoryPage(props: BrowserInternalPageProps) {
         </section>
       ))}
       {more ? (
-        <Button variant="toolbar" size="xs"
+        <Button
+          variant="toolbar"
+          size="xs"
           className="mx-auto flex"
           disabled={loading}
           onClick={() => void load(visits[visits.length - 1]?.visitedAt)}

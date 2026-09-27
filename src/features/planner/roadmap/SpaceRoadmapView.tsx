@@ -1,4 +1,7 @@
-import type { AiArtifact as AiArtifact, AiSurfaceAdapter as AiSurfaceAdapter } from "@/features/ai-surface/types";
+import type {
+  AiArtifact as AiArtifact,
+  AiSurfaceAdapter as AiSurfaceAdapter,
+} from "@/features/ai-surface/types";
 import { useRoadmapRuntime, isPlannerConflict } from "./spaceRoadmap/RoadmapRuntime";
 
 import type {
@@ -24,7 +27,10 @@ import {
 import { roadmapPalette, type RoadmapPaletteItem } from "./spaceRoadmap/roadmapNodeCatalog";
 
 export function SpaceRoadmapView(props: {
-  spaceId: string; roadmapId: string; canManage: boolean; workspaceTabId?: string;
+  spaceId: string;
+  roadmapId: string;
+  canManage: boolean;
+  workspaceTabId?: string;
 }) {
   return <RoadmapDocument key={`${props.spaceId}:${props.roadmapId}`} {...props} />;
 }

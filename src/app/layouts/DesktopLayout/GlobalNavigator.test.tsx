@@ -20,7 +20,7 @@ function renderNavigator() {
         profileOpen={false}
         settingsOpen={false}
         onProfileOpenChange={() => undefined}
-            onOpenAccountSettings={() => undefined}
+        onOpenAccountSettings={() => undefined}
         onSettingsClick={() => {}}
       />
     </MemoryRouter>,

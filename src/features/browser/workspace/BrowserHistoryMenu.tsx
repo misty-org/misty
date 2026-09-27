@@ -14,7 +14,9 @@ const recentLimit = 8;
 function ClosedTabIcon({ tab }: { tab: WorkspaceTab }) {
   if (tab.surfaceId !== "browser") return <AppWindow />;
   const url = parseBrowserTabState(tab.state).url;
-  return isBrowserInternalUrl(url) ? <History /> : (
+  return isBrowserInternalUrl(url) ? (
+    <History />
+  ) : (
     <span className="grid size-4 shrink-0 place-items-center [&_img]:size-4 [&_svg]:size-4">
       <SavedWebsiteIcon url={url} />
     </span>

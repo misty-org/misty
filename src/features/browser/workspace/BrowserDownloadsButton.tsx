@@ -22,10 +22,7 @@ import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
  * Appears while something is downloading or just finished, like Chrome's
  * downloads bubble. The full list lives at misty://downloads.
  */
-export function BrowserDownloadsButton(props: {
-  suspensionReason: string;
-  onShowAll: () => void;
-}) {
+export function BrowserDownloadsButton(props: { suspensionReason: string; onShowAll: () => void }) {
   const entries = useBrowserDownloadsStore((state) => state.entries);
   const lastFinishedAt = useBrowserDownloadsStore((state) => state.lastFinishedAt);
   const refresh = useBrowserDownloadsStore((state) => state.refresh);
@@ -45,7 +42,9 @@ export function BrowserDownloadsButton(props: {
 
   const fractions = active.map(downloadProgressFraction);
   const known = fractions.filter((value): value is number => value !== null);
-  const progress = known.length ? known.reduce((sum, value) => sum + value, 0) / known.length : null;
+  const progress = known.length
+    ? known.reduce((sum, value) => sum + value, 0) / known.length
+    : null;
   const justFinished = Date.now() - lastFinishedAt < 2_000;
 
   return (
@@ -59,8 +58,20 @@ export function BrowserDownloadsButton(props: {
         >
           <Download {...toolbarIconProps} />
           {active.length ? (
-            <svg className="pointer-events-none absolute inset-0.5" viewBox="0 0 36 36" aria-hidden="true">
-              <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="2" />
+            <svg
+              className="pointer-events-none absolute inset-0.5"
+              viewBox="0 0 36 36"
+              aria-hidden="true"
+            >
+              <circle
+                cx="18"
+                cy="18"
+                r="16"
+                fill="none"
+                stroke="currentColor"
+                strokeOpacity="0.15"
+                strokeWidth="2"
+              />
               <circle
                 cx="18"
                 cy="18"

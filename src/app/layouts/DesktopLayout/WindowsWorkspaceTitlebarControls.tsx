@@ -23,7 +23,9 @@ export function WindowsWorkspaceTitlebarControls(props: {
 
   return (
     <PortalToId targetId="misty-windows-workspace-controls">
-      <IconButton size="xs" tooltip={false}
+      <IconButton
+        size="xs"
+        tooltip={false}
         disabled={!props.canSplitSideways}
         label="Create split right"
         title="Split right"
@@ -31,7 +33,9 @@ export function WindowsWorkspaceTitlebarControls(props: {
       >
         <PanelRightDashed className="size-4" size={16} />
       </IconButton>
-      <IconButton size="xs" tooltip={false}
+      <IconButton
+        size="xs"
+        tooltip={false}
         disabled={!props.canSplitVertically}
         label="Create split down"
         title="Split down"

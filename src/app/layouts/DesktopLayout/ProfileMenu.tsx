@@ -10,7 +10,16 @@ import {
   MenuItem,
   MenuSubmenu,
 } from "@/shared/ui";
-import { Check, Compass, ExternalLink, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
+import {
+  Check,
+  Compass,
+  ExternalLink,
+  LogIn,
+  LogOut,
+  Plus,
+  Repeat2,
+  UserCircle,
+} from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -120,7 +129,12 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
             label="Take workspace tour"
             onSelect={() => useTourStore.getState().resetTour(account?.id)}
           />
-          <MenuSubmenu icon={<Repeat2 />} label="Switch accounts" width="lg" disabled={transitioning}>
+          <MenuSubmenu
+            icon={<Repeat2 />}
+            label="Switch accounts"
+            width="lg"
+            disabled={transitioning}
+          >
             <DropdownMenuLabel>Switch accounts</DropdownMenuLabel>
             {switchError ? (
               <p role="alert" className="m-0 px-2 py-1 text-xs text-cream-muted">

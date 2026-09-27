@@ -30,15 +30,11 @@ export function BrowserAgentAccessMenu(props: {
           <MessageCirclePlus {...toolbarIconProps} />
         </IconButton>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={8}
-        className="w-72"
-      >
+      <PopoverContent align="end" sideOffset={8} className="w-72">
         <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
         <p className="mb-3 mt-1 text-xs text-cream-muted">
-          Attach this tab when you ask an Agent to work. Access belongs only to that run and
-          expires automatically.
+          Attach this tab when you ask an Agent to work. Access belongs only to that run and expires
+          automatically.
         </p>
         <p className="m-0 text-xs text-cream-muted">
           {props.agentAccess
@@ -48,8 +44,8 @@ export function BrowserAgentAccessMenu(props: {
         <div className="mt-3 border-t border-charcoal-border pt-3">
           <p className="m-0 text-xs font-medium">Misty page context</p>
           <p className="mb-2 mt-1 text-[11px] text-cream-muted">
-            A one-time inspection captures bounded page text. The temporary read grant is
-            revoked immediately after capture.
+            A one-time inspection captures bounded page text. The temporary read grant is revoked
+            immediately after capture.
           </p>
           <Button
             variant="outline"

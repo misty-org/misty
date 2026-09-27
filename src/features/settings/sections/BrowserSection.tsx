@@ -42,7 +42,10 @@ export function BrowserSection(
             description="Where a typed phrase goes when it is not a web address."
           >
             <SelectControl
-              value={Math.max(0, browserSearchEngines.findIndex((engine) => engine.id === engineId))}
+              value={Math.max(
+                0,
+                browserSearchEngines.findIndex((engine) => engine.id === engineId),
+              )}
               options={browserSearchEngines.map((engine) => engine.name)}
               disabled={props.working}
               onChange={(index) =>
@@ -59,7 +62,12 @@ export function BrowserSection(
             description={`Send what you type in the address bar to ${engineName} to suggest searches.`}
           >
             <SwitchControl
-              checked={booleanSetting(props.document, "general", "browser_search_suggestions", false)}
+              checked={booleanSetting(
+                props.document,
+                "general",
+                "browser_search_suggestions",
+                false,
+              )}
               disabled={props.working}
               onChange={(value) =>
                 props.onSettingChange("general", "browser_search_suggestions", value)

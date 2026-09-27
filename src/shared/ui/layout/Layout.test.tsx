@@ -11,7 +11,11 @@ describe("Layout CVA primitives", () => {
   });
 
   it("renders Stack with flex-col and gap variant", () => {
-    const { container } = render(<Stack gap="md" align="center">Content</Stack>);
+    const { container } = render(
+      <Stack gap="md" align="center">
+        Content
+      </Stack>,
+    );
     const el = container.firstChild as HTMLElement;
     expect(el.className).toContain("flex");
     expect(el.className).toContain("flex-col");

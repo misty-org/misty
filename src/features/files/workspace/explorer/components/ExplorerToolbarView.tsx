@@ -3,14 +3,15 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuTrigger,
+  IconButton,
   Input,
+  MenuItem,
+  MenuTrigger,
+  toolbarIconProps,
 } from "@/shared/ui";
 import {
   ArrowDownUp,
-  ChevronDown,
   ChevronRight,
   Clipboard,
   Copy,
@@ -25,15 +26,7 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ExplorerToolbarRuntime } from "./ExplorerToolbarRuntime";
 import type { ExplorerToolbarProps } from "../model/interfaces/components/ExplorerToolbarModel";
 import { breadcrumbSegments } from "../utils/fileFormat";
@@ -51,7 +44,6 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
   props: ExplorerToolbarProps & { runtime: ExplorerToolbarRuntime },
 ) {
   const { DropTarget, Search } = props.runtime;
-  const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [pathEditing, setPathEditing] = useState(false);
   const [pathDraft, setPathDraft] = useState(props.displayPath ?? props.path);
   const pathInputRef = useRef<HTMLInputElement | null>(null);
@@ -103,17 +95,12 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
             onForward={props.onForward}
             onParent={props.onParent}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Refresh current folder"
-            title="Refresh current folder"
-            className={toolbarStyles.navigationButton}
-            onClick={runRefresh}
-          >
-            <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={17} />
-          </Button>
+          <IconButton label="Refresh current folder" onClick={runRefresh}>
+            <RefreshCcw
+              {...toolbarIconProps}
+              className={refreshSpinning ? "animate-spin" : undefined}
+            />
+          </IconButton>
         </div>
 
         <div
@@ -200,104 +187,56 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
 
       <div role="toolbar" aria-label="File actions" className={toolbarStyles.actionRow}>
         <div className={toolbarStyles.actionLeft}>
-          <DropdownMenu open={newMenuOpen} onOpenChange={setNewMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="sm" className={toolbarStyles.newButton}>
-                <Plus size={17} />
-                <span>New</span>
-                <ChevronDown
-                  size={15}
-                  className={cx("transition-transform", newMenuOpen && "rotate-180")}
-                />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" sideOffset={6} className="w-52">
-              <DropdownMenuLabel className="text-xs text-cream-muted">
-                Create in this folder
-              </DropdownMenuLabel>
-              <DropdownMenuItem disabled={!props.canCreateFolder} onSelect={props.onCreateFolder}>
-                <FolderPlus />
-                Folder
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={!props.canCreateFile} onSelect={props.onCreateFile}>
-                <FilePlus />
-                File
-              </DropdownMenuItem>
+          <DropdownMenu>
+            <MenuTrigger label="New" icon={<Plus size={16} />} className="text-cream" />
+            <DropdownMenuContent align="start" sideOffset={6} width="sm">
+              <DropdownMenuLabel>Create in this folder</DropdownMenuLabel>
+              <MenuItem
+                icon={<FolderPlus />}
+                label="Folder"
+                disabled={!props.canCreateFolder}
+                onSelect={props.onCreateFolder}
+              />
+              <MenuItem
+                icon={<FilePlus />}
+                label="File"
+                disabled={!props.canCreateFile}
+                onSelect={props.onCreateFile}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
-          <ToolbarIconButton
-            label={props.undoTitle}
-            disabled={!props.canUndo}
-            onClick={props.onUndo}
-          >
-            <Undo2 size={18} />
-          </ToolbarIconButton>
-          <ToolbarIconButton
-            label={props.redoTitle}
-            disabled={!props.canRedo}
-            onClick={props.onRedo}
-          >
-            <Redo2 size={18} />
-          </ToolbarIconButton>
-          <ToolbarIconButton label="Cut" disabled={props.canCut === false} onClick={props.onCut}>
-            <Scissors size={18} />
-          </ToolbarIconButton>
-          <ToolbarIconButton label="Copy" disabled={props.canCopy === false} onClick={props.onCopy}>
-            <Copy size={18} />
-          </ToolbarIconButton>
-          <ToolbarIconButton
-            label="Paste"
-            disabled={props.canPaste === false}
-            onClick={props.onPaste}
-          >
-            <Clipboard size={18} />
-          </ToolbarIconButton>
+          <IconButton label={props.undoTitle} disabled={!props.canUndo} onClick={props.onUndo}>
+            <Undo2 {...toolbarIconProps} />
+          </IconButton>
+          <IconButton label={props.redoTitle} disabled={!props.canRedo} onClick={props.onRedo}>
+            <Redo2 {...toolbarIconProps} />
+          </IconButton>
+          <IconButton label="Cut" disabled={props.canCut === false} onClick={props.onCut}>
+            <Scissors {...toolbarIconProps} />
+          </IconButton>
+          <IconButton label="Copy" disabled={props.canCopy === false} onClick={props.onCopy}>
+            <Copy {...toolbarIconProps} />
+          </IconButton>
+          <IconButton label="Paste" disabled={props.canPaste === false} onClick={props.onPaste}>
+            <Clipboard {...toolbarIconProps} />
+          </IconButton>
           {props.onRestore && (
-            <ToolbarIconButton
+            <IconButton
               label="Restore"
               disabled={props.canRestore === false}
               onClick={props.onRestore}
             >
-              <RotateCcw size={18} />
-            </ToolbarIconButton>
+              <RotateCcw {...toolbarIconProps} />
+            </IconButton>
           )}
-          <ToolbarIconButton
-            label="Rename"
-            disabled={props.canRename === false}
-            onClick={props.onRename}
-          >
-            <Pencil size={18} />
-          </ToolbarIconButton>
-          <ToolbarIconButton
-            label="Delete"
-            disabled={props.canDelete === false}
-            onClick={props.onDelete}
-          >
-            <Trash2 size={18} />
-          </ToolbarIconButton>
+          <IconButton label="Rename" disabled={props.canRename === false} onClick={props.onRename}>
+            <Pencil {...toolbarIconProps} />
+          </IconButton>
+          <IconButton label="Delete" disabled={props.canDelete === false} onClick={props.onDelete}>
+            <Trash2 {...toolbarIconProps} />
+          </IconButton>
         </div>
       </div>
     </header>
   );
 });
-
-function ToolbarIconButton(props: {
-  children: ReactNode;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label={props.label}
-      title={props.label}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </Button>
-  );
-}

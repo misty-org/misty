@@ -12,7 +12,11 @@ describe("Button CVA variants", () => {
   });
 
   it("renders pill variant with rounded-full and charcoal hover", () => {
-    const { getByRole } = render(<Button variant="pill" size="pill">Pill</Button>);
+    const { getByRole } = render(
+      <Button variant="pill" size="pill">
+        Pill
+      </Button>,
+    );
     const btn = getByRole("button", { name: "Pill" });
     expect(btn.className).toContain("rounded-full");
     expect(btn.className).toContain("bg-charcoal-hover");

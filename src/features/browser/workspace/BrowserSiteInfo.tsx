@@ -22,15 +22,7 @@ import {
 } from "@/features/browser-workspace/sitePermissions";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
-export function BrowserSiteInfo({
-  id,
-  url,
-  active,
-}: {
-  id: string;
-  url: string;
-  active: boolean;
-}) {
+export function BrowserSiteInfo({ id, url, active }: { id: string; url: string; active: boolean }) {
   const { open, onOpenChange } = useBrowserOverlayControl(`site-info:${id}`);
   const [info, setInfo] = useState<SiteInfo | null>(null);
   const [error, setError] = useState<string | null>(null);

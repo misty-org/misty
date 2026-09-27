@@ -147,7 +147,9 @@ export function WorkspaceLayoutTabs(
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeLayoutTabId, position]);
   const newTabButton = (
-    <IconButton size="xs" tooltip={false}
+    <IconButton
+      size="xs"
+      tooltip={false}
       className={vertical ? "misty-side-new-tab" : undefined}
       label="New tab"
       title="New tab"
@@ -326,7 +328,9 @@ export function WorkspaceLayoutTabs(
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <IconButton size="xs" tooltip={false}
+                  <IconButton
+                    size="xs"
+                    tooltip={false}
                     label={`Close tab ${label}`}
                     title={`Close tab ${label}`}
                     className="mr-0.5"
@@ -349,7 +353,9 @@ export function WorkspaceLayoutTabs(
       >
         {!props.windowsTitlebarControls ? (
           <>
-            <IconButton size="xs" tooltip={false}
+            <IconButton
+              size="xs"
+              tooltip={false}
               disabled={!canRight}
               label="Create split right"
               title="Split right"
@@ -357,7 +363,9 @@ export function WorkspaceLayoutTabs(
             >
               <PanelRightDashed className="size-4" size={16} />
             </IconButton>
-            <IconButton size="xs" tooltip={false}
+            <IconButton
+              size="xs"
+              tooltip={false}
               disabled={!canDown}
               label="Create split down"
               title="Split down"
@@ -367,7 +375,9 @@ export function WorkspaceLayoutTabs(
             </IconButton>
           </>
         ) : null}
-        <IconButton size="xs" tooltip={false}
+        <IconButton
+          size="xs"
+          tooltip={false}
           disabled={dockLeaves(layout.root).length <= 1}
           label="Close pane"
           title="Close pane"

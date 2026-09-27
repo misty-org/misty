@@ -75,7 +75,10 @@ export function FeedbackSection() {
           <BannerDescription>Restart Misty to finish installing.</BannerDescription>
         </BannerContent>
       </Banner>
-      <EmptyState title="Nothing here yet" description="Empty, error, and permission states share one layout." />
+      <EmptyState
+        title="Nothing here yet"
+        description="Empty, error, and permission states share one layout."
+      />
     </GallerySection>
   );
 }

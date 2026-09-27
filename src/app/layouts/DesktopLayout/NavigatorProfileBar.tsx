@@ -35,7 +35,11 @@ export function NavigatorProfileBar(props: {
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className={navigatorHeaderRowClass}>
-        <DropdownMenu open={props.profileOpen} onOpenChange={props.onProfileOpenChange} modal={false}>
+        <DropdownMenu
+          open={props.profileOpen}
+          onOpenChange={props.onProfileOpenChange}
+          modal={false}
+        >
           <DropdownMenuTrigger asChild>
             <ProfileNavButton
               open={props.profileOpen}
