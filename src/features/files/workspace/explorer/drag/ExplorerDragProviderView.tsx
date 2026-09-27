@@ -107,43 +107,40 @@ export function ExplorerDragProviderView(props: {
     [runtime],
   );
 
-  const resolveTargetAt = useCallback(
-    (x: number, y: number) => {
-      const payload = stateRef.current.payload;
-      if (!payload || typeof document.elementsFromPoint !== "function") return;
-      const candidates: Array<{ zone: RegisteredZone; depth: number }> = [];
-      const seen = new Set<string>();
-      document.elementsFromPoint(x, y).forEach((element, depth) => {
-        const zoneElement = element.closest<HTMLElement>("[data-explorer-drop-zone-id]");
-        const id = zoneElement?.dataset.explorerDropZoneId;
-        if (!id || seen.has(id)) return;
-        const zone = zonesRef.current.get(id);
-        if (!zone) return;
-        seen.add(id);
-        candidates.push({ zone, depth });
-      });
-      const selected =
-        selectDropCandidate(
-          candidates.map((candidate) => ({
-            ...candidate,
-            priority: candidate.zone.spec.priority ?? 0,
-          })),
-        )?.zone ?? null;
-      const acceptance = selected?.spec.accepts(payload, modifiersRef.current) ?? null;
-      zonesRef.current.forEach(({ element }) => delete element.dataset.explorerDropActive);
-      if (selected) selected.element.dataset.explorerDropActive = "true";
-      const next = {
-        ...stateRef.current,
-        pointer: { x, y },
-        activeZoneId: selected?.spec.id ?? null,
-        acceptance,
-      };
-      stateRef.current = next;
-      setState(next);
-      autoScrollAt(x, y);
-    },
-    [runtime],
-  );
+  const resolveTargetAt = useCallback((x: number, y: number) => {
+    const payload = stateRef.current.payload;
+    if (!payload || typeof document.elementsFromPoint !== "function") return;
+    const candidates: Array<{ zone: RegisteredZone; depth: number }> = [];
+    const seen = new Set<string>();
+    document.elementsFromPoint(x, y).forEach((element, depth) => {
+      const zoneElement = element.closest<HTMLElement>("[data-explorer-drop-zone-id]");
+      const id = zoneElement?.dataset.explorerDropZoneId;
+      if (!id || seen.has(id)) return;
+      const zone = zonesRef.current.get(id);
+      if (!zone) return;
+      seen.add(id);
+      candidates.push({ zone, depth });
+    });
+    const selected =
+      selectDropCandidate(
+        candidates.map((candidate) => ({
+          ...candidate,
+          priority: candidate.zone.spec.priority ?? 0,
+        })),
+      )?.zone ?? null;
+    const acceptance = selected?.spec.accepts(payload, modifiersRef.current) ?? null;
+    zonesRef.current.forEach(({ element }) => delete element.dataset.explorerDropActive);
+    if (selected) selected.element.dataset.explorerDropActive = "true";
+    const next = {
+      ...stateRef.current,
+      pointer: { x, y },
+      activeZoneId: selected?.spec.id ?? null,
+      acceptance,
+    };
+    stateRef.current = next;
+    setState(next);
+    autoScrollAt(x, y);
+  }, []);
 
   const scheduleHitTest = useCallback(
     (x: number, y: number) => {

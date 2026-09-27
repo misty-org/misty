@@ -27,6 +27,8 @@ export function AgentExecutionSurface() {
   useEffect(() => {
     if (execution?.state === "finished" && !execution.normalTabs)
       void continueQueuedLocalWork(execution.taskId).catch((e) => setError(String(e)));
+    // Continue queued work once per finish, not whenever the execution object is replaced.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution?.taskId, execution?.state]);
   const viewport = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -71,15 +73,18 @@ export function AgentExecutionSurface() {
       disposed = true;
       observer.disconnect();
     };
+    // Re-lay out only when the task, its state, or its views change, not on every progress update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution?.taskId, execution?.state, execution?.views.length, active]);
+  const executionTaskId = execution?.taskId;
   useEffect(() => {
-    if (!execution) return;
+    if (!executionTaskId) return;
     const close = () => {
       void pauseLocalExecution();
     };
     window.addEventListener("pagehide", close);
     return () => window.removeEventListener("pagehide", close);
-  }, [execution?.taskId]);
+  }, [executionTaskId]);
   if (!execution) return null;
   if (execution.autopilot || execution.normalTabs) return null;
   const action = (task: () => Promise<unknown>) => {

@@ -91,7 +91,7 @@ export function RoadmapHome(props: {
     return () => {
       active = false;
     };
-  }, [selectedRoadmapId, spaceId]);
+  }, [selectedRoadmapId, spaceId, spacesApi]);
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
       <div

@@ -37,6 +37,8 @@ export function HostRoadmapRuntimeProvider(props: {
           formatShortcutLabel(effectiveShortcut(command).primary, detectShortcutPlatform()),
         ]),
       ),
+    // Shortcut labels read the settings store; recompute when document settings change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [settings],
   );
   const subscribeChanges = useCallback(

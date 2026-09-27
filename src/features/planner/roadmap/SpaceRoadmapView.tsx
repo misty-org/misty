@@ -370,7 +370,7 @@ function RoadmapDocument({
         }
       },
     };
-  }, [canManage, load, snapshot, spaceId]);
+  }, [canManage, load, snapshot, spaceId, spacesApi]);
   const withIntegration = (content: ReactNode) => (
     <>
       {runtime.renderIntegration({

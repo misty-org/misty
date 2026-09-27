@@ -74,7 +74,7 @@ export function SpaceRoadmapItemsView({
     } finally {
       setLoading(false);
     }
-  }, [kind, spaceId]);
+  }, [kind, spaceId, spacesApi]);
 
   useEffect(() => {
     void load();
