@@ -611,7 +611,7 @@ export default function NativeAgentsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn(button, "h-7 text-xs gap-1.5")}
+                  className="h-7 gap-1.5 text-xs"
                   disabled={working}
                   onClick={() => {
                     if (profile) select(profile.id, true);

@@ -72,7 +72,8 @@ describe("ProfileMenu", () => {
     ];
     renderMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /Switch accounts/ }));
-    const chooser = screen.getAllByRole("menu").at(-1)!;
+    const menus = screen.getAllByRole("menu");
+    const chooser = menus[menus.length - 1]!;
     expect(chooser.textContent).toContain("Owner");
     expect(chooser.textContent).toContain("Matt");
     expect(chooser.textContent).toContain("Add another account");

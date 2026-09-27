@@ -10,7 +10,7 @@ import { GlobalNavigator } from "./GlobalNavigator";
 import { seedNavigatorApps, spaceFixture, spaceTab } from "./GlobalNavigator.testFixtures";
 
 vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" } }),
+  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" }, accounts: [] }),
   useAccountAvatarUrl: () => null,
   useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
 }));

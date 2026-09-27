@@ -6,7 +6,7 @@ import { cn } from "../utils";
 import { DropdownMenuTrigger } from "./DropdownMenu";
 import { PopoverTrigger } from "./Popover";
 
-type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children"> & {
+type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "value"> & {
   /** Accessible name; also the visible text unless `value` is given. */
   label: string;
   icon?: React.ReactNode;
