@@ -14,8 +14,8 @@ import {
   Collapsible,
   CollapsibleContent,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   Dialog,
   DialogContent,
@@ -225,10 +225,11 @@ function WebsiteGroupRow(props: {
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => props.onOpen(website.id, true)}>
-                  Open in new tab
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => setDeleting(website)}>Remove site</ContextMenuItem>
+                <ContextMenuAction
+                  label="Open in new tab"
+                  onSelect={() => props.onOpen(website.id, true)}
+                />
+                <ContextMenuAction label="Remove site" onSelect={() => setDeleting(website)} />
               </ContextMenuContent>
             </ContextMenu>
           ))}

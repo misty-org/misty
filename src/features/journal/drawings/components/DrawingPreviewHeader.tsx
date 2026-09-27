@@ -2,10 +2,10 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
   Input,
+  MenuItem,
 } from "@/shared/ui";
 import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -134,16 +134,10 @@ export function DrawingPreviewHeader({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             {canRename ? (
-              <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                <Pencil />
-                Rename
-              </DropdownMenuItem>
+              <MenuItem icon={<Pencil />} label="Rename" onSelect={() => setRenaming(true)} />
             ) : null}
             {drawing.can_delete ? (
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                <Trash2 />
-                Delete
-              </DropdownMenuItem>
+              <MenuItem icon={<Trash2 />} label="Delete" destructive onSelect={onDelete} />
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>

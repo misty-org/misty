@@ -10,10 +10,10 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
   Skeleton,
 } from "@/shared/ui";
 import { Ellipsis, Mail, ShieldCheck, Trash2, Users } from "lucide-react";
@@ -110,18 +110,20 @@ function MemberActionsMenu({
       <DropdownMenuContent align="end">
         {canTransferOwnership ? (
           <>
-            <DropdownMenuItem onSelect={() => onAction({ kind: "transfer", member })}>
-              <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-            </DropdownMenuItem>
+            <MenuItem
+              icon={<ShieldCheck className="size-4" />}
+              label="Transfer ownership"
+              onSelect={() => onAction({ kind: "transfer", member })}
+            />
             <DropdownMenuSeparator />
           </>
         ) : null}
-        <DropdownMenuItem
-          variant="destructive"
+        <MenuItem
+          icon={<Trash2 className="size-4" />}
+          label="Remove member"
+          destructive
           onSelect={() => onAction({ kind: "remove", member })}
-        >
-          <Trash2 className="mr-2 size-4" /> Remove member
-        </DropdownMenuItem>
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

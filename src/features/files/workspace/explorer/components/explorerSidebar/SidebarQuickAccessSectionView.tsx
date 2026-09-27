@@ -4,9 +4,9 @@ import {
   Collapsible,
   CollapsibleContent,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuCheckboxItem,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
   IconButton,
@@ -76,10 +76,11 @@ export function SidebarQuickAccessSectionView({
             </ContextMenuCheckboxItem>
           ))}
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={quick.resetQuickAccessDefaults}>
-            <RefreshCcw size={15} />
-            <span>Reset Defaults</span>
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={<RefreshCcw size={15} />}
+            label="Reset Defaults"
+            onSelect={quick.resetQuickAccessDefaults}
+          />
         </ContextMenuContent>
       </ContextMenu>
       <CollapsibleContent>
@@ -135,11 +136,14 @@ export function SidebarQuickAccessSectionView({
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
-                  <ContextMenuItem onSelect={() => sidebar.onOpenInNewTab(item.path, item.label)}>
-                    <ExternalLink size={15} />
-                    <span>Open in New Tab</span>
-                  </ContextMenuItem>
-                  <ContextMenuItem
+                  <ContextMenuAction
+                    icon={<ExternalLink size={15} />}
+                    label="Open in New Tab"
+                    onSelect={() => sidebar.onOpenInNewTab(item.path, item.label)}
+                  />
+                  <ContextMenuAction
+                    icon={<X size={15} />}
+                    label="Remove from Sidebar"
                     onSelect={() =>
                       quick.removeQuickAccessItem({
                         kind: "builtIn",
@@ -147,15 +151,13 @@ export function SidebarQuickAccessSectionView({
                         path: item.path,
                       })
                     }
-                  >
-                    <X size={15} />
-                    <span>Remove from Sidebar</span>
-                  </ContextMenuItem>
+                  />
                   <ContextMenuSeparator />
-                  <ContextMenuItem onSelect={quick.resetQuickAccessDefaults}>
-                    <RefreshCcw size={15} />
-                    <span>Reset Defaults</span>
-                  </ContextMenuItem>
+                  <ContextMenuAction
+                    icon={<RefreshCcw size={15} />}
+                    label="Reset Defaults"
+                    onSelect={quick.resetQuickAccessDefaults}
+                  />
                 </ContextMenuContent>
               </ContextMenu>
             );
@@ -204,13 +206,14 @@ export function SidebarQuickAccessSectionView({
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
-                  <ContextMenuItem
+                  <ContextMenuAction
+                    icon={<ExternalLink size={15} />}
+                    label="Open in New Tab"
                     onSelect={() => sidebar.onOpenInNewTab(path, pinnedPathLabel(path))}
-                  >
-                    <ExternalLink size={15} />
-                    <span>Open in New Tab</span>
-                  </ContextMenuItem>
-                  <ContextMenuItem
+                  />
+                  <ContextMenuAction
+                    icon={<X size={15} />}
+                    label="Remove from Sidebar"
                     onSelect={() =>
                       quick.removeQuickAccessItem({
                         kind: "pinned",
@@ -218,15 +221,13 @@ export function SidebarQuickAccessSectionView({
                         path,
                       })
                     }
-                  >
-                    <X size={15} />
-                    <span>Remove from Sidebar</span>
-                  </ContextMenuItem>
+                  />
                   <ContextMenuSeparator />
-                  <ContextMenuItem onSelect={quick.resetQuickAccessDefaults}>
-                    <RefreshCcw size={15} />
-                    <span>Reset Defaults</span>
-                  </ContextMenuItem>
+                  <ContextMenuAction
+                    icon={<RefreshCcw size={15} />}
+                    label="Reset Defaults"
+                    onSelect={quick.resetQuickAccessDefaults}
+                  />
                 </ContextMenuContent>
               </ContextMenu>
             );

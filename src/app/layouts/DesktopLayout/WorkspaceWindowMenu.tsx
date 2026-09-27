@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   IconButton,
+  MenuItem,
   MenuTrigger,
 } from "@/shared/ui";
 import { AppWindow, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -85,26 +86,27 @@ export function WorkspaceWindowMenu(props: {
           </p>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={props.onCreate}>
-          <Plus className="size-4" /> New
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!props.canReopen} onSelect={props.onReopen}>
-          <RotateCcw className="size-4" /> Reopen
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        <MenuItem icon={<Plus className="size-4" />} label="New" onSelect={props.onCreate} />
+        <MenuItem
+          icon={<RotateCcw className="size-4" />}
+          label="Reopen"
+          disabled={!props.canReopen}
+          onSelect={props.onReopen}
+        />
+        <MenuItem
+          icon={<X className="size-4" />}
+          label="Close"
           disabled={!activeWindow || !canClose(activeWindow)}
           onSelect={() => props.onClose(props.activeWindowId)}
-        >
-          <X className="size-4" /> Close
-        </DropdownMenuItem>
+        />
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <MenuItem
+          icon={<Trash2 className="size-4" />}
+          label="Clear history"
           onSelect={() =>
             void clearNavigationRestoreHistory().catch((error) => setError(String(error)))
           }
-        >
-          <Trash2 className="size-4" /> Clear history
-        </DropdownMenuItem>
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

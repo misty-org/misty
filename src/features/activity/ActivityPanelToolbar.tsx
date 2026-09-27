@@ -4,7 +4,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -12,6 +11,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   Input,
+  MenuItem,
   NavIsland,
   NavIslandItem,
 } from "@/shared/ui";
@@ -83,15 +83,14 @@ export function ActivityPanelToolbar({
               align="end"
               className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-60 overflow-y-auto"
             >
-              <DropdownMenuItem
+              <MenuItem
+                label="Reset filters"
                 disabled={!active}
                 onSelect={(event) => {
                   event.preventDefault();
                   onChange({ ...view, types: [], statuses: [] });
                 }}
-              >
-                Reset filters
-              </DropdownMenuItem>
+              />
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Type</DropdownMenuLabel>
               {Object.entries(activityTypes).map(([key, label]) => (

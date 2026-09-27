@@ -2,10 +2,10 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   FileInput,
   IconButton,
+  MenuItem,
   Spinner,
   Textarea,
 } from "@/shared/ui";
@@ -192,12 +192,16 @@ export function MistyComposer(props: {
               </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" data-misty-layer-portal>
-              <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
-                <ImagePlus className="size-4" /> Attach files
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={props.onCapture}>
-                <Camera className="size-4" /> Capture part of the screen
-              </DropdownMenuItem>
+              <MenuItem
+                icon={<ImagePlus className="size-4" />}
+                label="Attach files"
+                onSelect={() => fileRef.current?.click()}
+              />
+              <MenuItem
+                icon={<Camera className="size-4" />}
+                label="Capture part of the screen"
+                onSelect={props.onCapture}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (

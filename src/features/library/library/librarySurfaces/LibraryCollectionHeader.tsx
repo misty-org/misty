@@ -2,9 +2,9 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
 } from "@/shared/ui";
 import { EllipsisVertical, Pencil, Play, Trash2 } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
@@ -68,17 +68,17 @@ export function LibraryCollectionHeader() {
               </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={collectionActions.openEditAlbum}>
-                <Pencil size={13} />
-                Edit album
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
+              <MenuItem
+                icon={<Pencil size={13} />}
+                label="Edit album"
+                onSelect={collectionActions.openEditAlbum}
+              />
+              <MenuItem
+                icon={<Trash2 size={13} />}
+                label="Delete album"
+                destructive
                 onSelect={() => void collectionActions.deleteCurrentAlbum()}
-              >
-                <Trash2 size={13} />
-                Delete album
-              </DropdownMenuItem>
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}

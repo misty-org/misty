@@ -8,8 +8,8 @@ import {
   Button,
   cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   EmptyState,
   Input,
@@ -314,10 +314,11 @@ function RoadmapRows(props: RoadmapRowsProps) {
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">
-          <ContextMenuItem onSelect={() => props.onTogglePin(roadmap.id)}>
-            {pinned ? <PinOff /> : <Pin />}
-            {pinned ? "Unpin" : "Pin"}
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={pinned ? <PinOff /> : <Pin />}
+            label={pinned ? "Unpin" : "Pin"}
+            onSelect={() => props.onTogglePin(roadmap.id)}
+          />
         </ContextMenuContent>
       </ContextMenu>
     );

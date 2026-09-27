@@ -9,10 +9,10 @@ import {
   DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
   Input,
+  MenuItem,
   Spinner,
 } from "@/shared/ui";
 import { Check, Copy, MoreHorizontal, Trash2 } from "lucide-react";
@@ -114,23 +114,19 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                       </IconButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem onSelect={copyTaskKey}>
-                        {copiedKey ? (
-                          <Check className="mr-2 size-4 text-status-green" />
-                        ) : (
-                          <Copy className="mr-2 size-4" />
-                        )}
-                        {copiedKey ? "Task ID copied" : `Copy task ID (${editing.task_key})`}
-                      </DropdownMenuItem>
+                      <MenuItem
+                        icon={copiedKey ? <Check className="text-status-green" /> : <Copy />}
+                        label={copiedKey ? "Task ID copied" : `Copy task ID (${editing.task_key})`}
+                        onSelect={copyTaskKey}
+                      />
                       {props.onArchive ? (
-                        <DropdownMenuItem
+                        <MenuItem
+                          icon={<Trash2 className="size-4" />}
+                          label="Delete task"
                           disabled={busy}
-                          variant="destructive"
+                          destructive
                           onSelect={props.onArchive}
-                        >
-                          <Trash2 className="mr-2 size-4" />
-                          Delete task
-                        </DropdownMenuItem>
+                        />
                       ) : null}
                     </DropdownMenuContent>
                   </DropdownMenu>

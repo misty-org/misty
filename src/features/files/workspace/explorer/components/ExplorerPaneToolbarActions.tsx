@@ -9,6 +9,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -141,46 +142,49 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-cream-muted">Location</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={runRefresh}>
-              <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} />
-              Refresh
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => props.onCopyPath(props.path)}>
-              <Copy />
-              Copy Current Path
-            </DropdownMenuItem>
-            <DropdownMenuItem
+            <MenuItem
+              icon={<RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} />}
+              label="Refresh"
+              onSelect={runRefresh}
+            />
+            <MenuItem
+              icon={<Copy />}
+              label="Copy Current Path"
+              onSelect={() => props.onCopyPath(props.path)}
+            />
+            <MenuItem
+              icon={<Folder />}
+              label="Calculate Folder Sizes"
               disabled={!props.canCalculateDirectorySizes}
               onSelect={props.onCalculateDirectorySizes}
-            >
-              <Folder />
-              Calculate Folder Sizes
-            </DropdownMenuItem>
+            />
             {props.selectedCount > 0 ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-xs text-cream-muted">
                   {props.selectedCount === 1 ? "Selection" : `${props.selectedCount} Selected`}
                 </DropdownMenuLabel>
-                <DropdownMenuItem disabled={!props.canOpenWithSelected} onSelect={props.onOpenWith}>
-                  <AppWindow />
-                  Open With…
-                </DropdownMenuItem>
+                <MenuItem
+                  icon={<AppWindow />}
+                  label="Open With…"
+                  disabled={!props.canOpenWithSelected}
+                  onSelect={props.onOpenWith}
+                />
                 {props.hasRemoteSelection ? (
-                  <DropdownMenuItem onSelect={props.onDownload}>
-                    <Download />
-                    Save to Downloads
-                  </DropdownMenuItem>
+                  <MenuItem
+                    icon={<Download />}
+                    label="Save to Downloads"
+                    onSelect={props.onDownload}
+                  />
                 ) : null}
-                <DropdownMenuItem
+                <MenuItem
+                  icon={<Copy />}
+                  label="Copy Selected Path"
                   disabled={props.selectedCount !== 1 || !props.selectedEntryPath}
                   onSelect={() => {
                     if (props.selectedEntryPath) props.onCopyPath(props.selectedEntryPath);
                   }}
-                >
-                  <Copy />
-                  Copy Selected Path
-                </DropdownMenuItem>
+                />
               </>
             ) : null}
           </DropdownMenuContent>

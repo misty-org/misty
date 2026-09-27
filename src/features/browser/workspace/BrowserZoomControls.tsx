@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
-import { Button, cn, DropdownMenuItem } from "@/shared/ui";
+import { Button, cn, MenuItem } from "@/shared/ui";
 
 const levels = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
@@ -72,7 +72,8 @@ export function BrowserZoomControls({
         const unavailable = disabled || value === undefined;
         const width = label === "Reset zoom to 100%" ? "min-w-12" : "min-w-6";
         return menu ? (
-          <DropdownMenuItem
+          <MenuItem
+            label={content}
             key={label}
             aria-label={label}
             title={label}
@@ -82,9 +83,7 @@ export function BrowserZoomControls({
               event.preventDefault();
               void change(value!);
             }}
-          >
-            {content}
-          </DropdownMenuItem>
+          />
         ) : (
           <Button
             key={label}

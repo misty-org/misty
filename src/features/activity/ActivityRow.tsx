@@ -4,9 +4,9 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
   Pressable,
 } from "@/shared/ui";
 import { activityMuteKeys, isPendingRequest } from "./activityPolicy";
@@ -75,13 +75,19 @@ export function ActivityRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {keys.map((key) => (
-                <DropdownMenuItem key={key} onSelect={() => onMute(key, !muted.includes(key))}>
-                  {muted.includes(key) ? "Unmute" : "Mute"}{" "}
-                  {key.startsWith("space:") ? "Space" : "app"}
-                </DropdownMenuItem>
+                <MenuItem
+                  label={
+                    <>
+                      {muted.includes(key) ? "Unmute" : "Mute"}{" "}
+                      {key.startsWith("space:") ? "Space" : "app"}
+                    </>
+                  }
+                  key={key}
+                  onSelect={() => onMute(key, !muted.includes(key))}
+                />
               ))}
               {item.dismissible && pending ? (
-                <DropdownMenuItem onSelect={onDismiss}>Dismiss notice</DropdownMenuItem>
+                <MenuItem label="Dismiss notice" onSelect={onDismiss} />
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>

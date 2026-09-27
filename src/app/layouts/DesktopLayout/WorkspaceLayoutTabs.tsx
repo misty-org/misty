@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   IconButton,
+  MenuItem,
   MenuTrigger,
   OverflowFadeText,
   Pressable,
@@ -310,9 +311,11 @@ export function WorkspaceLayoutTabs(
                               </span>
                               {focused ? <Check size={14} aria-hidden /> : null}
                             </DropdownMenuItem>
-                            <DropdownMenuItem
+                            <MenuItem
+                              icon={<X size={14} aria-hidden />}
+                              label=""
                               aria-label={`Close pane ${paneViewLabel(itemView)}`}
-                              className="shrink-0 justify-center px-2"
+                              className="shrink-0 justify-center"
                               onSelect={() => {
                                 if (!useWorkspaceStore.getState().closeTab(itemView.id)) return;
                                 const current = activeLayoutView(
@@ -320,9 +323,7 @@ export function WorkspaceLayoutTabs(
                                 );
                                 if (current) props.onOpen(current);
                               }}
-                            >
-                              <X size={14} aria-hidden />
-                            </DropdownMenuItem>
+                            />
                           </div>
                         );
                       })}

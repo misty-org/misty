@@ -4,8 +4,8 @@ import {
   Button,
   cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   IconButton,
 } from "@/shared/ui";
@@ -97,42 +97,37 @@ export function ConnectedDevicesSidebarSection(props: ConnectedDevicesSidebarSec
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem
+                    <ContextMenuAction
+                      icon={<Pencil size={15} />}
+                      label="Rename"
                       onSelect={() => {
                         const name = window.prompt("Device name", peer.name);
                         if (name) void connectedDevices.renamePeer(peer, name);
                       }}
-                    >
-                      <Pencil size={15} />
-                      <span>Rename</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem
+                    />
+                    <ContextMenuAction
+                      icon={<ClipboardCopy size={15} />}
+                      label={peer.clipboardCanSend ? "Turn off clipboard" : "Turn on clipboard"}
                       onSelect={() =>
                         void connectedDevices.setClipboardConsent(peer, !peer.clipboardCanSend)
                       }
-                    >
-                      <ClipboardCopy size={15} />
-                      <span>
-                        {peer.clipboardCanSend ? "Turn off clipboard" : "Turn on clipboard"}
-                      </span>
-                    </ContextMenuItem>
-                    <ContextMenuItem
+                    />
+                    <ContextMenuAction
+                      icon={<ClipboardCopy size={15} />}
+                      label="Prepare clipboard files"
                       disabled={!peer.clipboardCanReceive}
                       onSelect={() => void connectedDevicesPrepareClipboardFiles(peer.deviceId)}
-                    >
-                      <ClipboardCopy size={15} />
-                      <span>Prepare clipboard files</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem
+                    />
+                    <ContextMenuAction
+                      icon={<Info size={15} />}
+                      label="Copy diagnostics ID"
                       onSelect={() => void navigator.clipboard.writeText(peer.p2pEndpointId)}
-                    >
-                      <Info size={15} />
-                      <span>Copy diagnostics ID</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void connectedDevices.unpair(peer)}>
-                      <Unlink size={15} />
-                      <span>Unpair</span>
-                    </ContextMenuItem>
+                    />
+                    <ContextMenuAction
+                      icon={<Unlink size={15} />}
+                      label="Unpair"
+                      onSelect={() => void connectedDevices.unpair(peer)}
+                    />
                   </ContextMenuContent>
                 </ContextMenu>
               );

@@ -4,8 +4,8 @@ import {
   Collapsible,
   CollapsibleContent,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   IconButton,
 } from "@/shared/ui";
@@ -228,21 +228,20 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                         </div>
                       </ContextMenuTrigger>
                       <ContextMenuContent>
-                        <ContextMenuItem
+                        <ContextMenuAction
+                          icon={<Unplug size={15} />}
+                          label={
+                            device.isSystem
+                              ? "Startup disk — protected"
+                              : canUnmountMountedDevice(device)
+                                ? "Unmount…"
+                                : "Unmount unavailable"
+                          }
                           disabled={!canUnmountMountedDevice(device)}
                           onSelect={() =>
                             void unmountMountedDevice(device, setDeviceActionError, props.runtime)
                           }
-                        >
-                          <Unplug size={15} />
-                          <span>
-                            {device.isSystem
-                              ? "Startup disk — protected"
-                              : canUnmountMountedDevice(device)
-                                ? "Unmount…"
-                                : "Unmount unavailable"}
-                          </span>
-                        </ContextMenuItem>
+                        />
                       </ContextMenuContent>
                     </ContextMenu>
                   );

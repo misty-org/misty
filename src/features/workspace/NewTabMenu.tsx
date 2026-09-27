@@ -1,9 +1,9 @@
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
 } from "@/shared/ui";
 import { Plus, type LucideIcon } from "lucide-react";
 
@@ -24,10 +24,12 @@ export function NewTabMenu(props: { ariaLabel: string; options: ReadonlyArray<Ne
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52">
         {props.options.map(({ id, icon: Icon, label, onSelect }) => (
-          <DropdownMenuItem key={id} className="h-9 gap-2" onSelect={onSelect}>
-            <Icon className="size-4" strokeWidth={1.8} />
-            <span className="text-sm font-medium">{label}</span>
-          </DropdownMenuItem>
+          <MenuItem
+            icon={<Icon className="size-4" strokeWidth={1.8} />}
+            label={label}
+            key={id}
+            onSelect={onSelect}
+          />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

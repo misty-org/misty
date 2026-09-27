@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   IconButton,
   Input,
+  MenuItem,
   MenuTrigger,
   Spinner,
 } from "@/shared/ui";
@@ -334,9 +335,11 @@ export function ConversationMenu(props: {
         />
       )}
       <DropdownMenuContent align="end" width="xl" data-misty-layer-portal>
-        <DropdownMenuItem onSelect={props.onNew}>
-          <Plus className="size-4" /> New conversation
-        </DropdownMenuItem>
+        <MenuItem
+          icon={<Plus className="size-4" />}
+          label="New conversation"
+          onSelect={props.onNew}
+        />
         {props.conversations.length ? (
           <>
             <DropdownMenuSeparator />

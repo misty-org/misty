@@ -12,11 +12,11 @@ import {
   DragHandleButton,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   Input,
+  MenuItem,
   Separator,
   SuggestionItem,
   SuggestionList,
@@ -817,11 +817,14 @@ function BlockHandle(props: {
           </DragHandleButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="left" className="w-52">
-          <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
-            <Pilcrow />
-            Turn into text
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Pilcrow />}
+            label="Turn into text"
+            onSelect={() => editor.chain().focus().setParagraph().run()}
+          />
+          <MenuItem
+            icon={<Heading />}
+            label="Turn into heading"
             onSelect={() =>
               editor
                 .chain()
@@ -831,11 +834,10 @@ function BlockHandle(props: {
                 })
                 .run()
             }
-          >
-            <Heading />
-            Turn into heading
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Highlighter />}
+            label="Highlight block"
             disabled={!range}
             onSelect={() =>
               range &&
@@ -848,12 +850,11 @@ function BlockHandle(props: {
                 })
                 .run()
             }
-          >
-            <Highlighter />
-            Highlight block
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Copy />}
+            label="Duplicate block"
             disabled={!node}
             onSelect={() =>
               node &&
@@ -863,36 +864,30 @@ function BlockHandle(props: {
                 .insertContentAt(pos + node.nodeSize, node.toJSON())
                 .run()
             }
-          >
-            <Copy />
-            Duplicate block
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Copy />}
+            label="Copy to clipboard"
             disabled={!node}
             onSelect={() => node && void navigator.clipboard.writeText(node.textContent)}
-          >
-            <Copy />
-            Copy to clipboard
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Link2 />}
+            label="Copy anchor link"
             onSelect={() =>
               void navigator.clipboard.writeText(
                 `misty://notes/${props.noteId}#${String(node?.attrs.id || `block-${pos}`)}`,
               )
             }
-          >
-            <Link2 />
-            Copy anchor link
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Trash2 />}
+            label="Delete"
             disabled={!range}
-            variant="destructive"
+            destructive
             onSelect={() => range && editor.chain().focus().deleteRange(range).run()}
-          >
-            <Trash2 />
-            Delete
-          </DropdownMenuItem>
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

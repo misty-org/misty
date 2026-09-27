@@ -10,12 +10,12 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   Field,
   IconButton,
   Input,
   ListRowButton,
+  MenuItem,
   NavigationChevron,
   Pressable,
   Sheet,
@@ -297,23 +297,24 @@ export default function NativeAgentsPage() {
                           </IconButton>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" width="md">
-                          <DropdownMenuItem onSelect={() => select(agent.id, true)}>
-                            <Plus className="size-3.5 shrink-0" />
-                            New conversation
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
+                          <MenuItem
+                            icon={<Plus className="size-3.5" />}
+                            label="New conversation"
+                            onSelect={() => select(agent.id, true)}
+                          />
+                          <MenuItem
+                            icon={<SlidersHorizontal className="size-3.5" />}
+                            label="Agent settings"
                             onSelect={() => {
                               setSelected(agent.id);
                               openSettingsModal("settings");
                             }}
-                          >
-                            <SlidersHorizontal className="size-3.5 shrink-0" />
-                            Agent settings
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={create}>
-                            <Plus className="size-3.5 shrink-0" />
-                            Create new agent
-                          </DropdownMenuItem>
+                          />
+                          <MenuItem
+                            icon={<Plus className="size-3.5" />}
+                            label="Create new agent"
+                            onSelect={create}
+                          />
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

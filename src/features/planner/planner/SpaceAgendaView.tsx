@@ -14,9 +14,9 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   IconButton,
   Input,
+  MenuItem,
   MenuTrigger,
   Popover,
   PopoverContent,
@@ -452,13 +452,12 @@ export function SpaceAgendaView({
               />
               <DropdownMenuContent align="start">
                 {(["month", "week", "day"] as const).map((option) => (
-                  <DropdownMenuItem
+                  <MenuItem
+                    label={option[0].toUpperCase() + option.slice(1)}
                     key={option}
                     className={view === option ? "bg-charcoal-hover text-cream" : undefined}
                     onSelect={() => updateView(option)}
-                  >
-                    {option[0].toUpperCase() + option.slice(1)}
-                  </DropdownMenuItem>
+                  />
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>

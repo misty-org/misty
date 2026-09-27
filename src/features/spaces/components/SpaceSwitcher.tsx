@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  MenuItem,
   MenuTrigger,
   OverflowFadeText,
   Tooltip,
@@ -181,31 +182,31 @@ export function SpaceSwitcher(props: {
             </div>
 
             <DropdownMenuSeparator />
-            <DropdownMenuItem
+            <MenuItem
+              icon={<Plus size={14} aria-hidden="true" />}
+              label="New Space"
               disabled={!props.canAddSpace}
               title={props.canAddSpace ? undefined : "Space limit reached"}
               onSelect={() => {
                 setMenuOpen(false);
                 openCreateSpaceDialog();
               }}
-            >
-              <Plus size={14} aria-hidden="true" />
-              New Space
-            </DropdownMenuItem>
+            />
             {availableAction ? (
-              <DropdownMenuItem
+              <MenuItem
+                icon={
+                  availableAction === "delete" ? (
+                    <Trash2 size={14} aria-hidden="true" />
+                  ) : (
+                    <LogOut size={14} aria-hidden="true" />
+                  )
+                }
+                label={availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
                 onSelect={() => {
                   setMenuOpen(false);
                   setPendingAction(availableAction);
                 }}
-              >
-                {availableAction === "delete" ? (
-                  <Trash2 size={14} aria-hidden="true" />
-                ) : (
-                  <LogOut size={14} aria-hidden="true" />
-                )}
-                {availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
-              </DropdownMenuItem>
+              />
             ) : null}
           </DropdownMenuContent>
           {props.activeSpace ? (

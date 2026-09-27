@@ -12,8 +12,8 @@ import {
   Button,
   cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   EmptyState,
   Input,
@@ -445,15 +445,18 @@ function DrawingRows(props: {
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">
-          <ContextMenuItem onSelect={() => props.onTogglePin(drawing.id)}>
-            {isPinned ? <PinOff /> : <Pin />}
-            {isPinned ? "Unpin" : "Pin"}
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={isPinned ? <PinOff /> : <Pin />}
+            label={isPinned ? "Unpin" : "Pin"}
+            onSelect={() => props.onTogglePin(drawing.id)}
+          />
           {drawing.can_delete ? (
-            <ContextMenuItem variant="destructive" onSelect={() => props.onDelete(drawing)}>
-              <Trash2 />
-              Delete
-            </ContextMenuItem>
+            <ContextMenuAction
+              icon={<Trash2 />}
+              label="Delete"
+              destructive
+              onSelect={() => props.onDelete(drawing)}
+            />
           ) : null}
         </ContextMenuContent>
       </ContextMenu>

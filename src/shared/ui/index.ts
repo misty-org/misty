@@ -69,7 +69,6 @@ export * from "./feedback/Spinner";
 export * from "./feedback/StateView";
 
 // navigation
-export * from "./navigation/Breadcrumb";
 export * from "./navigation/NavIsland";
 export * from "./navigation/NavigationMenu";
 export * from "./navigation/NavigationTree";
@@ -83,7 +82,6 @@ export * from "./icons/brandIcons";
 
 // patterns
 export * from "./patterns/ComingSoonSurface";
-export * from "./patterns/DesktopAccessState";
 export * from "./patterns/DiscoverCard";
 
 export * from "./utils";

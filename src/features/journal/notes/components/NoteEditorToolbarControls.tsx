@@ -2,8 +2,8 @@ import {
   ColorSwatch,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   IconButton,
+  MenuItem,
   MenuTrigger,
   Popover,
   PopoverContent,
@@ -41,11 +41,15 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
         <DropdownMenu>
           <MenuTrigger iconOnly label="Headings" size="md" icon={<Heading size={17} />} />
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
-              <Pilcrow /> Text
-            </DropdownMenuItem>
+            <MenuItem
+              icon={<Pilcrow />}
+              label="Text"
+              onSelect={() => editor.chain().focus().setParagraph().run()}
+            />
             {[1, 2, 3, 4].map((level) => (
-              <DropdownMenuItem
+              <MenuItem
+                icon={<Heading />}
+                label={<>Heading {level}</>}
                 key={level}
                 onSelect={() =>
                   editor
@@ -54,24 +58,28 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
                     .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
                     .run()
                 }
-              >
-                <Heading /> Heading {level}
-              </DropdownMenuItem>
+              />
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
           <MenuTrigger iconOnly label="Lists" size="md" icon={<List size={17} />} />
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleBulletList().run()}>
-              <List /> Bullet list
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleOrderedList().run()}>
-              <ListOrdered /> Numbered list
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleTaskList().run()}>
-              <ListChecks /> To-do list
-            </DropdownMenuItem>
+            <MenuItem
+              icon={<List />}
+              label="Bullet list"
+              onSelect={() => editor.chain().focus().toggleBulletList().run()}
+            />
+            <MenuItem
+              icon={<ListOrdered />}
+              label="Numbered list"
+              onSelect={() => editor.chain().focus().toggleOrderedList().run()}
+            />
+            <MenuItem
+              icon={<ListChecks />}
+              label="To-do list"
+              onSelect={() => editor.chain().focus().toggleTaskList().run()}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
         <ToolButton
