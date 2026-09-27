@@ -16,7 +16,7 @@ import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { invokeShortcutCommand } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
-import { ScrollArea, cn } from "@/shared/ui";
+import { cn, ScrollArea, ViewportLayer } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -446,12 +446,10 @@ export function GlobalMistySurface(props: {
   );
 
   return (
-    <div
-      className={
-        docked
-          ? "pointer-events-none fixed inset-0 layer-chrome flex flex-col items-center px-4 pt-10"
-          : "pointer-events-none fixed inset-0 layer-chrome flex flex-col items-center pt-[9vh]"
-      }
+    <ViewportLayer
+      layer="chrome"
+      passthrough
+      className={cn("flex flex-col items-center", docked ? "px-4 pt-10" : "pt-[9vh]")}
       data-global-misty-root
     >
       {docked && open && (
@@ -601,7 +599,7 @@ export function GlobalMistySurface(props: {
           />
         </Suspense>
       ) : null}
-    </div>
+    </ViewportLayer>
   );
 }
 

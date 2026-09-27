@@ -1,11 +1,22 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui";
 import { MousePointer2, Square } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
 import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+
+// Radix Select has no empty value, so the server default gets a stand-in.
+const serverDefaultModel = "__server_default__";
+
 export function AgentCompanionPanel() {
   const { presentation: state, control } = useCompanionState();
   const working = useMistyStore((s) => s.working);
@@ -136,24 +147,25 @@ export function AgentCompanionPanel() {
         )}
         <label>
           Model
-          <select
-            aria-label="Companion model"
-            value={state.model}
+          <Select
+            value={state.model || serverDefaultModel}
             disabled={!control}
-            onChange={(e) =>
-              act({
-                kind: "model",
-                model: e.target.value,
-              })
+            onValueChange={(model) =>
+              act({ kind: "model", model: model === serverDefaultModel ? "" : model })
             }
           >
-            <option value="">OpenAI · server default</option>
-            {state.models?.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger aria-label="Companion model" className="h-8 min-w-0 max-w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={serverDefaultModel}>OpenAI · server default</SelectItem>
+              {state.models?.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
       </details>
       {(error || state.error) && (

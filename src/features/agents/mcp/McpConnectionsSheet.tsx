@@ -171,7 +171,7 @@ function AddConnectionForm({ onDone }: { onDone: () => void }) {
           placeholder="https://tools.example.com/mcp"
         />
         {url.trim() && !validEndpoint ? (
-          <span className="text-xs text-[#d68b80]">
+          <span className="text-xs text-avatar-red">
             Enter a fixed HTTPS URL without credentials, query text, or a fragment.
           </span>
         ) : null}
@@ -236,7 +236,7 @@ function ConnectionCard({ connection }: { connection: McpConnection }) {
         </div>
       </header>
       {connection.status === "needs_attention" ? (
-        <p className="mt-3 text-xs text-[#d68b80]">
+        <p className="mt-3 text-xs text-avatar-red">
           This connection needs attention. Check it again before enabling tools.
         </p>
       ) : null}

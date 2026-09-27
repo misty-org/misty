@@ -1,6 +1,6 @@
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Switch } from "@/shared/ui";
+import { Button, Slider, Switch } from "@/shared/ui";
 import { useState } from "react";
 import {
   companionSizeDefault,
@@ -59,22 +59,15 @@ export function CompanionAppearanceSettings() {
             <span>Companion size</span>
             <span>{size}%</span>
           </span>
-          <input
-            type="range"
+          <Slider
             aria-label="Companion size"
             aria-valuetext={`${size}%`}
             min={companionSizeMin}
             max={companionSizeMax}
             step={companionSizeStep}
-            value={size}
+            value={[size]}
             disabled={!control}
-            className="w-full accent-cream"
-            onChange={(event) =>
-              change({
-                kind: "size",
-                size: Number(event.target.value),
-              })
-            }
+            onValueChange={([next]) => change({ kind: "size", size: next })}
           />
         </label>
         <Button

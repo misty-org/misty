@@ -2,12 +2,13 @@ import { companionReply } from "@/features/agents";
 import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  cn,
+  Input,
+  MenuTrigger,
 } from "@/shared/ui";
 import {
   Bell,
@@ -316,26 +317,22 @@ export function ConversationMenu(props: {
   };
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size={props.compact ? "icon-sm" : "sm"}
-          aria-label={props.compact ? "Conversation history" : undefined}
-          title={props.compact ? "Conversation history" : undefined}
-          className="max-w-48 gap-1.5 text-xs text-cream-muted"
-        >
-          <History className="size-3.5" />
-          {!props.compact && (
-            <>
-              <span className="truncate">
-                {active?.title ?? (props.loading ? "Loading…" : "New conversation")}
-              </span>
-              <ChevronDown className="size-3" />
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72" data-misty-layer-portal>
+      {props.compact ? (
+        <MenuTrigger
+          iconOnly
+          label="Conversation history"
+          title="Conversation history"
+          icon={<History className="size-3.5" />}
+        />
+      ) : (
+        <MenuTrigger
+          label="Conversation history"
+          value={active?.title ?? (props.loading ? "Loading…" : "New conversation")}
+          icon={<History className="size-3.5" />}
+          className="max-w-48 text-xs text-cream-muted"
+        />
+      )}
+      <DropdownMenuContent align="end" width="xl" data-misty-layer-portal>
         <DropdownMenuItem onSelect={props.onNew}>
           <Plus className="size-4" /> New conversation
         </DropdownMenuItem>
@@ -344,13 +341,14 @@ export function ConversationMenu(props: {
             <DropdownMenuSeparator />
             <div className="flex items-center gap-2 px-2 py-1.5">
               <Search className="size-3.5 text-cream-muted" />
-              <input
+              <Input
+                variant="toolbar"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => event.stopPropagation()}
                 placeholder="Search conversations"
                 aria-label="Search conversations"
-                className="min-w-0 flex-1 bg-transparent text-xs text-cream outline-none placeholder:text-cream-muted"
+                className="h-7 min-w-0 flex-1 border-0 px-0 hover:bg-transparent focus:bg-transparent"
               />
             </div>
             <DropdownMenuSeparator />
@@ -367,11 +365,12 @@ export function ConversationMenu(props: {
               }}
             >
               {renaming ? (
-                <input
+                <Input
+                  variant="toolbar"
                   autoFocus
                   value={draftTitle}
                   aria-label={`Rename ${conversation.title}`}
-                  className="h-7 min-w-0 flex-1 rounded-md border border-charcoal-border bg-charcoal-bg px-2 text-xs text-cream outline-none"
+                  className="h-7 min-w-0 flex-1"
                   onChange={(event) => setDraftTitle(event.target.value)}
                   onClick={(event) => {
                     event.preventDefault();
