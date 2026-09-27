@@ -1,10 +1,5 @@
 import { SpaceRequestError } from "@/api/spaces/api";
-import type {
-  Space,
-  SpaceMember,
-  SpaceMessage,
-  SpaceStudioResource,
-} from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMember, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildMessageSpans,
@@ -75,19 +70,6 @@ const member: SpaceMember = {
   role: "member",
   joined_at: "2026-07-14T00:00:00Z",
   read_message_seq: 0,
-};
-
-const agent: SpaceStudioResource = {
-  id: "agent-helper",
-  space_id: "space",
-  creator_user_id: "owner",
-  kind: "agent",
-  name: "Helper",
-  enabled: true,
-  version: 1,
-  schedules_enabled: false,
-  created_at: "2026-07-14T00:00:00Z",
-  updated_at: "2026-07-14T00:00:00Z",
 };
 
 describe("buildMessageSpans", () => {

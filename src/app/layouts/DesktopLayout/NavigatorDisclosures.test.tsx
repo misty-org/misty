@@ -1,7 +1,7 @@
 import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { useSpacesStore } from "@/features/spaces";
-import { dockTabs, useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
+import { useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";

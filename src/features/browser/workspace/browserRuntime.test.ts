@@ -3,10 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   browserTabIdForRuntime,
   browserRuntimeId,
-  browserRuntimeIdForTabId,
-  browserRuntimeIdForScope,
-  browserRuntimeCreated,
-  browserScopeId,
   closeBrowserRuntime,
   hideAllBrowserWebviews,
   hideBrowserWebview,

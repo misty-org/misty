@@ -1,9 +1,4 @@
-import type {
-  SpaceEvent,
-  SpaceMember,
-  SpaceMessage,
-  SpaceStudioResource,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceEvent, SpaceMember, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 
 export function mergeSpaceMessages(

@@ -9,7 +9,7 @@ import {
   CommandSeparator,
   PopoverContent,
 } from "@/shared/ui";
-import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
+import { LibraryBig, Paperclip, Users } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 
 export interface ChatSuggestionPopoverProps {

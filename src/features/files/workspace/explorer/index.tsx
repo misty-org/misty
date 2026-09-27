@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from "react";
+import { lazy, Suspense } from "react";
 import { ExplorerLoadingShell } from "./components/ExplorerLoadingShell";
 
 export * from "./components/FileBrowser";

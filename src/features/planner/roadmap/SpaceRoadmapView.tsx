@@ -25,6 +25,7 @@ import {
   readExpandedGoals,
 } from "./spaceRoadmap/RoadmapWorkspaceHelpers";
 import { roadmapPalette, type RoadmapPaletteItem } from "./spaceRoadmap/roadmapNodeCatalog";
+import type { ReactNode } from "react";
 
 export function SpaceRoadmapView(props: {
   spaceId: string;
@@ -370,7 +371,7 @@ function RoadmapDocument({
       },
     };
   }, [canManage, load, snapshot, spaceId]);
-  const withIntegration = (content: import("react").ReactNode) => (
+  const withIntegration = (content: ReactNode) => (
     <>
       {runtime.renderIntegration({
         title: snapshot?.roadmap.name?.trim() || "Roadmaps",

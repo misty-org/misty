@@ -30,6 +30,7 @@ import {
   isInteractiveDragTarget,
   modifiersFromEvent,
 } from "./explorerDragHelpers";
+import type { explorerPrepareDragItems } from "../../native";
 
 const DRAG_THRESHOLD = 6;
 const SPRING_LOAD_MS = 700;
@@ -44,7 +45,7 @@ const initialState: ExplorerDragViewState = {
 };
 
 export interface ExplorerDragRuntime {
-  prepare: typeof import("@/features/files/workspace/native").explorerPrepareDragItems;
+  prepare: typeof explorerPrepareDragItems;
   cancelPreparation(sessionId: string): Promise<unknown>;
   notify(message: string): void;
   startDrag(

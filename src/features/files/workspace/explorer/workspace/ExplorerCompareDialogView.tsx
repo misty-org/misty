@@ -30,6 +30,7 @@ import { formatBytes } from "@/features/file-ui";
 import { compareStyles } from "./ExplorerDesktopDialogStyles";
 import { leftDiffKind, rightDiffKind } from "./compareDialog/compareDiff";
 import { CompareDiffLine, joinLocalPath, parentPath } from "./compareDialog/ComparePresentation";
+import type { ComponentType } from "react";
 export type {
   CompareDialogSeed,
   CompareImagePreview,
@@ -51,7 +52,7 @@ export interface CompareDialogRuntime {
   copy(source: string, destination: string): Promise<unknown>;
   trash(path: string): Promise<unknown>;
   notify(message: string): void;
-  Error: import("react").ComponentType<{ error: string }>;
+  Error: ComponentType<{ error: string }>;
 }
 
 export function CompareDialogView(props: {

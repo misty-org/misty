@@ -1,7 +1,7 @@
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
 import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
-import { Bot, Flag, User } from "lucide-react";
+import { Flag, User } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   statusDot,
