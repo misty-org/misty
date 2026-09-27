@@ -31,7 +31,7 @@ import {
 import { memo, useCallback } from "react";
 import type { ExplorerPaneToolbarActionsProps } from "../model/interfaces/components/ExplorerToolbarModel";
 import { toolbarSortOptions } from "./ExplorerToolbarModel";
-import { cx, paneToolbarActionStyles } from "./ExplorerToolbarSupport";
+import { cx, paneToolbarActionStyles } from "@/features/file-ui";
 
 export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActions(
   props: ExplorerPaneToolbarActionsProps,

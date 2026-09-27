@@ -1,8 +1,11 @@
 import type { FileEntry } from "@/native/ipc";
-import type { GridThumbnailJob } from "../../model/interfaces/components/FileBrowser";
-import type { GridThumbnailSubscriber } from "../../model/types/components/FileBrowser";
-import { GRID_THUMBNAIL_MAX_DIMENSION, MAX_CONCURRENT_GRID_THUMBNAILS } from "./fileTableConfig";
-import { gridThumbnailSupported } from "./gridThumbnailSupported";
+import {
+  type GridThumbnailJob,
+  type GridThumbnailSubscriber,
+  GRID_THUMBNAIL_MAX_DIMENSION,
+  MAX_CONCURRENT_GRID_THUMBNAILS,
+  gridThumbnailSupported,
+} from "@/features/file-ui";
 const BACKGROUND_START_DELAY_MS = 250;
 /** Keep the existing visible-before-background queue, with an owning thumbnail backend. */
 export function createGridThumbnailQueue(

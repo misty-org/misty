@@ -1,10 +1,7 @@
 import { SystemErrorActivity } from "@/features/activity";
-import {
-  explorerOpenPath,
-  explorerSavePreviewItem,
-} from "@/features/files/workspace/native";
+import { explorerOpenPath, explorerSavePreviewItem } from "@/features/files/workspace/native";
 import { useShortcutHandler } from "@/features/shortcuts";
-import type { PreviewRuntime } from "./PreviewRuntime";
+import type { PreviewRuntime } from "@/features/file-ui";
 import { useHostDocumentLoader } from "./useGlobalPreviewResource";
 import { useMemo } from "react";
 export function useHostPreviewRuntime(): PreviewRuntime {

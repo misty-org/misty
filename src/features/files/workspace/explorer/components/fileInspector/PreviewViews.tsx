@@ -2,8 +2,7 @@ import type { FileEntry } from "@/native/ipc";
 import { Button } from "@/shared/ui";
 import { Archive, FileText, Folder, Music } from "lucide-react";
 import type { LoadedInspectorPreview } from "../../model/interfaces/components/FileInspectorPreview";
-import { formatBytes } from "../../utils/fileFormat";
-import { FileIcon } from "../FileBrowserIcons";
+import { formatBytes, FileIcon } from "@/features/file-ui";
 import { inspectorStyles } from "../FileInspectorStyles";
 import {
   archiveEntryIsArchive,

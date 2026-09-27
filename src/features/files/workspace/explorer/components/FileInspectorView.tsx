@@ -1,10 +1,9 @@
 import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/ipc";
-import type { PreviewRuntime } from "./globalPreview/PreviewRuntime";
+import { type PreviewRuntime, formatBytes, formatDate } from "@/features/file-ui";
 import type * as PreviewHooks from "./FileInspectorPreview";
 import { Button } from "@/shared/ui";
 import { FileSearch, Maximize2 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
-import { formatBytes, formatDate } from "../utils/fileFormat";
 import {
   ArchiveContentsPreview,
   AudioPreview,

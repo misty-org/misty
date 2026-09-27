@@ -18,13 +18,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { DEFAULT_LIBRARY_TAG_LIMIT } from "../utils/libraryTags";
 import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
-import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
 import {
+  SmartFolderDialog,
   createSmartFolderDialogState,
   smartFolderMatchMode,
   smartFolderQueryFromRules,
-} from "./ExplorerSidebarSupport";
-import { searchResultContext, searchResultSummary } from "./ExplorerToolbarSupport";
+  searchResultContext,
+  searchResultSummary,
+} from "@/features/file-ui";
 import { LibraryDropReviewDialog } from "./LibraryDropReviewDialog";
 import { LibraryEmpty } from "./libraryWorkspace/LibraryDetailPrimitives";
 import { LibraryAssetViewer, LibraryGallery } from "./libraryWorkspace/LibraryGallery";

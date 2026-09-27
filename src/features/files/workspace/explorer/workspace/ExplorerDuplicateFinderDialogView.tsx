@@ -21,7 +21,7 @@ import {
 } from "@/shared/ui";
 import type { ComponentType } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatBytes, formatDate } from "../utils/fileFormat";
+import { formatBytes, formatDate } from "@/features/file-ui";
 
 const dialogChromeClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(760px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream";

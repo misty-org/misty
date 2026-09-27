@@ -1,4 +1,4 @@
-import type { PreviewErrorComponent } from "./globalPreview/PreviewRuntime";
+import type { PreviewErrorComponent } from "@/features/file-ui";
 import { Button } from "@/shared/ui";
 import { Loader2, Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";

@@ -5,10 +5,7 @@ import {
   explorerPreviewItem,
 } from "@/features/files/workspace/native";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
-import type {
-  GlobalPreviewSource,
-  PreviewResource,
-} from "../../model/interfaces/components/GlobalPreview";
+import type { GlobalPreviewSource, PreviewResource } from "@/features/file-ui";
 import { sourceExtension } from "./previewFormat";
 import { audioMimeTypes, imageMimeTypes, videoMimeTypes } from "./previewMediaTables";
 import {

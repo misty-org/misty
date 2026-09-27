@@ -1,8 +1,11 @@
 import type { FileEntry } from "@/native/ipc";
 import { memo, useCallback, useEffect, useMemo, type MouseEvent, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { groupItemsByOperation } from "../drag/operations";
-import type { ExplorerDragModifiers, ExplorerDragPayload } from "../model/interfaces/drag/types";
+import {
+  groupItemsByOperation,
+  type ExplorerDragModifiers,
+  type ExplorerDragPayload,
+} from "@/features/file-ui";
 import { useExplorerStore } from "../store";
 import { FileBrowser } from "./FileBrowser";
 

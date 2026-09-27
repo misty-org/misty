@@ -3,14 +3,17 @@ import { errorText } from "@/shared/lib/format";
 import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { Copy, ExternalLink, FileQuestion, Loader2, Save, X } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import type { GlobalPreviewSource } from "../../model/interfaces/components/GlobalPreview";
-import { formatBytes, formatDate } from "../../utils/fileFormat";
+import {
+  type GlobalPreviewSource,
+  formatBytes,
+  formatDate,
+  type PreviewRuntime,
+} from "@/features/file-ui";
 import { PreviewBodyView } from "./PreviewBodyView";
 import { fileName, friendlyType, imageOutputMimeType, sourceExtension } from "./previewFormat";
 import { InspectorDetail, PreviewMessage, ToolbarButton } from "./PreviewPrimitives";
 import { globalPreviewKindForSource } from "./previewDocument";
 import { usePreviewResource } from "./usePreviewResource";
-import type { PreviewRuntime } from "./PreviewRuntime";
 
 export function GlobalPreviewDialogView(props: {
   runtime: PreviewRuntime;

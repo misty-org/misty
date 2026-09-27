@@ -210,7 +210,7 @@ export function directorySizeRecordsEqual(
   );
 }
 
-export { directorySizeRecordForPath, entrySizeBytes } from "../../utils/entrySize";
+export { directorySizeRecordForPath, entrySizeBytes } from "@/features/file-ui";
 
 export {
   sortListing,

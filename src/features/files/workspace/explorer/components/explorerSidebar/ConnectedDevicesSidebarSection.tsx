@@ -16,7 +16,7 @@ import { ClipboardCopy, Info, MonitorSmartphone, Pencil, Plus, Unlink } from "lu
 import { useState } from "react";
 import { ConnectedDevicePairingDialog } from "../../../connected-devices/ConnectedDevicePairingDialog";
 import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
-import { SidebarDeviceGroup, sidebarStyles } from "../ExplorerSidebarSupport";
+import { SidebarDeviceGroup, sidebarStyles } from "@/features/file-ui";
 
 interface ConnectedDevicesSidebarSectionProps {
   activePath: string;

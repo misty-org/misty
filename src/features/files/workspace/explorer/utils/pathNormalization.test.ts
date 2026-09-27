@@ -7,7 +7,7 @@ import {
 } from "@/shared/lib/pathNormalization";
 import { describe, expect, it } from "vitest";
 import { parentDirectory } from "../store/helpers/listing";
-import { breadcrumbSegments } from "./fileFormat";
+import { breadcrumbSegments } from "@/features/file-ui";
 
 describe("explorer path normalization", () => {
   it("canonicalizes Windows drive paths for frontend state", () => {

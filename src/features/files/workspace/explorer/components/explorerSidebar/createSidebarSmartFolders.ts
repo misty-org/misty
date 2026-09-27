@@ -2,16 +2,16 @@ import type { SavedSearch } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { useEffect, useState } from "react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
-import type { SmartFolderDraft } from "../../model/interfaces/components/ExplorerSidebarSupport";
-import type { SmartFolderDialogState } from "../../model/types/components/ExplorerSidebarSupport";
 import {
+  type SmartFolderDraft,
+  type SmartFolderDialogState,
   createSmartFolderDialogState,
   smartFolderId,
   smartFolderMatchMode,
   smartFolderQueryFromRules,
   smartFolderRulesWithMode,
   sortSavedSearches,
-} from "../ExplorerSidebarSupport";
+} from "@/features/file-ui";
 
 export interface SidebarSmartFolderServices {
   snapshot(): Promise<{ searches: SavedSearch[] }>;

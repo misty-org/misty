@@ -1,6 +1,6 @@
 import { useAppStore } from "@/features/app-shell";
-import type { ExplorerSortState } from "@/features/file-ui";
 import {
+  type ExplorerSortState,
   ExplorerPickerToolbar,
   FileBrowserRuntimeProvider,
   FileBrowserView,

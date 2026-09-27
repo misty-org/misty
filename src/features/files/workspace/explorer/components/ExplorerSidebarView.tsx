@@ -14,9 +14,9 @@ import { memo, useMemo, useState } from "react";
 import type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
 import type { ExplorerSidebarRuntime } from "./explorerSidebar/ExplorerSidebarRuntime";
 import { SidebarQuickAccessSectionView } from "./explorerSidebar/SidebarQuickAccessSectionView";
-import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
-import type { SidebarDeviceEntry } from "./ExplorerSidebarSupport";
 import {
+  SmartFolderDialog,
+  type SidebarDeviceEntry,
   buildDeviceEntries,
   deviceCapacityLabel,
   pathIsInside,
@@ -26,7 +26,7 @@ import {
   smartFolderMatchMode,
   smartFolderQueryFromRules,
   visibleSmartFolderRules,
-} from "./ExplorerSidebarSupport";
+} from "@/features/file-ui";
 export type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
 export type { QuickAccessItem } from "../model/types/components/ExplorerSidebar";
 export const ExplorerSidebarView = memo(function ExplorerSidebarView(

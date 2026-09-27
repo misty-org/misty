@@ -1,11 +1,11 @@
-import type { PreviewRuntime } from "./PreviewRuntime";
+import {
+  type PreviewRuntime,
+  type GlobalPreviewSource,
+  type PreviewResource,
+} from "@/features/file-ui";
 import { Button, Textarea } from "@/shared/ui";
 import { ExternalLink, FileQuestion } from "lucide-react";
 import { lazy, Suspense } from "react";
-import type {
-  GlobalPreviewSource,
-  PreviewResource,
-} from "../../model/interfaces/components/GlobalPreview";
 import { friendlyType } from "./previewFormat";
 import { ArchiveReader, PreviewMessage } from "./PreviewPrimitives";
 

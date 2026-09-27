@@ -1,5 +1,5 @@
 import type { ArchiveEntry } from "@/native/ipc";
-import { formatBytes } from "../../utils/fileFormat";
+import { formatBytes } from "@/features/file-ui";
 import { archivePreviewExtensions } from "./previewConstants";
 
 export function archiveEntryName(path: string): string {

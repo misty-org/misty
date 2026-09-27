@@ -2,7 +2,7 @@ import { explorerGenerateImageThumbnail } from "@/features/files/workspace/nativ
 import type { SearchResult } from "@/native/ipc";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { useEffect, useState } from "react";
-import { FileIcon } from "./FileBrowserIcons";
+import { FileIcon } from "@/features/file-ui";
 
 const thumbnailCache = new Map<string, string>();
 const failedThumbnails = new Set<string>();

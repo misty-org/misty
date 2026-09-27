@@ -1,9 +1,8 @@
 import { loadPdfPreview } from "@/features/files/workspace/previews";
-import type { PreviewErrorComponent } from "../file-ui/explorer/components/globalPreview/PreviewRuntime";
+import type { PreviewErrorComponent, PreviewResource } from "@/features/file-ui";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import type { PreviewResource } from "../file-ui/explorer/model/interfaces/components/GlobalPreview";
 import { friendlyType, sourceExtension } from "./previewFormat";
 import {
   audioMimeTypes,

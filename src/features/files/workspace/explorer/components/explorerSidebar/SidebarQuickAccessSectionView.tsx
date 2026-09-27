@@ -13,7 +13,7 @@ import {
 } from "@/shared/ui";
 import { ExternalLink, Folder, PinOff, Plus, RefreshCcw, X } from "lucide-react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
-import { pinnedPathLabel, SidebarSectionHeader, sidebarStyles } from "../ExplorerSidebarSupport";
+import { pinnedPathLabel, SidebarSectionHeader, sidebarStyles } from "@/features/file-ui";
 import type { ExplorerSidebarRuntime } from "./ExplorerSidebarRuntime";
 import type { useSidebarQuickAccess } from "./useSidebarQuickAccess";
 

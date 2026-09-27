@@ -1,7 +1,7 @@
 import { Button } from "@/shared/ui";
 import { ArrowUp, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import type { ExplorerToolbarRuntime } from "./ExplorerToolbarRuntime";
-import { toolbarStyles } from "./ExplorerToolbarSupport";
+import { toolbarStyles } from "@/features/file-ui";
 
 export function ExplorerToolbarDragNavigationView(props: {
   DropTarget: ExplorerToolbarRuntime["DropTarget"];

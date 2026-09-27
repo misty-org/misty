@@ -22,7 +22,7 @@ import {
   searchResultContext,
   searchResultSummary,
   toolbarStyles,
-} from "./ExplorerToolbarSupport";
+} from "@/features/file-ui";
 import type { SearchResultThumbnail } from "./SearchResultThumbnail";
 export interface ExplorerToolbarSearchRuntime {
   query(query: string, path: string, signal: AbortSignal): Promise<SearchResult[]>;

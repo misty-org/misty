@@ -29,9 +29,8 @@ import {
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ExplorerToolbarRuntime } from "./ExplorerToolbarRuntime";
 import type { ExplorerToolbarProps } from "../model/interfaces/components/ExplorerToolbarModel";
-import { breadcrumbSegments } from "../utils/fileFormat";
+import { breadcrumbSegments, cx, toolbarStyles } from "@/features/file-ui";
 import { ExplorerToolbarDragNavigationView } from "./ExplorerToolbarDragNavigationView";
-import { cx, toolbarStyles } from "./ExplorerToolbarSupport";
 
 export { ExplorerPaneToolbarActions } from "./ExplorerPaneToolbarActions";
 export type {

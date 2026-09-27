@@ -1,8 +1,4 @@
-import type {
-  CompareFilesResult,
-  CompareFolderRow,
-  CompareFoldersResult,
-} from "@/native/ipc";
+import type { CompareFilesResult, CompareFolderRow, CompareFoldersResult } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
   AlertDialog,
@@ -30,7 +26,7 @@ import type {
   CompareTextDiffState,
 } from "../model/interfaces/workspace/ExplorerCompareDialog";
 import type { CompareMode } from "../model/types/workspace/ExplorerCompareDialog";
-import { formatBytes } from "../utils/fileFormat";
+import { formatBytes } from "@/features/file-ui";
 import { compareStyles } from "./ExplorerDesktopDialogStyles";
 import { leftDiffKind, rightDiffKind } from "./compareDialog/compareDiff";
 import { CompareDiffLine, joinLocalPath, parentPath } from "./compareDialog/ComparePresentation";
