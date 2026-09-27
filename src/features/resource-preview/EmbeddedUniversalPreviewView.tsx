@@ -1,6 +1,6 @@
 import type { PreviewErrorComponent, PreviewResource } from "@/features/file-ui";
 import { errorText } from "@/shared/lib/format";
-import { FileQuestion, Loader2 } from "lucide-react";
+import { FileQuestion } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { friendlyType, sourceExtension } from "./previewFormat";
 import {
@@ -11,6 +11,7 @@ import {
   videoMimeTypes,
 } from "./previewMediaTables";
 import { PreviewMessage } from "./PreviewPrimitives";
+import { Spinner } from "@/shared/ui";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(() => import("./PdfViewerView"));
@@ -53,7 +54,7 @@ export function EmbeddedUniversalPreviewView(props: {
   if (props.loading || documentLoading)
     return (
       <PreviewMessage
-        icon={<Loader2 className="animate-spin" size={28} />}
+        icon={<Spinner size="lg" label={false} className="size-7" />}
         title="Preparing preview"
         detail="Loading the best available reader…"
       />

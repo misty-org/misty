@@ -19,8 +19,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from "@/shared/ui";
-import { CheckCircle2, Copy, LoaderCircle, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -316,7 +317,7 @@ function JobIcon({ stage }: { stage: UploadStage }) {
   if (stage === "ready") return <CheckCircle2 className="size-4 text-sage-fg" />;
   if (stage === "failed" || stage === "canceled")
     return <XCircle className="size-4 text-cream-bright" />;
-  if (stage !== "queued") return <LoaderCircle className="size-4 animate-spin text-cream-bright" />;
+  if (stage !== "queued") return <Spinner label={false} className="text-cream-bright" />;
   return <Copy className="size-4 text-cream-muted" />;
 }
 

@@ -1,11 +1,11 @@
-import { LoaderCircle, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitationPreview } from "@/api/spaces/dto/interfaces/types";
-import { Button, Card } from "@/shared/ui";
+import { Button, Card, Spinner } from "@/shared/ui";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 export function SpaceInvitationRedemption() {
@@ -58,7 +58,7 @@ export function SpaceInvitationRedemption() {
     <div className="grid h-full place-items-center bg-charcoal-bg p-6">
       <Card className="w-full max-w-md p-6 text-center">
         {loading ? (
-          <LoaderCircle className="mx-auto size-6 animate-spin text-cream-muted" />
+          <Spinner size="lg" label={false} className="size-6 mx-auto text-cream-muted" />
         ) : preview ? (
           <>
             <span className="mx-auto grid size-11 place-items-center rounded-xl bg-charcoal-active text-cream-bright">
@@ -71,7 +71,7 @@ export function SpaceInvitationRedemption() {
             {user ? (
               <div className="mt-5 grid gap-2">
                 <Button type="button" disabled={joining} onClick={() => void join()}>
-                  {joining ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                  {joining ? <Spinner label={false} /> : null}
                   {joining ? "Joining…" : "Join Space"}
                 </Button>
                 <p className="m-0 text-xs text-cream-muted">Signed in as {user.email}</p>

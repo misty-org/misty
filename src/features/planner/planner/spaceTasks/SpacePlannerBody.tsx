@@ -1,7 +1,6 @@
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
-import { Button } from "@/shared/ui";
-import { LoaderCircle } from "lucide-react";
+import { Button, Spinner } from "@/shared/ui";
 import { SpaceTaskBoard, SpaceTaskList } from "../SpacePlannerViews";
 import type { ReactNode } from "react";
 import { matchesDueFilter } from "./taskFiltering";
@@ -39,7 +38,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
       {data.error ? props.renderError(data.error) : null}
       {isEmptyLoad ? (
         <div className="grid h-full min-h-56 place-items-center text-cream-muted">
-          <LoaderCircle className="size-5 animate-spin" aria-label="Loading tasks" />
+          <Spinner size="lg" label="Loading tasks" />
         </div>
       ) : view === "board" ? (
         <SpaceTaskBoard
@@ -76,7 +75,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
           type="button"
           onClick={() => void data.load(true)}
         >
-          {data.loading ? <LoaderCircle className="size-4 animate-spin" /> : null}Load more
+          {data.loading ? <Spinner label={false} /> : null}Load more
         </Button>
       ) : null}
     </section>

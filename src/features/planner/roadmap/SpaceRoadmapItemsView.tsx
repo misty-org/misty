@@ -19,16 +19,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from "@/shared/ui";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Flag,
-  GitFork,
-  LoaderCircle,
-  Plus,
-  Target,
-} from "lucide-react";
+import { CalendarDays, CheckCircle2, Flag, GitFork, Plus, Target } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SpaceViewModeToggle } from "@/features/spaces";
@@ -160,7 +153,7 @@ export function SpaceRoadmapItemsView({
           {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
           {loading && !snapshots.length ? (
             <div className="grid min-h-48 place-items-center">
-              <LoaderCircle className="size-5 animate-spin text-cream-muted" />
+              <Spinner size="lg" label={false} className="text-cream-muted" />
             </div>
           ) : rows.length ? (
             <div className="overflow-hidden rounded-xl border border-charcoal-border/70 bg-charcoal-card">
@@ -388,11 +381,7 @@ function CreateRoadmapItem({
               setOpen(false);
             }}
           >
-            {saving ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Plus className="size-4" />
-            )}
+            {saving ? <Spinner label={false} /> : <Plus className="size-4" />}
             Create
           </Button>
         </div>

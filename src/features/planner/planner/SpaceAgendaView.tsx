@@ -20,6 +20,7 @@ import {
   MenuTrigger,
   Popover,
   PopoverContent,
+  Spinner,
 } from "@/shared/ui";
 import {
   CalendarCheck2,
@@ -27,7 +28,6 @@ import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
-  LoaderCircle,
   Minus,
   Plus,
   RotateCw,
@@ -498,11 +498,7 @@ export function SpaceAgendaView({
                 })
               }
             >
-              {loading ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <RotateCw className="size-4" />
-              )}
+              {loading ? <Spinner label={false} /> : <RotateCw className="size-4" />}
             </IconButton>
           </div>
         </header>

@@ -1,7 +1,7 @@
 import { accountScopeWillResetEvent } from "@/features/auth";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ArrowUpRight, Loader2 } from "lucide-react";
+import { Search, ArrowUpRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
   IconButton,
   Input,
+  Spinner,
 } from "@/shared/ui";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -143,11 +144,7 @@ export function BrowserSearchDialog() {
         >
           <div className="flex items-center gap-2">
             {loading ? (
-              <Loader2
-                size={18}
-                className="shrink-0 animate-spin text-cream-muted"
-                aria-hidden="true"
-              />
+              <Spinner size="lg" label={false} className="text-cream-muted" />
             ) : (
               <Search size={18} className="shrink-0 text-cream-muted" aria-hidden="true" />
             )}

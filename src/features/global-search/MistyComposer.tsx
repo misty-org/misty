@@ -6,9 +6,10 @@ import {
   DropdownMenuTrigger,
   FileInput,
   IconButton,
+  Spinner,
   Textarea,
 } from "@/shared/ui";
-import { ArrowUp, Camera, ImagePlus, Loader2, Plus, Search, X } from "lucide-react";
+import { ArrowUp, Camera, ImagePlus, Plus, Search, X } from "lucide-react";
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef, useState } from "react";
 import { SearchAskToggle } from "./GlobalMistySupport";
@@ -116,7 +117,7 @@ export function MistyComposer(props: {
                   {attachment.state === "failed" ? (
                     <span className="text-[9px] text-red-300">Failed</span>
                   ) : (
-                    <Loader2 className="size-4 animate-spin text-white" />
+                    <Spinner label={false} className="text-white" />
                   )}
                 </div>
               ) : null}
@@ -230,11 +231,7 @@ export function MistyComposer(props: {
           }
           onClick={props.onSubmit}
         >
-          {props.busy ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ArrowUp className="size-4" />
-          )}
+          {props.busy ? <Spinner label={false} /> : <ArrowUp className="size-4" />}
         </IconButton>
         {props.trailingControl}
       </div>

@@ -30,8 +30,9 @@ import {
   IconButton,
   MenuTrigger,
   Pressable,
+  Spinner,
 } from "@/shared/ui";
-import { Blocks, ChevronDown, LoaderCircle, VenetianMask, X, type LucideIcon } from "lucide-react";
+import { Blocks, ChevronDown, VenetianMask, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { providerFromRoute, providers } from "@/features/webviews/providers";
@@ -110,10 +111,10 @@ export function TabIcon({
   }
   if (isBrowser && isLoading) {
     return (
-      <LoaderCircle
-        className={cn("shrink-0 animate-spin", isActive ? "text-cream-bright" : "text-cream-muted")}
-        size={size}
-        strokeWidth={2}
+      <Spinner
+        label={false}
+        className={isActive ? "text-cream-bright" : "text-cream-muted"}
+        style={{ width: size, height: size }}
       />
     );
   }

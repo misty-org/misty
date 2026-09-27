@@ -3,12 +3,11 @@ import type {
   SpaceRoadmapSnapshot,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn, IconButton } from "@/shared/ui";
+import { Button, cn, IconButton, Spinner } from "@/shared/ui";
 import {
   ArrowLeft,
   Check,
   CircleAlert,
-  LoaderCircle,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -707,7 +706,7 @@ function SaveStatus({ state }: { state: SpaceRoadmapSaveState }) {
       aria-live="polite"
     >
       {state === "saving" ? (
-        <LoaderCircle className="size-3.5 animate-spin" />
+        <Spinner size="sm" label={false} />
       ) : failed ? (
         <CircleAlert className="size-3.5" />
       ) : (

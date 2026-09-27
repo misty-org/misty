@@ -11,16 +11,9 @@ import {
   IconButton,
   Input,
   Pressable,
+  Spinner,
 } from "@/shared/ui";
-import {
-  CheckSquare,
-  GripVertical,
-  LoaderCircle,
-  Maximize2,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { CheckSquare, GripVertical, Maximize2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -251,7 +244,7 @@ function BoardColumn({
                       className="h-6 px-2.5 text-[11px]"
                     >
                       {busy === `create:${column.id}` ? (
-                        <LoaderCircle className="size-3 animate-spin" />
+                        <Spinner size="sm" label={false} className="size-3" />
                       ) : (
                         "Add"
                       )}
@@ -380,7 +373,7 @@ function TaskCard({
             ) : null}
           </div>
           <div className="flex items-center gap-0.5">
-            {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
+            {busy ? <Spinner size="sm" label={false} className="text-cream-muted" /> : null}
             <div className="invisible flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
               <IconButton
                 size="xs"

@@ -9,9 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Spinner,
   Textarea,
 } from "@/shared/ui";
-import { CalendarDays, Clock3, ExternalLink, LoaderCircle, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, Clock3, ExternalLink, Trash2, UserRound } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 type EventDraft = {
@@ -180,7 +181,7 @@ export function SpaceTaskEventDrawer({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={busy || !draft.title.trim() || !datesValid}>
-                  {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                  {busy ? <Spinner label={false} /> : null}
                   {busy ? "Saving…" : "Save changes"}
                 </Button>
               </div>

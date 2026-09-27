@@ -1,7 +1,7 @@
 import { PhotoEditorView } from "@/features/editor/PhotoEditorView";
 import { errorText } from "@/shared/lib/format";
-import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
-import { Copy, ExternalLink, FileQuestion, Loader2, Save, X } from "lucide-react";
+import { Button, Dialog, DialogContent, DialogTitle, Spinner } from "@/shared/ui";
+import { Copy, ExternalLink, FileQuestion, Save, X } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import {
   type GlobalPreviewSource,
@@ -166,11 +166,7 @@ export function GlobalPreviewDialogView(props: {
                     disabled={!dirty || Boolean(saving)}
                     onClick={() => void save(true)}
                   >
-                    {saving === "copy" ? (
-                      <Loader2 className="animate-spin" size={14} />
-                    ) : (
-                      <Copy size={14} />
-                    )}
+                    {saving === "copy" ? <Spinner size="sm" label={false} /> : <Copy size={14} />}
                     Save as Copy
                   </Button>
                   <Button
@@ -179,11 +175,7 @@ export function GlobalPreviewDialogView(props: {
                     disabled={!dirty || props.source.readonly || Boolean(saving)}
                     onClick={() => void save(false)}
                   >
-                    {saving === "save" ? (
-                      <Loader2 className="animate-spin" size={14} />
-                    ) : (
-                      <Save size={14} />
-                    )}
+                    {saving === "save" ? <Spinner size="sm" label={false} /> : <Save size={14} />}
                     Save
                   </Button>
                 </>
@@ -212,7 +204,7 @@ export function GlobalPreviewDialogView(props: {
               <div className="min-h-0 overflow-auto">
                 {loading ? (
                   <PreviewMessage
-                    icon={<Loader2 className="animate-spin" size={28} />}
+                    icon={<Spinner size="lg" label={false} className="size-7" />}
                     title="Preparing preview"
                     detail="Loading the best available reader…"
                   />

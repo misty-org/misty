@@ -5,6 +5,7 @@ import {
   Card,
   IconButton,
   Input,
+  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -12,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui";
-import { LoaderCircle, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -76,7 +77,7 @@ export function SpaceTaskList({
                     type="button"
                     onClick={() => onOpen(task)}
                   >
-                    {taskBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
+                    {taskBusy ? <Spinner size="sm" label={false} /> : null}
                     <span className="truncate">{task.title}</span>
                   </Button>
                 </TableCell>

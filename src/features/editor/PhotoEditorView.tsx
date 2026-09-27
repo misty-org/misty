@@ -1,8 +1,8 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
 import type { PreviewErrorComponent } from "@/features/file-ui";
-import { IconButton, ViewportLayer } from "@/shared/ui";
-import { Copy, Loader2, X } from "lucide-react";
+import { IconButton, Spinner, ViewportLayer } from "@/shared/ui";
+import { Copy, X } from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -164,7 +164,7 @@ function EditorStatus(props: {
             />
           ) : (
             <>
-              <Loader2 className="animate-spin" size={28} />
+              <Spinner size="lg" label={false} className="size-7" />
               Preparing image…
             </>
           )}
@@ -222,7 +222,7 @@ export function PhotoEditorView(props: PhotoEditorProps & { Error: PreviewErrorC
       <Suspense
         fallback={
           <div className="grid h-full place-items-center text-cream-bright/60">
-            <Loader2 className="animate-spin" size={28} />
+            <Spinner size="lg" label={false} className="size-7" />
           </div>
         }
       >

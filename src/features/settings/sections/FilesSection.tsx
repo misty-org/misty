@@ -8,8 +8,8 @@ import {
   defaultFileActionOptions,
   fileViewModeOptions,
   settingsAssociationRowClass,
+  settingsDisabledControlClass,
   settingsEmptyClass,
-  settingsIconDangerClass,
   settingsReferenceHeaderClass,
   settingsReferenceListClass,
   settingsReferenceSpanClass,
@@ -116,10 +116,9 @@ export function FilesSection(props: SettingsContentProps & { page?: "browsing" |
                   {association.applicationPath}
                 </span>
                 <IconButton
-                  size="md"
-                  variant="outline"
+                  variant="destructive"
                   label={`Remove ${association.key}`}
-                  className={settingsIconDangerClass}
+                  className={settingsDisabledControlClass}
                   disabled={props.working}
                   onClick={() => void props.onRemoveOpenWithAssociation(association.key)}
                 >

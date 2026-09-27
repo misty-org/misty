@@ -14,7 +14,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { settingsDisabledControlClass, settingsIconDangerClass } from "../settingsConstants";
+import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function ServerSection(props: SettingsContentProps) {
@@ -106,10 +106,9 @@ export function ServerSection(props: SettingsContentProps) {
                 </Button>
                 {!current ? (
                   <IconButton
-                    size="md"
-                    variant="outline"
+                    variant="destructive"
                     label={`Forget ${server.name}`}
-                    className={settingsIconDangerClass}
+                    className={settingsDisabledControlClass}
                     disabled={switchingTo !== null || props.working}
                     onClick={() => setServers(forgetDeployment(server.url))}
                   >

@@ -3,18 +3,8 @@ import type {
   AiContextReference,
   AiSelectionSnapshot,
 } from "@/features/ai-surface";
-import { Button, cn, IconButton, SegmentedControl } from "@/shared/ui";
-import {
-  Bot,
-  Camera,
-  Command,
-  FileText,
-  FolderOpen,
-  Loader2,
-  MessageCircle,
-  Search,
-  X,
-} from "lucide-react";
+import { Button, cn, IconButton, SegmentedControl, Spinner } from "@/shared/ui";
+import { Bot, Camera, Command, FileText, FolderOpen, MessageCircle, Search, X } from "lucide-react";
 import type {
   GlobalAiContextRef,
   GlobalAiMode,
@@ -78,7 +68,7 @@ export function CandidateList(props: {
     <div className="p-2" role="listbox" aria-label="Misty candidates">
       {props.searching ? (
         <div className="flex h-7 items-center px-2 text-[11px] text-cream-muted">
-          <Loader2 className="mr-1.5 size-3 animate-spin" /> Enriching results…
+          <Spinner size="sm" label={false} className="size-3 mr-1.5" /> Enriching results…
         </div>
       ) : null}
       {props.candidates.map((candidate) => {

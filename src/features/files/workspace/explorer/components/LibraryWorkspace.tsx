@@ -2,18 +2,8 @@ import { MistyFilePicker } from "@/features/picker";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSmartLibraryStore } from "@/features/library/library";
 import type { SearchResult } from "@/native/ipc";
-import { Button, IconButton, Input, Pressable } from "@/shared/ui";
-import {
-  BrainCircuit,
-  Film,
-  FolderSearch,
-  Images,
-  Loader2,
-  Plus,
-  Search,
-  Tag,
-  X,
-} from "lucide-react";
+import { Button, IconButton, Input, Pressable, Spinner } from "@/shared/ui";
+import { BrainCircuit, Film, FolderSearch, Images, Plus, Search, Tag, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { DEFAULT_LIBRARY_TAG_LIMIT } from "../utils/libraryTags";
@@ -144,7 +134,7 @@ export function LibraryWorkspace(props: {
             </Button>
           ) : null}
           <Button disabled={analysisBusy} type="button" onClick={() => void selectFiles()}>
-            {analysisBusy ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+            {analysisBusy ? <Spinner label={false} /> : <Plus size={16} />}
             {analysisBusy ? "Adding…" : "Add files"}
           </Button>
         </div>
@@ -207,9 +197,7 @@ export function LibraryWorkspace(props: {
                   placeholder="Search subjects, descriptions, or tags"
                   onChange={(event) => setQuery(event.target.value)}
                 />
-                {semanticSearching ? (
-                  <Loader2 className="shrink-0 animate-spin text-cream-muted" size={15} />
-                ) : null}
+                {semanticSearching ? <Spinner label={false} className="text-cream-muted" /> : null}
               </div>
             </div>
             {semanticError ? (

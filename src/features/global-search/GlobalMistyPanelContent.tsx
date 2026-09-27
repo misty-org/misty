@@ -10,6 +10,7 @@ import {
   IconButton,
   Input,
   MenuTrigger,
+  Spinner,
 } from "@/shared/ui";
 import {
   Bell,
@@ -23,7 +24,6 @@ import {
   FolderKanban,
   History,
   Library,
-  Loader2,
   Map as MapIcon,
   MessageCircle,
   NotebookPen,
@@ -71,7 +71,7 @@ export function SearchResults(props: {
   return (
     <div className="p-2">
       <div className="flex h-7 items-center px-2 text-[11px] text-cream-muted">
-        {props.searching ? <Loader2 className="mr-1.5 size-3 animate-spin" /> : null}
+        {props.searching ? <Spinner size="sm" label={false} className="size-3 mr-1.5" /> : null}
         Showing {props.results.length} {props.results.length === 1 ? "result" : "results"}
       </div>
       {props.results.map((result) => {

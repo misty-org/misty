@@ -8,8 +8,9 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Spinner,
 } from "@/shared/ui";
-import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 /** Compact task controls shared by the Board and List presentations. */
@@ -118,11 +119,7 @@ export function SpacePlannerHeader({
         </Popover>
 
         <IconButton label="Refresh tasks" className="text-cream-muted/70" onClick={onSync}>
-          {loading ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <RotateCw className="size-4" aria-hidden />
-          )}
+          {loading ? <Spinner label={false} /> : <RotateCw className="size-4" aria-hidden />}
         </IconButton>
 
         {canManage ? (

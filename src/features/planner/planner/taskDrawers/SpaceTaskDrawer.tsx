@@ -13,8 +13,9 @@ import {
   DropdownMenuTrigger,
   IconButton,
   Input,
+  Spinner,
 } from "@/shared/ui";
-import { Check, Copy, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   useState,
   type Dispatch,
@@ -182,13 +183,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               to save
             </div>
             <div className="ml-auto flex items-center gap-2.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                disabled={busy}
-                onClick={onClose}
-              >
+              <Button variant="ghost" size="sm" type="button" disabled={busy} onClick={onClose}>
                 Cancel
               </Button>
               <Button
@@ -197,7 +192,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 type="submit"
                 className={cn("px-4", false)}
               >
-                {busy ? <LoaderCircle className="mr-1.5 size-3.5 animate-spin" /> : null}
+                {busy ? <Spinner size="sm" label={false} className="mr-1.5" /> : null}
                 {editing ? "Save changes" : "Create task"}
               </Button>
             </div>

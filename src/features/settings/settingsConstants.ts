@@ -32,11 +32,6 @@ export const settingsReferenceHeaderClass =
 
 export const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
 
-export const settingsIconDangerClass =
-  "size-[30px] border-charcoal-active/25 text-cream-bright " +
-  "hover:bg-charcoal-active hover:text-cream-bright " +
-  settingsDisabledControlClass;
-
 export const settingsInlineActionsClass = "flex items-center gap-3 px-5 py-4";
 
 export const settingsEmptyClass = "px-5 py-4 text-sm text-cream-muted";

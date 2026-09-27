@@ -6,11 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Spinner,
 } from "@/shared/ui";
 import { reportSystemError } from "@/features/activity";
 import { ManagedAiRequestError } from "@/features/agents";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, RefreshCcw, Wifi } from "lucide-react";
+import { RefreshCcw, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { useConnectedDevices } from "./useConnectedDevices";
 
@@ -95,11 +96,7 @@ export function ConnectedDevicePairingDialog({
           {!controller.ready && !pairing ? (
             <div className="grid justify-items-center gap-3 py-7 text-center">
               <span className="grid size-11 place-items-center rounded-full bg-charcoal-active text-cream-bright">
-                {controller.loading ? (
-                  <Loader2 className="animate-spin" size={19} />
-                ) : (
-                  <Wifi size={19} />
-                )}
+                {controller.loading ? <Spinner size="lg" label={false} /> : <Wifi size={19} />}
               </span>
               <div className="grid gap-1">
                 <p className="font-medium text-cream">

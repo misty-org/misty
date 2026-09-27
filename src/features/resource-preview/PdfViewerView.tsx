@@ -1,6 +1,6 @@
 import type { PreviewErrorComponent } from "@/features/file-ui";
-import { IconButton } from "@/shared/ui";
-import { Loader2, Minus, Plus } from "lucide-react";
+import { IconButton, Spinner } from "@/shared/ui";
+import { Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -147,7 +147,7 @@ export default function PdfViewerView({
             }
             loading={
               <div className="mt-10 grid justify-items-center gap-2 text-sm text-cream-muted">
-                <Loader2 className="animate-spin" size={26} />
+                <Spinner size="lg" label={false} className="size-7" />
                 Loading PDF…
               </div>
             }

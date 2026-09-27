@@ -5,8 +5,8 @@ import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMis
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, IconButton, Input, Pressable } from "@/shared/ui";
-import { Loader2, Mic, Square, X } from "lucide-react";
+import { Button, IconButton, Input, Pressable, Spinner } from "@/shared/ui";
+import { Mic, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
 import { useCompanionState } from "../companion/companionState";
@@ -269,7 +269,7 @@ export function AgentWorkspaceConversation({
               onClick={() => (voice.recording ? voice.stop() : void voice.start())}
             >
               {voice.requesting || voice.transcribing ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Spinner size="lg" label={false} />
               ) : voice.recording ? (
                 <Square size={16} />
               ) : (
