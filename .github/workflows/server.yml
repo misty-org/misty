@@ -49,7 +49,7 @@ jobs:
       TEST_DB_SSLMODE: disable
       STRIPE_WEBHOOK_SECRET: whsec_ci_test_secret_123
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Scan source for secrets
@@ -57,7 +57,7 @@ jobs:
           docker run --rm -v "$PWD:/repo"
           zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
           detect --source=/repo --no-git --redact --config=/repo/.gitleaks.toml
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: 1.25.12
           cache: true

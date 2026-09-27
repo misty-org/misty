@@ -1,7 +1,5 @@
 name: Prepare macOS beta draft
 on:
-  push:
-    branches: [codex/macos-beta-release]
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,16 +14,16 @@ jobs:
     outputs:
       version: ${{ steps.pins.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: misty
       - id: pins
         working-directory: misty
         run: |
           node --input-type=module -e 'import fs from "node:fs"; fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${JSON.parse(fs.readFileSync("package.json")).version}\n`);'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24.12.0
+          node-version-file: misty/.nvmrc
       - run: npm ci && npm run typecheck
         working-directory: misty
       - run: npm test -- src/shared/schemas
@@ -41,7 +39,7 @@ jobs:
       - name: Prepare release manifest
         working-directory: misty
         run: node cli/tasks/release/prepare-manifest.ts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: beta-packages
           path: misty/artifacts/v${{ steps.pins.outputs.version }}/*
@@ -65,7 +63,7 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: '12.0'
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Apple notarization credentials before building
         env:
           APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
@@ -75,9 +73,9 @@ jobs:
           set -euo pipefail
           xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --output-format json > "$RUNNER_TEMP/notary-history.json"
           rm "$RUNNER_TEMP/notary-history.json"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24.12.0
+          node-version-file: .nvmrc
       - uses: dtolnay/rust-toolchain@1.91.0
         with:
           targets: ${{ matrix.target }}
@@ -114,7 +112,7 @@ jobs:
           npm run tauri build -- --target ${{ matrix.target }} --bundles app,dmg --ci
           node cli/tasks/release/sign-dmg.ts ${{ matrix.target }}
       - run: node cli/tasks/release/collect-macos.ts ${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: beta-${{ matrix.target }}
           path: artifacts/v${{ needs.packages.outputs.version }}/*
@@ -127,11 +125,11 @@ jobs:
     needs: [packages, macos]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24.12.0
-      - uses: actions/download-artifact@v4
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v8
         with:
           pattern: beta-*
           path: artifacts/v${{ needs.packages.outputs.version }}

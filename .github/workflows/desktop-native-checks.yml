@@ -43,9 +43,9 @@ jobs:
         run: brew install restic
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 24.12.0
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Set up Rust
@@ -60,11 +60,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
-      - name: Check browser frontend
-        run: npm run typecheck
-
-      - name: Test browser frontend
-        run: npm test -- src/features/browser/workspace/BrowserWorkspace.test.ts src/features/agents/worker.test.ts src/features/agents/companion src/features/agents/localExecution.test.ts src/features/agents/voice src/features/agents/components/agentCloudAvatars.test.ts src/features/agents/components/AgentWorkspaceConversation.test.tsx src/app/main.test.ts
+      # The full suite runs in Frontend checks; this repeats the native-bridge tests on each OS.
+      - name: Test native bridges on this OS
+        run: npm test -- src/features/agents/worker.test.ts src/features/agents/companion src/features/agents/localExecution.test.ts src/features/agents/components/agentCloudAvatars.test.ts src/features/agents/components/AgentWorkspaceConversation.test.tsx src/app/main.test.ts
 
       - name: Compile native desktop
         run: cargo check --manifest-path src-tauri/Cargo.toml --lib
@@ -94,7 +92,7 @@ jobs:
 
       - name: Preserve desktop acceptance package
         if: runner.os == 'macOS' || runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: companion-acceptance-${{ runner.os }}
           path: |
