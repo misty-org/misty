@@ -43,7 +43,6 @@ import {
   type NavigatorLayout,
 } from "./navigatorMode";
 import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
-import { ProfilePopover } from "./ProfilePopover";
 import { RestoreGlyph } from "./RestoreGlyph";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { SettingsOverlay } from "./SettingsOverlays";
@@ -96,7 +95,6 @@ export function DesktopLayout(props: {
 
   const framePacingOverlayEnabled = useDesktopShellStatus();
 
-  const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const docking = useWindowDockingLayout();
   const [navigatorLayout, setNavigatorLayout] = useState<NavigatorLayout>(readNavigatorLayout);
@@ -353,14 +351,14 @@ export function DesktopLayout(props: {
   const navigatorContent = (
     <GlobalNavigator
       position={docking.navigation}
-      profileAnchorRef={profileAnchorRef}
       profileOpen={profileOpen}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
       suppressActiveTool={Boolean(standaloneRouteTitle)}
-      onProfileClick={() => {
-        setSettingsOpen(false);
-        setProfileOpen((open) => !open);
+      onProfileOpenChange={(open) => {
+        if (open) setSettingsOpen(false);
+        setProfileOpen(open);
       }}
+      onOpenAccountSettings={openAccountSettings}
       onSettingsClick={openSettingsOverlay}
       onStartWindowDrag={startTitlebarDrag}
     />
@@ -568,19 +566,8 @@ export function DesktopLayout(props: {
           </>
         ) : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
-        <div
-          id="misty-shell-overlays"
-          className="pointer-events-none fixed inset-0 layer-chrome"
-        />
         {!isAuthRoute ? (
           <>
-            <ProfilePopover
-              anchorRef={profileAnchorRef}
-              currentPath={location.pathname}
-              open={profileOpen}
-              onClose={() => setProfileOpen(false)}
-              onOpenAccountSettings={openAccountSettings}
-            />
             <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
             {user?.id ? (
               <GlobalMisty

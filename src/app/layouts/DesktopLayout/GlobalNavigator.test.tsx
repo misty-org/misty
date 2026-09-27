@@ -1,4 +1,3 @@
-import { createRef } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,10 +17,10 @@ function renderNavigator() {
   return render(
     <MemoryRouter>
       <GlobalNavigator
-        profileAnchorRef={createRef()}
         profileOpen={false}
         settingsOpen={false}
-        onProfileClick={() => {}}
+        onProfileOpenChange={() => undefined}
+            onOpenAccountSettings={() => undefined}
         onSettingsClick={() => {}}
       />
     </MemoryRouter>,

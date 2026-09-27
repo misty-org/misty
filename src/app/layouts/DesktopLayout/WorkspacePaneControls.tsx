@@ -1,6 +1,5 @@
 import { liftPanePresentation } from "@/features/workspace/paneDragPresentation";
 import { useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   ArrowDownToLine,
   ArrowLeftRight,
@@ -16,15 +15,13 @@ import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  Button,
+  IconButton,
+  MenuItem,
+  MenuTrigger,
+  Portal,
 } from "@/shared/ui";
-
-const controlClass =
-  "grid size-6 shrink-0 place-items-center rounded text-cream-muted hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
 
 export function WorkspacePaneControls({
   pane,
@@ -90,36 +87,32 @@ export function WorkspacePaneControls({
   return (
     <>
       <span ref={anchor} className="pointer-events-none absolute right-0 top-0" aria-hidden />
-      {createPortal(
+      <Portal>
         <div
           style={bounds}
           data-visible={hovered || open}
           className="pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-card p-0.5 opacity-0 transition-opacity data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100 hover:pointer-events-auto hover:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
           onPointerDown={(event) => event.stopPropagation()}
         >
-          <Button
-            variant="ghost"
-            size="none"
-            className={`${controlClass} cursor-grab touch-none active:cursor-grabbing`}
+          <IconButton
+            size="xs"
+            tooltip={false}
+            className="cursor-grab touch-none active:cursor-grabbing"
             data-reorder-handle
-            aria-label="Drag pane"
+            label="Drag pane"
             title="Drag pane to an edge to move, or center to swap"
             onPointerDown={drag}
           >
             <Move className="size-3.5" size={14} />
-          </Button>
+          </IconButton>
           <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="none"
-                className={controlClass}
-                aria-label="Arrange pane"
-                title="Arrange pane"
-              >
-                <LayoutPanelTop className="size-3.5" size={14} />
-              </Button>
-            </DropdownMenuTrigger>
+            <MenuTrigger
+              iconOnly
+              size="xs"
+              label="Arrange pane"
+              title="Arrange pane"
+              icon={<LayoutPanelTop className="size-3.5" size={14} />}
+            />
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Move pane to workspace edge</DropdownMenuLabel>
               {(
@@ -130,46 +123,37 @@ export function WorkspacePaneControls({
                   ["down", "Push below", ArrowDownToLine],
                 ] as const
               ).map(([direction, label, Icon]) => (
-                <DropdownMenuItem
+                <MenuItem
                   key={direction}
-                  onSelect={() => {
-                    useWorkspaceStore.getState().movePane(pane.id, direction);
-                  }}
-                >
-                  <Icon size={14} />
-                  {label}
-                </DropdownMenuItem>
+                  icon={<Icon />}
+                  label={label}
+                  onSelect={() => useWorkspaceStore.getState().movePane(pane.id, direction)}
+                />
               ))}
               <DropdownMenuSeparator />
               {panes.map((target, index) =>
                 target.id === pane.id ? null : (
-                  <DropdownMenuItem
+                  <MenuItem
                     key={target.id}
-                    onSelect={() => {
-                      useWorkspaceStore.getState().swapPanes(pane.id, target.id);
-                    }}
-                  >
-                    <ArrowLeftRight size={14} />
-                    Swap with pane {index + 1}:{" "}
-                    {target.tabs.find((tab) => tab.id === target.activeTabId)?.title ?? "Empty"}
-                  </DropdownMenuItem>
+                    icon={<ArrowLeftRight />}
+                    label={`Swap with pane ${index + 1}: ${
+                      target.tabs.find((tab) => tab.id === target.activeTabId)?.title ?? "Empty"
+                    }`}
+                    onSelect={() => useWorkspaceStore.getState().swapPanes(pane.id, target.id)}
+                  />
                 ),
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="none"
-            className={controlClass}
-            aria-label="Close pane"
+          <IconButton size="xs" tooltip={false}
+            label="Close pane"
             title="Close pane"
             onClick={onClose}
           >
             <X className="size-3" size={12} />
-          </Button>
-        </div>,
-        document.body,
-      )}
+          </IconButton>
+        </div>
+      </Portal>
     </>
   );
 }

@@ -1,9 +1,9 @@
 import { WebsiteGroupNavigator } from "@/features/browser-workspace/WebsiteGroupNavigator";
-import { useState, type RefObject } from "react";
-import { Globe, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Globe } from "lucide-react";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { dockLeaves, parseBrowserTabState, useWorkspaceStore } from "@/features/workspace";
-import { cn, Button, Popover, PopoverTrigger, PopoverContent } from "@/shared/ui";
+import { cn, MenuTrigger, Popover, PopoverContent } from "@/shared/ui";
 import {
   NavigatorHeaderHomeButton,
   NavigatorHeaderAgentsButton,
@@ -22,11 +22,11 @@ import {
 
 export function GlobalNavigator(props: {
   position?: DockPosition;
-  profileAnchorRef: RefObject<HTMLButtonElement | null>;
   profileOpen: boolean;
+  onProfileOpenChange: (open: boolean) => void;
+  onOpenAccountSettings: () => void;
   settingsOpen: boolean;
   suppressActiveTool?: boolean;
-  onProfileClick: () => void;
   onSettingsClick: () => void;
   onStartWindowDrag?: (event: React.PointerEvent<HTMLElement>) => void;
   /** Present on desktop: drags (and double-click zooms) from the top band. */
@@ -93,17 +93,13 @@ export function GlobalNavigator(props: {
           <WorkspaceSpaceNavigation activeTab={activeTab} />
           {horizontal ? (
             <Popover open={groupsOpen} onOpenChange={setGroupsOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="shrink-0 gap-2 text-xs text-cream-muted"
-                  aria-label="Website groups"
-                >
-                  <Globe size={16} />
-                  Groups
-                  <ChevronDown size={12} />
-                </Button>
-              </PopoverTrigger>
+              <MenuTrigger
+                kind="popover"
+                label="Groups"
+                aria-label="Website groups"
+                icon={<Globe size={16} />}
+                className="shrink-0 text-xs text-cream-muted"
+              />
               <PopoverContent
                 side={props.position === "bottom" ? "top" : "bottom"}
                 align="start"
@@ -122,10 +118,10 @@ export function GlobalNavigator(props: {
 
       <NavigatorProfileBar
         compact={horizontal}
-        profileAnchorRef={props.profileAnchorRef}
         profileOpen={props.profileOpen}
         settingsOpen={props.settingsOpen}
-        onProfileClick={props.onProfileClick}
+        onProfileOpenChange={props.onProfileOpenChange}
+        onOpenAccountSettings={props.onOpenAccountSettings}
         onSettingsClick={props.onSettingsClick}
       />
     </nav>

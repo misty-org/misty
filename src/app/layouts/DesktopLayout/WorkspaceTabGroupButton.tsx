@@ -28,7 +28,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  MenuTrigger,
   ProviderBrandIcon,
   WebsiteBrandIcon,
 } from "@/shared/ui";
@@ -298,20 +298,14 @@ export function WorkspaceTabGroupButton({
         </Button>
         {showChevron ? (
           <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="none"
-                className={cn(
-                  "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted outline-none",
-                  " hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-                )}
-                aria-label={`Show ${displayLabel} tabs`}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <ChevronDown aria-hidden size={12} className="size-3" />
-              </Button>
-            </DropdownMenuTrigger>
+            <MenuTrigger
+              iconOnly
+              size="xs"
+              className="mr-1"
+              label={`Show ${displayLabel} tabs`}
+              icon={<ChevronDown aria-hidden size={12} className="size-3" />}
+              onClick={(event) => event.stopPropagation()}
+            />
             <DropdownMenuContent
               align="start"
               className="min-w-[220px]"
