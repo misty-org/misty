@@ -11,6 +11,7 @@ export * from "./controls/IconButton";
 export * from "./controls/Input";
 export * from "./controls/InputGroup";
 export * from "./controls/Label";
+export * from "./controls/OptionSelect";
 export * from "./controls/RadioGroup";
 export * from "./controls/Select";
 export * from "./controls/Slider";
@@ -34,7 +35,7 @@ export * from "./overlays/SuggestionList";
 export * from "./overlays/Tooltip";
 export * from "./overlays/ViewportLayer";
 export * from "./overlays/WorkspaceOverlay";
-export * from "./overlays/popupStyles";
+export type { MenuWidth } from "./overlays/popupStyles";
 
 // layout
 export * from "./layout/Collapsible";

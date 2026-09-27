@@ -19,6 +19,11 @@ const inputVariants = {
     "hover:bg-cream/[0.025] focus:border-cream/[0.12] focus:bg-cream/[0.04]",
     "disabled:pointer-events-none disabled:opacity-50",
   ],
+  // No frame: for fields inside a container that already draws one (search pills, tab titles).
+  bare: [
+    "w-full min-w-0 bg-transparent text-sm text-cream outline-none placeholder:text-cream-muted",
+    "disabled:pointer-events-none disabled:opacity-50",
+  ],
 } as const;
 
 export type InputProps = React.ComponentProps<"input"> & { variant?: keyof typeof inputVariants };
