@@ -1,32 +1,4 @@
 {
-  "src/app/layouts/DesktopLayout/GlobalNavigator.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/app/layouts/DesktopLayout/index.tsx": [
-    "full-screen-overlay"
-  ],
-  "src/app/layouts/DesktopLayout/ProfilePopover.tsx": [
-    "portal"
-  ],
-  "src/app/layouts/DesktopLayout/styles.ts": [
-    "full-screen-overlay",
-    "popup-class"
-  ],
-  "src/app/layouts/DesktopLayout/WindowsWorkspaceTitlebarControls.tsx": [
-    "portal"
-  ],
-  "src/app/layouts/DesktopLayout/WorkspaceLayoutTabs.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/app/layouts/DesktopLayout/WorkspacePaneControls.tsx": [
-    "portal"
-  ],
-  "src/app/layouts/DesktopLayout/WorkspaceTabGroupButton.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/app/layouts/DesktopLayout/WorkspaceWindowMenu.tsx": [
-    "manual-menu-chevron"
-  ],
   "src/features/activity/ActivityPanelToolbar.tsx": [
     "raw-control"
   ],

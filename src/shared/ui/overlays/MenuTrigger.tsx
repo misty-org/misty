@@ -1,9 +1,10 @@
 import { ChevronDown } from "lucide-react";
 import * as React from "react";
 import { Button, type ButtonProps } from "../controls/Button";
-import { IconButton } from "../controls/IconButton";
+import { IconButton, type IconButtonProps } from "../controls/IconButton";
 import { cn } from "../utils";
 import { DropdownMenuTrigger } from "./DropdownMenu";
+import { PopoverTrigger } from "./Popover";
 
 type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children"> & {
   /** Accessible name; also the visible text unless `value` is given. */
@@ -14,20 +15,41 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children"> & {
   /** Icon-only triggers are toolbar icon buttons and never show a chevron. */
   iconOnly?: boolean;
   tooltip?: string | false;
+  /** Opens a DropdownMenu by default; "popover" for a Popover with rich content. */
+  kind?: "menu" | "popover";
+  /** Icon-only triggers only: the IconButton size. */
+  size?: IconButtonProps["size"];
 };
 
 /**
- * The button that opens a DropdownMenu. Labeled triggers always end in a chevron that
- * flips while open; icon-only triggers never have one. Features never draw their own.
+ * The button that opens a DropdownMenu, or a Popover with kind="popover". Labeled triggers
+ * always end in a chevron that flips while open; icon-only triggers never have one.
+ * Features never draw their own.
  */
 const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
-  ({ label, icon, value, iconOnly = false, tooltip, variant, className, ...props }, ref) => {
+  (
+    {
+      label,
+      icon,
+      value,
+      iconOnly = false,
+      tooltip,
+      variant,
+      className,
+      kind = "menu",
+      size,
+      ...props
+    },
+    ref,
+  ) => {
+    const Trigger = kind === "popover" ? PopoverTrigger : DropdownMenuTrigger;
     if (iconOnly) {
       return (
-        <DropdownMenuTrigger asChild>
+        <Trigger asChild>
           <IconButton
             ref={ref}
             label={label}
+            size={size}
             tooltip={tooltip ?? false}
             variant={variant ?? "toolbar"}
             className={className}
@@ -35,11 +57,11 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
           >
             {icon}
           </IconButton>
-        </DropdownMenuTrigger>
+        </Trigger>
       );
     }
     return (
-      <DropdownMenuTrigger asChild>
+      <Trigger asChild>
         <Button
           ref={ref}
           type="button"
@@ -56,7 +78,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
             className="size-3.5 shrink-0 text-cream-muted transition-transform duration-150 group-data-[state=open]/button:rotate-180"
           />
         </Button>
-      </DropdownMenuTrigger>
+      </Trigger>
     );
   },
 );

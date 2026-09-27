@@ -105,7 +105,7 @@ vi.mock("@/features/tour", () => ({
   },
 }));
 
-vi.mock("./ProfilePopover", () => ({ ProfilePopover: () => null }));
+vi.mock("./ProfileMenu", () => ({ ProfileMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
 vi.mock("./TransferStatus", () => ({
   WorkStatusPopup: () => null,

@@ -4,15 +4,15 @@ import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationNames, windowNameKey } from "@/features/navigation-names/store";
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
 import {
+  Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  cn,
-  Button,
+  MenuTrigger,
 } from "@/shared/ui";
-import { AppWindow, ChevronDown, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { AppWindow, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export function WorkspaceWindowMenu(props: {
   windows: WorkspaceVirtualWindow[];
@@ -34,19 +34,14 @@ export function WorkspaceWindowMenu(props: {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="none"
-          className={dockActionClass}
-          aria-label="Manage virtual windows"
-          title="Manage virtual windows"
-          data-tour-target="workspace-window-menu"
-        >
-          <AppWindow className="size-4" />
-          <ChevronDown className="size-3" aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
+      <MenuTrigger
+        iconOnly
+        size="xs"
+        label="Manage virtual windows"
+        title="Manage virtual windows"
+        data-tour-target="workspace-window-menu"
+        icon={<AppWindow className="size-4" />}
+      />
       <DropdownMenuContent align="end" className="w-60 max-w-[calc(100vw-16px)]">
         {props.windows.map((workspaceWindow) => {
           const isActive = workspaceWindow.id === props.activeWindowId;
@@ -119,8 +114,3 @@ export function WorkspaceWindowMenu(props: {
     </DropdownMenu>
   );
 }
-
-const dockActionClass = [
-  "flex h-7 shrink-0 items-center justify-center gap-1 px-1.5 rounded text-cream-muted outline-none",
-  " hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-].join(" ");

@@ -2,7 +2,7 @@ import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { useSpacesStore } from "@/features/spaces";
 import { dockTabs, useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
-import { act, createRef } from "react";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -370,10 +370,10 @@ describe("GlobalNavigator disclosures", () => {
       root.render(
         <MemoryRouter initialEntries={[initialEntry]}>
           <GlobalNavigator
-            profileAnchorRef={createRef<HTMLButtonElement>()}
             profileOpen={false}
             settingsOpen={false}
-            onProfileClick={() => undefined}
+            onProfileOpenChange={() => undefined}
+            onOpenAccountSettings={() => undefined}
             onSettingsClick={() => undefined}
           />
         </MemoryRouter>,

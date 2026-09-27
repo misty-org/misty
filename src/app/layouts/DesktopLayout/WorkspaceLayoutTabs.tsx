@@ -7,7 +7,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  IconButton,
+  MenuTrigger,
   OverflowFadeText,
 } from "@/shared/ui";
 import {
@@ -38,13 +39,7 @@ import { minimumForWorkspaceTabs } from "./WorkspaceDockTree";
 import { TabIcon } from "./WorkspaceTabGroupButton";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
 import { navigatorMotionClass } from "./styles";
-import {
-  dockActionClass,
-  WindowsWorkspaceTitlebarControls,
-} from "./WindowsWorkspaceTitlebarControls";
-
-const tabActionClass =
-  "grid size-6 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright active:bg-charcoal-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
+import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
 
 export function WorkspaceLayoutTabs(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
@@ -152,17 +147,15 @@ export function WorkspaceLayoutTabs(
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeLayoutTabId, position]);
   const newTabButton = (
-    <Button
-      variant="ghost"
-      size="none"
-      className={cn(tabActionClass, vertical && "misty-side-new-tab")}
-      aria-label="New tab"
+    <IconButton size="xs" tooltip={false}
+      className={vertical ? "misty-side-new-tab" : undefined}
+      label="New tab"
       title="New tab"
       onClick={props.onNewTab}
     >
       <Plus className="size-3.5" size={14} />
       {vertical && <span>New tab</span>}
-    </Button>
+    </IconButton>
   );
   const select = (id: string) => {
     const view = useWorkspaceStore.getState().selectLayoutTab(id);
@@ -282,20 +275,14 @@ export function WorkspaceLayoutTabs(
                 <BrowserTabAudioButton tabs={panes.flatMap((pane) => pane.tabs)} />
                 {panes.length > 1 ? (
                   <DropdownMenu modal={false}>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="none"
-                        aria-label={`Show panes in ${label}`}
-                        aria-description={`${panes.length} panes`}
-                        className={cn(
-                          tabActionClass,
-                          "mr-0.5 aria-expanded:bg-transparent data-[state=open]:bg-transparent",
-                        )}
-                      >
-                        <ChevronDown className="size-3" size={12} />
-                      </Button>
-                    </DropdownMenuTrigger>
+                    <MenuTrigger
+                      iconOnly
+                      size="xs"
+                      className="mr-0.5"
+                      label={`Show panes in ${label}`}
+                      aria-description={`${panes.length} panes`}
+                      icon={<ChevronDown className="size-3" size={12} />}
+                    />
                     <DropdownMenuContent align="start" className="min-w-[220px]">
                       {panes.map((item) => {
                         const itemView = item.tabs[0];
@@ -339,16 +326,14 @@ export function WorkspaceLayoutTabs(
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    aria-label={`Close tab ${label}`}
+                  <IconButton size="xs" tooltip={false}
+                    label={`Close tab ${label}`}
                     title={`Close tab ${label}`}
-                    className={cn(tabActionClass, "mr-0.5")}
+                    className="mr-0.5"
                     onClick={() => props.onCloseLayoutTab(tab.id)}
                   >
                     <X className="size-3.5" size={14} />
-                  </Button>
+                  </IconButton>
                 )}
               </div>
             </Renameable>
@@ -364,41 +349,32 @@ export function WorkspaceLayoutTabs(
       >
         {!props.windowsTitlebarControls ? (
           <>
-            <Button
-              variant="ghost"
-              size="none"
+            <IconButton size="xs" tooltip={false}
               disabled={!canRight}
-              className={dockActionClass}
-              aria-label="Create split right"
+              label="Create split right"
               title="Split right"
               onClick={() => props.onSplitPane(pane.id, "right")}
             >
               <PanelRightDashed className="size-4" size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="none"
+            </IconButton>
+            <IconButton size="xs" tooltip={false}
               disabled={!canDown}
-              className={dockActionClass}
-              aria-label="Create split down"
+              label="Create split down"
               title="Split down"
               onClick={() => props.onSplitPane(pane.id, "down")}
             >
               <PanelBottomDashed className="size-4" size={16} />
-            </Button>
+            </IconButton>
           </>
         ) : null}
-        <Button
-          variant="ghost"
-          size="none"
+        <IconButton size="xs" tooltip={false}
           disabled={dockLeaves(layout.root).length <= 1}
-          className={dockActionClass}
-          aria-label="Close pane"
+          label="Close pane"
           title="Close pane"
           onClick={() => props.onClosePane(pane.id)}
         >
           <ClosePaneIcon className="size-4" size={16} />
-        </Button>
+        </IconButton>
         {!props.windowsTitlebarControls ? (
           <WorkspaceWindowMenu
             windows={props.virtualWindows}

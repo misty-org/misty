@@ -1,14 +1,7 @@
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
-import { Button } from "@/shared/ui";
+import { IconButton, PortalToId } from "@/shared/ui";
 import { PanelBottomDashed, PanelRightDashed } from "lucide-react";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
-
-export const dockActionClass = [
-  "grid size-7 place-items-center rounded text-cream-muted outline-none",
-  "hover:bg-charcoal-card hover:text-cream focus-visible:ring-1 focus-visible:ring-charcoal-active disabled:pointer-events-none disabled:opacity-35",
-].join(" ");
 
 export function WindowsWorkspaceTitlebarControls(props: {
   enabled: boolean;
@@ -26,38 +19,26 @@ export function WindowsWorkspaceTitlebarControls(props: {
   onCloseWindow: (windowId: string) => void;
   onReopenWindow: () => void;
 }) {
-  const [target, setTarget] = useState<HTMLElement | null>(null);
+  if (!props.enabled || !props.focused) return null;
 
-  useEffect(() => {
-    setTarget(props.enabled ? document.getElementById("misty-windows-workspace-controls") : null);
-  }, [props.enabled]);
-
-  if (!props.enabled || !props.focused || !target) return null;
-
-  return createPortal(
-    <>
-      <Button
-        variant="ghost"
-        size="none"
+  return (
+    <PortalToId targetId="misty-windows-workspace-controls">
+      <IconButton size="xs" tooltip={false}
         disabled={!props.canSplitSideways}
-        className={dockActionClass}
-        aria-label="Create split right"
+        label="Create split right"
         title="Split right"
         onClick={() => props.onSplitPane(props.paneId, "right")}
       >
         <PanelRightDashed className="size-4" size={16} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="none"
+      </IconButton>
+      <IconButton size="xs" tooltip={false}
         disabled={!props.canSplitVertically}
-        className={dockActionClass}
-        aria-label="Create split down"
+        label="Create split down"
         title="Split down"
         onClick={() => props.onSplitPane(props.paneId, "down")}
       >
         <PanelBottomDashed className="size-4" size={16} />
-      </Button>
+      </IconButton>
       <WorkspaceWindowMenu
         windows={props.windows}
         activeWindowId={props.activeWindowId}
@@ -68,7 +49,6 @@ export function WindowsWorkspaceTitlebarControls(props: {
         onClose={props.onCloseWindow}
         onReopen={props.onReopenWindow}
       />
-    </>,
-    target,
+    </PortalToId>
   );
 }
