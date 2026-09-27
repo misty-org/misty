@@ -11,7 +11,6 @@ import { BrowserMenuView } from "./BrowserMenuView";
 import { useCallback } from "react";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 export function BrowserMenu(props: {
-  iconButtonClass: string;
   nativeRuntime: boolean;
   tab: WorkspaceTab;
   url: string;

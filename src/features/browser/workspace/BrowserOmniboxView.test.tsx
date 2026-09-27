@@ -27,7 +27,6 @@ function baseProps(overrides: Partial<Parameters<typeof BrowserOmniboxView>[0]> 
     currentUrl: "https://example.com/",
     context,
     providers: providers(),
-    lightChrome: false,
     suspensionReason: "test-address",
     setOverlay: vi.fn(async () => {}),
     onNavigate: vi.fn(),

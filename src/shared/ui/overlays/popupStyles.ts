@@ -14,9 +14,9 @@ export const popupMotionClass =
 /** Padding and row rhythm shared by every list of menu rows. */
 export const menuListClass = "grid gap-1 p-1";
 
-export const menuContentClass = `relative z-[2147483400] max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32 overflow-x-hidden overflow-y-auto data-[state=closed]:overflow-hidden ${menuListClass} ${popupSurfaceClass} ${popupMotionClass}`;
+export const menuContentClass = `relative layer-menu max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32 overflow-x-hidden overflow-y-auto data-[state=closed]:overflow-hidden ${menuListClass} ${popupSurfaceClass} ${popupMotionClass}`;
 
-export const popoverContentClass = `z-[2147483420] w-72 p-3 ${popupSurfaceClass} ${popupMotionClass}`;
+export const popoverContentClass = `layer-popover w-72 p-3 ${popupSurfaceClass} ${popupMotionClass}`;
 
 /** A menu row. Also used for plain buttons inside popovers that act as menus. */
 export const menuItemClass =

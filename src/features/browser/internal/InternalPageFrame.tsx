@@ -58,17 +58,6 @@ export function InternalPageEmpty(props: { title: string; detail?: string }) {
   );
 }
 
-export const internalRowClass = cn(
-  "group flex min-h-11 items-center gap-3 rounded-md px-2 py-1.5",
-  "hover:bg-charcoal-hover focus-within:bg-charcoal-hover",
-);
-
-export const internalActionClass = cn(
-  "rounded-md px-2 py-1 text-xs text-cream-muted transition-colors",
-  "hover:bg-charcoal-card hover:text-cream-bright disabled:pointer-events-none disabled:opacity-50",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
-);
-
 export function SiteIcon({ url }: { url: string }) {
   return (
     <span className="grid size-6 shrink-0 place-items-center text-cream-muted">

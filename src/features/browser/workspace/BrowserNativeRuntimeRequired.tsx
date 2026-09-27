@@ -1,3 +1,4 @@
+import { Button } from "@/shared/ui";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 
 export function BrowserNativeRuntimeRequired(props: { url: string; onOpenExternal: () => void }) {
@@ -20,14 +21,10 @@ export function BrowserNativeRuntimeRequired(props: { url: string; onOpenExterna
         <p className="mt-4 max-w-full truncate rounded-md bg-charcoal-card px-3 py-2 font-mono text-xs text-cream-muted">
           {props.url}
         </p>
-        <button
-          type="button"
-          className="mt-5 inline-flex min-h-9 items-center gap-2 rounded-md bg-charcoal-active px-3 text-sm font-medium text-cream-bright transition-colors hover:bg-charcoal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted"
-          onClick={props.onOpenExternal}
-        >
-          <ExternalLink className="size-4" aria-hidden="true" />
+        <Button className="mt-5" onClick={props.onOpenExternal}>
+          <ExternalLink aria-hidden="true" />
           Open in browser
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -83,7 +83,7 @@ export function BrowserSyncBadge({
         sideOffset={8}
         collisionPadding={12}
         aria-label="Device control center"
-        className="z-[2147483300] max-h-[calc(100dvh-64px)] w-96 max-w-[calc(100vw-24px)] overflow-y-auto"
+        className="layer-blocking-popup max-h-[calc(100dvh-64px)] w-96 max-w-[calc(100vw-24px)] overflow-y-auto"
         data-misty-window-drag-block="true"
       >
         {sync.session?.account_id === accountId && (

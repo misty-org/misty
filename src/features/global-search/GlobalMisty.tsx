@@ -449,8 +449,8 @@ export function GlobalMistySurface(props: {
     <div
       className={
         docked
-          ? "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center px-4 pt-10"
-          : "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
+          ? "pointer-events-none fixed inset-0 layer-chrome flex flex-col items-center px-4 pt-10"
+          : "pointer-events-none fixed inset-0 layer-chrome flex flex-col items-center pt-[9vh]"
       }
       data-global-misty-root
     >

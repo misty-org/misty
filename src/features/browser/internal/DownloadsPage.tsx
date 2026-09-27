@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { cn } from "@/shared/ui";
+import { Button, cn, ListRow, ListRowButton } from "@/shared/ui";
 import {
   downloadProgressFraction,
   formatBytes,
@@ -10,8 +10,6 @@ import { browserLibrary, type BrowserDownloadEntry } from "../library/native";
 import {
   InternalPageEmpty,
   InternalPageFrame,
-  internalActionClass,
-  internalRowClass,
 } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 
@@ -78,14 +76,12 @@ export function DownloadsPage(props: BrowserInternalPageProps) {
       icon={Download}
       search={{ value: text, placeholder: "Search downloads", onChange: setText }}
       actions={
-        <button
-          type="button"
-          className={internalActionClass}
+        <Button variant="toolbar" size="xs"
           disabled={!entries.some((entry) => entry.state !== "in_progress")}
           onClick={() => run(() => browserLibrary.removeDownloads({}))}
         >
           Clear list
-        </button>
+        </Button>
       }
     >
       {error || actionError ? (
@@ -125,12 +121,11 @@ function DownloadRow(props: {
   const active = entry.state === "in_progress";
   const openable = entry.state === "finished" && entry.exists;
   return (
-    <li className={cn(internalRowClass, "items-start py-2.5")}>
+    <ListRow className="items-start py-2.5">
       <div className="min-w-0 flex-1">
-        <button
-          type="button"
+        <ListRowButton
           className={cn(
-            "block max-w-full truncate text-left text-sm focus-visible:outline-none",
+            "block max-w-full truncate text-sm",
             openable ? "text-cream-bright hover:underline" : "text-cream-muted",
             !openable && entry.state === "finished" && "line-through",
           )}
@@ -139,7 +134,7 @@ function DownloadRow(props: {
           onClick={() => run(() => browserLibrary.openDownload(entry.id))}
         >
           {entry.fileName || hostOf(entry.url) || "Download"}
-        </button>
+        </ListRowButton>
         <p className="mt-0.5 truncate text-xs text-cream-muted">{downloadStatusText(entry)}</p>
         {active ? (
           <div
@@ -161,40 +156,34 @@ function DownloadRow(props: {
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {active ? (
-          <button
-            type="button"
-            className={internalActionClass}
+          <Button variant="toolbar" size="xs"
             onClick={() => run(() => browserLibrary.cancelDownload(entry.id))}
           >
             Cancel
-          </button>
+          </Button>
         ) : null}
         {entry.state === "finished" && entry.exists ? (
-          <button
-            type="button"
-            className={internalActionClass}
+          <Button variant="toolbar" size="xs"
             onClick={() => run(() => browserLibrary.revealDownload(entry.id))}
           >
             {revealLabel}
-          </button>
+          </Button>
         ) : null}
         {!active && entry.state !== "finished" ? (
-          <button type="button" className={internalActionClass} onClick={props.retry}>
+          <Button variant="toolbar" size="xs" onClick={props.retry}>
             Retry
-          </button>
+          </Button>
         ) : null}
         {!active ? (
-          <button
-            type="button"
-            className={internalActionClass}
+          <Button variant="toolbar" size="xs"
             aria-label={`Remove ${entry.fileName || "download"} from the list`}
             title="Remove from list"
             onClick={() => run(() => browserLibrary.removeDownloads({ ids: [entry.id] }))}
           >
             Remove
-          </button>
+          </Button>
         ) : null}
       </div>
-    </li>
+    </ListRow>
   );
 }

@@ -94,7 +94,7 @@ export function WorkspacePaneControls({
         <div
           style={bounds}
           data-visible={hovered || open}
-          className="pointer-events-none fixed z-[2147483300] flex items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-card p-0.5 opacity-0 transition-opacity data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100 hover:pointer-events-auto hover:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+          className="pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-card p-0.5 opacity-0 transition-opacity data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100 hover:pointer-events-auto hover:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
           onPointerDown={(event) => event.stopPropagation()}
         >
           <Button

@@ -7,6 +7,12 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  Field,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/shared/ui";
 import { useBrowserDownloadsStore } from "../library/downloadsStore";
 import { browserLibrary, type BrowserWebsiteDataKind } from "../library/native";
@@ -78,20 +84,20 @@ export function BrowserClearDataDialog(props: {
       <DialogContent className="sm:max-w-md">
         <DialogTitle>Clear browsing data</DialogTitle>
         <DialogDescription>Applies to this browser profile on this device.</DialogDescription>
-        <label className="grid gap-2 text-sm">
-          Time range
-          <select
-            className="h-9 rounded-md border border-charcoal-border bg-charcoal-card px-2 text-sm text-cream"
-            value={range}
-            onChange={(event) => setRange(Number(event.target.value))}
-          >
-            {ranges.map((item, index) => (
-              <option key={item.label} value={index}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Field label="Time range">
+          <Select value={String(range)} onValueChange={(value) => setRange(Number(value))}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ranges.map((item, index) => (
+                <SelectItem key={item.label} value={String(index)}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <div className="grid gap-3">
           {choices.map((choice) => (
             <label key={choice.id} className="flex items-start gap-3 text-sm">

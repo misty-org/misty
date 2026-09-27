@@ -3,15 +3,13 @@
     "manual-menu-chevron"
   ],
   "src/app/layouts/DesktopLayout/index.tsx": [
-    "full-screen-overlay",
-    "z-index-literal"
+    "full-screen-overlay"
   ],
   "src/app/layouts/DesktopLayout/ProfilePopover.tsx": [
     "portal"
   ],
   "src/app/layouts/DesktopLayout/styles.ts": [
     "full-screen-overlay",
-    "z-index-literal",
     "popup-class"
   ],
   "src/app/layouts/DesktopLayout/WindowsWorkspaceTitlebarControls.tsx": [
@@ -21,8 +19,7 @@
     "manual-menu-chevron"
   ],
   "src/app/layouts/DesktopLayout/WorkspacePaneControls.tsx": [
-    "portal",
-    "z-index-literal"
+    "portal"
   ],
   "src/app/layouts/DesktopLayout/WorkspaceTabGroupButton.tsx": [
     "manual-menu-chevron"
@@ -30,16 +27,12 @@
   "src/app/layouts/DesktopLayout/WorkspaceWindowMenu.tsx": [
     "manual-menu-chevron"
   ],
-  "src/app/layouts/RootLayout.tsx": [
-    "z-index-literal"
-  ],
   "src/features/activity/ActivityPanelToolbar.tsx": [
     "raw-control"
   ],
   "src/features/agents/AgentExecutionSurface.tsx": [
     "raw-control",
-    "full-screen-overlay",
-    "z-index-literal"
+    "full-screen-overlay"
   ],
   "src/features/agents/AgentsPage.tsx": [
     "raw-control"
@@ -59,9 +52,6 @@
   "src/features/agents/mcp/McpConnectionsSheet.tsx": [
     "hex-color"
   ],
-  "src/features/agents/WorkspaceAutopilotBar.tsx": [
-    "z-index-literal"
-  ],
   "src/features/ai-surface/AiSelectionMenu.tsx": [
     "raw-control",
     "popup-class"
@@ -72,113 +62,8 @@
   "src/features/ai-surface/VoiceInputMenu.tsx": [
     "manual-menu-chevron"
   ],
-  "src/features/browser-workspace/BrowserSyncBadge.tsx": [
-    "z-index-literal"
-  ],
-  "src/features/browser-workspace/BrowserSyncSleepOverlay.tsx": [
-    "z-index-literal"
-  ],
-  "src/features/browser-workspace/DeviceChooseScreen.tsx": [
-    "z-index-literal",
-    "popup-animation-off"
-  ],
-  "src/features/browser-workspace/DeviceControlContent.tsx": [
-    "popup-animation-off"
-  ],
-  "src/features/browser-workspace/restore/RestoreStatusList.tsx": [
-    "popup-animation-off"
-  ],
-  "src/features/browser-workspace/TreeSwitcherList.tsx": [
-    "popup-animation-off"
-  ],
-  "src/features/browser-workspace/WebsiteGroupsManager.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/internal/BookmarksPage.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/internal/DownloadsPage.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/internal/HistoryPage.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/BrowserAgentAccessMenu.tsx": [
-    "raw-control",
-    "popup-animation-off",
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserAnnotationLayerView.tsx": [
-    "raw-control",
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserBookmarkDialog.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/BrowserBookmarkStar.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/BrowserClearDataDialog.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/BrowserDownloadsButton.tsx": [
-    "raw-control",
-    "popup-class"
-  ],
-  "src/features/browser/workspace/BrowserFindBar.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/BrowserHistoryMenu.tsx": [
-    "popup-class"
-  ],
-  "src/features/browser/workspace/BrowserMenuView.tsx": [
-    "raw-control",
-    "popup-class"
-  ],
-  "src/features/browser/workspace/BrowserNativeRuntimeRequired.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/BrowserOfflinePage.tsx": [
-    "raw-control",
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserOmniboxView.tsx": [
-    "raw-control",
-    "popup-class",
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserTabAudioButton.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/browserToolbarStyles.ts": [
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserViewportMenuView.tsx": [
-    "raw-control",
-    "popup-class",
-    "popup-animation-off",
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserWorkspace.tsx": [
-    "raw-control",
-    "hex-color"
-  ],
-  "src/features/browser/workspace/BrowserZoomControls.tsx": [
-    "raw-control"
-  ],
-  "src/features/browser/workspace/omnibox/OmniboxRow.tsx": [
-    "raw-control",
-    "popup-class"
-  ],
-  "src/features/connected-devices/ConnectedDevicesProvider.tsx": [
-    "z-index-literal"
-  ],
-  "src/features/dnd/PointerDragContext.tsx": [
-    "z-index-literal"
-  ],
   "src/features/editor/PhotoEditorView.tsx": [
-    "full-screen-overlay",
-    "z-index-literal"
+    "full-screen-overlay"
   ],
   "src/features/files/workspace/explorer/components/ExplorerToolbarView.tsx": [
     "manual-menu-chevron"
@@ -186,12 +71,8 @@
   "src/features/files/workspace/explorer/workspace/ExplorerContextMenuView.tsx": [
     "portal"
   ],
-  "src/features/global-search/BrowserContextMenuBridge.tsx": [
-    "z-index-literal"
-  ],
   "src/features/global-search/GlobalMisty.tsx": [
-    "full-screen-overlay",
-    "z-index-literal"
+    "full-screen-overlay"
   ],
   "src/features/global-search/GlobalMistyPanelContent.tsx": [
     "raw-control",
@@ -223,13 +104,9 @@
   "src/features/journal/notes/SpaceNotesView.tsx": [
     "raw-control"
   ],
-  "src/features/navigation-names/NavigationNamesBoundary.tsx": [
-    "z-index-literal"
-  ],
   "src/features/navigation-names/Renameable.tsx": [
     "raw-control",
-    "portal",
-    "z-index-literal"
+    "portal"
   ],
   "src/features/planner/planner/SpaceAgendaView.tsx": [
     "manual-menu-chevron"

@@ -1,5 +1,5 @@
-import { ArrowRightLeft, Check, Laptop, LoaderCircle, Monitor } from "lucide-react";
-import { Button, Switch } from "@/shared/ui";
+import { ArrowRightLeft, Check, Laptop, Monitor } from "lucide-react";
+import { Button, Spinner, Switch } from "@/shared/ui";
 import { useUserStore } from "@/features/auth/core";
 import type { NativeSyncView, SyncTreeView } from "./native";
 import { seatText, treeRows } from "./treeControl";
@@ -75,11 +75,7 @@ export function TreeSwitcherList({
                 >
                   {switching ? (
                     <>
-                      <LoaderCircle
-                        aria-hidden
-                        className="size-4 animate-spin motion-reduce:animate-none"
-                      />
-                      <span className="sr-only">Switching…</span>
+                      <Spinner label="Switching…" />
                     </>
                   ) : (
                     <ArrowRightLeft aria-hidden className="size-4" />

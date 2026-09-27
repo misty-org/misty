@@ -2,12 +2,13 @@ import { useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
+  Button,
   Dialog,
   DialogContent,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
-  Button,
+  DialogTitle,
+  FileInput,
   Input,
   Popover,
   PopoverContent,
@@ -272,12 +273,10 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3" aria-label="Group icons">
-        <input
+        <FileInput
           ref={fileInput}
-          type="file"
           accept="image/png,image/jpeg,image/webp"
           aria-label="Upload group icon"
-          className="hidden"
           onChange={async (event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";

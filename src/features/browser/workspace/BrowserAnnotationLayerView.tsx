@@ -1,4 +1,4 @@
-import { cn } from "@/shared/ui";
+import { Button, cn, IconButton, Input, Toolbar } from "@/shared/ui";
 import { Circle, Eraser, Minus, Pencil, Redo2, Square, Trash2, Type, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -23,7 +23,6 @@ export function BrowserAnnotationLayerView(props: {
     enabled: () => boolean,
   ) => () => void;
   onClose: () => void;
-  lightChrome: boolean;
 }) {
   const [tool, setTool] = useState<AnnotationTool>("pen");
   const [color, setColor] = useState(colors[0]);
@@ -193,14 +192,12 @@ export function BrowserAnnotationLayerView(props: {
       </svg>
 
       {textDraft ? (
-        <input
+        <Input
           autoFocus
+          variant="toolbar"
           value={textDraft.value}
           aria-label="Annotation text"
-          className={cn(
-            "absolute z-10 min-w-40 rounded-md border border-white/20 bg-black/75 px-2 py-1",
-            "text-sm text-white shadow-lg outline-none focus:ring-2 focus:ring-white/30",
-          )}
+          className="absolute z-10 w-auto min-w-40 bg-charcoal-card/90 text-sm shadow-lg"
           style={{ left: textDraft.point.x, top: textDraft.point.y }}
           onChange={(event) => setTextDraft({ ...textDraft, value: event.target.value })}
           onBlur={commitText}
@@ -211,15 +208,10 @@ export function BrowserAnnotationLayerView(props: {
         />
       ) : null}
 
-      <div
-        className={cn(
-          "absolute bottom-4 left-1/2 z-20 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-xl border p-1.5 shadow-2xl",
-          props.lightChrome
-            ? "border-black/10 bg-white/95 text-[#202020]"
-            : "border-white/10 bg-[#171717]/95 text-[#eeeeee]",
-        )}
-        role="toolbar"
-        aria-label="Annotation tools"
+      <Toolbar
+        variant="floating"
+        label="Annotation tools"
+        className="absolute bottom-4 left-1/2 z-20 max-w-[calc(100%-24px)] -translate-x-1/2 shadow-2xl"
       >
         <ToolButton label="Pen" active={tool === "pen"} onClick={() => setTool("pen")}>
           <Pencil />
@@ -245,12 +237,13 @@ export function BrowserAnnotationLayerView(props: {
         </ToolButton>
         <span className="mx-1 h-6 w-px shrink-0 bg-current opacity-15" aria-hidden />
         {colors.map((option) => (
-          <button
+          <Button
             key={option}
-            type="button"
+            variant="ghost"
+            size="none"
             className={cn(
-              "size-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110",
-              color === option ? "border-current" : "border-transparent",
+              "size-6 shrink-0 rounded-full border-2 p-0 transition-transform hover:scale-110",
+              color === option ? "border-cream" : "border-transparent",
             )}
             style={{ backgroundColor: option }}
             aria-label={`Use ${option} ink`}
@@ -275,14 +268,10 @@ export function BrowserAnnotationLayerView(props: {
         >
           <Trash2 />
         </ToolButton>
-        <button
-          type="button"
-          className="ml-1 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium hover:bg-current/10"
-          onClick={props.onClose}
-        >
+        <Button variant="ghost" size="sm" className="ml-1" onClick={props.onClose}>
           <X size={15} /> Close
-        </button>
-      </div>
+        </Button>
+      </Toolbar>
     </div>
   );
 }
@@ -295,20 +284,15 @@ function ToolButton(props: {
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      className={cn(
-        "grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-current/10 disabled:opacity-30",
-        props.active && "bg-current/15",
-        "[&_svg]:size-4",
-      )}
-      aria-label={props.label}
+    <IconButton
+      label={props.label}
+      tooltip={false}
       aria-pressed={props.active}
       disabled={props.disabled}
       onClick={props.onClick}
     >
       {props.children}
-    </button>
+    </IconButton>
   );
 }
 

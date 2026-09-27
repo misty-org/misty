@@ -80,7 +80,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "fixed inset-0 z-[2147483000] bg-black/45 duration-160 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none",
+      "fixed inset-0 layer-dialog-backdrop bg-black/45 duration-160 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none",
       className,
     )}
     {...props}
@@ -111,8 +111,8 @@ const DialogContent = React.forwardRef<
         data-slot="dialog-content"
         className={cn(
           container
-            ? "absolute left-1/2 top-1/2 z-[2147483100] grid -translate-x-1/2 -translate-y-1/2"
-            : "fixed left-1/2 top-1/2 z-[2147483100] grid -translate-x-1/2 -translate-y-1/2",
+            ? "absolute left-1/2 top-1/2 layer-dialog grid -translate-x-1/2 -translate-y-1/2"
+            : "fixed left-1/2 top-1/2 layer-dialog grid -translate-x-1/2 -translate-y-1/2",
           "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
           "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
           "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",

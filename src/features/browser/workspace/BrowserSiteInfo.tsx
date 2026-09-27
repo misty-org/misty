@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Info, LockKeyhole, ShieldAlert } from "lucide-react";
 import {
   Button,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -25,12 +26,10 @@ export function BrowserSiteInfo({
   id,
   url,
   active,
-  iconButtonClass,
 }: {
   id: string;
   url: string;
   active: boolean;
-  iconButtonClass: string;
 }) {
   const { open, onOpenChange } = useBrowserOverlayControl(`site-info:${id}`);
   const [info, setInfo] = useState<SiteInfo | null>(null);
@@ -90,16 +89,9 @@ export function BrowserSiteInfo({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className={iconButtonClass}
-          aria-label="Site information and permissions"
-          title="Site information and permissions"
-        >
+        <IconButton label="Site information and permissions" tooltip={false}>
           <Info {...browserToolbarStyles.roundIcon} />
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 max-w-[calc(100vw-24px)] p-4">
         <h2 className="break-all text-sm font-medium">{info?.origin ?? "Site information"}</h2>

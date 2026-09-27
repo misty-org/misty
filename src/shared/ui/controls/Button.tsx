@@ -23,8 +23,12 @@ const buttonVariants = cva(
           "border-charcoal-border bg-charcoal-bg shadow-none hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream-bright aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
         secondary:
           "bg-charcoal-card text-cream hover:bg-charcoal-hover hover:text-cream-bright aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
-        ghost:
-          "hover:bg-charcoal-hover hover:text-cream-bright aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover data-[state=open]:bg-charcoal-hover",
+        // Same wash as the toolbar look, for ghost buttons that keep their own text color.
+        ghost: [
+          "hover:bg-cream/[0.045] hover:text-cream",
+          "aria-pressed:bg-cream/[0.06] aria-expanded:bg-cream/[0.06] aria-expanded:text-cream",
+          "data-[state=open]:bg-cream/[0.06] data-[state=open]:text-cream",
+        ],
         // The browser chrome's look: muted glyph, a soft wash of the text color on hover.
         // Washing with cream keeps it right on light surfaces too.
         toolbar: [
@@ -38,8 +42,11 @@ const buttonVariants = cva(
         pill: "rounded-full border-0 bg-charcoal-hover text-cream hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card",
         "pill-subtle":
           "rounded-full border-charcoal-border bg-transparent text-cream-muted hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream-bright",
-        "nav-action":
-          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright aria-pressed:bg-charcoal-hover aria-expanded:bg-charcoal-hover data-[state=open]:bg-charcoal-hover focus-visible:ring-2 focus-visible:ring-cream-muted disabled:cursor-wait",
+        "nav-action": [
+          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
+          "aria-pressed:bg-cream/[0.06] aria-expanded:bg-cream/[0.06] data-[state=open]:bg-cream/[0.06]",
+          "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:cursor-wait",
+        ],
       },
       size: {
         default:

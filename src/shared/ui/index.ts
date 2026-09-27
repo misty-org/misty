@@ -4,6 +4,7 @@
 export * from "./controls/Button";
 export * from "./controls/Checkbox";
 export * from "./controls/Field";
+export * from "./controls/FileInput";
 export * from "./controls/IconButton";
 export * from "./controls/Input";
 export * from "./controls/InputGroup";
@@ -27,6 +28,7 @@ export * from "./overlays/MenuTrigger";
 export * from "./overlays/Popover";
 export * from "./overlays/Portal";
 export * from "./overlays/Sheet";
+export * from "./overlays/SuggestionList";
 export * from "./overlays/Tooltip";
 export * from "./overlays/WorkspaceOverlay";
 export * from "./overlays/popupStyles";
@@ -46,6 +48,7 @@ export * from "./layout/overflowFade";
 export * from "./display/Avatar";
 export * from "./display/Badge";
 export * from "./display/Card";
+export * from "./display/ListRow";
 export * from "./display/StatusBadge";
 export * from "./display/Table";
 

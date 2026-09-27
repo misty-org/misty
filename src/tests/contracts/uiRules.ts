@@ -38,7 +38,8 @@ export const uiRules = {
     guidance: "use MenuTrigger; it owns the chevron",
   },
   "popup-animation-off": {
-    pattern: /\banimate-none\b/,
+    // motion-reduce:animate-none is an accessibility preference, not a disabled popup.
+    pattern: /(?<!motion-reduce:)\banimate-none\b/,
     guidance: "popups keep the shared open/close motion",
   },
   "popup-surface-override": {

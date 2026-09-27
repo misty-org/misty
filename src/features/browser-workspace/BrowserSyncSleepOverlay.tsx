@@ -23,12 +23,12 @@ export function SyncSleepScreen({
       <Dialog.Portal>
         <div
           aria-hidden="true"
-          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483200] bg-black/75 backdrop-blur-sm"
+          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking-backdrop bg-black/75 backdrop-blur-sm"
         />
         <Dialog.Content
           data-slot="dialog-content"
           data-device-sync-sleep=""
-          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
+          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}

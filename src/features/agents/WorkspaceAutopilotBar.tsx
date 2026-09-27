@@ -11,7 +11,7 @@ import {
 import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
 
 export const agentOverlayBarClass =
-  "pointer-events-auto fixed bottom-4 left-1/2 z-[2147482600] flex w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg bg-charcoal-card p-1 text-cream shadow-lg";
+  "pointer-events-auto fixed bottom-4 left-1/2 layer-workspace-overlay flex w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg bg-charcoal-card p-1 text-cream shadow-lg";
 
 export function WorkspaceAutopilotBar({ execution, name }: { execution: Execution; name: string }) {
   const [error, setError] = useState("");

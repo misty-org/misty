@@ -117,13 +117,13 @@ export function navigatorRowClass(active: boolean): string {
 }
 
 export const profilePopoverClass = [
-  "pointer-events-auto fixed z-[2147482900] max-h-[calc(100dvh-44px)] w-[256px] overflow-y-auto",
+  "pointer-events-auto fixed layer-notification max-h-[calc(100dvh-44px)] w-[256px] overflow-y-auto",
   popupSurfaceClass,
   menuListClass,
 ].join(" ");
 
 export const accountChooserPopoverClass = [
-  "pointer-events-auto fixed z-[2147482910] max-h-[calc(100dvh-44px)] w-[280px] overflow-y-auto",
+  "pointer-events-auto fixed layer-notification-raised max-h-[calc(100dvh-44px)] w-[280px] overflow-y-auto",
   popupSurfaceClass,
   menuListClass,
 ].join(" ");
@@ -190,7 +190,7 @@ export const frameOverlayBaseClass = [
 ].join(" ");
 
 export const settingsOverlayLayerClass =
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace px-8 py-8";
+  "fixed inset-0 layer-workspace-overlay grid place-items-center bg-charcoal-workspace px-8 py-8";
 
 export const settingsOverlayPanelClass = [
   "h-[min(760px,calc(100dvh-64px))] w-[min(980px,calc(100dvw-144px))]",
