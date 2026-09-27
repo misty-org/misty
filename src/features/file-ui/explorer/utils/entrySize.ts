@@ -1,4 +1,4 @@
-import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import { normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 
 export function directorySizeRecordForPath(

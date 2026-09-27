@@ -1,4 +1,4 @@
-import { Button, cn, EmptyState, Skeleton } from "@/shared/ui";
+import { Button, cn, EmptyState, IconButton, Input, Pressable, Skeleton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import type { Text as YText } from "yjs";
@@ -204,14 +204,9 @@ function CollaborativeTitleInput(props: {
     [props.noteId, props.runtime, session?.role],
   );
   return (
-    <input
+    <Input
       ref={inputRef}
-      className={cn(
-        "block w-full max-w-md min-w-0 rounded-md border border-charcoal-active bg-charcoal-card px-2 text-sm font-semibold",
-        "h-8",
-        "text-cream-bright shadow-none outline-none placeholder:text-cream-muted",
-        "focus-visible:border-sage-fg/70 focus-visible:ring-2 focus-visible:ring-sage-fg/15",
-      )}
+      className="h-8 max-w-md text-sm font-semibold text-cream-bright"
       value={title}
       maxLength={500}
       aria-label="Note title"
@@ -255,15 +250,9 @@ function InspectorHeader(props: {
       <span className="text-cream-muted">{props.icon}</span>
       <h2 className="m-0 flex-1 text-sm font-semibold text-cream-bright">{props.title}</h2>
       {props.children}
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-8"
-        aria-label={`Close ${props.title}`}
-        onClick={props.onClose}
-      >
+      <IconButton label={`Close ${props.title}`} onClick={props.onClose}>
         <PanelRightClose size={16} />
-      </Button>
+      </IconButton>
     </header>
   );
 }
@@ -314,16 +303,15 @@ function BacklinksInspector(props: {
         ) : links.length ? (
           <div className="grid gap-1">
             {links.map((backlink) => (
-              <button
+              <Pressable
                 key={backlink.id}
-                type="button"
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-cream hover:bg-charcoal-active"
+                className="flex items-center hover:bg-cream/[0.045] rounded-lg px-3 py-2 text-cream"
                 onClick={() => props.onSelectNote?.(`misty:${backlink.id}`)}
               >
                 <FileText size={15} />
                 <span className="min-w-0 flex-1 truncate">{backlink.title}</span>
                 <ChevronRight size={14} />
-              </button>
+              </Pressable>
             ))}
           </div>
         ) : (

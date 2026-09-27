@@ -1,11 +1,4 @@
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  cn,
-} from "@/shared/ui";
+import { cn, DropdownMenu, DropdownMenuContent, MenuItem, MenuTrigger } from "@/shared/ui";
 import { Check, ChevronDown, Mic } from "lucide-react";
 import type { AiVoiceInputDevice } from "./useAiVoiceRecorder";
 
@@ -23,36 +16,44 @@ export function VoiceInputMenu(props: {
 
   return (
     <DropdownMenu onOpenChange={(open) => open && props.onRefresh()}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size={props.labeled ? "sm" : "icon"}
-          disabled={props.disabled}
-          className={cn(
-            "h-8 w-6 shrink-0 rounded-lg text-cream-muted hover:bg-white/[0.06] hover:text-cream",
-            props.compact && "h-7 w-5 rounded-full",
-            props.labeled && "w-auto max-w-52 gap-2 px-2 text-xs",
-          )}
-          aria-label={`Choose microphone. Current input: ${selectedLabel}`}
+      {props.labeled ? (
+        <MenuTrigger
+          label={`Choose microphone. Current input: ${selectedLabel}`}
+          value={selectedLabel}
           title={`Microphone: ${selectedLabel}`}
-        >
-          {props.labeled && <span className="truncate">{selectedLabel}</span>}
-          <ChevronDown className="size-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={7} className="w-72" data-misty-layer-portal>
-        <DropdownMenuItem onSelect={() => props.onSelect("")}>
-          <Mic className="size-4" />
-          <span className="min-w-0 flex-1 truncate">System default</span>
-          {!props.selectedDeviceId ? <Check className="size-3.5" /> : null}
-        </DropdownMenuItem>
+          disabled={props.disabled}
+          className="max-w-52 text-xs"
+        />
+      ) : (
+        <MenuTrigger
+          iconOnly
+          size="xs"
+          label={`Choose microphone. Current input: ${selectedLabel}`}
+          title={`Microphone: ${selectedLabel}`}
+          disabled={props.disabled}
+          className={cn("h-8 w-6 rounded-lg", props.compact && "h-7 w-5 rounded-full")}
+          icon={<ChevronDown className="size-3.5" />}
+        />
+      )}
+      <DropdownMenuContent align="start" sideOffset={7} width="xl" data-misty-layer-portal>
+        <MenuItem
+          icon={<Mic />}
+          label="System default"
+          shortcut={!props.selectedDeviceId ? <Check className="size-3.5" /> : undefined}
+          onSelect={() => props.onSelect("")}
+        />
         {props.devices.map((device) => (
-          <DropdownMenuItem key={device.deviceId} onSelect={() => props.onSelect(device.deviceId)}>
-            <Mic className="size-4" />
-            <span className="min-w-0 flex-1 truncate">{device.label}</span>
-            {props.selectedDeviceId === device.deviceId ? <Check className="size-3.5" /> : null}
-          </DropdownMenuItem>
+          <MenuItem
+            key={device.deviceId}
+            icon={<Mic />}
+            label={device.label}
+            shortcut={
+              props.selectedDeviceId === device.deviceId ? (
+                <Check className="size-3.5" />
+              ) : undefined
+            }
+            onSelect={() => props.onSelect(device.deviceId)}
+          />
         ))}
         {!props.devices.length ? (
           <div className="px-2 py-2 text-xs text-cream-muted">

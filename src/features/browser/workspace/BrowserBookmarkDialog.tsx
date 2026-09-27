@@ -12,7 +12,13 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  Field,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/shared/ui";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
@@ -97,25 +103,29 @@ export function BrowserBookmarkDialog(props: {
               save();
             }}
           >
-            <label className="grid gap-2 text-sm">
-              Name
-              <Input autoFocus value={name} maxLength={160} onChange={(event) => setName(event.target.value)} />
-            </label>
-            <label className="grid gap-2 text-sm">
-              Group
-              <select
-                className="h-9 rounded-md border border-charcoal-border bg-charcoal-card px-2 text-sm text-cream"
-                value={groupId}
-                onChange={(event) => setGroupId(event.target.value)}
-              >
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.fields.label}
-                  </option>
-                ))}
-                <option value={newGroupValue}>New group “Bookmarks”</option>
-              </select>
-            </label>
+            <Field label="Name">
+              <Input
+                autoFocus
+                value={name}
+                maxLength={160}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </Field>
+            <Field label="Group">
+              <Select value={groupId} onValueChange={setGroupId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.fields.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={newGroupValue}>New group “Bookmarks”</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
             {error ? (
               <p role="alert" className="text-sm text-destructive">
                 {error}

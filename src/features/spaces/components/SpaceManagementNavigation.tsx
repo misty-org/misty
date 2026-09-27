@@ -1,6 +1,6 @@
 import { SpaceMembersPopover } from "@/features/spaces/members";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
+import { IconButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
 import { Gauge, UsersRound } from "lucide-react";
 import { SpaceUsagePopover } from "./SpaceUsagePopover";
 
@@ -17,9 +17,9 @@ export function SpaceManagementNavigation({ space }: { space: Space | undefined 
             side="right"
             trigger={
               <TooltipTrigger asChild>
-                <Button variant="ghost" className={railControlClass} aria-label="Members">
+                <IconButton size="lg" label="Members" tooltip={false} className={railControlClass}>
                   <UsersRound aria-hidden="true" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
             }
           />
@@ -31,9 +31,9 @@ export function SpaceManagementNavigation({ space }: { space: Space | undefined 
             side="right"
             trigger={
               <TooltipTrigger asChild>
-                <Button variant="ghost" className={railControlClass} aria-label="Usage">
+                <IconButton size="lg" label="Usage" tooltip={false} className={railControlClass}>
                   <Gauge aria-hidden="true" />
-                </Button>
+                </IconButton>
               </TooltipTrigger>
             }
           />
@@ -44,5 +44,5 @@ export function SpaceManagementNavigation({ space }: { space: Space | undefined 
   );
 }
 
-const railControlClass =
-  "misty-space-rail-control relative grid size-10 shrink-0 place-items-center rounded-md p-0 text-cream-muted shadow-none [@media(pointer:coarse)]:size-11";
+// The rail's own hover and active fill come from .misty-space-rail-control in App.css.
+const railControlClass = "misty-space-rail-control relative [@media(pointer:coarse)]:size-11";

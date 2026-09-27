@@ -1,9 +1,5 @@
 use super::*;
 
-pub(super) fn remote_job_path(job_id: &str) -> String {
-    format!("/api/remote/file/jobs/{job_id}")
-}
-
 pub(super) async fn cleanup_partial_destination_on_cancel<T>(
     destination: &Path,
     is_directory: bool,
@@ -97,24 +93,6 @@ pub(super) async fn remove_local_path(path: &Path, is_directory: bool) -> ApiRes
     };
     result
         .map_err(|error| ApiError::Message(format!("Failed to remove {}: {error}", path.display())))
-}
-
-pub(super) async fn response_json<T>(response: StorageResponse, operation: &str) -> ApiResult<T>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let status = response.status();
-    let body = response.text().await.unwrap_or_default();
-    if !status.is_success() {
-        return Err(ApiError::Message(if body.is_empty() {
-            format!("Failed to {operation} (HTTP {})", status.as_u16())
-        } else {
-            body
-        }));
-    }
-    serde_json::from_str(&body).map_err(|error| {
-        ApiError::Message(format!("Failed to parse {operation} response: {error}"))
-    })
 }
 
 pub(super) fn virtual_folder_entry(

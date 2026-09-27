@@ -1,8 +1,8 @@
 import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useSetupStore } from "@/features/installer";
-import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
-import type { TransferRecord } from "@/native/contracts";
-import type { TransferStatus } from "@/native/contracts/primitives";
+import { useTransfersStore } from "@/features/transfers";
+import type { TransferRecord } from "@/native/ipc";
+import type { TransferStatus } from "@/native/ipc/primitives";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 import { memo, useEffect, useRef, useState } from "react";
 import {
@@ -10,7 +10,7 @@ import {
   emptyTransferCompletionTracker,
 } from "../transferCompletionNotifications";
 import { workStatusToastDurationMs } from "./styles";
-import { Notification } from "@/shared/ui/notification";
+import { Notification } from "@/shared/ui";
 
 const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
 const emptyTransferRows: TransferRecord[] = [];
@@ -88,13 +88,11 @@ export const TransferCompletionNotifier = memo(function TransferCompletionNotifi
     );
     trackerRef.current = advanced.tracker;
     const pushNotification = (title: string, level: string, _duration: number) => {
-      useActivityStore
-        .getState()
-        .ingestLocal({
-          title,
-          kind: level === "success" ? "completion" : "failure",
-          appId: "files",
-        });
+      useActivityStore.getState().ingestLocal({
+        title,
+        kind: level === "success" ? "completion" : "failure",
+        appId: "files",
+      });
     };
     for (const row of advanced.changed) {
       if (row.status === "completed") {

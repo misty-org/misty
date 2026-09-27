@@ -21,16 +21,7 @@ it("offers immediate size and visibility controls in agent settings", () => {
     control,
   });
   render(<CompanionAppearanceSettings />);
-  fireEvent.change(
-    screen.getByRole("slider", {
-      name: "Companion size",
-    }),
-    {
-      target: {
-        value: "175",
-      },
-    },
-  );
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Companion size" }), { key: "ArrowRight" });
   expect(control).toHaveBeenCalledWith({
     kind: "size",
     size: 175,

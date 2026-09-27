@@ -1,6 +1,6 @@
-import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRuntime";
+import { AgentsError as SystemErrorActivity } from "@/features/agents/AgentsRuntime";
 
-import { useAgentsAuth as useAuth } from "@/features/agents/agentsRuntime";
+import { useAgentsAuth as useAuth } from "@/features/agents/AgentsRuntime";
 
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
@@ -18,11 +18,9 @@ import {
   Label,
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
+  Spinner,
 } from "@/shared/ui";
-import { Cable, LoaderCircle, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Cable, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { publicMcpOrigin, validRemoteMcpEndpoint } from "./normalization";
 import type { McpConnection } from "./types";
@@ -40,9 +38,7 @@ export function McpConnectionsSheet(props: {
   );
 }
 
-export function McpConnectionsView(props: {
-  showCustomConnections?: boolean;
-}) {
+export function McpConnectionsView(props: { showCustomConnections?: boolean }) {
   const showCustomConnections =
     props.showCustomConnections ?? publicBetaFeatureEnabled("mcpConnections");
   const { user } = useAuth();
@@ -82,7 +78,7 @@ export function McpConnectionsView(props: {
           {adding ? <AddConnectionForm onDone={() => setAdding(false)} /> : null}
           {store.loading ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
-              <LoaderCircle className="size-4 animate-spin" /> Loading connections…
+              <Spinner label={false} /> Loading connections…
             </div>
           ) : !customConnections.length ? (
             <p className="mt-3 rounded-lg border border-dashed border-charcoal-border p-4 text-sm text-cream-muted">
@@ -171,7 +167,7 @@ function AddConnectionForm({ onDone }: { onDone: () => void }) {
           placeholder="https://tools.example.com/mcp"
         />
         {url.trim() && !validEndpoint ? (
-          <span className="text-xs text-[#d68b80]">
+          <span className="text-xs text-avatar-red">
             Enter a fixed HTTPS URL without credentials, query text, or a fragment.
           </span>
         ) : null}
@@ -197,11 +193,7 @@ function AddConnectionForm({ onDone }: { onDone: () => void }) {
           disabled={!name.trim() || !validEndpoint || store.busy === "add"}
           onClick={() => void submit()}
         >
-          {store.busy === "add" ? (
-            <LoaderCircle className="size-4 animate-spin" />
-          ) : (
-            <Cable className="size-4" />
-          )}
+          {store.busy === "add" ? <Spinner label={false} /> : <Cable className="size-4" />}
           Connect
         </Button>
       </div>
@@ -236,7 +228,7 @@ function ConnectionCard({ connection }: { connection: McpConnection }) {
         </div>
       </header>
       {connection.status === "needs_attention" ? (
-        <p className="mt-3 text-xs text-[#d68b80]">
+        <p className="mt-3 text-xs text-avatar-red">
           This connection needs attention. Check it again before enabling tools.
         </p>
       ) : null}

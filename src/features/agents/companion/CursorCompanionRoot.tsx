@@ -1,4 +1,4 @@
-import sprite from "@/assets/branding/misty-icon.png?inline";
+import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";

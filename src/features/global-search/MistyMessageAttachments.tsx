@@ -1,4 +1,4 @@
-import { readAgentsImage } from "@/features/agents/agentsRuntime";
+import { readAgentsImage } from "@/features/agents/AgentsRuntime";
 import { ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MistyImageAttachment } from "./types";
@@ -37,7 +37,7 @@ function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment })
       active = false;
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
-  }, [attachment.previewUrl]);
+  }, [attachment.id, attachment.previewUrl]);
   return source ? (
     <img
       src={source}

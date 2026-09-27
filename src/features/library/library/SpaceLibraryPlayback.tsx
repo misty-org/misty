@@ -1,10 +1,17 @@
 import { ChevronLeft, ChevronRight, File, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "./LibraryRuntime";
+import { LibraryError as SystemErrorActivity } from "./LibraryRuntime";
 import type { LibraryDiscoveryGroup, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  IconButton,
+  Pressable,
+} from "@/shared/ui";
 
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
 
@@ -120,9 +127,8 @@ export function LibraryMemoryPlayback({
       >
         <div className="flex items-center gap-1 px-5 pt-4">
           {items.map((candidate, candidateIndex) => (
-            <Button
-              className="h-1 flex-1 overflow-hidden rounded-full border-0 bg-charcoal-active p-0"
-              type="button"
+            <Pressable
+              className="h-1 flex-1 overflow-hidden rounded-full bg-charcoal-active"
               key={candidate.id}
               onClick={() => setIndex(candidateIndex)}
               aria-label={`Show item ${candidateIndex + 1}`}
@@ -130,7 +136,7 @@ export function LibraryMemoryPlayback({
               <span
                 className={`block h-full bg-charcoal-active transition-[width] duration-300 ${candidateIndex < index ? "w-full" : candidateIndex === index ? "w-1/2" : "w-0"}`}
               />
-            </Button>
+            </Pressable>
           ))}
         </div>
         <header className="px-5 py-4 pr-16">
@@ -184,49 +190,44 @@ export function LibraryMemoryPlayback({
           )}
           {items.length > 1 ? (
             <>
-              <Button
-                className="absolute left-5 grid size-10 place-items-center rounded-full border-0 bg-charcoal-workspace text-cream-bright opacity-70 hover:opacity-100"
-                type="button"
+              <IconButton
+                variant="overlay"
+                shape="round"
+                size="lg"
+                label="Previous"
+                className="absolute left-5 opacity-70 hover:opacity-100"
                 onClick={previous}
-                aria-label="Previous"
               >
                 <ChevronLeft size={22} />
-              </Button>
-              <Button
-                className="absolute right-5 grid size-10 place-items-center rounded-full border-0 bg-charcoal-workspace text-cream-bright opacity-70 hover:opacity-100"
-                type="button"
+              </IconButton>
+              <IconButton
+                variant="overlay"
+                shape="round"
+                size="lg"
+                label="Next"
+                className="absolute right-5 opacity-70 hover:opacity-100"
                 onClick={next}
-                aria-label="Next"
               >
                 <ChevronRight size={22} />
-              </Button>
+              </IconButton>
             </>
           ) : null}
           <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-charcoal-workspace px-4 py-2 ">
-            <Button
-              className="grid size-8 place-items-center border-0 bg-transparent text-cream-bright/75 hover:text-cream-bright"
-              type="button"
-              onClick={previous}
-              aria-label="Previous"
-            >
+            <IconButton label="Previous" onClick={previous}>
               <SkipBack size={17} />
-            </Button>
-            <Button
-              className="grid size-10 place-items-center rounded-full border-0 bg-charcoal-active text-charcoal-bg"
-              type="button"
+            </IconButton>
+            <IconButton
+              variant="primary"
+              shape="round"
+              size="lg"
+              label={playing ? "Pause" : "Play"}
               onClick={() => setPlaying((current) => !current)}
-              aria-label={playing ? "Pause" : "Play"}
             >
               {playing ? <Pause size={18} /> : <Play size={18} />}
-            </Button>
-            <Button
-              className="grid size-8 place-items-center border-0 bg-transparent text-cream-bright/75 hover:text-cream-bright"
-              type="button"
-              onClick={next}
-              aria-label="Next"
-            >
+            </IconButton>
+            <IconButton label="Next" onClick={next}>
               <SkipForward size={17} />
-            </Button>
+            </IconButton>
           </div>
         </main>
         <footer className="px-5 py-3 text-center">

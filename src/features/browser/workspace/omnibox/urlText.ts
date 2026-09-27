@@ -49,13 +49,20 @@ export function inlineCompletion(text: string, url: string): string | undefined 
   const typed = typedUrlText(text);
   if (!typed || /\s/.test(typed)) return undefined;
   const stripped = strippedUrl(url);
-  if (!stripped.toLowerCase().startsWith(typed) || stripped.length === typed.length) return undefined;
+  if (!stripped.toLowerCase().startsWith(typed) || stripped.length === typed.length)
+    return undefined;
   return stripped.slice(typed.length);
 }
 
-export function describeUrl(value: string): { title: string; detail: string; faviconUrl: string } | null {
+export function describeUrl(
+  value: string,
+): { title: string; detail: string; faviconUrl: string } | null {
   const url = webUrl(value);
   if (!url) return null;
   const detail = strippedUrl(value);
-  return { title: url.host.replace(/^www\./i, ""), detail, faviconUrl: `${url.origin}/favicon.ico` };
+  return {
+    title: url.host.replace(/^www\./i, ""),
+    detail,
+    faviconUrl: `${url.origin}/favicon.ico`,
+  };
 }

@@ -3,7 +3,7 @@ import {
   explorerPathIsDirectory,
   explorerQueuePasteItems,
   transfersSnapshot,
-} from "@/features/files/workspace/native";
+} from "../../../native";
 import { errorText, userFacingErrorText } from "@/shared/lib/format";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { open } from "@tauri-apps/plugin-dialog";

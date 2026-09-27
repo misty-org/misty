@@ -59,11 +59,6 @@ const mocks = vi.hoisted(() => {
     }),
   });
   const agentRefresh = vi.fn().mockResolvedValue(undefined);
-  const useAgentSessionStore = Object.assign(vi.fn(), {
-    getState: () => ({
-      refreshStatus: agentRefresh,
-    }),
-  });
   return {
     accountA,
     accountB,
@@ -73,7 +68,6 @@ const mocks = vi.hoisted(() => {
     userStore,
     useUserStore,
     useSpacesStore,
-    useAgentSessionStore,
     spacesLoad,
     agentRefresh,
     activeAccountId: accountA.id,
@@ -168,10 +162,6 @@ vi.mock("@/features/files/workspace/search", () => ({
 vi.mock("@/features/spaces", () => ({
   resetSpacesAccountState: mocks.resetSpacesAccountState,
   useSpacesStore: mocks.useSpacesStore,
-}));
-vi.mock("@/features/agents/store/useAgentSessionStore", () => ({
-  resetAgentAccountState: mocks.resetAgentAccountState,
-  useAgentSessionStore: mocks.useAgentSessionStore,
 }));
 vi.mock("@/features/agents", () => ({
   resetAllAgentAccountState: () => {

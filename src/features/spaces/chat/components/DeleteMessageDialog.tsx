@@ -29,12 +29,7 @@ export function DeleteMessageDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
-            onClick={onConfirm}
-          >
-            Delete message
-          </AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm}>Delete message</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

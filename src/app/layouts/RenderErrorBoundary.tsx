@@ -29,8 +29,7 @@ export class RenderErrorBoundary extends Component<
           {this.state.error.message}
         </p>
         <Button
-          className="rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-cream"
-          type="button"
+          variant="outline"
           onClick={() => {
             // A failed module request does not imply damaged workspace data.
             if (this.state.error && isHookOrderMismatch(this.state.error)) {

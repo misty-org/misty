@@ -21,7 +21,8 @@ vi.mock("@/api/client/session", () => ({
   readApiAuthToken: mocks.credentials,
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/shared/ui", () => ({
+vi.mock("@/shared/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof UiModule>()),
   Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
 }));
 vi.mock("@/features/settings/desktop", () => ({
@@ -38,7 +39,7 @@ vi.mock("@/features/settings/desktop", () => ({
     </div>
   ),
 }));
-vi.mock("@/features/settings/settingsControls", () => ({
+vi.mock("@/features/settings/SettingsControls", () => ({
   SettingsNote: ({ children }: { children: ReactNode }) => <p>{children}</p>,
   TextControl: ({ value, placeholder }: { value: string; placeholder?: string }) => (
     <input readOnly value={value} placeholder={placeholder} />
@@ -59,6 +60,7 @@ vi.mock("./SyncVaultForm", () => ({ SyncVaultForm: () => <div>Unlock sync</div> 
 import { BrowserSyncSettings } from "./BrowserSyncSettings";
 import { useBrowserSyncStore } from "./store";
 import type { NativeSyncView } from "./native";
+import type * as UiModule from "@/shared/ui";
 
 describe("BrowserSyncSettings", () => {
   let container: HTMLDivElement;

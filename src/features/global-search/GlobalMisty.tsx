@@ -16,7 +16,7 @@ import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { invokeShortcutCommand } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
-import { ScrollArea, cn } from "@/shared/ui";
+import { cn, ScrollArea, ViewportLayer } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -446,12 +446,10 @@ export function GlobalMistySurface(props: {
   );
 
   return (
-    <div
-      className={
-        docked
-          ? "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center px-4 pt-10"
-          : "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
-      }
+    <ViewportLayer
+      layer="chrome"
+      passthrough
+      className={cn("flex flex-col items-center", docked ? "px-4 pt-10" : "pt-[9vh]")}
       data-global-misty-root
     >
       {docked && open && (
@@ -481,7 +479,11 @@ export function GlobalMistySurface(props: {
               className={cn(
                 "pointer-events-none flex flex-col items-center",
                 docked
-                  ? "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden rounded-xl bg-charcoal-card text-cream shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+                  ? [
+                      "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden",
+                      "rounded-xl bg-charcoal-card text-cream",
+                      "shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
+                    ]
                   : "gap-2",
               )}
               data-html2canvas-ignore="true"
@@ -601,7 +603,7 @@ export function GlobalMistySurface(props: {
           />
         </Suspense>
       ) : null}
-    </div>
+    </ViewportLayer>
   );
 }
 

@@ -4,8 +4,7 @@ import {
   workspaceSurfaceFromRoute,
   type WorkspaceTab,
 } from "@/features/workspace";
-import { cn, navigationMenuLinkClass } from "@/shared/ui";
-import { appIconStrokeWidth } from "@/shared/ui/app-icons";
+import { appIconStrokeWidth, cn, navigationMenuLinkClass } from "@/shared/ui";
 import { PanelsTopLeft } from "lucide-react";
 
 /** The global navigator opens Spaces; each Space pane owns its tools. */

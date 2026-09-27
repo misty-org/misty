@@ -12,7 +12,7 @@ import {
   mediaSearchSetAssetState,
   mediaSearchSnapshot,
 } from "@/native/filesystem";
-import type { MediaAsset, MediaSearchSnapshot } from "@/native/contracts";
+import type { MediaAsset, MediaSearchSnapshot } from "@/native/ipc";
 import { create } from "zustand";
 import { ensureMediaSearchDeviceReady } from "./useMediaSearchMigrationStore";
 import {

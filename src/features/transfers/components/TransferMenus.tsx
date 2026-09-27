@@ -1,18 +1,18 @@
 import {
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
+  MenuItem,
 } from "@/shared/ui";
-import { IconButton } from "@/shared/ui/icon-button";
 import {
   ArrowDown,
   ArrowUp,
@@ -145,15 +145,16 @@ function DropdownActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
     entry.kind === "separator" ? (
       <DropdownMenuSeparator key={`separator-${index}`} />
     ) : (
-      <DropdownMenuItem
+      <MenuItem
+        label={
+          <>
+            {entry.icon} {entry.label}
+          </>
+        }
         key={`${entry.label}-${index}`}
         disabled={entry.disabled}
-        variant={entry.danger ? "destructive" : "default"}
         onSelect={entry.run}
-      >
-        {entry.icon}
-        {entry.label}
-      </DropdownMenuItem>
+      />
     ),
   );
 }
@@ -163,15 +164,16 @@ function ContextActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
     entry.kind === "separator" ? (
       <ContextMenuSeparator key={`separator-${index}`} />
     ) : (
-      <ContextMenuItem
+      <ContextMenuAction
+        label={
+          <>
+            {entry.icon} {entry.label}
+          </>
+        }
         key={`${entry.label}-${index}`}
         disabled={entry.disabled}
-        variant={entry.danger ? "destructive" : "default"}
         onSelect={entry.run}
-      >
-        {entry.icon}
-        {entry.label}
-      </ContextMenuItem>
+      />
     ),
   );
 }

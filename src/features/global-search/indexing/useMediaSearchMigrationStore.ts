@@ -1,5 +1,5 @@
 import { mediaSearchCompleteLegacyAdoption } from "@/native/filesystem";
-import type { MediaSearchSnapshot } from "@/native/contracts";
+import type { MediaSearchSnapshot } from "@/native/ipc";
 import { adoptLegacyMediaSearchDevice } from "./useMediaSearchServerStore";
 
 export async function ensureMediaSearchDeviceReady(

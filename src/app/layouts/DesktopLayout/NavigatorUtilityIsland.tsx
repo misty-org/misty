@@ -1,12 +1,20 @@
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { useShortcutTitle } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
+import {
+  appIcons,
+  appIconStrokeWidth,
+  cn,
+  IconButton,
+  navigationMenuLinkClass,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui";
 import { PanelsTopLeft, Search } from "lucide-react";
-import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
 const { browser: BrowserIcon, agents: AgentIcon, files: FilesIcon } = appIcons;
 import { Link } from "react-router-dom";
-import { navigationMenuLinkClass } from "@/shared/ui";
 import { navigatorFocusRingClass } from "./styles";
 
 const navigatorHeaderActionClass = `${navigationMenuLinkClass} w-full`;
@@ -66,12 +74,12 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
     <TooltipProvider delayDuration={450}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
+          <IconButton
             variant="nav-action"
-            size="icon-sm"
+            label="Search"
+            tooltip={false}
             className={cn(navigatorFocusRingClass, props?.className)}
             onClick={openSearchPanel}
-            aria-label="Search"
             data-misty-window-drag-block="true"
           >
             <Search
@@ -80,7 +88,7 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
               strokeWidth={appIconStrokeWidth}
               aria-hidden="true"
             />
-          </Button>
+          </IconButton>
         </TooltipTrigger>
         <TooltipContent>{searchShortcutTitle}</TooltipContent>
       </Tooltip>

@@ -1,4 +1,4 @@
-import { booleanSetting, numberSetting, stringSetting } from "@/features/settings/settingsControls";
+import { booleanSetting, numberSetting, stringSetting } from "@/features/settings/SettingsControls";
 
 export function selectPaneFocusPreferences(document?: Record<string, unknown> | null) {
   const source = document ?? {};

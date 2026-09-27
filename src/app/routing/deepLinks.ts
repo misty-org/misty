@@ -11,7 +11,7 @@ export function installMistyDeepLinkHandler(
   let active = true;
   let unlisten: UnlistenFn | null = null;
   let lastCurrentSignature: string | null = null;
-  let currentUrlPoll: number | null = null;
+  const currentUrlPoll: number | null = null;
   const handleUrls = (urls: string[] | null, source: "current" | "event") => {
     if (!active || !urls) return;
     const signature = urls.join("\n");

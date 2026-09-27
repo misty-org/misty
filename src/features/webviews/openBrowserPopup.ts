@@ -1,5 +1,5 @@
 import { inheritProviderBrowser } from "./browserProviders";
-import { MistyBrowserUrlSchema } from "@/shared/contracts";
+import { MistyBrowserUrlSchema } from "@/shared/schemas";
 import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { browserRuntimeIdForTabId, browserTabIdForRuntime } from "./browserRuntime";

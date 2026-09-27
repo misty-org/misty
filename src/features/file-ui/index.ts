@@ -1,16 +1,27 @@
-export { FileBrowserView } from "./explorer/components/FileBrowserView";
-export { FileBrowserRuntimeProvider } from "./explorer/components/fileBrowser/FileBrowserRuntime";
-export { ExplorerPickerToolbar } from "./explorer/components/ExplorerPickerToolbar";
-export {
-  buildDeviceEntries,
-  dedupePinnedPathsForQuickAccess,
-  joinPath,
-  loadDeviceCustomization,
-  loadHiddenQuickAccessPaths,
-  pathIsInside,
-  pinnedPathLabel,
-  quickAccessPathHidden,
-} from "./explorer/components/ExplorerSidebarSupport";
+// Stateless file-browsing UI shared by Files and the file picker. Files owns workspace state;
+// this package owns presentation, drag mechanics, and the types they share.
 export type { ExplorerSortState } from "./explorer/store";
-
-export type { PreviewErrorComponent } from "./explorer/components/globalPreview/PreviewRuntime";
+export * from "./explorer/components/ExplorerPickerToolbar";
+export * from "./explorer/components/ExplorerSidebarDialogs";
+export * from "./explorer/components/ExplorerSidebarSupport";
+export * from "./explorer/components/ExplorerToolbarSupport";
+export * from "./explorer/components/FileBrowserDrag";
+export * from "./explorer/components/FileBrowserIcons";
+export * from "./explorer/components/FileBrowserView";
+export * from "./explorer/components/fileBrowser/FileBrowserRuntime";
+export * from "./explorer/components/fileBrowser/fileTableConfig";
+export * from "./explorer/components/fileBrowser/gridThumbnailSupported";
+export * from "./explorer/components/globalPreview/PreviewRuntime";
+export * from "./explorer/drag/ExplorerDragHooks";
+export * from "./explorer/drag/ExplorerDragState";
+export * from "./explorer/drag/ExplorerDragTypes";
+export * from "./explorer/drag/geometry";
+export * from "./explorer/drag/operations";
+export * from "./explorer/model/interfaces/components/ExplorerSidebarSupport";
+export * from "./explorer/model/interfaces/components/FileBrowser";
+export * from "./explorer/model/interfaces/components/GlobalPreview";
+export * from "./explorer/model/interfaces/drag/types";
+export * from "./explorer/model/types/components/ExplorerSidebarSupport";
+export * from "./explorer/model/types/components/FileBrowser";
+export * from "./explorer/utils/entrySize";
+export * from "./explorer/utils/fileFormat";

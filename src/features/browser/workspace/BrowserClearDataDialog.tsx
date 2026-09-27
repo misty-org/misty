@@ -7,6 +7,12 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  Field,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/shared/ui";
 import { useBrowserDownloadsStore } from "../library/downloadsStore";
 import { browserLibrary, type BrowserWebsiteDataKind } from "../library/native";
@@ -23,10 +29,18 @@ const ranges = [
 type Choice = "history" | "downloads" | BrowserWebsiteDataKind;
 
 const choices: { id: Choice; label: string; detail: string }[] = [
-  { id: "history", label: "Browsing history", detail: "Pages you visited, and their address bar suggestions." },
+  {
+    id: "history",
+    label: "Browsing history",
+    detail: "Pages you visited, and their address bar suggestions.",
+  },
   { id: "downloads", label: "Download list", detail: "Downloaded files stay on disk." },
   { id: "cookies", label: "Cookies and site data", detail: "Signs you out of most websites." },
-  { id: "cache", label: "Cached images and files", detail: "Some sites may load more slowly next time." },
+  {
+    id: "cache",
+    label: "Cached images and files",
+    detail: "Some sites may load more slowly next time.",
+  },
 ];
 
 /** Clear browsing data for this tab's browser profile. */
@@ -78,20 +92,20 @@ export function BrowserClearDataDialog(props: {
       <DialogContent className="sm:max-w-md">
         <DialogTitle>Clear browsing data</DialogTitle>
         <DialogDescription>Applies to this browser profile on this device.</DialogDescription>
-        <label className="grid gap-2 text-sm">
-          Time range
-          <select
-            className="h-9 rounded-md border border-charcoal-border bg-charcoal-card px-2 text-sm text-cream"
-            value={range}
-            onChange={(event) => setRange(Number(event.target.value))}
-          >
-            {ranges.map((item, index) => (
-              <option key={item.label} value={index}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Field label="Time range">
+          <Select value={String(range)} onValueChange={(value) => setRange(Number(value))}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ranges.map((item, index) => (
+                <SelectItem key={item.label} value={String(index)}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <div className="grid gap-3">
           {choices.map((choice) => (
             <label key={choice.id} className="flex items-start gap-3 text-sm">
@@ -116,8 +130,8 @@ export function BrowserClearDataDialog(props: {
         </div>
         {selected.has("cookies") ? (
           <p className="rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted">
-            If Sync is on, website sign-ins saved from another device can be restored the next
-            time this device syncs.
+            If Sync is on, website sign-ins saved from another device can be restored the next time
+            this device syncs.
           </p>
         ) : null}
         {error ? (

@@ -4,21 +4,21 @@ import { GlobalCreateSpaceDialog, SpaceAvatar, spaceNavigationName } from "@/fea
 import { spaceLandingRoute } from "@/features/spaces/navigation";
 
 import {
-  Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  MenuItem,
+  MenuTrigger,
   OverflowFadeText,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-  cn,
 } from "@/shared/ui";
-import { ChevronDown, LogOut, Plus, Trash2 } from "lucide-react";
+import { LogOut, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -26,8 +26,11 @@ import {
   spaceLifecycleAction,
   type SpaceLifecycleAction,
 } from "./SpaceLifecycleDialogs";
-const navigatorHierarchyTriggerClass =
-  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1 text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted";
+const navigatorHierarchyTriggerClass = cn(
+  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1",
+  "text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright",
+  "focus-visible:ring-2 focus-visible:ring-cream-muted",
+);
 
 export function SpaceSwitcher(props: {
   iconOnly?: boolean;
@@ -71,21 +74,19 @@ export function SpaceSwitcher(props: {
           <TooltipProvider delayDuration={450}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    justify="start"
-                    className={cn(
-                      navigatorHierarchyTriggerClass,
-                      props.iconOnly
-                        ? "misty-space-rail-control misty-space-rail-avatar size-10 justify-center p-0 [@media(pointer:coarse)]:size-11"
-                        : "w-auto min-w-0 max-w-full",
-                    )}
-                    aria-label={switcherLabel}
-                    data-misty-window-drag-block="true"
-                    data-space-menu-open={menuOpen ? "true" : "false"}
-                  >
+                <MenuTrigger
+                  iconOnly={props.iconOnly}
+                  label={switcherLabel}
+                  justify="start"
+                  className={cn(
+                    navigatorHierarchyTriggerClass,
+                    props.iconOnly
+                      ? "misty-space-rail-control misty-space-rail-avatar size-10 justify-center p-0 [@media(pointer:coarse)]:size-11"
+                      : "w-auto min-w-0 max-w-full gap-1.5",
+                  )}
+                  data-misty-window-drag-block="true"
+                  data-space-menu-open={menuOpen ? "true" : "false"}
+                  icon={
                     <span
                       className={cn(
                         "relative flex shrink-0 items-center justify-center",
@@ -113,20 +114,19 @@ export function SpaceSwitcher(props: {
                         />
                       )}
                     </span>
-                    {!props.iconOnly && (
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <OverflowFadeText
-                          className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-sm font-semibold text-inherit tracking-[-0.015em]"
-                          data-active-space-name="true"
-                          title={activeName}
-                        >
-                          {activeName}
-                        </OverflowFadeText>
-                        <ChevronDown size={14} aria-hidden="true" />
-                      </span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
+                  }
+                  value={
+                    props.iconOnly ? undefined : (
+                      <OverflowFadeText
+                        className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-sm font-semibold text-inherit tracking-[-0.015em]"
+                        data-active-space-name="true"
+                        title={activeName}
+                      >
+                        {activeName}
+                      </OverflowFadeText>
+                    )
+                  }
+                />
               </TooltipTrigger>
               <TooltipContent side={props.iconOnly ? "right" : "top"}>
                 {activeName} · Switch Space
@@ -185,31 +185,31 @@ export function SpaceSwitcher(props: {
             </div>
 
             <DropdownMenuSeparator />
-            <DropdownMenuItem
+            <MenuItem
+              icon={<Plus size={14} aria-hidden="true" />}
+              label="New Space"
               disabled={!props.canAddSpace}
               title={props.canAddSpace ? undefined : "Space limit reached"}
               onSelect={() => {
                 setMenuOpen(false);
                 openCreateSpaceDialog();
               }}
-            >
-              <Plus size={14} aria-hidden="true" />
-              New Space
-            </DropdownMenuItem>
+            />
             {availableAction ? (
-              <DropdownMenuItem
+              <MenuItem
+                icon={
+                  availableAction === "delete" ? (
+                    <Trash2 size={14} aria-hidden="true" />
+                  ) : (
+                    <LogOut size={14} aria-hidden="true" />
+                  )
+                }
+                label={availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
                 onSelect={() => {
                   setMenuOpen(false);
                   setPendingAction(availableAction);
                 }}
-              >
-                {availableAction === "delete" ? (
-                  <Trash2 size={14} aria-hidden="true" />
-                ) : (
-                  <LogOut size={14} aria-hidden="true" />
-                )}
-                {availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
-              </DropdownMenuItem>
+              />
             ) : null}
           </DropdownMenuContent>
           {props.activeSpace ? (

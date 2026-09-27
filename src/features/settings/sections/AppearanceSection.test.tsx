@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as SettingsControlsModule from "../settingsControls";
+import type * as SettingsControlsModule from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { AppearanceSection } from "./AppearanceSection";
 
@@ -24,8 +24,8 @@ vi.mock("@/features/app-shell", () => ({
   useNavigatorLayoutValue: () => ({ visibility: "sticky" }),
 }));
 
-vi.mock("../settingsControls", async () => {
-  const actual = await vi.importActual<typeof SettingsControlsModule>("../settingsControls");
+vi.mock("../SettingsControls", async () => {
+  const actual = await vi.importActual<typeof SettingsControlsModule>("../SettingsControls");
   return {
     ...actual,
     SliderControl: (props: {

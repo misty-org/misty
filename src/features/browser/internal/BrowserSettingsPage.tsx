@@ -1,7 +1,7 @@
 import { Button } from "@/shared/ui";
 import { Settings2 } from "lucide-react";
 import { useEffect } from "react";
-import { InternalPageFrame, internalActionClass } from "./InternalPageFrame";
+import { InternalPageFrame } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 function openBrowserSettings() {
   window.dispatchEvent(new CustomEvent("misty:open-settings", { detail: { section: "browser" } }));
@@ -14,22 +14,12 @@ export function BrowserSettingsPage(props: BrowserInternalPageProps) {
       title="Browser settings"
       icon={Settings2}
       actions={
-        <Button
-          variant="ghost"
-          type="button"
-          className={internalActionClass}
-          onClick={props.clearBrowsingData}
-        >
+        <Button variant="toolbar" size="xs" onClick={props.clearBrowsingData}>
           Clear browsing data…
         </Button>
       }
     >
-      <Button
-        variant="ghost"
-        type="button"
-        className={internalActionClass}
-        onClick={openBrowserSettings}
-      >
+      <Button variant="toolbar" size="xs" onClick={openBrowserSettings}>
         Open Browser settings
       </Button>
     </InternalPageFrame>

@@ -1,6 +1,6 @@
-import { useMediaSearchStore } from "@/features/files/workspace/search";
+import { useMediaSearchStore } from "@/features/global-search/indexing";
 import { SystemErrorActivity } from "@/features/activity";
-import { Button, Progress } from "@/shared/ui";
+import { Button, IconButton, Progress } from "@/shared/ui";
 import { Film, Music, Pause, Play, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -211,18 +211,14 @@ export function MediaLibraryPanel() {
                     </Button>
                   ) : null}
                   {current ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Remove index for ${asset.name}`}
-                      className="text-cream-muted hover:text-cream-bright"
+                    <IconButton
+                      label={`Remove index for ${asset.name}`}
                       onClick={() =>
                         setRemoveTarget({ kind: "asset", assetId: asset.assetId, name: asset.name })
                       }
                     >
                       <Trash2 size={14} />
-                    </Button>
+                    </IconButton>
                   ) : null}
                 </span>
               </div>

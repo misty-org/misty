@@ -488,7 +488,16 @@ fn clean_display_path(path: &str) -> String {
     path.to_string()
 }
 
--{nanos}"))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unique_test_home(label: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!("misty-env-{label}-{nanos}"))
     }
 
     #[test]

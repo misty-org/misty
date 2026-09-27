@@ -44,9 +44,7 @@ export function BrowserQrCodeDialog(props: {
           <Button
             type="button"
             variant="ghost"
-            onClick={() =>
-              void navigator.clipboard.writeText(url).then(() => setCopied(true))
-            }
+            onClick={() => void navigator.clipboard.writeText(url).then(() => setCopied(true))}
           >
             {copied ? "Copied" : "Copy link"}
           </Button>

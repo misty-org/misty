@@ -1036,3 +1036,61 @@
     color: var(--code-workspace-bg) !important;
   }
 }
+
+/* Named stacking layers. Use these instead of z-[number] so the order stays in one place. */
+/* Agent execution surface over workspace content */
+@utility layer-agent-surface {
+  z-index: 2147482400;
+}
+/* Floating app chrome: global Misty panel, layout controls */
+@utility layer-chrome {
+  z-index: 2147482500;
+}
+/* Overlays scoped to the workspace */
+@utility layer-workspace-overlay {
+  z-index: 2147482600;
+}
+/* Toasts and notices */
+@utility layer-notification {
+  z-index: 2147482900;
+}
+/* A notice above another notice */
+@utility layer-notification-raised {
+  z-index: 2147482910;
+}
+/* Dialog and sheet backdrops */
+@utility layer-dialog-backdrop {
+  z-index: 2147483000;
+}
+/* Dialogs, sheets, and pointer drags over them */
+@utility layer-dialog {
+  z-index: 2147483100;
+}
+/* Blocking screens and alert-dialog backdrops */
+@utility layer-blocking-backdrop {
+  z-index: 2147483200;
+}
+/* Blocking screen content */
+@utility layer-blocking {
+  z-index: 2147483201;
+}
+/* Alert dialogs and popups opened over blocking screens */
+@utility layer-blocking-popup {
+  z-index: 2147483300;
+}
+/* Menus and drag previews */
+@utility layer-menu {
+  z-index: 2147483400;
+}
+/* Inline editors raised over menus */
+@utility layer-menu-raised {
+  z-index: 2147483401;
+}
+/* Popovers and select lists */
+@utility layer-popover {
+  z-index: 2147483420;
+}
+/* Tooltips and the drag ghost, always on top */
+@utility layer-tooltip {
+  z-index: 2147483500;
+}

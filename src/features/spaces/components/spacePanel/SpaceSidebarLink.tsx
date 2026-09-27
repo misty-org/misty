@@ -1,12 +1,12 @@
 import {
+  appIconStrokeWidth,
   cn,
   navigationMenuLinkClass,
   navigationMenuPrimaryIconClass,
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
+  TooltipTrigger,
 } from "@/shared/ui";
-import { appIconStrokeWidth } from "@/shared/ui/app-icons";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -64,7 +64,10 @@ export function SpaceSidebarLink({
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {badgeCount > 0 ? (
           <span
-            className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-notification-red px-1 text-[10px] font-bold leading-none text-white"
+            className={cn(
+              "grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full",
+              "bg-notification-red px-1 text-[10px] font-bold leading-none text-white",
+            )}
             aria-label={`${badgeCount} new`}
           >
             {badgeCount > 99 ? "99+" : badgeCount}

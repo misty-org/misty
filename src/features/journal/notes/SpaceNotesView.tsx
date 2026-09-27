@@ -8,17 +8,19 @@ import {
   Button,
   cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  IconButton,
   Input,
+  ListRowButton,
+  MenuItem,
   Skeleton,
 } from "@/shared/ui";
 import { MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
@@ -479,10 +481,9 @@ function NoteRows(props: NoteRowsProps) {
                 : "bg-transparent hover:bg-charcoal-border/65",
             )}
           >
-            <button
-              type="button"
+            <ListRowButton
               aria-current={isSelected ? "true" : undefined}
-              className="flex min-w-0 flex-1 self-stretch items-center gap-2 border-0 bg-transparent px-3.5 text-left outline-none"
+              className="self-stretch items-center rounded-none px-3.5"
               onClick={() => props.onSelect(note)}
             >
               <h3 className="m-0 min-w-0 flex-1 truncate text-[13px] font-medium text-cream-bright">
@@ -491,61 +492,67 @@ function NoteRows(props: NoteRowsProps) {
               {isPinned ? (
                 <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
               ) : null}
-            </button>
+            </ListRowButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
+                <IconButton
+                  label={`More actions for ${title}`}
+                  tooltip={false}
                   className={cn(
-                    "mr-2 shrink-0 text-cream-muted hover:text-cream-bright aria-expanded:opacity-100",
-                    "size-7 opacity-0 group-hover/note:opacity-100",
+                    "mr-2 aria-expanded:opacity-100",
+                    "opacity-0 group-hover/note:opacity-100",
                   )}
-                  aria-label={`More actions for ${title}`}
                 >
                   <MoreHorizontal className="size-4" aria-hidden="true" />
-                </Button>
+                </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onSelect={() => props.onTogglePin(note.id)}>
-                  {isPinned ? <PinOff /> : <Pin />}
-                  {isPinned ? "Unpin" : "Pin"}
-                </DropdownMenuItem>
+                <MenuItem
+                  icon={isPinned ? <PinOff /> : <Pin />}
+                  label={isPinned ? "Unpin" : "Pin"}
+                  onSelect={() => props.onTogglePin(note.id)}
+                />
                 {canRename || note.canDelete ? <DropdownMenuSeparator /> : null}
                 {canRename ? (
-                  <DropdownMenuItem onSelect={() => props.onRename(note)}>
-                    <Pencil />
-                    Rename
-                  </DropdownMenuItem>
+                  <MenuItem
+                    icon={<Pencil />}
+                    label="Rename"
+                    onSelect={() => props.onRename(note)}
+                  />
                 ) : null}
                 {note.canDelete ? (
-                  <DropdownMenuItem variant="destructive" onSelect={() => props.onDelete(note)}>
-                    <Trash2 />
-                    Delete
-                  </DropdownMenuItem>
+                  <MenuItem
+                    icon={<Trash2 />}
+                    label="Delete"
+                    destructive
+                    onSelect={() => props.onDelete(note)}
+                  />
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">
-          <ContextMenuItem onSelect={() => props.onTogglePin(note.id)}>
-            {isPinned ? <PinOff /> : <Pin />}
-            {isPinned ? "Unpin" : "Pin"}
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={isPinned ? <PinOff /> : <Pin />}
+            label={isPinned ? "Unpin" : "Pin"}
+            onSelect={() => props.onTogglePin(note.id)}
+          />
           {canRename || note.canDelete ? <ContextMenuSeparator /> : null}
           {canRename ? (
-            <ContextMenuItem onSelect={() => props.onRename(note)}>
-              <Pencil />
-              Rename
-            </ContextMenuItem>
+            <ContextMenuAction
+              icon={<Pencil />}
+              label="Rename"
+              onSelect={() => props.onRename(note)}
+            />
           ) : null}
           {note.canDelete ? (
-            <ContextMenuItem variant="destructive" onSelect={() => props.onDelete(note)}>
-              <Trash2 />
-              Delete
-            </ContextMenuItem>
+            <ContextMenuAction
+              icon={<Trash2 />}
+              label="Delete"
+              destructive
+              onSelect={() => props.onDelete(note)}
+            />
           ) : null}
         </ContextMenuContent>
       </ContextMenu>

@@ -49,7 +49,11 @@ export function BrowserPermissionSettings() {
   return (
     <DesktopSettingsSection
       title="Website permissions"
-      description="Saved choices for open browser profiles. Websites ask before using your camera or microphone. Change a site's choices from the information button beside its address. Resetting stops capture in that browser profile."
+      description={
+        "Saved choices for open browser profiles. Websites ask before using your camera or " +
+        "microphone. Change a site's choices from the information button beside its address. " +
+        "Resetting stops capture in that browser profile."
+      }
     >
       {loading ? (
         <p role="status" className="p-4 text-sm text-cream-muted">
@@ -83,7 +87,9 @@ export function BrowserPermissionSettings() {
               </div>
               <Button
                 type="button"
-                className="shrink-0 rounded-md border border-charcoal-border px-3 py-1.5 text-xs hover:bg-charcoal-hover disabled:opacity-50"
+                variant="outline"
+                size="sm"
+                className="shrink-0 px-3 text-xs"
                 disabled={busy}
                 aria-label={`Reset permissions for ${entry.origin}`}
                 onClick={() => void reset(entry)}

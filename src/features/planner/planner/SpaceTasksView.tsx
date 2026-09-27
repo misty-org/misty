@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SpacePlannerHeader } from "./components/SpacePlannerHeader";
 import { SpaceTaskDrawer } from "./SpacePlannerViews";
@@ -137,7 +137,7 @@ export function SpaceTasksView({
   ]);
   const title = actions.editing?.title?.trim() || (view === "list" ? "Task list" : "Task board");
   const createQueryConsumedRef = useRef(false);
-  const openCreate = useCallback(() => actions.openCreate(), [actions.openCreate]);
+  const openCreate = actions.openCreate;
   const openEdit = actions.openEdit;
   useEffect(() => {
     const params = new URLSearchParams(location.search);

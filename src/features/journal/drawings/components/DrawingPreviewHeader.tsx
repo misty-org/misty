@@ -2,9 +2,10 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   Input,
+  MenuItem,
 } from "@/shared/ui";
 import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -127,28 +128,16 @@ export function DrawingPreviewHeader({
       {!renaming && hasActions ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="size-8 shrink-0 text-cream-muted hover:text-cream-bright"
-              aria-label={`Actions for ${title || "untitled drawing"}`}
-            >
+            <IconButton label={`Actions for ${title || "untitled drawing"}`} tooltip={false}>
               <MoreHorizontal className="size-4" />
-            </Button>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             {canRename ? (
-              <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                <Pencil />
-                Rename
-              </DropdownMenuItem>
+              <MenuItem icon={<Pencil />} label="Rename" onSelect={() => setRenaming(true)} />
             ) : null}
             {drawing.can_delete ? (
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                <Trash2 />
-                Delete
-              </DropdownMenuItem>
+              <MenuItem icon={<Trash2 />} label="Delete" destructive onSelect={onDelete} />
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>

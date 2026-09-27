@@ -50,7 +50,8 @@ describe("WorkspaceWindowMenu", () => {
     const trigger = screen.getByRole("button", { name: "Manage virtual windows" });
     expect(container.contains(trigger)).toBe(true);
     expect(container.querySelectorAll('[aria-label="Manage virtual windows"]')).toHaveLength(1);
-    expect(trigger.querySelector(".lucide-chevron-down")).not.toBeNull();
+    // Icon-only menu triggers never carry a chevron.
+    expect(trigger.querySelector(".lucide-chevron-down")).toBeNull();
 
     fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
       button: 0,

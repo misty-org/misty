@@ -18,8 +18,9 @@ export function AlbumsIndex() {
         <div className="flex items-center gap-2">
           {currentAlbumFolder ? (
             <Button
-              className="border-0 bg-transparent p-0 text-xs text-cream-muted"
-              type="button"
+              variant="link"
+              size="none"
+              className="text-xs text-cream-muted"
               onClick={() =>
                 data.setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")
               }

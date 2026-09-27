@@ -25,7 +25,7 @@ export default defineConfig(({ command, mode }) => {
   const uploadSourceMaps = Boolean(
     command === "build" && sourceMapKey && posthogProjectId && posthogHost && mode !== "test",
   );
-  const platformLayoutPath = new URL("../src/app/platform-layout.tsx", import.meta.url).pathname;
+  const platformLayoutPath = new URL("../src/app/PlatformLayout.tsx", import.meta.url).pathname;
 
   return {
     root: resolve(process.cwd(), "src/app"),
@@ -85,7 +85,7 @@ export default defineConfig(({ command, mode }) => {
     },
     resolve: {
       alias: {
-        "@/app/platform-layout": platformLayoutPath,
+        "@/app/PlatformLayout": platformLayoutPath,
         "@": new URL("../src", import.meta.url).pathname,
       },
     },

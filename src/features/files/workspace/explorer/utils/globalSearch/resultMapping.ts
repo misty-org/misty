@@ -1,4 +1,4 @@
-import { smartLibraryResolveAssets, smartLibrarySnapshot } from "@/features/files/workspace/native";
+import { smartLibraryResolveAssets, smartLibrarySnapshot } from "../../../native";
 import type {
   ExplorerLocation,
   FileEntry,
@@ -7,10 +7,10 @@ import type {
   SearchResult,
   SearchResultMatch,
   SmartLibraryAsset,
-} from "@/native/contracts";
-import type { SearchSourceKind } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { SearchSourceKind } from "@/native/ipc/primitives";
 import type { ExplorerSearchOptions } from "../../model/interfaces/utils/globalSearch";
-import type { MediaSearchHit } from "../../model/stores/media/interfaces/useMediaSearchServerStore";
+import type { MediaSearchHit } from "@/features/global-search/indexing";
 import type { SemanticSearchHit } from "../../model/stores/media/interfaces/useSmartLibraryServerStore";
 import {
   baseName,

@@ -1,15 +1,15 @@
 import type { MultiPanelTab, useMultiPanelStore } from "@/features/workspace";
-import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote } from "@/native/contracts";
+import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/ipc";
+import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import {
   explorerPathKey,
   explorerPathName,
   joinExplorerPath,
   normalizeExplorerPath,
 } from "@/shared/lib/pathNormalization";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
-import { cx } from "./ExplorerDesktopShared";
 import { explorerShellStyles } from "./ExplorerShellStyles";
 export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
@@ -21,29 +21,25 @@ export function ExplorerBottomBar(props: {
   const PreviewIcon = props.previewVisible ? PanelRightClose : PanelRightOpen;
   return (
     <footer className={explorerShellStyles.bottomBar}>
-      <Button
-        type="button"
-        className={cx(
-          explorerShellStyles.bottomButton,
-          props.sidebarVisible && explorerShellStyles.bottomButtonSelected,
-        )}
-        title={props.sidebarVisible ? "Hide sidebar" : "Show sidebar"}
+      <IconButton
+        size="xs"
+        label={props.sidebarVisible ? "Hide sidebar" : "Show sidebar"}
+        tooltip={false}
+        aria-pressed={props.sidebarVisible}
         onClick={props.onToggleSidebar}
       >
         <SidebarIcon size={15} />
-      </Button>
+      </IconButton>
       <div className={explorerShellStyles.bottomBarGroup}>
-        <Button
-          type="button"
-          className={cx(
-            explorerShellStyles.bottomButton,
-            props.previewVisible && explorerShellStyles.bottomButtonSelected,
-          )}
-          title={props.previewVisible ? "Hide preview" : "Show preview"}
+        <IconButton
+          size="xs"
+          label={props.previewVisible ? "Hide preview" : "Show preview"}
+          tooltip={false}
+          aria-pressed={props.previewVisible}
           onClick={props.onTogglePreview}
         >
           <PreviewIcon size={15} />
-        </Button>
+        </IconButton>
       </div>
     </footer>
   );
@@ -52,14 +48,13 @@ export function buildExplorerLocationResults(
   homePath: string,
   mountRoot: string,
   pinnedPaths: string[],
-  remotes: ProviderRemote[],
   library: ExplorerLibrarySnapshot | null,
   workspacePaths: string[],
 ): ExplorerLocationResult[] {
   const results: ExplorerLocationResult[] = [];
   const seen = new Set<string>();
   const add = (label: string, path: string, badge: string) => {
-    if (!path) return;
+    if (!path || isRetiredCloudLocation(path, mountRoot)) return;
     const normalized = normalizedPath(path) || "/";
     const key = explorerPathKey(normalized);
     if (seen.has(key)) return;
@@ -90,9 +85,6 @@ export function buildExplorerLocationResults(
   }
   for (const item of library?.recentFiles ?? []) {
     add(item.name || titleFromPath(item.path), item.path, "Recent");
-  }
-  for (const remote of remotes) {
-    add(remote.name, joinPath(mountRoot, remote.name), remote.type);
   }
   return results;
 }

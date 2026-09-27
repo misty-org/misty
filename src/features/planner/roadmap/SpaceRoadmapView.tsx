@@ -1,5 +1,9 @@
-import type { AiArtifact as AiArtifact, AiSurfaceAdapter as AiSurfaceAdapter } from "@/features/ai-surface/types";
-import { useRoadmapRuntime, isPlannerConflict } from "./spaceRoadmap/roadmapRuntime";
+import type {
+  AiArtifact as AiArtifact,
+  AiSurfaceAdapter as AiSurfaceAdapter,
+} from "@/features/ai-surface/types";
+import { useRoadmapRuntime, isPlannerConflict } from "./spaceRoadmap/RoadmapRuntime";
+import { Spinner } from "@/shared/ui";
 
 import type {
   SpaceRoadmap,
@@ -9,7 +13,6 @@ import type {
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { errorText } from "@/shared/lib/format";
-import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { RoadmapNode } from "./spaceRoadmap/RoadmapCanvasNodes";
@@ -22,9 +25,13 @@ import {
   readExpandedGoals,
 } from "./spaceRoadmap/RoadmapWorkspaceHelpers";
 import { roadmapPalette, type RoadmapPaletteItem } from "./spaceRoadmap/roadmapNodeCatalog";
+import type { ReactNode } from "react";
 
 export function SpaceRoadmapView(props: {
-  spaceId: string; roadmapId: string; canManage: boolean; workspaceTabId?: string;
+  spaceId: string;
+  roadmapId: string;
+  canManage: boolean;
+  workspaceTabId?: string;
 }) {
   return <RoadmapDocument key={`${props.spaceId}:${props.roadmapId}`} {...props} />;
 }
@@ -363,8 +370,8 @@ function RoadmapDocument({
         }
       },
     };
-  }, [canManage, load, snapshot, spaceId]);
-  const withIntegration = (content: import("react").ReactNode) => (
+  }, [canManage, load, snapshot, spaceId, spacesApi]);
+  const withIntegration = (content: ReactNode) => (
     <>
       {runtime.renderIntegration({
         title: snapshot?.roadmap.name?.trim() || "Roadmaps",
@@ -426,7 +433,7 @@ function RoadmapDocument({
   if (loading && !snapshot)
     return withIntegration(
       <div className="grid h-full place-items-center">
-        <LoaderCircle className="size-5 animate-spin text-cream-muted" />
+        <Spinner size="lg" label={false} className="text-cream-muted" />
       </div>,
     );
   if (!snapshot)

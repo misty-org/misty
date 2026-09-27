@@ -1,9 +1,9 @@
-import type { SemanticReindexPlan, SmartLibraryProgress } from "@/features/files/workspace/explorer";
+import type { SemanticReindexPlan, SmartLibraryProgress } from "@/features/files/workspace";
 import type {
   AnalysisEstimate,
   FolderLibraryStatus,
   SmartLibraryImportPreflight,
-} from "@/native/contracts";
+} from "@/native/ipc";
 export type SmartLibraryPhase =
   | "idle"
   | "scanning"

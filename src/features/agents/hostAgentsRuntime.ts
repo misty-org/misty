@@ -14,7 +14,7 @@ import {
 import { createAgentOwnedBrowserWorkspace } from "./agentOwnedBrowserWorkspace";
 import { uploadMistyImage, deleteMistyImage } from "@/features/global-search/mistyImageAttachments";
 import { apiBlobRequest } from "@/api/client";
-import { configureAgentsRuntime } from "./agentsRuntime";
+import { configureAgentsRuntime } from "./AgentsRuntime";
 export function initializeHostAgentsRuntime() {
   configureAgentsRuntime({
     openMisty,

@@ -1,11 +1,19 @@
 import { accountScopeWillResetEvent } from "@/features/auth";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ArrowUpRight, Loader2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from "@/shared/ui";
+import { Search, ArrowUpRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  IconButton,
+  Input,
+  Spinner,
+} from "@/shared/ui";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { openFilesTabRevealing } from "@/features/files/workspace/explorer/workspace/explorerWorkspace/filesTabReveal";
+import { openFilesTabRevealing } from "@/features/files/workspace";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { browserSearchDestination, useBrowserSearchStore } from "./search";
 import {
@@ -136,11 +144,7 @@ export function BrowserSearchDialog() {
         >
           <div className="flex items-center gap-2">
             {loading ? (
-              <Loader2
-                size={18}
-                className="shrink-0 animate-spin text-cream-muted"
-                aria-hidden="true"
-              />
+              <Spinner size="lg" label={false} className="text-cream-muted" />
             ) : (
               <Search size={18} className="shrink-0 text-cream-muted" aria-hidden="true" />
             )}
@@ -160,15 +164,13 @@ export function BrowserSearchDialog() {
               spellCheck={false}
               className="min-w-0 flex-1"
             />
-            <Button
+            <IconButton
+              label="Open in new tab"
               type="submit"
-              size="icon-sm"
-              variant="ghost"
               disabled={scope === "browser" ? !query.trim() && !items.length : !items.length}
-              aria-label="Open in new tab"
             >
               <ArrowUpRight size={18} />
-            </Button>
+            </IconButton>
           </div>
           {error && (
             <p role="alert" className="mt-2 text-sm text-destructive">

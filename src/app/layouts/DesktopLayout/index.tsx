@@ -2,7 +2,7 @@ import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
-import { CursorCompanionController } from "@/features/agents/companion/CursorCompanionController";
+import { CursorCompanionController } from "@/features/agents";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { useAuth } from "@/features/auth";
@@ -26,7 +26,7 @@ import {
 } from "@/features/workspace";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 import { Minus, Square, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
@@ -43,7 +43,6 @@ import {
   type NavigatorLayout,
 } from "./navigatorMode";
 import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
-import { ProfilePopover } from "./ProfilePopover";
 import { RestoreGlyph } from "./RestoreGlyph";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { SettingsOverlay } from "./SettingsOverlays";
@@ -96,7 +95,6 @@ export function DesktopLayout(props: {
 
   const framePacingOverlayEnabled = useDesktopShellStatus();
 
-  const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const docking = useWindowDockingLayout();
   const [navigatorLayout, setNavigatorLayout] = useState<NavigatorLayout>(readNavigatorLayout);
@@ -159,11 +157,6 @@ export function DesktopLayout(props: {
         );
     });
   }, []);
-  const openRemotesOverlay = useCallback(() => {
-    useSettingsStore.getState().setActiveSection("files-connections");
-    openSettingsOverlay();
-  }, [openSettingsOverlay]);
-
   useEffect(() => {
     if (!user?.id || transitioning) return;
     const tourState = useTourStore.getState();
@@ -201,11 +194,10 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     if (!location.pathname.startsWith("/providers")) return;
-    openRemotesOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
+  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate]);
 
   useEffect(() => {
     const currentRoute = `${location.pathname}${location.search}${location.hash}`;
@@ -359,14 +351,14 @@ export function DesktopLayout(props: {
   const navigatorContent = (
     <GlobalNavigator
       position={docking.navigation}
-      profileAnchorRef={profileAnchorRef}
       profileOpen={profileOpen}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
       suppressActiveTool={Boolean(standaloneRouteTitle)}
-      onProfileClick={() => {
-        setSettingsOpen(false);
-        setProfileOpen((open) => !open);
+      onProfileOpenChange={(open) => {
+        if (open) setSettingsOpen(false);
+        setProfileOpen(open);
       }}
+      onOpenAccountSettings={openAccountSettings}
       onSettingsClick={openSettingsOverlay}
       onStartWindowDrag={startTitlebarDrag}
     />
@@ -456,35 +448,30 @@ export function DesktopLayout(props: {
                 transformOrigin: "top right",
               }}
             >
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={styles.windowsTitlebarControlButtonClass}
+              <Pressable
                 aria-label="Minimize window"
+                className={styles.windowsTitlebarControlButtonClass}
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
                 <Minus size={16} strokeWidth={1.5} />
-              </Button>
-              <Button
-                variant="ghost"
+              </Pressable>
+              <Pressable
                 className={styles.windowsTitlebarControlButtonClass}
                 aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
                 title={isWindowMaximized ? "Restore" : "Maximize"}
                 onClick={() => void toggleTitlebarMaximize().catch(() => undefined)}
               >
                 {isWindowMaximized ? <RestoreGlyph /> : <Square size={13} strokeWidth={1.5} />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={styles.windowsTitlebarCloseButtonClass}
+              </Pressable>
+              <Pressable
                 aria-label="Close window"
+                className={styles.windowsTitlebarCloseButtonClass}
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
                 <X size={18} strokeWidth={1.65} />
-              </Button>
+              </Pressable>
             </div>
           ) : null}
         </header>
@@ -574,19 +561,8 @@ export function DesktopLayout(props: {
           </>
         ) : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
-        <div
-          id="misty-shell-overlays"
-          className="pointer-events-none fixed inset-0 z-[2147482500]"
-        />
         {!isAuthRoute ? (
           <>
-            <ProfilePopover
-              anchorRef={profileAnchorRef}
-              currentPath={location.pathname}
-              open={profileOpen}
-              onClose={() => setProfileOpen(false)}
-              onOpenAccountSettings={openAccountSettings}
-            />
             <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
             {user?.id ? (
               <GlobalMisty
@@ -613,7 +589,7 @@ export function DesktopLayout(props: {
 }
 
 function standaloneWorkspaceRouteTitle(pathname: string): string | null {
-  if (import.meta.env.DEV && pathname === "/roadmap-preview") return "Roadmap preview";
+  if (import.meta.env.DEV && pathname === "/dev/ui") return "UI gallery";
   if (pathname === "/activity") return "Activity";
   if (pathname.startsWith("/invite/")) return "Space invitation";
   return null;

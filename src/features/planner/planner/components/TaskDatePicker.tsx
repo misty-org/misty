@@ -123,12 +123,11 @@ export function TaskDatePicker({
           variant="outline"
           type="button"
           disabled={disabled}
+          size="sm"
+          justify="start"
           className={cn(
-            "group flex h-8 w-full items-center justify-start gap-2 rounded-lg border-charcoal-border/70",
-            "bg-charcoal-workspace/60 px-2.5 text-xs text-left shadow-none transition-all",
-            "hover:border-charcoal-border hover:bg-charcoal-card",
-            "disabled:pointer-events-none disabled:opacity-40",
-            formattedDate ? "text-cream font-medium" : "text-cream-muted",
+            "group w-full gap-2 px-2.5 text-xs",
+            formattedDate ? "text-cream" : "font-normal text-cream-muted",
             className,
           )}
         >
@@ -242,10 +241,8 @@ function PresetButton({
       size="sm"
       type="button"
       onClick={onClick}
-      className={cn(
-        "flex h-7 w-full items-center justify-between rounded-md px-2 text-xs text-cream-muted transition-colors",
-        "hover:bg-charcoal-hover hover:text-cream text-left",
-      )}
+      justify="between"
+      className="h-7 w-full px-2 text-xs text-cream-muted"
     >
       <div className="flex items-center gap-2">
         <Icon className="size-3.5 shrink-0 opacity-70" />

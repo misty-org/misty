@@ -9,7 +9,9 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 if (typeof (globalThis as Record<string, unknown>).CSS === "undefined") {
   (globalThis as Record<string, unknown>).CSS = {};
 }
-if (typeof (globalThis as { CSS?: { escape?: (value: string) => string } }).CSS?.escape !== "function") {
+if (
+  typeof (globalThis as { CSS?: { escape?: (value: string) => string } }).CSS?.escape !== "function"
+) {
   (globalThis as { CSS: { escape: (value: string) => string } }).CSS.escape = (value: string) =>
     value.replace(/([^\w-])/g, "\\$1");
 }

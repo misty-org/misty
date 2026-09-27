@@ -30,7 +30,7 @@ vi.mock("@/features/planner/planner/SpacePlanner", () => ({
 // Keep the real runtime guards and host initializers: a shallow tool mock used
 // to hide missing service setup in the restored built-in entry point.
 vi.mock("@/features/library/library/SpaceLibrary", async () => {
-  const { libraryRuntime } = await import("@/features/library/library/libraryRuntime");
+  const { libraryRuntime } = await import("@/features/library/library/LibraryRuntime");
   return {
     SpaceLibrary: ({ spaceId }: { spaceId: string }) => {
       expect(libraryRuntime().api).toBeTruthy();
@@ -39,7 +39,7 @@ vi.mock("@/features/library/library/SpaceLibrary", async () => {
   };
 });
 vi.mock("./chat/SpaceChat", async () => {
-  const { useSocialAuth } = await import("./chat/socialRuntime");
+  const { useSocialAuth } = await import("./chat/SocialRuntime");
   return {
     SpaceSocial: ({ spaceId, provider }: { spaceId: string; provider: string }) => {
       const { user } = useSocialAuth();

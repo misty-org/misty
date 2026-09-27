@@ -1,9 +1,13 @@
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import {
+  cn,
   Button,
   Card,
+  IconButton,
   Input,
+  Pressable,
+  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -11,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui";
-import { LoaderCircle, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -69,15 +73,13 @@ export function SpaceTaskList({
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <Button
-                    className="h-auto max-w-[420px] justify-start p-0 text-left text-sm font-medium hover:bg-transparent"
-                    variant="ghost"
-                    type="button"
+                  <Pressable
+                    className="max-w-[420px] text-sm font-medium"
                     onClick={() => onOpen(task)}
                   >
-                    {taskBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
+                    {taskBusy ? <Spinner size="sm" label={false} /> : null}
                     <span className="truncate">{task.title}</span>
-                  </Button>
+                  </Pressable>
                 </TableCell>
                 <TableCell>
                   <TaskInlineSelect
@@ -141,18 +143,20 @@ export function SpaceTaskList({
                 </TableCell>
                 <TableCell>
                   {canManage ? (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      type="button"
+                    <IconButton
+                      label={`Delete ${task.title}`}
                       title="Delete task"
-                      aria-label={`Delete ${task.title}`}
                       disabled={taskBusy}
                       onClick={() => onDelete(task)}
-                      className="invisible size-7 text-cream-muted opacity-0 transition-opacity group-focus-within/task-row:visible group-focus-within/task-row:opacity-100 group-hover/task-row:visible group-hover/task-row:opacity-100 hover:bg-charcoal-card hover:text-notification-red"
+                      className={cn(
+                        "invisible opacity-0 transition-opacity",
+                        "group-focus-within/task-row:visible",
+                        "group-focus-within/task-row:opacity-100 group-hover/task-row:visible",
+                        "group-hover/task-row:opacity-100 hover:text-notification-red",
+                      )}
                     >
                       <Trash2 className="size-3.5" />
-                    </Button>
+                    </IconButton>
                   ) : null}
                 </TableCell>
               </TableRow>

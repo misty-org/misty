@@ -4,8 +4,8 @@ import type {
   ExplorerLocation,
   FileEntry,
   SearchResult,
-} from "@/native/contracts";
-import type { FileKind, SearchQueryScope, SearchSourceKind } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { FileKind, SearchQueryScope, SearchSourceKind } from "@/native/ipc/primitives";
 
 export function mergeLibrarySearchResults(
   backendResults: SearchResult[],
@@ -72,9 +72,10 @@ function scoreLibraryItem(
   options: LibrarySearchOptions,
   indexedAtMs: number,
 ): SearchResult | null {
-  const sourceKind: SearchSourceKind = item.type === 1 ? "remote" : "local";
+  if (item.type === 1) return null;
+  const sourceKind: SearchSourceKind = "local";
   if (options.scope === "local" && sourceKind !== "local") return null;
-  if (options.scope === "remotes" && sourceKind !== "remote") return null;
+  if (options.scope === "remotes") return null;
   if (
     options.scope === "current" &&
     options.currentPath &&

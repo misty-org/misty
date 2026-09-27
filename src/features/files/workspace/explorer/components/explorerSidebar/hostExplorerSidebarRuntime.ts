@@ -1,5 +1,5 @@
 import { SystemErrorActivity } from "@/features/activity";
-import { devicesUnmount } from "@/features/files/workspace/native";
+import { devicesUnmount } from "../../../native";
 import { ExplorerDropTarget } from "../../drag/ExplorerDropTarget";
 import { ConnectedDevicesSidebarSection } from "./ConnectedDevicesSidebarSection";
 import { useSidebarPreferences } from "./useSidebarPreferences";

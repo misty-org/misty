@@ -1,6 +1,6 @@
 import { MistyAgentPicker } from "./MistyAgentPicker";
 import { VoiceInputMenu, type useAiVoiceRecorder } from "@/features/ai-surface";
-import { Button, cn } from "@/shared/ui";
+import { cn, IconButton } from "@/shared/ui";
 import { Mic, Plus, Settings2, Square, X } from "lucide-react";
 import type { KeyboardEvent, RefObject, ReactNode } from "react";
 import { ConversationMenu } from "./GlobalMistyPanelContent";
@@ -49,16 +49,9 @@ export function GlobalMistyComposerBar(props: {
           )}
           <div className="ml-auto flex shrink-0 items-center gap-0.5 text-cream-muted">
             {props.headerControls}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close Misty"
-              title="Close Misty"
-              onClick={props.onClose}
-            >
+            <IconButton label="Close Misty" onClick={props.onClose}>
               <X className="size-4" />
-            </Button>
+            </IconButton>
           </div>
         </header>
       )}
@@ -89,19 +82,14 @@ export function GlobalMistyComposerBar(props: {
         onError={props.onError}
         modelControl={
           props.headerControls ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-cream-muted"
-              aria-label="Thinking options"
-              title="Thinking options"
+            <IconButton
+              label="Thinking options"
               aria-expanded={props.showSettings}
               aria-controls="misty-settings"
               onClick={props.onToggleSettings}
             >
               <Settings2 className="size-4" />
-            </Button>
+            </IconButton>
           ) : props.mode !== "search" ? (
             <MistyModelPicker
               conversationId={props.activeConversationId}
@@ -117,16 +105,9 @@ export function GlobalMistyComposerBar(props: {
         }
         trailingControl={
           !props.headerControls && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-cream-muted"
-              aria-label="Close Misty"
-              onClick={props.onClose}
-            >
+            <IconButton label="Close Misty" onClick={props.onClose}>
               <X className="size-4" />
-            </Button>
+            </IconButton>
           )
         }
       />
@@ -159,18 +140,14 @@ function ComposerVoiceControls({
 }) {
   return (
     <div className="flex items-center">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={cn("size-7 text-cream-muted", voice.recording && "text-red-300")}
+      <IconButton
+        label={voice.recording ? "Stop voice recording" : "Talk to Misty"}
+        className={cn(voice.recording && "text-red-300")}
         disabled={voice.requesting || voice.transcribing}
         onClick={voice.recording ? voice.stop : () => void voice.start()}
-        aria-label={voice.recording ? "Stop voice recording" : "Talk to Misty"}
-        title={voice.recording ? "Stop voice recording" : "Talk to Misty"}
       >
         {voice.recording ? <Square className="size-3 fill-current" /> : <Mic className="size-4" />}
-      </Button>
+      </IconButton>
       {showInputMenu && (
         <VoiceInputMenu
           compact
@@ -206,15 +183,9 @@ export function GlobalMistyConversationControls(props: {
         onDelete={props.onDelete}
         onRename={props.onRename}
       />
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="New conversation"
-        title="New conversation"
-        onClick={props.onNew}
-      >
+      <IconButton label="New conversation" onClick={props.onNew}>
         <Plus className="size-4" />
-      </Button>
+      </IconButton>
     </div>
   );
 }

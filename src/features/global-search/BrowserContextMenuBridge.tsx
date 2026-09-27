@@ -169,12 +169,13 @@ export function BrowserContextMenuBridge() {
       {error ? (
         <div
           role="alert"
-          className="fixed right-4 top-16 z-[2147483400] max-w-sm rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-md ring-1 ring-cream/10"
+          className="fixed right-4 top-16 layer-menu max-w-sm rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-md ring-1 ring-cream/10"
         >
           <p>{error}</p>
           <Button
             variant="ghost"
-            className="mt-2 rounded-sm px-2 py-1 text-cream-muted hover:bg-charcoal-hover focus-visible:outline"
+            size="sm"
+            className="mt-2 text-cream-muted"
             onClick={() => setError(null)}
           >
             Dismiss

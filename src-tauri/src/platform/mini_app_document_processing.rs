@@ -447,7 +447,6 @@ pub(super) mod tests {
             super::super::super::Instance {
                 root: root.path().into(),
                 permissions,
-
             },
         );
         (state, root)
@@ -1419,15 +1418,11 @@ pub(super) mod tests {
         );
         use crate::infra::{
             environment::AppEnvironmentService, explorer::ExplorerService,
-            explorer_library::ExplorerLibraryService, providers::ProviderService,
-            storage::StorageService, transfers::TransferService,
+            explorer_library::ExplorerLibraryService, transfers::TransferService,
         };
         let env = AppEnvironmentService::for_test_home(root.path().to_owned());
-        let storage = StorageService::new(env.clone());
         let explorer = ExplorerService::new(
             env.clone(),
-            storage.clone(),
-            ProviderService::new(storage),
             TransferService::new(env.clone()),
             ExplorerLibraryService::new(env),
         );
@@ -1537,19 +1532,14 @@ pub(super) mod tests {
             environment::AppEnvironmentService,
             explorer::ExplorerService,
             explorer_library::ExplorerLibraryService,
-            providers::ProviderService,
             smart_library::{
                 PrepareSmartLibraryPreviewsRequest, SmartLibraryScanRequest, SmartLibraryService,
             },
-            storage::StorageService,
             transfers::TransferService,
         };
         let env = AppEnvironmentService::for_test_home(root.path().to_owned());
-        let storage = StorageService::new(env.clone());
         let explorer = ExplorerService::new(
             env.clone(),
-            storage.clone(),
-            ProviderService::new(storage),
             TransferService::new(env.clone()),
             ExplorerLibraryService::new(env.clone()),
         );
@@ -1644,10 +1634,7 @@ pub(super) mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore = "requires MISTY_TEST_SEARCH_WORKER pointing to a built worker"]
     async fn downloaded_search_preserves_incremental_results_scopes_and_revocation() {
-        use crate::infra::{
-            environment::AppEnvironmentService, providers::ProviderService, search::*,
-            storage::StorageService,
-        };
+        use crate::infra::{environment::AppEnvironmentService, search::*};
         let worker =
             std::fs::read(std::env::var("MISTY_TEST_SEARCH_WORKER").expect("worker path")).unwrap();
         let (state, root) = fixture();
@@ -1655,9 +1642,7 @@ pub(super) mod tests {
         assert!(verified_service(root.path(), "library", "1", "file-search", 1).is_err());
         assert!(verified_service(root.path(), "files", "2", "file-search", 1).is_err());
         let env = AppEnvironmentService::for_test_home(root.path().to_owned());
-        let proxy = StorageService::new(env.clone());
-        let providers = ProviderService::new(proxy.clone());
-        let base = SearchService::new(env, providers, proxy);
+        let base = SearchService::new(env);
         let lease = ServiceLease::acquire_service(&state, "test", "files", "file-search", 1)
             .await
             .unwrap();

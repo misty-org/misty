@@ -1,24 +1,26 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ChevronLeft, Pencil, Trash2, Folder, Globe, Search } from "lucide-react";
-import { mistyBrowserProviders } from "@/shared/contracts";
-import { BrandIcon } from "../../shared/toolAssets/BrandIcon";
-import { providers, type ProviderId } from "@/features/webviews/providers";
+import { mistyBrowserProviders } from "@/shared/schemas";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  cn,
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
+  AlertDialogTitle,
+  BrandIcon,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+  IconButton,
   Input,
 } from "@/shared/ui";
+import { providers, type ProviderId } from "@/features/webviews/providers";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
 import type { SharedRecord } from "./model";
 import {
@@ -58,7 +60,7 @@ function SiteRow({
         size="sm"
         aria-label={actionLabel}
         onClick={onAdd}
-        className="h-7 bg-charcoal-hover px-3 text-xs hover:bg-charcoal-active [@media(hover:none)]:min-h-11"
+        className="h-7 px-3 text-xs [@media(hover:none)]:min-h-11"
       >
         Add
       </Button>
@@ -414,12 +416,15 @@ export function EditableGroupRow({
       <div className="group/edit-row flex min-h-9 min-w-0 items-center gap-2 text-sm">
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <div className="flex shrink-0 items-center opacity-0 group-hover/edit-row:opacity-100 group-focus-within/edit-row:opacity-100 [@media(hover:none)]:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={editLabel}
-            className="text-cream-muted [@media(hover:none)]:size-11"
+        <div
+          className={cn(
+            "flex shrink-0 items-center opacity-0 group-hover/edit-row:opacity-100",
+            "group-focus-within/edit-row:opacity-100 [@media(hover:none)]:opacity-100",
+          )}
+        >
+          <IconButton
+            label={editLabel}
+            className="[@media(hover:none)]:size-11"
             onClick={() => {
               setValue(label);
               setError(null);
@@ -427,19 +432,17 @@ export function EditableGroupRow({
             }}
           >
             <Pencil className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={deleteLabel}
-            className="text-cream-muted [@media(hover:none)]:size-11"
+          </IconButton>
+          <IconButton
+            label={deleteLabel}
+            className="[@media(hover:none)]:size-11"
             onClick={() => {
               setError(null);
               setDeleting(true);
             }}
           >
             <Trash2 className="size-4" />
-          </Button>
+          </IconButton>
         </div>
       </div>
       <Dialog open={editing} onOpenChange={setEditing}>

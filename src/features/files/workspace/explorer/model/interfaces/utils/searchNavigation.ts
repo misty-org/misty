@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 
 export interface ExplorerSearchNavigationTarget {
   result: SearchResult;

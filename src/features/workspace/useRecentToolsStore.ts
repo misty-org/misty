@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { homeApi } from "@/api/home/api";
 import type { LucideIcon } from "lucide-react";
-import { appIcon, appIcons } from "@/shared/ui/app-icons";
+import { appIcon, appIcons } from "@/shared/ui";
 import type { WorkspaceSurfaceId, WorkspaceTab } from "./model";
 import { spaceWorkspaceToolFromRoute } from "./routeSurface";
 

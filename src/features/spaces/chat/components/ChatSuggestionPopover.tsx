@@ -1,5 +1,5 @@
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
-import { SocialError as SystemErrorActivity } from "@/features/spaces/chat/socialRuntime";
+import { SocialError as SystemErrorActivity } from "../SocialRuntime";
 import {
   Command,
   CommandEmpty,
@@ -9,7 +9,7 @@ import {
   CommandSeparator,
   PopoverContent,
 } from "@/shared/ui";
-import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
+import { LibraryBig, Paperclip, Users } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 
 export interface ChatSuggestionPopoverProps {
@@ -68,12 +68,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
                 onMouseEnter={() => props.onHoverIndex(index)}
                 onSelect={() => props.onSelect(suggestion)}
               >
-                {suggestion.kind === "member" ? (
-                  <Users />
-
-                ) : (
-                  <LibraryBig />
-                )}
+                {suggestion.kind === "member" ? <Users /> : <LibraryBig />}
                 <span className="min-w-0">
                   <span className="block truncate">{suggestion.label}</span>
                   <span className="block truncate text-xs text-cream-muted">
