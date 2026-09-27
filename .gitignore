@@ -60,6 +60,7 @@ artifacts/
 *.gif
 *.webp
 !src/shared/assets/mail-providers/*.webp
+!src/shared/assets/misty-cloud-expression-cycle.webp
 *.avif
 *.ico
 *.icns

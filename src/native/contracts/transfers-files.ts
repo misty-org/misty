@@ -11,20 +11,6 @@ import type {
   TransferType,
 } from "@/native/contracts/primitives";
 
-import type { ProviderWorkflowOption } from "./workspace-settings";
-export interface ProviderConfigStep {
-  kind: string;
-  name: string;
-  state: string;
-  result: string;
-  done: boolean;
-  error: string;
-  authorizeUrl: string;
-  instructions: string;
-  pollAfterMs: number;
-  option: ProviderWorkflowOption | null;
-}
-
 export interface TransferRecord {
   id: number;
   jobId: number;

@@ -1,5 +1,7 @@
-import { LibraryPicker as MistyFilePicker } from "@/features/library/library/libraryRuntime";
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import {
+  LibraryPicker as MistyFilePicker,
+  libraryApi as spacesApi,
+} from "@/features/library/library/libraryRuntime";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
@@ -156,7 +158,7 @@ export function SpaceLibraryOverlays() {
           mode="file"
           multiple
           title="Add files to this Space"
-          allowRemoteFiles={canImportLibrary}
+          allowDeviceFiles={canImportLibrary}
           onCancel={() => setFilePickerOpen(false)}
           onSelect={(path) => {
             setFilePickerOpen(false);

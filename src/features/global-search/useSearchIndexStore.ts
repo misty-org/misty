@@ -1,13 +1,13 @@
-import { create } from "zustand";
-import {
-  searchInit,
-  searchGetStatus,
-  searchStartScan,
-  searchCancelScan,
-} from "@/native/filesystem";
-import type { SearchStatus } from "@/native/contracts";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
+import type { SearchStatus } from "@/native/contracts";
+import {
+  searchCancelScan,
+  searchGetStatus,
+  searchInit,
+  searchStartScan,
+} from "@/native/filesystem";
 import { userFacingErrorText } from "@/shared/lib/format";
+import { create } from "zustand";
 
 /** Native index lifecycle shared by global search and settings, independent of Files. */
 export const useSearchIndexStore = create<{
@@ -37,7 +37,7 @@ export const useSearchIndexStore = create<{
         );
         return searchStartScan({
           includeLocal: true,
-          includeRemotes: true,
+          includeRemotes: false,
           roots: [],
           maxDepth: preferences.maxDepth,
           ignoredPaths: preferences.ignoredPaths,

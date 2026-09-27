@@ -248,6 +248,14 @@ pub(super) fn configure_browser_webview(
             if let Some(parent) = view.superview() {
                 parent.setAutoresizesSubviews(true);
             }
+            // Stop pages at their edges instead of rubber-banding past the
+            // viewport. This is WebKit SPI (_WKRectEdgeNone = 0), so probe for
+            // it; CSS overscroll-behavior on the root blocked wheel scrolling.
+            let rubber_banding = objc2::sel!(_setRubberBandingEnabled:);
+            let supported: bool = objc2::msg_send![view, respondsToSelector: rubber_banding];
+            if supported {
+                let _: () = objc2::msg_send![view, _setRubberBandingEnabled: 0usize];
+            }
             if let Some(window) = view.window() {
                 // AppKit normally preserves cached window contents during a
                 // user resize. That optimization produces a frozen WKWebView

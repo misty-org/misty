@@ -151,6 +151,8 @@ fn load_snapshot(path: PathBuf) -> ApiResult<ExplorerLibrarySnapshot> {
             )));
         }
     };
+    snapshot.recent_files.retain(|item| item.r#type == 0);
+    snapshot.starred_files.retain(|item| item.r#type == 0);
     snapshot.path = path.display().to_string();
     Ok(snapshot)
 }

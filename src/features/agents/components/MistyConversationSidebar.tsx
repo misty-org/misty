@@ -1,4 +1,4 @@
-import mistyCompanion from "@/assets/branding/misty-icon.png?inline";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
   AlertDialog,

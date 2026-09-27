@@ -1,7 +1,8 @@
-import type { SearchResult } from "@/native/contracts";
 import { SystemErrorActivity } from "@/features/activity";
-import type { SearchQueryScope } from "@/native/contracts/primitives";
+import { useSearchStore } from "@/features/files/workspace/search";
 import { ShortcutHint } from "@/features/shortcuts";
+import type { SearchResult } from "@/native/contracts";
+import type { SearchQueryScope } from "@/native/contracts/primitives";
 import {
   Button,
   Dialog,
@@ -15,7 +16,6 @@ import { CornerDownLeft, ListFilter, Loader2, Search } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useSearchStore } from "@/features/files/workspace/search";
 import { useExplorerStore } from "../store";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
@@ -27,7 +27,6 @@ const scopeOptions: Array<{ value: SearchQueryScope; label: string }> = [
   { value: "everything", label: "All" },
   { value: "current", label: "Here" },
   { value: "local", label: "Local" },
-  { value: "remotes", label: "Remotes" },
 ];
 const emptyPaneEntries: SearchResult["entry"][] = [];
 

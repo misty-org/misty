@@ -8,7 +8,6 @@ import {
 } from "@/features/agents";
 import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
 import { ConnectedDevicePairingDialog } from "@/features/files/workspace";
-import { ConnectedStoragePanel } from "@/features/providers";
 import { useSpacesStore } from "@/features/spaces";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -267,14 +266,6 @@ export function NativeAvailability({ feature }: { feature: string }) {
         preferences remain available here.
       </p>
     </Section>
-  );
-}
-export function FileConnectionsSection(props: SettingsContentProps) {
-  const navigate = useNavigate();
-  return hasTauriInternals() ? (
-    <ConnectedStoragePanel onClose={() => (props.onOpenResource ?? navigate)("/files")} />
-  ) : (
-    <NativeAvailability feature="File connections" />
   );
 }
 export function AgentConnectionsSection() {

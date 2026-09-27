@@ -1,4 +1,4 @@
-import type { MountedDevice, ProviderRemote } from "@/native/contracts";
+import type { MountedDevice } from "@/native/contracts";
 import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 
@@ -12,8 +12,7 @@ import {
   pinnedPathLabel,
   quickAccessPathHidden,
 } from "@/features/file-ui";
-import { providerIconForType } from "@/shared/assets/icons";
-import { AssetIcon, Button, cn } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 
 /**
  * The picker's locations rail: the explorer sidebar reduced to navigation only — no workspace
@@ -74,28 +73,6 @@ export function PickerPlaces(props: PickerPlacesProps) {
           />
         ))}
       </PlacesSection>
-
-      {props.remotes.length > 0 || props.remoteLoading ? (
-        <PlacesSection label="Remotes">
-          {props.remotes.length === 0 ? (
-            <PlacesHint>Loading…</PlacesHint>
-          ) : (
-            props.remotes.map((remote) => {
-              const path = joinPath(props.mountRoot, remote.name);
-              const icon = providerIconForType(remote.type);
-              return (
-                <PlaceRow
-                  key={`${remote.type}:${remote.name}`}
-                  active={props.activePath === path || props.activePath.startsWith(`${path}/`)}
-                  icon={<AssetIcon src={icon.src} color={icon.color} size={16} />}
-                  label={remote.name}
-                  onSelect={() => props.onNavigate(path)}
-                />
-              );
-            })
-          )}
-        </PlacesSection>
-      ) : null}
 
       {devices.length > 0 || props.devicesLoading ? (
         <PlacesSection label="Devices">
@@ -163,8 +140,6 @@ export interface PickerPlacesProps {
   homePath: string;
   activePath: string;
   mountRoot: string;
-  remotes: ProviderRemote[];
-  remoteLoading: boolean;
   devices: MountedDevice[];
   devicesLoading: boolean;
   pinnedPaths: string[];

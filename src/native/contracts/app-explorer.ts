@@ -15,13 +15,7 @@ export interface AppSnapshot {
   appName: string;
   version: string;
   migrationStage: string;
-  storageRuntime: StorageRuntimeSnapshot;
   environment: AppEnvironmentSnapshot;
-}
-export interface StorageRuntimeSnapshot {
-  ready: boolean;
-  error: string | null;
-  version: string;
 }
 export interface AppEnvironmentSnapshot {
   homeDir: string;

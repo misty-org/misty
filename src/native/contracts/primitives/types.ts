@@ -33,8 +33,6 @@ export type ShortcutSource = "default" | "user";
 
 export type PowerToolEndpointKind = "local" | "remote";
 
-export type ProviderConfigMode = "add" | "repair";
-
 export type TransferType =
   "upload" | "download" | "create" | "copy" | "move" | "rename" | "delete" | "archive";
 

@@ -1,4 +1,4 @@
-import type { PowerToolEndpointKind, ProviderConfigMode } from "@/native/contracts/primitives";
+import type { PowerToolEndpointKind } from "@/native/contracts/primitives";
 // eslint-disable-next-line no-restricted-imports -- these transport types are owned by the shortcut registry
 import type { ShortcutCommandDefinition, ShortcutPlatform } from "@/features/shortcuts/registry";
 // eslint-disable-next-line no-restricted-imports -- shortcut slots are shared with native persistence
@@ -137,82 +137,6 @@ export interface ResetShortcutRequest {
   commandIds?: string[];
 }
 
-export interface ProviderHealth {
-  ready: boolean;
-  port: string | null;
-  version: string | null;
-  uptimeSeconds: number;
-  connectedProviders: number;
-  availableProviders: number;
-  error: string | null;
-}
-
-export interface ProviderRemote {
-  name: string;
-  type: string;
-  statusLabel: string;
-  needsReconnect: boolean;
-  error: string | null;
-  configSource: string;
-  connectionId?: string | null;
-  connectionSource?: "connected_account" | "legacy_cloud" | null;
-  connectedAccountId?: string | null;
-}
-
-export interface ProviderWorkflowOption {
-  name: string;
-  label: string;
-  help: string;
-  defaultValue: string;
-  required: boolean;
-  password: boolean;
-  choices: Array<{ value: string; help: string }>;
-}
-
-export interface ProviderWorkflow {
-  type: string;
-  name: string;
-  description: string;
-  options: ProviderWorkflowOption[];
-}
-
-export interface ProvidersSnapshot {
-  health: ProviderHealth;
-  remotes: ProviderRemote[];
-  workflows: ProviderWorkflow[];
-  loading: boolean;
-  error: string | null;
-}
-
-export interface RemoteEditDraft {
-  name: string;
-  originalName: string;
-  providerType: string;
-  config: Record<string, string>;
-  aboutJson: string | null;
-  lastCheckedUnix: number | null;
-}
-
-export interface SaveRemoteRequest {
-  originalName: string;
-  name: string;
-  parameters: Record<string, string>;
-}
-
-export interface RemoteTestResult {
-  success: boolean;
-  message: string;
-  aboutJson: string | null;
-  checkedUnix: number | null;
-}
-
-export interface CloudConfigPaths {
-  configPath: string | null;
-  cachePath: string | null;
-  tempPath: string | null;
-  rawJson: string;
-}
-
 export interface PowerToolEndpoint {
   kind: PowerToolEndpointKind;
   remote?: string;
@@ -226,60 +150,4 @@ export interface TransferProfileOptions {
   retries?: number;
   lowLevelRetries?: number;
   checksum?: boolean;
-}
-
-export interface VerifyOptions {
-  oneWay?: boolean;
-  download?: boolean;
-  profile?: TransferProfileOptions;
-}
-
-export interface VerifyStartRequest {
-  source: PowerToolEndpoint;
-  dest: PowerToolEndpoint;
-  options?: VerifyOptions;
-}
-
-export interface ProviderJobStart {
-  jobId: string;
-}
-
-export interface ProviderJobStatus {
-  jobId: string;
-  operation: string;
-  state: string;
-  phase: string;
-  bytesCompleted: number;
-  bytesTotal: number;
-  bytesPerSecond?: number;
-  sourceRemote?: string | null;
-  sourcePath?: string | null;
-  destRemote?: string | null;
-  destPath?: string | null;
-  message?: string | null;
-  resultReady?: boolean;
-  resultKind?: string | null;
-}
-
-export interface VerifyResult {
-  success: boolean;
-  status?: string | null;
-  hashType?: string | null;
-  missingOnSrc: string[];
-  missingOnDst: string[];
-  match: string[];
-  differ: string[];
-  error: string[];
-  combined: string[];
-}
-
-export interface ProviderConfigRequest {
-  name: string;
-  providerType: string;
-  parameters: Record<string, string>;
-  state?: string;
-  result?: string;
-  mode: ProviderConfigMode;
-  continuing?: boolean;
-  continueExisting?: boolean;
 }

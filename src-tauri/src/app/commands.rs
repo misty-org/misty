@@ -61,12 +61,6 @@ use crate::infra::power_pack::{
     FileToolsReadonlyRequest, FileToolsSymlinkRequest, FileToolsSymlinkTargetRequest,
     FileToolsSymlinkTargetResult, SavedSearch, SavedSearchesSnapshot,
 };
-use crate::infra::providers::{
-    BackendAction, BackendActionResult, BackendRunRequest, CloudConfigPaths, ConfigSecurityStatus,
-    ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
-    ProvidersSnapshot, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult,
-    VerifyStartRequest,
-};
 use crate::infra::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::infra::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::infra::smart_library::{
@@ -76,8 +70,6 @@ use crate::infra::smart_library::{
     SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest,
     SmartLibrarySearchRequest, SmartLibrarySnapshot,
 };
-use crate::infra::storage::StorageSnapshot;
-use crate::infra::storage_runtime::StorageRuntimeSnapshot;
 use crate::infra::transfers::{TransferFilter, TransferPage};
 
 #[derive(Debug, Serialize)]
@@ -86,7 +78,6 @@ pub struct AppSnapshot {
     app_name: &'static str,
     version: &'static str,
     migration_stage: &'static str,
-    storage_runtime: StorageRuntimeSnapshot,
     environment: AppEnvironmentSnapshot,
 }
 
@@ -131,7 +122,6 @@ pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapsh
         app_name: "Misty",
         version: env!("CARGO_PKG_VERSION"),
         migration_stage: "Tauri migration shell",
-        storage_runtime: state.storage_runtime.snapshot(),
         environment: state.environment.snapshot(),
     })
 }
@@ -307,11 +297,6 @@ pub fn claude_drain_events(state: State<'_, MistyRuntime>) -> Vec<ClaudeStreamEv
 #[tauri::command]
 pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
     state.claude.abort()
-}
-
-#[tauri::command]
-pub async fn storage_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<StorageSnapshot> {
-    Ok(state.storage.snapshot().await)
 }
 
 #[tauri::command]
@@ -1862,198 +1847,6 @@ pub async fn connected_devices_prepare_clipboard_files(
 }
 
 #[tauri::command]
-pub async fn providers_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ProvidersSnapshot> {
-    state.providers.snapshot().await
-}
-
-#[tauri::command]
-pub async fn providers_refresh(state: State<'_, MistyRuntime>) -> ApiResult<ProvidersSnapshot> {
-    state.providers.refresh().await
-}
-
-#[tauri::command]
-pub async fn providers_import_cloud_connection(
-    name: String,
-    provider_type: String,
-    connection_id: String,
-    connection_source: Option<String>,
-    connected_account_id: Option<String>,
-    handoff: String,
-    redeem_url: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProvidersSnapshot> {
-    let name = name.trim();
-    let provider_type = provider_type.trim();
-    let connection_id = connection_id.trim();
-    let handoff = handoff.trim();
-    if name.is_empty() || connection_id.is_empty() || handoff.is_empty() {
-        return Err(ApiError::Message(
-            "Cloud connection name and credential handoff are required.".to_owned(),
-        ));
-    }
-    if !matches!(provider_type, "drive" | "dropbox" | "onedrive") {
-        return Err(ApiError::Message(
-            "That cloud provider is not supported.".to_owned(),
-        ));
-    }
-    let connection_source = connection_source.as_deref().unwrap_or("legacy_cloud");
-    if !matches!(connection_source, "connected_account" | "legacy_cloud")
-        || (connection_source == "connected_account"
-            && connected_account_id
-                .as_deref()
-                .is_none_or(|value| value.trim().is_empty()))
-    {
-        return Err(ApiError::Message(
-            "Cloud connection provenance was invalid.".to_owned(),
-        ));
-    }
-    let credential = crate::infra::cloud_handoff::redeem_cloud_credential(handoff, &redeem_url)
-        .await
-        .map_err(ApiError::Message)?;
-    if credential.connection_id != connection_id
-        || credential.provider != provider_type
-        || credential.access_token.trim().is_empty()
-    {
-        return Err(ApiError::Message(
-            "Cloud credential handoff did not match the selected connection.".to_owned(),
-        ));
-    }
-    state
-        .storage_runtime
-        .call(
-            "config/create",
-            serde_json::json!({
-                "name": name,
-                "type": provider_type,
-                "parameters": {
-                    "access_token": credential.access_token,
-                    "misty_connection_id": connection_id,
-                    "misty_connection_source": connection_source,
-                    "misty_connected_account_id": connected_account_id.as_deref().unwrap_or(""),
-                },
-                "opt": { "nonInteractive": true }
-            }),
-        )
-        .map_err(ApiError::Message)?;
-    state.providers.refresh().await
-}
-
-#[tauri::command]
-pub async fn providers_select_remote(
-    name: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RemoteEditDraft> {
-    state.providers.select_remote(name).await
-}
-
-#[tauri::command]
-pub async fn providers_save_remote(
-    request: SaveRemoteRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RemoteEditDraft> {
-    state.providers.save_remote(request).await
-}
-
-#[tauri::command]
-pub async fn providers_test_remote(
-    name: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RemoteTestResult> {
-    state.providers.test_remote(name).await
-}
-
-#[tauri::command]
-pub async fn providers_config_paths(state: State<'_, MistyRuntime>) -> ApiResult<CloudConfigPaths> {
-    state.providers.config_paths().await
-}
-
-#[tauri::command]
-pub async fn providers_configure_remote(
-    request: ProviderConfigRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProviderConfigStep> {
-    state.providers.configure_remote(request).await
-}
-
-#[tauri::command]
-pub async fn providers_verify_start(
-    request: VerifyStartRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProviderJobStart> {
-    state.providers.start_verify(request).await
-}
-
-#[tauri::command]
-pub async fn providers_job_status(
-    job_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProviderJobStatus> {
-    state.providers.job_status(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_job_cancel(
-    job_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.providers.cancel_job(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_verify_result(
-    job_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<VerifyResult> {
-    state.providers.verify_result(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_backend_actions(
-    remote: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Vec<BackendAction>> {
-    state.providers.backend_actions(remote).await
-}
-
-#[tauri::command]
-pub async fn providers_run_backend_action(
-    request: BackendRunRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<BackendActionResult> {
-    state.providers.run_backend_action(request).await
-}
-
-#[tauri::command]
-pub async fn providers_config_security(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConfigSecurityStatus> {
-    state.providers.config_security().await
-}
-
-#[tauri::command]
-pub async fn providers_harden_config(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConfigSecurityStatus> {
-    state.providers.harden_config().await
-}
-
-#[tauri::command]
-pub async fn providers_repair_config_security(
-    password: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConfigSecurityStatus> {
-    state.providers.repair_config_security(password).await
-}
-
-#[tauri::command]
-pub async fn providers_disconnect_remote(
-    name: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProvidersSnapshot> {
-    state.providers.disconnect_remote(name).await
-}
-
-#[tauri::command]
 pub async fn transfers_snapshot(
     filter: Option<TransferFilter>,
     state: State<'_, MistyRuntime>,
@@ -2207,7 +2000,6 @@ fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
             errors.join("; ")
         )));
     }
-
 }
 
 #[tauri::command]
@@ -2426,17 +2218,6 @@ pub async fn duplicates_cancel(scan_id: String, state: State<'_, MistyRuntime>) 
 }
 
 #[tauri::command]
-pub async fn duplicates_hash_remote_candidates(
-    scan_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<DuplicateScanResult> {
-    state
-        .power_pack
-        .duplicates_hash_remote_candidates(scan_id)
-        .await
-}
-
-#[tauri::command]
 pub async fn saved_searches_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<SavedSearchesSnapshot> {
@@ -2563,7 +2344,9 @@ pub async fn settings_profile_state(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
     if webview.label() != "main" {
-        return Err(ApiError::Unavailable("Only the trusted Misty shell can read settings profiles.".into()));
+        return Err(ApiError::Unavailable(
+            "Only the trusted Misty shell can read settings profiles.".into(),
+        ));
     }
     state.settings.profile_state(scope, None).await
 }
@@ -2577,7 +2360,12 @@ pub async fn settings_profile_commit(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
     if webview.label() != "main" {
-        return Err(ApiError::Unavailable("Only the trusted Misty shell can save settings profiles.".into()));
+        return Err(ApiError::Unavailable(
+            "Only the trusted Misty shell can save settings profiles.".into(),
+        ));
     }
-    state.settings.profile_state(scope, Some((revision, document))).await
+    state
+        .settings
+        .profile_state(scope, Some((revision, document)))
+        .await
 }

@@ -1,4 +1,4 @@
-import sprite from "@/assets/branding/misty-icon.png?inline";
+import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Switch } from "@/shared/ui";
 import { useState } from "react";

@@ -15,11 +15,11 @@ import {
   searchInit,
   searchStartScan,
 } from "@/features/files/workspace/native";
+import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 import type { SearchResult, SearchStatus } from "@/native/contracts";
 import type { SearchQueryScope } from "@/native/contracts/primitives";
 import { userFacingErrorText } from "@/shared/lib/format";
 import { create } from "zustand";
-import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 
 const searchDebounceMs = 180;
 const activeStatusPollMs = 500;
@@ -96,7 +96,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       );
       const status = await searchStartScan({
         includeLocal: true,
-        includeRemotes: true,
+        includeRemotes: false,
         roots: [],
         maxDepth: searchPreferences.maxDepth,
         ignoredPaths: searchPreferences.ignoredPaths,

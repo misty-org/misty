@@ -808,7 +808,7 @@ function AgentEditor({
         <div className="rounded-xl border border-charcoal-border/70 bg-charcoal-bg/50 p-4 space-y-4">
           <div>
             <div className="text-xs font-medium text-cream-muted mb-2 uppercase tracking-wider">
-              Misty mark
+              Cloud avatar
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {agentCloudVariants.map((variant) => {

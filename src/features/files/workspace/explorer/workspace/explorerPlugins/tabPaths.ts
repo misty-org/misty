@@ -3,15 +3,10 @@ import { useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import type { PluginTabState } from "../../model/types/workspace/ExplorerDesktopPlugins";
 
 const transfersTabPath = "misty-transfers://history";
-const remotesTabPath = "misty-remotes://manage";
 const pluginTabProtocol = "misty-plugin:";
 
-export function isRemotesTabPath(path: string): boolean {
-  return path === remotesTabPath;
-}
-
 export function isChromeTabPath(path: string): boolean {
-  return isTransfersTabPath(path) || isRemotesTabPath(path);
+  return isTransfersTabPath(path);
 }
 
 export function canCloseExplorerTab(tab: MultiPanelTab, tabs: MultiPanelTab[]): boolean {
@@ -56,7 +51,7 @@ export function openTransfersTab(): WorkspaceTab {
  * Leaves a chrome tab for an ordinary browse tab.
  *
  * The embedded file manager hides its own tab strip because the dock supplies
- * one, so a chrome tab like Remotes has no visible way back. Falls back to
+ * one, so a chrome tab like Transfers has no visible way back. Falls back to
  * opening a browse tab when every remaining tab is chrome.
  */
 export function returnToBrowseTab(

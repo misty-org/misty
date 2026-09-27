@@ -1,5 +1,5 @@
-import sprite from "@/assets/branding/misty-icon.png?inline";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui";
 import { MousePointer2, Square } from "lucide-react";

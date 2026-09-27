@@ -23,7 +23,6 @@ import {
   AgentPermissionsSection,
   CompanionSection,
   DevicesSection,
-  FileConnectionsSection,
   ManageSpacesSection,
   ModelsSection,
   NativeAvailability,
@@ -147,7 +146,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "device",
     true,
   ),
-  page("files", "files-connections", "Connections", FileConnectionsSection, "resource"),
   page("files", "search", "Search", (p) => <SearchSection {...p} page="search" />, "device", true),
   page(
     "files",

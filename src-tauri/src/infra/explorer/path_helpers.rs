@@ -49,29 +49,6 @@ pub(super) fn ignored_upload_name(name: &str) -> bool {
         || lower.ends_with('~')
 }
 
-pub(super) fn remote_job_transferred_bytes(
-    status: &RemoteJobStatus,
-    progress: Option<TransferProgress>,
-) -> i64 {
-    progress
-        .map(|progress| {
-            progress
-                .base_bytes
-                .saturating_add(status.bytes_completed.max(0))
-        })
-        .unwrap_or(status.bytes_completed)
-}
-
-pub(super) fn remote_job_total_bytes(
-    status: &RemoteJobStatus,
-    progress: Option<TransferProgress>,
-) -> i64 {
-    progress
-        .filter(|progress| progress.total_bytes > 0)
-        .map(|progress| progress.total_bytes)
-        .unwrap_or(status.bytes_total)
-}
-
 pub(super) fn validate_remote_name(name: &str) -> ApiResult<&str> {
     let trimmed = name.trim();
     if trimmed.is_empty() || trimmed.contains('/') || trimmed.contains('\\') {
@@ -83,87 +60,6 @@ pub(super) fn validate_remote_name(name: &str) -> ApiResult<&str> {
         return Err(ApiError::Message("Choose a different name.".to_string()));
     }
     Ok(trimmed)
-}
-
-pub(super) fn remote_parent_path(path: &str) -> String {
-    let parent = Path::new(path)
-        .parent()
-        .and_then(|value| value.to_str())
-        .unwrap_or("/");
-    if parent.is_empty() {
-        "/".to_string()
-    } else {
-        parent.to_string()
-    }
-}
-
-pub(super) fn remote_item_is_directory(
-    parent: &RemoteBrowseTarget,
-    target_path: &str,
-    items: &[RemoteListItem],
-) -> ApiResult<Option<bool>> {
-    for item in items {
-        if remote_item_path(parent, item)? == target_path {
-            return Ok(Some(item.is_dir));
-        }
-    }
-    Ok(None)
-}
-
-pub(super) fn is_remote_directory_not_found_error(error: &ApiError) -> bool {
-    let message = error.to_string().to_ascii_lowercase();
-    message.contains("directory not found")
-        || message.contains("object not found")
-        || message.contains("invalidresourceid")
-        || message.contains("objecthandle is invalid")
-}
-
-pub(super) fn remote_preview_metadata_from_items(
-    parent: &RemoteBrowseTarget,
-    target_path: &str,
-    items: &[RemoteListItem],
-) -> ApiResult<Option<(i64, String)>> {
-    for item in items {
-        if remote_item_path(parent, item)? != target_path {
-            continue;
-        }
-        if item.is_dir {
-            return Err(ApiError::Message(
-                "Only files can be previewed.".to_string(),
-            ));
-        }
-        return Ok(Some((item.size, item.mod_time.clone())));
-    }
-    Ok(None)
-}
-
-pub(super) fn dedupe_remote_list_items(
-    parent: &RemoteBrowseTarget,
-    items: Vec<RemoteListItem>,
-) -> ApiResult<Vec<RemoteListItem>> {
-    let mut seen_paths = BTreeSet::new();
-    let mut deduped = Vec::with_capacity(items.len());
-    for item in items {
-        if item.name.trim().is_empty() && item.path.trim().is_empty() {
-            continue;
-        }
-        let child_path = remote_item_path(parent, &item)?;
-        if seen_paths.insert(child_path) {
-            deduped.push(item);
-        }
-    }
-    Ok(deduped)
-}
-
-pub(super) fn remote_item_path(
-    parent: &RemoteBrowseTarget,
-    item: &RemoteListItem,
-) -> ApiResult<String> {
-    let name = item.name.trim();
-    if name.is_empty() {
-        return parent.child_remote_path(item);
-    }
-    normalize_remote_path(&join_remote_path(&parent.remote_path, name))
 }
 
 pub(super) async fn ensure_destination_available(path: &Path) -> ApiResult<()> {

@@ -81,7 +81,8 @@ fn read_env_value(path: &Path, key: &str) -> Option<String> {
 }
 
 /// Build helpers for the same target and profile as Misty, then embed their
-/// bytes. Separate target directories avoid Cargo's parent-build lock.
+/// bytes. Keep helpers inside this build's OUT_DIR so neither the parent nor
+/// another desktop profile competes for the same worker build directory.
 fn build_builtin_workers() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
         return;
@@ -89,6 +90,7 @@ fn build_builtin_workers() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("services");
     let target = env::var("TARGET").expect("Cargo target");
     let profile = env::var("PROFILE").expect("Cargo profile");
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
     for (service, protocol) in [
         ("document-processing", 5),
@@ -104,14 +106,17 @@ fn build_builtin_workers() {
         command
             .current_dir(&directory)
             .args(["build", "--locked", "--target", &target]);
-        command.env("CARGO_TARGET_DIR", directory.join("target"));
+        let worker_target = out_dir.join("worker-targets").join(service);
+        command.env("CARGO_TARGET_DIR", &worker_target);
+        // Do not inherit the desktop's intermediate directory: a nested Cargo
+        // build would wait on the lock held by its own parent build.
+        command.env("CARGO_BUILD_BUILD_DIR", &worker_target);
         if profile == "release" {
             command.arg("--release");
         }
         let status = command.status().expect("could not build bundled worker");
         assert!(status.success(), "could not build bundled {service} worker");
-        let binary = directory
-            .join("target")
+        let binary = worker_target
             .join(&target)
             .join(&profile)
             .join(format!("misty-{service}"));
@@ -121,9 +126,5 @@ fn build_builtin_workers() {
         ));
     }
     source.push_str("_ => Err(\"Unknown built-in worker protocol.\".into()),\n}");
-    std::fs::write(
-        PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("builtin_workers.rs"),
-        source,
-    )
-    .expect("write bundled worker map");
+    std::fs::write(out_dir.join("builtin_workers.rs"), source).expect("write bundled worker map");
 }
