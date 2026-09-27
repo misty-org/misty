@@ -7,6 +7,7 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile, AgentProfileInput } from "@/shared/contracts";
 import {
   Button,
+  IconButton,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +72,8 @@ const emptyProfile: AgentProfileInput = {
   reasoning_effort: "",
   enabled: true,
 };
+const recipientRowClass = "h-auto w-full justify-start gap-3 rounded-md p-2.5 text-left";
+
 export default function NativeAgentsPage() {
   const { user } = useAuth();
   // New work is personal. Historical conversations retain their saved scope when reopened.
@@ -176,7 +179,7 @@ export default function NativeAgentsPage() {
       setActivity(false);
     });
   return (
-    <main className={`agents-workspace${""}`}>
+    <main className="agents-workspace">
       <aside className="agents-roster" aria-label="Your agents">
         <header
           className="agents-roster-heading"
@@ -187,20 +190,10 @@ export default function NativeAgentsPage() {
             Agents
           </span>
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="agent-icon-button"
-              onClick={showSettings}
-              aria-label="Agent settings"
-              title="Agent settings"
-            >
+            <IconButton onClick={showSettings} label="Agent settings">
               <SlidersHorizontal className="size-4 shrink-0" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="agent-icon-button"
+            </IconButton>
+            <IconButton
               onClick={() =>
                 change(() => {
                   setNewChat(true);
@@ -209,12 +202,11 @@ export default function NativeAgentsPage() {
                   setSettingsModalOpen(false);
                 })
               }
-              aria-label="New chat"
-              title="New chat"
+              label="New chat"
               disabled={working || editorStatus.busy}
             >
               <Plus className="size-4 shrink-0" />
-            </Button>
+            </IconButton>
           </div>
         </header>
         <div className="agents-roster-list">
@@ -309,7 +301,7 @@ export default function NativeAgentsPage() {
                             <MoreHorizontal className="size-3.5 shrink-0" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="agent-options-menu">
+                        <DropdownMenuContent align="end" width="md">
                           <DropdownMenuItem onSelect={() => select(agent.id, true)}>
                             <Plus className="size-3.5 shrink-0" />
                             New conversation
@@ -452,15 +444,9 @@ export default function NativeAgentsPage() {
                   onChange={(e) => setRecipientSearch(e.target.value)}
                 />
               </label>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="agent-icon-button"
-                aria-label="Close new chat"
-                onClick={() => setNewChat(false)}
-              >
+              <IconButton label="Close new chat" onClick={() => setNewChat(false)}>
                 <X size={18} />
-              </Button>
+              </IconButton>
             </>
           ) : (
             <>
@@ -479,27 +465,20 @@ export default function NativeAgentsPage() {
                       : profile?.name || "Misty"}
                 </h2>
               </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn(
-                  "agent-icon-button",
-                  activity && "bg-charcoal-active text-cream-bright",
-                )}
-                aria-label={activity ? "Hide activity" : "View agent activity"}
-                title={activity ? "Hide activity" : "Agent activity and details"}
+              <IconButton
+                label={activity ? "Hide activity" : "View agent activity"}
                 aria-pressed={activity}
                 onClick={() => setActivity((prev) => !prev)}
               >
                 <Activity size={18} />
-              </Button>
+              </IconButton>
             </>
           )}
         </header>
         {newChat ? (
           <div className="agent-new-chat">
             <div className="agent-recipient-results" role="group" aria-label="Choose an agent">
-              <Button variant="ghost" onClick={create}>
+              <Button variant="ghost" className={recipientRowClass} onClick={create}>
                 <Plus size={20} />
                 Create new agent
               </Button>
@@ -508,7 +487,12 @@ export default function NativeAgentsPage() {
                   a.name.toLocaleLowerCase().includes(recipientSearch.trim().toLocaleLowerCase()),
                 )
                 .map((a) => (
-                  <Button variant="ghost" key={a.id} onClick={() => select(a.id, true)}>
+                  <Button
+                    variant="ghost"
+                    key={a.id}
+                    className={recipientRowClass}
+                    onClick={() => select(a.id, true)}
+                  >
                     <AgentAvatar agent={a} />
                     {a.name}
                   </Button>

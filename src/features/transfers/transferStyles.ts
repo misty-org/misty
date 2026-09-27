@@ -58,7 +58,7 @@ export const transferStyles = {
   rowActionGroup:
     "inline-flex h-8 overflow-hidden rounded-md border border-charcoal-border/70 bg-charcoal-card",
   rowActionIconButton:
-    "h-[30px] w-8 rounded-none border-0 border-r border-charcoal-border/70 bg-transparent p-0 text-cream-muted shadow-none last:border-r-0 hover:bg-charcoal-hover hover:text-cream",
+    "h-[30px] w-8 rounded-none border-0 border-r border-charcoal-border/70 bg-transparent p-0 text-cream-muted shadow-none last:border-r-0 hover:bg-cream/[0.045] hover:text-cream",
   pagination:
     "flex min-w-0 items-center justify-between gap-2 border-t border-charcoal-border/70 px-3 py-1.5 text-xs text-cream-muted",
   contentScroll: "h-full overflow-auto p-3",

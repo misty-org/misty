@@ -47,7 +47,10 @@ function WindowLayoutEditor() {
               variant="ghost"
               size="none"
               aria-pressed={layout.navigation === preset.navigation && layout.tabs === preset.tabs}
-              className="misty-docking-preset"
+              className={cn(
+                "h-auto flex-col items-stretch gap-[7px] whitespace-normal rounded-md border-charcoal-border p-[9px]",
+                "text-xs font-normal text-cream-muted aria-pressed:border-cream-muted aria-pressed:text-cream-bright",
+              )}
               onClick={() => {
                 setLayout(preset);
                 setMessage("");
@@ -63,7 +66,7 @@ function WindowLayoutEditor() {
             <legend className="mb-2 text-xs font-medium">
               {part === "navigation" ? "Navigation" : "Tabs"}
             </legend>
-            <div className="misty-docking-positions">
+            <div className="flex gap-0.5 rounded-md border border-charcoal-border bg-charcoal-workspace p-[3px]">
               {dockPositions.map((position) => {
                 const occupied = layout[part === "navigation" ? "tabs" : "navigation"] === position;
                 return (
@@ -82,7 +85,7 @@ function WindowLayoutEditor() {
                       setPosition(part, position);
                       setMessage("");
                     }}
-                    className="capitalize"
+                    className="h-[30px] flex-1 justify-center rounded-[3px] text-xs capitalize aria-pressed:text-cream-bright"
                   >
                     {position}
                   </Button>

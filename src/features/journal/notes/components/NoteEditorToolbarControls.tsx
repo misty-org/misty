@@ -1,10 +1,9 @@
 import {
-  Button,
-  cn,
   ColorSwatch,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  IconButton,
   MenuTrigger,
   Popover,
   PopoverContent,
@@ -40,12 +39,7 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
       </ToolbarGroup>
       <ToolbarGroup>
         <DropdownMenu>
-          <MenuTrigger
-            iconOnly
-            label="Headings"
-            className="misty-tiptap-tool"
-            icon={<Heading size={17} />}
-          />
+          <MenuTrigger iconOnly label="Headings" size="md" icon={<Heading size={17} />} />
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
               <Pilcrow /> Text
@@ -67,12 +61,7 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
-          <MenuTrigger
-            iconOnly
-            label="Lists"
-            className="misty-tiptap-tool"
-            icon={<List size={17} />}
-          />
+          <MenuTrigger iconOnly label="Lists" size="md" icon={<List size={17} />} />
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={() => editor.chain().focus().toggleBulletList().run()}>
               <List /> Bullet list
@@ -144,9 +133,9 @@ export function NoteToolbarInlineControls({ editor }: { editor: Editor }) {
       />
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" className="misty-tiptap-tool" aria-label="Highlight">
+          <IconButton size="md" label="Highlight">
             <Highlighter size={17} />
-          </Button>
+          </IconButton>
         </PopoverTrigger>
         <PopoverContent className="flex w-auto gap-1 p-2">
           {["#7255d9", "#d7a928", "#3f8e72", "#b95656"].map((color) => (
@@ -169,24 +158,15 @@ function ToolbarGroup({ children }: { children: React.ReactNode }) {
   return <div className="flex shrink-0 items-center gap-0.5">{children}</div>;
 }
 
-function ToolButton(props: {
+export function ToolButton(props: {
   label: string;
   Icon: LucideIcon;
   active?: boolean;
   onClick: () => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.active}
-      className={cn("misty-tiptap-tool", props.active && "is-active")}
-      onClick={props.onClick}
-    >
+    <IconButton size="md" label={props.label} aria-pressed={props.active} onClick={props.onClick}>
       <props.Icon size={17} />
-    </Button>
+    </IconButton>
   );
 }

@@ -89,7 +89,7 @@ const multiPanelStyles = {
     "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
   paneActionButton: [
     "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-cream-muted",
-    "hover:bg-charcoal-hover hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
+    "hover:bg-cream/[0.045] hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
     "max-[720px]:h-7 max-[720px]:w-[30px]",
   ].join(" "),
 } as const;

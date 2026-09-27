@@ -334,7 +334,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
                               variant="ghost"
                               size="icon-sm"
                               className={cn(
-                                "grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream",
+                                "grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
                                 settingsDisabledControlClass,
                               )}
                               aria-label={`Restore ${definition.label}`}

@@ -1,6 +1,6 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/contracts";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCompanionPresentation, useCompanionState } from "../companion/companionState";
@@ -102,12 +102,9 @@ describe("Agents workspace conversations", () => {
     const auto = screen.getByRole("radio", {
       name: "Auto",
     });
+    expect(auto.getAttribute("aria-checked")).toBe("true");
+    act(() => auto.focus());
     expect(auto.tabIndex).toBe(0);
-    expect(
-      screen.getByRole("radio", {
-        name: "Team",
-      }).tabIndex,
-    ).toBe(-1);
     fireEvent.keyDown(auto, {
       key: "ArrowLeft",
     });

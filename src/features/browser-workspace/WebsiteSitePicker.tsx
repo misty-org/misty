@@ -58,7 +58,7 @@ function SiteRow({
         size="sm"
         aria-label={actionLabel}
         onClick={onAdd}
-        className="h-7 bg-charcoal-hover px-3 text-xs hover:bg-charcoal-active [@media(hover:none)]:min-h-11"
+        className="h-7 px-3 text-xs [@media(hover:none)]:min-h-11"
       >
         Add
       </Button>

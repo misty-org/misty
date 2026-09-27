@@ -3,7 +3,7 @@ import type {
   AiContextReference,
   AiSelectionSnapshot,
 } from "@/features/ai-surface";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, SegmentedControl } from "@/shared/ui";
 import {
   Bot,
   Camera,
@@ -41,47 +41,28 @@ export function SearchAskToggle(props: {
   compact?: boolean;
   onChange: (mode: "search" | "ask") => void;
 }) {
-  const activeMode = props.mode === "search" ? "search" : "ask";
-  const options = [
-    { mode: "search" as const, label: "Search", icon: Search },
-    { mode: "ask" as const, label: "Ask", icon: MessageCircle },
-  ];
-
   return (
-    <div className={cn("flex", !props.compact && "px-4 pb-3")}>
-      <div
-        className={cn(
-          "flex items-center gap-0.5 rounded-xl border border-charcoal-border bg-charcoal-bg/70 p-0.5",
-          props.compact && "rounded-lg border-white/10 bg-white/[0.035]",
-        )}
-        role="group"
-        aria-label="Search or Ask"
-      >
-        {options.map((option) => {
-          const Icon = option.icon;
-          const active = activeMode === option.mode;
-          return (
-            <Button
-              variant="ghost"
-              key={option.mode}
-              data-misty-mode={option.mode}
-              aria-pressed={active}
-              onClick={() => props.onChange(option.mode)}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors",
-                props.compact && "h-6 rounded-md px-2 text-[11px]",
-                active
-                  ? "bg-charcoal-hover text-cream shadow-sm"
-                  : "text-cream-muted hover:text-cream",
-              )}
-            >
-              <Icon className="size-3.5" strokeWidth={1.9} />
-              {option.label}
-            </Button>
-          );
-        })}
-      </div>
-    </div>
+    <SegmentedControl
+      label="Search or Ask"
+      size={props.compact ? "xs" : "sm"}
+      className={props.compact ? undefined : "mx-4 mb-3"}
+      value={props.mode === "search" ? "search" : "ask"}
+      options={[
+        {
+          value: "search",
+          label: "Search",
+          icon: <Search strokeWidth={1.9} />,
+          attributes: { "data-misty-mode": "search" },
+        },
+        {
+          value: "ask",
+          label: "Ask",
+          icon: <MessageCircle strokeWidth={1.9} />,
+          attributes: { "data-misty-mode": "ask" },
+        },
+      ]}
+      onChange={props.onChange}
+    />
   );
 }
 

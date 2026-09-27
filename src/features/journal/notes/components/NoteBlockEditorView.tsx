@@ -60,7 +60,7 @@ import {
   Superscript as SuperscriptIcon,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Text as YText } from "yjs";
 import type { NoteBodyFormat } from "../model/types/types";
 import type { UploadNoteAssetInput } from "../noteAssets";
@@ -69,6 +69,7 @@ import { journalImage } from "./journalImage";
 import {
   NoteToolbarInlineControls,
   NoteToolbarStructureControls,
+  ToolButton,
 } from "./NoteEditorToolbarControls";
 import "./noteTiptapEditor.css";
 export type NoteEditorSession = Pick<
@@ -708,12 +709,7 @@ function SimpleEditorToolbar(props: {
       </ToolbarGroup>
       <ToolbarRule />
       <ToolbarGroup>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="misty-tiptap-tool gap-1.5 px-2"
-          onClick={props.onAddImage}
-        >
+        <Button variant="toolbar" size="sm" className="gap-1.5 px-2" onClick={props.onAddImage}>
           <ImagePlus size={17} />
           Add
         </Button>
@@ -735,29 +731,6 @@ function ToolbarGroup({ children }: { children: ReactNode }) {
 }
 function ToolbarRule() {
   return <Separator orientation="vertical" className="mx-1.5 h-6 shrink-0" />;
-}
-function ToolButton(props: {
-  label: string;
-  Icon: ComponentType<{
-    size?: number;
-  }>;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.active}
-      className={cn("misty-tiptap-tool", props.active && "is-active")}
-      onClick={props.onClick}
-    >
-      <props.Icon size={17} />
-    </Button>
-  );
 }
 function SearchReplacePanel(props: {
   editor: Editor;

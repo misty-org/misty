@@ -146,17 +146,20 @@ export function WorkspaceLayoutTabs(
       ?.closest("[data-reorder-item]")
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeLayoutTabId, position]);
-  const newTabButton = (
-    <IconButton
-      size="xs"
-      tooltip={false}
-      className={vertical ? "misty-side-new-tab" : undefined}
-      label="New tab"
-      title="New tab"
+  const newTabButton = vertical ? (
+    <Button
+      variant="toolbar"
+      size="sm"
+      justify="start"
+      className="w-full gap-2 px-2 text-xs"
       onClick={props.onNewTab}
     >
-      <Plus className="size-3.5" size={14} />
-      {vertical && <span>New tab</span>}
+      <Plus className="size-3.5" />
+      New tab
+    </Button>
+  ) : (
+    <IconButton size="xs" tooltip={false} label="New tab" onClick={props.onNewTab}>
+      <Plus className="size-3.5" />
     </IconButton>
   );
   const select = (id: string) => {

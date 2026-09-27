@@ -330,7 +330,7 @@ function FeedbackButton(props: { label: string; onClick: () => void; children: R
       onClick={props.onClick}
       className={cn(
         "grid size-7 place-items-center rounded-md text-cream-muted transition-colors",
-        "hover:bg-charcoal-hover hover:text-cream",
+        "hover:bg-cream/[0.045] hover:text-cream",
       )}
     >
       {props.children}

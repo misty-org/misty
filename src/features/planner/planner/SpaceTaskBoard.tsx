@@ -226,7 +226,7 @@ function BoardColumn({
                     type="button"
                     title="Expand into full task editor"
                     onClick={onOpenFullCreate}
-                    className="size-6 text-cream-muted hover:bg-charcoal-hover hover:text-cream"
+                    className="size-6 text-cream-muted hover:bg-cream/[0.045] hover:text-cream"
                   >
                     <Maximize2 className="size-3" />
                   </Button>
@@ -389,7 +389,7 @@ function TaskCard({
                   event.stopPropagation();
                   onOpen(task);
                 }}
-                className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream"
+                className="size-6 rounded-md text-cream-muted hover:bg-cream/[0.045] hover:text-cream"
               >
                 <Pencil className="size-3" />
               </Button>
@@ -405,7 +405,7 @@ function TaskCard({
                     event.stopPropagation();
                     onDelete(task);
                   }}
-                  className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-notification-red"
+                  className="size-6 rounded-md text-cream-muted hover:bg-cream/[0.045] hover:text-notification-red"
                 >
                   <Trash2 className="size-3" />
                 </Button>

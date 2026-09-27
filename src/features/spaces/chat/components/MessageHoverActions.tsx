@@ -57,7 +57,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
           icon={<Trash2 />}
           label="Delete message"
           title="Delete"
-          className="text-cream-muted hover:bg-charcoal-active hover:text-cream-bright"
+          className="text-cream-muted hover:bg-cream/[0.045] hover:text-cream-bright"
           onClick={() => props.onDelete(message)}
         />
       ) : null}

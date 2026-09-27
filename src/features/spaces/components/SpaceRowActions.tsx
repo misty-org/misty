@@ -75,6 +75,6 @@ export function SpaceRowActions({
 
 const spaceRowActionClass = [
   "size-7 rounded-md p-0 text-cream-muted",
-  "hover:bg-charcoal-hover hover:text-cream-bright",
+  "hover:bg-cream/[0.045] hover:text-cream-bright",
   "focus-visible:ring-2 focus-visible:ring-charcoal-active",
 ].join(" ");

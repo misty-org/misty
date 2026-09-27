@@ -22,17 +22,6 @@
 .misty-tiptap-toolbar::-webkit-scrollbar {
   display: none;
 }
-.misty-tiptap-tool {
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  color: var(--color-cream-muted);
-}
-.misty-tiptap-tool:hover,
-.misty-tiptap-tool.is-active,
-.misty-tiptap-tool[aria-pressed="true"] {
-  color: var(--color-cream-bright);
-}
 
 .misty-tiptap-search {
   position: absolute;
