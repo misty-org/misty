@@ -1,10 +1,10 @@
 import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
 import {
   Button,
-  cn,
   EmptyState,
   IconButton,
   Input,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -23,8 +23,6 @@ import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
 const toolbarControlStyles = {
   group:
     "flex h-9 shrink-0 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1 shadow-xs",
-  button: "size-7 rounded-sm text-cream-muted shadow-none",
-  buttonActive: "bg-charcoal-hover text-cream",
 } as const;
 const mediaTypeOptions = [
   {
@@ -221,36 +219,16 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
               </SelectContent>
             </Select>
 
-            <div
-              role="group"
-              aria-label="Library layout"
-              className="flex h-8 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1"
-            >
-              <IconButton
-                size="xs"
-                label="Grid view"
-                className={cn(
-                  "rounded-sm shadow-none",
-                  props.viewMode === "grid" && "bg-charcoal-hover text-cream",
-                )}
-                aria-pressed={props.viewMode === "grid"}
-                onClick={() => props.onViewMode("grid")}
-              >
-                <Grid2X2 className="size-3.5" />
-              </IconButton>
-              <IconButton
-                size="xs"
-                label="List view"
-                className={cn(
-                  "rounded-sm shadow-none",
-                  props.viewMode === "list" && "bg-charcoal-hover text-cream",
-                )}
-                aria-pressed={props.viewMode === "list"}
-                onClick={() => props.onViewMode("list")}
-              >
-                <List className="size-3.5" />
-              </IconButton>
-            </div>
+            <SegmentedControl
+              label="Library layout"
+              size="xs"
+              value={props.viewMode}
+              options={[
+                { value: "grid", label: <Grid2X2 className="size-3.5" />, ariaLabel: "Grid view" },
+                { value: "list", label: <List className="size-3.5" />, ariaLabel: "List view" },
+              ]}
+              onChange={props.onViewMode}
+            />
             <SpaceLibraryScaleControls
               itemScale={props.itemScale}
               onItemScale={props.onItemScale}
@@ -287,7 +265,6 @@ function SpaceLibraryScaleControls({
     <div role="group" aria-label="Item scale" className={toolbarControlStyles.group}>
       <IconButton
         label="Zoom out"
-        className={toolbarControlStyles.button}
         disabled={scale <= LIBRARY_ITEM_SCALE_MIN}
         onClick={() => onItemScale(scale - 1)}
       >
@@ -295,7 +272,6 @@ function SpaceLibraryScaleControls({
       </IconButton>
       <IconButton
         label="Zoom in"
-        className={toolbarControlStyles.button}
         disabled={scale >= LIBRARY_ITEM_SCALE_MAX}
         onClick={() => onItemScale(scale + 1)}
       >

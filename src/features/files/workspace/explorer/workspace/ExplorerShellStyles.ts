@@ -6,11 +6,6 @@ export const explorerShellStyles = {
   bottomBar:
     "grid min-h-[28px] min-w-0 grid-cols-[auto_auto] items-center justify-between gap-2 border-t border-charcoal-border/60 bg-charcoal-sidebar px-2",
   bottomBarGroup: "grid grid-flow-col auto-cols-max items-center gap-1",
-  bottomButton:
-    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
-  bottomButtonSelected: "bg-charcoal-hover text-cream",
-  paneActionButton:
-    "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted shadow-none disabled:cursor-default disabled:opacity-40",
   paneHeaderActions: "flex h-full flex-none items-center gap-5",
   paneHeaderActionSection: "flex flex-none items-center gap-1 overflow-visible",
 } as const;

@@ -5,7 +5,7 @@ import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMis
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, IconButton, Input } from "@/shared/ui";
+import { Button, IconButton, Input, Pressable } from "@/shared/ui";
 import { Loader2, Mic, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
@@ -188,10 +188,9 @@ export function AgentWorkspaceConversation({
                 </div>
                 <div className="agent-starter-options">
                   {suggestions.map(([label, prompt], index) => (
-                    <Button
-                      variant="ghost"
+                    <Pressable
                       key={label}
-                      className="h-auto min-h-[38px] w-full justify-start gap-2 rounded-none px-2 py-2 text-left"
+                      className="flex items-center hover:bg-cream/[0.045] min-h-[38px] w-full gap-2 rounded-none px-2 py-2"
                       disabled={!agent.enabled || state.working}
                       onClick={() => {
                         setDraft(prompt);
@@ -202,7 +201,7 @@ export function AgentWorkspaceConversation({
                         {String.fromCharCode(65 + index)}
                       </span>
                       <span>{label}</span>
-                    </Button>
+                    </Pressable>
                   ))}
                 </div>
                 <Input

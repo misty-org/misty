@@ -10,7 +10,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  cn,
 } from "@/shared/ui";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -64,20 +63,13 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
   const displayMembers = activeMembers.slice(0, 4);
   const overflowCount = activeMembers.length - displayMembers.length;
 
-  const pillClass = cn(
-    "flex h-7 items-center gap-1.5 rounded-full border border-charcoal-border/60",
-    "bg-charcoal-card px-2 py-0.5 text-xs text-cream-muted transition-colors",
-    "hover:bg-charcoal-hover hover:text-cream-bright focus:outline-none",
-    open && "bg-charcoal-hover text-cream-bright border-charcoal-border",
-  );
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          type="button"
-          variant="ghost"
-          className={pillClass}
+          variant="chip"
+          size="chip"
+          className="px-2"
           title={`${activeMembers.length} active member${activeMembers.length > 1 ? "s" : ""}`}
         >
           <div className="flex -space-x-2 overflow-hidden">

@@ -328,10 +328,7 @@ function FeedbackButton(props: { label: string; onClick: () => void; children: R
       aria-label={props.label}
       title={props.label}
       onClick={props.onClick}
-      className={cn(
-        "grid size-7 place-items-center rounded-md text-cream-muted transition-colors",
-        "hover:bg-cream/[0.045] hover:text-cream",
-      )}
+      className={cn("grid size-7 place-items-center text-cream-muted", "hover:text-cream")}
     >
       {props.children}
     </Button>

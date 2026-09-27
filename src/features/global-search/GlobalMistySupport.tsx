@@ -118,7 +118,7 @@ export function CandidateList(props: {
             {result ? (
               <Button
                 variant="ghost"
-                className="rounded-md px-2 py-1 text-[11px] text-cream-muted opacity-0 hover:text-cream group-hover:opacity-100 focus:opacity-100"
+                className="px-2 py-1 text-[11px] text-cream-muted opacity-0 hover:text-cream group-hover:opacity-100 focus:opacity-100"
                 onClick={() => props.onAddContext(result)}
               >
                 + Context
@@ -270,15 +270,12 @@ export function FilterBar(props: {
     >
       {buttons.map((button) => (
         <Button
-          variant="ghost"
+          variant="chip"
+          size="xs"
+          aria-pressed={button.active}
           key={button.label}
           onClick={button.run}
-          className={cn(
-            "h-6 shrink-0 rounded-full border px-2.5 text-[11px] transition-colors",
-            button.active
-              ? "border-cream-muted bg-cream text-charcoal-bg"
-              : "border-charcoal-border bg-charcoal-bg text-cream-muted hover:text-cream",
-          )}
+          className="shrink-0"
         >
           {button.label}
           {button.active ? " ×" : ""}

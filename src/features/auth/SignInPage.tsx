@@ -154,9 +154,8 @@ export default function SignIn() {
             ) : null}
             {error ? <AuthMessage tone="error" message={error} /> : null}
             <Button
-              type="button"
               variant="outline"
-              className="mt-1 h-11 justify-start border-dashed px-3 text-cream-muted"
+              className="mt-1 h-11 justify-start px-3 text-cream-muted"
               disabled={Boolean(busyAccountId) || transitioning}
               onClick={() => {
                 setError("");

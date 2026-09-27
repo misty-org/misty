@@ -1,9 +1,9 @@
 import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/native/ipc";
 import {
   Button,
+  cn,
   Collapsible,
   CollapsibleContent,
-  cn,
   navigationDisclosureChevronClass,
   navigationDisclosureLabelClass,
   navigationTreeContentInsetClass,
@@ -11,6 +11,7 @@ import {
   navigationTreeIconClass,
   navigationTreeRowClass,
   navigationTreeSurfaceClass,
+  Pressable,
 } from "@/shared/ui";
 import { ChevronRight } from "lucide-react";
 import { useId, type MouseEvent, type ReactNode } from "react";
@@ -50,7 +51,7 @@ export const sidebarStyles = {
   section: `${navigationTreeGroupClass} [&+&]:mt-3`,
   sectionTitle: "group/section-title flex h-9 min-w-0 items-center gap-1 px-2.5",
   sectionToggle:
-    "misty-navigator-row-target h-9 min-w-0 flex-1 justify-start gap-1 rounded-md px-0 text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-bright",
+    "misty-navigator-row-target flex h-9 min-w-0 flex-1 items-center gap-1 rounded-md px-0 text-[13px] font-semibold text-cream-bright",
   sectionToggleLabel: navigationDisclosureLabelClass,
   sectionChevron: navigationDisclosureChevronClass,
   sectionActions: "ml-auto flex flex-none items-center gap-0",
@@ -112,10 +113,7 @@ export function SidebarSectionHeader(props: {
 }) {
   return (
     <div className={sidebarStyles.sectionTitle} onContextMenu={props.onContextMenu}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
+      <Pressable
         className={sidebarStyles.sectionToggle}
         onClick={props.onToggle}
         aria-expanded={!props.collapsed}
@@ -133,7 +131,7 @@ export function SidebarSectionHeader(props: {
             data-chevron-placement="inline"
           />
         </span>
-      </Button>
+      </Pressable>
       {props.actions ? (
         <div className={`${sidebarStyles.sectionActions} ${sidebarStyles.sectionActionsReveal}`}>
           {props.actions}

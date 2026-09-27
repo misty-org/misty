@@ -1,5 +1,4 @@
 import {
-  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -121,17 +120,17 @@ export function MistyComposer(props: {
                   )}
                 </div>
               ) : null}
-              <Button
-                variant="ghost"
-                className={cn(
-                  "absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-black/75",
-                  "text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100",
-                )}
-                aria-label={`Remove ${attachment.name}`}
+              <IconButton
+                variant="overlay"
+                shape="round"
+                size="2xs"
+                label={`Remove ${attachment.name}`}
+                tooltip={false}
+                className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                 onClick={() => void props.onRemoveAttachment(attachment)}
               >
                 <X className="size-3" />
-              </Button>
+              </IconButton>
               {attachment.state === "uploading" ? (
                 <span className="absolute inset-x-0 bottom-0 h-0.5 bg-white/20">
                   <span

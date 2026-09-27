@@ -26,7 +26,7 @@ import {
 } from "@/features/workspace";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, IconButton } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 import { Minus, Square, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
@@ -448,31 +448,30 @@ export function DesktopLayout(props: {
                 transformOrigin: "top right",
               }}
             >
-              <IconButton
-                label="Minimize window"
+              <Pressable
+                aria-label="Minimize window"
                 className={styles.windowsTitlebarControlButtonClass}
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
                 <Minus size={16} strokeWidth={1.5} />
-              </IconButton>
-              <Button
-                variant="ghost"
+              </Pressable>
+              <Pressable
                 className={styles.windowsTitlebarControlButtonClass}
                 aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
                 title={isWindowMaximized ? "Restore" : "Maximize"}
                 onClick={() => void toggleTitlebarMaximize().catch(() => undefined)}
               >
                 {isWindowMaximized ? <RestoreGlyph /> : <Square size={13} strokeWidth={1.5} />}
-              </Button>
-              <IconButton
-                label="Close window"
+              </Pressable>
+              <Pressable
+                aria-label="Close window"
                 className={styles.windowsTitlebarCloseButtonClass}
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
                 <X size={18} strokeWidth={1.65} />
-              </IconButton>
+              </Pressable>
             </div>
           ) : null}
         </header>

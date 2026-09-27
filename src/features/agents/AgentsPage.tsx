@@ -17,6 +17,7 @@ import {
   Input,
   ListRowButton,
   NavigationChevron,
+  Pressable,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -72,7 +73,7 @@ const emptyProfile: AgentProfileInput = {
   reasoning_effort: "",
   enabled: true,
 };
-const recipientRowClass = "h-auto w-full justify-start gap-3 rounded-md p-2.5 text-left";
+const recipientRowClass = "h-auto w-full justify-start gap-3 p-2.5 text-left";
 
 export default function NativeAgentsPage() {
   const { user } = useAuth();
@@ -336,16 +337,14 @@ export default function NativeAgentsPage() {
                               key={c.id}
                               className="relative flex items-center h-7 pr-1 text-[12px] group/branch-row"
                             >
-                              <Button
-                                variant="ghost"
-                                size="none"
-                                justify="start"
+                              <Pressable
                                 aria-current={isActiveConvo ? "true" : undefined}
                                 className={cn(
+                                  "flex items-center hover:bg-cream/[0.045] rounded-md",
                                   "h-full w-full gap-1.5 truncate px-2 text-[12px]",
                                   isActiveConvo
                                     ? "bg-cream/[0.06] font-medium text-cream-bright"
-                                    : "font-normal text-cream-muted",
+                                    : "text-cream-muted",
                                 )}
                                 onClick={() => {
                                   change(() => {
@@ -368,7 +367,7 @@ export default function NativeAgentsPage() {
                                 <span className="text-[10px] text-cream-muted/50 tabular-nums shrink-0 ml-1">
                                   {relativeTime(c.updatedAt)}
                                 </span>
-                              </Button>
+                              </Pressable>
                             </div>
                           );
                         })
@@ -753,12 +752,10 @@ function AgentEditor({
       }}
     >
       <div className="flex items-center gap-4 pb-1">
-        <Button
-          variant="outline"
-          size="none"
+        <Pressable
           aria-label="Edit agent avatar"
           onClick={() => setAvatarEditing(!avatarEditing)}
-          className="group relative size-14 shrink-0 overflow-hidden rounded-xl p-1"
+          className="flex items-center group relative size-14 shrink-0 overflow-hidden rounded-xl p-1"
         >
           <AgentAvatar
             agent={
@@ -773,7 +770,7 @@ function AgentEditor({
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
             <Pencil className="size-3.5 text-cream-bright" />
           </div>
-        </Button>
+        </Pressable>
         <div className="flex-1 min-w-0">
           <Button
             variant="link"

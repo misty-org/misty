@@ -32,7 +32,7 @@ export function MessageReplyPreview({
       </div>
       <Button
         variant="ghost"
-        className="h-auto min-w-0 justify-start gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-cream-muted shadow-none hover:bg-transparent hover:text-cream"
+        className="h-auto min-w-0 justify-start gap-1.5 self-start overflow-hidden p-0 text-left text-[13px] leading-5 text-cream-muted hover:bg-transparent hover:text-cream"
         type="button"
         onClick={onOpen}
         aria-label={

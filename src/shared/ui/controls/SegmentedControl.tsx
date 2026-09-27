@@ -8,6 +8,9 @@ type SegmentedOption<T extends string> = {
   icon?: React.ReactNode;
   /** Accessible name when `label` alone is not descriptive enough. */
   ariaLabel?: string;
+  disabled?: boolean;
+  /** Explains a disabled option, e.g. why it is unavailable. */
+  title?: string;
   /** Extra attributes for the option's button, e.g. data hooks. */
   attributes?: Record<`data-${string}`, string>;
 };
@@ -22,6 +25,8 @@ type SegmentedControlProps<T extends string> = {
   disabled?: boolean;
   /** Layout only: margins, alignment, or width. */
   className?: string;
+  /** Stretch options to fill the track. */
+  fill?: boolean;
 };
 
 const itemSizes = {
@@ -42,6 +47,7 @@ function SegmentedControl<T extends string>({
   size = "sm",
   disabled,
   className,
+  fill = false,
 }: SegmentedControlProps<T>) {
   return (
     <RadioGroupPrimitive.Root
@@ -50,7 +56,8 @@ function SegmentedControl<T extends string>({
       orientation="horizontal"
       aria-label={label}
       className={cn(
-        "flex w-fit shrink-0 items-center gap-0.5 rounded-full border border-charcoal-border/70 bg-charcoal-sidebar p-0.5",
+        "flex shrink-0 items-center gap-0.5 rounded-full border border-charcoal-border/70 bg-charcoal-sidebar p-0.5",
+        fill ? "w-full" : "w-fit",
         className,
       )}
       onValueChange={(next) => onChange(next as T)}
@@ -66,6 +73,8 @@ function SegmentedControl<T extends string>({
           key={option.value}
           value={option.value}
           aria-label={option.ariaLabel}
+          disabled={option.disabled}
+          title={option.title}
           {...option.attributes}
           className={cn(
             "inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full font-medium text-cream-muted outline-none transition-colors",
@@ -74,6 +83,7 @@ function SegmentedControl<T extends string>({
             "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:pointer-events-none disabled:opacity-50",
             "[&_svg]:pointer-events-none [&_svg]:shrink-0",
             itemSizes[size],
+            fill && "flex-1",
           )}
         >
           {option.icon}

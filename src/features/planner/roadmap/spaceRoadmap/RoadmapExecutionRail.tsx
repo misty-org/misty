@@ -1,5 +1,5 @@
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, cn, IconButton } from "@/shared/ui";
+import { Button, cn, IconButton, Pressable } from "@/shared/ui";
 import {
   ArrowRight,
   CalendarClock,
@@ -139,13 +139,10 @@ function ExecutionRow(props: {
   const stateLabel = item.state === "done" ? "Done" : item.state === "ready" ? "Ready" : "Blocked";
   return (
     <li className="relative">
-      <Button
-        variant="ghost"
-        size="none"
-        justify="start"
+      <Pressable
         aria-current={props.selected ? "true" : undefined}
         className={cn(
-          "group h-auto w-full items-start gap-2.5 whitespace-normal rounded-lg px-2 py-2.5 text-left font-normal",
+          "group w-full items-start gap-2.5 rounded-lg px-2 py-2.5",
           props.selected && "bg-cream/[0.06]",
         )}
         onClick={props.onFocus}
@@ -180,7 +177,7 @@ function ExecutionRow(props: {
             </span>
           ) : null}
         </span>
-      </Button>
+      </Pressable>
     </li>
   );
 }

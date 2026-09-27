@@ -57,11 +57,7 @@ export function SpaceUsagePopover({
         {trigger ?? (
           <IconButton
             label="Usage"
-            className={cn(
-              "relative shadow-none",
-              "focus-visible:ring-2 focus-visible:ring-charcoal-active",
-              open && "text-cream-bright",
-            )}
+            className={cn("relative", "", open && "text-cream-bright")}
             aria-haspopup="dialog"
             aria-expanded={open}
           >

@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { Check, Trash2 } from "lucide-react";
-import { Button, cn, IconButton, Input } from "@/shared/ui";
+import { Button, cn, IconButton, Input, Pressable, SegmentedControl } from "@/shared/ui";
 import {
   dockingPresets,
   dockPositions,
@@ -42,14 +42,13 @@ function WindowLayoutEditor() {
         <h3 className="mb-2 text-xs text-cream-muted">Start with a preset</h3>
         <div className="mb-6 grid grid-cols-2 gap-2 min-[1100px]:grid-cols-4">
           {dockingPresets.map((preset) => (
-            <Button
+            <Pressable
               key={preset.id}
-              variant="ghost"
-              size="none"
               aria-pressed={layout.navigation === preset.navigation && layout.tabs === preset.tabs}
               className={cn(
-                "h-auto flex-col items-stretch gap-[7px] whitespace-normal rounded-md border-charcoal-border p-[9px]",
-                "text-xs font-normal text-cream-muted aria-pressed:border-cream-muted aria-pressed:text-cream-bright",
+                "flex items-center hover:bg-cream/[0.045] rounded-md",
+                "flex-col items-stretch gap-[7px] border-charcoal-border p-[9px]",
+                "text-xs text-cream-muted aria-pressed:border-cream-muted aria-pressed:text-cream-bright",
               )}
               onClick={() => {
                 setLayout(preset);
@@ -58,7 +57,7 @@ function WindowLayoutEditor() {
             >
               <LayoutPreview layout={preset} />
               <span>{preset.name}</span>
-            </Button>
+            </Pressable>
           ))}
         </div>
         {(["navigation", "tabs"] as const).map((part) => (
@@ -66,41 +65,35 @@ function WindowLayoutEditor() {
             <legend className="mb-2 text-xs font-medium">
               {part === "navigation" ? "Navigation" : "Tabs"}
             </legend>
-            <div className="flex gap-0.5 rounded-md border border-charcoal-border bg-charcoal-workspace p-[3px]">
-              {dockPositions.map((position) => {
-                const occupied = layout[part === "navigation" ? "tabs" : "navigation"] === position;
-                return (
-                  <Button
-                    key={position}
-                    variant="ghost"
-                    size="none"
-                    disabled={occupied}
-                    aria-pressed={layout[part] === position}
-                    title={
-                      occupied
-                        ? `Already used by ${part === "navigation" ? "tabs" : "navigation"}`
-                        : undefined
-                    }
-                    onClick={() => {
-                      setPosition(part, position);
-                      setMessage("");
-                    }}
-                    className="h-[30px] flex-1 justify-center rounded-[3px] text-xs capitalize aria-pressed:text-cream-bright"
-                  >
-                    {position}
-                  </Button>
-                );
+            <SegmentedControl
+              fill
+              label={`${part === "navigation" ? "Navigation" : "Tabs"} position`}
+              value={layout[part]}
+              options={dockPositions.map((position) => {
+                const other = part === "navigation" ? "tabs" : "navigation";
+                const occupied = layout[other] === position;
+                return {
+                  value: position,
+                  label: <span className="capitalize">{position}</span>,
+                  ariaLabel: position,
+                  disabled: occupied,
+                  title: occupied ? `Already used by ${other}` : undefined,
+                };
               })}
-            </div>
+              onChange={(position) => {
+                setPosition(part, position);
+                setMessage("");
+              }}
+            />
           </fieldset>
         ))}
         <p className="mb-4 text-xs leading-relaxed text-cream-muted">
           Navigation and tabs use different edges. Side tabs keep New tab at the top.
         </p>
         <Button
-          variant="ghost"
+          variant="link"
           size="none"
-          className="text-xs underline underline-offset-4"
+          className="text-xs text-cream-muted underline"
           onClick={() => {
             setLayout(dockingPresets[0]);
             setMessage("");

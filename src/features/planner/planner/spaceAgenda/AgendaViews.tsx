@@ -1,5 +1,5 @@
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, cn } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 import { CalendarDays, CheckSquare2, GitFork } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { dayKey, groupAgendaEntries, startOfDay, startOfWeek } from "./agendaDates";
@@ -320,11 +320,9 @@ function AgendaMonthChip({
   onOpen: (entry: SpaceAgendaEntry) => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
+    <Pressable
       className={cn(
-        "h-6 w-full justify-start gap-1 truncate rounded px-1.5 text-left text-[10px] font-medium",
+        "h-6 w-full gap-1 truncate rounded px-1.5 text-[10px] font-medium",
         kindSurface(entry.kind),
       )}
       title={entry.title}
@@ -335,7 +333,7 @@ function AgendaMonthChip({
         {entry.all_day ? "" : `${formatTime(entry.starts_at)} `}
         {entry.title}
       </span>
-    </Button>
+    </Pressable>
   );
 }
 function AgendaAllDayChip({
@@ -346,18 +344,16 @@ function AgendaAllDayChip({
   onOpen: (entry: SpaceAgendaEntry) => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
+    <Pressable
       className={cn(
-        "h-7 w-full justify-start gap-1.5 truncate rounded-md border px-2 text-left text-[11px] font-medium",
+        "h-7 w-full gap-1.5 truncate border px-2 text-[11px] font-medium",
         kindSurface(entry.kind),
       )}
       onClick={() => onOpen(entry)}
     >
       <EntryIcon entry={entry} className="size-3.5 shrink-0" />
       <span className="truncate">{entry.title}</span>
-    </Button>
+    </Pressable>
   );
 }
 function AgendaTimedEvent({
@@ -381,12 +377,10 @@ function AgendaTimedEvent({
   const top = (startMinutes / 60) * hourHeight;
   const height = Math.max(40, (durationMinutes / 60) * hourHeight);
   return (
-    <Button
-      type="button"
-      variant="ghost"
+    <Pressable
       className={cn(
-        "absolute inset-x-1 z-20 h-auto min-h-7 items-start justify-start gap-1.5",
-        "overflow-hidden rounded-md border px-2 py-1.5 text-left font-normal shadow-sm",
+        "absolute inset-x-1 z-20 min-h-7 items-start gap-1.5",
+        "overflow-hidden border px-2 py-1.5 shadow-sm",
         kindSurface(entry.kind),
       )}
       style={{
@@ -406,7 +400,7 @@ function AgendaTimedEvent({
           </span>
         ) : null}
       </span>
-    </Button>
+    </Pressable>
   );
 }
 function EntryIcon({ entry, className }: { entry: SpaceAgendaEntry; className?: string }) {

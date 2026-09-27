@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,6 +15,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Pressable,
 } from "@/shared/ui";
 import { EditableGroupRow } from "./WebsiteSitePicker";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
@@ -60,14 +62,13 @@ export function WebsiteGroupsManager() {
         <div className="flex min-w-0 flex-col border-r border-charcoal-border p-4 max-sm:p-2">
           <nav aria-label="Website groups" className="grid content-start gap-1">
             {ordered.map((item) => (
-              <Button
-                variant="ghost"
-                size="none"
-                justify="start"
+              <Pressable
                 key={item.id}
-                type="button"
                 aria-current={group?.id === item.id ? "true" : undefined}
-                className={`flex min-h-8 min-w-0 items-center gap-2 text-left text-[13px] outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted ${group?.id === item.id ? "font-medium text-cream-bright" : "text-cream-muted"}`}
+                className={cn(
+                  "hover:bg-cream/[0.045] rounded-md",
+                  `flex min-h-8 min-w-0 items-center gap-2 text-left text-[13px] outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted ${group?.id === item.id ? "font-medium text-cream-bright" : "text-cream-muted"}`,
+                )}
                 onClick={() => {
                   setSelected(item.id);
                   setAdding(false);
@@ -76,7 +77,7 @@ export function WebsiteGroupsManager() {
               >
                 <GroupIcon name={item.fields.icon} size={18} />
                 <span className="truncate">{item.fields.label}</span>
-              </Button>
+              </Pressable>
             ))}
           </nav>
           <div className="mt-auto pt-6">
@@ -324,7 +325,6 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
                 label={id.replace(/-/g, " ")}
                 key={id}
                 aria-pressed={value === id}
-                className={value === id ? "text-cream-bright ring-1 ring-cream-muted" : ""}
                 onClick={() => {
                   uploadRequest.current++;
                   setUploading(false);

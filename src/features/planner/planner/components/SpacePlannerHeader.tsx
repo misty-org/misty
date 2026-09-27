@@ -117,11 +117,7 @@ export function SpacePlannerHeader({
           </PopoverContent>
         </Popover>
 
-        <IconButton
-          label="Refresh tasks"
-          className="text-cream-muted/70 shadow-none"
-          onClick={onSync}
-        >
+        <IconButton label="Refresh tasks" className="text-cream-muted/70" onClick={onSync}>
           {loading ? (
             <LoaderCircle className="size-4 animate-spin" aria-hidden />
           ) : (

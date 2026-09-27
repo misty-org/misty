@@ -27,7 +27,7 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
         return (
           <IconButton
             label={`${reacted ? "Remove" : "Add"} ${emoji} reaction`}
-            className={`text-sm leading-none ${reacted ? "bg-charcoal-active" : ""}`}
+            className="text-sm leading-none"
             key={emoji}
             onClick={() => props.onToggleReaction(message, emoji, reacted)}
             aria-pressed={reacted}

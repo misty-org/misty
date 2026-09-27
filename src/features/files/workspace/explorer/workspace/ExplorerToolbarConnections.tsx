@@ -348,7 +348,6 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
     <>
       <IconButton
         label="Split file pane vertically"
-        className={explorerShellStyles.paneActionButton}
         title="Split vertically"
         onClick={() => splitPane(props.paneId, "vertical")}
         disabled={!canSplit}
@@ -357,7 +356,6 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
       </IconButton>
       <IconButton
         label="Split file pane horizontally"
-        className={explorerShellStyles.paneActionButton}
         title="Split horizontally"
         onClick={() => splitPane(props.paneId, "horizontal")}
         disabled={!canSplit}
@@ -366,7 +364,6 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
       </IconButton>
       <IconButton
         label="Close file pane"
-        className={explorerShellStyles.paneActionButton}
         title="Close pane"
         onClick={() => closePane(props.paneId)}
         disabled={!canClose}

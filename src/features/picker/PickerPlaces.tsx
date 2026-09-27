@@ -12,7 +12,7 @@ import {
   pinnedPathLabel,
   quickAccessPathHidden,
 } from "@/features/file-ui";
-import { Button, cn } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 
 /**
  * The picker's locations rail: the explorer sidebar reduced to navigation only — no workspace
@@ -120,19 +120,14 @@ function PlaceRow({
   onSelect: () => void;
 }) {
   return (
-    <Button
-      className={cn(
-        "h-8 w-full justify-start gap-2 px-2 font-normal shadow-none",
-        active && "bg-charcoal-hover text-cream",
-      )}
-      variant="ghost"
-      type="button"
+    <Pressable
+      className={cn("h-8 w-full gap-2 px-2", active && "bg-charcoal-hover text-cream")}
       aria-current={active ? "true" : undefined}
       onClick={onSelect}
     >
       <span className="shrink-0 text-cream-muted">{icon}</span>
       <span className="min-w-0 truncate">{label}</span>
-    </Button>
+    </Pressable>
   );
 }
 

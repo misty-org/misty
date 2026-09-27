@@ -10,6 +10,7 @@ import {
   IconButton,
   MenuTrigger,
   OverflowFadeText,
+  Pressable,
 } from "@/shared/ui";
 import {
   Blocks,
@@ -227,16 +228,13 @@ export function WorkspaceLayoutTabs(
                     : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
                 )}
               >
-                <Button
-                  variant="ghost"
-                  size="none"
-                  justify="start"
+                <Pressable
                   role="tab"
                   aria-selected={active}
                   tabIndex={active ? 0 : -1}
                   title={label}
                   data-reorder-handle="true"
-                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent pl-2 pr-1 text-left outline-none hover:bg-transparent focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
+                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-1"
                   onClick={() => select(tab.id)}
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);
@@ -276,7 +274,7 @@ export function WorkspaceLayoutTabs(
                       {panes.length}
                     </span>
                   ) : null}
-                </Button>
+                </Pressable>
                 <BrowserTabAudioButton tabs={panes.flatMap((pane) => pane.tabs)} />
                 {panes.length > 1 ? (
                   <DropdownMenu modal={false}>

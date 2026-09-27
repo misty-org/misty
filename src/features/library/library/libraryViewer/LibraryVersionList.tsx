@@ -1,6 +1,6 @@
 import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
 import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
-import { Button } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";
 import { libraryRenditionStatus } from "../SpaceLibraryViewerUtils";
@@ -80,15 +80,14 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
               </Button>
             ) : null}
             {canEdit && !version.is_current ? (
-              <Button
-                className="grid size-6 place-items-center border-0 bg-transparent text-cream-muted"
-                type="button"
+              <IconButton
+                size="xs"
+                label={`Delete edit ${version.version_number}`}
                 disabled={editSaving}
                 onClick={() => props.onDelete(version.id)}
-                aria-label={`Delete edit ${version.version_number}`}
               >
                 <Trash2 size={12} />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         ))}

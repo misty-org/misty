@@ -379,12 +379,7 @@ function AgendaRows(props: {
           </p>
           <p className="mt-1 text-xs text-cream-muted">Check your connection and try again.</p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="rounded-lg bg-charcoal-active px-3 py-2 text-xs font-medium text-cream outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-sage-fg/60"
-          onClick={() => void props.onRetry()}
-        >
+        <Button size="sm" onClick={() => void props.onRetry()}>
           Try again
         </Button>
       </div>

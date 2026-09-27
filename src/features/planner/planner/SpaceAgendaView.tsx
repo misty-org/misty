@@ -470,7 +470,6 @@ export function SpaceAgendaView({
               >
                 <IconButton
                   label="Zoom out calendar"
-                  className="rounded-none border-r border-charcoal-border/60"
                   disabled={zoomMinutes === 60}
                   onClick={() => updateZoom("out")}
                 >
@@ -481,7 +480,6 @@ export function SpaceAgendaView({
                 </span>
                 <IconButton
                   label="Zoom in calendar"
-                  className="rounded-none border-l border-charcoal-border/60"
                   disabled={zoomMinutes === 15}
                   onClick={() => updateZoom("in")}
                 >
@@ -492,7 +490,7 @@ export function SpaceAgendaView({
 
             <IconButton
               label="Refresh calendar"
-              className="text-cream-muted/70 shadow-none"
+              className="text-cream-muted/70"
               onClick={() =>
                 void run("sync", async () => {
                   await spacesApi.syncCalendarTasks(spaceId);

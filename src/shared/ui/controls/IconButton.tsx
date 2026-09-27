@@ -4,6 +4,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ove
 import { cn } from "../utils";
 
 const iconButtonSizes = {
+  // Inline closers inside tabs and menu rows.
+  "2xs": "size-5 [&_svg:not([class*='size-'])]:size-3",
   xs: "size-6 [&_svg:not([class*='size-'])]:size-3.5",
   sm: "size-[30px]",
   md: "size-9",
@@ -15,7 +17,8 @@ export const toolbarIconProps = { size: 16, strokeWidth: 1.75, "aria-hidden": tr
 
 /**
  * The one icon-only button. Defaults to the browser chrome's toolbar look at 30px;
- * `label` is required and doubles as the tooltip unless `tooltip={false}`.
+ * `label` is required and doubles as the tooltip unless `tooltip={false}`. With `asChild` it
+ * styles its child, such as a router Link. `shape="round"` is for tab closers and media controls.
  */
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
@@ -24,6 +27,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       children,
       className,
       label,
+      shape = "square",
       size = "sm",
       tooltip = label,
       type = "button",
@@ -40,7 +44,12 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         size="none"
         aria-label={ariaLabel ?? label}
         title={tooltip === false ? label : undefined}
-        className={cn("shrink-0 p-0 shadow-none", iconButtonSizes[size], className)}
+        className={cn(
+          "shrink-0 p-0 shadow-none",
+          iconButtonSizes[size],
+          shape === "round" && "rounded-full",
+          className,
+        )}
         {...props}
       >
         {children}
@@ -62,9 +71,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
 IconButton.displayName = "IconButton";
 export { IconButton };
 
-export type IconButtonProps = Omit<ButtonProps, "asChild" | "size"> & {
+export type IconButtonProps = Omit<ButtonProps, "size"> & {
   children: React.ReactNode;
   label: string;
   tooltip?: string | false;
   size?: keyof typeof iconButtonSizes;
+  shape?: "square" | "round";
 };

@@ -10,6 +10,7 @@ import {
   cn,
   IconButton,
   Input,
+  Pressable,
 } from "@/shared/ui";
 import {
   CheckSquare,
@@ -277,13 +278,12 @@ function BoardColumn({
         ))}
 
         {!tasks.length && !creating ? (
-          <Button
+          <Pressable
             className={cn(
-              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50 bg-transparent",
-              "text-xs text-cream-muted/70 shadow-none hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
+              "flex items-center",
+              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50",
+              "text-xs text-cream-muted/70 hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
             )}
-            variant="ghost"
-            type="button"
             disabled={!canManage}
             onClick={onStartCreate}
           >
@@ -291,7 +291,7 @@ function BoardColumn({
               <Plus className="size-3.5" />
             </span>
             <span>Drop or create</span>
-          </Button>
+          </Pressable>
         ) : null}
       </div>
     </section>

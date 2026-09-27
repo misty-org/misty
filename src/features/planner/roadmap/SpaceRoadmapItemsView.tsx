@@ -13,6 +13,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Pressable,
   Select,
   SelectContent,
   SelectItem,
@@ -175,14 +176,12 @@ export function SpaceRoadmapItemsView({
                     onOpenChange={(open) => setSelectedId(open ? item.id : "")}
                   >
                     <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
+                      <Pressable
                         className={[
-                          "h-auto w-full justify-start gap-3 rounded-none px-4 py-3 text-left",
-                          "whitespace-normal transition-colors hover:bg-charcoal-card",
+                          "w-full gap-3 rounded-none px-4 py-3",
+                          "hover:bg-charcoal-card",
                           index ? "border-t border-charcoal-border/60" : "",
-                        ].join(" ")}
+                        ].join("")}
                       >
                         <StatusIcon status={status} />
                         <span className="min-w-0 flex-1">
@@ -207,7 +206,7 @@ export function SpaceRoadmapItemsView({
                             ? `${goal.progress_percentage}%`
                             : `${milestone?.goal_done ?? 0}/${milestone?.goal_total ?? 0} goals`}
                         </span>
-                      </Button>
+                      </Pressable>
                     </PopoverTrigger>
                     <PopoverContent
                       side="right"

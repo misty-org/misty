@@ -2,7 +2,7 @@ import { MistyFilePicker } from "@/features/picker";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSmartLibraryStore } from "@/features/library/library";
 import type { SearchResult } from "@/native/ipc";
-import { Button, IconButton, Input } from "@/shared/ui";
+import { Button, IconButton, Input, Pressable } from "@/shared/ui";
 import {
   BrainCircuit,
   Film,
@@ -269,23 +269,19 @@ export function LibraryWorkspace(props: {
             </div>
             <div className="mb-6 flex flex-wrap items-center gap-2">
               <Button
-                variant={!selectedTag ? "default" : "outline"}
-                size="sm"
-                className="rounded-full"
+                variant="chip"
+                size="chip"
+                aria-pressed={!selectedTag}
                 onClick={() => setSelectedTag(null)}
               >
                 All files
               </Button>
               {visibleTags.map((tag) => (
                 <Button
+                  variant="chip"
+                  size="chip"
+                  aria-pressed={selectedTag?.toLocaleLowerCase() === tag.name.toLocaleLowerCase()}
                   key={tag.name}
-                  variant={
-                    selectedTag?.toLocaleLowerCase() === tag.name.toLocaleLowerCase()
-                      ? "default"
-                      : "outline"
-                  }
-                  size="sm"
-                  className="rounded-full"
                   onClick={() => setSelectedTag(tag.name)}
                 >
                   {tag.name} <span className="opacity-60">{tag.count}</span>
@@ -293,10 +289,8 @@ export function LibraryWorkspace(props: {
               ))}
               {!tagQuery && tags.length > DEFAULT_LIBRARY_TAG_LIMIT ? (
                 <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full border-dashed text-cream-muted"
+                  variant="chip"
+                  size="chip"
                   aria-expanded={tagsExpanded}
                   onClick={() => setTagsExpanded((current) => !current)}
                 >
@@ -377,10 +371,9 @@ export function LibraryWorkspace(props: {
               <div className="mt-6 grid gap-1">
                 <h3 className="mb-2">Results · {folderResults.length}</h3>
                 {folderResults.map((result) => (
-                  <Button
+                  <Pressable
                     key={`${result.sourceKind}:${result.entry.path}`}
-                    variant="ghost"
-                    className="grid h-auto min-h-[72px] grid-cols-[52px_minmax(0,1fr)] items-center gap-3 rounded-lg p-2 text-left"
+                    className="hover:bg-cream/[0.045] grid min-h-[72px] grid-cols-[52px_minmax(0,1fr)] items-center gap-3 rounded-lg p-2"
                     onClick={() =>
                       void (props.onOpenResult
                         ? props.onOpenResult(result)
@@ -404,7 +397,7 @@ export function LibraryWorkspace(props: {
                         {searchResultContext(result)}
                       </small>
                     </span>
-                  </Button>
+                  </Pressable>
                 ))}
               </div>
             ) : null}

@@ -201,7 +201,7 @@ export function InstallerCard({
           <IconButton
             size="md"
             label="Refresh install checks"
-            className="text-cream-muted/70 shadow-none"
+            className="text-cream-muted/70"
             disabled={busy}
             onClick={() => {
               startRefreshSpin();

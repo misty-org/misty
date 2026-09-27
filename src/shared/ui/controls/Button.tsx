@@ -36,12 +36,24 @@ const buttonVariants = cva(
           "aria-pressed:bg-cream/[0.06] aria-pressed:text-cream",
           "aria-expanded:bg-cream/[0.06] aria-expanded:text-cream",
           "data-[state=open]:bg-cream/[0.06] data-[state=open]:text-cream",
+          // A menu trigger whose setting is on, e.g. agent access or a narrowed viewport.
+          "data-[active=true]:bg-cream/[0.06] data-[active=true]:text-cream",
           "focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-cream/15 disabled:opacity-40",
         ],
         link: "text-cream-bright underline-offset-4 hover:underline",
-        pill: "rounded-full border-0 bg-charcoal-hover text-cream hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card",
-        "pill-subtle":
-          "rounded-full border-charcoal-border bg-transparent text-cream-muted hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream-bright",
+        // The one filled call to action on a surface: sign in, confirm, mark all read.
+        primary: "bg-cream-bright text-charcoal-bg hover:bg-cream-action-hover",
+        // Controls drawn over images and video: a dark translucent disc that reads on any media.
+        overlay: [
+          "border-cream/10 bg-charcoal-bg/75 text-cream backdrop-blur-sm",
+          "hover:bg-charcoal-bg/90 hover:text-cream-bright",
+        ],
+        // Filters, tags, reactions, and presence: outlined until pressed, then filled.
+        chip: [
+          "rounded-full border-charcoal-border/70 text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
+          "aria-pressed:border-transparent aria-pressed:bg-charcoal-active aria-pressed:text-cream-bright",
+          "data-[state=open]:bg-cream/[0.06] data-[state=open]:text-cream",
+        ],
         "nav-action": [
           "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
           "aria-pressed:bg-cream/[0.06] aria-expanded:bg-cream/[0.06] data-[state=open]:bg-cream/[0.06]",
@@ -59,7 +71,7 @@ const buttonVariants = cva(
           "size-6 rounded-md in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8 rounded-md in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-10",
-        pill: "h-[22px] min-w-0 max-w-[50%] px-2 text-[13px] gap-1 [&_svg]:!size-3.5 [&_img]:!size-3.5",
+        chip: "h-7 gap-1.5 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
         none: "",
       },
       justify: {

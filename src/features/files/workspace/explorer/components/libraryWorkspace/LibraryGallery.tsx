@@ -1,5 +1,5 @@
 import type { SmartLibraryAsset } from "@/native/ipc";
-import { Button } from "@/shared/ui";
+import { Pressable } from "@/shared/ui";
 import { File } from "lucide-react";
 import { GlobalPreviewDialog } from "../GlobalPreview";
 import { libraryAssetPreview } from "./LibraryDetailPrimitives";
@@ -31,10 +31,8 @@ function LibraryGalleryTile(props: {
 }) {
   const preview = libraryAssetPreview(props.asset, props.rootPath);
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      className="group block h-auto min-w-0 overflow-hidden rounded-lg bg-charcoal-card p-0 text-left shadow-xs inset-ring-1 inset-ring-cream/10 transition hover:-translate-y-0.5 hover:shadow-md"
+    <Pressable
+      className="hover:bg-cream/[0.045] group block min-w-0 overflow-hidden rounded-lg bg-charcoal-card p-0 shadow-xs inset-ring-1 inset-ring-cream/10 hover:-translate-y-0.5 hover:shadow-md"
       aria-label={`View ${props.asset.name}`}
       title={props.asset.name}
       onClick={props.onOpen}
@@ -60,7 +58,7 @@ function LibraryGalleryTile(props: {
           </span>
         </span>
       </span>
-    </Button>
+    </Pressable>
   );
 }
 

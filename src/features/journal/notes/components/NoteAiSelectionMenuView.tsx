@@ -27,11 +27,7 @@ export function NoteAiSelectionMenuView({
       <AiSelectionMenu
         actions={noteSelectionActions}
         trigger={
-          <IconButton
-            variant="secondary"
-            label="Edit selection with Misty"
-            className="rounded-full"
-          >
+          <IconButton variant="secondary" shape="round" label="Edit selection with Misty">
             <Pencil className="size-3.5" />
           </IconButton>
         }

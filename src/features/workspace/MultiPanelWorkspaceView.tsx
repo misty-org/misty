@@ -1,5 +1,5 @@
 import { StablePaneLayout } from "./StablePaneLayout";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { Columns2, GripVertical, PanelTopClose, Rows2 } from "lucide-react";
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import {
@@ -87,11 +87,6 @@ const multiPanelStyles = {
   paneContent: "min-h-0 min-w-0 overflow-hidden",
   paneActions:
     "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
-  paneActionButton: [
-    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-cream-muted",
-    "hover:bg-cream/[0.045] hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-    "max-[720px]:h-7 max-[720px]:w-[30px]",
-  ].join(" "),
 } as const;
 
 export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
@@ -300,36 +295,30 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
         {renderTabActions ? <MultiPanelTabActionsSlot renderTabActions={renderTabActions} /> : null}
         {showDefaultPaneControls ? (
           <>
-            <Button
-              className={multiPanelStyles.paneActionButton}
-              type="button"
+            <IconButton
               title="Split vertically"
-              aria-label="Split file pane vertically"
+              label="Split file pane vertically"
               onClick={() => splitPane(activePaneId, "vertical")}
               disabled={!canSplit}
             >
               <Columns2 size={16} />
-            </Button>
-            <Button
-              className={multiPanelStyles.paneActionButton}
-              type="button"
+            </IconButton>
+            <IconButton
               title="Split horizontally"
-              aria-label="Split file pane horizontally"
+              label="Split file pane horizontally"
               onClick={() => splitPane(activePaneId, "horizontal")}
               disabled={!canSplit}
             >
               <Rows2 size={16} />
-            </Button>
-            <Button
-              className={multiPanelStyles.paneActionButton}
-              type="button"
+            </IconButton>
+            <IconButton
               title="Close pane"
-              aria-label="Close file pane"
+              label="Close file pane"
               onClick={() => handleClosePane(activePaneId)}
               disabled={activeTab.panes.length <= 1}
             >
               <PanelTopClose size={16} />
-            </Button>
+            </IconButton>
           </>
         ) : null}
       </div>

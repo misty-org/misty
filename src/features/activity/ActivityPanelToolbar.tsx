@@ -23,8 +23,8 @@ import {
   type ActivitySection,
 } from "./activityView";
 
-const iconButton =
-  "relative rounded-md text-cream-muted hover:bg-cream/[0.045] hover:text-cream-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright data-[active]:bg-cream/[0.06] data-[active]:text-cream-bright";
+// Filters that are set read as pressed.
+const iconButton = "relative";
 
 export function ActivityPanelToolbar({
   view,
@@ -64,7 +64,7 @@ export function ActivityPanelToolbar({
                 label="Filter activity"
                 tooltip={false}
                 className={iconButton}
-                data-active={active || undefined}
+                data-active={active}
               >
                 <SlidersHorizontal size={16} />
                 {active && (

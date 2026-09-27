@@ -1,4 +1,4 @@
-import { Button, cn, EmptyState, IconButton, Input, Skeleton } from "@/shared/ui";
+import { Button, cn, EmptyState, IconButton, Input, Pressable, Skeleton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import type { Text as YText } from "yjs";
@@ -303,17 +303,15 @@ function BacklinksInspector(props: {
         ) : links.length ? (
           <div className="grid gap-1">
             {links.map((backlink) => (
-              <Button
+              <Pressable
                 key={backlink.id}
-                variant="ghost"
-                justify="start"
-                className="h-auto rounded-lg px-3 py-2 font-normal text-cream"
+                className="flex items-center hover:bg-cream/[0.045] rounded-lg px-3 py-2 text-cream"
                 onClick={() => props.onSelectNote?.(`misty:${backlink.id}`)}
               >
                 <FileText size={15} />
                 <span className="min-w-0 flex-1 truncate">{backlink.title}</span>
                 <ChevronRight size={14} />
-              </Button>
+              </Pressable>
             ))}
           </div>
         ) : (

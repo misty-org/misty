@@ -170,8 +170,9 @@ function EditorStatus(props: {
           )}
           <IconButton
             size="lg"
+            variant="default"
             label="Close editor"
-            className="mt-2 rounded-xl bg-charcoal-active text-cream-bright/60"
+            className="mt-2"
             onClick={props.onClose}
           >
             <X size={19} />

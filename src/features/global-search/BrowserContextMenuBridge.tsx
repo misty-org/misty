@@ -174,7 +174,8 @@ export function BrowserContextMenuBridge() {
           <p>{error}</p>
           <Button
             variant="ghost"
-            className="mt-2 rounded-sm px-2 py-1 text-cream-muted hover:bg-cream/[0.045] focus-visible:outline"
+            size="sm"
+            className="mt-2 text-cream-muted"
             onClick={() => setError(null)}
           >
             Dismiss

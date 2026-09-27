@@ -13,6 +13,7 @@ import {
   EmptyState,
   IconButton,
   Input,
+  Pressable,
   ScrollArea,
   Select,
   SelectContent,
@@ -204,15 +205,14 @@ export function MistyLibraryPicker({
                 const selected = selection.includes(item.id);
                 const unavailable = !selected && selection.length >= maximumSelected;
                 return (
-                  <Button
+                  <Pressable
                     className={cn(
-                      "group relative h-auto flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
+                      "flex items-center",
+                      "group relative flex-col items-stretch gap-0 overflow-hidden rounded-lg p-0 shadow-xs",
                       selected
                         ? "ring-2 ring-charcoal-active"
                         : "bg-charcoal-card inset-ring-1 inset-ring-cream/10 hover:bg-charcoal-hover",
                     )}
-                    variant="ghost"
-                    type="button"
                     key={item.id}
                     disabled={unavailable}
                     aria-pressed={selected}
@@ -234,7 +234,7 @@ export function MistyLibraryPicker({
                         <Check className="size-3" />
                       </span>
                     ) : null}
-                  </Button>
+                  </Pressable>
                 );
               })}
             </div>

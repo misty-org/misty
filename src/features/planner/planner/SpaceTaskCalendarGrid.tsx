@@ -1,5 +1,5 @@
 import type { SpaceCalendarEvent, SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import { Badge, Button, Card, IconButton } from "@/shared/ui";
+import { Badge, Card, IconButton, Pressable } from "@/shared/ui";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { taskAssigneeName } from "./SpaceTaskPrimitives";
 
@@ -73,10 +73,8 @@ export function SpaceTaskCalendar({
               </span>
               <div className="mt-1 grid gap-1">
                 {dayEvents.slice(0, 3).map((event) => (
-                  <Button
-                    className="h-6 justify-start truncate rounded-md bg-sage-bg px-1.5 text-[10px] font-normal text-sage-fg hover:bg-sage-bg text-sage-fg"
-                    variant="ghost"
-                    type="button"
+                  <Pressable
+                    className="flex items-center rounded-md h-6 truncate bg-sage-bg px-1.5 text-[10px] text-sage-fg hover:bg-sage-bg text-sage-fg"
                     key={event.id}
                     onClick={() => onOpenEvent(event)}
                     title={event.title || "Busy"}
@@ -85,19 +83,17 @@ export function SpaceTaskCalendar({
                       ? ""
                       : `${new Date(event.starts_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · `}
                     {event.title || "Busy"}
-                  </Button>
+                  </Pressable>
                 ))}
                 {dayTasks.slice(0, 3).map((task) => (
-                  <Button
-                    className="h-6 justify-start truncate rounded-md border-l-2 border-sage-fg bg-sage-bg px-1.5 text-[10px] font-normal text-sage-fg hover:bg-sage-bg text-sage-fg"
-                    variant="ghost"
+                  <Pressable
+                    className="flex items-center rounded-md h-6 truncate border-l-2 border-sage-fg bg-sage-bg px-1.5 text-[10px] text-sage-fg hover:bg-sage-bg text-sage-fg"
                     title={`${task.task_key} · ${taskAssigneeName(members, task)}`}
-                    type="button"
                     key={task.id}
                     onClick={() => onOpenTask(task)}
                   >
                     {task.title}
-                  </Button>
+                  </Pressable>
                 ))}
                 {visibleEntries > 6 ? (
                   <Badge className="w-fit px-1.5 py-0 text-[9px]" variant="secondary">

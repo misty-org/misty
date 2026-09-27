@@ -1,9 +1,9 @@
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from "@/shared/ui";
 import { Plus, type LucideIcon } from "lucide-react";
 
@@ -18,15 +18,9 @@ export function NewTabMenu(props: { ariaLabel: string; options: ReadonlyArray<Ne
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className="size-7 rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
-          title={props.ariaLabel}
-          aria-label={props.ariaLabel}
-        >
+        <IconButton shape="round" label={props.ariaLabel} tooltip={false}>
           <Plus size={15} strokeWidth={2.4} />
-        </Button>
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52">
         {props.options.map(({ id, icon: Icon, label, onSelect }) => (

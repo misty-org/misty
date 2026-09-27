@@ -7,12 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  Pressable,
 } from "@/shared/ui";
 import { activityMuteKeys, isPendingRequest } from "./activityPolicy";
 import type { ActivityItem } from "./types";
-
-const actionClass =
-  "grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:text-cream-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright";
 
 export function ActivityRow({
   item,
@@ -64,19 +62,14 @@ export function ActivityRow({
           </IconButton>
         ) : null}
         {!pending && !item.readAt ? (
-          <IconButton
-            label={`Mark update read: ${item.title}`}
-            className={actionClass}
-            title="Mark read"
-            onClick={onRead}
-          >
+          <IconButton label={`Mark update read: ${item.title}`} title="Mark read" onClick={onRead}>
             <Check size={15} aria-hidden="true" />
           </IconButton>
         ) : null}
         {keys.length || (item.dismissible && pending) ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <IconButton label={`Options for ${source}`} tooltip={false} className={actionClass}>
+              <IconButton label={`Options for ${source}`} tooltip={false}>
                 <MoreHorizontal size={14} />
               </IconButton>
             </DropdownMenuTrigger>
@@ -94,10 +87,9 @@ export function ActivityRow({
           </DropdownMenu>
         ) : null}
       </div>
-      <Button
-        variant="ghost"
+      <Pressable
         onClick={onOpen}
-        className="flex h-auto w-full items-start gap-2 px-3 py-2 text-left hover:bg-charcoal-hover/50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
+        className="rounded-md flex w-full items-start gap-2 px-3 py-2 hover:bg-charcoal-hover/50"
       >
         <span className="min-w-0 flex-1">
           <span className="mb-1 flex flex-wrap items-baseline gap-x-2 text-[11px] text-cream-muted">
@@ -117,14 +109,14 @@ export function ActivityRow({
             {item.title}
           </span>
         </span>
-      </Button>
+      </Pressable>
       {item.body ? (
         <Button
           variant="ghost"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           title={expanded ? "Collapse details" : "Expand details"}
-          className="block h-auto w-full px-3 pb-2 text-left text-xs leading-4 text-cream-muted hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
+          className="block h-auto w-full px-3 pb-2 text-left text-xs leading-4 text-cream-muted hover:text-cream"
         >
           <span className={`${expanded ? "" : "line-clamp-1"} [overflow-wrap:anywhere]`}>
             {item.body}

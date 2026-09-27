@@ -4,12 +4,12 @@ import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationNames, windowNameKey } from "@/features/navigation-names/store";
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
 import {
-  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  IconButton,
   MenuTrigger,
 } from "@/shared/ui";
 import { AppWindow, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -61,16 +61,11 @@ export function WorkspaceWindowMenu(props: {
                 <AppWindow className="size-4" />
                 <span className="min-w-0 flex-1 truncate">{title}</span>
                 {canClose(workspaceWindow) ? (
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    className={cn(
-                      "grid size-[18px] shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0",
-                      " hover:text-cream group-hover/window:opacity-100",
-                      "group-data-[highlighted]/window:opacity-100",
-                      "focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-                    )}
-                    aria-label={`Close ${title}`}
+                  <IconButton
+                    size="2xs"
+                    tooltip={false}
+                    className="opacity-0 focus-visible:opacity-100 group-hover/window:opacity-100 group-data-[highlighted]/window:opacity-100"
+                    label={`Close ${title}`}
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -78,7 +73,7 @@ export function WorkspaceWindowMenu(props: {
                     }}
                   >
                     <X className="size-3" />
-                  </Button>
+                  </IconButton>
                 ) : null}
               </DropdownMenuItem>
             </Renameable>

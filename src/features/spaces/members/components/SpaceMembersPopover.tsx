@@ -82,11 +82,7 @@ export function SpaceMembersPopover({
         {trigger ?? (
           <IconButton
             label="Space team"
-            className={cn(
-              "relative shadow-none",
-              "focus-visible:ring-2 focus-visible:ring-charcoal-active",
-              open && "text-cream-bright",
-            )}
+            className={cn("relative", "", open && "text-cream-bright")}
             title="Team"
             aria-haspopup="dialog"
             aria-expanded={open}

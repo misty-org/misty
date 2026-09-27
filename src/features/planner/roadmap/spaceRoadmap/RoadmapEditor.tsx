@@ -472,8 +472,9 @@ export function RoadmapEditor(props: {
           aria-label="Edit roadmap selection"
         >
           <IconButton
+            shape="round"
             label="Close editor"
-            className={cn("absolute right-2 z-10 rounded-full", "top-2")}
+            className="absolute right-2 top-2 z-10"
             onClick={() => selectForEditing("")}
           >
             <X className="size-3.5" />

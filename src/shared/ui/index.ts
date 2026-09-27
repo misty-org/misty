@@ -19,6 +19,7 @@ export * from "./controls/Switch";
 export * from "./controls/Textarea";
 export * from "./controls/Toggle";
 export * from "./controls/ToggleGroup";
+export * from "./controls/Pressable";
 export * from "./controls/SegmentedControl";
 
 // overlays

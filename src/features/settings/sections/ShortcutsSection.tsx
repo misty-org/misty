@@ -5,7 +5,7 @@ import {
   type ShortcutSlot,
 } from "@/features/shortcuts";
 import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
-import { Button, cn, IconButton, Input } from "@/shared/ui";
+import { Button, cn, IconButton, Input, Pressable } from "@/shared/ui";
 import { RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -421,16 +421,14 @@ function BindingSlot(props: {
   const target = { commandId: props.commandId, slot: props.slot };
   return (
     <div className="group/slot relative min-w-[106px]">
-      <Button
-        type="button"
-        variant="ghost"
+      <Pressable
         disabled={props.disabled}
         aria-label={`${props.label} shortcut${props.value ? `: ${props.value}` : ": unbound"}`}
         onClick={() => props.onBegin(target)}
         onKeyDown={(event) => (props.capturing ? props.onKeyDown(event, target) : undefined)}
         className={cn(
           "flex h-8 w-full items-center justify-center gap-0.5 rounded border px-2",
-          "text-xs outline-none transition",
+          "text-xs",
           props.capturing
             ? "border-charcoal-active bg-charcoal-hover text-cream ring-1 ring-charcoal-active/40"
             : "border-charcoal-border bg-charcoal-bg text-cream-muted hover:border-charcoal-active",
@@ -448,14 +446,15 @@ function BindingSlot(props: {
         ) : (
           <span className="text-cream-muted">Unbound</span>
         )}
-      </Button>
+      </Pressable>
       {props.value ? (
         <IconButton
-          size="xs"
+          size="2xs"
+          variant="secondary"
+          shape="round"
           label={`Clear ${props.label.toLowerCase()} shortcut`}
           className={cn(
-            "absolute -right-1 -top-1 rounded-full",
-            "bg-charcoal-border opacity-0 transition-opacity",
+            "absolute -right-1 -top-1 opacity-0 transition-opacity",
             "group-hover/slot:opacity-100 group-focus-within/slot:opacity-100 max-[720px]:opacity-100",
           )}
           onClick={(event) => {

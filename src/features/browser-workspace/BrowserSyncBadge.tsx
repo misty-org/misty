@@ -4,7 +4,7 @@ import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/clien
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { retryWorkspaceRecovery } from "@/features/workspace/useWorkspaceRecoveryRetry";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { Button, cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { Button, cn, Popover, PopoverContent, PopoverTrigger, Pressable } from "@/shared/ui";
 import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
 import { DeviceControlContent } from "./DeviceControlContent";
 import { syncBadgeStatus } from "./syncBadgeStatus";
@@ -54,9 +54,7 @@ export function BrowserSyncBadge({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="none"
+        <Pressable
           data-misty-window-drag-block="true"
           data-sync-status={status.tone}
           aria-label={
@@ -64,7 +62,8 @@ export function BrowserSyncBadge({
           }
           title={viewing ? `Viewing ${viewing}` : `Sync: ${status.title}`}
           className={cn(
-            "h-6 shrink-0 gap-1.5 rounded-full border px-2 text-xs font-medium focus-visible:ring-2 focus-visible:ring-cream-muted",
+            "flex items-center",
+            "h-6 shrink-0 gap-1.5 rounded-full border px-2 text-xs font-medium",
             status.tone === "green" &&
               "border-status-green/25 bg-status-green/15 text-status-green hover:bg-status-green/25 hover:text-status-green aria-expanded:text-status-green",
             status.tone === "red" &&
@@ -75,7 +74,7 @@ export function BrowserSyncBadge({
         >
           <Icon aria-hidden="true" className="size-3" />
           {viewing ? <span className="max-w-40 truncate">Viewing {viewing}</span> : "Sync"}
-        </Button>
+        </Pressable>
       </PopoverTrigger>
       <PopoverContent
         align="start"

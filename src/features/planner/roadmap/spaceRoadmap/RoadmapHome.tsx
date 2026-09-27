@@ -13,6 +13,7 @@ import {
   ContextMenuTrigger,
   EmptyState,
   Input,
+  Pressable,
   Skeleton,
 } from "@/shared/ui";
 import { ArrowRight, Pin, PinOff, Plus, Search } from "lucide-react";
@@ -293,10 +294,8 @@ function RoadmapRows(props: RoadmapRowsProps) {
                 : "hover:bg-charcoal-border/65",
             )}
           >
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex h-auto min-w-0 flex-1 self-stretch items-center justify-start gap-2 rounded-none px-3.5 py-2 text-left outline-none hover:bg-transparent"
+            <Pressable
+              className="flex min-w-0 flex-1 self-stretch items-center gap-2 rounded-none px-3.5 py-2"
               aria-current={selected ? "true" : undefined}
               onClick={() => props.onSelect(roadmap.id)}
             >
@@ -311,7 +310,7 @@ function RoadmapRows(props: RoadmapRowsProps) {
               {pinned ? (
                 <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
               ) : null}
-            </Button>
+            </Pressable>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">

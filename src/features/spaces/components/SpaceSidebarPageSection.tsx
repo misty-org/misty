@@ -1,4 +1,4 @@
-import { Button, cn } from "@/shared/ui";
+import { cn, IconButton } from "@/shared/ui";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -35,17 +35,16 @@ export function SpaceSidebarPageSection(props: {
             <span className="font-medium text-cream-muted"> - {props.count}</span>
           ) : null}
         </Link>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-auto w-auto shrink-0 p-0 text-cream-muted shadow-none hover:bg-transparent hover:text-cream-bright"
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${props.label}`}
+        <IconButton
+          size="2xs"
+          label={`${expanded ? "Collapse" : "Expand"} ${props.label}`}
+          tooltip={false}
           aria-controls={contentId}
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
           <ChevronRight size={13} className={cn("transition-transform", expanded && "rotate-90")} />
-        </Button>
+        </IconButton>
         <span className="flex-1" />
         {props.action}
       </div>

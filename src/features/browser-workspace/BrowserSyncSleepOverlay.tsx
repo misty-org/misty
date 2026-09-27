@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
+import { Pressable } from "@/shared/ui";
 import misty from "@/assets/branding/misty-icon.png?inline";
 import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
@@ -34,15 +34,12 @@ export function SyncSleepScreen({
           onCloseAutoFocus={(event) => event.preventDefault()}
           onKeyDown={(event) => event.stopPropagation()}
         >
-          <Button
-            variant="ghost"
-            size="none"
-            type="button"
+          <Pressable
             aria-label="Wake Misty and use this device"
             aria-busy={busy}
             disabled={busy}
             onClick={onWake}
-            className="group mb-6 rounded-full p-3 outline-none transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-300/80 focus-visible:ring-offset-8 focus-visible:ring-offset-transparent disabled:cursor-wait disabled:opacity-100 motion-reduce:transform-none"
+            className="flex items-center hover:bg-cream/[0.045] group mb-6 rounded-full p-3 transition-transform duration-200 hover:scale-105 active:scale-95 disabled:cursor-wait disabled:opacity-100 motion-reduce:transform-none"
           >
             <img
               src={misty}
@@ -52,7 +49,7 @@ export function SyncSleepScreen({
               draggable={false}
               className="size-44 select-none object-contain"
             />
-          </Button>
+          </Pressable>
           <Dialog.Title className="text-xl font-medium tracking-tight">
             Misty’s resting here
           </Dialog.Title>

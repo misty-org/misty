@@ -35,9 +35,9 @@ export function SpaceSidebarSection({
               type="button"
               variant="ghost"
               className={[
-                "h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs shadow-none",
+                "h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs",
                 "font-semibold text-cream-muted hover:bg-transparent hover:text-cream-bright",
-              ].join(" ")}
+              ].join("")}
               aria-controls={contentId}
               aria-expanded={expanded}
               onClick={() => setExpanded((current) => !current)}
