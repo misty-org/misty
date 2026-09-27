@@ -2,7 +2,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, stringSetting, SwitchControl, TextAreaControl } from "../settingsControls";
+import { booleanSetting, stringSetting, SwitchControl, TextAreaControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function PrivacySection(props: SettingsContentProps & { page?: "app" | "browser" }) {

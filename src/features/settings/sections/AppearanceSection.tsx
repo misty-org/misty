@@ -21,7 +21,7 @@ import {
   SelectControl,
   stringSetting,
   SwitchControl,
-} from "../settingsControls";
+} from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { Button } from "@/shared/ui";
 

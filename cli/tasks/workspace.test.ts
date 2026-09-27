@@ -22,7 +22,7 @@ test("built-in tools share the host runtime without public app packages", () => 
   for (const name of ["react", "react-dom"]) {
     assert.match(host.dependencies[name], /^19\./);
     const hostRequire = createRequire(resolve(root, "package.json"));
-    const appRequire = createRequire(resolve(root, "src/app/hostMain.tsx"));
+    const appRequire = createRequire(resolve(root, "src/app/HostMain.tsx"));
     assert.equal(hostRequire.resolve(name), appRequire.resolve(name));
   }
 });

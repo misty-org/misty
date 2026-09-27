@@ -1,5 +1,5 @@
 import type { AiArtifact as AiArtifact, AiSurfaceAdapter as AiSurfaceAdapter } from "@/features/ai-surface/types";
-import { useRoadmapRuntime, isPlannerConflict } from "./spaceRoadmap/roadmapRuntime";
+import { useRoadmapRuntime, isPlannerConflict } from "./spaceRoadmap/RoadmapRuntime";
 
 import type {
   SpaceRoadmap,

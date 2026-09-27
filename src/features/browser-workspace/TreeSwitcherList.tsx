@@ -1,6 +1,5 @@
 import { ArrowRightLeft, Check, Laptop, LoaderCircle, Monitor } from "lucide-react";
-import { Button } from "@/shared/ui/button";
-import { Switch } from "@/shared/ui/switch";
+import { Button, Switch } from "@/shared/ui";
 import { useUserStore } from "@/features/auth/core";
 import type { NativeSyncView, SyncTreeView } from "./native";
 import { seatText, treeRows } from "./treeControl";

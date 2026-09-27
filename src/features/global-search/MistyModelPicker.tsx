@@ -1,4 +1,4 @@
-import { runtimeAssistantApi as assistantApi } from "@/features/agents/agentsRuntime";
+import { runtimeAssistantApi as assistantApi } from "@/features/agents/AgentsRuntime";
 import { thinkingMode, thinkingEffort, type ThinkingMode } from "@/features/agents/thinkingMode";
 import {
   Button,

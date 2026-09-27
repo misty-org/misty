@@ -2,7 +2,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, CopyableValueText, SwitchControl } from "../settingsControls";
+import { booleanSetting, CopyableValueText, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function AdvancedSection(props: SettingsContentProps) {

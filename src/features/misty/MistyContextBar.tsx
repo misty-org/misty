@@ -1,4 +1,4 @@
-import { runtimeAiApi } from "@/features/agents/agentsRuntime";
+import { runtimeAiApi } from "@/features/agents/AgentsRuntime";
 import { useState } from "react";
 import { useMistyStore } from "./useMistyStore";
 import { requestHostContext } from "./contextBridge";

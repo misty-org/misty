@@ -15,7 +15,7 @@ import {
   stringSetting,
   SwitchControl,
   TextControl,
-} from "../settingsControls";
+} from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { definitionById, runtimeAdapters } from "../profiles/registry";
 

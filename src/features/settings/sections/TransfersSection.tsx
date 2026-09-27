@@ -11,7 +11,7 @@ import {
   SelectControl,
   SwitchControl,
   TextControl,
-} from "../settingsControls";
+} from "../SettingsControls";
 import {
   defaultTransferProfileId,
   transferProfileDocument,

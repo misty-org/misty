@@ -7,7 +7,7 @@ import type {
   PreviewResource,
 } from "../../model/interfaces/components/GlobalPreview";
 import { friendlyType } from "./previewFormat";
-import { ArchiveReader, PreviewMessage } from "./previewPrimitives";
+import { ArchiveReader, PreviewMessage } from "./PreviewPrimitives";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(() => import("../PdfViewerView"));

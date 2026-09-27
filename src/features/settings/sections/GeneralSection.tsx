@@ -3,7 +3,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, numberSetting, SelectControl, SwitchControl } from "../settingsControls";
+import { booleanSetting, numberSetting, SelectControl, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 export function GeneralSection(props: SettingsContentProps) {
   const launchOnLoginUnsupported = props.launchOnLogin?.supported === false;

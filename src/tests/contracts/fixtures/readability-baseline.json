@@ -11,12 +11,6 @@
       "hash": "5aab0420a6de0452"
     }
   ],
-  "src/features/agents/AgentSources.tsx": [
-    {
-      "length": 287,
-      "hash": "0444dc36ca36ba69"
-    }
-  ],
   "src/features/auth/SignInPage.tsx": [
     {
       "length": 185,
@@ -25,20 +19,6 @@
     {
       "length": 195,
       "hash": "2f0b6b91eb5e48b6"
-    }
-  ],
-  "src/features/files/workspace/explorer/components/DeepSearchOverlay.tsx": [
-    {
-      "length": 319,
-      "hash": "043bcc5b43e4abfb"
-    },
-    {
-      "length": 170,
-      "hash": "5742f1a0b6c9ca78"
-    },
-    {
-      "length": 164,
-      "hash": "e36571c94fea60c0"
     }
   ],
   "src/features/files/workspace/explorer/components/ExplorerSidebar.tsx": [
@@ -91,60 +71,10 @@
       "hash": "7e98b31fa6357fc1"
     }
   ],
-  "src/features/files/workspace/explorer/components/FileBrowserStyles.ts": [
-    {
-      "length": 293,
-      "hash": "bdd8303a6f9758ed"
-    },
-    {
-      "length": 226,
-      "hash": "53af1478daeb4792"
-    },
-    {
-      "length": 315,
-      "hash": "7b453a0d72fc990b"
-    },
-    {
-      "length": 224,
-      "hash": "4d9bba85432618e6"
-    },
-    {
-      "length": 286,
-      "hash": "e3bbbf97c2618a79"
-    },
-    {
-      "length": 295,
-      "hash": "6714114c1c6a1d92"
-    },
-    {
-      "length": 186,
-      "hash": "a7cb3377baed7ad2"
-    },
-    {
-      "length": 473,
-      "hash": "155776b3db8a16d0"
-    },
-    {
-      "length": 238,
-      "hash": "63094f68c2bd11c8"
-    }
-  ],
   "src/features/files/workspace/explorer/components/MediaSearchViewer.tsx": [
     {
       "length": 168,
       "hash": "346027b027925317"
-    }
-  ],
-  "src/features/files/workspace/explorer/components/fileBrowser/FileGridItem.tsx": [
-    {
-      "length": 280,
-      "hash": "5ee2a3673e83c23f"
-    }
-  ],
-  "src/features/files/workspace/explorer/components/fileBrowser/FileTableRow.tsx": [
-    {
-      "length": 287,
-      "hash": "b4c2e7423e99897f"
     }
   ],
   "src/features/files/workspace/explorer/components/globalPreview/EmbeddedUniversalPreview.tsx": [
@@ -161,12 +91,6 @@
     {
       "length": 252,
       "hash": "5c7e40e14f4fbc2c"
-    }
-  ],
-  "src/features/files/workspace/explorer/components/libraryWorkspace/LegacyLibraryAssetViewer.tsx": [
-    {
-      "length": 312,
-      "hash": "d6fecc00bf4b053b"
     }
   ],
   "src/features/files/workspace/explorer/components/libraryWorkspace/LibraryGallery.tsx": [
@@ -323,19 +247,7 @@
       "hash": "b696271c03ef9587"
     }
   ],
-  "src/features/providers/ProvidersPage.tsx": [
-    {
-      "length": 198,
-      "hash": "fd2ec3cf22d7eb39"
-    }
-  ],
-  "src/features/providers/components/RemoteListPanel.tsx": [
-    {
-      "length": 184,
-      "hash": "99c8dc05c6c0ef8d"
-    }
-  ],
-  "src/features/settings/settingsControls.tsx": [
+  "src/features/settings/SettingsControls.tsx": [
     {
       "length": 173,
       "hash": "a31d88740c6ecdc9"
@@ -471,19 +383,19 @@
       "hash": "a1902bf61947a3b8"
     }
   ],
-  "src/shared/ui/alert-dialog.tsx": [
+  "src/shared/ui/overlays/AlertDialog.tsx": [
     {
       "length": 182,
       "hash": "f50fd3b389aaa1a9"
     }
   ],
-  "src/shared/ui/alert.tsx": [
+  "src/shared/ui/feedback/Alert.tsx": [
     {
       "length": 318,
       "hash": "99a36f81b1dcd188"
     }
   ],
-  "src/shared/ui/avatar.tsx": [
+  "src/shared/ui/display/Avatar.tsx": [
     {
       "length": 202,
       "hash": "ea35c9437cb52838"
@@ -497,13 +409,13 @@
       "hash": "b5d6686e3c7cf320"
     }
   ],
-  "src/shared/ui/badge.tsx": [
+  "src/shared/ui/display/Badge.tsx": [
     {
       "length": 344,
       "hash": "c55227b71cc33062"
     }
   ],
-  "src/shared/ui/button.tsx": [
+  "src/shared/ui/controls/Button.tsx": [
     {
       "length": 635,
       "hash": "0c4d96199007caca"
@@ -517,7 +429,7 @@
       "hash": "f9b1e240d32f08fd"
     }
   ],
-  "src/shared/ui/card.tsx": [
+  "src/shared/ui/display/Card.tsx": [
     {
       "length": 285,
       "hash": "6f80747f55e0d299"
@@ -527,7 +439,7 @@
       "hash": "0fd31895d3e806d9"
     }
   ],
-  "src/shared/ui/command.tsx": [
+  "src/shared/ui/overlays/Command.tsx": [
     {
       "length": 388,
       "hash": "df5bb95f1e54869e"
@@ -541,7 +453,7 @@
       "hash": "101e6de7ba486f2f"
     }
   ],
-  "src/shared/ui/context-menu.tsx": [
+  "src/shared/ui/overlays/ContextMenu.tsx": [
     {
       "length": 291,
       "hash": "88d485f81ca29eb3"
@@ -567,7 +479,7 @@
       "hash": "dd1c5dc9e8552c35"
     }
   ],
-  "src/shared/ui/dialog.tsx": [
+  "src/shared/ui/overlays/Dialog.tsx": [
     {
       "length": 182,
       "hash": "0d1d81cf83893556"
@@ -577,13 +489,13 @@
       "hash": "68a00f7845be8b17"
     }
   ],
-  "src/shared/ui/drag-layer.tsx": [
+  "src/shared/ui/layout/DragLayer.tsx": [
     {
       "length": 162,
       "hash": "1d858e9f0ea727ff"
     }
   ],
-  "src/shared/ui/dropdown-menu.tsx": [
+  "src/shared/ui/overlays/DropdownMenu.tsx": [
     {
       "length": 344,
       "hash": "938ac8a13a38bba6"
@@ -609,25 +521,19 @@
       "hash": "7fa0b7e7ce65792b"
     }
   ],
-  "src/shared/ui/popover.tsx": [
+  "src/shared/ui/overlays/Popover.tsx": [
     {
       "length": 468,
       "hash": "a9ab7707cefa0acc"
     }
   ],
-  "src/shared/ui/radio-group.tsx": [
+  "src/shared/ui/controls/RadioGroup.tsx": [
     {
       "length": 278,
       "hash": "50ba02f7e7e3ffe3"
     }
   ],
-  "src/shared/ui/resizable.tsx": [
-    {
-      "length": 676,
-      "hash": "68340d3a904d0f8a"
-    }
-  ],
-  "src/shared/ui/select.tsx": [
+  "src/shared/ui/controls/Select.tsx": [
     {
       "length": 539,
       "hash": "ba3b6856afe22c60"
@@ -637,7 +543,7 @@
       "hash": "437ae662e3920950"
     }
   ],
-  "src/shared/ui/sheet.tsx": [
+  "src/shared/ui/overlays/Sheet.tsx": [
     {
       "length": 182,
       "hash": "11cce1cfe96c32df"
@@ -651,7 +557,7 @@
       "hash": "8be6d06314d8c0df"
     }
   ],
-  "src/shared/ui/tabs.tsx": [
+  "src/shared/ui/layout/Tabs.tsx": [
     {
       "length": 231,
       "hash": "b27539ee55cd7744"
@@ -665,7 +571,7 @@
       "hash": "4eb744700a98828a"
     }
   ],
-  "src/shared/ui/toggle-group.tsx": [
+  "src/shared/ui/controls/ToggleGroup.tsx": [
     {
       "length": 174,
       "hash": "67c111461cb5f1b5"

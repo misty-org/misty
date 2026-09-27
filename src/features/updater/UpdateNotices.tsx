@@ -1,5 +1,5 @@
 import { ArrowDownToLine, X } from "lucide-react";
-import { Button } from "@/shared/ui/button";
+import { Button } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";

@@ -1,6 +1,6 @@
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "@/features/library/library/LibraryRuntime";
 import {
   Button,
   Dialog,

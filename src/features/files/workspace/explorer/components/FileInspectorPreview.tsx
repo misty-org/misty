@@ -7,7 +7,7 @@ export {
   AudioPreview,
   FolderContentsPreview,
   PreviewImage,
-} from "./fileInspector/previewViews";
+} from "./fileInspector/PreviewViews";
 
 import {
   explorerListDirectory,

@@ -38,7 +38,7 @@ import type {
   ContextMenuLeafItem,
 } from "../model/types/workspace/ExplorerContextMenu";
 import { useExplorerStore } from "../store";
-import { buildArchiveItems, buildFileToolsItems } from "./contextMenu/archiveToolsItems";
+import { buildArchiveItems, buildFileToolsItems } from "./contextMenu/ArchiveToolsItems";
 import { openCompareWith } from "./contextMenu/remoteVerification";
 import { calculateSelectedFolderSizes } from "./contextMenu/selectionHelpers";
 import { useContextMenuState } from "./contextMenu/useContextMenuState";

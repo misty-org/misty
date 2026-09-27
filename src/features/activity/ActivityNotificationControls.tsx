@@ -6,7 +6,7 @@ import {
   DesktopSettingsRow,
   DesktopSettingsSection,
 } from "@/features/settings/components/DesktopSettingsUI";
-import { SwitchControl } from "@/features/settings/settingsControls";
+import { SwitchControl } from "@/features/settings/SettingsControls";
 import { Button } from "@/shared/ui";
 
 export function ActivityNotificationControls() {

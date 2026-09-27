@@ -1,6 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowRightLeft, LoaderCircle } from "lucide-react";
-import { Button } from "@/shared/ui/button";
+import { Button } from "@/shared/ui";
 import mistyStill from "@/assets/branding/misty-icon.png?inline";
 import { useUserStore } from "@/features/auth/core";
 import type { NativeSyncView, SyncTreeView } from "./native";

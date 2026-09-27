@@ -1,9 +1,9 @@
 import { readAccountSessionGeneration } from "@/features/auth";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "@/features/library/library/LibraryRuntime";
 import { useActivityStore } from "@/features/activity/useActivityStore";
-import { useLibrarySpaces as useSpacesStore } from "@/features/library/library/libraryRuntime";
+import { useLibrarySpaces as useSpacesStore } from "@/features/library/library/LibraryRuntime";
 import { spaceNavigationName } from "@/features/spaces/defaultSpace";
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
 import {
   Badge,
   Button,

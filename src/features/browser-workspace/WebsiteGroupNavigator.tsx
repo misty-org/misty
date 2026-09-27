@@ -27,7 +27,7 @@ import {
 } from "@/shared/ui";
 import type { SharedRecord } from "./model";
 import { userWebsiteGroups } from "./navigationDefaults";
-import { GroupIcon } from "./groupIcons";
+import { GroupIcon } from "./GroupIcons";
 import { WebsiteGroupsManager } from "./WebsiteGroupsManager";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
 import {

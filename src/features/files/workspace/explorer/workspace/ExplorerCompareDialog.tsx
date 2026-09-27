@@ -10,7 +10,7 @@ import { useExplorerStore, useOperationQueueStore } from "../store";
 import {
   loadCompareImagePreview,
   loadCompareTextDiff,
-} from "./compareDialog/comparePreview";
+} from "./compareDialog/ComparePreview";
 import {
   CompareDialogView,
   type CompareDialogRuntime,

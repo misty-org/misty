@@ -11,8 +11,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  PrimitiveIconButton as IconButton,
 } from "@/shared/ui";
-import { IconButton } from "@/shared/ui/icon-button";
 import {
   ArrowDown,
   ArrowUp,

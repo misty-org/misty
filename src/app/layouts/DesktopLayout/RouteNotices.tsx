@@ -3,7 +3,7 @@ import { reportSystemError } from "@/features/activity";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
 import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
-import { Notification } from "@/shared/ui/notification";
+import { Notification } from "@/shared/ui";
 import { memo, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {

@@ -25,7 +25,7 @@ import {
   SwitchControl,
   TextAreaControl,
   stringSetting,
-} from "../settingsControls";
+} from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function SearchSection(props: SettingsContentProps & { page?: "search" | "indexing" }) {

@@ -1,5 +1,5 @@
 import { useSettingsStore } from "@/features/settings";
-import { runtimeAssistantApi as assistantApi } from "@/features/agents/agentsRuntime";
+import { runtimeAssistantApi as assistantApi } from "@/features/agents/AgentsRuntime";
 import { safeAssistantTurnInput } from "@/api/assistant/api-core";
 import type {
   GlobalAiActionProposal,

@@ -1,7 +1,15 @@
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { BrowserTabAudioButton } from "@/features/browser/workspace/BrowserTabAudioButton";
 import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
-import { OverflowFadeText } from "@/shared/ui/overflow-fade-text";
+import {
+  Button,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  OverflowFadeText,
+} from "@/shared/ui";
 import {
   Blocks,
   Check,
@@ -18,14 +26,6 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  cn,
-  Button,
-} from "@/shared/ui";
 import {
   activeLayoutView,
   layoutTabs,

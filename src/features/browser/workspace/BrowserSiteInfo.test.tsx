@@ -15,7 +15,8 @@ vi.mock("./useBrowserOverlayControl", async () => {
   };
 });
 // Exercise the panel lifecycle without depending on Radix pointer-event internals in jsdom.
-vi.mock("@/shared/ui", () => ({
+vi.mock("@/shared/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/ui")>()),
   Button: ({
     variant: _variant,
     size: _size,

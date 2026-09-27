@@ -1,4 +1,4 @@
-import { LoadingScreen } from "@/shared/ui/loading-screen";
+import { LoadingScreen } from "@/shared/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";

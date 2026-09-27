@@ -1,7 +1,7 @@
 import {
   LibraryPicker as MistyFilePicker,
   libraryApi as spacesApi,
-} from "@/features/library/library/libraryRuntime";
+} from "@/features/library/library/LibraryRuntime";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";

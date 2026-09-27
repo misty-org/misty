@@ -15,7 +15,7 @@ import {
 } from "@/shared/ui";
 import { EditableGroupRow } from "./WebsiteSitePicker";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
-import { GroupIcon, groupIcons } from "./groupIcons";
+import { GroupIcon, groupIcons } from "./GroupIcons";
 import { readGroupIcon } from "./groupIconUpload";
 import {
   addWebsite,

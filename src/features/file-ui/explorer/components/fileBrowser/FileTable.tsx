@@ -19,7 +19,7 @@ import {
   loadColumnWidths,
   saveColumnWidths,
 } from "./columnLayout";
-import { passiveRenameDraftsFor } from "./entryPresentation";
+import { passiveRenameDraftsFor } from "./EntryPresentation";
 import {
   TABLE_OVERSCAN_ROWS,
   defaultColumnWidths,

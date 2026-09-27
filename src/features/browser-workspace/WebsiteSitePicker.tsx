@@ -1,24 +1,24 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ChevronLeft, Pencil, Trash2, Folder, Globe, Search } from "lucide-react";
 import { mistyBrowserProviders } from "@/shared/contracts";
-import { BrandIcon } from "../../shared/toolAssets/BrandIcon";
-import { providers, type ProviderId } from "@/features/webviews/providers";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
+  AlertDialogTitle,
+  BrandIcon,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
   Input,
 } from "@/shared/ui";
+import { providers, type ProviderId } from "@/features/webviews/providers";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
 import type { SharedRecord } from "./model";
 import {

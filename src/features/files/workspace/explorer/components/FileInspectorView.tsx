@@ -10,7 +10,7 @@ import {
   AudioPreview,
   FolderContentsPreview,
   PreviewImage,
-} from "./fileInspector/previewViews";
+} from "./fileInspector/PreviewViews";
 import { inspectorStyles } from "./FileInspectorStyles";
 import { GlobalPreviewDialogView } from "./globalPreview/GlobalPreviewDialogView";
 

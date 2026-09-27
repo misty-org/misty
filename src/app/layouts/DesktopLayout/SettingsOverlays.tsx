@@ -1,5 +1,5 @@
 import { SettingsWorkspace } from "@/features/settings";
-import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
+import { WorkspaceOverlay } from "@/shared/ui";
 type OverlayProps = {
   open: boolean;
   onClose: () => void;
