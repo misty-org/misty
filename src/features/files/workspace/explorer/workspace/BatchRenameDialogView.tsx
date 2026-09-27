@@ -19,6 +19,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { ExplorerBatchRenameItem } from "../model/interfaces/store/types";
 import type { ExplorerDialogState } from "../model/types/store/types";
 import { validateBatchRenameItems } from "../utils/inlineEdit";
+import { cn } from "@/shared/ui/utils";
 const dialogChromeClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(720px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream";
 const dialogWideClass = "w-[min(760px,calc(100vw-48px))]";
@@ -284,7 +285,11 @@ export function BatchRenameDialogView(props: {
               </label>
             </div>
             <div
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-charcoal-border px-4 py-2 text-[10px] font-semibold text-cream-muted"
+              className={cn(
+                "grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b",
+                "border-charcoal-border px-4 py-2 text-[10px] font-semibold",
+                "text-cream-muted",
+              )}
               aria-hidden="true"
             >
               <span>Before</span>
@@ -320,7 +325,12 @@ export function BatchRenameDialogView(props: {
                       </em>
                     ) : (
                       <em
-                        className={`${`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "text-cream-muted" : "text-sage-fg"} mt-1 block text-[11px] not-italic`}
+                        className={cn(
+                          `${item.value.trim()}${item.lockedExtension}` === item.originalName
+                            ? "text-cream-muted"
+                            : "text-sage-fg",
+                          "mt-1 block text-[11px] not-italic",
+                        )}
                       >
                         {`${item.value.trim()}${item.lockedExtension}` === item.originalName
                           ? "Unchanged"

@@ -4,6 +4,7 @@ import { Button } from "@/shared/ui";
 import { capabilityApprovalsApi, type CapabilityApprovalReview } from "./api";
 import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useCapabilityApprovals } from "./store";
+import { cn } from "@/shared/ui/utils";
 
 export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boolean } = {}) {
   const { items, loading, loaded, error, nextCursor, refresh, loadMore } = useCapabilityApprovals();
@@ -42,7 +43,13 @@ export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boole
               <Button
                 variant="ghost"
                 aria-expanded={selected === item.id}
-                className="flex min-h-11 w-full items-start justify-between gap-3 rounded-md px-2 py-3 text-start text-sm text-cream hover:bg-charcoal-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream-muted font-normal h-auto"
+                className={[
+                  "flex min-h-11 w-full items-start justify-between gap-3 rounded-md px-2",
+                  "py-3 text-start text-sm text-cream hover:bg-charcoal-card",
+                  "focus-visible:outline focus-visible:outline-2",
+                  "focus-visible:outline-offset-2 focus-visible:outline-cream-muted",
+                  "font-normal h-auto",
+                ].join(" ")}
                 onClick={() =>
                   setParams((current) => {
                     const next = new URLSearchParams(current);
@@ -236,7 +243,11 @@ export function CapabilityApprovalDetail({ id, onClose }: { id: string; onClose(
             </p>
             <pre
               dir="auto"
-              className="misty-transient-scrollbar mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md bg-charcoal-card p-3 font-mono text-sm leading-6 text-cream [overflow-wrap:anywhere]"
+              className={cn(
+                "misty-transient-scrollbar mt-2 max-h-80 overflow-auto",
+                "whitespace-pre-wrap break-words rounded-md bg-charcoal-card p-3",
+                "font-mono text-sm leading-6 text-cream [overflow-wrap:anywhere]",
+              )}
               tabIndex={0}
             >
               {typeof details!.input === "string"

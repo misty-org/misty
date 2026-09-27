@@ -378,7 +378,13 @@ function TaskCard({
           </div>
           <div className="flex items-center gap-0.5">
             {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
-            <div className="invisible flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+            <div
+              className={cn(
+                "invisible flex items-center gap-0.5 opacity-0 transition-opacity",
+                "group-focus-within:visible group-focus-within:opacity-100",
+                "group-hover:visible group-hover:opacity-100",
+              )}
+            >
               <Button
                 size="icon"
                 variant="ghost"

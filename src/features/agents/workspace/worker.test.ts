@@ -81,8 +81,28 @@ describe("v2 device workflow node worker", () => {
 });
 
 it("bounds work by the acknowledged lease and refuses expired or revoked jobs", () => {
-  const job = { id:"job",runId:"run",nodeId:"node",scopeId:"scope",operation:"browser.inspect",attempt:1,input:{},config:{},controlVersion:2,deadlineAt:new Date(Date.now()+60000).toISOString() };
-  expect(deviceExecutionRemaining(job,new Date(Date.now()+10000).toISOString())).toBeLessThanOrEqual(10000);
-  expect(()=>deviceExecutionRemaining(job,new Date(Date.now()-1).toISOString())).toThrow("expired");
-  expect(()=>deviceExecutionRemaining({...job,cancelRequestedAt:new Date().toISOString()},job.deadlineAt)).toThrow("stopped");
+  const job = {
+    id: "job",
+    runId: "run",
+    nodeId: "node",
+    scopeId: "scope",
+    operation: "browser.inspect",
+    attempt: 1,
+    input: {},
+    config: {},
+    controlVersion: 2,
+    deadlineAt: new Date(Date.now() + 60000).toISOString(),
+  };
+  expect(
+    deviceExecutionRemaining(job, new Date(Date.now() + 10000).toISOString()),
+  ).toBeLessThanOrEqual(10000);
+  expect(() => deviceExecutionRemaining(job, new Date(Date.now() - 1).toISOString())).toThrow(
+    "expired",
+  );
+  expect(() =>
+    deviceExecutionRemaining(
+      { ...job, cancelRequestedAt: new Date().toISOString() },
+      job.deadlineAt,
+    ),
+  ).toThrow("stopped");
 });

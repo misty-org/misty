@@ -5,6 +5,7 @@ import mistyStill from "@/assets/branding/misty-icon.png?inline";
 import { useUserStore } from "@/features/auth/core";
 import type { NativeSyncView, SyncTreeView } from "./native";
 import { seatText, treeRows } from "./treeControl";
+import { cn } from "@/shared/ui/utils";
 
 /** Shown when another device took this device's seat: take a workspace back. */
 export function DeviceChooseScreen({
@@ -35,7 +36,11 @@ export function DeviceChooseScreen({
         <Dialog.Content
           data-slot="dialog-content"
           data-device-sync-choose=""
-          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
+          className={cn(
+            "fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col",
+            "items-center justify-center overflow-y-auto p-8 text-center text-cream",
+            "outline-none",
+          )}
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}

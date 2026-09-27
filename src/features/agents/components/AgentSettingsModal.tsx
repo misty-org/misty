@@ -24,7 +24,11 @@ export function AgentSettingsModal(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent
         container={props.container}
-        className="flex max-h-[85%] w-[min(680px,94%)] sm:max-w-[680px] flex-col overflow-hidden rounded-xl border border-charcoal-border/80 bg-charcoal-card p-0 shadow-2xl"
+        className={cn(
+          "flex max-h-[85%] w-[min(680px,94%)] sm:max-w-[680px] flex-col",
+          "overflow-hidden rounded-xl border border-charcoal-border/80",
+          "bg-charcoal-card p-0 shadow-2xl",
+        )}
         aria-describedby="agent-settings-dialog-description"
       >
         <DialogHeaderWithTabs
@@ -118,7 +122,11 @@ function DialogHeaderWithTabs(props: {
           <button
             type="button"
             onClick={props.onNewConversation}
-            className="flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-cream-muted hover:text-cream-bright hover:bg-charcoal-card transition-colors cursor-pointer border border-charcoal-border/70 ml-1"
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium",
+              "text-cream-muted hover:text-cream-bright hover:bg-charcoal-card",
+              "transition-colors cursor-pointer border border-charcoal-border/70 ml-1",
+            )}
             title="Start a new conversation"
           >
             <Plus className="size-3.5" />
@@ -130,7 +138,11 @@ function DialogHeaderWithTabs(props: {
           <button
             type="button"
             onClick={props.onCreateAgent}
-            className="flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-cream-muted hover:text-cream-bright hover:bg-charcoal-card transition-colors cursor-pointer border border-charcoal-border/70 ml-1"
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium",
+              "text-cream-muted hover:text-cream-bright hover:bg-charcoal-card",
+              "transition-colors cursor-pointer border border-charcoal-border/70 ml-1",
+            )}
             title="Create new agent"
           >
             <Plus className="size-3.5" />

@@ -379,7 +379,9 @@ export function WorkspaceTabGroupButton({
             className={cn(
               "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0 outline-none",
               " hover:text-cream focus:outline-none focus-visible:opacity-100",
-              "focus-visible:ring-1 focus-visible:ring-cream-muted group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100",
+              "focus-visible:ring-1 focus-visible:ring-cream-muted",
+              "group-hover/tab:opacity-100 group-focus-within/tab:opacity-100",
+              "[@media(hover:none)]:opacity-100",
             )}
             onClick={(event) => {
               event.stopPropagation();

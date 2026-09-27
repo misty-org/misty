@@ -8,6 +8,7 @@ import misty from "@/assets/branding/misty-icon.png?inline";
 import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
 import { useBrowserSyncStore } from "./store";
+import { cn } from "@/shared/ui/utils";
 
 export function SyncSleepScreen({
   busy,
@@ -28,7 +29,11 @@ export function SyncSleepScreen({
         <Dialog.Content
           data-slot="dialog-content"
           data-device-sync-sleep=""
-          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
+          className={cn(
+            "fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col",
+            "items-center justify-center overflow-y-auto p-8 text-center text-cream",
+            "outline-none",
+          )}
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -42,7 +47,13 @@ export function SyncSleepScreen({
             aria-busy={busy}
             disabled={busy}
             onClick={onWake}
-            className="group mb-6 rounded-full p-3 outline-none transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-300/80 focus-visible:ring-offset-8 focus-visible:ring-offset-transparent disabled:cursor-wait disabled:opacity-100 motion-reduce:transform-none"
+            className={cn(
+              "group mb-6 rounded-full p-3 outline-none transition-transform",
+              "duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2",
+              "focus-visible:ring-sky-300/80 focus-visible:ring-offset-8",
+              "focus-visible:ring-offset-transparent disabled:cursor-wait",
+              "disabled:opacity-100 motion-reduce:transform-none",
+            )}
           >
             <img
               src={misty}

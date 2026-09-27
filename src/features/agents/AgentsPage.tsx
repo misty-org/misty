@@ -54,8 +54,11 @@ function relativeTime(value: string | number | undefined): string {
 }
 const field =
   "w-full rounded-md border border-charcoal-border bg-charcoal-bg px-3 py-2 text-sm text-cream";
-const button =
-  "rounded-md border border-charcoal-border px-3 py-2 text-sm enabled:hover:bg-charcoal-active disabled:text-cream-muted disabled:cursor-not-allowed disabled:opacity-100";
+const button = cn(
+  "rounded-md border border-charcoal-border px-3 py-2 text-sm",
+  "enabled:hover:bg-charcoal-active disabled:text-cream-muted",
+  "disabled:cursor-not-allowed disabled:opacity-100",
+);
 const emptyProfile: AgentProfileInput = {
   name: "",
   role: "",
@@ -243,7 +246,10 @@ export default function NativeAgentsPage() {
                   >
                     <button
                       type="button"
-                      className="flex items-center gap-2 flex-1 min-w-0 h-full py-0.5 text-left border-none bg-transparent outline-none cursor-pointer text-inherit"
+                      className={cn(
+                        "flex items-center gap-2 flex-1 min-w-0 h-full py-0.5 text-left",
+                        "border-none bg-transparent outline-none cursor-pointer text-inherit",
+                      )}
                       aria-pressed={isAgentSelected}
                       disabled={working || editorStatus.busy}
                       onClick={() => {
@@ -529,7 +535,11 @@ export default function NativeAgentsPage() {
           side="right"
           portal={false}
           overlay={false}
-          className="flex w-[min(560px,94vw)] flex-col overflow-hidden border-l border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl sm:max-w-[560px]"
+          className={cn(
+            "flex w-[min(560px,94vw)] flex-col overflow-hidden border-l",
+            "border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl",
+            "sm:max-w-[560px]",
+          )}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Agent activity</SheetTitle>
@@ -775,7 +785,11 @@ function AgentEditor({
           type="button"
           aria-label="Edit agent avatar"
           onClick={() => setAvatarEditing(!avatarEditing)}
-          className="group relative flex size-14 items-center justify-center rounded-xl border border-charcoal-border bg-charcoal-bg hover:border-cream-muted/60 transition-colors cursor-pointer overflow-hidden p-1 shrink-0"
+          className={cn(
+            "group relative flex size-14 items-center justify-center rounded-xl",
+            "border border-charcoal-border bg-charcoal-bg hover:border-cream-muted/60",
+            "transition-colors cursor-pointer overflow-hidden p-1 shrink-0",
+          )}
         >
           <AgentAvatar
             agent={
@@ -838,7 +852,11 @@ function AgentEditor({
                       "flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all text-center gap-1 cursor-pointer",
                       chosen
                         ? "border-cream-bright/80 bg-charcoal-active text-cream-bright shadow-xs ring-1 ring-cream-bright/30"
-                        : "border-charcoal-border bg-charcoal-card/60 text-cream-muted hover:border-charcoal-border hover:bg-charcoal-active/40 hover:text-cream",
+                        : [
+                            "border-charcoal-border bg-charcoal-card/60 text-cream-muted",
+                            "hover:border-charcoal-border hover:bg-charcoal-active/40",
+                            "hover:text-cream",
+                          ],
                     )}
                   >
                     <div className="size-10 shrink-0 flex items-center justify-center">

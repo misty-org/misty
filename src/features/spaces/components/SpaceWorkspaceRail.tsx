@@ -47,7 +47,11 @@ export function SpaceWorkspaceRail({
   return (
     <>
       <aside
-        className="misty-navigation-icons flex h-full w-14 shrink-0 flex-col items-center overflow-y-auto border-r border-charcoal-border bg-charcoal-workspace pb-2 pt-1.5"
+        className={cn(
+          "misty-navigation-icons flex h-full w-14 shrink-0 flex-col items-center",
+          "overflow-y-auto border-r border-charcoal-border bg-charcoal-workspace",
+          "pb-2 pt-1.5",
+        )}
         aria-label="Space navigation"
       >
         {space && (

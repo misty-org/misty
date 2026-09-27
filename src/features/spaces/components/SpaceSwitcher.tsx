@@ -26,8 +26,11 @@ import {
   spaceLifecycleAction,
   type SpaceLifecycleAction,
 } from "./SpaceLifecycleDialogs";
-const navigatorHierarchyTriggerClass =
-  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1 text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted";
+const navigatorHierarchyTriggerClass = cn(
+  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1",
+  "text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright",
+  "focus-visible:ring-2 focus-visible:ring-cream-muted",
+);
 
 export function SpaceSwitcher(props: {
   iconOnly?: boolean;

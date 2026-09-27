@@ -22,8 +22,12 @@ import {
   type ActivitySection,
 } from "./activityView";
 
-const iconButton =
-  "relative rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright data-[active]:bg-charcoal-hover data-[active]:text-cream-bright";
+const iconButton = [
+  "relative rounded-md text-cream-muted hover:bg-charcoal-hover",
+  "hover:text-cream-bright focus-visible:outline focus-visible:outline-2",
+  "focus-visible:outline-cream-bright data-[active]:bg-charcoal-hover",
+  "data-[active]:text-cream-bright",
+].join(" ");
 
 export function ActivityPanelToolbar({
   view,

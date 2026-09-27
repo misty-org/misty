@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { forwardRef } from "react";
+import { cn } from "@/shared/ui/utils";
 
 export interface TerminalSearchResult {
   resultIndex: number;
@@ -24,7 +25,12 @@ export const TerminalSearchField = forwardRef<HTMLInputElement, TerminalSearchFi
     return (
       <div
         role="search"
-        className="flex h-6 min-w-0 w-64 max-w-[55%] items-center gap-1.5 rounded border border-charcoal-border bg-charcoal-card px-2 text-[11px] text-cream-muted transition-colors focus-within:border-charcoal-active focus-within:text-cream"
+        className={cn(
+          "flex h-6 min-w-0 w-64 max-w-[55%] items-center gap-1.5 rounded border",
+          "border-charcoal-border bg-charcoal-card px-2 text-[11px]",
+          "text-cream-muted transition-colors focus-within:border-charcoal-active",
+          "focus-within:text-cream",
+        )}
       >
         <Search size={12} className="shrink-0" aria-hidden="true" />
         <input

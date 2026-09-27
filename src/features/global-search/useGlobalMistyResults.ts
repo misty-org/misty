@@ -57,7 +57,11 @@ export function useGlobalMistyResults(input: {
     };
 
     input.closePanel();
-    const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}${fileResult.entry.kind === "file" ? `&select=${encodeURIComponent(fileResult.entry.name)}` : ""}`;
+    const fileSelection =
+      fileResult.entry.kind === "file"
+        ? `&select=${encodeURIComponent(fileResult.entry.name)}`
+        : "";
+    const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}${fileSelection}`;
     const surface = workspaceSurfaceFromRoute(filesRoute);
     if (surface) {
       const tab = useWorkspaceStore.getState().openSurface({
@@ -66,7 +70,6 @@ export function useGlobalMistyResults(input: {
       useWorkspaceStore.getState().focusTab(tab.id);
     }
     navigate(filesRoute);
-
   };
   const addResultContext = (result: GlobalSearchResult) => {
     const localPath =

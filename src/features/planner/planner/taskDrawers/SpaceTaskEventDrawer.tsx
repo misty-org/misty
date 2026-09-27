@@ -13,6 +13,7 @@ import {
 } from "@/shared/ui";
 import { CalendarDays, Clock3, ExternalLink, LoaderCircle, Trash2, UserRound } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { cn } from "@/shared/ui/utils";
 
 type EventDraft = {
   title: string;
@@ -65,7 +66,13 @@ export function SpaceTaskEventDrawer({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="w-[min(560px,calc(100vw-2rem))] max-w-[560px] gap-0 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card p-0 shadow-xl ring-0">
+      <DialogContent
+        className={cn(
+          "w-[min(560px,calc(100vw-2rem))] max-w-[560px] gap-0 overflow-hidden",
+          "rounded-2xl border border-charcoal-border bg-charcoal-card p-0 shadow-xl",
+          "ring-0",
+        )}
+      >
         {editable ? (
           <form onSubmit={submit}>
             <DialogHeader className="border-b border-charcoal-border px-6 py-5 pr-14 text-left">

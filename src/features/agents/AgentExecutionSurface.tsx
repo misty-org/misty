@@ -14,9 +14,14 @@ import {
 import { Button } from "@/shared/ui";
 
 import { TaskArtifacts } from "./TaskArtifactList";
+import { cn } from "@/shared/ui/utils";
 
-const control =
-  "rounded border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-cream-muted disabled:bg-charcoal-bg disabled:border-charcoal-border disabled:text-cream-muted disabled:cursor-not-allowed";
+const control = cn(
+  "rounded border border-charcoal-border bg-charcoal-card px-3 py-1.5",
+  "text-sm focus-visible:ring-2 focus-visible:ring-cream-muted",
+  "disabled:bg-charcoal-bg disabled:border-charcoal-border",
+  "disabled:text-cream-muted disabled:cursor-not-allowed",
+);
 export function AgentExecutionSurface() {
   const execution = useLocalExecution((s) => s.execution);
   const agent = usePersonalAgentsStore((s) => s.agents.find((a) => a.id === execution?.agentId));

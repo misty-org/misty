@@ -59,11 +59,28 @@ export function folderIdForAccount(
 }
 
 export function reportAccountError(set: InboxSet, connectionId: string, error: unknown): void {
-  const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "";
-  const reconnect = ["connection_revoked", "permission_missing", "token_expired", "refresh_failed", "mail_provider_authorization_failed", "mail_provider_mailbox_unavailable"].includes(code);
+  const code =
+    error && typeof error === "object" && "code" in error && typeof error.code === "string"
+      ? error.code
+      : "";
+  const reconnect = [
+    "connection_revoked",
+    "permission_missing",
+    "token_expired",
+    "refresh_failed",
+    "mail_provider_authorization_failed",
+    "mail_provider_mailbox_unavailable",
+  ].includes(code);
   set((state) => ({
-    ...(reconnect ? { accounts: state.accounts.map((account) => account.connection_id === connectionId
-      ? { ...account, status: "needs_attention" as const, error_code: code } : account) } : {}),
+    ...(reconnect
+      ? {
+          accounts: state.accounts.map((account) =>
+            account.connection_id === connectionId
+              ? { ...account, status: "needs_attention" as const, error_code: code }
+              : account,
+          ),
+        }
+      : {}),
     accountErrors: { ...state.accountErrors, [connectionId]: errorText(error) },
     accountErrorCodes: {
       ...state.accountErrorCodes,

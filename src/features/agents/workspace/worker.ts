@@ -55,7 +55,11 @@ export class DesktopAgentJobWorker {
     }
   }
 
-  private async runWorkflowNodeClaim(claim: ClaimedWorkflowNodeJob, localDeviceId: string, deviceId: string): Promise<void> {
+  private async runWorkflowNodeClaim(
+    claim: ClaimedWorkflowNodeJob,
+    localDeviceId: string,
+    deviceId: string,
+  ): Promise<void> {
     const controller = new AbortController();
     this.active = controller;
     let job = claim.job;
@@ -72,7 +76,13 @@ export class DesktopAgentJobWorker {
     };
     try {
       arm();
-      job = await devicesApi.beginWorkflowJob<ClaimedWorkflowNodeJob["job"]>(signedAgentDeviceRequest, localDeviceId, deviceId, job.id, claim.leaseToken);
+      job = await devicesApi.beginWorkflowJob<ClaimedWorkflowNodeJob["job"]>(
+        signedAgentDeviceRequest,
+        localDeviceId,
+        deviceId,
+        job.id,
+        claim.leaseToken,
+      );
       began = true;
       leaseExpiresAt = job.leaseExpiresAt;
       controller.signal.throwIfAborted();
@@ -82,29 +92,68 @@ export class DesktopAgentJobWorker {
         renewing = true;
         void (async () => {
           try {
-            const renewed = await devicesApi.renewWorkflowJobLease<ClaimedWorkflowNodeJob["job"]>(signedAgentDeviceRequest, localDeviceId, deviceId, job.id, claim.leaseToken);
+            const renewed = await devicesApi.renewWorkflowJobLease<ClaimedWorkflowNodeJob["job"]>(
+              signedAgentDeviceRequest,
+              localDeviceId,
+              deviceId,
+              job.id,
+              claim.leaseToken,
+            );
             if (controller.signal.aborted) return;
-            if (renewed.id !== job.id || renewed.deadlineAt !== job.deadlineAt || renewed.cancelRequestedAt) throw new Error("device_execution_stopped");
+            if (
+              renewed.id !== job.id ||
+              renewed.deadlineAt !== job.deadlineAt ||
+              renewed.cancelRequestedAt
+            )
+              throw new Error("device_execution_stopped");
             leaseExpiresAt = renewed.leaseExpiresAt;
             arm();
-            if (job.operation.startsWith("browser.")) await invoke("browser_agent_execution_renew", { request: browserExecutionControl(job, leaseExpiresAt) });
+            if (job.operation.startsWith("browser."))
+              await invoke("browser_agent_execution_renew", {
+                request: browserExecutionControl(job, leaseExpiresAt),
+              });
             await heartbeatServerAgentDevice(deviceId, localDeviceId);
           } catch (error) {
-            const status = error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
-            if ([401,403,409,410,422].includes(status) || String(error).includes("device_execution")) controller.abort(error);
+            const status =
+              error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
+            if (
+              [401, 403, 409, 410, 422].includes(status) ||
+              String(error).includes("device_execution")
+            )
+              controller.abort(error);
             // A lost renewal response never extends the last acknowledged lease.
-          } finally { renewing = false; }
+          } finally {
+            renewing = false;
+          }
         })();
       }, leaseHeartbeatMs);
-      const output = await abortable(executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt), controller.signal);
-      report = () => devicesApi.completeWorkflowJob(signedAgentDeviceRequest, localDeviceId, deviceId, job.id, { leaseToken: claim.leaseToken, output });
+      const output = await abortable(
+        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt),
+        controller.signal,
+      );
+      report = () =>
+        devicesApi.completeWorkflowJob(signedAgentDeviceRequest, localDeviceId, deviceId, job.id, {
+          leaseToken: claim.leaseToken,
+          output,
+        });
     } catch (error) {
       // After begin, a lost native response may conceal an external effect.
       // Keep completion delivery outside this catch: a lost receipt is not failure.
-      const uncertain = began && job.operation.startsWith("browser.") && !(error instanceof DeviceOperationNotAttempted);
-      report = () => (uncertain ? devicesApi.uncertainWorkflowJob : devicesApi.failWorkflowJob)(signedAgentDeviceRequest, localDeviceId, deviceId, job.id, {
-        leaseToken: claim.leaseToken, errorCode: uncertain ? "device_execution_uncertain" : deviceWorkflowErrorCode(error),
-      });
+      const uncertain =
+        began &&
+        job.operation.startsWith("browser.") &&
+        !(error instanceof DeviceOperationNotAttempted);
+      report = () =>
+        (uncertain ? devicesApi.uncertainWorkflowJob : devicesApi.failWorkflowJob)(
+          signedAgentDeviceRequest,
+          localDeviceId,
+          deviceId,
+          job.id,
+          {
+            leaseToken: claim.leaseToken,
+            errorCode: uncertain ? "device_execution_uncertain" : deviceWorkflowErrorCode(error),
+          },
+        );
     } finally {
       clearTimeout(timer);
       clearInterval(heartbeat);
@@ -112,22 +161,41 @@ export class DesktopAgentJobWorker {
     }
     // Retry only delivery of the exact observed result, never the operation.
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { await report(); return; } catch { if (attempt < 2) await wait(500 * (attempt + 1)); }
+      try {
+        await report();
+        return;
+      } catch {
+        if (attempt < 2) await wait(500 * (attempt + 1));
+      }
     }
   }
 }
 
-export function deviceExecutionRemaining(job: ClaimedWorkflowNodeJob["job"], leaseExpiresAt: string | null | undefined): number {
-  if (job.controlVersion !== 2 || job.cancelRequestedAt) throw new Error("device_execution_stopped");
+export function deviceExecutionRemaining(
+  job: ClaimedWorkflowNodeJob["job"],
+  leaseExpiresAt: string | null | undefined,
+): number {
+  if (job.controlVersion !== 2 || job.cancelRequestedAt)
+    throw new Error("device_execution_stopped");
   const deadline = Date.parse(job.deadlineAt ?? "");
   const lease = Date.parse(leaseExpiresAt ?? "");
   const remaining = Math.min(deadline, lease) - Date.now();
-  if (!Number.isFinite(remaining) || remaining <= 0 || remaining > nodeExecutionTimeoutMs) throw new Error("device_execution_expired");
+  if (!Number.isFinite(remaining) || remaining <= 0 || remaining > nodeExecutionTimeoutMs)
+    throw new Error("device_execution_expired");
   return remaining;
 }
 
-function browserExecutionControl(job: ClaimedWorkflowNodeJob["job"], leaseExpiresAt: string | null | undefined) {
-  return { executionId: job.id, deadlineAt: job.deadlineAt, leaseExpiresAt, scopeId: job.scopeId, grantId: `${job.contextId}:${job.id}` };
+function browserExecutionControl(
+  job: ClaimedWorkflowNodeJob["job"],
+  leaseExpiresAt: string | null | undefined,
+) {
+  return {
+    executionId: job.id,
+    deadlineAt: job.deadlineAt,
+    leaseExpiresAt,
+    scopeId: job.scopeId,
+    grantId: `${job.contextId}:${job.id}`,
+  };
 }
 
 async function claimNextWorkflowNodeJob(
@@ -149,34 +217,50 @@ async function executeWorkflowNodeOnDevice(
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
   if (job.operation.startsWith("browser.")) {
-    const cancel = () => { void invoke("browser_agent_execution_cancel", { request: browserExecutionControl(job, leaseExpiresAt) }).catch(() => undefined); };
+    const cancel = () => {
+      void invoke("browser_agent_execution_cancel", {
+        request: browserExecutionControl(job, leaseExpiresAt),
+      }).catch(() => undefined);
+    };
     signal.addEventListener("abort", cancel, { once: true });
     try {
       try {
         await registerRunBoundBrowserContext(job);
         signal.throwIfAborted();
-      } catch (error) { throw new DeviceOperationNotAttempted(error); }
+      } catch (error) {
+        throw new DeviceOperationNotAttempted(error);
+      }
       return await invoke<Record<string, unknown>>("browser_agent_execute_bounded", {
-        request: { control: browserExecutionControl(job, leaseExpiresAt), operation: browserAgentExecutionRequest(job) },
+        request: {
+          control: browserExecutionControl(job, leaseExpiresAt),
+          operation: browserAgentExecutionRequest(job),
+        },
       });
     } catch (error) {
-      if (String(error).startsWith("browser_snapshot_stale:")) throw new DeviceOperationNotAttempted(error);
+      if (String(error).startsWith("browser_snapshot_stale:"))
+        throw new DeviceOperationNotAttempted(error);
       throw error;
     } finally {
       signal.removeEventListener("abort", cancel);
       const id = browserRuntimeIdForScope(job.scopeId);
-      if (id) await invoke("browser_agent_grant_revoke", { request: { id, grantId: `${job.contextId}:${job.id}` } }).catch(() => undefined);
+      if (id)
+        await invoke("browser_agent_grant_revoke", {
+          request: { id, grantId: `${job.contextId}:${job.id}` },
+        }).catch(() => undefined);
     }
   }
   if (job.operation !== "read_content") {
     throw new Error(`unsupported_device_operation:${job.operation}`);
   }
   const ref = deviceContentReference(job.input, job.scopeId);
-  const document = await agentsPrepareScopedDocument({
-    scopeId: ref.scopeId,
-    relativePath: ref.relativePath,
-    spaceId: job.spaceId ?? "",
-  }, signal);
+  const document = await agentsPrepareScopedDocument(
+    {
+      scopeId: ref.scopeId,
+      relativePath: ref.relativePath,
+      spaceId: job.spaceId ?? "",
+    },
+    signal,
+  );
   const content = {
     sourceKind: ref.sourceKind || "local_file",
     providerId: ref.providerId || "device",
@@ -246,7 +330,9 @@ async function registerRunBoundBrowserContext(job: ClaimedWorkflowNodeJob["job"]
       grantId: `${contextId}:${job.id}`,
       agentId,
       capabilities: [job.operation],
-      expiresAt: new Date(Math.min(Date.parse(expiresAt), Date.parse(job.deadlineAt ?? ""))).toISOString(),
+      expiresAt: new Date(
+        Math.min(Date.parse(expiresAt), Date.parse(job.deadlineAt ?? "")),
+      ).toISOString(),
     },
   });
 }
@@ -292,20 +378,28 @@ function findDeviceContentReference(value: unknown): Record<string, string> | nu
 }
 
 class DeviceOperationNotAttempted extends Error {
-  constructor(error: unknown) { super(error instanceof Error ? error.message : String(error)); }
+  constructor(error: unknown) {
+    super(error instanceof Error ? error.message : String(error));
+  }
 }
 
 export function deviceWorkflowErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("Add Files")) return "files_app_required";
-  if (message.includes("document service") || message.includes("processor")) return "document_service_unavailable";
+  if (message.includes("document service") || message.includes("processor"))
+    return "document_service_unavailable";
   if (message.startsWith("browser_snapshot_stale:")) return "browser_snapshot_stale";
   if (message.includes("unsupported_content")) return "unsupported_content";
   if (message.includes("invalid_device_scope")) return "invalid_scope";
   if (message.includes("unsupported_device_operation")) return "unsupported_operation";
   if (message.includes("invalid_browser_grant") || message.includes("not active"))
     return "browser_grant_invalid";
-  if (message.includes("browser_context_closed") || message.includes("not open") || message.includes("not running")) return "browser_tab_closed";
+  if (
+    message.includes("browser_context_closed") ||
+    message.includes("not open") ||
+    message.includes("not running")
+  )
+    return "browser_tab_closed";
   if (message.includes("timed out")) return "browser_timeout";
   if (message.includes("inspect it again") || message.includes("page changed"))
     return "browser_snapshot_stale";

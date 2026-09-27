@@ -102,10 +102,19 @@ it("a send completion cannot refresh a different account after switching account
   disposeInboxStore(store);
 });
 
-
 it("keeps provider authorization failures visible and does not retry on folder changes", async () => {
-  const account = { connection_id: "mail", provider: "google" as const, account_id: "mail", email: "a@example.test", display_name: "Mail", total: 0, unread: 0 };
-  const failure = Object.assign(new Error("Reconnect this email account."), { code: "mail_provider_authorization_failed" });
+  const account = {
+    connection_id: "mail",
+    provider: "google" as const,
+    account_id: "mail",
+    email: "a@example.test",
+    display_name: "Mail",
+    total: 0,
+    unread: 0,
+  };
+  const failure = Object.assign(new Error("Reconnect this email account."), {
+    code: "mail_provider_authorization_failed",
+  });
   const api = {
     accounts: vi.fn(async () => ({ accounts: [account] })),
     folders: vi.fn(async () => ({ folders: [] })),

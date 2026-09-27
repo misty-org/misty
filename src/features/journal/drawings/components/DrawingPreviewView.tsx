@@ -15,6 +15,7 @@ import type { useDrawingRoomView, DrawingUser } from "../hooks/useDrawingRoomVie
 import type { DrawingAssetReference } from "../types";
 import type { BinaryFileData } from "@excalidraw/excalidraw/types";
 import type { SpaceDrawing } from "../types";
+import { cn } from "@/shared/ui/utils";
 
 interface DrawingExportData {
   elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -297,7 +298,12 @@ function BackgroundChoices(props: { value: string; onChange: (value: string) => 
         <button
           key={color}
           type="button"
-          className={`size-5 shrink-0 rounded-md border border-charcoal-border outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-cream-muted ${props.value === color ? "ring-2 ring-[#a89cf7] ring-offset-1 ring-offset-charcoal-card" : ""}`}
+          className={cn(
+            "size-5 shrink-0 rounded-md border border-charcoal-border outline-none transition-shadow",
+            "focus-visible:ring-2 focus-visible:ring-cream-muted",
+            props.value === color &&
+              "ring-2 ring-[#a89cf7] ring-offset-1 ring-offset-charcoal-card",
+          )}
           style={{ backgroundColor: color }}
           aria-label={`Preview background ${index + 1}`}
           aria-pressed={props.value === color}
@@ -305,7 +311,12 @@ function BackgroundChoices(props: { value: string; onChange: (value: string) => 
         />
       ))}
       <label
-        className="relative ml-0.5 grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-cream-muted outline-none transition-colors hover:bg-charcoal-hover hover:text-cream-bright focus-within:ring-2 focus-within:ring-cream-muted"
+        className={cn(
+          "relative ml-0.5 grid size-6 shrink-0 cursor-pointer place-items-center",
+          "rounded-md text-cream-muted outline-none transition-colors",
+          "hover:bg-charcoal-hover hover:text-cream-bright focus-within:ring-2",
+          "focus-within:ring-cream-muted",
+        )}
         title="Choose a custom preview background"
       >
         <Palette className="pointer-events-none size-3.5" />

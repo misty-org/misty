@@ -164,8 +164,14 @@ export function DeviceControlContent({
                   <span
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center",
-                      !(pending?.deviceId === device.device_id && pending.fullSync === null) &&
-                        "pointer-events-none opacity-0 group-hover/device:pointer-events-auto group-hover/device:opacity-100 group-focus-within/device:pointer-events-auto group-focus-within/device:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100",
+                      !(pending?.deviceId === device.device_id && pending.fullSync === null) && [
+                        "pointer-events-none opacity-0 group-hover/device:pointer-events-auto",
+                        "group-hover/device:opacity-100",
+                        "group-focus-within/device:pointer-events-auto",
+                        "group-focus-within/device:opacity-100",
+                        "[@media(hover:none)]:pointer-events-auto",
+                        "[@media(hover:none)]:opacity-100",
+                      ],
                     )}
                   >
                     <Button

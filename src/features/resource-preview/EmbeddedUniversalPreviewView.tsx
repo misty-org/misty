@@ -13,6 +13,7 @@ import {
   videoMimeTypes,
 } from "./previewMediaTables";
 import { PreviewMessage } from "./previewPrimitives";
+import { cn } from "@/shared/ui/utils";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(loadPdfPreview);
@@ -104,7 +105,13 @@ export function EmbeddedUniversalPreviewView(props: {
     );
   if (isAudio && props.url)
     return (
-      <div className="grid w-[min(520px,90%)] justify-items-center gap-5 rounded-xl bg-charcoal-card p-8 text-center shadow-xs inset-ring-1 inset-ring-cream/10">
+      <div
+        className={cn(
+          "grid w-[min(520px,90%)] justify-items-center gap-5 rounded-xl",
+          "bg-charcoal-card p-8 text-center shadow-xs inset-ring-1",
+          "inset-ring-cream/10",
+        )}
+      >
         <span className="text-5xl text-cream-muted">♫</span>
         <strong>{props.name}</strong>
         <audio className="w-full" src={props.url} controls />
@@ -132,7 +139,12 @@ export function EmbeddedUniversalPreviewView(props: {
     );
   if (resource?.kind === "document")
     return (
-      <article className="mx-auto h-full w-full max-w-4xl overflow-auto whitespace-pre-wrap px-10 py-12 text-left font-serif text-[16px] leading-8 text-cream/80">
+      <article
+        className={cn(
+          "mx-auto h-full w-full max-w-4xl overflow-auto whitespace-pre-wrap px-10",
+          "py-12 text-left font-serif text-[16px] leading-8 text-cream/80",
+        )}
+      >
         {resource.text || "This document contains no readable text."}
       </article>
     );

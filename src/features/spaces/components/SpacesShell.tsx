@@ -22,6 +22,7 @@ import { SpacePageFrame } from "./SpacePageLayout";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
 import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
+import { cn } from "@/shared/ui/utils";
 
 export { SpacesIndexRedirect } from "../spacesShell/SpacesIndexRedirect";
 
@@ -265,7 +266,13 @@ export default function SpacesShell() {
       }}
     >
       {activeInvitation ? (
-        <aside className="col-start-1 row-start-1 flex min-h-0 min-w-[248px] flex-col overflow-hidden border-r border-charcoal-border bg-charcoal-sidebar px-3 pb-2 pt-3 text-sm text-cream-muted">
+        <aside
+          className={cn(
+            "col-start-1 row-start-1 flex min-h-0 min-w-[248px] flex-col",
+            "overflow-hidden border-r border-charcoal-border bg-charcoal-sidebar px-3",
+            "pb-2 pt-3 text-sm text-cream-muted",
+          )}
+        >
           <SpaceInvitationSidebar invitation={activeInvitation} />
         </aside>
       ) : null}

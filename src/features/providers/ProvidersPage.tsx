@@ -15,6 +15,7 @@ import {
   selectProviderWorkspaceDerived,
   useProvidersStore,
 } from "./store";
+import { cn } from "@/shared/ui/utils";
 
 // Remotes is a single-pane surface. The previous multi-tab workspace was
 // removed — there is one remotes pane, so it renders directly with a stable id.
@@ -27,8 +28,12 @@ const providersPageShellClass = "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] b
 const providersOverlayHeaderClass =
   "flex items-center justify-between gap-3 border-b border-charcoal-border/70 px-5 py-3.5";
 const providersPaneContainerClass = "min-h-0 min-w-0 overflow-hidden p-4";
-const providersPaneWorkspaceClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(300px,0.38fr)_minmax(420px,0.62fr)] overflow-hidden rounded-2xl border border-charcoal-border/70 bg-charcoal-card/55 max-[860px]:grid-cols-[minmax(0,1fr)]";
+const providersPaneWorkspaceClass = cn(
+  "grid h-full min-h-0 min-w-0",
+  "grid-cols-[minmax(300px,0.38fr)_minmax(420px,0.62fr)] overflow-hidden",
+  "rounded-2xl border border-charcoal-border/70 bg-charcoal-card/55",
+  "max-[860px]:grid-cols-[minmax(0,1fr)]",
+);
 const providersEmptyClass =
   "grid h-full min-h-0 place-items-center overflow-auto rounded-2xl border border-charcoal-border/70 bg-charcoal-card/45 p-8";
 export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {

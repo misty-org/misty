@@ -481,7 +481,11 @@ export function GlobalMistySurface(props: {
               className={cn(
                 "pointer-events-none flex flex-col items-center",
                 docked
-                  ? "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden rounded-xl bg-charcoal-card text-cream shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+                  ? [
+                      "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden",
+                      "rounded-xl bg-charcoal-card text-cream",
+                      "shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
+                    ]
                   : "gap-2",
               )}
               data-html2canvas-ignore="true"

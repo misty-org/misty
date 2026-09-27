@@ -43,8 +43,12 @@ import {
   WindowsWorkspaceTitlebarControls,
 } from "./WindowsWorkspaceTitlebarControls";
 
-const tabActionClass =
-  "grid size-6 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright active:bg-charcoal-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
+const tabActionClass = cn(
+  "grid size-6 shrink-0 place-items-center rounded border-0 bg-transparent",
+  "p-0 text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright",
+  "active:bg-charcoal-active focus-visible:outline-none",
+  "focus-visible:ring-1 focus-visible:ring-cream-muted",
+);
 
 export function WorkspaceLayoutTabs(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
@@ -220,7 +224,9 @@ export function WorkspaceLayoutTabs(
                 data-reorder-preview="true"
                 data-misty-window-drag-block="true"
                 className={cn(
-                  "group/tab flex items-center rounded-md border text-xs transition-colors duration-150 select-none focus-within:ring-1 focus-within:ring-cream-muted/50",
+                  "group/tab flex items-center rounded-md border text-xs transition-colors",
+                  "duration-150 select-none focus-within:ring-1",
+                  "focus-within:ring-cream-muted/50",
                   vertical
                     ? "h-9 w-full shrink-0"
                     : "h-7 min-w-[80px] max-w-[160px] flex-[1_1_120px]",
@@ -238,7 +244,12 @@ export function WorkspaceLayoutTabs(
                   tabIndex={active ? 0 : -1}
                   title={label}
                   data-reorder-handle="true"
-                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent pl-2 pr-1 text-left outline-none hover:bg-transparent focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
+                  className={cn(
+                    "flex h-full min-w-0 flex-1 items-center justify-start gap-1.5",
+                    "overflow-hidden rounded-none border-0 bg-transparent pl-2 pr-1 text-left",
+                    "outline-none hover:bg-transparent focus-visible:ring-1",
+                    "focus-visible:ring-inset focus-visible:ring-cream-muted",
+                  )}
                   onClick={() => select(tab.id)}
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);

@@ -4,7 +4,11 @@ import * as React from "react";
 import { cn } from "./utils";
 
 const navIslandVariants = cva(
-  "inline-flex max-w-full items-center shrink-0 border border-charcoal-border bg-charcoal-card overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+  [
+    "inline-flex max-w-full items-center shrink-0 border",
+    "border-charcoal-border bg-charcoal-card overflow-x-auto",
+    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+  ],
   {
     variants: {
       variant: {
@@ -26,12 +30,24 @@ const navIslandVariants = cva(
 );
 
 const navIslandItemVariants = cva(
-  "group/nav-island-item inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-transparent font-medium whitespace-nowrap outline-none transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  [
+    "group/nav-island-item inline-flex shrink-0 items-center justify-center",
+    "gap-1.5 rounded-md border border-transparent font-medium",
+    "whitespace-nowrap outline-none transition-colors select-none",
+    "focus-visible:outline-none focus-visible:ring-2",
+    "focus-visible:ring-cream-muted disabled:pointer-events-none",
+    "disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  ],
   {
     variants: {
       variant: {
-        default:
-          "text-cream-muted hover:bg-charcoal-hover/40 hover:text-cream aria-[current=page]:bg-charcoal-hover aria-[current=page]:text-cream-bright data-[active=true]:bg-charcoal-hover data-[active=true]:text-cream-bright",
+        default: [
+          "text-cream-muted hover:bg-charcoal-hover/40 hover:text-cream",
+          "aria-[current=page]:bg-charcoal-hover",
+          "aria-[current=page]:text-cream-bright",
+          "data-[active=true]:bg-charcoal-hover",
+          "data-[active=true]:text-cream-bright",
+        ],
       },
       active: {
         true: "!bg-charcoal-hover !text-cream-bright font-medium",

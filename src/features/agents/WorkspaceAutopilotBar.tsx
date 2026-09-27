@@ -9,9 +9,13 @@ import {
   type Execution,
 } from "./localExecution";
 import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
+import { cn } from "@/shared/ui/utils";
 
-export const agentOverlayBarClass =
-  "pointer-events-auto fixed bottom-4 left-1/2 z-[2147482600] flex w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg bg-charcoal-card p-1 text-cream shadow-lg";
+export const agentOverlayBarClass = cn(
+  "pointer-events-auto fixed bottom-4 left-1/2 z-[2147482600] flex w-max",
+  "max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg",
+  "bg-charcoal-card p-1 text-cream shadow-lg",
+);
 
 export function WorkspaceAutopilotBar({ execution, name }: { execution: Execution; name: string }) {
   const [error, setError] = useState("");

@@ -29,6 +29,7 @@ import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
 import { MistyBriefingsSection } from "./MistyBriefingsSection";
 import { defaultRecap, managedSurfaces } from "./mistySettingsConfig";
+import { cn } from "@/shared/ui/utils";
 
 export function MistySection(_props: SettingsContentProps & { page?: "misty" | "memory" }) {
   const memoryPage = _props.page === "memory";
@@ -194,7 +195,11 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           >
             <Switch
               aria-label="Enable Misty"
-              className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+              className={cn(
+                "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg",
+                "disabled:opacity-100",
+                "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border",
+              )}
               checked={settings?.enabled ?? false}
               disabled={!settings || working}
               onCheckedChange={(value) => void updateSettings(value)}
@@ -272,7 +277,11 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
             >
               <Switch
                 aria-label="Use remembered context"
-                className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+                className={cn(
+                  "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg",
+                  "disabled:opacity-100",
+                  "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border",
+                )}
                 checked={settings?.memory_enabled ?? false}
                 disabled={!settings || working || !settings.enabled}
                 onCheckedChange={(value) =>

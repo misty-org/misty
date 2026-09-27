@@ -11,6 +11,7 @@ import { InspectorDetail, PreviewMessage, ToolbarButton } from "./previewPrimiti
 import { globalPreviewKindForSource } from "./previewDocument";
 import { usePreviewResource } from "./usePreviewResource";
 import type { PreviewRuntime } from "./PreviewRuntime";
+import { cn } from "@/shared/ui/utils";
 
 export function GlobalPreviewDialogView(props: {
   runtime: PreviewRuntime;
@@ -133,7 +134,12 @@ export function GlobalPreviewDialogView(props: {
       <DialogContent
         ref={previewRef}
         aria-describedby={undefined}
-        className="left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0 rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 [&>[data-slot=dialog-close]]:hidden"
+        className={cn(
+          "left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0",
+          "rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0",
+          "data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100",
+          "[&>[data-slot=dialog-close]]:hidden",
+        )}
       >
         <section className="grid h-full min-h-0 grid-rows-[58px_minmax(0,1fr)]">
           <header className="grid min-w-0 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-3 border-b border-charcoal-border px-4">

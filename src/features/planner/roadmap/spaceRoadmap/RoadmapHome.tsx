@@ -296,7 +296,10 @@ function RoadmapRows(props: RoadmapRowsProps) {
             <Button
               type="button"
               variant="ghost"
-              className="flex h-auto min-w-0 flex-1 self-stretch items-center justify-start gap-2 rounded-none px-3.5 py-2 text-left outline-none hover:bg-transparent"
+              className={cn(
+                "flex h-auto min-w-0 flex-1 self-stretch items-center justify-start gap-2",
+                "rounded-none px-3.5 py-2 text-left outline-none hover:bg-transparent",
+              )}
               aria-current={selected ? "true" : undefined}
               onClick={() => props.onSelect(roadmap.id)}
             >

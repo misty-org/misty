@@ -147,7 +147,11 @@ function WindowLayoutEditor() {
         </label>
         <input
           id={nameId}
-          className="h-9 w-full max-w-md rounded-md border border-charcoal-border bg-charcoal-bg px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-cream-muted"
+          className={cn(
+            "h-9 w-full max-w-md rounded-md border border-charcoal-border",
+            "bg-charcoal-bg px-2 text-xs outline-none focus-visible:ring-1",
+            "focus-visible:ring-cream-muted",
+          )}
           value={name}
           maxLength={40}
           placeholder="My workspace"

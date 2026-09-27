@@ -575,7 +575,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
 
         {state.private ? (
           <span
-            className="flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08]",
+              "bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted",
+            )}
             title="Private tab: no history, and cookies and site data are discarded when the last private tab closes"
           >
             <VenetianMask className="size-3" aria-hidden="true" />

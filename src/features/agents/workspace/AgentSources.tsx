@@ -2,6 +2,7 @@ import { Button } from "@/shared/ui";
 import { FileText, Presentation, Sheet, TextQuote } from "lucide-react";
 import type { AgentCitation } from "./model/interfaces/types";
 import { agentsOpenCitation } from "./store/useAgentsStore";
+import { cn } from "@/shared/ui/utils";
 
 export function AgentSources({ citations, compact = false, onOpen }: AgentSourcesProps) {
   if (citations.length === 0) return null;
@@ -33,7 +34,12 @@ export function AgentSources({ citations, compact = false, onOpen }: AgentSource
                 citation.id ||
                 `${citation.scopeId}:${citation.relativePath || citation.fileName}:${citation.label}:${index}`
               }
-              className="grid min-h-7 max-w-full grid-cols-[18px_14px_minmax(0,auto)_auto] items-center gap-1 rounded-md border border-charcoal-border bg-charcoal-card px-2 py-1 text-left text-[11px] text-cream-muted hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream"
+              className={cn(
+                "grid min-h-7 max-w-full grid-cols-[18px_14px_minmax(0,auto)_auto]",
+                "items-center gap-1 rounded-md border border-charcoal-border",
+                "bg-charcoal-card px-2 py-1 text-left text-[11px] text-cream-muted",
+                "hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream",
+              )}
               type="button"
               title={citation.excerpt ?? `${citation.fileName}, ${citation.label}`}
               onClick={() => open(citation)}

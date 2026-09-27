@@ -1,5 +1,6 @@
 import { MistyBrandIcon } from "@/features/workspace";
 import { Button } from "@/shared/ui";
+import { cn } from "@/shared/ui/utils";
 
 export function TourWelcomeModal(props: { onStart: () => void; onSkip: () => void }) {
   return (
@@ -9,7 +10,13 @@ export function TourWelcomeModal(props: { onStart: () => void; onSkip: () => voi
       aria-modal="true"
       aria-labelledby="tour-welcome-title"
     >
-      <div className="misty-popup-surface w-full max-w-[400px] rounded-xl border border-charcoal-border bg-charcoal-card p-7 text-center shadow-2xl ring-1 ring-cream/10">
+      <div
+        className={cn(
+          "misty-popup-surface w-full max-w-[400px] rounded-xl border",
+          "border-charcoal-border bg-charcoal-card p-7 text-center shadow-2xl",
+          "ring-1 ring-cream/10",
+        )}
+      >
         <div className="mx-auto grid size-12 place-items-center rounded-full border border-charcoal-border bg-charcoal-hover text-cream-bright">
           <MistyBrandIcon size={24} />
         </div>

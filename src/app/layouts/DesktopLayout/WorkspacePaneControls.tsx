@@ -22,9 +22,13 @@ import {
   DropdownMenuTrigger,
   Button,
 } from "@/shared/ui";
+import { cn } from "@/shared/ui/utils";
 
-const controlClass =
-  "grid size-6 shrink-0 place-items-center rounded text-cream-muted hover:text-cream focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted";
+const controlClass = cn(
+  "grid size-6 shrink-0 place-items-center rounded text-cream-muted",
+  "hover:text-cream focus-visible:outline-none focus-visible:ring-1",
+  "focus-visible:ring-cream-muted",
+);
 
 export function WorkspacePaneControls({
   pane,
@@ -94,7 +98,16 @@ export function WorkspacePaneControls({
         <div
           style={bounds}
           data-visible={hovered || open}
-          className="pointer-events-none fixed z-[2147483300] flex items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-card p-0.5 opacity-0 transition-opacity data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100 hover:pointer-events-auto hover:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+          className={cn(
+            "pointer-events-none fixed z-[2147483300] flex items-center gap-0.5",
+            "rounded-md border border-charcoal-border bg-charcoal-card p-0.5",
+            "opacity-0 transition-opacity data-[visible=true]:pointer-events-auto",
+            "data-[visible=true]:opacity-100 hover:pointer-events-auto",
+            "hover:opacity-100 has-[:focus-visible]:pointer-events-auto",
+            "has-[:focus-visible]:opacity-100",
+            "[@media(hover:none)]:pointer-events-auto",
+            "[@media(hover:none)]:opacity-100",
+          )}
           onPointerDown={(event) => event.stopPropagation()}
         >
           <Button

@@ -3,8 +3,11 @@ import { Button, Input } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { effectiveValues } from "./model";
 import { useSettingsProfiles } from "./store";
-const selectClass =
-  "min-h-9 w-full rounded-md border border-charcoal-border bg-charcoal-bg px-2 text-sm text-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-muted";
+const selectClass = [
+  "min-h-9 w-full rounded-md border border-charcoal-border bg-charcoal-bg",
+  "px-2 text-sm text-cream focus-visible:outline focus-visible:outline-2",
+  "focus-visible:outline-cream-muted",
+].join(" ");
 export function ProfileSelector() {
   const store = useSettingsProfiles();
   return (

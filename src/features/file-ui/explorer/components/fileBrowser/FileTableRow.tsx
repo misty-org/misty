@@ -68,7 +68,13 @@ export const FileTableRow = memo(function FileTableRow(props: {
   return (
     <TableRow
       ref={drop.ref}
-      className={`${fileBrowserStyles.tableRow} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${source.dragging ? fileBrowserStyles.tableRowDragging : ""} ${props.cut ? fileBrowserStyles.tableRowCut : ""}`}
+      className={[
+        fileBrowserStyles.tableRow,
+        props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : "",
+        entry.isDeleted ? fileBrowserStyles.tableRowDeleted : "",
+        source.dragging ? fileBrowserStyles.tableRowDragging : "",
+        props.cut ? fileBrowserStyles.tableRowCut : "",
+      ].join(" ")}
       style={{ height: props.rowHeight }}
       aria-disabled={entry.isDeleted || undefined}
       aria-selected={props.selected}

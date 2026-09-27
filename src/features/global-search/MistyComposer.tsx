@@ -156,7 +156,9 @@ export function MistyComposer(props: {
             : "Ask Misty anything…")
         }
         className={cn(
-          "max-h-40 min-h-12 w-full resize-none overflow-x-hidden bg-transparent px-4 pb-2.5 pt-3 text-[15px] leading-6 text-cream outline-none placeholder:text-cream-muted",
+          "max-h-40 min-h-12 w-full resize-none overflow-x-hidden bg-transparent",
+          "px-4 pb-2.5 pt-3 text-[15px] leading-6 text-cream outline-none",
+          "placeholder:text-cream-muted",
           props.compact && "min-h-11 px-3.5 pb-2 pt-2.5 text-sm leading-5",
           props.inputFirst && "min-h-20 px-4 pb-3 pt-3 text-base leading-6",
         )}

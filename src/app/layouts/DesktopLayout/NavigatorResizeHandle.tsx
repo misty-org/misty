@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { cn } from "@/shared/ui/utils";
 import {
   clampNavigatorWidth,
   navigatorMinWidth,
@@ -32,7 +33,15 @@ export function NavigatorResizeHandle(props: {
       aria-description="Drag to resize. Double-click to reset."
       onDoubleClick={() => props.onChange(navigatorWidths.full)}
       data-misty-window-drag-block="true"
-      className={`absolute inset-y-0 ${props.workspaceEdge ? "misty-workspace-resize-handle left-0" : props.side === "right" ? "left-0" : "right-0"} z-30 w-1.5 touch-none cursor-col-resize focus-visible:outline-none`}
+      className={cn(
+        "absolute inset-y-0",
+        props.workspaceEdge
+          ? "misty-workspace-resize-handle left-0"
+          : props.side === "right"
+            ? "left-0"
+            : "right-0",
+        "z-30 w-1.5 touch-none cursor-col-resize focus-visible:outline-none",
+      )}
       onKeyDown={(event) => {
         const width =
           event.key === "ArrowLeft"

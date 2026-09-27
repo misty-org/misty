@@ -1,4 +1,5 @@
 import { ExternalLink, ShieldCheck } from "lucide-react";
+import { cn } from "@/shared/ui/utils";
 
 export function BrowserNativeRuntimeRequired(props: { url: string; onOpenExternal: () => void }) {
   return (
@@ -22,7 +23,12 @@ export function BrowserNativeRuntimeRequired(props: { url: string; onOpenExterna
         </p>
         <button
           type="button"
-          className="mt-5 inline-flex min-h-9 items-center gap-2 rounded-md bg-charcoal-active px-3 text-sm font-medium text-cream-bright transition-colors hover:bg-charcoal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted"
+          className={cn(
+            "mt-5 inline-flex min-h-9 items-center gap-2 rounded-md",
+            "bg-charcoal-active px-3 text-sm font-medium text-cream-bright",
+            "transition-colors hover:bg-charcoal-hover focus-visible:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-cream-muted",
+          )}
           onClick={props.onOpenExternal}
         >
           <ExternalLink className="size-4" aria-hidden="true" />

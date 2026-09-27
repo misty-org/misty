@@ -21,6 +21,7 @@ import {
 } from "@/shared/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatBytes, formatDate } from "../utils/fileFormat";
+import { cn } from "@/shared/ui/utils";
 
 const dialogChromeClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(760px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream";
@@ -29,17 +30,10 @@ const fieldClass = "grid gap-1.5 text-xs font-medium text-cream-muted";
 const groupListClass = "mt-4 grid max-h-[360px] gap-3 overflow-auto pr-1";
 
 export interface DuplicateFinderRuntime {
-  scan(request: {
-    roots: string[];
-    hashAll: boolean;
-  }): Promise<DuplicateScanResult>;
+  scan(request: { roots: string[]; hashAll: boolean }): Promise<DuplicateScanResult>;
   cancel(scanId?: string): Promise<unknown>;
   hashRemote(scanId: string): Promise<DuplicateScanResult>;
-  cleanup(
-    paths: string[],
-    mode: "trash" | "move",
-    destination: string,
-  ): Promise<void>;
+  cleanup(paths: string[], mode: "trash" | "move", destination: string): Promise<void>;
   Error: import("react").ComponentType<{ error: string }>;
 }
 export function DuplicateFinderDialogView(props: {
@@ -63,18 +57,13 @@ export function DuplicateFinderDialogView(props: {
   const [scanning, setScanning] = useState(false);
   const [remoteApprovalPending, setRemoteApprovalPending] = useState(false);
   const [result, setResult] = useState<DuplicateScanResult | null>(null);
-  const [selectedCleanupPaths, setSelectedCleanupPaths] = useState<string[]>(
-    [],
-  );
+  const [selectedCleanupPaths, setSelectedCleanupPaths] = useState<string[]>([]);
   const [cleanupMode, setCleanupMode] = useState<"trash" | "move">("trash");
   const [cleanupMoveDestination, setCleanupMoveDestination] = useState(
     initialRoot.startsWith("misty://") ? "/" : initialRoot,
   );
   const [error, setError] = useState<string | null>(null);
-  const selectedSet = useMemo(
-    () => new Set(selectedCleanupPaths),
-    [selectedCleanupPaths],
-  );
+  const selectedSet = useMemo(() => new Set(selectedCleanupPaths), [selectedCleanupPaths]);
   const roots = useMemo(() => parseDuplicateRoots(rootsText), [rootsText]);
   const cleanupCount = selectedCleanupPaths.length;
   const cleanupBytes = useMemo(
@@ -96,9 +85,7 @@ export function DuplicateFinderDialogView(props: {
       if (revision !== requestRevision.current) return;
       setResult(next);
       setSelectedCleanupPaths(defaultDuplicateCleanupPaths(next.groups));
-      setRemoteApprovalPending(
-        next.remoteCandidateCount > 0 && !next.remoteHashingApproved,
-      );
+      setRemoteApprovalPending(next.remoteCandidateCount > 0 && !next.remoteHashingApproved);
     } catch (scanError) {
       if (revision === requestRevision.current) setError(errorText(scanError));
     } finally {
@@ -122,42 +109,31 @@ export function DuplicateFinderDialogView(props: {
       if (revision !== requestRevision.current) return;
       setResult(next);
       setSelectedCleanupPaths(defaultDuplicateCleanupPaths(next.groups));
-      setRemoteApprovalPending(
-        next.remoteCandidateCount > 0 && !next.remoteHashingApproved,
-      );
+      setRemoteApprovalPending(next.remoteCandidateCount > 0 && !next.remoteHashingApproved);
     } catch (approvalError) {
-      if (revision === requestRevision.current)
-        setError(errorText(approvalError));
+      if (revision === requestRevision.current) setError(errorText(approvalError));
     } finally {
       if (revision === requestRevision.current) setScanning(false);
     }
   }, [result?.scanId, runtime]);
 
-  const toggleCleanupPath = useCallback(
-    (group: DuplicateGroup, path: string) => {
-      setSelectedCleanupPaths((current) => {
-        const currentSet = new Set(current);
-        if (currentSet.has(path)) {
-          currentSet.delete(path);
-          return [...currentSet];
-        }
-        const selectedInGroup = group.items.filter((item) =>
-          currentSet.has(item.path),
-        ).length;
-        if (selectedInGroup >= group.items.length - 1) return current;
-        currentSet.add(path);
+  const toggleCleanupPath = useCallback((group: DuplicateGroup, path: string) => {
+    setSelectedCleanupPaths((current) => {
+      const currentSet = new Set(current);
+      if (currentSet.has(path)) {
+        currentSet.delete(path);
         return [...currentSet];
-      });
-    },
-    [],
-  );
+      }
+      const selectedInGroup = group.items.filter((item) => currentSet.has(item.path)).length;
+      if (selectedInGroup >= group.items.length - 1) return current;
+      currentSet.add(path);
+      return [...currentSet];
+    });
+  }, []);
 
   const queueCleanup = useCallback(async () => {
     if (selectedCleanupPaths.length === 0) return;
-    const safeItems = duplicateSafeCleanupItems(
-      result?.groups ?? [],
-      selectedSet,
-    );
+    const safeItems = duplicateSafeCleanupItems(result?.groups ?? [], selectedSet);
     if (safeItems.length === 0) {
       setError("Keep at least one file in every duplicate group.");
       return;
@@ -229,12 +205,7 @@ export function DuplicateFinderDialogView(props: {
                 <Button type="submit" disabled={scanning}>
                   {scanning ? "Scanning" : "Scan"}
                 </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={!scanning}
-                  onClick={cancelScan}
-                >
+                <Button variant="outline" type="button" disabled={!scanning} onClick={cancelScan}>
                   Cancel
                 </Button>
               </div>
@@ -248,8 +219,8 @@ export function DuplicateFinderDialogView(props: {
             </label>
             {remoteApprovalPending ? (
               <Card className="mt-3 flex flex-wrap items-center justify-between gap-3 border-0 bg-sage-bg p-3 text-sm text-sage-fg shadow-none text-sage-fg">
-                {result?.remoteCandidateCount ?? 0} remote candidates need
-                explicit download approval before hashing.
+                {result?.remoteCandidateCount ?? 0} remote candidates need explicit download
+                approval before hashing.
                 <Button
                   variant="outline"
                   type="button"
@@ -265,9 +236,8 @@ export function DuplicateFinderDialogView(props: {
               <Card className="mt-3 grid gap-1 border-0 bg-charcoal-card p-3 text-sm text-cream-muted shadow-none">
                 <span>{result.message}</span>
                 <span>
-                  {result.scannedCount} scanned, {result.hashedCount} hashed,{" "}
-                  {cleanupCount} selected for cleanup (
-                  {formatBytes(cleanupBytes)}).
+                  {result.scannedCount} scanned, {result.hashedCount} hashed, {cleanupCount}{" "}
+                  selected for cleanup ({formatBytes(cleanupBytes)}).
                 </span>
               </Card>
             ) : null}
@@ -285,46 +255,35 @@ export function DuplicateFinderDialogView(props: {
                   >
                     <header className="flex items-center justify-between gap-3 border-b border-charcoal-border/70 px-3 py-2 text-xs">
                       <strong>
-                        {group.items.length} copies ·{" "}
-                        {formatBytes(group.sizeBytes)}
+                        {group.items.length} copies · {formatBytes(group.sizeBytes)}
                       </strong>
-                      <span className="truncate text-cream-muted">
-                        {group.key}
-                      </span>
+                      <span className="truncate text-cream-muted">{group.key}</span>
                     </header>
                     {group.items.map((item) => {
                       const selected = selectedSet.has(item.path);
                       return (
                         <label
-                          className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0"
+                          className={cn(
+                            "grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3",
+                            "border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0",
+                          )}
                           key={item.path}
                         >
                           <Checkbox
                             checked={selected}
-                            onCheckedChange={() =>
-                              toggleCleanupPath(group, item.path)
-                            }
+                            onCheckedChange={() => toggleCleanupPath(group, item.path)}
                           />
                           <span className="grid min-w-0 gap-1">
-                            <span
-                              className="truncate text-cream"
-                              title={item.path}
-                            >
+                            <span className="truncate text-cream" title={item.path}>
                               {item.path}
                             </span>
                             <small className="text-cream-muted">
                               {formatDate(item.modifiedMs)}
-                              {item.sha256
-                                ? ` · ${item.sha256.slice(0, 12)}`
-                                : ""}
+                              {item.sha256 ? ` · ${item.sha256.slice(0, 12)}` : ""}
                             </small>
                           </span>
                           <Badge variant={selected ? "secondary" : "outline"}>
-                            {selected
-                              ? cleanupMode === "move"
-                                ? "Move"
-                                : "Trash"
-                              : "Keep"}
+                            {selected ? (cleanupMode === "move" ? "Move" : "Trash") : "Keep"}
                           </Badge>
                         </label>
                       );
@@ -337,9 +296,7 @@ export function DuplicateFinderDialogView(props: {
           <DialogFooter className="mt-0 flex-row flex-wrap border-t border-charcoal-border px-5 py-4">
             <Select
               value={cleanupMode}
-              onValueChange={(value) =>
-                setCleanupMode(value === "move" ? "move" : "trash")
-              }
+              onValueChange={(value) => setCleanupMode(value === "move" ? "move" : "trash")}
             >
               <SelectTrigger className="w-40">
                 <SelectValue />
@@ -355,19 +312,13 @@ export function DuplicateFinderDialogView(props: {
                 value={cleanupMoveDestination}
                 placeholder="Destination folder"
                 aria-label="Duplicate cleanup destination"
-                onChange={(event) =>
-                  setCleanupMoveDestination(event.target.value)
-                }
+                onChange={(event) => setCleanupMoveDestination(event.target.value)}
               />
             ) : null}
             <Button variant="outline" type="button" onClick={props.onClose}>
               Close
             </Button>
-            <Button
-              type="button"
-              disabled={cleanupCount === 0}
-              onClick={() => void queueCleanup()}
-            >
+            <Button type="button" disabled={cleanupCount === 0} onClick={() => void queueCleanup()}>
               Queue Cleanup
             </Button>
           </DialogFooter>
@@ -390,30 +341,20 @@ function parseDuplicateRoots(value: string): string[] {
 }
 
 function defaultDuplicateCleanupPaths(groups: DuplicateGroup[]): string[] {
-  return groups.flatMap((group) =>
-    group.items.slice(1).map((item) => item.path),
-  );
+  return groups.flatMap((group) => group.items.slice(1).map((item) => item.path));
 }
 
-function duplicateSafeCleanupItems(
-  groups: DuplicateGroup[],
-  selected: Set<string>,
-) {
+function duplicateSafeCleanupItems(groups: DuplicateGroup[], selected: Set<string>) {
   const items: DuplicateGroup["items"] = [];
   for (const group of groups) {
-    const selectedInGroup = group.items.filter((item) =>
-      selected.has(item.path),
-    );
+    const selectedInGroup = group.items.filter((item) => selected.has(item.path));
     if (selectedInGroup.length >= group.items.length) continue;
     items.push(...selectedInGroup);
   }
   return items;
 }
 
-function duplicateCleanupBytes(
-  groups: DuplicateGroup[],
-  selected: Set<string>,
-): number {
+function duplicateCleanupBytes(groups: DuplicateGroup[], selected: Set<string>): number {
   return duplicateSafeCleanupItems(groups, selected).reduce(
     (total, item) => total + (item.sizeBytes ?? 0),
     0,
