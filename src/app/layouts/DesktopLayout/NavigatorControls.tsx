@@ -27,9 +27,7 @@ export function NavigatorControls(props: {
   return (
     <div className={cn("flex items-center", props.className)} data-misty-window-drag-block="true">
       <IconButton
-        // Pressed means the navigator holds its column; that is the resting state, so no fill.
-        className="misty-navigator-icon-target aria-pressed:bg-transparent aria-pressed:hover:bg-cream/[0.045]"
-        aria-pressed={sticky}
+        className="misty-navigator-icon-target"
         label={sticky ? "Hide navigation" : "Show navigation"}
         tooltip={title}
         onClick={props.onToggleVisibility}

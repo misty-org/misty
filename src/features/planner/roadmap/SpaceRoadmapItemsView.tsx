@@ -9,6 +9,7 @@ import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { errorText } from "@/shared/lib/format";
 import {
   Button,
+  cn,
   Input,
   Popover,
   PopoverContent,
@@ -170,11 +171,10 @@ export function SpaceRoadmapItemsView({
                   >
                     <PopoverTrigger asChild>
                       <Pressable
-                        className={[
-                          "w-full gap-3 rounded-none px-4 py-3",
-                          "hover:bg-charcoal-card",
-                          index ? "border-t border-charcoal-border/60" : "",
-                        ].join("")}
+                        className={cn(
+                          "flex w-full items-center gap-3 px-4 py-3 hover:bg-charcoal-card",
+                          index && "border-t border-charcoal-border/60",
+                        )}
                       >
                         <StatusIcon status={status} />
                         <span className="min-w-0 flex-1">

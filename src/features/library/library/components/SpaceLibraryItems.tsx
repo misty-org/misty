@@ -241,10 +241,7 @@ function LibraryItemCard({
         }
       >
         <Pressable
-          className={[
-            "relative grid aspect-[4/3] w-full place-items-center overflow-hidden",
-            "rounded-lg bg-charcoal-card p-0 text-cream-muted hover:bg-charcoal-card",
-          ].join("")}
+          className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-lg bg-charcoal-card text-cream-muted"
           onClick={(event) => {
             libraryViewerTriggerRef.current = event.currentTarget;
             setSelectedItemId(item.id);

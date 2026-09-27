@@ -24,6 +24,7 @@ export * from "./controls/SegmentedControl";
 
 // overlays
 export * from "./overlays/AlertDialog";
+export * from "./overlays/BlockingScreen";
 export * from "./overlays/Command";
 export * from "./overlays/ContextMenu";
 export * from "./overlays/Dialog";

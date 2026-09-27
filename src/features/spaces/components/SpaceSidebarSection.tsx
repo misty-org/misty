@@ -1,4 +1,4 @@
-import { Button, cn } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 import { ChevronRight } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
@@ -31,13 +31,8 @@ export function SpaceSidebarSection({
       {title || action ? (
         <div className="group/sidebar-header flex min-h-7 items-center gap-1 px-1.5">
           {title && canCollapse ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className={[
-                "h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs",
-                "font-semibold text-cream-muted hover:bg-transparent hover:text-cream-bright",
-              ].join("")}
+            <Pressable
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-semibold text-cream-muted hover:text-cream-bright"
               aria-controls={contentId}
               aria-expanded={expanded}
               onClick={() => setExpanded((current) => !current)}
@@ -53,7 +48,7 @@ export function SpaceSidebarSection({
                 size={13}
                 className={cn("shrink-0 transition-transform", expanded && "rotate-90")}
               />
-            </Button>
+            </Pressable>
           ) : title ? (
             <h2 className="m-0 min-w-0 flex-1 truncate text-xs font-semibold text-cream-muted">
               {title}

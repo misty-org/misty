@@ -294,8 +294,9 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
               </div>
               {activityState === "error" && (
                 <Button
-                  variant="ghost"
-                  className="h-auto p-0 text-xs text-cream-muted hover:bg-transparent hover:text-cream-bright"
+                  variant="link"
+                  size="none"
+                  className="text-xs text-cream-muted hover:text-cream-bright"
                   onClick={() => setActivityAttempt((value) => value + 1)}
                 >
                   Retry activity

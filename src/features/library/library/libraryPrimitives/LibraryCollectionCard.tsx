@@ -1,4 +1,4 @@
-import { Button, cn, IconButton } from "@/shared/ui";
+import { cn, IconButton, Pressable } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, Pin, type LucideIcon } from "lucide-react";
 import { useContext } from "react";
 import { LibraryCanEditContext } from "./LibraryCanEditContext";
@@ -33,16 +33,11 @@ export function LibraryCollectionCard({
 
   return (
     <article className={cardClass}>
-      <Button
-        className="block w-full border-0 bg-transparent p-4 text-left disabled:opacity-40"
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-      >
+      <Pressable className="block w-full p-4" disabled={disabled} onClick={onClick}>
         <Icon size={22} />
         <p className="mb-0 mt-3 truncate text-xs font-medium">{label}</p>
         <p className="mb-0 mt-1 text-[10px] text-cream-muted">{count} items</p>
-      </Button>
+      </Pressable>
 
       {canEdit && onTogglePin && !disabled ? (
         <IconButton

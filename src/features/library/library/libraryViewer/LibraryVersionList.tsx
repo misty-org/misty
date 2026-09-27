@@ -1,6 +1,6 @@
 import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
 import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
-import { Button, IconButton } from "@/shared/ui";
+import { Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";
 import { libraryRenditionStatus } from "../SpaceLibraryViewerUtils";
@@ -53,9 +53,8 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
             className={`flex items-center gap-2 rounded-lg bg-charcoal-card px-2 py-2 ${version.is_current ? "ring-1 ring-charcoal-active" : ""}`}
             key={version.id}
           >
-            <Button
-              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left"
-              type="button"
+            <Pressable
+              className="min-w-0 flex-1"
               disabled={!canEdit || editSaving || version.is_current}
               onClick={() => props.onSelect(version.id)}
             >
@@ -66,7 +65,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
               <span className="mt-0.5 block text-[10px] text-cream-muted">
                 {libraryRenditionStatus(version)} · {formatTime(version.created_at)}
               </span>
-            </Button>
+            </Pressable>
             {canEdit &&
             (version.rendition_state === "none" || version.rendition_state === "failed") ? (
               <Button

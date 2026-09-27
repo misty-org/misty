@@ -12,6 +12,13 @@ import {
 
 const extensions = new Set([".ts", ".tsx"]);
 const uiImplementationRoots = ["src/shared/ui/"];
+/** Files whose job is defining custom properties that stylesheets read. */
+const customPropertyDefinitionOwners = new Set([
+  // The theme store writes the palette every surface reads.
+  "src/features/settings/store/extensionTheme.ts",
+  // The companion's runtime size feeds four rules in cursorCompanion.css.
+  "src/features/agents/companion/CursorCompanionRoot.tsx",
+]);
 const allowedSourceRoots = new Set([
   "api",
   "app",
@@ -79,7 +86,13 @@ describe("UI architecture contract", () => {
       ) {
         failures.push(`${relative}: import Radix only inside src/shared/ui`);
       }
-      if (/var\(--|["']--[a-z][a-z0-9-]*["']\s*:/.test(text)) {
+      // Reading a token with var() inside a Tailwind class is fine; defining new custom
+      // properties inline is where styling escapes the design system.
+      if (
+        !uiImplementationRoots.some((root) => relative.startsWith(root)) &&
+        !customPropertyDefinitionOwners.has(relative) &&
+        /["']--[a-z][a-z0-9-]*["']\s*:/.test(text)
+      ) {
         failures.push(`${relative}: use Tailwind classes instead of CSS custom properties`);
       }
     }

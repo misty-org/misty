@@ -49,6 +49,24 @@ export const uiRules = {
     ),
     guidance: "popup surfaces are fixed; set width, height, or alignment only",
   },
+  "icon-only-button": {
+    pattern: /<Button\b(?:[^>]|=>)*?\bsize="icon/,
+    guidance: "use IconButton for icon-only buttons",
+  },
+  "button-restyle": {
+    // Surfaces whose look is their content (cards, rows, tabs) use Pressable instead.
+    pattern:
+      /<(?:Button|IconButton)\b(?:[^>]|=>)*?className=(?:"|\{[^}]*")[^"]*(?<![\w[-])(?:[a-z-]+:)*(?:bg-|rounded|shadow-|ring-|border-(?!0\b))/,
+    guidance: "pick a Button or IconButton variant, size, or shape; use Pressable for surfaces",
+  },
+  "unsized-button": {
+    pattern: /<Button\b(?![^>]*variant="link")(?:[^>]|=>)*?\bsize="none"/,
+    guidance: "use a Button size, IconButton, or Pressable; only links drop the size",
+  },
+  "hand-rolled-spinner": {
+    pattern: /<(?:Loader2|LoaderCircle)\b[^>]*animate-spin/,
+    guidance: "use Spinner",
+  },
   "hex-color": {
     pattern: /-\[#[0-9a-fA-F]{3,8}\]/,
     guidance: "use theme color tokens instead of hex values",

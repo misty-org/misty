@@ -5,6 +5,7 @@ import {
   Card,
   IconButton,
   Input,
+  Pressable,
   Spinner,
   Table,
   TableBody,
@@ -71,15 +72,13 @@ export function SpaceTaskList({
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <Button
-                    className="h-auto max-w-[420px] justify-start p-0 text-left text-sm font-medium hover:bg-transparent"
-                    variant="ghost"
-                    type="button"
+                  <Pressable
+                    className="max-w-[420px] text-sm font-medium"
                     onClick={() => onOpen(task)}
                   >
                     {taskBusy ? <Spinner size="sm" label={false} /> : null}
                     <span className="truncate">{task.title}</span>
-                  </Button>
+                  </Pressable>
                 </TableCell>
                 <TableCell>
                   <TaskInlineSelect

@@ -1,5 +1,5 @@
 import type { LibraryDiscoveryGroup } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn, DiscoverCard, IconButton } from "@/shared/ui";
+import { cn, DiscoverCard, IconButton, Pressable } from "@/shared/ui";
 import { Pin, type LucideIcon } from "lucide-react";
 import { useContext } from "react";
 import { AlbumCover } from "./AlbumCover";
@@ -25,11 +25,7 @@ export function LibraryDiscoveryCard({
 
   return (
     <DiscoverCard>
-      <Button
-        className="block w-full border-0 bg-transparent p-0 text-left"
-        type="button"
-        onClick={onClick}
-      >
+      <Pressable className="block w-full" onClick={onClick}>
         <span className="relative block">
           <AlbumCover spaceId={spaceId} itemId={group.cover_item_id} />
           <span className="absolute left-3 top-3 grid size-8 place-items-center rounded-lg bg-charcoal-workspace text-cream-bright ">
@@ -40,7 +36,7 @@ export function LibraryDiscoveryCard({
           <span className="block truncate text-xs font-medium">{group.title}</span>
           <span className="mt-1 block truncate text-[10px] text-cream-muted">{group.subtitle}</span>
         </span>
-      </Button>
+      </Pressable>
       {canEdit && onTogglePin ? (
         <IconButton
           variant="overlay"
