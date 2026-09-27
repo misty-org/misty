@@ -85,7 +85,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       data-slot="select-content"
       className={cn(
-        "relative z-[2147483420] max-h-[min(24rem,calc(100dvh-2rem))] min-w-32 overflow-x-hidden overflow-y-auto",
+        "relative layer-popover max-h-[min(24rem,calc(100dvh-2rem))] min-w-32 overflow-x-hidden overflow-y-auto",
         popupSurfaceClass,
         popupMotionClass,
         position === "popper" &&

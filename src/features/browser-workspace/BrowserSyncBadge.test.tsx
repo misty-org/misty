@@ -192,7 +192,7 @@ it("routes a remote switch and waits for signed activation rather than the HTTP 
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sync: Up to date" })));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Switch to Office" })));
   expect(mocks.control).toHaveBeenCalledWith("s", "remote", null, true);
-  expect(screen.getByText("Switching…")).toBeTruthy();
+  expect(screen.getByLabelText("Switching…")).toBeTruthy();
   expect(
     screen.getByRole("switch", { name: "Full sync for Office" }).getAttribute("disabled"),
   ).not.toBeNull();
@@ -207,7 +207,7 @@ it("routes a remote switch and waits for signed activation rather than the HTTP 
       },
     }),
   );
-  expect(screen.queryByText("Switching…")).toBeNull();
+  expect(screen.queryByLabelText("Switching…")).toBeNull();
   expect(screen.queryByRole("button", { name: "Switch to Office" })).toBeNull();
   expect(screen.getByRole("img", { name: "Active device: Office" })).toBeTruthy();
   await act(async () =>

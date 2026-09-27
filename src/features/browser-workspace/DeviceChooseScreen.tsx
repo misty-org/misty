@@ -1,6 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowRightLeft, LoaderCircle } from "lucide-react";
-import { Button } from "@/shared/ui";
+import { ArrowRightLeft } from "lucide-react";
+import { Button, Spinner } from "@/shared/ui";
 import mistyStill from "@/assets/branding/misty-icon.png?inline";
 import { useUserStore } from "@/features/auth/core";
 import type { NativeSyncView, SyncTreeView } from "./native";
@@ -30,12 +30,12 @@ export function DeviceChooseScreen({
       <Dialog.Portal>
         <div
           aria-hidden="true"
-          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483200] bg-black/75 backdrop-blur-sm"
+          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking-backdrop bg-black/75 backdrop-blur-sm"
         />
         <Dialog.Content
           data-slot="dialog-content"
           data-device-sync-choose=""
-          className="fixed inset-x-0 bottom-0 top-[38px] z-[2147483201] flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
+          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
@@ -81,10 +81,7 @@ export function DeviceChooseScreen({
                     </span>
                   </span>
                   {busyTree === row.deviceId ? (
-                    <LoaderCircle
-                      aria-hidden
-                      className="size-4 shrink-0 animate-spin motion-reduce:animate-none"
-                    />
+                    <Spinner label="Switching…" className="shrink-0" />
                   ) : (
                     <ArrowRightLeft aria-hidden className="size-4 shrink-0" />
                   )}

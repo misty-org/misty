@@ -74,7 +74,7 @@ describe("Browser site permissions", () => {
   });
   async function open(url = info.url) {
     await act(async () =>
-      root.render(<BrowserSiteInfo id="tab-one" url={url} active iconButtonClass="" />),
+      root.render(<BrowserSiteInfo id="tab-one" url={url} active />),
     );
     await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   }
@@ -111,7 +111,7 @@ describe("Browser site permissions", () => {
     await open();
     await act(async () =>
       root.render(
-        <BrowserSiteInfo id="tab-one" url="https://other.example" active iconButtonClass="" />,
+        <BrowserSiteInfo id="tab-one" url="https://other.example" active />,
       ),
     );
     await act(async () => resolve(info));

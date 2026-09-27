@@ -1,13 +1,18 @@
 import { MessageCirclePlus } from "lucide-react";
-import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import {
+  Button,
+  cn,
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  toolbarIconProps,
+} from "@/shared/ui";
 import type { BrowserMistyPage } from "./browserRuntime";
-import { browserToolbarStyles } from "./browserToolbarStyles";
 
 /** Run-bound agent access and the one-time Misty page read. */
 export function BrowserAgentAccessMenu(props: {
   overlay: { open: boolean; onOpenChange: (open: boolean) => void };
-  iconButtonClass: string;
-  lightChrome: boolean;
   agentAccess: boolean;
   nativeRuntime: boolean;
   mistyPage: BrowserMistyPage | null;
@@ -17,24 +22,18 @@ export function BrowserAgentAccessMenu(props: {
   return (
     <Popover open={props.overlay.open} onOpenChange={props.overlay.onOpenChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            props.iconButtonClass,
-            props.agentAccess &&
-              (props.lightChrome
-                ? "bg-black/[0.06] text-[#202020]"
-                : "bg-white/[0.06] text-[#e9e9e9]"),
-          )}
-          aria-label={`Agent access: ${props.agentAccess ? "On" : "Off"}`}
+        <IconButton
+          label={`Agent access: ${props.agentAccess ? "On" : "Off"}`}
+          tooltip={false}
+          className={cn(props.agentAccess && "bg-cream/[0.06] text-cream")}
         >
-          <MessageCirclePlus {...browserToolbarStyles.icon} />
-        </button>
+          <MessageCirclePlus {...toolbarIconProps} />
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-72 p-3 data-[state=closed]:animate-none data-[state=open]:animate-none"
+        className="w-72"
       >
         <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
         <p className="mb-3 mt-1 text-xs text-cream-muted">
@@ -52,9 +51,10 @@ export function BrowserAgentAccessMenu(props: {
             A one-time inspection captures bounded page text. The temporary read grant is
             revoked immediately after capture.
           </p>
-          <button
-            type="button"
-            className="w-full rounded-md border border-charcoal-border bg-charcoal-card px-3 py-2 text-xs hover:bg-charcoal-hover disabled:opacity-50"
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs"
             disabled={props.mistyPageLoading || !props.nativeRuntime}
             onClick={props.onAttachPage}
           >
@@ -63,7 +63,7 @@ export function BrowserAgentAccessMenu(props: {
               : props.mistyPage
                 ? "Refresh page context"
                 : "Allow one-time page read"}
-          </button>
+          </Button>
           {props.mistyPage ? (
             <p className="mb-0 mt-2 text-[10px] text-cream-muted">
               Attached: {props.mistyPage.title}

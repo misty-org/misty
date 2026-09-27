@@ -1,6 +1,14 @@
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn, menuItemClass, menuListClass, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import {
+  Button,
+  cn,
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  toolbarIconProps,
+} from "@/shared/ui";
 import { downloadStatusText } from "../internal/DownloadsPage";
 import {
   downloadProgressFraction,
@@ -8,7 +16,6 @@ import {
   useBrowserDownloadsStore,
 } from "../library/downloadsStore";
 import { browserLibrary } from "../library/native";
-import { browserToolbarStyles } from "./browserToolbarStyles";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
 /**
@@ -16,7 +23,6 @@ import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
  * downloads bubble. The full list lives at misty://downloads.
  */
 export function BrowserDownloadsButton(props: {
-  iconButtonClass: string;
   suspensionReason: string;
   onShowAll: () => void;
 }) {
@@ -45,13 +51,13 @@ export function BrowserDownloadsButton(props: {
   return (
     <Popover open={overlay.open} onOpenChange={overlay.onOpenChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(props.iconButtonClass, "relative", justFinished && "text-cream-bright")}
-          aria-label={active.length ? `Downloads: ${active.length} in progress` : "Downloads"}
+        <IconButton
+          label={active.length ? `Downloads: ${active.length} in progress` : "Downloads"}
+          tooltip={false}
           title="Downloads"
+          className={cn("relative", justFinished && "text-cream-bright")}
         >
-          <Download {...browserToolbarStyles.icon} />
+          <Download {...toolbarIconProps} />
           {active.length ? (
             <svg className="pointer-events-none absolute inset-0.5" viewBox="0 0 36 36" aria-hidden="true">
               <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="2" />
@@ -69,9 +75,9 @@ export function BrowserDownloadsButton(props: {
               />
             </svg>
           ) : null}
-        </button>
+        </IconButton>
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className={cn("w-80", menuListClass)}>
+      <PopoverContent align="end" sideOffset={8} className="grid w-80 gap-1 p-1">
         <ul className="grid">
           {entries.slice(0, 5).map((entry) => (
             <li key={entry.id} className="flex items-center gap-2 px-2 py-1.5">
@@ -80,35 +86,37 @@ export function BrowserDownloadsButton(props: {
                 <p className="truncate text-xs text-cream-muted">{downloadStatusText(entry)}</p>
               </div>
               {entry.state === "in_progress" ? (
-                <button
-                  type="button"
-                  className="rounded px-1.5 py-0.5 text-xs text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright"
+                <Button
+                  variant="toolbar"
+                  size="xs"
                   onClick={() => void browserLibrary.cancelDownload(entry.id).then(refresh)}
                 >
                   Cancel
-                </button>
+                </Button>
               ) : entry.state === "finished" && entry.exists ? (
-                <button
-                  type="button"
-                  className="rounded px-1.5 py-0.5 text-xs text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright"
+                <Button
+                  variant="toolbar"
+                  size="xs"
                   onClick={() => void browserLibrary.openDownload(entry.id).catch(refresh)}
                 >
                   Open
-                </button>
+                </Button>
               ) : null}
             </li>
           ))}
         </ul>
-        <button
-          type="button"
-          className={menuItemClass}
+        <Button
+          variant="ghost"
+          size="sm"
+          justify="start"
+          className="w-full font-normal"
           onClick={() => {
             overlay.onOpenChange(false);
             props.onShowAll();
           }}
         >
           Show all downloads
-        </button>
+        </Button>
       </PopoverContent>
     </Popover>
   );

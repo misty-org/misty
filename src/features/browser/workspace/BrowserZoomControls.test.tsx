@@ -73,7 +73,6 @@ it("keeps the Browser dropdown open across zoom adjustments and reopening", asyn
   const setZoom = vi.fn(async () => {});
   const ui = render(
     <BrowserMenuView
-      iconButtonClass=""
       zoomId="page"
       setZoom={setZoom}
       url="https://example.com"

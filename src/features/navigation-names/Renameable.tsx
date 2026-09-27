@@ -132,7 +132,7 @@ export function Renameable({
           <div
             data-misty-window-drag-block="true"
             data-navigation-name-editor="true"
-            className={portalEditor ? "fixed z-[2147483401]" : "absolute z-[2147483401]"}
+            className={portalEditor ? "fixed layer-menu-raised" : "absolute layer-menu-raised"}
             style={{
               left: portalEditor ? Math.max(4, rect.left) : anchor.current?.offsetLeft,
               top: portalEditor ? rect.top : anchor.current?.offsetTop,

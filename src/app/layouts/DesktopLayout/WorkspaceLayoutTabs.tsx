@@ -279,10 +279,7 @@ export function WorkspaceLayoutTabs(
                     </span>
                   ) : null}
                 </Button>
-                <BrowserTabAudioButton
-                  tabs={panes.flatMap((pane) => pane.tabs)}
-                  className={tabActionClass}
-                />
+                <BrowserTabAudioButton tabs={panes.flatMap((pane) => pane.tabs)} />
                 {panes.length > 1 ? (
                   <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>

@@ -214,7 +214,7 @@ describe("BrowserWorkspace", () => {
       await settleBrowserOverlay();
     });
     const menuItems = [
-      ...document.body.querySelectorAll<HTMLElement>('.website-header-menu [role="menuitem"]'),
+      ...document.body.querySelectorAll<HTMLElement>('[data-browser-menu] [role="menuitem"]'),
     ].map((item) => item.textContent?.trim() ?? "");
     for (const label of [
       "New tab",
@@ -267,12 +267,12 @@ describe("BrowserWorkspace", () => {
       openMenu(trigger);
       await new Promise<void>((resolve) => window.setTimeout(resolve, 20));
     });
-    expect(document.body.querySelector(".website-header-menu")).toBeNull();
+    expect(document.body.querySelector("[data-browser-menu]")).toBeNull();
     await act(async () => {
       releaseRestack?.();
       await settleBrowserOverlay();
     });
-    expect(document.body.querySelector(".website-header-menu")).not.toBeNull();
+    expect(document.body.querySelector("[data-browser-menu]")).not.toBeNull();
   });
 });
 

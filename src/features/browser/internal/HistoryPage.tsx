@@ -1,12 +1,10 @@
 import { History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { cn } from "@/shared/ui";
+import { Button, Checkbox, ListRow, ListRowButton } from "@/shared/ui";
 import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
 import {
   InternalPageEmpty,
   InternalPageFrame,
-  internalActionClass,
-  internalRowClass,
   SiteIcon,
 } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
@@ -107,17 +105,15 @@ export function HistoryPage(props: BrowserInternalPageProps) {
       actions={
         <div className="flex items-center gap-1">
           {selected.size ? (
-            <button
-              type="button"
-              className={internalActionClass}
+            <Button variant="toolbar" size="xs"
               onClick={() => void remove([...selected])}
             >
               Delete {selected.size} selected
-            </button>
+            </Button>
           ) : null}
-          <button type="button" className={internalActionClass} onClick={props.clearBrowsingData}>
+          <Button variant="toolbar" size="xs" onClick={props.clearBrowsingData}>
             Clear browsing data…
-          </button>
+          </Button>
         </div>
       }
     >
@@ -137,13 +133,12 @@ export function HistoryPage(props: BrowserInternalPageProps) {
           <h2 className="mb-1 px-2 text-xs font-medium text-cream-muted">{label}</h2>
           <ul className="grid">
             {dayVisits.map((visit) => (
-              <li key={visit.id} className={internalRowClass}>
-                <input
-                  type="checkbox"
-                  className="size-3.5 shrink-0 accent-cream-muted"
+              <ListRow key={visit.id}>
+                <Checkbox
+                  className="shrink-0"
                   aria-label={`Select ${visit.title || visit.url}`}
                   checked={selected.has(visit.id)}
-                  onChange={() => toggle(visit.id)}
+                  onCheckedChange={() => toggle(visit.id)}
                 />
                 <span className="w-14 shrink-0 text-xs tabular-nums text-cream-muted">
                   {new Date(visit.visitedAt).toLocaleTimeString(undefined, {
@@ -152,9 +147,8 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                   })}
                 </span>
                 <SiteIcon url={visit.url} />
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-baseline gap-2 text-left focus-visible:outline-none"
+                <ListRowButton
+                 
                   title={visit.url}
                   onClick={(event) =>
                     event.metaKey || event.ctrlKey
@@ -171,30 +165,28 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                   <span className="shrink-0 truncate text-xs text-cream-muted">
                     {hostOf(visit.url)}
                   </span>
-                </button>
-                <button
-                  type="button"
-                  className={cn(internalActionClass, "opacity-0 group-hover:opacity-100 focus:opacity-100")}
+                </ListRowButton>
+                <Button variant="toolbar" size="xs"
+                  className="opacity-0 group-hover/row:opacity-100 focus:opacity-100"
                   aria-label={`Remove ${visit.title || visit.url} from history`}
                   title="Remove from history"
                   onClick={() => void remove([visit.id])}
                 >
                   <Trash2 className="size-3.5" />
-                </button>
-              </li>
+                </Button>
+              </ListRow>
             ))}
           </ul>
         </section>
       ))}
       {more ? (
-        <button
-          type="button"
-          className={cn(internalActionClass, "mx-auto block")}
+        <Button variant="toolbar" size="xs"
+          className="mx-auto flex"
           disabled={loading}
           onClick={() => void load(visits[visits.length - 1]?.visitedAt)}
         >
           {loading ? "Loading…" : "Show older"}
-        </button>
+        </Button>
       ) : null}
     </InternalPageFrame>
   );

@@ -44,7 +44,7 @@ export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
       {children}
       {notice ? (
         <div
-          className="fixed bottom-5 right-5 z-[2147483200] rounded-lg border border-charcoal-border bg-charcoal-active px-4 py-3 text-sm text-cream-bright shadow-xl"
+          className="fixed bottom-5 right-5 layer-blocking-backdrop rounded-lg border border-charcoal-border bg-charcoal-active px-4 py-3 text-sm text-cream-bright shadow-xl"
           role="status"
         >
           {notice}

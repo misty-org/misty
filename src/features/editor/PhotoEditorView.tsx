@@ -134,7 +134,7 @@ async function renderedToBlob(image: RenderedImage, mimeType: string): Promise<B
 function EditorShell(props: { name: string; children: ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-[2147483300] bg-charcoal-workspace"
+      className="fixed inset-0 layer-blocking-popup bg-charcoal-workspace"
       role="dialog"
       aria-modal="true"
       aria-label={`Edit ${props.name}`}

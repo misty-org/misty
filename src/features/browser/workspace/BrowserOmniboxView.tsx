@@ -1,5 +1,5 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
-import { Button, cn, menuListClass, popupSurfaceClass } from "@/shared/ui";
+import { Button, Input, SuggestionList } from "@/shared/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OmniboxRow } from "./omnibox/OmniboxRow";
 import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "./omnibox/types";
@@ -16,7 +16,6 @@ export function BrowserOmniboxView(props: {
   focusRequest?: number;
   context: OmniboxContext;
   providers: readonly OmniboxProvider[];
-  lightChrome: boolean;
   suspensionReason: string;
   setOverlay: (reason: string, active: boolean) => Promise<void>;
   /** `typed` is true when the person chose a page by its address rather than a search. */
@@ -131,7 +130,7 @@ export function BrowserOmniboxView(props: {
           <span className="min-w-0 truncate">{props.pageTitle || "Website"}</span>
         </Button>
       )}
-      <input
+      <Input
         hidden={props.compact && !focused}
         ref={inputRef}
         value={shown}
@@ -189,22 +188,13 @@ export function BrowserOmniboxView(props: {
         aria-activedescendant={focused && matches.length ? selected?.id : undefined}
         autoComplete="off"
         spellCheck={false}
-        className={cn(
-          "h-[30px] w-full min-w-0 rounded-md border bg-transparent px-2 text-center text-xs outline-none transition-colors",
-          props.lightChrome
-            ? "border-black/[0.06] text-[#252525] hover:bg-black/[0.025] focus:border-black/[0.11] focus:bg-[#ededed] focus:text-left"
-            : "border-white/[0.07] text-[#e7e7e7] hover:bg-white/[0.025] focus:border-white/[0.12] focus:bg-[#222] focus:text-left",
-        )}
+        variant="toolbar"
+        className="text-center focus:text-left"
       />
       {focused && overlay.open && matches.length ? (
-        <div
+        <SuggestionList
           id="browser-omnibox-suggestions"
-          role="listbox"
-          className={cn(
-            "absolute left-0 right-0 top-[calc(100%+7px)] overflow-hidden",
-            popupSurfaceClass,
-            menuListClass,
-          )}
+          className="absolute left-0 right-0 top-[calc(100%+7px)]"
         >
           {matches.map((match, index) => (
             <OmniboxRow
@@ -220,7 +210,7 @@ export function BrowserOmniboxView(props: {
               onRemove={match.removable && props.onRemove ? () => remove(match) : undefined}
             />
           ))}
-        </div>
+        </SuggestionList>
       ) : null}
     </form>
   );

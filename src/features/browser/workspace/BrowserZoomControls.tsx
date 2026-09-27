@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
-import { DropdownMenuItem } from "@/shared/ui";
-import "./browserZoom.css";
+import { Button, cn, DropdownMenuItem } from "@/shared/ui";
 
 const levels = [
   25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500,
@@ -66,42 +65,42 @@ export function BrowserZoomControls({
   ];
   return (
     <div
-      className={`browser-zoom-controls${menu ? " browser-zoom-menu-item" : ""}`}
+      className="flex min-h-8 items-center px-2 text-sm"
       role="group"
       aria-label="Page zoom"
       onClick={(event) => event.stopPropagation()}
     >
-      <span className="browser-zoom-label">Zoom</span>
+      <span className="mr-2 flex-1">Zoom</span>
       {actions.map(({ label, value, content }) => {
         const unavailable = disabled || value === undefined;
-        const button = (
-          <button
-            className="browser-zoom-button"
-            type="button"
-            aria-label={label}
-            title={label}
-            disabled={unavailable}
-            onClick={menu ? undefined : () => void change(value!)}
-          >
-            {content}
-          </button>
-        );
+        const width = label === "Reset zoom to 100%" ? "min-w-12" : "min-w-6";
         return menu ? (
           <DropdownMenuItem
             key={label}
-            asChild
+            aria-label={label}
+            title={label}
             disabled={unavailable}
+            className={cn("min-h-6 w-auto justify-center px-1 py-0 tabular-nums", width)}
             onSelect={(event) => {
               event.preventDefault();
               void change(value!);
             }}
           >
-            {button}
+            {content}
           </DropdownMenuItem>
         ) : (
-          <span key={label} className="browser-zoom-action">
-            {button}
-          </span>
+          <Button
+            key={label}
+            variant="toolbar"
+            size="xs"
+            className={cn("px-1 tabular-nums", width)}
+            aria-label={label}
+            title={label}
+            disabled={unavailable}
+            onClick={() => void change(value!)}
+          >
+            {content}
+          </Button>
         );
       })}
     </div>

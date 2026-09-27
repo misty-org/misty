@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, LoaderCircle, Monitor, MousePointer2 } from "lucide-react";
-import { Button, cn, Switch } from "@/shared/ui";
+import { Check, Monitor, MousePointer2 } from "lucide-react";
+import { Button, cn, Spinner, Switch } from "@/shared/ui";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import {
   activateNativeDevice,
@@ -185,11 +185,7 @@ export function DeviceControlContent({
                     >
                       {pending?.deviceId === device.device_id && pending.fullSync === null ? (
                         <>
-                          <LoaderCircle
-                            aria-hidden
-                            className="size-4 animate-spin motion-reduce:animate-none"
-                          />
-                          <span className="sr-only">Switching…</span>
+                          <Spinner label="Switching…" />
                         </>
                       ) : (
                         <MousePointer2 aria-hidden className="size-4" />

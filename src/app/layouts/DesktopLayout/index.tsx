@@ -570,7 +570,7 @@ export function DesktopLayout(props: {
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
         <div
           id="misty-shell-overlays"
-          className="pointer-events-none fixed inset-0 z-[2147482500]"
+          className="pointer-events-none fixed inset-0 layer-chrome"
         />
         {!isAuthRoute ? (
           <>

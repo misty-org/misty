@@ -7,8 +7,8 @@
   ],
   "src/app/layouts/RootLayout.tsx": [
     {
-      "length": 308,
-      "hash": "5aab0420a6de0452"
+      "length": 315,
+      "hash": "7b915d8f1194d0ba"
     }
   ],
   "src/features/auth/SignInPage.tsx": [
@@ -385,8 +385,8 @@
   ],
   "src/shared/ui/overlays/AlertDialog.tsx": [
     {
-      "length": 182,
-      "hash": "f50fd3b389aaa1a9"
+      "length": 191,
+      "hash": "2da9e6d54d271fbb"
     }
   ],
   "src/shared/ui/feedback/Alert.tsx": [
@@ -491,8 +491,8 @@
   ],
   "src/shared/ui/layout/DragLayer.tsx": [
     {
-      "length": 162,
-      "hash": "1d858e9f0ea727ff"
+      "length": 161,
+      "hash": "22b5ca7c8234c876"
     }
   ],
   "src/shared/ui/overlays/DropdownMenu.tsx": [

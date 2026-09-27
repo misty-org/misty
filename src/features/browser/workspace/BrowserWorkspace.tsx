@@ -18,7 +18,7 @@ import {
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { cn, Notification } from "@/shared/ui";
+import { Button, cn, IconButton, Notification, toolbarIconProps } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight, Pencil, RotateCw, VenetianMask, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -49,7 +49,7 @@ import {
   type BrowserMistyPage,
 } from "./browserRuntime";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
-import { browserToolbarButtonClass, browserToolbarStyles } from "./browserToolbarStyles";
+import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   browserViewportFrameStyle,
   BrowserViewportMenu,
@@ -120,9 +120,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     state.url,
     nativeRuntime,
   );
-  const lightChrome = false;
   const browserChromeBackground = "#18191c";
-  const iconButtonClass = browserToolbarButtonClass(lightChrome);
   const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
   const agentMenuSuspensionReason = `browser-agent-menu:${browserRuntimeId(tab)}`;
@@ -518,8 +516,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     <section
       className={cn(
         "grid h-full min-h-0 overflow-hidden",
-        "grid-rows-[44px_auto_minmax(0,1fr)]",
-        lightChrome ? "text-[#202020]" : "text-cream",
+        "grid-rows-[44px_auto_minmax(0,1fr)] text-cream",
       )}
       style={{
         backgroundColor: browserChromeBackground,
@@ -528,53 +525,49 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       data-browser-workspace-tab={tab.id}
     >
       <div
-        className={cn(
-          browserToolbarStyles.bar,
-          lightChrome ? "border-black/[0.08]" : "border-white/[0.055]",
-        )}
+        className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
         style={{
           backgroundColor: browserChromeBackground,
         }}
         data-browser-toolbar
       >
         <div className={browserToolbarStyles.group}>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label="Back"
+          <IconButton
+            label="Back"
+            tooltip={false}
             disabled={history.index === 0}
             onClick={() => travel(-1)}
           >
-            <ArrowLeft {...browserToolbarStyles.icon} />
-          </button>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label="Forward"
+            <ArrowLeft {...toolbarIconProps} />
+          </IconButton>
+          <IconButton
+            label="Forward"
+            tooltip={false}
             disabled={history.index >= history.entries.length - 1}
             onClick={() => travel(1)}
           >
-            <ArrowRight {...browserToolbarStyles.icon} />
-          </button>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label={showStop ? "Stop loading" : "Reload"}
-            title={showStop ? "Stop loading" : "Reload"}
+            <ArrowRight {...toolbarIconProps} />
+          </IconButton>
+          <IconButton
+            label={showStop ? "Stop loading" : "Reload"}
+            tooltip={false}
             disabled={!showStop && Boolean(internalPage)}
             onClick={showStop ? page.commands.stop : reload}
           >
             {showStop ? (
-              <X {...browserToolbarStyles.icon} />
+              <X {...toolbarIconProps} />
             ) : (
               <RotateCw {...browserToolbarStyles.roundIcon} />
             )}
-          </button>
+          </IconButton>
         </div>
 
         {state.private ? (
           <span
-            className="flex shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
+              "bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted",
+            )}
             title="Private tab: no history, and cookies and site data are discarded when the last private tab closes"
           >
             <VenetianMask className="size-3" aria-hidden="true" />
@@ -583,12 +576,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         ) : null}
         {state.agentOwned ? (
           <span
-            className={cn(
-              "shrink-0 rounded-md border px-2 py-1 text-[10px] font-medium",
-              lightChrome
-                ? "border-black/10 bg-black/[0.035] text-black/60"
-                : "border-white/[0.08] bg-white/[0.045] text-cream-muted",
-            )}
+            className="shrink-0 rounded-md border border-cream/[0.08] bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
             title="This browser tab is scoped to Misty's current work"
           >
             Misty
@@ -596,12 +584,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         ) : null}
 
         {supportsSitePermissions() && /^https?:/.test(state.url) ? (
-          <BrowserSiteInfo
-            id={browserRuntimeId(tab)}
-            url={state.url}
-            active={active}
-            iconButtonClass={iconButtonClass}
-          />
+          <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
         ) : null}
         <BrowserOmnibox
           compact={Boolean(state.websiteId)}
@@ -609,52 +592,35 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           focusRequest={addressFocusRequest}
           currentUrl={state.url}
           historyEntries={history.entries}
-          lightChrome={lightChrome}
           tab={tab}
           onNavigate={navigateActiveTab}
         />
         {page.commands.bookmark ? (
-          <BrowserBookmarkStar
-            url={state.url}
-            iconButtonClass={iconButtonClass}
-            onBookmark={page.commands.bookmark}
-          />
+          <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
         ) : null}
 
         <div className={browserToolbarStyles.group}>
           {
             <>
-              <button
-                type="button"
-                className={cn(
-                  iconButtonClass,
-                  annotationsActive &&
-                    (lightChrome
-                      ? "bg-black/[0.06] text-[#202020]"
-                      : "bg-white/[0.06] text-[#e9e9e9]"),
-                )}
-                aria-label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+              <IconButton
+                label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+                tooltip={false}
                 aria-pressed={annotationsActive}
-                title={annotationsActive ? "Exit annotation mode" : "Annotate page"}
                 onClick={() => setAnnotationsActive((active) => !active)}
               >
-                <Pencil {...browserToolbarStyles.icon} />
-              </button>
+                <Pencil {...toolbarIconProps} />
+              </IconButton>
               <BrowserViewportMenu
                 value={viewport}
                 onChange={setViewport}
                 sizes={sizes}
                 onSizeChange={setSize}
-                iconButtonClass={iconButtonClass}
-                lightChrome={lightChrome}
                 suspensionReason={viewportMenuSuspensionReason}
               />
             </>
           }
           <BrowserAgentAccessMenu
             overlay={agentMenuOverlay}
-            iconButtonClass={iconButtonClass}
-            lightChrome={lightChrome}
             agentAccess={agentAccess}
             nativeRuntime={nativeRuntime}
             mistyPage={mistyPage}
@@ -663,13 +629,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           />
           {
             <BrowserDownloadsButton
-              iconButtonClass={iconButtonClass}
               suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
               onShowAll={() => page.commands.openPage("downloads")}
             />
           }
           <BrowserMenu
-            iconButtonClass={iconButtonClass}
             nativeRuntime={nativeRuntime}
             tab={tab}
             url={state.url}
@@ -743,9 +707,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         >
           <p>{downloadNotice ?? "This site rejected Misty’s embedded browser verification."}</p>
           {compatibilityIssue ? (
-            <button
-              type="button"
-              className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-medium hover:bg-white/15"
+            <Button
+              variant="secondary"
+              size="xs"
+              className="shrink-0"
               onClick={() => {
                 void openSystemExternalLink(compatibilityIssue.url).catch((error: unknown) =>
                   setBrowserError(tab.id, error),
@@ -753,7 +718,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               }}
             >
               Open in browser
-            </button>
+            </Button>
           ) : null}
         </Notification>
       ) : null}
@@ -762,7 +727,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         className={cn(
           "flex min-h-0 min-w-0 items-center justify-center overflow-hidden",
           viewport === "responsive" ? "p-0" : "p-3",
-          viewport === "responsive" ? undefined : lightChrome ? "bg-[#e8e8e8]" : "bg-[#101010]",
+          viewport === "responsive" ? undefined : "bg-charcoal-workspace",
         )}
         style={{
           ...browserViewportStageStyle,
@@ -796,12 +761,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               clearBrowsingData={page.commands.clearBrowsingData}
             />
           ) : isOffline ? (
-            <BrowserOfflinePage
-              url={state.url}
-              onRetry={handleRetry}
-              onGoHome={handleGoHome}
-              lightChrome={lightChrome}
-            />
+            <BrowserOfflinePage url={state.url} onRetry={handleRetry} onGoHome={handleGoHome} />
           ) : !nativeRuntime && state.url !== blankBrowserUrl ? (
             <BrowserNativeRuntimeRequired
               url={state.url}
@@ -814,7 +774,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           ) : null}
           <BrowserAnnotationLayer
             active={annotationsActive}
-            lightChrome={lightChrome}
             onClose={() => setAnnotationsActive(false)}
           />
         </div>

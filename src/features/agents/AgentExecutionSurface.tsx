@@ -88,7 +88,7 @@ export function AgentExecutionSurface() {
   };
   return (
     <section
-      className="fixed inset-0 z-[2147482400] flex flex-col bg-charcoal-bg text-cream"
+      className="fixed inset-0 layer-agent-surface flex flex-col bg-charcoal-bg text-cream"
       aria-label={`${agent?.name ?? "Agent"} workspace`}
     >
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-charcoal-border px-4">

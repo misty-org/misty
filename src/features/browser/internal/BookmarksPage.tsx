@@ -1,11 +1,11 @@
 import { Bookmark } from "lucide-react";
+import { ListRow, ListRowButton } from "@/shared/ui";
 import { useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/features/workspace";
 import { WebsiteGroupsManager } from "@/features/browser-workspace/WebsiteGroupsManager";
 import {
   InternalPageEmpty,
   InternalPageFrame,
-  internalRowClass,
   SiteIcon,
 } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
@@ -37,11 +37,10 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
         matches.length ? (
           <ul className="grid">
             {matches.map((site) => (
-              <li key={site.id} className={internalRowClass}>
+              <ListRow key={site.id}>
                 <SiteIcon url={site.fields.url} />
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-baseline gap-2 text-left focus-visible:outline-none"
+                <ListRowButton
+                 
                   title={site.fields.url}
                   onClick={(event) =>
                     event.metaKey || event.ctrlKey
@@ -53,8 +52,8 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
                   <span className="shrink-0 truncate text-xs text-cream-muted">
                     {groupLabel(site.fields.group_id)}
                   </span>
-                </button>
-              </li>
+                </ListRowButton>
+              </ListRow>
             ))}
           </ul>
         ) : (
