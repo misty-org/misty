@@ -1,5 +1,5 @@
 import { SystemErrorActivity } from "@/features/activity";
-import { explorerOpenPath, explorerSavePreviewItem } from "@/features/files/workspace/native";
+import { explorerOpenPath, explorerSavePreviewItem } from "../../../native";
 import { useShortcutHandler } from "@/features/shortcuts";
 import type { PreviewRuntime } from "@/features/file-ui";
 import { useHostDocumentLoader } from "./useGlobalPreviewResource";

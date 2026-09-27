@@ -26,3 +26,5 @@ export interface PreviewResource {
   archiveEntries?: ArchiveEntry[];
   archiveFormat?: string;
 }
+
+export type GlobalPreviewKind = PreviewResource["kind"];

@@ -5,7 +5,7 @@ import { Search, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from "@/shared/ui";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { openFilesTabRevealing } from "@/features/files/workspace/explorer/workspace/explorerWorkspace/filesTabReveal";
+import { openFilesTabRevealing } from "@/features/files/workspace";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { browserSearchDestination, useBrowserSearchStore } from "./search";
 import {

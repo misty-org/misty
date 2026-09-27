@@ -5,7 +5,7 @@ import {
   mergeHybridSearchResults,
   queryIndexedExplorerSearch,
   querySemanticExplorerSearch,
-} from "@/features/files/workspace/explorer/utils/globalSearch";
+} from "@/features/files/workspace";
 import type { SearchResult } from "@/native/ipc";
 
 export interface ScopedSearchResult {

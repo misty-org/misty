@@ -1,5 +1,5 @@
 import { SystemErrorActivity } from "@/features/activity";
-import { useSearchStore } from "@/features/files/workspace/search";
+import { useSearchStore } from "../../search";
 import { useExplorerStore } from "../store";
 import {
   mergeHybridSearchResults,

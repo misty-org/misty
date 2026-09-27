@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SpaceViewModeToggle } from "@/features/spaces/components/SpaceViewModeToggle";
+import { SpaceViewModeToggle } from "@/features/spaces";
 import { ErrorBanner } from "./spaceRoadmap/RoadmapEditor";
 import { GoalForm, MilestoneForm } from "./spaceRoadmap/RoadmapInspector";
 

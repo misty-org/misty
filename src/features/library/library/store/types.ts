@@ -1,7 +1,4 @@
-import type {
-  SemanticReindexPlan,
-  SmartLibraryProgress,
-} from "@/features/files/workspace/explorer";
+import type { SemanticReindexPlan, SmartLibraryProgress } from "@/features/files/workspace";
 import type {
   AnalysisEstimate,
   FolderLibraryStatus,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { socialApi as spacesApi } from "@/features/spaces/chat/SocialRuntime";
+import { socialApi as spacesApi } from "../SocialRuntime";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { isAgentAuthoredMessage } from "./messageHelpers";
 

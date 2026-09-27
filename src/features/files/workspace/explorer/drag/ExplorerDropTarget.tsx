@@ -8,7 +8,7 @@ import {
   explorerPathIsDirectory,
   explorerPrepareDragItems,
   explorerQueueDeleteItems,
-} from "@/features/files/workspace/native";
+} from "../../native";
 import { useMemo, type ReactNode } from "react";
 import {
   transferDropAcceptance,

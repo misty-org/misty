@@ -1,4 +1,4 @@
-import { useMediaViewerStore } from "@/features/files/workspace/preview";
+import { useMediaViewerStore } from "../../preview";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import {
   Button,

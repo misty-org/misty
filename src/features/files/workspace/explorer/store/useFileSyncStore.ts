@@ -4,7 +4,7 @@ import {
   fileSyncPairRemove,
   fileSyncPairSave,
   fileSyncPairsSnapshot,
-} from "@/features/files/workspace/native";
+} from "../../native";
 import type {
   FileSyncApplyResult,
   FileSyncCompareRow,

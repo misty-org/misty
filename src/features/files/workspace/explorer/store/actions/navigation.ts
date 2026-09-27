@@ -4,7 +4,7 @@ import {
   explorerCalculateDirectorySizes,
   explorerDirectorySizeSnapshot,
   explorerListDirectory,
-} from "@/features/files/workspace/native";
+} from "../../../native";
 import { multiPanelStoreForPane, useMultiPanelStore } from "@/features/workspace";
 import type { DirectorySizeRecord } from "@/native/ipc";
 import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";

@@ -10,9 +10,16 @@ import {
   type PreviewRuntime,
 } from "@/features/file-ui";
 import { PreviewBodyView } from "./PreviewBodyView";
-import { fileName, friendlyType, imageOutputMimeType, sourceExtension } from "./previewFormat";
-import { InspectorDetail, PreviewMessage, ToolbarButton } from "./PreviewPrimitives";
-import { globalPreviewKindForSource } from "./previewDocument";
+import {
+  fileName,
+  friendlyType,
+  imageOutputMimeType,
+  sourceExtension,
+  InspectorDetail,
+  PreviewMessage,
+  ToolbarButton,
+  globalPreviewKindForSource,
+} from "@/features/resource-preview";
 import { usePreviewResource } from "./usePreviewResource";
 
 export function GlobalPreviewDialogView(props: {

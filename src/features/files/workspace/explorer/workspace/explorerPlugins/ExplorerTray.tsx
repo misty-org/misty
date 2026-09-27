@@ -1,4 +1,4 @@
-import { openTerminalAtPath } from "@/features/files/workspace/native";
+import { openTerminalAtPath } from "../../../native";
 import { reportSystemError } from "@/features/activity";
 import { IconButton, toolbarIconProps } from "@/shared/ui";
 import { PanelsTopLeft, Terminal } from "lucide-react";

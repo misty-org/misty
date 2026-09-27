@@ -9,7 +9,7 @@ const f = vi.hoisted(() => ({
 vi.mock("@/features/files/workspace/explorer", () => ({
   clearSemanticExplorerSearchCache: vi.fn(),
 }));
-vi.mock("@/features/files/workspace/native", () => ({ smartLibraryPreparePreviews: f.previews }));
+vi.mock("@/native/filesystem", () => ({ smartLibraryPreparePreviews: f.previews }));
 vi.mock("./smartLibraryHelpers", () => ({
   bytesToBase64: () => "",
   loadAssetsByIds: async () => [{ assetId: "asset", status: "pending" }],

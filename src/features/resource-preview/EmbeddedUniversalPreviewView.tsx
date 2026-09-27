@@ -1,4 +1,3 @@
-import { loadPdfPreview } from "@/features/files/workspace/previews";
 import type { PreviewErrorComponent, PreviewResource } from "@/features/file-ui";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion, Loader2 } from "lucide-react";
@@ -14,7 +13,7 @@ import {
 import { PreviewMessage } from "./PreviewPrimitives";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
-const PdfViewer = lazy(loadPdfPreview);
+const PdfViewer = lazy(() => import("./PdfViewerView"));
 
 export function EmbeddedUniversalPreviewView(props: {
   runtime: EmbeddedPreviewRuntime;

@@ -1,5 +1,5 @@
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { BrowserTabAudioButton } from "@/features/browser/workspace/BrowserTabAudioButton";
+import { BrowserTabAudioButton } from "@/features/browser/workspace";
 import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
 import {
   Button,

@@ -1,8 +1,4 @@
-import {
-  savedSearchesDelete,
-  savedSearchesSave,
-  savedSearchesSnapshot,
-} from "@/features/files/workspace/native";
+import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "../../../native";
 import type { SavedSearch, SearchResult } from "@/native/ipc";
 import { useEffect, useState } from "react";
 import {

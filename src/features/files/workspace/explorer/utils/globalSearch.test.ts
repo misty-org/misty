@@ -1,6 +1,6 @@
 import type { ResolvedMediaAsset, ResolvedSmartLibraryAsset, SearchResult } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
-import type { MediaSearchHit } from "../model/stores/media/interfaces/useMediaSearchServerStore";
+import type { MediaSearchHit } from "@/features/global-search/indexing";
 import type { SemanticSearchHit } from "../model/stores/media/interfaces/useSmartLibraryServerStore";
 import {
   isPathWithin,

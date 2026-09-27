@@ -1,4 +1,4 @@
-import { socialApi as spacesApi } from "@/features/spaces/chat/SocialRuntime";
+import { socialApi as spacesApi } from "../SocialRuntime";
 import type {
   SpaceLibraryItem,
   SpaceMember,

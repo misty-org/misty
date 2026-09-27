@@ -14,7 +14,7 @@ import {
   explorerPreviewItem,
   connectedDevicesMediaUrl,
   fileMetadataSnapshot,
-} from "@/features/files/workspace/native";
+} from "../../native";
 import type { DirectoryListing, FileEntry, FileMetadataSnapshot } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { useEffect, useState } from "react";

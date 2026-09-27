@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+export * from "./components/DesktopSettingsUI";
 export * from "./hooks/useDocumentAppAppearance";
 export { SettingsProfilesBridge } from "./profiles/SettingsProfilesBridge";
 export type { SettingsSection } from "./settingsTypes";

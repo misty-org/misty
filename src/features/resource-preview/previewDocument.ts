@@ -1,4 +1,4 @@
-import type { GlobalPreviewKind } from "../../model/types/components/GlobalPreview";
+import type { GlobalPreviewKind } from "@/features/file-ui";
 import { documentXmlFile, naturalPathSort, rtfToText, xmlToText } from "./previewFormat";
 import {
   archiveExtensions,

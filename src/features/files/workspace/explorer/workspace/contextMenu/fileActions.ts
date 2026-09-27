@@ -6,7 +6,7 @@ import {
   fileToolsCreateSymlink,
   fileToolsReadSymlink,
   openTerminalAtPath,
-} from "@/features/files/workspace/native";
+} from "../../../native";
 import type { FileEntry } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";

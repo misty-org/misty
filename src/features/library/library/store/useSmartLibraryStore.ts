@@ -1,8 +1,5 @@
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import type {
-  SmartLibraryPreviewInput,
-  SmartLibraryProgress,
-} from "@/features/files/workspace/explorer";
+import type { SmartLibraryPreviewInput, SmartLibraryProgress } from "@/features/files/workspace";
 import { clearSemanticExplorerSearchCache } from "@/features/global-search/semanticSearchCache";
 import {
   smartLibraryApplyResults,
@@ -13,7 +10,7 @@ import {
   smartLibraryScan,
   smartLibrarySetServerFolderId,
   smartLibrarySnapshot,
-} from "@/features/files/workspace/native";
+} from "@/native/filesystem";
 import type { FolderLibraryStatus } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";

@@ -1,5 +1,5 @@
 import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
-import { SpaceViewModeToggle } from "@/features/spaces/components/SpaceViewModeToggle";
+import { SpaceViewModeToggle } from "@/features/spaces";
 import { Badge, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ReactNode } from "react";

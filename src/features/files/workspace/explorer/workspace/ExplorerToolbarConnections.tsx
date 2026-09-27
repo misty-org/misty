@@ -1,4 +1,4 @@
-import { useTransfersStore } from "@/features/transfers";
+import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import {
   maxMultiPanelPanes,
   useMultiPanelStore,
@@ -14,12 +14,7 @@ import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/Explo
 import { FileInspector } from "../components/FileInspector";
 import type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
 import type { ExplorerSortColumn } from "../store";
-import {
-  selectedEntriesForPane,
-  selectedEntryForPane,
-  useExplorerStore,
-  useOperationQueueStore,
-} from "../store";
+import { selectedEntriesForPane, selectedEntryForPane, useExplorerStore } from "../store";
 import { revealSearchResultInPane } from "../utils/searchNavigation";
 import {
   newestUndoableTransfer,

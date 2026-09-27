@@ -1,7 +1,4 @@
-import {
-  connectedDevicesPrepareClipboardFiles,
-  connectedDevicesRoots,
-} from "@/features/files/workspace/native";
+import { connectedDevicesPrepareClipboardFiles, connectedDevicesRoots } from "../../../native";
 import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,

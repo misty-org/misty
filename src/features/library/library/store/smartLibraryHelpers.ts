@@ -1,11 +1,5 @@
-import type {
-  SemanticReindexInput,
-  SemanticReindexPlan,
-} from "@/features/files/workspace/explorer";
-import {
-  smartLibraryAssetsPage,
-  smartLibraryPreparePreviews,
-} from "@/features/files/workspace/native";
+import type { SemanticReindexInput, SemanticReindexPlan } from "@/features/files/workspace";
+import { smartLibraryAssetsPage, smartLibraryPreparePreviews } from "@/native/filesystem";
 import type { FolderLibraryStatus, SmartLibraryAsset } from "@/native/ipc";
 
 export function bytesToBase64(bytes: number[]): string {

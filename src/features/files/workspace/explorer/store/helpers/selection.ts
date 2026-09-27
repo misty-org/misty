@@ -1,11 +1,10 @@
 import { useAppStore } from "@/features/app-shell";
 import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers";
+import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import type { FileEntry, PasteItem } from "@/native/ipc";
 import type { CreateItemKind } from "@/native/ipc/primitives";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useOperationQueueStore } from "..";
 
 import type {
   ExplorerBatchRenameItem,

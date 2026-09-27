@@ -1,4 +1,4 @@
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState } from "react";
 import { createLongExposureImage } from "../SpaceLibraryViewerUtils";

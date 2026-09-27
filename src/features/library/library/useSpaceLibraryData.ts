@@ -4,7 +4,7 @@ export type {
   SpaceLibraryData,
 } from "./types/useSpaceLibraryData";
 
-import { useLibrarySpaces as useSpacesStore } from "@/features/library/library/LibraryRuntime";
+import { useLibrarySpaces as useSpacesStore } from "./LibraryRuntime";
 import { useCallback, useState } from "react";
 import { useLibraryCatalog } from "./libraryData/useLibraryCatalog";
 import { useLibraryDerived } from "./libraryData/useLibraryDerived";

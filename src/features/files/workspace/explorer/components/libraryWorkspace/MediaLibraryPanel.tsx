@@ -1,4 +1,4 @@
-import { useMediaSearchStore } from "@/features/files/workspace/search";
+import { useMediaSearchStore } from "@/features/global-search/indexing";
 import { SystemErrorActivity } from "@/features/activity";
 import { Button, Progress } from "@/shared/ui";
 import { Film, Music, Pause, Play, Trash2 } from "lucide-react";

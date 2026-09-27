@@ -11,7 +11,7 @@ import type {
   SmartLibraryPreviewInput,
   SmartLibraryProgress,
   SmartLibraryResultsResponse,
-} from "@/features/files/workspace/explorer";
+} from "@/features/files/workspace";
 import type {
   AnalysisEstimate,
   AnalysisResult,
@@ -34,7 +34,7 @@ export type {
   SmartLibraryPreviewInput,
   SmartLibraryProgress,
   SmartLibraryResultsResponse,
-} from "@/features/files/workspace/explorer";
+} from "@/features/files/workspace";
 
 export function registerSmartLibraryFolder(
   body: RegisterSmartLibraryFolderRequest,

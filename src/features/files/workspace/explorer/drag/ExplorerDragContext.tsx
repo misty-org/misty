@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  explorerCancelDragPreparation,
-  explorerPrepareDragItems,
-} from "@/features/files/workspace/native";
+import { explorerCancelDragPreparation, explorerPrepareDragItems } from "../../native";
 import { getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useExplorerStore } from "../store";

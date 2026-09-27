@@ -5,8 +5,8 @@
  * the Explorer and Spaces Library already use.
  */
 export type { GlobalPreviewSource, PreviewResource } from "@/features/file-ui";
-export type { GlobalPreviewKind } from "../model/types/components/GlobalPreview";
+export type { GlobalPreviewKind } from "@/features/file-ui";
 
-export { EmbeddedUniversalPreview } from "./globalPreview/EmbeddedUniversalPreview";
+export { EmbeddedUniversalPreview } from "@/features/resource-preview";
 export { GlobalPreviewDialog } from "./globalPreview/GlobalPreviewDialog";
 export { globalPreviewKindForSource } from "./globalPreview/useGlobalPreviewResource";

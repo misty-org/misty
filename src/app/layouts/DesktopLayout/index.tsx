@@ -2,7 +2,7 @@ import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
-import { CursorCompanionController } from "@/features/agents/companion/CursorCompanionController";
+import { CursorCompanionController } from "@/features/agents";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { useAuth } from "@/features/auth";

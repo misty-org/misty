@@ -1,3 +1,4 @@
+import { loadPdfPreview } from "@/features/resource-preview";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import { type PreviewRuntime, formatBytes, formatDate } from "@/features/file-ui";
 import type * as PreviewHooks from "./FileInspectorPreview";
@@ -13,7 +14,7 @@ import {
 import { inspectorStyles } from "./FileInspectorStyles";
 import { GlobalPreviewDialogView } from "./globalPreview/GlobalPreviewDialogView";
 
-const PdfViewer = lazy(() => import("./PdfViewerView"));
+const PdfViewer = lazy(loadPdfPreview);
 
 export interface FileInspectorRuntime {
   preview: PreviewRuntime;

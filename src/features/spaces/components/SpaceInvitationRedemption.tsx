@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth";
-import { spaceNotesEnabled } from "@/features/journal/notes/availability";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitationPreview } from "@/api/spaces/dto/interfaces/types";
 import { Button, Card } from "@/shared/ui";
@@ -45,10 +44,7 @@ export function SpaceInvitationRedemption() {
     try {
       const space = await spacesApi.redeemInvitation(token);
       await loadSpaces();
-      navigate(
-        `/spaces/${encodeURIComponent(space.id)}/${spaceNotesEnabled ? "notes" : "drawings"}`,
-        { replace: true },
-      );
+      navigate(`/spaces/${encodeURIComponent(space.id)}/notes`, { replace: true });
     } catch {
       setError(
         "Misty could not accept this invitation. Make sure you are signed in with the invited email.",
