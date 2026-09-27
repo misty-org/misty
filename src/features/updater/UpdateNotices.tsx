@@ -1,5 +1,5 @@
 import { ArrowDownToLine, X } from "lucide-react";
-import { Button } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
@@ -73,19 +73,16 @@ export function UpdateNotices({ accountId }: { accountId: string }) {
             </p>
           )}
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="-mr-1 -mt-1 text-cream-muted"
-          aria-label="Dismiss update notification"
+        <IconButton
+          label="Dismiss update notification"
+          className="-mr-1 -mt-1"
           onClick={() => {
             setDismissed(key);
             setNotice("");
           }}
         >
           <X aria-hidden="true" className="size-4" />
-        </Button>
+        </IconButton>
       </div>
       {!notice && (
         <div className="mt-3 flex justify-end">

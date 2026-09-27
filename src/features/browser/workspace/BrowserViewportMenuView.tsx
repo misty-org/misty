@@ -1,10 +1,9 @@
 import {
-  Button,
-  cn,
   IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Pressable,
   toolbarIconProps,
 } from "@/shared/ui";
 import { Check, Laptop, RectangleHorizontal } from "lucide-react";
@@ -53,7 +52,7 @@ export function BrowserViewportMenuView(props: {
         <IconButton
           label={`Viewport: ${active.label}`}
           tooltip={false}
-          className={cn(props.value !== "responsive" && "bg-cream/[0.06] text-cream")}
+          data-active={props.value !== "responsive"}
         >
           <ActiveIcon {...toolbarIconProps} />
         </IconButton>
@@ -66,11 +65,8 @@ export function BrowserViewportMenuView(props: {
           const size = option.id === "responsive" ? null : props.sizes[option.id];
           return (
             <div key={option.id}>
-              <Button
-                variant="ghost"
-                size="none"
-                justify="start"
-                className="h-auto w-full gap-2.5 px-2 py-2 text-left font-normal"
+              <Pressable
+                className="flex items-center hover:bg-cream/[0.045] rounded-md w-full gap-2.5 px-2 py-2"
                 aria-pressed={selected}
                 onClick={() => props.onChange(option.id)}
               >
@@ -82,7 +78,7 @@ export function BrowserViewportMenuView(props: {
                   </span>
                 </span>
                 {selected ? <Check size={14} aria-hidden /> : null}
-              </Button>
+              </Pressable>
               {selected && size ? (
                 <BrowserViewportSizeSliders
                   device={option.id as BrowserViewportDevice}

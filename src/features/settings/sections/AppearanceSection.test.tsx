@@ -25,7 +25,7 @@ vi.mock("@/features/app-shell", () => ({
 }));
 
 vi.mock("../SettingsControls", async () => {
-  const actual = await vi.importActual<typeof SettingsControlsModule>("../settingsControls");
+  const actual = await vi.importActual<typeof SettingsControlsModule>("../SettingsControls");
   return {
     ...actual,
     SliderControl: (props: {

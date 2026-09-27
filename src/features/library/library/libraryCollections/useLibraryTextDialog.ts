@@ -1,4 +1,4 @@
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { FormEvent } from "react";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 import type { SpaceLibraryItemActions } from "../types/useSpaceLibraryItemActions";

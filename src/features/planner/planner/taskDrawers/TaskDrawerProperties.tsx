@@ -1,7 +1,14 @@
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
-import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
-import { Bot, Flag, User } from "lucide-react";
+import {
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  MenuItem,
+  MenuTrigger,
+} from "@/shared/ui";
+import { Flag, User } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   statusDot,
@@ -101,25 +108,26 @@ export function TaskDrawerProperties({
             />
             <DropdownMenuContent align="start" className="w-44">
               {taskPriorityOptions.map(([priorityKey, label]) => (
-                <DropdownMenuItem
+                <MenuItem
+                  icon={
+                    <Flag
+                      className={cn(
+                        "size-3.5 shrink-0",
+                        priorityKey === "high"
+                          ? "text-avatar-red"
+                          : priorityKey === "low"
+                            ? "text-avatar-blue"
+                            : "text-avatar-yellow",
+                      )}
+                    />
+                  }
+                  label={label}
                   key={priorityKey}
                   onClick={() => setDraft({ ...draft, priority: priorityKey })}
                   className={cn(
                     draft.priority === priorityKey && "font-semibold text-cream-bright",
                   )}
-                >
-                  <Flag
-                    className={cn(
-                      "size-3.5 shrink-0",
-                      priorityKey === "high"
-                        ? "text-avatar-red"
-                        : priorityKey === "low"
-                          ? "text-avatar-blue"
-                          : "text-avatar-yellow",
-                    )}
-                  />
-                  {label}
-                </DropdownMenuItem>
+                />
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -145,20 +153,21 @@ export function TaskDrawerProperties({
               }
             />
             <DropdownMenuContent align="start" className="w-56 max-h-60 overflow-y-auto">
-              <DropdownMenuItem
+              <MenuItem
+                icon={<User className="size-3.5 opacity-60" />}
+                label="Unassigned"
                 onClick={() => setDraft({ ...draft, assignee_user_id: "" })}
                 className="text-cream-muted"
-              >
-                <User className="size-3.5 opacity-60" />
-                Unassigned
-              </DropdownMenuItem>
+              />
               {members.length > 0 ? (
                 <>
                   <div className="px-2 py-1 text-[10px] font-semibold text-cream-faint/60">
                     Members
                   </div>
                   {members.map((member) => (
-                    <DropdownMenuItem
+                    <MenuItem
+                      icon={<TaskMemberAvatar member={member} size="sm" />}
+                      label={member.name}
                       key={member.user_id}
                       onClick={() =>
                         setDraft({
@@ -170,10 +179,7 @@ export function TaskDrawerProperties({
                         draft.assignee_user_id === member.user_id &&
                           "font-semibold text-cream-bright bg-charcoal-hover",
                       )}
-                    >
-                      <TaskMemberAvatar member={member} size="sm" />
-                      <span className="truncate">{member.name}</span>
-                    </DropdownMenuItem>
+                    />
                   ))}
                 </>
               ) : null}

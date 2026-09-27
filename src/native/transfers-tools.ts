@@ -28,8 +28,8 @@ import type {
   SavedSearchesSnapshot,
   TransferFilter,
   TransferPage,
-} from "@/native/contracts";
-import type { OperationConflictPolicy } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { OperationConflictPolicy } from "@/native/ipc/primitives";
 
 import { invoke } from "./invoke";
 export function transfersSnapshot(filter: TransferFilter = {}): Promise<TransferPage> {

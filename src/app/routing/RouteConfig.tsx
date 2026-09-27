@@ -2,7 +2,7 @@ import { ActivityPage } from "@/features/activity";
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
 import { SettingsPage } from "@/features/settings";
-import { SpaceInvitationRedemption } from "@/features/spaces/components/SpaceInvitationRedemption";
+import { SpaceInvitationRedemption } from "@/features/spaces";
 import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";

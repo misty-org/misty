@@ -4,12 +4,13 @@ import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationNames, windowNameKey } from "@/features/navigation-names/store";
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
 import {
-  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  IconButton,
+  MenuItem,
   MenuTrigger,
 } from "@/shared/ui";
 import { AppWindow, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -61,16 +62,11 @@ export function WorkspaceWindowMenu(props: {
                 <AppWindow className="size-4" />
                 <span className="min-w-0 flex-1 truncate">{title}</span>
                 {canClose(workspaceWindow) ? (
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    className={cn(
-                      "grid size-[18px] shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0",
-                      " hover:text-cream group-hover/window:opacity-100",
-                      "group-data-[highlighted]/window:opacity-100",
-                      "focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-                    )}
-                    aria-label={`Close ${title}`}
+                  <IconButton
+                    size="2xs"
+                    tooltip={false}
+                    className="opacity-0 focus-visible:opacity-100 group-hover/window:opacity-100 group-data-[highlighted]/window:opacity-100"
+                    label={`Close ${title}`}
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -78,7 +74,7 @@ export function WorkspaceWindowMenu(props: {
                     }}
                   >
                     <X className="size-3" />
-                  </Button>
+                  </IconButton>
                 ) : null}
               </DropdownMenuItem>
             </Renameable>
@@ -90,26 +86,27 @@ export function WorkspaceWindowMenu(props: {
           </p>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={props.onCreate}>
-          <Plus className="size-4" /> New
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!props.canReopen} onSelect={props.onReopen}>
-          <RotateCcw className="size-4" /> Reopen
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        <MenuItem icon={<Plus className="size-4" />} label="New" onSelect={props.onCreate} />
+        <MenuItem
+          icon={<RotateCcw className="size-4" />}
+          label="Reopen"
+          disabled={!props.canReopen}
+          onSelect={props.onReopen}
+        />
+        <MenuItem
+          icon={<X className="size-4" />}
+          label="Close"
           disabled={!activeWindow || !canClose(activeWindow)}
           onSelect={() => props.onClose(props.activeWindowId)}
-        >
-          <X className="size-4" /> Close
-        </DropdownMenuItem>
+        />
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <MenuItem
+          icon={<Trash2 className="size-4" />}
+          label="Clear history"
           onSelect={() =>
             void clearNavigationRestoreHistory().catch((error) => setError(String(error)))
           }
-        >
-          <Trash2 className="size-4" /> Clear history
-        </DropdownMenuItem>
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

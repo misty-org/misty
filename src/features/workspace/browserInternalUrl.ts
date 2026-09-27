@@ -21,7 +21,9 @@ export function browserInternalPage(url: string): BrowserInternalPage | null {
   const match = /^misty:\/\/([a-z]+)\/?$/i.exec(url.trim());
   if (!match) return null;
   const page = match[1].toLowerCase();
-  return Object.prototype.hasOwnProperty.call(browserInternalPages, page) ? (page as BrowserInternalPage) : null;
+  return Object.prototype.hasOwnProperty.call(browserInternalPages, page)
+    ? (page as BrowserInternalPage)
+    : null;
 }
 
 export function isBrowserInternalUrl(url: string): boolean {

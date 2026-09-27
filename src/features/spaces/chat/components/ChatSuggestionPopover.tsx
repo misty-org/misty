@@ -1,5 +1,5 @@
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
-import { SocialError as SystemErrorActivity } from "@/features/spaces/chat/SocialRuntime";
+import { SocialError as SystemErrorActivity } from "../SocialRuntime";
 import {
   Command,
   CommandEmpty,
@@ -9,7 +9,7 @@ import {
   CommandSeparator,
   PopoverContent,
 } from "@/shared/ui";
-import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
+import { LibraryBig, Paperclip, Users } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 
 export interface ChatSuggestionPopoverProps {

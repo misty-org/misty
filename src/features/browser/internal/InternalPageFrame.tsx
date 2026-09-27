@@ -1,5 +1,5 @@
 import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
-import { cn, Input } from "@/shared/ui";
+import { Input } from "@/shared/ui";
 import type { LucideIcon } from "lucide-react";
 import { Search } from "lucide-react";
 import type { ReactNode } from "react";

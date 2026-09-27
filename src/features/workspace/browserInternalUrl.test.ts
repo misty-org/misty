@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalizeBrowserAddress } from "@/features/browser-workspace/address";
-import { browserInternalPage, browserInternalUrl, isBrowserInternalUrl } from "./browserInternalUrl";
+import {
+  browserInternalPage,
+  browserInternalUrl,
+  isBrowserInternalUrl,
+} from "./browserInternalUrl";
 import { browserTabTitle } from "./model";
 
 describe("browser internal pages", () => {

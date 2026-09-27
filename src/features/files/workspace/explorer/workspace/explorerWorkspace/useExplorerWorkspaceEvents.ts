@@ -1,4 +1,4 @@
-import "@/features/files/workspace/native";
+import "../../../native";
 import { registerShortcutHandler, shortcutCommandsById } from "@/features/shortcuts";
 import {
   dockLeaves,

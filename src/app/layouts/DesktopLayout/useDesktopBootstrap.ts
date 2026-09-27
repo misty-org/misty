@@ -1,9 +1,9 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { useMediaSearchStore } from "@/features/global-search/indexing/useMediaSearchStore";
+import { useMediaSearchStore } from "@/features/global-search/indexing";
 import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
+import { useTransfersStore } from "@/features/transfers";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";

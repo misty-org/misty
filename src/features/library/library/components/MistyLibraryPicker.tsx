@@ -1,8 +1,9 @@
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/LibraryRuntime";
+import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -10,7 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  IconButton,
   Input,
+  Pressable,
   ScrollArea,
   Select,
   SelectContent,
@@ -18,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
-  cn,
 } from "@/shared/ui";
 import { Check, File, Image, Music2, Search, Video, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -134,16 +136,9 @@ export function MistyLibraryPicker({
             placeholder="Search names, filenames, and tags"
           />
           {query ? (
-            <Button
-              className="size-6 shrink-0"
-              size="icon"
-              variant="ghost"
-              type="button"
-              aria-label="Clear Library search"
-              onClick={() => setQuery("")}
-            >
+            <IconButton size="xs" label="Clear Library search" onClick={() => setQuery("")}>
               <X size={13} />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
         <Select
@@ -210,15 +205,14 @@ export function MistyLibraryPicker({
                 const selected = selection.includes(item.id);
                 const unavailable = !selected && selection.length >= maximumSelected;
                 return (
-                  <Button
+                  <Pressable
                     className={cn(
-                      "group relative h-auto flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
+                      "flex items-center",
+                      "group relative flex-col items-stretch gap-0 overflow-hidden rounded-lg p-0 shadow-xs",
                       selected
                         ? "ring-2 ring-charcoal-active"
                         : "bg-charcoal-card inset-ring-1 inset-ring-cream/10 hover:bg-charcoal-hover",
                     )}
-                    variant="ghost"
-                    type="button"
                     key={item.id}
                     disabled={unavailable}
                     aria-pressed={selected}
@@ -240,7 +234,7 @@ export function MistyLibraryPicker({
                         <Check className="size-3" />
                       </span>
                     ) : null}
-                  </Button>
+                  </Pressable>
                 );
               })}
             </div>

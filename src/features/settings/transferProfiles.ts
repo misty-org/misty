@@ -1,4 +1,4 @@
-import type { TransferProfileOptions } from "@/native/contracts";
+import type { TransferProfileOptions } from "@/native/ipc";
 
 export const BUILT_IN_TRANSFER_PROFILE_IDS = new Set([
   "balanced",

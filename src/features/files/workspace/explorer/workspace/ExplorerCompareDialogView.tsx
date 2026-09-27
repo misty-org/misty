@@ -1,10 +1,7 @@
-import type {
-  CompareFilesResult,
-  CompareFolderRow,
-  CompareFoldersResult,
-} from "@/native/contracts";
+import type { CompareFilesResult, CompareFolderRow, CompareFoldersResult } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
+  cn,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,10 +27,11 @@ import type {
   CompareTextDiffState,
 } from "../model/interfaces/workspace/ExplorerCompareDialog";
 import type { CompareMode } from "../model/types/workspace/ExplorerCompareDialog";
-import { formatBytes } from "../utils/fileFormat";
+import { formatBytes } from "@/features/file-ui";
 import { compareStyles } from "./ExplorerDesktopDialogStyles";
 import { leftDiffKind, rightDiffKind } from "./compareDialog/compareDiff";
 import { CompareDiffLine, joinLocalPath, parentPath } from "./compareDialog/ComparePresentation";
+import type { ComponentType } from "react";
 export type {
   CompareDialogSeed,
   CompareImagePreview,
@@ -55,7 +53,7 @@ export interface CompareDialogRuntime {
   copy(source: string, destination: string): Promise<unknown>;
   trash(path: string): Promise<unknown>;
   notify(message: string): void;
-  Error: import("react").ComponentType<{ error: string }>;
+  Error: ComponentType<{ error: string }>;
 }
 
 export function CompareDialogView(props: {
@@ -178,7 +176,12 @@ export function CompareDialogView(props: {
           if (!open) props.onClose();
         }}
       >
-        <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream">
+        <DialogContent
+          className={cn(
+            "flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))]",
+            "max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream",
+          )}
+        >
           <form
             className="contents"
             onSubmit={(event) => {

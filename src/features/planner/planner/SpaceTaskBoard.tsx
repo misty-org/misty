@@ -1,16 +1,19 @@
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
-import { Button, Card, CardContent, CardHeader, CardTitle, cn, Input } from "@/shared/ui";
 import {
-  CheckSquare,
-  GripVertical,
-  LoaderCircle,
-  Maximize2,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  cn,
+  IconButton,
+  Input,
+  Pressable,
+  Spinner,
+} from "@/shared/ui";
+import { CheckSquare, GripVertical, Maximize2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -191,16 +194,13 @@ function BoardColumn({
         <h2 className="m-0 text-xs font-semibold text-cream">{column.label}</h2>
         <span className="text-[11px] tabular-nums text-cream-muted">{total ?? tasks.length}</span>
         {canManage ? (
-          <Button
-            className="ml-auto size-7 text-cream-muted hover:bg-charcoal-card hover:text-cream"
-            size="icon"
-            variant="ghost"
-            type="button"
+          <IconButton
+            label={`Create in ${column.label}`}
+            className="ml-auto"
             onClick={onStartCreate}
-            aria-label={`Create in ${column.label}`}
           >
             <Plus className="size-3.5" />
-          </Button>
+          </IconButton>
         ) : null}
       </header>
 
@@ -220,16 +220,13 @@ function BoardColumn({
                   className="h-auto border-0 bg-transparent p-0 text-xs font-medium text-cream shadow-none placeholder:text-cream-faint/40 focus-visible:ring-0"
                 />
                 <div className="flex items-center justify-between gap-1 border-t border-charcoal-border/40 pt-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    type="button"
-                    title="Expand into full task editor"
+                  <IconButton
+                    size="xs"
+                    label="Expand into full task editor"
                     onClick={onOpenFullCreate}
-                    className="size-6 text-cream-muted hover:bg-charcoal-hover hover:text-cream"
                   >
                     <Maximize2 className="size-3" />
-                  </Button>
+                  </IconButton>
                   <div className="ml-auto flex items-center gap-1.5">
                     <Button
                       size="sm"
@@ -247,7 +244,7 @@ function BoardColumn({
                       className="h-6 px-2.5 text-[11px]"
                     >
                       {busy === `create:${column.id}` ? (
-                        <LoaderCircle className="size-3 animate-spin" />
+                        <Spinner size="sm" label={false} className="size-3" />
                       ) : (
                         "Add"
                       )}
@@ -274,13 +271,12 @@ function BoardColumn({
         ))}
 
         {!tasks.length && !creating ? (
-          <Button
+          <Pressable
             className={cn(
-              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50 bg-transparent",
-              "text-xs text-cream-muted/70 shadow-none hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
+              "flex items-center",
+              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50",
+              "text-xs text-cream-muted/70 hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
             )}
-            variant="ghost"
-            type="button"
             disabled={!canManage}
             onClick={onStartCreate}
           >
@@ -288,7 +284,7 @@ function BoardColumn({
               <Plus className="size-3.5" />
             </span>
             <span>Drop or create</span>
-          </Button>
+          </Pressable>
         ) : null}
       </div>
     </section>
@@ -377,38 +373,39 @@ function TaskCard({
             ) : null}
           </div>
           <div className="flex items-center gap-0.5">
-            {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
-            <div className="invisible flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-              <Button
-                size="icon"
-                variant="ghost"
-                type="button"
+            {busy ? <Spinner size="sm" label={false} className="text-cream-muted" /> : null}
+            <div
+              className={cn(
+                "invisible flex items-center gap-0.5 opacity-0 transition-opacity",
+                "group-focus-within:visible group-focus-within:opacity-100",
+                "group-hover:visible group-hover:opacity-100",
+              )}
+            >
+              <IconButton
+                size="xs"
+                label={`Edit ${task.title}`}
                 title="Edit task"
-                aria-label={`Edit ${task.title}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpen(task);
                 }}
-                className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream"
               >
                 <Pencil className="size-3" />
-              </Button>
+              </IconButton>
               {canManage ? (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  type="button"
+                <IconButton
+                  size="xs"
+                  label={`Delete ${task.title}`}
                   title="Delete task"
-                  aria-label={`Delete ${task.title}`}
                   disabled={busy}
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete(task);
                   }}
-                  className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-notification-red"
+                  className="hover:text-notification-red"
                 >
                   <Trash2 className="size-3" />
-                </Button>
+                </IconButton>
               ) : null}
             </div>
           </div>

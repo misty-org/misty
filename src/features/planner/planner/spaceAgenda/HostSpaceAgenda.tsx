@@ -44,7 +44,7 @@ export function HostSpaceAgenda(props: {
         api: spacesApi,
         connections: connectionsApi,
         members,
-        
+
         ...preferences,
         subscribeChanges,
         confirm: confirmAction,

@@ -1,4 +1,4 @@
-import type { SavedSearchRule } from "@/native/contracts";
+import type { SavedSearchRule } from "@/native/ipc";
 import {
   Button,
   Dialog,
@@ -7,6 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  IconButton,
   Input,
   Label,
   Select,
@@ -202,15 +203,13 @@ export function SmartFolderDialog(props: {
                   onChange={(event) => updateRule(index, { value: event.target.value })}
                   aria-label={`Rule ${index + 1} value`}
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  aria-label={`Remove rule ${index + 1}`}
+                <IconButton
+                  size="md"
+                  label={`Remove rule ${index + 1}`}
                   onClick={() => removeRule(index)}
                 >
                   <X size={15} />
-                </Button>
+                </IconButton>
               </div>
             ))}
           </div>

@@ -189,7 +189,6 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
               >
                 {props.canUploadAttachments || props.canBrowseLibrary ? (
                   <InputGroupButton
-                    className={cn(false)}
                     variant="ghost"
                     size="icon-xs"
                     type="button"
@@ -204,7 +203,6 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 ) : null}
                 <PopoverTrigger asChild>
                   <InputGroupButton
-                    className={cn(false)}
                     variant="ghost"
                     size="icon-xs"
                     type="button"
@@ -223,10 +221,9 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                   </InputGroupText>
                 ) : null}
                 <InputGroupButton
-                  className={cn(
-                    "rounded-full p-2",
-                    draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
-                  )}
+                  className={
+                    draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto"
+                  }
                   size="icon-sm"
                   disabled={draft.isEmpty}
                   type="submit"

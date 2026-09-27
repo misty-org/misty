@@ -306,7 +306,6 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
             <AlertDialogFooter>
               <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                 disabled={dangerBusy}
                 onClick={(event) => {
                   event.preventDefault();
@@ -351,7 +350,6 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
             <AlertDialogFooter>
               <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                 disabled={dangerBusy || deleteConfirmation !== space.name}
                 onClick={(event) => {
                   event.preventDefault();

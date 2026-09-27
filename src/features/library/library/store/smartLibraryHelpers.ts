@@ -1,6 +1,6 @@
-import type { SemanticReindexInput, SemanticReindexPlan } from "@/features/files/workspace/explorer";
-import { smartLibraryAssetsPage, smartLibraryPreparePreviews } from "@/features/files/workspace/native";
-import type { FolderLibraryStatus, SmartLibraryAsset } from "@/native/contracts";
+import type { SemanticReindexInput, SemanticReindexPlan } from "@/features/files/workspace";
+import { smartLibraryAssetsPage, smartLibraryPreparePreviews } from "@/native/filesystem";
+import type { FolderLibraryStatus, SmartLibraryAsset } from "@/native/ipc";
 
 export function bytesToBase64(bytes: number[]): string {
   let binary = "";
@@ -48,7 +48,9 @@ export async function prepareSemanticReindexInputs(
   const localAssets = new Map(library.assets.map((asset) => [asset.assetId, asset]));
   const preparedIds = planned.map((asset) => asset.assetId);
   const previews =
-    preparedIds.length > 0 ? await smartLibraryPreparePreviews(preparedIds, 512, originSpaceId) : [];
+    preparedIds.length > 0
+      ? await smartLibraryPreparePreviews(preparedIds, 512, originSpaceId)
+      : [];
   const previewsById = new Map(previews.map((preview) => [preview.assetId, preview]));
   return planned.map((asset) => {
     const local = localAssets.get(asset.assetId);

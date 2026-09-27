@@ -4,7 +4,7 @@ import { defaultActivityView, selectActivityView } from "./activityView";
 import { useActivityStore } from "./useActivityStore";
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
+import { cn, Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
 import { CapabilityApprovalDetail } from "@/features/capability-approvals/CapabilityApprovals";
 import { AgentInterventions } from "@/features/agent-interventions/AgentInterventions";
@@ -46,7 +46,11 @@ export function ActivityPanel() {
             trigger.focus();
           }
         }}
-        className="flex h-[min(560px,75dvh)] max-h-[calc(100dvh-2rem)] max-w-2xl flex-col gap-0 overflow-hidden bg-charcoal-bg p-0 [&>[data-slot=dialog-close]]:top-2 [&>[data-slot=dialog-close]]:right-3"
+        className={cn(
+          "flex h-[min(560px,75dvh)] max-h-[calc(100dvh-2rem)] max-w-2xl flex-col",
+          "gap-0 overflow-hidden bg-charcoal-bg p-0",
+          "[&>[data-slot=dialog-close]]:top-2 [&>[data-slot=dialog-close]]:right-3",
+        )}
       >
         <header className="flex min-h-12 shrink-0 items-center px-3 pr-12">
           <DialogTitle className="flex items-center gap-2.5 text-xl font-semibold">

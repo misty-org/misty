@@ -1,4 +1,4 @@
-import type { ExplorerLocation } from "@/native/contracts";
+import type { ExplorerLocation } from "@/native/ipc";
 
 import type { DropAction, ExplorerDragPhase } from "../../types/drag/types";
 

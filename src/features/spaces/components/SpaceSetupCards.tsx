@@ -2,7 +2,7 @@ import { UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Button, Card } from "@/shared/ui";
+import { Button, Card, IconButton } from "@/shared/ui";
 
 export function SpaceSetupCards({
   spaceId,
@@ -28,16 +28,9 @@ export function SpaceSetupCards({
           </p>
         </div>
         {dismissible ? (
-          <Button
-            className="size-7 shrink-0"
-            size="icon"
-            variant="ghost"
-            type="button"
-            aria-label="Dismiss setup"
-            onClick={() => setDismissed(true)}
-          >
+          <IconButton label="Dismiss setup" onClick={() => setDismissed(true)}>
             <X size={14} />
-          </Button>
+          </IconButton>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">

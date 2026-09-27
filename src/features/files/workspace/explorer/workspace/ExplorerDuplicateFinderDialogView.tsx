@@ -1,6 +1,7 @@
-import type { DuplicateGroup, DuplicateScanResult } from "@/native/contracts";
+import type { DuplicateGroup, DuplicateScanResult } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
+  cn,
   Badge,
   Button,
   Card,
@@ -21,7 +22,7 @@ import {
 } from "@/shared/ui";
 import type { ComponentType } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatBytes, formatDate } from "../utils/fileFormat";
+import { formatBytes, formatDate } from "@/features/file-ui";
 
 const dialogChromeClass =
   "flex max-h-[min(760px,calc(100vh-48px))] w-[min(760px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream";
@@ -227,7 +228,10 @@ export function DuplicateFinderDialogView(props: {
                       const selected = selectedSet.has(item.path);
                       return (
                         <label
-                          className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0"
+                          className={cn(
+                            "grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3",
+                            "border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0",
+                          )}
                           key={item.path}
                         >
                           <Checkbox

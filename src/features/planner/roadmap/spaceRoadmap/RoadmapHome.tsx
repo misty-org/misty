@@ -8,11 +8,12 @@ import {
   Button,
   cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   EmptyState,
   Input,
+  Pressable,
   Skeleton,
 } from "@/shared/ui";
 import { ArrowRight, Pin, PinOff, Plus, Search } from "lucide-react";
@@ -91,7 +92,7 @@ export function RoadmapHome(props: {
     return () => {
       active = false;
     };
-  }, [selectedRoadmapId, spaceId]);
+  }, [selectedRoadmapId, spaceId, spacesApi]);
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
       <div
@@ -293,10 +294,8 @@ function RoadmapRows(props: RoadmapRowsProps) {
                 : "hover:bg-charcoal-border/65",
             )}
           >
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex h-auto min-w-0 flex-1 self-stretch items-center justify-start gap-2 rounded-none px-3.5 py-2 text-left outline-none hover:bg-transparent"
+            <Pressable
+              className="flex min-w-0 flex-1 self-stretch items-center gap-2 rounded-none px-3.5 py-2"
               aria-current={selected ? "true" : undefined}
               onClick={() => props.onSelect(roadmap.id)}
             >
@@ -311,14 +310,15 @@ function RoadmapRows(props: RoadmapRowsProps) {
               {pinned ? (
                 <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
               ) : null}
-            </Button>
+            </Pressable>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">
-          <ContextMenuItem onSelect={() => props.onTogglePin(roadmap.id)}>
-            {pinned ? <PinOff /> : <Pin />}
-            {pinned ? "Unpin" : "Pin"}
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={pinned ? <PinOff /> : <Pin />}
+            label={pinned ? "Unpin" : "Pin"}
+            onSelect={() => props.onTogglePin(roadmap.id)}
+          />
         </ContextMenuContent>
       </ContextMenu>
     );

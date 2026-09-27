@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 import type {
   ExplorerBatchRenameItem,

@@ -12,8 +12,8 @@ import {
   useSocialSetup as useSetupStore,
   useSocialDraft as useSpaceChatDraft,
   useSocialTitle as useWorkspaceTabTitle,
-} from "@/features/spaces/chat/SocialRuntime";
-import { SpaceSetupCards } from "@/features/spaces/components/SpaceSetupCards";
+} from "./SocialRuntime";
+import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";

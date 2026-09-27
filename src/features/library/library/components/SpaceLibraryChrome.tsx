@@ -1,9 +1,10 @@
 import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
 import {
   Button,
-  cn,
   EmptyState,
+  IconButton,
   Input,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -22,8 +23,6 @@ import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
 const toolbarControlStyles = {
   group:
     "flex h-9 shrink-0 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1 shadow-xs",
-  button: "size-7 rounded-sm text-cream-muted shadow-none",
-  buttonActive: "bg-charcoal-hover text-cream",
 } as const;
 const mediaTypeOptions = [
   {
@@ -151,30 +150,21 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
               }}
             />
             {props.searchInput ? (
-              <Button
-                className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
-                size="icon"
-                variant="ghost"
-                type="button"
+              <IconButton
+                size="xs"
+                label="Clear Library search"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => props.onSearchInput("")}
-                aria-label="Clear Library search"
               >
                 <X className="size-3.5" />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         ) : (
-          <Button
-            className="size-8"
-            size="icon"
-            variant="ghost"
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            aria-label="Search Library"
-          >
+          <IconButton label="Search Library" onClick={() => setSearchOpen(true)}>
             <Search className="size-4" />
-          </Button>
+          </IconButton>
         )}
 
         <Select
@@ -229,42 +219,16 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
               </SelectContent>
             </Select>
 
-            <div
-              role="group"
-              aria-label="Library layout"
-              className="flex h-8 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1"
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "size-6 rounded-sm text-cream-muted shadow-none",
-                  props.viewMode === "grid" && "bg-charcoal-hover text-cream",
-                )}
-                aria-label="Grid view"
-                title="Grid view"
-                aria-pressed={props.viewMode === "grid"}
-                onClick={() => props.onViewMode("grid")}
-              >
-                <Grid2X2 className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "size-6 rounded-sm text-cream-muted shadow-none",
-                  props.viewMode === "list" && "bg-charcoal-hover text-cream",
-                )}
-                aria-label="List view"
-                title="List view"
-                aria-pressed={props.viewMode === "list"}
-                onClick={() => props.onViewMode("list")}
-              >
-                <List className="size-3.5" />
-              </Button>
-            </div>
+            <SegmentedControl
+              label="Library layout"
+              size="xs"
+              value={props.viewMode}
+              options={[
+                { value: "grid", label: <Grid2X2 className="size-3.5" />, ariaLabel: "Grid view" },
+                { value: "list", label: <List className="size-3.5" />, ariaLabel: "List view" },
+              ]}
+              onChange={props.onViewMode}
+            />
             <SpaceLibraryScaleControls
               itemScale={props.itemScale}
               onItemScale={props.onItemScale}
@@ -299,30 +263,20 @@ function SpaceLibraryScaleControls({
   const scale = normalizeLibraryItemScale(itemScale);
   return (
     <div role="group" aria-label="Item scale" className={toolbarControlStyles.group}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className={toolbarControlStyles.button}
-        aria-label="Zoom out"
-        title="Zoom out"
+      <IconButton
+        label="Zoom out"
         disabled={scale <= LIBRARY_ITEM_SCALE_MIN}
         onClick={() => onItemScale(scale - 1)}
       >
         <Minus size={15} />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className={toolbarControlStyles.button}
-        aria-label="Zoom in"
-        title="Zoom in"
+      </IconButton>
+      <IconButton
+        label="Zoom in"
         disabled={scale >= LIBRARY_ITEM_SCALE_MAX}
         onClick={() => onItemScale(scale + 1)}
       >
         <Plus size={15} />
-      </Button>
+      </IconButton>
     </div>
   );
 }

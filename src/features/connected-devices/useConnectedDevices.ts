@@ -14,7 +14,7 @@ import {
   ManagedAiRequestError,
   signedAgentDeviceRequest,
 } from "@/features/agents";
-import type { ConnectedDevicesSnapshot } from "@/native/contracts";
+import type { ConnectedDevicesSnapshot } from "@/native/ipc";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useRef, useState } from "react";
 

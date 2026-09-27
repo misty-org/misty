@@ -23,23 +23,23 @@ import {
   appIconStrokeWidth,
   BrandIcon,
   brandIconAsset,
-  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  IconButton,
   MenuTrigger,
-  ProviderBrandIcon,
-  WebsiteBrandIcon,
+  Pressable,
+  Spinner,
 } from "@/shared/ui";
-import { Blocks, ChevronDown, LoaderCircle, VenetianMask, X, type LucideIcon } from "lucide-react";
+import { Blocks, ChevronDown, VenetianMask, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { providerFromRoute, providers } from "../../../shared/toolAssets/providers";
+import { providerFromRoute, providers } from "@/features/webviews/providers";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
-} from "../../../shared/toolAssets/websiteIntegrations";
+} from "@/features/webviews/websiteIntegrations";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
 export interface TabGroup {
   instanceId?: string;
@@ -111,10 +111,10 @@ export function TabIcon({
   }
   if (isBrowser && isLoading) {
     return (
-      <LoaderCircle
-        className={cn("shrink-0 animate-spin", isActive ? "text-cream-bright" : "text-cream-muted")}
-        size={size}
-        strokeWidth={2}
+      <Spinner
+        label={false}
+        className={isActive ? "text-cream-bright" : "text-cream-muted"}
+        style={{ width: size, height: size }}
       />
     );
   }
@@ -143,7 +143,7 @@ export function TabIcon({
   if (provider)
     return (
       <span className="inline-flex shrink-0">
-        <ProviderBrandIcon provider={provider} size={size} />
+        <BrandIcon brand={provider} size={size} />
       </span>
     );
   const website = tab
@@ -156,7 +156,7 @@ export function TabIcon({
   )
     return (
       <span className="inline-flex shrink-0">
-        <WebsiteBrandIcon id={website as WebsiteIntegrationId} size={size} />
+        <BrandIcon brand={website} size={size} />
       </span>
     );
   const section = tab ? new URL(tab.route, "https://misty.local").searchParams.get("view") : null;
@@ -265,15 +265,8 @@ export function WorkspaceTabGroupButton({
             : "border-transparent text-cream-muted hover:text-cream-bright hover:text-cream",
         )}
       >
-        <Button
-          variant="ghost"
-          size="none"
-          justify="start"
-          className={cn(
-            "flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden border-0 pl-2 pr-1",
-            "text-left outline-none focus:outline-none focus-visible:ring-1",
-            "focus-visible:ring-inset focus-visible:ring-cream-muted",
-          )}
+        <Pressable
+          className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-1"
           data-reorder-handle="true"
           aria-description="Drag to reorder. Alt+Shift+Left or Right also moves this tab group."
           aria-pressed={containsActive}
@@ -295,7 +288,7 @@ export function WorkspaceTabGroupButton({
               ({group.tabs.length})
             </span>
           ) : null}
-        </Button>
+        </Pressable>
         {showChevron ? (
           <DropdownMenu modal={false}>
             <MenuTrigger
@@ -338,16 +331,12 @@ export function WorkspaceTabGroupButton({
                         <TabIcon tab={tab} icon={Icon} size={13} isActive={isActive} />
                         <span className="min-w-0 flex-1 truncate">{tabTitle}</span>
                         {canClose && (!canCloseTab || canCloseTab(tab)) ? (
-                          <Button
-                            variant="ghost"
-                            size="none"
-                            className={cn(
-                              "grid size-5 shrink-0 place-items-center rounded border-0 text-cream-muted/70",
-                              " hover:text-cream focus-visible:outline-none",
-                              "focus-visible:ring-1 focus-visible:ring-cream-muted",
-                            )}
+                          <IconButton
+                            size="2xs"
+                            label={`Close ${tabTitle}`}
+                            tooltip={false}
+                            className="text-cream-muted/70"
                             data-reorder-ignore="true"
-                            aria-label={`Close ${tabTitle}`}
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -355,7 +344,7 @@ export function WorkspaceTabGroupButton({
                             }}
                           >
                             <X className="size-[11px]" size={11} />
-                          </Button>
+                          </IconButton>
                         ) : null}
                       </DropdownMenuItem>
                     </Renameable>
@@ -366,22 +355,18 @@ export function WorkspaceTabGroupButton({
           </DropdownMenu>
         ) : null}
         {!showChevron && canCloseDisplayedTab ? (
-          <Button
-            variant="ghost"
-            size="none"
-            aria-label={`Close ${displayTab ? workspaceTabDisplayTitle(displayTab, group) : displayLabel}`}
-            className={cn(
-              "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0 outline-none",
-              " hover:text-cream focus:outline-none focus-visible:opacity-100",
-              "focus-visible:ring-1 focus-visible:ring-cream-muted group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100",
-            )}
+          <IconButton
+            size="xs"
+            tooltip={false}
+            label={`Close ${displayTab ? workspaceTabDisplayTitle(displayTab, group) : displayLabel}`}
+            className="mr-1 opacity-0 focus-visible:opacity-100 group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               if (displayTab) onClose(displayTab);
             }}
           >
             <X className="size-3" size={12} />
-          </Button>
+          </IconButton>
         ) : null}
       </div>
     </Renameable>

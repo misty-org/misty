@@ -16,12 +16,13 @@ export function BrowserMenu(props: {
   url: string;
   commands?: BrowserPageCommands;
 }) {
+  const runtimeId = browserRuntimeId(props.tab);
   const setOverlay = useCallback(
     async (reason: string, active: boolean) => {
-      setBrowserWebviewsSuspended(active, `browser-${reason}:${browserRuntimeId(props.tab)}`);
+      setBrowserWebviewsSuspended(active, `browser-${reason}:${runtimeId}`);
       await browserOverlayReady();
     },
-    [props.tab.instanceKey],
+    [runtimeId],
   );
   const reportError = (error: unknown) =>
     useBrowserRuntimeStore

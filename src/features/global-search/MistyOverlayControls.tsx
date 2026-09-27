@@ -1,6 +1,6 @@
 import { Play, Pause, X, Check, ShieldX } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useLocalExecution } from "@/features/agents/localExecution";
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
@@ -77,27 +77,19 @@ export function MistyOverlayControls() {
   return (
     <aside aria-label="Agent control" className={agentOverlayBarClass}>
       <div className="flex items-center gap-1" role="group" aria-label="Playback controls">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Resume"
-          title="Send a message above to start a task"
-          disabled
-        >
+        <IconButton size="md" label="Resume" title="Send a message above to start a task" disabled>
           <Play className="size-4" />
-        </Button>
-        <Button variant="ghost" size="icon" aria-label="Pause" title="Pause" disabled>
+        </IconButton>
+        <IconButton size="md" label="Pause" disabled>
           <Pause className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Close overlay"
-          title="Close overlay"
+        </IconButton>
+        <IconButton
+          size="md"
+          label="Close overlay"
           onClick={() => useMistyStore.getState().closePanel()}
         >
           <X className="size-4" />
-        </Button>
+        </IconButton>
       </div>
     </aside>
   );

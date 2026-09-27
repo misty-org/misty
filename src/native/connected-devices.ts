@@ -4,7 +4,7 @@ import type {
   OpenWorkspaceRouteResult,
   PeerResponse,
   PeerRoot,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { invoke } from "./invoke";
 
 export function connectedDevicesInitialize(request: {

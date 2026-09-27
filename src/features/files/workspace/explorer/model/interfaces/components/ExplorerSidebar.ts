@@ -1,4 +1,4 @@
-import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/contracts";
+import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/ipc";
 export interface ExplorerSidebarProps {
   homePath: string;
   activePath: string;

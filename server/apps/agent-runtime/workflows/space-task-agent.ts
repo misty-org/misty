@@ -1,10 +1,19 @@
 import { modelTurnLimit } from "../src/model-budget.js";
 import { requiresBrowserReinspection } from "../src/browser-reinspection.js";
-import type { LanguageModelUsage } from "ai";
 import { MISTY_HARNESS_VERSION, type HarnessCheckpoint, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
 import { executePinnedCapability } from "../src/pinned-capability.js";
 import { WorkflowAgent } from "@ai-sdk/workflow";
-import { isStepCount, jsonSchema, tool, type StopCondition, type ModelMessage } from "ai";
+import {
+  isStepCount,
+  jsonSchema,
+  tool,
+  type FilePart,
+  type ImagePart,
+  type ModelMessage,
+  type StopCondition,
+  type TextPart,
+  type ToolSet,
+} from "ai";
 import { FatalError, getWorkflowMetadata, RetryableError } from "workflow";
 import { z } from "zod";
 import {
@@ -303,7 +312,7 @@ function errorText(error: unknown): string {
   }
 }
 
-export const stopOnRepeatedOrTerminalToolFailure: StopCondition<any> = ({
+export const stopOnRepeatedOrTerminalToolFailure: StopCondition<ToolSet> = ({
   steps,
 }) => {
   const counts = new Map<string, number>();
@@ -530,14 +539,6 @@ async function requestLegacyToolExecution(
     },
     idempotencyKey,
   );
-}
-
-async function executeNamedTool(
-  name: string,
-  input: Record<string, unknown>,
-  options: { context: RuntimeToolContext; toolCallId: string },
-): Promise<unknown> {
-  return executeTool(options.context, options.toolCallId, name, input);
 }
 
 async function checkpoint(
@@ -947,7 +948,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
               role: "user",
               content: [
                 { type: "text", text: context.prompt + "\nSupplied task files (use these IDs for upload):\n" + (context.attachments ?? []).map(file => JSON.stringify({attachmentId:file.id,name:file.name,mimeType:file.mime_type})).join("\n") },
-                ...images.flatMap<import("ai").TextPart | import("ai").ImagePart | import("ai").FilePart>(
+                ...images.flatMap<TextPart | ImagePart | FilePart>(
                   (image) =>
                     image.mime_type === "text/plain"
                       ? {type:"text" as const,text:`Attachment ${image.name}:\n${Buffer.from(image.data_url.split(",")[1]??"","base64").toString("utf8")}`}

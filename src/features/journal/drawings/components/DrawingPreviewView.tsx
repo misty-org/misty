@@ -4,8 +4,8 @@ import {
   CustomColorSwatch,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
   Spinner,
 } from "@/shared/ui";
 import type { ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/element/types";
@@ -212,12 +212,8 @@ export function DrawingPreviewView(props: {
 
   const renderExportChoices = () => (
     <>
-      <DropdownMenuItem disabled={!previewUrl} onSelect={exportPng}>
-        PNG
-      </DropdownMenuItem>
-      <DropdownMenuItem disabled={!exportData} onSelect={() => void exportSvg()}>
-        SVG
-      </DropdownMenuItem>
+      <MenuItem label="PNG" disabled={!previewUrl} onSelect={exportPng} />
+      <MenuItem label="SVG" disabled={!exportData} onSelect={() => void exportSvg()} />
     </>
   );
 

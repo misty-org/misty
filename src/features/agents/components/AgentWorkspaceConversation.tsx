@@ -3,10 +3,10 @@ import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
-import { Loader2, Mic, Square, X } from "lucide-react";
+import { Button, IconButton, Input, Pressable, Spinner } from "@/shared/ui";
+import { Mic, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
 import { useCompanionState } from "../companion/companionState";
@@ -178,21 +178,19 @@ export function AgentWorkspaceConversation({
               <div className="agent-starters">
                 <div className="agent-starters-heading">
                   <h3>What can I take off your plate?</h3>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="agent-icon-button"
-                    aria-label="Dismiss suggestions"
+                  <IconButton
+                    size="xs"
+                    label="Dismiss suggestions"
                     onClick={() => setShowSuggestions(false)}
                   >
                     <X size={16} />
-                  </Button>
+                  </IconButton>
                 </div>
                 <div className="agent-starter-options">
                   {suggestions.map(([label, prompt], index) => (
-                    <Button
-                      variant="ghost"
+                    <Pressable
                       key={label}
+                      className="flex items-center hover:bg-cream/[0.045] min-h-[38px] w-full gap-2 rounded-none px-2 py-2"
                       disabled={!agent.enabled || state.working}
                       onClick={() => {
                         setDraft(prompt);
@@ -203,7 +201,7 @@ export function AgentWorkspaceConversation({
                         {String.fromCharCode(65 + index)}
                       </span>
                       <span>{label}</span>
-                    </Button>
+                    </Pressable>
                   ))}
                 </div>
                 <Input
@@ -223,7 +221,7 @@ export function AgentWorkspaceConversation({
               </div>
             )}
             {!agent && (
-              <Button variant="ghost" className="agent-create-action" onClick={onCreate}>
+              <Button variant="secondary" className="mt-4" onClick={onCreate}>
                 Create an agent
               </Button>
             )}
@@ -234,15 +232,9 @@ export function AgentWorkspaceConversation({
         {state.error && (
           <div role="alert" className="agent-compose-error">
             <p>{state.error}</p>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="agent-icon-button"
-              aria-label="Dismiss error"
-              onClick={() => reportError("")}
-            >
+            <IconButton label="Dismiss error" onClick={() => reportError("")}>
               <X size={16} />
-            </Button>
+            </IconButton>
           </div>
         )}
         {agent && !agent.enabled && (
@@ -251,7 +243,6 @@ export function AgentWorkspaceConversation({
           </p>
         )}
         <MistyComposer
-          className="agent-workspace-composer"
           value={draft}
           onChange={setDraft}
           mode="ask"
@@ -272,30 +263,24 @@ export function AgentWorkspaceConversation({
           disabled={!agent?.enabled || !accountId}
           busy={state.working}
           voiceControl={
-            <Button
-              variant="ghost"
-              className="agent-voice-button"
-              aria-label={voice.recording ? "Stop recording" : "Start voice input"}
-              title={voice.recording ? "Stop recording" : "Voice input"}
+            <IconButton
+              label={voice.recording ? "Stop recording" : "Start voice input"}
               disabled={!agent?.enabled || state.working || voice.requesting || voice.transcribing}
               onClick={() => (voice.recording ? voice.stop() : void voice.start())}
             >
               {voice.requesting || voice.transcribing ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Spinner size="lg" label={false} />
               ) : voice.recording ? (
                 <Square size={16} />
               ) : (
                 <Mic size={18} />
               )}
-            </Button>
+            </IconButton>
           }
           trailingControl={
             state.working ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="agent-icon-button"
-                aria-label="Stop response"
+              <IconButton
+                label="Stop response"
                 onClick={() => {
                   if (state.invocationId)
                     void aiSurfaceApi
@@ -304,7 +289,7 @@ export function AgentWorkspaceConversation({
                 }}
               >
                 <Square size={16} />
-              </Button>
+              </IconButton>
             ) : undefined
           }
         />

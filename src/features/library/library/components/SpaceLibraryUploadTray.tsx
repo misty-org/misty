@@ -1,7 +1,7 @@
 import { Upload, X } from "lucide-react";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/LibraryRuntime";
+import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
 
-import { Button, Popover, PopoverContent, PopoverTrigger, Progress } from "@/shared/ui";
+import { IconButton, Popover, PopoverContent, PopoverTrigger, Progress } from "@/shared/ui";
 import type { LibraryUploadJob } from "../types/useSpaceLibraryData";
 
 /**
@@ -32,16 +32,16 @@ export function SpaceLibraryUploadTray({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          className="relative shrink-0"
-          size="icon"
+        <IconButton
+          size="md"
           variant="outline"
-          type="button"
-          aria-label={
+          label={
             uploading
               ? `${active.length} upload${active.length === 1 ? "" : "s"} in progress`
               : `${jobs.length} upload${jobs.length === 1 ? "" : "s"} finished`
           }
+          tooltip={false}
+          className="relative"
         >
           <Upload className={uploading ? "animate-pulse" : ""} size={15} aria-hidden="true" />
           <span
@@ -51,7 +51,7 @@ export function SpaceLibraryUploadTray({
           >
             {failed.length > 0 ? failed.length : active.length || jobs.length}
           </span>
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
@@ -63,15 +63,9 @@ export function SpaceLibraryUploadTray({
                 : `${jobs.length} upload${jobs.length === 1 ? "" : "s"} complete`}
           </p>
           {!uploading ? (
-            <Button
-              size="icon"
-              variant="ghost"
-              type="button"
-              onClick={onClear}
-              aria-label="Clear finished uploads"
-            >
+            <IconButton size="md" label="Clear finished uploads" onClick={onClear}>
               <X size={13} />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
         {uploading ? <Progress className="h-0.5 rounded-none" value={overall} /> : null}

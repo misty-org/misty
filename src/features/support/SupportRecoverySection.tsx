@@ -1,6 +1,6 @@
 import { clientMetadata } from "@/telemetry/metadata";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, cn, Input, OptionSelect, Textarea } from "@/shared/ui";
+import { Button, cn, Input, OptionSelect, Pressable, Textarea } from "@/shared/ui";
 import {
   AlertTriangle,
   Compass,
@@ -41,9 +41,6 @@ const initialDraft: FeedbackDraft = {
   expected: "",
   frequency: "unknown",
 };
-
-const supportDisabledControlClass =
-  "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:text-cream-muted disabled:opacity-100 disabled:shadow-none";
 
 export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {}) {
   const { user } = useAuth();
@@ -200,11 +197,10 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
             </legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {feedbackKinds.map((kind) => (
-                <Button
-                  variant="ghost"
+                <Pressable
                   key={kind.id}
                   className={cn(
-                    "rounded-md border px-3 py-2.5 text-left text-xs transition h-auto font-normal justify-start",
+                    "rounded-md border px-3 py-2.5 text-xs",
                     draft.kind === kind.id
                       ? "border-charcoal-active bg-charcoal-hover text-cream-bright"
                       : "border-charcoal-border bg-charcoal-bg text-cream-muted hover:text-cream",
@@ -213,7 +209,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
                   onClick={() => updateDraft("kind", kind.id)}
                 >
                   {kind.label}
-                </Button>
+                </Pressable>
               ))}
             </div>
           </fieldset>
@@ -286,7 +282,6 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-charcoal-border pt-5">
             <Button
               variant="outline"
-              className={supportDisabledControlClass}
               disabled={Boolean(working)}
               onClick={() => void downloadDiagnostics()}
             >
@@ -294,7 +289,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
               {working === "bundle" ? "Preparing…" : "Download diagnostics"}
             </Button>
             <Button
-              className={supportDisabledControlClass}
+              variant="primary"
               disabled={!draft.summary.trim() || !draft.details.trim() || Boolean(working)}
               onClick={() => void openFeedbackTicket()}
             >

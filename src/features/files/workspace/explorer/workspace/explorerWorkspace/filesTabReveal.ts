@@ -1,5 +1,5 @@
 import { useWorkspaceStore } from "@/features/workspace";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { searchResultNavigationTarget } from "../../utils/searchNavigation";
 
 // One-shot reveal requests keyed by dock tab id. They live outside the tab's

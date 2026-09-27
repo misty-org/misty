@@ -1,5 +1,4 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
-import { spaceNotesEnabled } from "@/features/journal/notes/availability";
 
 type PlannerSubpage = "tasks" | "agenda" | "roadmaps";
 type JournalSubpage = "notes" | "drawings";
@@ -59,13 +58,11 @@ export function rememberedJournalRoute(
   subpage?: JournalSubpage,
 ) {
   const memory = readMemory(accountId, spaceId).journal;
-  const fallback = spaceNotesEnabled ? "notes" : "drawings";
-  const selected = subpage ?? memory?.active ?? fallback;
-  const available = selected === "notes" && !spaceNotesEnabled ? "drawings" : selected;
-  const remembered = memory?.[available];
-  return validRememberedRoute(spaceId, remembered, "journal", available)
+  const selected = subpage ?? memory?.active ?? "notes";
+  const remembered = memory?.[selected];
+  return validRememberedRoute(spaceId, remembered, "journal", selected)
     ? remembered
-    : `/spaces/${encodeURIComponent(spaceId)}/${available}`;
+    : `/spaces/${encodeURIComponent(spaceId)}/${selected}`;
 }
 
 function defaultPlannerRoute(spaceId: string, subpage: PlannerSubpage) {

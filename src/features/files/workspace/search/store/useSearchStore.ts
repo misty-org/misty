@@ -8,16 +8,11 @@ import {
   semanticQueryMinimumCharacters,
   semanticSearchDebounceMs,
   useExplorerStore,
-} from "@/features/files/workspace/explorer";
-import {
-  searchCancelScan,
-  searchGetStatus,
-  searchInit,
-  searchStartScan,
-} from "@/features/files/workspace/native";
+} from "../../explorer";
+import { searchCancelScan, searchGetStatus, searchInit, searchStartScan } from "../../native";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import type { SearchResult, SearchStatus } from "@/native/contracts";
-import type { SearchQueryScope } from "@/native/contracts/primitives";
+import type { SearchResult, SearchStatus } from "@/native/ipc";
+import type { SearchQueryScope } from "@/native/ipc/primitives";
 import { userFacingErrorText } from "@/shared/lib/format";
 import { create } from "zustand";
 

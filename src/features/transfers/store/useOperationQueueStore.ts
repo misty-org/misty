@@ -22,8 +22,8 @@ import type {
   OperationDescriptor,
   OperationEndpoint,
   OperationQueueSnapshot,
-} from "@/native/contracts";
-import type { OperationConflictPolicy } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { OperationConflictPolicy } from "@/native/ipc/primitives";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 

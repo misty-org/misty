@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import { personalAgentsApi } from "@/api/agents/native";
 
 interface PersonalAgentsState {

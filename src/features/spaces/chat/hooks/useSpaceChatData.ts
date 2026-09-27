@@ -1,4 +1,4 @@
-import { useSocialSpaces as useSpacesStore } from "@/features/spaces/chat/SocialRuntime";
+import { useSocialSpaces as useSpacesStore } from "../SocialRuntime";
 import type {
   SpaceConversation,
   SpaceMember,

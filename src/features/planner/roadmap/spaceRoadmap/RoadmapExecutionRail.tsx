@@ -1,5 +1,5 @@
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton, Pressable } from "@/shared/ui";
 import {
   ArrowRight,
   CalendarClock,
@@ -32,16 +32,9 @@ export function RoadmapExecutionRail(props: {
           <ListChecks className="size-4 text-sage-fg" />
           <h2 className="text-sm font-semibold text-cream">Daily plan</h2>
           {props.onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="ml-auto size-7"
-              aria-label="Hide daily plan"
-              onClick={props.onClose}
-            >
+            <IconButton label="Hide daily plan" className="ml-auto" onClick={props.onClose}>
               <PanelRightClose className="size-4" />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
         <div className="mt-3 flex items-center gap-3 text-[11px] text-cream-muted">
@@ -146,13 +139,10 @@ function ExecutionRow(props: {
   const stateLabel = item.state === "done" ? "Done" : item.state === "ready" ? "Ready" : "Blocked";
   return (
     <li className="relative">
-      <Button
-        variant="ghost"
-        size="none"
-        justify="start"
+      <Pressable
         aria-current={props.selected ? "true" : undefined}
         className={cn(
-          "group h-auto w-full items-start gap-2.5 whitespace-normal rounded-lg px-2 py-2.5 text-left font-normal",
+          "group w-full items-start gap-2.5 rounded-lg px-2 py-2.5",
           props.selected && "bg-cream/[0.06]",
         )}
         onClick={props.onFocus}
@@ -187,7 +177,7 @@ function ExecutionRow(props: {
             </span>
           ) : null}
         </span>
-      </Button>
+      </Pressable>
     </li>
   );
 }

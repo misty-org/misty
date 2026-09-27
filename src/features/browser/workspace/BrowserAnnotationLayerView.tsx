@@ -31,9 +31,10 @@ export function BrowserAnnotationLayerView(props: {
   const [draft, setDraft] = useState<DrawingMark | null>(null);
   const [textDraft, setTextDraft] = useState<{ point: Point; value: string } | null>(null);
   const layerRef = useRef<SVGSVGElement | null>(null);
+  const { registerCommand, active } = props;
   useEffect(
     () =>
-      props.registerCommand(
+      registerCommand(
         "browser.annotation_undo",
         () => {
           setMarks((current) => {
@@ -43,13 +44,13 @@ export function BrowserAnnotationLayerView(props: {
             return current.slice(0, -1);
           });
         },
-        () => props.active && marks.length > 0,
+        () => active && marks.length > 0,
       ),
-    [props.registerCommand, props.active, marks.length],
+    [registerCommand, active, marks.length],
   );
   useEffect(
     () =>
-      props.registerCommand(
+      registerCommand(
         "browser.annotation_redo",
         () => {
           setRedo((current) => {
@@ -59,9 +60,9 @@ export function BrowserAnnotationLayerView(props: {
             return current.slice(0, -1);
           });
         },
-        () => props.active && redo.length > 0,
+        () => active && redo.length > 0,
       ),
-    [props.registerCommand, props.active, redo.length],
+    [registerCommand, active, redo.length],
   );
 
   useEffect(() => {

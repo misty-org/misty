@@ -10,8 +10,8 @@ import {
   explorerQueuePasteItems,
   explorerQueuePasteText,
   explorerSetOpenAssociation,
-} from "@/features/files/workspace/native";
-import type { ClipboardPayload, FileEntry, PasteItem, PreparedOpenItem } from "@/native/contracts";
+} from "../../../native";
+import type { ClipboardPayload, FileEntry, PasteItem, PreparedOpenItem } from "@/native/ipc";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { clipboardImagePng } from "../../utils/clipboardImage";
 

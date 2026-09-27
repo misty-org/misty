@@ -40,7 +40,10 @@ function merge(a: OmniboxMatch, b: OmniboxMatch): OmniboxMatch {
  * row per page or search, best first, with a match allowed to be the default
  * always on top so Enter never lands somewhere surprising.
  */
-export function mergeMatches(groups: OmniboxMatch[][], limit = OMNIBOX_MAX_MATCHES): OmniboxMatch[] {
+export function mergeMatches(
+  groups: OmniboxMatch[][],
+  limit = OMNIBOX_MAX_MATCHES,
+): OmniboxMatch[] {
   const byKey = new Map<string, OmniboxMatch>();
   for (const match of groups.flat()) {
     const key = dedupeKey(match);

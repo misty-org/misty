@@ -6,15 +6,15 @@ import {
   Avatar,
   AvatarFallback,
   Badge,
-  Button,
   Card,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
+  MenuItem,
   Skeleton,
-  cn,
 } from "@/shared/ui";
 import { Ellipsis, Mail, ShieldCheck, Trash2, Users } from "lucide-react";
 import { MemberPermissionControls } from "./MemberPermissionControls";
@@ -103,25 +103,27 @@ function MemberActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" type="button" aria-label={`Actions for ${member.name}`}>
+        <IconButton size="md" label={`Actions for ${member.name}`} tooltip={false}>
           <Ellipsis className="size-4" />
-        </Button>
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {canTransferOwnership ? (
           <>
-            <DropdownMenuItem onSelect={() => onAction({ kind: "transfer", member })}>
-              <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-            </DropdownMenuItem>
+            <MenuItem
+              icon={<ShieldCheck className="size-4" />}
+              label="Transfer ownership"
+              onSelect={() => onAction({ kind: "transfer", member })}
+            />
             <DropdownMenuSeparator />
           </>
         ) : null}
-        <DropdownMenuItem
-          variant="destructive"
+        <MenuItem
+          icon={<Trash2 className="size-4" />}
+          label="Remove member"
+          destructive
           onSelect={() => onAction({ kind: "remove", member })}
-        >
-          <Trash2 className="mr-2 size-4" /> Remove member
-        </DropdownMenuItem>
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

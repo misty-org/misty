@@ -18,11 +18,9 @@ import {
   Label,
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
+  Spinner,
 } from "@/shared/ui";
-import { Cable, LoaderCircle, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Cable, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { publicMcpOrigin, validRemoteMcpEndpoint } from "./normalization";
 import type { McpConnection } from "./types";
@@ -80,7 +78,7 @@ export function McpConnectionsView(props: { showCustomConnections?: boolean }) {
           {adding ? <AddConnectionForm onDone={() => setAdding(false)} /> : null}
           {store.loading ? (
             <div className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
-              <LoaderCircle className="size-4 animate-spin" /> Loading connections…
+              <Spinner label={false} /> Loading connections…
             </div>
           ) : !customConnections.length ? (
             <p className="mt-3 rounded-lg border border-dashed border-charcoal-border p-4 text-sm text-cream-muted">
@@ -195,11 +193,7 @@ function AddConnectionForm({ onDone }: { onDone: () => void }) {
           disabled={!name.trim() || !validEndpoint || store.busy === "add"}
           onClick={() => void submit()}
         >
-          {store.busy === "add" ? (
-            <LoaderCircle className="size-4 animate-spin" />
-          ) : (
-            <Cable className="size-4" />
-          )}
+          {store.busy === "add" ? <Spinner label={false} /> : <Cable className="size-4" />}
           Connect
         </Button>
       </div>

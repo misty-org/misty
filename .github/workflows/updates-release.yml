@@ -22,20 +22,22 @@ jobs:
   site:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24.12.0
+          node-version-file: .nvmrc
       - name: Verify and stage the prepared site without rebuilding
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_PHASE: ${{ inputs.phase }}
         run: node cli/tasks/release/promote-beta.ts
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: artifacts/update-site
+          # The staged site includes .nojekyll, which v4+ drops unless asked.
+          include-hidden-files: true
   deploy:
     needs: site
     runs-on: ubuntu-24.04
@@ -43,5 +45,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment

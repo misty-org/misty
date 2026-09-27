@@ -1,6 +1,9 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type { ExplorerDragItem, ExplorerDragModifiers } from "../model/interfaces/drag/types";
-import { edgeScrollDelta } from "./geometry";
+import {
+  type ExplorerDragItem,
+  type ExplorerDragModifiers,
+  edgeScrollDelta,
+} from "@/features/file-ui";
 const EDGE_SCROLL_SIZE = 32;
 export function modifiersFromEvent(
   event: Pick<PointerEvent | KeyboardEvent | ReactPointerEvent, "altKey" | "ctrlKey" | "shiftKey">,

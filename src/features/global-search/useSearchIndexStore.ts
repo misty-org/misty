@@ -1,5 +1,5 @@
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import type { SearchStatus } from "@/native/contracts";
+import type { SearchStatus } from "@/native/ipc";
 import {
   searchCancelScan,
   searchGetStatus,

@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 
 export function compileEntryFilterMatcher(query: string): EntryFilterMatcher | null {
   if (!query) return null;

@@ -1,4 +1,4 @@
-import { Button } from "@/shared/ui";
+import { Pressable } from "@/shared/ui";
 import type { ExplorerInlineEditState, ExplorerNotification } from "../store";
 import { cx } from "./ExplorerDesktopShared";
 
@@ -75,9 +75,8 @@ export function ExplorerNotifications(props: {
   return (
     <div className={notificationStyles.stack} aria-live="polite" aria-atomic="false">
       {props.notifications.map((notification) => (
-        <Button
+        <Pressable
           key={notification.id}
-          type="button"
           className={cx(
             notificationStyles.item,
             notification.type === "success" && notificationStyles.success,
@@ -88,7 +87,7 @@ export function ExplorerNotifications(props: {
           onClick={() => props.onDismiss(notification.id)}
         >
           {compactNotificationMessage(notification.message)}
-        </Button>
+        </Pressable>
       ))}
     </div>
   );

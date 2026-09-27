@@ -63,8 +63,6 @@ async function requestJson<T>(method: AccountMethod, path: string, body?: unknow
     const token = shouldAttachAuthToken(path) ? await readApiAuthToken() : null;
     assertAccountGeneration(accountGeneration);
     const headers = addRequestCorrelation(requestHeaders(body, token) ?? new Headers());
-    if (path === "/login" || path.startsWith("/self-host/")) {
-    }
     const response = await httpRequest(url, {
       method,
       headers,

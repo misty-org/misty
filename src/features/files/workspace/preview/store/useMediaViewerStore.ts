@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { create } from "zustand";
 export const useMediaViewerStore = create<MediaViewerState>((set) => ({
   result: null,

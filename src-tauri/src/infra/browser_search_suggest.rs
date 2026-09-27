@@ -9,7 +9,7 @@
 use serde::Deserialize;
 use std::{sync::OnceLock, time::Duration};
 
-const ENGINES: &str = include_str!("../../../src/shared/contracts/browser-search-engines.json");
+const ENGINES: &str = include_str!("../../../src/shared/schemas/browser-search-engines.json");
 const MAX_TEXT_CHARS: usize = 200;
 const MAX_RESPONSE_BYTES: usize = 64 * 1024;
 const MAX_SUGGESTIONS: usize = 8;

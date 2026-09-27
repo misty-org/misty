@@ -1,4 +1,4 @@
-import type { SmartLibraryAsset } from "@/native/contracts";
+import type { SmartLibraryAsset } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
 import {
   aggregateLibraryTags,

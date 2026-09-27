@@ -1,5 +1,6 @@
 import { CompanionAppearanceSettings } from "../companion/CompanionAppearanceSettings";
 import {
+  cn,
   Button,
   Dialog,
   DialogContent,
@@ -33,7 +34,11 @@ export function AgentSettingsModal(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent
         container={props.container}
-        className="flex max-h-[85%] w-[min(680px,94%)] sm:max-w-[680px] flex-col overflow-hidden rounded-xl border border-charcoal-border/80 bg-charcoal-card p-0 shadow-2xl"
+        className={cn(
+          "flex max-h-[85%] w-[min(680px,94%)] sm:max-w-[680px] flex-col",
+          "overflow-hidden rounded-xl border border-charcoal-border/80",
+          "bg-charcoal-card p-0 shadow-2xl",
+        )}
         aria-describedby="agent-settings-dialog-description"
       >
         <DialogHeaderWithTabs

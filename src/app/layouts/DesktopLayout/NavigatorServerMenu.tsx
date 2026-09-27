@@ -9,16 +9,16 @@ import {
 import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
-  NavigationChevron,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Button,
+  MenuItem,
+  NavigationChevron,
 } from "@/shared/ui";
 import { Cloud, Plus, Server } from "lucide-react";
 import { useState } from "react";
@@ -119,16 +119,15 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <MenuItem
+          icon={<Plus aria-hidden="true" />}
+          label="Connect another server…"
           disabled={switching}
           onSelect={() => {
             useSettingsStore.getState().setActiveSection("server");
             props.onSettingsClick();
           }}
-        >
-          <Plus aria-hidden="true" />
-          Connect another server…
-        </DropdownMenuItem>
+        />
         <p className="px-2 py-1 text-xs text-cream-muted" role="status">
           {switching
             ? "Connecting… Misty will restart."

@@ -22,8 +22,9 @@ export function mistyContentProvider(deps: OmniboxDeps): OmniboxProvider {
         detail: item.detail,
         target: { type: "open-in-app" as const, url: item.route },
         relevance:
-          (item.title.toLowerCase().startsWith(query) ? relevance.contentTitlePrefix : relevance.content) -
-          index,
+          (item.title.toLowerCase().startsWith(query)
+            ? relevance.contentTitlePrefix
+            : relevance.content) - index,
         allowedToBeDefault: false,
       }));
     },

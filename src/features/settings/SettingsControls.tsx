@@ -1,6 +1,7 @@
 import {
   Button,
   cn,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -389,18 +390,17 @@ export function CopyableValueText(props: { value: string; disabled?: boolean }) 
       >
         {props.value}
       </span>
-      <Button
+      <IconButton
+        size="md"
         variant="outline"
-        size="icon"
-        type="button"
+        label={`Copy ${settingLabel.toLowerCase()}`}
         className={settingsDisabledControlClass}
         disabled={props.disabled}
-        aria-label={`Copy ${settingLabel.toLowerCase()}`}
         title="Copy"
         onClick={copyValue}
       >
         <Copy size={14} />
-      </Button>
+      </IconButton>
     </span>
   );
 }

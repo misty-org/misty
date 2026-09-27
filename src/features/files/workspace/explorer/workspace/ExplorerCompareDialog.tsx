@@ -1,12 +1,13 @@
+import { useOperationQueueStore } from "@/features/transfers";
 import {
   compareApplyTextMerge,
   compareFiles,
   compareFolders,
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
-} from "@/features/files/workspace/native";
+} from "../../native";
 import { SystemErrorActivity } from "@/features/activity";
-import { useExplorerStore, useOperationQueueStore } from "../store";
+import { useExplorerStore } from "../store";
 import { loadCompareImagePreview, loadCompareTextDiff } from "./compareDialog/ComparePreview";
 import { CompareDialogView, type CompareDialogRuntime } from "./ExplorerCompareDialogView";
 import type { CompareDialogSeed } from "../model/interfaces/workspace/ExplorerCompareDialog";

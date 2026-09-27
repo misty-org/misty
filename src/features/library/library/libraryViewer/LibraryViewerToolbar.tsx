@@ -3,7 +3,7 @@ import type {
   LibraryEditVersion,
   SpaceLibraryItem,
 } from "@/api/spaces/dto/interfaces/types";
-import { Button, DialogClose } from "@/shared/ui";
+import { Button, DialogClose, IconButton } from "@/shared/ui";
 import { ClipboardCopy, Copy, EyeOff, SlidersHorizontal, Star, Trash2, X } from "lucide-react";
 
 export interface LibraryViewerToolbarProps {
@@ -81,71 +81,55 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
       ) : null}
       {canEdit ? (
         <IconButton
-          icon={<Star size={15} fill={item.favorite ? "currentColor" : "none"} />}
+          size="md"
+          variant="outline"
           label={item.favorite ? "Remove favorite" : "Favorite"}
           onClick={props.onToggleFavorite}
-        />
+        >
+          <Star size={15} fill={item.favorite ? "currentColor" : "none"} />
+        </IconButton>
       ) : null}
       {canEdit ? (
         <IconButton
-          icon={<EyeOff size={15} />}
+          size="md"
+          variant="outline"
           label={item.hidden ? "Unhide" : "Hide"}
           onClick={props.onToggleHidden}
-        />
+        >
+          <EyeOff size={15} />
+        </IconButton>
       ) : null}
       {canEdit && props.editingAvailable ? (
-        <IconButton
-          icon={<SlidersHorizontal size={15} />}
-          label="Edit"
-          onClick={props.onBeginEditing}
-        />
+        <IconButton size="md" variant="outline" label="Edit" onClick={props.onBeginEditing}>
+          <SlidersHorizontal size={15} />
+        </IconButton>
       ) : null}
       {canCopy ? (
         <IconButton
-          icon={<ClipboardCopy size={15} />}
+          size="md"
+          variant="outline"
           label={copyLabel}
           disabled={Boolean(activeEdit) && !renditionReady}
           onClick={props.onCopyItem}
-        />
+        >
+          <ClipboardCopy size={15} />
+        </IconButton>
       ) : null}
       {canEdit ? (
         <IconButton
-          icon={<Trash2 size={15} />}
+          size="md"
+          variant="outline"
           label="Move to Recently Deleted"
           onClick={props.onTrash}
-        />
+        >
+          <Trash2 size={15} />
+        </IconButton>
       ) : null}
       <DialogClose asChild>
-        <Button size="icon" variant="outline" type="button" aria-label="Close">
+        <IconButton size="md" variant="outline" label="Close" tooltip={false}>
           <X size={15} />
-        </Button>
+        </IconButton>
       </DialogClose>
     </div>
-  );
-}
-
-function IconButton({
-  icon,
-  label,
-  disabled,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      size="icon"
-      variant="outline"
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-    >
-      {icon}
-    </Button>
   );
 }
