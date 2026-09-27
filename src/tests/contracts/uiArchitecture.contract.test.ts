@@ -9,7 +9,6 @@ const protectedRoots = [
   "src/features/files/workspace/explorer/",
   "src/features/files/workspace/preview/",
   "src/features/files/workspace/search/",
-  "src/features/providers/",
   "src/features/settings/",
   "src/features/spaces/chat/",
   "src/features/library/library/",
