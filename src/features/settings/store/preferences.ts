@@ -1,5 +1,5 @@
 import { appZoomBaseline, appZoomFromStoredScale } from "@/shared/hooks/useAppZoom";
-import { booleanSetting, numberSetting, sectionRecord, stringSetting } from "../settingsControls";
+import { booleanSetting, numberSetting, sectionRecord, stringSetting } from "../SettingsControls";
 export const settingsBoolean = booleanSetting;
 export const settingsNumber = numberSetting;
 export const settingsString = stringSetting;

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Globe } from "lucide-react";
 import { mistyBrowserProviders } from "@/shared/contracts";
-import { BrandIcon } from "../../shared/toolAssets/BrandIcon";
-import { brandIconAsset } from "../../shared/toolAssets/brandIcons";
+import { BrandIcon, brandIconAsset } from "@/shared/ui";
 
 /** Resolve branding from the saved launch address, independent of the current page. */
 export function SavedWebsiteIcon({ url }: { url: string }) {

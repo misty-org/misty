@@ -1,12 +1,20 @@
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { useShortcutTitle } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Button, cn } from "@/shared/ui";
+import {
+  appIcons,
+  appIconStrokeWidth,
+  Button,
+  cn,
+  navigationMenuLinkClass,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui";
 import { PanelsTopLeft, Search } from "lucide-react";
-import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
 const { browser: BrowserIcon, agents: AgentIcon, files: FilesIcon } = appIcons;
 import { Link } from "react-router-dom";
-import { navigationMenuLinkClass } from "@/shared/ui";
 import { navigatorFocusRingClass } from "./styles";
 
 const navigatorHeaderActionClass = `${navigationMenuLinkClass} w-full`;

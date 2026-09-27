@@ -23,7 +23,7 @@ import {
   SwitchControl,
   TextControl,
   WorkspaceRootControl,
-} from "../settingsControls";
+} from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function FilesSection(props: SettingsContentProps & { page?: "browsing" | "locations" }) {

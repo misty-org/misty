@@ -1,12 +1,12 @@
 import {
+  appIconStrokeWidth,
   cn,
   navigationMenuLinkClass,
   navigationMenuPrimaryIconClass,
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
+  TooltipTrigger,
 } from "@/shared/ui";
-import { appIconStrokeWidth } from "@/shared/ui/app-icons";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 

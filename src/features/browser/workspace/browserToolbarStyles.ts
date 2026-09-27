@@ -1,4 +1,4 @@
-import { cn } from "@/shared/ui/utils";
+import { cn } from "@/shared/ui";
 
 /** Shared geometry for browser chrome. Keep touch targets full size. */
 export const browserToolbarStyles = {

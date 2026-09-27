@@ -1,4 +1,4 @@
-import { readAgentsImage } from "@/features/agents/agentsRuntime";
+import { readAgentsImage } from "@/features/agents/AgentsRuntime";
 import { ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MistyImageAttachment } from "./types";

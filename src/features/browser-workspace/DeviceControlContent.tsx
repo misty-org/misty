@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, LoaderCircle, Monitor, MousePointer2 } from "lucide-react";
-import { Button } from "@/shared/ui/button";
-import { Switch } from "@/shared/ui/switch";
-import { cn } from "@/shared/ui/utils";
+import { Button, cn, Switch } from "@/shared/ui";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import {
   activateNativeDevice,

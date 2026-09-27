@@ -1,9 +1,8 @@
-import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
+import { MailProviderIcon, ProviderBrandIcon, WebsiteBrandIcon } from "@/shared/ui";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
 } from "../../../shared/toolAssets/websiteIntegrations";
-import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
 import { providerFromRoute } from "../../../shared/toolAssets/providers";
 import {
   NotesDestinationIcon,
@@ -20,7 +19,6 @@ import {
   DeletedDestinationIcon,
 } from "./NavigatorDestinationIcons";
 import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
-import { MailProviderIcon } from "@/shared/ui/mail-provider-icon";
 import { Link2, Plug } from "lucide-react";
 import { BotMessageSquare, Workflow } from "lucide-react";
 import type { NavigationItem as MistyNavigationItem } from "@/shared/navigation/NavigationItem";

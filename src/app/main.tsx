@@ -15,6 +15,6 @@ export const startup = (async () => {
     return;
   }
   await (
-    await import("./hostMain")
+    await import("./HostMain")
   ).startup;
 })();

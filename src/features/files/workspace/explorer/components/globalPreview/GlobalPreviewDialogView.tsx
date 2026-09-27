@@ -7,7 +7,7 @@ import type { GlobalPreviewSource } from "../../model/interfaces/components/Glob
 import { formatBytes, formatDate } from "../../utils/fileFormat";
 import { PreviewBodyView } from "./PreviewBodyView";
 import { fileName, friendlyType, imageOutputMimeType, sourceExtension } from "./previewFormat";
-import { InspectorDetail, PreviewMessage, ToolbarButton } from "./previewPrimitives";
+import { InspectorDetail, PreviewMessage, ToolbarButton } from "./PreviewPrimitives";
 import { globalPreviewKindForSource } from "./previewDocument";
 import { usePreviewResource } from "./usePreviewResource";
 import type { PreviewRuntime } from "./PreviewRuntime";

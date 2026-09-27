@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Info, LockKeyhole, ShieldAlert } from "lucide-react";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   type BrowserSiteInfo as SiteInfo,

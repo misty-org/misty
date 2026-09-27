@@ -9,7 +9,7 @@ import { EmbeddedUniversalPreview } from "@/features/resource-preview/EmbeddedUn
 import { PhotoEditor } from "@/features/editor";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { clipboardWriteFileBytes } from "@/native";
-import { configureLibraryRuntime } from "./libraryRuntime";
+import { configureLibraryRuntime } from "./LibraryRuntime";
 export function initializeHostLibraryRuntime() {
   configureLibraryRuntime({
     api: spacesApi,

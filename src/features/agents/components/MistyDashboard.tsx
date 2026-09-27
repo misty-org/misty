@@ -6,7 +6,7 @@ import {
   runtimeAgentsApi as agents,
   useAgentsAuth,
   openAgentsMisty as openMisty,
-} from "../agentsRuntime";
+} from "../AgentsRuntime";
 import { activityParent, type MistyActivityEntry } from "@/features/misty/activity";
 import type { PersonalAgentRunDetail } from "../model/interfaces/personal";
 

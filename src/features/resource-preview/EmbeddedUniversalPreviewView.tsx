@@ -12,7 +12,7 @@ import {
   textExtensions,
   videoMimeTypes,
 } from "./previewMediaTables";
-import { PreviewMessage } from "./previewPrimitives";
+import { PreviewMessage } from "./PreviewPrimitives";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(loadPdfPreview);

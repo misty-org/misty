@@ -20,22 +20,22 @@ import {
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
 import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import {
+  appIconStrokeWidth,
+  BrandIcon,
+  brandIconAsset,
   Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  ProviderBrandIcon,
+  WebsiteBrandIcon,
 } from "@/shared/ui";
-import { appIconStrokeWidth } from "@/shared/ui/app-icons";
 import { Blocks, ChevronDown, LoaderCircle, VenetianMask, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { BrandIcon } from "../../../shared/toolAssets/BrandIcon";
-import { brandIconAsset } from "../../../shared/toolAssets/brandIcons";
-import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
 import { providerFromRoute, providers } from "../../../shared/toolAssets/providers";
-import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,

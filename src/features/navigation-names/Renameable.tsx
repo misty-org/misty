@@ -1,12 +1,7 @@
 import { Pencil, RotateCcw } from "lucide-react";
 import { cloneElement, useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/shared/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/shared/ui";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import {
   setNavigationName,

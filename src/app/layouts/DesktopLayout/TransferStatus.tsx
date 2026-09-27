@@ -10,7 +10,7 @@ import {
   emptyTransferCompletionTracker,
 } from "../transferCompletionNotifications";
 import { workStatusToastDurationMs } from "./styles";
-import { Notification } from "@/shared/ui/notification";
+import { Notification } from "@/shared/ui";
 
 const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
 const emptyTransferRows: TransferRecord[] = [];

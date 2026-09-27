@@ -50,7 +50,7 @@ export { messageReplyPreviewText } from "./messageHelpers";
 import {
   SocialError as SystemErrorActivity,
   socialErrorMessage as systemErrorMessage,
-} from "@/features/spaces/chat/socialRuntime";
+} from "@/features/spaces/chat/SocialRuntime";
 import { Button } from "@/shared/ui";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { useMemo } from "react";

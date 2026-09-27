@@ -35,7 +35,7 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
     selector({ activeScopeKey: "" }),
 }));
 
-vi.mock("@/app/platform-layout", () => ({
+vi.mock("@/app/PlatformLayout", () => ({
   default: () => <div data-testid="platform-layout">Platform Layout Content</div>,
 }));
 

@@ -1,6 +1,6 @@
-import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRuntime";
+import { AgentsError as SystemErrorActivity } from "@/features/agents/AgentsRuntime";
 
-import { useAgentsAuth as useAuth } from "@/features/agents/agentsRuntime";
+import { useAgentsAuth as useAuth } from "@/features/agents/AgentsRuntime";
 
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import {

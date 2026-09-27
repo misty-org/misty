@@ -7,7 +7,7 @@ import { dragItemsForEntry } from "../FileBrowserDrag";
 import { GenericFileIcon } from "../FileBrowserIcons";
 import { InlineNameEditor } from "../FileBrowserInline";
 import { fileBrowserStyles } from "../FileBrowserStyles";
-import { passiveRenameDraftsFor } from "./entryPresentation";
+import { passiveRenameDraftsFor } from "./EntryPresentation";
 import { FileGridItem } from "./FileGridItem";
 import {
   GRID_GAP,

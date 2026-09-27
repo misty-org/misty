@@ -20,7 +20,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { SwitchControl, TextControl } from "../settingsControls";
+import { SwitchControl, TextControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 const field =

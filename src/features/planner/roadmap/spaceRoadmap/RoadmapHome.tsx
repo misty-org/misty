@@ -17,7 +17,7 @@ import {
 } from "@/shared/ui";
 import { ArrowRight, Pin, PinOff, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useRoadmapRuntime } from "./roadmapRuntime";
+import { useRoadmapRuntime } from "./RoadmapRuntime";
 import { RoadmapSnapshotPreview } from "./RoadmapSnapshotPreview";
 import { normalizeRoadmapSnapshot } from "./RoadmapWorkspaceHelpers";
 export function RoadmapHome(props: {

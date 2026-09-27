@@ -15,7 +15,7 @@ import { transferDropAcceptance } from "../FileBrowserDrag";
 import { FileIcon } from "../FileBrowserIcons";
 import { InlineNameEditor, PassiveRenameDraftView } from "../FileBrowserInline";
 import { fileBrowserStyles } from "../FileBrowserStyles";
-import { formatEntrySize } from "./entryPresentation";
+import { formatEntrySize } from "./EntryPresentation";
 
 export const FileTableRow = memo(function FileTableRow(props: {
   entry: FileEntry;

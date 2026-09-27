@@ -1,6 +1,5 @@
-import { mistyRoadmapUrl } from "@/shared/ui/coming-soon-surface";
+import { DiscoverCard, mistyRoadmapUrl } from "@/shared/ui";
 import { KeyRound, Puzzle, ShieldBan, BookOpenText, Code2, type LucideIcon } from "lucide-react";
-import { DiscoverCard } from "@/shared/ui";
 import { InternalPageFrame } from "./InternalPageFrame";
 
 const previews: { icon: LucideIcon; title: string; detail: string }[] = [

@@ -37,7 +37,7 @@ import {
   CompareDiffLine,
   joinLocalPath,
   parentPath,
-} from "./compareDialog/comparePresentation";
+} from "./compareDialog/ComparePresentation";
 export type {
   CompareDialogSeed,
   CompareImagePreview,

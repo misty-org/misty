@@ -18,8 +18,7 @@ import {
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { cn } from "@/shared/ui";
-import { Notification } from "@/shared/ui/notification";
+import { cn, Notification } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight, Pencil, RotateCw, VenetianMask, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";

@@ -32,7 +32,7 @@ import { RoadmapInspector } from "./RoadmapInspector";
 import type { RoadmapPaletteItem } from "./roadmapNodeCatalog";
 import { RoadmapNodeDrawer } from "./RoadmapNodeDrawer";
 import { RoadmapOutline } from "./RoadmapOutline";
-import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./roadmapRuntime";
+import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./RoadmapRuntime";
 import { roadmapEndpoint } from "./RoadmapWorkspaceHelpers";
 export type RoadmapMutation = <T>(
   action: (version: number) => Promise<T>,

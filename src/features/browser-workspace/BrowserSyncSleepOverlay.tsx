@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui/button";
+import { Button } from "@/shared/ui";
 import misty from "@/assets/branding/misty-icon.png?inline";
 import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";

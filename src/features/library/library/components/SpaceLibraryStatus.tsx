@@ -1,5 +1,5 @@
 import { ClipboardCopy, Star, Trash2, X } from "lucide-react";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "@/features/library/library/LibraryRuntime";
 
 import { Button } from "@/shared/ui";
 

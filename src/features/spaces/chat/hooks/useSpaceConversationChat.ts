@@ -1,5 +1,5 @@
-import { socialEvents } from "../socialRuntime";
-import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
+import { socialEvents } from "../SocialRuntime";
+import { socialApi as spacesApi } from "@/features/spaces/chat/SocialRuntime";
 import type {
   SpaceConversation,
   SpaceEvent,

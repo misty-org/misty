@@ -1,4 +1,4 @@
-import { IconButton } from "@/shared/ui/icon-button";
+import { PrimitiveIconButton as IconButton } from "@/shared/ui";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { transferStyles } from "../transferStyles";
 

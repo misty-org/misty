@@ -4,9 +4,7 @@ import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/clien
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { retryWorkspaceRecovery } from "@/features/workspace/useWorkspaceRecoveryRetry";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { Button } from "@/shared/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
-import { cn } from "@/shared/ui/utils";
+import { Button, cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
 import { DeviceControlContent } from "./DeviceControlContent";
 import { syncBadgeStatus } from "./syncBadgeStatus";

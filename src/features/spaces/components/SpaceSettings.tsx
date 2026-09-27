@@ -18,8 +18,8 @@ import {
   CardTitle,
   Input,
   Separator,
+  WorkspaceOverlay,
 } from "@/shared/ui";
-import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
 import { Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

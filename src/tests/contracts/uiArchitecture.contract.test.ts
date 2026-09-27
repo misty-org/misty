@@ -47,6 +47,30 @@ describe("UI architecture contract", () => {
     expect([...new Set(failures)], failures.join("\n")).toEqual([]);
   });
 
+  it("imports shared UI only through its barrel", () => {
+    const failures = walk("src", extensions)
+      .map(repositoryPath)
+      .filter((path) => !uiImplementationRoots.some((root) => path.startsWith(root)))
+      .filter((path) =>
+        /from\s+["'](?:@\/shared\/ui\/|(?:\.\.?\/)+(?:[\w-]+\/)*shared\/ui\/)/.test(
+          readFileSync(path, "utf8"),
+        ),
+      )
+      .map((path) => `${path}: import from "@/shared/ui"`);
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("names component files in PascalCase", () => {
+    const failures = walk("src", new Set([".tsx"]))
+      .map(repositoryPath)
+      .filter((path) => !/\.test\.tsx$/.test(path))
+      .filter((path) => {
+        const name = path.split("/").pop()!.replace(/\.tsx$/, "");
+        return !/^[A-Z]/.test(name) && !/^[a-z]+$/.test(name) && !/^use[A-Z]/.test(name);
+      });
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
   it("keeps shared primitives at the UI boundary", () => {
     const failures: string[] = [];
     for (const path of walk("src", extensions)) {

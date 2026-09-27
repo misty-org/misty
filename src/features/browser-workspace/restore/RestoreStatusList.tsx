@@ -1,5 +1,5 @@
 import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { Button } from "@/shared/ui/button";
+import { Button } from "@/shared/ui";
 import { usePageRestoreStore } from "./store";
 
 /** Per-tab result of restoring pages after a device switch. */
