@@ -14,16 +14,20 @@
     "postinstall": "node scripts/patch-workflow-schema.ts",
     "eval:browser": "vitest run --config evals/browser/vitest.config.ts",
     "eval:code": "vitest run --config evals/code/vitest.config.ts",
-    "trace": "node evals/browser/trace.ts"
+    "trace": "node evals/browser/trace.ts",
+    "eval:voice": "vitest run --config evals/voice/vitest.config.ts"
   },
   "dependencies": {
     "@ai-sdk/elevenlabs": "3.0.30",
     "@ai-sdk/openai": "4.0.46",
     "@ai-sdk/provider": "4.0.7",
     "@ai-sdk/workflow": "1.0.67",
+    "@audeeo/core": "file:vendor/audeeo-core",
     "@misty/mcp-client-runtime": "file:./vendor/mcp-client-runtime",
     "@modelcontextprotocol/client": "^2.0.0",
     "@opentelemetry/api": "1.9.1",
+    "@soniox/node": "2.4.0",
+    "@soniox/vercel-ai-sdk-provider": "0.1.3",
     "@workflow/serde": "4.1.0",
     "@workflow/world-local": "4.2.4",
     "@workflow/world-postgres": "4.3.3",

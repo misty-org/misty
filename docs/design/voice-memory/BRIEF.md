@@ -171,10 +171,19 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
 - **The relay needs a long-lived process.** WebSockets can't be held by Vercel
   functions, so the relay runs on the Docker (node-server) deployment of the runtime.
   The route is off unless `MISTY_RUNTIME_LIVE_TRANSCRIBE=1` and a Soniox key is set.
-- **Tickets.** Go signs a short-lived ticket with the runtime control secret: user,
-  device, reservation, expiry and nonce. The runtime verifies it statelessly and burns
-  the nonce. On close, the runtime settles the measured audio minutes back to Go with a
-  signed call.
+- **Tickets.** `POST /me/voice/live/ticket` returns a ticket, the relay URL
+  (`MISTY_VOICE_LIVE_URL`) and the session's audio limit.
+  - The ticket is `v1.<claims>.<hmac>`, signed with the runtime control secret under
+    the `misty-live-ticket` domain. Its claims are session, user, device, channels,
+    limit, model and a one-minute expiry.
+  - The billing reservation is taken when the ticket is issued and recorded in
+    `voice_live_sessions`.
+  - The runtime verifies the ticket statelessly and spends the session id. On close
+    it posts the measured audio to `/internal/voice/live/settle`, which settles
+    exactly once.
+- **Wire format.** Binary frames are one channel byte (0 for mic, 1 for system)
+  followed by 16 kHz PCM16. Text frames are `start` (language and context) and
+  `finish`. The relay sends `ready`, `segment`, `limit`, `error` and `finished`.
 - **Senses.** `live-transcription` and `diarized-transcription` join `aimodels/config.go`.
   The model ids live in the role defaults, never in callers.
 
@@ -192,13 +201,16 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
    It only runs when both channels are open; mic-only dictation doesn't need it.
 3. **Quota numbers.** Every number is configurable on the server, and these are the
    defaults:
-   - **Voice price basis:**
-     - live: `MISTY_VOICE_LIVE_UNITS_PER_MINUTE=2000` weighted units (Soniox realtime
-       at about $0.12 an hour)
-     - files: `MISTY_VOICE_FILE_UNITS_PER_MINUTE=1700`
-   - **Weekly voice minutes per tier** (`MISTY_VOICE_WEEKLY_MINUTES`): Basic 120,
-     Pro 600, Max 1200, Ultra 6000, Ultra+ 12000. Voice also counts toward the weekly AI
-     limit; whichever runs out first stops it.
+   - **Voice price basis:** live and file voice are billed as the existing
+     `agent.voice.transcription` operation, by `audio_ms`.
+     - `misty-billing` prices it with `MISTY_AGENT_TRANSCRIPTION_MINUTE_MICROUSD`
+       (6000, which is above Soniox's roughly $0.002 a minute).
+     - A Soniox-specific rate is a follow-up in `misty-billing`.
+   - **Weekly voice minutes per plan:** `MISTY_VOICE_WEEKLY_MINUTES`, a rolling seven
+     days, defaulting to `basic=120,pro=600,max=1200,ultra=6000,ultra_plus=12000`.
+     Voice also counts toward the weekly AI limit; whichever runs out first stops it.
+   - **Per ticket:** `MISTY_VOICE_LIVE_TICKET_MINUTES` (15) per channel. The relay
+     stops at the limit and keeps what was heard.
    - **Memory backlog cap:** `MISTY_MEMORY_BACKLOG_CAP=2000` events waiting to embed.
      Past it the recorder stops and says so.
 

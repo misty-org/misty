@@ -108,13 +108,14 @@ func (s *Server) mountPublicFeatureRoutes(prefix string, deps *mountDeps) {
 
 // mountOperationalRoutes registers the unversioned metrics, agent-runtime
 // callback, and MCP endpoints.
-func (s *Server) mountOperationalRoutes() {
+func (s *Server) mountOperationalRoutes(deps *mountDeps) {
 	// Unmounted entirely when no token is configured: the output names every
 	// route, its traffic volume, and its error rate.
 	if token := metricsToken(); token != "" {
 		s.Router.Get("/metrics", s.Metrics.Handler(token))
 	}
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/activate", s.Spaces.AgentRuntimeActivate())
+	s.Router.Post("/internal/voice/live/settle", deps.agents.VoiceLiveSettle())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/start-receipt", s.Spaces.AgentRuntimeStartReceipt())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/budget", s.Spaces.AgentRuntimeExecutionBudget())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/steering", s.Spaces.AgentRuntimeSteering())

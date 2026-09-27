@@ -54,7 +54,7 @@ func (s *Server) MountHandlers() error {
 	for _, prefix := range []string{"", "/api", "/v1"} {
 		s.mountPublicRoutes(prefix, deps)
 	}
-	s.mountOperationalRoutes()
+	s.mountOperationalRoutes(deps)
 
 	return nil
 }
@@ -130,6 +130,7 @@ func (s *Server) wireAIServices(deps *mountDeps) error {
 	agentsService := api.NewAgentsService(s.Database)
 	agentsService.SetVoiceAnalyzer(libraryAnalyzer)
 	agentsService.SetVoiceMetrics(s.Metrics)
+	agentsService.SetVoiceLive(api.VoiceLiveConfigFromEnv(s.AgentRuntime))
 	if serverConnectedDevicesConfigured() {
 		connectedDevicesConfig, configErr := api.ConnectedDevicesConfigFromEnv()
 		if configErr != nil {
