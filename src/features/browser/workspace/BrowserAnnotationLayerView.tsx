@@ -1,4 +1,4 @@
-import { Button, cn, IconButton, Input, Toolbar } from "@/shared/ui";
+import { Button, cn, ColorSwatch, IconButton, Input, Toolbar } from "@/shared/ui";
 import { Circle, Eraser, Minus, Pencil, Redo2, Square, Trash2, Type, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -237,17 +237,12 @@ export function BrowserAnnotationLayerView(props: {
         </ToolButton>
         <span className="mx-1 h-6 w-px shrink-0 bg-current opacity-15" aria-hidden />
         {colors.map((option) => (
-          <Button
+          <ColorSwatch
             key={option}
-            variant="ghost"
-            size="none"
-            className={cn(
-              "size-6 shrink-0 rounded-full border-2 p-0 transition-transform hover:scale-110",
-              color === option ? "border-cream" : "border-transparent",
-            )}
-            style={{ backgroundColor: option }}
-            aria-label={`Use ${option} ink`}
-            aria-pressed={color === option}
+            color={option}
+            label={`Use ${option} ink`}
+            selected={color === option}
+            className="size-6 border-2"
             onClick={() => setColor(option)}
           />
         ))}

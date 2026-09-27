@@ -1,19 +1,19 @@
 import {
   Button,
+  cn,
+  ColorSwatch,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  MenuTrigger,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  cn,
 } from "@/shared/ui";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,
   Braces,
-  ChevronDown,
   Code2,
   Heading,
   Highlighter,
@@ -40,17 +40,12 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
       </ToolbarGroup>
       <ToolbarGroup>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="misty-tiptap-tool gap-1"
-              aria-label="Headings"
-            >
-              <Heading size={17} />
-              <ChevronDown size={12} />
-            </Button>
-          </DropdownMenuTrigger>
+          <MenuTrigger
+            iconOnly
+            label="Headings"
+            className="misty-tiptap-tool"
+            icon={<Heading size={17} />}
+          />
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
               <Pilcrow /> Text
@@ -72,17 +67,12 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="misty-tiptap-tool gap-1"
-              aria-label="Lists"
-            >
-              <List size={17} />
-              <ChevronDown size={12} />
-            </Button>
-          </DropdownMenuTrigger>
+          <MenuTrigger
+            iconOnly
+            label="Lists"
+            className="misty-tiptap-tool"
+            icon={<List size={17} />}
+          />
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={() => editor.chain().focus().toggleBulletList().run()}>
               <List /> Bullet list
@@ -160,12 +150,11 @@ export function NoteToolbarInlineControls({ editor }: { editor: Editor }) {
         </PopoverTrigger>
         <PopoverContent className="flex w-auto gap-1 p-2">
           {["#7255d9", "#d7a928", "#3f8e72", "#b95656"].map((color) => (
-            <button
+            <ColorSwatch
               key={color}
-              type="button"
-              className="size-6 rounded-full ring-1 ring-white/15"
-              style={{ background: color }}
-              aria-label={`Highlight ${color}`}
+              color={color}
+              label={`Highlight ${color}`}
+              className="size-6"
               onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
             />
           ))}

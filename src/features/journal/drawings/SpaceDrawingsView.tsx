@@ -10,16 +10,17 @@ import {
   Avatar,
   AvatarFallback,
   Button,
+  cn,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
   EmptyState,
   Input,
+  ListRowButton,
   PermissionState,
   Skeleton,
   Spinner,
-  cn,
 } from "@/shared/ui";
 import { Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -429,10 +430,9 @@ function DrawingRows(props: {
                 : "bg-transparent hover:bg-charcoal-border/65",
             )}
           >
-            <button
-              type="button"
+            <ListRowButton
               aria-current={isSelected ? "true" : undefined}
-              className="flex min-w-0 flex-1 self-stretch items-center gap-2 border-0 bg-transparent px-3.5 text-left outline-none"
+              className="self-stretch items-center rounded-none px-3.5"
               onClick={() => props.onSelect(drawing)}
             >
               <h3 className="m-0 min-w-0 flex-1 truncate text-[13px] font-medium text-cream-bright">
@@ -441,7 +441,7 @@ function DrawingRows(props: {
               {isPinned ? (
                 <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
               ) : null}
-            </button>
+            </ListRowButton>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">

@@ -5,6 +5,7 @@ const layerClass = {
   "agent-surface": "layer-agent-surface",
   chrome: "layer-chrome",
   "workspace-overlay": "layer-workspace-overlay",
+  "blocking-popup": "layer-blocking-popup",
 } as const;
 
 type ViewportLayerProps = React.ComponentPropsWithoutRef<"div"> & {

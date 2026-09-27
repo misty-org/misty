@@ -2,29 +2,6 @@
   "src/features/activity/ActivityPanelToolbar.tsx": [
     "raw-control"
   ],
-  "src/features/editor/PhotoEditorView.tsx": [
-    "full-screen-overlay"
-  ],
-  "src/features/journal/drawings/components/DrawingPreviewView.tsx": [
-    "raw-control",
-    "hex-color"
-  ],
-  "src/features/journal/drawings/SpaceDrawingsView.tsx": [
-    "raw-control"
-  ],
-  "src/features/journal/notes/components/NoteBlockEditorView.tsx": [
-    "raw-control"
-  ],
-  "src/features/journal/notes/components/NoteEditorToolbarControls.tsx": [
-    "raw-control",
-    "manual-menu-chevron"
-  ],
-  "src/features/journal/notes/components/NoteReadingPaneView.tsx": [
-    "raw-control"
-  ],
-  "src/features/journal/notes/SpaceNotesView.tsx": [
-    "raw-control"
-  ],
   "src/features/navigation-names/Renameable.tsx": [
     "raw-control",
     "portal"
