@@ -31,8 +31,8 @@ const itemSizes = {
 
 /**
  * A pill track of mutually exclusive choices, such as view modes or Search/Ask. It is a radio
- * group: the chosen option is the tab stop and arrow keys change the choice. Features never draw
- * their own segmented pills.
+ * group: the chosen option is the tab stop, and arrow keys, Home, and End change the choice.
+ * Features never draw their own segmented pills.
  */
 function SegmentedControl<T extends string>({
   label,
@@ -54,6 +54,12 @@ function SegmentedControl<T extends string>({
         className,
       )}
       onValueChange={(next) => onChange(next as T)}
+      onKeyDown={(event) => {
+        // Arrow keys already choose as they move; Home and End choose the ends too.
+        if (event.key !== "Home" && event.key !== "End") return;
+        const edge = event.key === "Home" ? options[0] : options[options.length - 1];
+        if (edge && edge.value !== value) onChange(edge.value);
+      }}
     >
       {options.map((option) => (
         <RadioGroupPrimitive.Item

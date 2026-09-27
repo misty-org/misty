@@ -77,8 +77,6 @@ export * from "./navigation/NavigationTree";
 export * from "./icons/AssetIcon";
 export * from "./icons/BrandIcon";
 export * from "./icons/MailProviderIcon";
-export * from "./icons/ProviderBrandIcon";
-export * from "./icons/WebsiteBrandIcon";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
 

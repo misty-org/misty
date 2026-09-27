@@ -29,17 +29,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   MenuTrigger,
-  ProviderBrandIcon,
-  WebsiteBrandIcon,
 } from "@/shared/ui";
 import { Blocks, ChevronDown, LoaderCircle, VenetianMask, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { providerFromRoute, providers } from "../../../shared/toolAssets/providers";
+import { providerFromRoute, providers } from "@/features/webviews/providers";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
-} from "../../../shared/toolAssets/websiteIntegrations";
+} from "@/features/webviews/websiteIntegrations";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
 export interface TabGroup {
   instanceId?: string;
@@ -143,7 +141,7 @@ export function TabIcon({
   if (provider)
     return (
       <span className="inline-flex shrink-0">
-        <ProviderBrandIcon provider={provider} size={size} />
+        <BrandIcon brand={provider} size={size} />
       </span>
     );
   const website = tab
@@ -156,7 +154,7 @@ export function TabIcon({
   )
     return (
       <span className="inline-flex shrink-0">
-        <WebsiteBrandIcon id={website as WebsiteIntegrationId} size={size} />
+        <BrandIcon brand={website} size={size} />
       </span>
     );
   const section = tab ? new URL(tab.route, "https://misty.local").searchParams.get("view") : null;
