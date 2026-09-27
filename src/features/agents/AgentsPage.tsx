@@ -4,7 +4,7 @@ import { useAuth } from "@/features/auth";
 import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import { openMisty } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import type { AgentProfile, AgentProfileInput } from "@/shared/contracts";
+import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
   Button,
   IconButton,

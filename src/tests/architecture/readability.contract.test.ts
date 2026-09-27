@@ -10,7 +10,7 @@ const maxLength = 160;
 const extensions = new Set([".ts", ".tsx", ".css"]);
 const baseline = JSON.parse(
   readFileSync(
-    resolve(repositoryRoot, "src/tests/contracts/fixtures/readability-baseline.json"),
+    resolve(repositoryRoot, "src/tests/architecture/fixtures/readability-baseline.json"),
     "utf8",
   ),
 ) as Record<string, BaselineEntry[]>;

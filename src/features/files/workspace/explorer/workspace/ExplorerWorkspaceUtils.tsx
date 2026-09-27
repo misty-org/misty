@@ -1,5 +1,5 @@
 import type { MultiPanelTab, useMultiPanelStore } from "@/features/workspace";
-import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/contracts";
+import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/ipc";
 import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import {
   explorerPathKey,

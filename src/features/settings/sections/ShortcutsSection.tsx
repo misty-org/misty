@@ -4,7 +4,7 @@ import {
   shortcutFromEvent,
   type ShortcutSlot,
 } from "@/features/shortcuts";
-import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/contracts";
+import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
 import { Button, Input, cn } from "@/shared/ui";
 import { RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

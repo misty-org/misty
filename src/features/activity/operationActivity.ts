@@ -1,4 +1,4 @@
-import type { OperationQueueSnapshot, OperationDescriptor } from "@/native/contracts";
+import type { OperationQueueSnapshot, OperationDescriptor } from "@/native/ipc";
 import { useActivityStore } from "./useActivityStore";
 import { belongsToActivityAccount } from "./activityState";
 

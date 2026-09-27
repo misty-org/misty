@@ -1,5 +1,5 @@
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { useNavigate } from "react-router-dom";
 import type { GlobalAiContextRef, GlobalSearchResult } from "./types";
 

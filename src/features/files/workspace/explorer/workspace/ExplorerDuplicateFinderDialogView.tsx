@@ -1,4 +1,4 @@
-import type { DuplicateGroup, DuplicateScanResult } from "@/native/contracts";
+import type { DuplicateGroup, DuplicateScanResult } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
   Badge,

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from "react";
-import { commandsForApp } from "@/shared/contracts";
+import { commandsForApp } from "@/shared/schemas";
 import { spacesApi } from "@/api/spaces/api";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";

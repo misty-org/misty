@@ -1,4 +1,4 @@
-import type { DirectoryListing, DirectorySizeRecord } from "@/native/contracts";
+import type { DirectoryListing, DirectorySizeRecord } from "@/native/ipc";
 import type {
   ExplorerSortState,
   ExplorerStore,

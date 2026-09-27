@@ -1,5 +1,5 @@
 import { SystemErrorActivity } from "@/features/activity";
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { explorerPrepareOpenItem } from "@/native/filesystem";
 import { formatBytes } from "@/shared/lib/fileFormat";
 import { errorText } from "@/shared/lib/format";

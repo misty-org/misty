@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import type { CSSProperties, MouseEvent } from "react";
 import { memo, useMemo } from "react";
 import { useExplorerDragSource, useExplorerDropZone } from "../../drag/ExplorerDragHooks";

@@ -1,6 +1,6 @@
 import type { SemanticReindexInput, SemanticReindexPlan } from "@/features/files/workspace/explorer";
 import { smartLibraryAssetsPage, smartLibraryPreparePreviews } from "@/features/files/workspace/native";
-import type { FolderLibraryStatus, SmartLibraryAsset } from "@/native/contracts";
+import type { FolderLibraryStatus, SmartLibraryAsset } from "@/native/ipc";
 
 export function bytesToBase64(bytes: number[]): string {
   let binary = "";

@@ -1,4 +1,4 @@
-import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import type { PreviewRuntime } from "./globalPreview/PreviewRuntime";
 import type * as PreviewHooks from "./FileInspectorPreview";
 import { Button } from "@/shared/ui";

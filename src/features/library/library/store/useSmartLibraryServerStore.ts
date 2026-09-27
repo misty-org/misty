@@ -17,7 +17,7 @@ import type {
   AnalysisResult,
   FolderPreflight,
   SmartLibraryAsset,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { SMART_LIBRARY_PILOT } from "../smartLibrary";
 export type {
   RegisterSmartLibraryFolderRequest,

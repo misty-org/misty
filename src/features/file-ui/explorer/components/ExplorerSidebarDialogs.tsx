@@ -1,4 +1,4 @@
-import type { SavedSearchRule } from "@/native/contracts";
+import type { SavedSearchRule } from "@/native/ipc";
 import {
   Button,
   Dialog,

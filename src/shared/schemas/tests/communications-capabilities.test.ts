@@ -5,7 +5,7 @@ import {
   MistyCommunicationSendResultSchema,
   mistyInboxCapabilities,
   mistySocialCapabilities,
-} from "@/shared/contracts";
+} from "@/shared/schemas";
 
 describe("communication capability conformance", () => {
   it("declares supported social operations", () => {

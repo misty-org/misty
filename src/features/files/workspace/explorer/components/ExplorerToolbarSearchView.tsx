@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import type { ComponentType, ComponentProps } from "react";
 import type { SystemErrorActivity } from "@/features/activity";
 import {

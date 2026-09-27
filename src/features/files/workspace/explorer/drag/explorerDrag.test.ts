@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
 import { dragItemsForEntry, transferDropAcceptance } from "../components/FileBrowserDrag";
 import {

@@ -1,4 +1,4 @@
-import type { MediaAsset } from "@/native/contracts";
+import type { MediaAsset } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
 import { estimateAssets } from "./useMediaSearchStore";
 

@@ -1,5 +1,5 @@
 import { explorerGenerateImageThumbnail } from "@/features/files/workspace/native";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { useEffect, useState } from "react";
 import { FileIcon } from "./FileBrowserIcons";

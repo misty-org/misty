@@ -1,5 +1,5 @@
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace/core";
-import type { OpenWorkspaceRouteRequest } from "@/native/contracts";
+import type { OpenWorkspaceRouteRequest } from "@/native/ipc";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import {

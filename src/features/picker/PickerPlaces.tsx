@@ -1,4 +1,4 @@
-import type { MountedDevice } from "@/native/contracts";
+import type { MountedDevice } from "@/native/ipc";
 import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 

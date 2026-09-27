@@ -1,6 +1,6 @@
 import type { AiSurfaceAdapter as MistySurfaceAdapter } from "@/features/ai-surface/types";
 import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
-import type { MistyAppCommand } from "@/shared/contracts";
+import type { MistyAppCommand } from "@/shared/schemas";
 import type { PlannerTaskServices } from "@/features/planner/planner/spaceTasks/taskServices";
 import type { PlannerRoadmapServices } from "./roadmapServices";
 

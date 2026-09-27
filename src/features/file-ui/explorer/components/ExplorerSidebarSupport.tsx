@@ -1,4 +1,4 @@
-import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/native/contracts";
+import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/native/ipc";
 import {
   Button,
   Collapsible,

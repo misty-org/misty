@@ -9,7 +9,7 @@ import type {
   SearchScanOutcome,
   SearchScanPhase,
   SearchSourceKind,
-} from "@/native/contracts/primitives";
+} from "@/native/ipc/primitives";
 import type { SavedSearchRule } from "./transfers-files";
 export interface AppSnapshot {
   appName: string;

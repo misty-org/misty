@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import type { GridThumbnailJob } from "../../model/interfaces/components/FileBrowser";
 import type { GridThumbnailSubscriber } from "../../model/types/components/FileBrowser";
 import { GRID_THUMBNAIL_MAX_DIMENSION, MAX_CONCURRENT_GRID_THUMBNAILS } from "./fileTableConfig";

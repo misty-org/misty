@@ -2,7 +2,7 @@ import type {
   CompareFilesResult,
   CompareFolderRow,
   CompareFoldersResult,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
   AlertDialog,

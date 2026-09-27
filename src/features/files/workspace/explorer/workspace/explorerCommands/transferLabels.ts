@@ -3,7 +3,7 @@ import {
   clipboardPublishShared,
   clipboardSetLocal,
 } from "@/features/files/workspace/native";
-import type { TransferRecord } from "@/native/contracts";
+import type { TransferRecord } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { useExplorerStore } from "../../store";

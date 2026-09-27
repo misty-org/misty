@@ -1,4 +1,4 @@
-import type { ArchiveEntry } from "@/native/contracts";
+import type { ArchiveEntry } from "@/native/ipc";
 import { Button } from "@/shared/ui";
 import { FileArchive } from "lucide-react";
 import { formatBytes } from "@/shared/lib/fileFormat";

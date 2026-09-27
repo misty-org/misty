@@ -1,5 +1,5 @@
-import type { TransferPage } from "@/native/contracts";
-import type { TransferStatus, TransferType } from "@/native/contracts/primitives";
+import type { TransferPage } from "@/native/ipc";
+import type { TransferStatus, TransferType } from "@/native/ipc/primitives";
 import type {
   TransferLocationScope,
   TransferSortDirection,

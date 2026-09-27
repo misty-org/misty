@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { memo, useDeferredValue, useEffect, useMemo } from "react";
 import { useExplorerDropZone } from "../drag/ExplorerDragHooks";
 import { storageIdForPath } from "../drag/operations";

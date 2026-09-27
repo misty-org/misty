@@ -1,5 +1,5 @@
 import { createContext, useContext, type ComponentType } from "react";
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 
 export interface FileBrowserRuntime {
   thumbnailPreviewsEnabled: boolean;

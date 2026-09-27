@@ -1,4 +1,4 @@
-import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import type { MouseEvent } from "react";
 import type {
   ExplorerCommandQueryMode,

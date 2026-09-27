@@ -3,7 +3,7 @@ import type {
   CreateItemKind,
   SmartLibraryAssetStatus,
   SmartLibrarySourceKind,
-} from "@/native/contracts/primitives";
+} from "@/native/ipc/primitives";
 import type { ExplorerLocation, FileEntry } from "./app-explorer";
 
 export interface MediaAsset {

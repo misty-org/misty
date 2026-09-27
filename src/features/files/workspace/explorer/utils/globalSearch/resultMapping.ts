@@ -7,8 +7,8 @@ import type {
   SearchResult,
   SearchResultMatch,
   SmartLibraryAsset,
-} from "@/native/contracts";
-import type { SearchSourceKind } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { SearchSourceKind } from "@/native/ipc/primitives";
 import type { ExplorerSearchOptions } from "../../model/interfaces/utils/globalSearch";
 import type { MediaSearchHit } from "../../model/stores/media/interfaces/useMediaSearchServerStore";
 import type { SemanticSearchHit } from "../../model/stores/media/interfaces/useSmartLibraryServerStore";

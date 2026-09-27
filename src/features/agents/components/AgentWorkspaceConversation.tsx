@@ -3,7 +3,7 @@ import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, IconButton, Input } from "@/shared/ui";
 import { Loader2, Mic, Square, X } from "lucide-react";

@@ -1,7 +1,7 @@
 import { MistyFilePicker } from "@/features/picker";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSmartLibraryStore } from "@/features/library/library";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { Button, Input } from "@/shared/ui";
 import {
   BrainCircuit,

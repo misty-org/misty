@@ -17,7 +17,7 @@ import type {
   ResolvedSmartLibraryAsset,
   SearchQueryRequest,
   SearchResult,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { searchApi } from "@/api/search/api";
 import type { ExplorerSearchOptions } from "../model/interfaces/utils/globalSearch";
 import type { MediaSearchHit } from "../model/stores/media/interfaces/useMediaSearchServerStore";

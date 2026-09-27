@@ -1,4 +1,4 @@
-import type { SmartLibraryAsset } from "@/native/contracts";
+import type { SmartLibraryAsset } from "@/native/ipc";
 
 export const DEFAULT_LIBRARY_TAG_LIMIT = 12;
 export const DEFAULT_ASSET_TAG_LIMIT = 5;

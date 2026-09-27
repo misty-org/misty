@@ -2,7 +2,7 @@ import type {
   ResolvedMediaAsset,
   ResolvedSmartLibraryAsset,
   SearchResult,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { describe, expect, it } from "vitest";
 import type { MediaSearchHit } from "../model/stores/media/interfaces/useMediaSearchServerStore";
 import type { SemanticSearchHit } from "../model/stores/media/interfaces/useSmartLibraryServerStore";

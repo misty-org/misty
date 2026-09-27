@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ChevronLeft, Pencil, Trash2, Folder, Globe, Search } from "lucide-react";
-import { mistyBrowserProviders } from "@/shared/contracts";
+import { mistyBrowserProviders } from "@/shared/schemas";
 import {
   AlertDialog,
   AlertDialogAction,

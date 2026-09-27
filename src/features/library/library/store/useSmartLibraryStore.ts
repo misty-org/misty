@@ -11,7 +11,7 @@ import {
   smartLibrarySetServerFolderId,
   smartLibrarySnapshot,
 } from "@/features/files/workspace/native";
-import type { FolderLibraryStatus } from "@/native/contracts";
+import type { FolderLibraryStatus } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import {

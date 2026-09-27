@@ -1,4 +1,4 @@
-import type { MountedDevice } from "@/native/contracts";
+import type { MountedDevice } from "@/native/ipc";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildDeviceEntries,

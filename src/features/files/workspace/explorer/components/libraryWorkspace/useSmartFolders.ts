@@ -3,7 +3,7 @@ import {
   savedSearchesSave,
   savedSearchesSnapshot,
 } from "@/features/files/workspace/native";
-import type { SavedSearch, SearchResult } from "@/native/contracts";
+import type { SavedSearch, SearchResult } from "@/native/ipc";
 import { useEffect, useState } from "react";
 import type { SmartFolderDraft } from "../../model/interfaces/components/ExplorerSidebarSupport";
 import type { SmartFolderDialogState } from "../../model/types/components/ExplorerSidebarSupport";

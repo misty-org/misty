@@ -9,7 +9,7 @@ import type {
   OperationStatus,
   TransferStatus,
   TransferType,
-} from "@/native/contracts/primitives";
+} from "@/native/ipc/primitives";
 
 export interface TransferRecord {
   id: number;

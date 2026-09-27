@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/native/contracts";
+import type { TransferRecord } from "@/native/ipc";
 import { prettyLabel } from "@/shared/lib/format";
 import { Button, EmptyState, IconButton, StatusBadge } from "@/shared/ui";
 import {

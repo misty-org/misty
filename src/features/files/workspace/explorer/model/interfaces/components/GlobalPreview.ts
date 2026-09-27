@@ -1,4 +1,4 @@
-import type { ArchiveEntry } from "@/native/contracts";
+import type { ArchiveEntry } from "@/native/ipc";
 
 export interface GlobalPreviewSource {
   path: string;

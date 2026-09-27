@@ -4,7 +4,7 @@ import {
   useMultiPanelStore,
   type MultiPanelStoreHook,
 } from "@/features/workspace";
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { Button } from "@/shared/ui";
 import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";

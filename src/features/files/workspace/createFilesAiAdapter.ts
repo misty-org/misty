@@ -1,6 +1,6 @@
 import type { AiSurfaceAdapter as MistySurfaceAdapter, AiArtifact as AiArtifact } from "@/features/ai-surface/types";
 
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 
 /** Metadata-only context. Native file authority stays with the calling workspace. */
 export function createFilesAiAdapter(options: {

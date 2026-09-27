@@ -1,4 +1,4 @@
-import type { ArchiveEntry, PreparedOpenItem } from "@/native/contracts";
+import type { ArchiveEntry, PreparedOpenItem } from "@/native/ipc";
 
 export interface LoadedInspectorPreview {
   kind: "image" | "video" | "audio" | "pdf" | "text" | "archive";

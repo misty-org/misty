@@ -1,8 +1,8 @@
 import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useSetupStore } from "@/features/installer";
 import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
-import type { TransferRecord } from "@/native/contracts";
-import type { TransferStatus } from "@/native/contracts/primitives";
+import type { TransferRecord } from "@/native/ipc";
+import type { TransferStatus } from "@/native/ipc/primitives";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 import { memo, useEffect, useRef, useState } from "react";
 import {

@@ -1,4 +1,4 @@
-import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import type { ExplorerSortState } from "../model/interfaces/store/types";
 import type { ExplorerSortColumn } from "../model/types/store/types";
 import { entrySizeBytes } from "./entrySize";

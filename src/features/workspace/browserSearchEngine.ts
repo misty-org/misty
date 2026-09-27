@@ -1,4 +1,4 @@
-import engineTable from "@/shared/contracts/browser-search-engines.json";
+import engineTable from "@/shared/schemas/browser-search-engines.json";
 
 /**
  * The search engine a typed query falls back to in the browser surface.

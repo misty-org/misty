@@ -6,7 +6,7 @@ import {
   explorerListDirectory,
 } from "@/features/files/workspace/native";
 import { multiPanelStoreForPane, useMultiPanelStore } from "@/features/workspace";
-import type { DirectorySizeRecord } from "@/native/contracts";
+import type { DirectorySizeRecord } from "@/native/ipc";
 import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import { errorText, userFacingErrorText } from "@/shared/lib/format";
 import type { ExplorerStore } from "../../model/interfaces/store/types";

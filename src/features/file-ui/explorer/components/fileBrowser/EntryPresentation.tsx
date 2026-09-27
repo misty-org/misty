@@ -1,4 +1,4 @@
-import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import type { ReactNode } from "react";
 import type { PassiveRenameDraft } from "../../model/types/components/FileBrowserInline";
 import type { ExplorerInlineEditState } from "../../store";

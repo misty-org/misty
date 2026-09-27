@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { memo, useCallback, useEffect, useMemo, type MouseEvent, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { groupItemsByOperation } from "../drag/operations";

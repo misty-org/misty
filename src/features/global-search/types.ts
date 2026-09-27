@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask" | "action";
 

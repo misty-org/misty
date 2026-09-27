@@ -8,7 +8,7 @@ const defaultLimit = 500;
 const extensions = new Set([".js", ".jsx", ".rs", ".sh", ".ts", ".tsx"]);
 const baseline = JSON.parse(
   readFileSync(
-    resolve(repositoryRoot, "src/tests/contracts/fixtures/file-size-baseline.json"),
+    resolve(repositoryRoot, "src/tests/architecture/fixtures/file-size-baseline.json"),
     "utf8",
   ),
 ) as Record<string, number>;

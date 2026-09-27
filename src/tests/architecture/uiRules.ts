@@ -77,7 +77,7 @@ export function isUiRuleSubject(path: string): boolean {
   );
 }
 
-export const uiExceptionsBaselinePath = "src/tests/contracts/fixtures/ui-exceptions-baseline.json";
+export const uiExceptionsBaselinePath = "src/tests/architecture/fixtures/ui-exceptions-baseline.json";
 
 function collect(root: string, directory: string, found: Record<string, UiRuleId[]>) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -92,7 +92,7 @@ function collect(root: string, directory: string, found: Record<string, UiRuleId
   return found;
 }
 
-/** Regenerate the baseline: `node src/tests/contracts/uiRules.ts --write-baseline` from the repo root. */
+/** Regenerate the baseline: `node src/tests/architecture/uiRules.ts --write-baseline` from the repo root. */
 if (process.argv.includes("--write-baseline")) {
   const root = process.cwd();
   const found = collect(root, join(root, "src"), {});

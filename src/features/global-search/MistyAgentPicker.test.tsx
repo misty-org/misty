@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { MistyAgentPicker } from "./MistyAgentPicker";

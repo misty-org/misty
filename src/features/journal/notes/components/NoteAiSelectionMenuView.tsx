@@ -5,7 +5,7 @@ import type {
   AiSuggestedAction,
   AiCompanionAnchor,
 } from "@/features/ai-surface/types";
-import type { MistyAiControlsSnapshot } from "@/shared/contracts";
+import type { MistyAiControlsSnapshot } from "@/shared/schemas";
 import {
   noteSelectionActions,
   type NoteAiSelection,

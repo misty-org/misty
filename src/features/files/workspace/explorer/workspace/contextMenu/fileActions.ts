@@ -7,7 +7,7 @@ import {
   fileToolsReadSymlink,
   openTerminalAtPath,
 } from "@/features/files/workspace/native";
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { selectedPathsForPane, useExplorerStore } from "../../store";

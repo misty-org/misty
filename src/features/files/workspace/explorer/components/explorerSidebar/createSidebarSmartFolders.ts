@@ -1,4 +1,4 @@
-import type { SavedSearch } from "@/native/contracts";
+import type { SavedSearch } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { useEffect, useState } from "react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";

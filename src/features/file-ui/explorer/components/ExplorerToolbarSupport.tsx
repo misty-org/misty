@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { cn } from "@/shared/ui";
 
 export const toolbarStyles = {

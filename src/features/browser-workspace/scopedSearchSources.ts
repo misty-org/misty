@@ -1,4 +1,4 @@
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import { searchApi } from "@/api/search/api";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
@@ -6,7 +6,7 @@ import {
   queryIndexedExplorerSearch,
   querySemanticExplorerSearch,
 } from "@/features/files/workspace/explorer/utils/globalSearch";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 
 export interface ScopedSearchResult {
   id: string;

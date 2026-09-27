@@ -1,4 +1,4 @@
-import { mistyBrowserProviders } from "@/shared/contracts";
+import { mistyBrowserProviders } from "@/shared/schemas";
 import { providerLoginUrls } from "./providerLoginUrls";
 export type WebsiteAppId = "journal" | "planner" | "library";
 export const websiteIntegrations = {

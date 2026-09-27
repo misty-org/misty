@@ -1,4 +1,4 @@
-import { mistyBrowserProviders, type MistyBrowserProvider } from "@/shared/contracts";
+import { mistyBrowserProviders, type MistyBrowserProvider } from "@/shared/schemas";
 
 type ProviderId = MistyBrowserProvider["id"];
 const googleLogin = (destination: string) =>

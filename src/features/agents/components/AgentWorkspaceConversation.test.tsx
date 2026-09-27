@@ -1,5 +1,5 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

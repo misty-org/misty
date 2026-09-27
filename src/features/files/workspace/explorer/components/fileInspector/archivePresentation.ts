@@ -1,4 +1,4 @@
-import type { ArchiveEntry } from "@/native/contracts";
+import type { ArchiveEntry } from "@/native/ipc";
 import { formatBytes } from "../../utils/fileFormat";
 import { archivePreviewExtensions } from "./previewConstants";
 

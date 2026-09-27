@@ -1,4 +1,4 @@
-import type { SmartLibraryAsset } from "@/native/contracts";
+import type { SmartLibraryAsset } from "@/native/ipc";
 import { Button } from "@/shared/ui";
 import { File } from "lucide-react";
 import { GlobalPreviewDialog } from "../GlobalPreview";

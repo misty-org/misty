@@ -10,8 +10,8 @@ import type {
   FileSyncCompareRow,
   FileSyncEndpoint,
   FileSyncPair,
-} from "@/native/contracts";
-import type { FileSyncPlannedAction, FileSyncPolicy } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { FileSyncPlannedAction, FileSyncPolicy } from "@/native/ipc/primitives";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import ".";

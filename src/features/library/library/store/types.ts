@@ -3,7 +3,7 @@ import type {
   AnalysisEstimate,
   FolderLibraryStatus,
   SmartLibraryImportPreflight,
-} from "@/native/contracts";
+} from "@/native/ipc";
 export type SmartLibraryPhase =
   | "idle"
   | "scanning"

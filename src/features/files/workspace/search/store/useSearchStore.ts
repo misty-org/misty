@@ -16,8 +16,8 @@ import {
   searchStartScan,
 } from "@/features/files/workspace/native";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import type { SearchResult, SearchStatus } from "@/native/contracts";
-import type { SearchQueryScope } from "@/native/contracts/primitives";
+import type { SearchResult, SearchStatus } from "@/native/ipc";
+import type { SearchQueryScope } from "@/native/ipc/primitives";
 import { userFacingErrorText } from "@/shared/lib/format";
 import { create } from "zustand";
 

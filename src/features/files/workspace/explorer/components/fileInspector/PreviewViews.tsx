@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { Button } from "@/shared/ui";
 import { Archive, FileText, Folder, Music } from "lucide-react";
 import type { LoadedInspectorPreview } from "../../model/interfaces/components/FileInspectorPreview";

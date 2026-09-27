@@ -8,7 +8,7 @@ import type {
   SettingsSnapshot,
   ShortcutsSnapshot,
   UpdateShortcutRequest,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 // eslint-disable-next-line no-restricted-imports -- shortcut hydration is the adapter boundary for the native snapshot
 import { detectShortcutPlatform, normalizeShortcut } from "@/features/shortcuts/bindings";

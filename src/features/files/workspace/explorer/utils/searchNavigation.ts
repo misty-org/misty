@@ -1,5 +1,5 @@
 import { useMediaViewerStore } from "@/features/files/workspace/preview";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 import type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
 import { parentDirectory, samePath } from "../store/helpers/listing";

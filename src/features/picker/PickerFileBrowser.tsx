@@ -10,7 +10,7 @@ import {
   selectGeneralPreferences,
   useSettingsStore,
 } from "@/features/settings";
-import type { DirectoryListing, MountedDevice } from "@/native/contracts";
+import type { DirectoryListing, MountedDevice } from "@/native/ipc";
 import { devicesSnapshot, explorerListDirectory } from "@/native/filesystem";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PickerPlaces } from "./PickerPlaces";

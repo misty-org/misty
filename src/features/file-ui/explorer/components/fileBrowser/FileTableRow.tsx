@@ -1,4 +1,4 @@
-import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import { TableCell, TableRow } from "@/shared/ui";
 import type { MouseEvent } from "react";
 import { memo, useMemo } from "react";

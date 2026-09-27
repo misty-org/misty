@@ -4,8 +4,8 @@ import type {
   ExplorerLibrarySnapshot,
   FileEntry,
   PasteItem,
-} from "@/native/contracts";
-import type { ClipboardOperation, CreateItemKind } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { ClipboardOperation, CreateItemKind } from "@/native/ipc/primitives";
 
 import type {
   ExplorerCommandQueryMode,

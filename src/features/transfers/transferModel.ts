@@ -1,5 +1,5 @@
-import type { OperationQueueSnapshot, TransferRecord } from "@/native/contracts";
-import type { TransferType } from "@/native/contracts/primitives";
+import type { OperationQueueSnapshot, TransferRecord } from "@/native/ipc";
+import type { TransferType } from "@/native/ipc/primitives";
 import { prettyLabel } from "@/shared/lib/format";
 import type {
   TransferColumnWidths,
