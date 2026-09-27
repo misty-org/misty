@@ -31,6 +31,7 @@ export type SettingsSection =
   | "agents-coding"
   | "agents-companion"
   | "agents-usage"
+  | "voice"
   | "account"
   | "general"
   | "sync"

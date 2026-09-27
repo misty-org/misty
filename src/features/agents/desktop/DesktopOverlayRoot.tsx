@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, Input } from "@/shared/ui";
+import { DictationPill } from "@/features/voice";
 import "./desktopOverlay.css";
 
 /**
@@ -16,6 +17,7 @@ export function DesktopOverlayRoot() {
   const label = getCurrentWindow().label;
   if (label === "misty-desktop-island") return <DesktopIsland />;
   if (label === "misty-dock-stack") return <DockStack />;
+  if (label === "misty-dictation-pill") return <DictationPill />;
   return <DesktopMist />;
 }
 

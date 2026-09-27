@@ -81,9 +81,22 @@ monochrome and shows:
 - Mute
 - once the key is released, a quiet "Cleaning up…" spinner before the text lands
 
-There is no "Loading…" text. The pill appears on key-down from the pre-rolled audio,
-before the network is ready. Saying "Hey <agent name>, …" at the start sends the rest to
+There is no "Loading…" text. The pill appears on key-down, before the network is
+ready: the microphone's first audio waits in the renderer while the ticket and socket
+open (up to 30 s), then goes first.
+
+No warm ticket is held between dictations. Each ticket reserves its audio allowance
+until it settles, so an unused warm ticket would hold billing for its whole window.
+The pre-roll covers the ticket's round trip instead. Saying "Hey <agent name>, …" at the start sends the rest to
 that agent instead of typing it, and the pill says where it went.
+
+Insertion:
+- Fields in Misty's own window get the text directly, with no clipboard.
+- A web page in a Misty tab, like any other app, gets a clipboard paste. The saved
+  clipboard is restored unless it changed, and paste waits for the dictation keys to
+  be released. Windows terminals get Ctrl+Shift+V; macOS terminals take Cmd+V.
+- If Accessibility isn't allowed yet, macOS asks once and the text stays on the
+  clipboard.
 
 ### Capture Note
 A Note in your personal Space, opened when a capture starts. It has three parts:
@@ -195,7 +208,17 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
    - WebKit may share one WebContent process between tabs. Where the spike shows sharing,
      "Transcribe this tab" uses the Kiri media capability on the page's media stream
      instead.
-   - Results are recorded under Phase 3 of the roadmap entry.
+   - Result (Phase 3, from reading the engines, not yet run on a device): tab
+     audio is not expected to come from the tab's own process. WebKit plays media
+     through its shared GPU process, and WebView2 through the shared Edge audio
+     service. So `Processes([pid])` on a WebContent or renderer PID would hear
+     nothing, and tapping the shared process would hear every tab.
+     "Transcribe this tab" therefore always uses the Kiri media tap: the page's
+     `<audio>`, `<video>` and call streams go through a WebAudio graph to a
+     16 kHz PCM signal. Only a tab that Misty started tapping can send audio.
+     Sound keeps playing for the person, and media from another site is skipped
+     with a notice, because routing it would mute it. The native PID path still
+     needs a check on a Mac with two tabs playing. It stays for "An app".
 2. **Echo reduction.** Reference subtraction: an NLMS filter in `audeeo-core` that uses
    the system channel as the reference. It needs no third-party AEC and no new license.
    It only runs when both channels are open; mic-only dictation doesn't need it.

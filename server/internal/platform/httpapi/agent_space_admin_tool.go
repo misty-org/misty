@@ -45,7 +45,8 @@ func (s *SpacesService) spaceAdminToolRegistration() agenttools.Registration {
 // accountAdminToolRegistrations are account tools that need the service:
 // workflow schedules, Space administration and deletes.
 func (s *SpacesService) accountAdminToolRegistrations() []agenttools.Registration {
-	return append(s.scheduleToolRegistrations(), s.spaceAdminToolRegistration(), s.deleteToolRegistration(), s.renameToolRegistration())
+	registrations := append(s.scheduleToolRegistrations(), s.spaceAdminToolRegistration(), s.deleteToolRegistration(), s.renameToolRegistration())
+	return append(registrations, s.voiceToolRegistrations()...)
 }
 
 type spaceAdminInput struct {

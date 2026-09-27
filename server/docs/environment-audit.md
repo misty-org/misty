@@ -265,6 +265,15 @@ variables and deliberate compatibility aliases are called out separately below.
 | `VISION_PROCESSOR_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` |
 | `VISION_PROCESSOR_TOKEN` | `integrations/ai.env` | `server/internal/app/server_core.go` |
 | `MISTY_COMPANION_TEACH_REASONING` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_cursor_companion.go` |
+| `MISTY_VOICE_LIVE` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_ticket.go` |
+| `MISTY_VOICE_LIVE_URL` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_ticket.go` |
+| `MISTY_VOICE_LIVE_TICKET_MINUTES` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_ticket.go` |
+| `MISTY_VOICE_WEEKLY_MINUTES` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_tokens.go` |
+| `MISTY_LIVE_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_model_senses.go` |
+| `MISTY_DIARIZED_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_model_senses.go` |
+| `MISTY_VOICE_NOTES_MODEL` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_model_senses.go` |
+| `MISTY_RUNTIME_LIVE_TRANSCRIBE` | `integrations/ai.env` | `server/apps/agent-runtime/src/live/route.ts` |
+| `SONIOX_API_KEY` | `integrations/ai.env` | `server/apps/agent-runtime/src/live/route.ts · server/apps/agent-runtime/src/transcribe-diarized.ts` |
 | `MISTY_AGENT_MODEL` | `integrations/ai.env` | `server/internal/platform/config/agent_model.go` · `server/apps/agent-runtime/src/model-provider.ts` |
 | `MISTY_AI_MAX_TOKENS_PER_DAY` | `integrations/ai.env` | `server/internal/agents/provider_budget_limits.go` |
 | `MISTY_AI_MAX_TOKENS_PER_HOUR` | `integrations/ai.env` | `server/internal/agents/provider_budget_limits.go` |

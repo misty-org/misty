@@ -4,6 +4,10 @@ import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
 import { LibraryMemoryPlayback } from "../SpaceLibraryPlayback";
 import { LibraryItemViewer } from "../SpaceLibraryViewer";
+import { publicBetaFeatureEnabled } from "@/features/launch";
+import { transcribeLibraryFile } from "@/features/voice";
+import { libraryMediaKind } from "../libraryViewer/libraryMediaKind";
+import { libraryItemMIME } from "../SpaceLibraryPrimitives";
 import { LibraryItemContextMenu } from "./LibraryItemContextMenu";
 
 export function SpaceLibraryOverlays() {
@@ -118,6 +122,11 @@ export function SpaceLibraryOverlays() {
           canEdit={canEditLibrary}
           deleted={collection === "deleted"}
           onClose={() => setItemMenu(null)}
+          onTranscribe={
+            transcribable(menuItem)
+              ? () => void transcribeLibraryFile(spaceId, menuItem.id, menuItem.display_name)
+              : undefined
+          }
           onCopy={() => void copyItemsToClipboard([menuItem])}
           onDuplicate={() => void duplicateItems([menuItem.id])}
           onRename={() =>
@@ -269,4 +278,11 @@ export function SpaceLibraryOverlays() {
       />
     </>
   );
+}
+
+/** Audio and video files can be transcribed once voice notes are on. */
+function transcribable(item: Parameters<typeof libraryItemMIME>[0]) {
+  if (!publicBetaFeatureEnabled("voiceNotes")) return false;
+  const kind = libraryMediaKind(libraryItemMIME(item), item.file.intrinsic_metadata);
+  return kind.isAudio || kind.isVideo;
 }

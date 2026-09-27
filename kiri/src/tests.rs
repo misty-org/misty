@@ -86,6 +86,21 @@ fn media_rejects_malformed_state_and_unknown_methods() {
 }
 
 #[test]
+fn media_audio_reaches_the_host_bounded() {
+    let (kiri, recorder) = kiri(vec![]);
+    let reply = dispatch(&kiri, VIEW, "https://meet.example/", json!({ "v": 1, "cap": "media", "method": "audio", "args": { "session": 7, "pcm": "AAEC" } }));
+    assert_eq!(reply, Ok(Value::Null));
+    assert_eq!(recorder.signals.lock().unwrap()[0].1, Signal::MediaAudio { session: 7, pcm: "AAEC".into() });
+    for args in [json!({ "session": 7, "pcm": "not base64!" }), json!({ "session": 7, "pcm": "A".repeat(70_000) }), json!({ "session": -1, "pcm": "AA" })] {
+        let reply = dispatch(&kiri, VIEW, "https://meet.example/", json!({ "v": 1, "cap": "media", "method": "audio", "args": args }));
+        assert_eq!(reply.unwrap_err().name, "TypeError");
+    }
+    let reply = dispatch(&kiri, VIEW, "https://meet.example/", json!({ "v": 1, "cap": "media", "method": "notice", "args": { "session": 7, "notice": "Some audio here can't be heard." } }));
+    assert_eq!(reply, Ok(Value::Null));
+    assert_eq!(recorder.signals.lock().unwrap().len(), 2);
+}
+
+#[test]
 fn unknown_capabilities_are_not_supported() {
     let (kiri, _) = kiri(vec![]);
     let reply = dispatch(&kiri, VIEW, "https://a.example/", json!({ "v": 1, "cap": "bluetooth", "method": "request-device" }));
@@ -119,6 +134,7 @@ fn page_script_installs_every_shim_once() {
     let script = page_script();
     assert!(!script.contains("__KIRI_CAPABILITIES__"));
     assert_eq!(script.matches("signal('media', 'state'").count(), 1);
+    assert_eq!(script.matches("defineProperty(window, '__kiriMediaTap'").count(), 1);
     assert!(script.contains("plugin:kiri|call"));
     // The transport never navigates to report; navigations can cancel page loads.
     assert!(!script.contains("location.href"));

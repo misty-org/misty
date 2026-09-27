@@ -13,7 +13,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// voiceTestDB applies the voice migration in a fresh schema of the disposable
+// voiceTestDB applies the voice migrations in a fresh schema of the disposable
 // database named by MISTY_VOICE_TEST_DSN (misty_voice_test). The connection
 // role must not bypass row-level security, so the owner policy is exercised.
 func voiceTestDB(t *testing.T) *Database {
@@ -51,13 +51,15 @@ func voiceTestDB(t *testing.T) *Database {
  CREATE FUNCTION misty_rls_is_service() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT current_setting('app.rls_mode',true)='service' $$;`); err != nil {
 		t.Fatal(err)
 	}
-	migration, err := migrationFiles.ReadFile("migrations/20271020000000_voice_live_sessions.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	up, _, _ := strings.Cut(string(migration), "-- +goose Down")
-	if _, err = conn.Exec(up); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"20271020000000_voice_live_sessions.sql", "20271020010000_voice_transcripts.sql"} {
+		migration, err := migrationFiles.ReadFile("migrations/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		up, _, _ := strings.Cut(string(migration), "-- +goose Down")
+		if _, err = conn.Exec(up); err != nil {
+			t.Fatal(name, err)
+		}
 	}
 	return &Database{Conn: conn}
 }

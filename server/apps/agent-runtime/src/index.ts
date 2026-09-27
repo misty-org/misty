@@ -4,6 +4,7 @@ import { instanceModelConfig } from "./model-provider.js";
 import { embedCall, generateTextCall, modelCallFailure, speechCall, transcribeCall } from "./model-calls.js";
 import { webSearchCall } from "./web-search.js";
 import { transcribeDiarizedCall } from "./transcribe-diarized.js";
+import { voiceNotesCall } from "./voice-notes.js";
 import { vercelHarness as harness } from "./vercel-harness.js";
 import { MISTY_HARNESS_VERSION } from "./harness.js";
 import { controlPlaneURL } from "./control-plane.js";
@@ -84,6 +85,7 @@ for (const [path, call] of [
   ["/v1/models/embed", embedCall],
   ["/v1/models/transcribe", transcribeCall],
   ["/v1/models/transcribe-diarized", transcribeDiarizedCall],
+  ["/v1/models/voice-notes", voiceNotesCall],
   ["/v1/models/speech", speechCall],
   ["/v1/models/search", webSearchCall],
 ] as const) {

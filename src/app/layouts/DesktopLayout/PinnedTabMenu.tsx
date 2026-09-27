@@ -1,4 +1,7 @@
-import { Pin, PinOff, RotateCcw, Star, StarOff } from "lucide-react";
+import { AudioLines, Pin, PinOff, RotateCcw, Star, StarOff } from "lucide-react";
+import { publicBetaFeatureEnabled } from "@/features/launch";
+import { captureTab } from "@/features/voice";
+import { browserRuntimeId } from "@/features/browser";
 import {
   addFavorite,
   isFavorite,
@@ -21,6 +24,7 @@ export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
     <>
       <PinnedTabMenu tab={tab} />
       <FavoriteTabMenu tab={tab} />
+      <TranscribeTabMenu tab={tab} />
     </>
   );
 }
@@ -95,6 +99,23 @@ function FavoriteTabMenu({ tab }: { tab: WorkspaceTab }) {
         // The favorite now switches to this tab instead of opening another.
         useWorkspaceStore.getState().updateBrowserView(view.id, { bookmarkId: id });
       }}
+    />
+  );
+}
+
+/** "Transcribe this tab": hear the page's own audio into a live Note. */
+function TranscribeTabMenu({ tab }: { tab: WorkspaceTab }) {
+  if (!publicBetaFeatureEnabled("voiceNotes")) return null;
+  const views = dockTreeViews(tab.root);
+  const view = views.length === 1 && views[0].surfaceId === "browser" ? views[0] : null;
+  if (!view) return null;
+  const state = parseBrowserViewState(view.state);
+  if (!/^https?:/.test(state.url)) return null;
+  return (
+    <ContextMenuAction
+      label="Transcribe this tab"
+      icon={<AudioLines />}
+      onSelect={() => void captureTab(browserRuntimeId(view), view.title, state.url)}
     />
   );
 }

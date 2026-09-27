@@ -17,12 +17,18 @@ impl kiri::Host for MistyHost {
         let Some(id) = caller.webview.strip_prefix(WEBVIEW_PREFIX) else {
             return;
         };
-        if let kiri::Signal::MediaAudible(audible) = signal {
-            let _ = self.app.emit_to(
-                super::browser::browser_owner_label(&self.app, id),
-                "misty://browser-media",
-                json!({ "id": id, "audible": audible }),
-            );
+        match signal {
+            kiri::Signal::MediaAudible(audible) => {
+                let _ = self.app.emit_to(
+                    super::browser::browser_owner_label(&self.app, id),
+                    "misty://browser-media",
+                    json!({ "id": id, "audible": audible }),
+                );
+            }
+            // "Transcribe this tab": forwarded only for a session Misty started.
+            kiri::Signal::MediaAudio { session, pcm } => crate::voice::tab_tap::forward(&self.app, id, session, Some(pcm), None),
+            kiri::Signal::MediaTapNotice { session, notice } => crate::voice::tab_tap::forward(&self.app, id, session, None, Some(notice)),
+            _ => {}
         }
     }
 
