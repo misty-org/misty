@@ -1,10 +1,4 @@
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { BrowserZoomControls, useBrowserZoom } from "./BrowserZoomControls";
 import { BrowserMenuView } from "./BrowserMenuView";
@@ -41,15 +35,10 @@ it("steps, resets, caps zoom and retains the confirmed value after failure", asy
   expect(report).toHaveBeenCalledOnce();
   for (let i = 0; i < 12; i++) await click("Zoom out");
   expect(ui.getByText("25%")).toBeTruthy();
-  expect(
-    (ui.getByRole("button", { name: "Zoom out" }) as HTMLButtonElement)
-      .disabled,
-  ).toBe(true);
+  expect((ui.getByRole("button", { name: "Zoom out" }) as HTMLButtonElement).disabled).toBe(true);
   for (let i = 0; i < 22; i++) await click("Zoom in");
   expect(ui.getByText("500%")).toBeTruthy();
-  expect(
-    (ui.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement).disabled,
-  ).toBe(true);
+  expect((ui.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 it("ignores a pending result from a replaced page and prevents duplicate requests", async () => {

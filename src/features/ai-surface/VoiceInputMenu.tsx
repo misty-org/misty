@@ -48,7 +48,9 @@ export function VoiceInputMenu(props: {
             icon={<Mic />}
             label={device.label}
             shortcut={
-              props.selectedDeviceId === device.deviceId ? <Check className="size-3.5" /> : undefined
+              props.selectedDeviceId === device.deviceId ? (
+                <Check className="size-3.5" />
+              ) : undefined
             }
             onSelect={() => props.onSelect(device.deviceId)}
           />

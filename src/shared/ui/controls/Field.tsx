@@ -11,7 +11,11 @@ type FieldProps = {
   layout?: "stacked" | "inline";
   className?: string;
   /** A single control; it receives the generated id and describedby wiring. */
-  children: React.ReactElement<{ id?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }>;
+  children: React.ReactElement<{
+    id?: string;
+    "aria-describedby"?: string;
+    "aria-invalid"?: boolean;
+  }>;
 };
 
 /** Label + control + hint/error, wired for accessibility. Forms and settings rows use this. */
@@ -37,10 +41,14 @@ function Field({ label, hint, error, layout = "stacked", className, children }: 
         <Label htmlFor={id} className="text-cream">
           {label}
         </Label>
-        {layout === "inline" && note ? <FieldNote id={noteId} error={Boolean(error)} note={note} /> : null}
+        {layout === "inline" && note ? (
+          <FieldNote id={noteId} error={Boolean(error)} note={note} />
+        ) : null}
       </div>
       {control}
-      {layout === "stacked" && note ? <FieldNote id={noteId} error={Boolean(error)} note={note} /> : null}
+      {layout === "stacked" && note ? (
+        <FieldNote id={noteId} error={Boolean(error)} note={note} />
+      ) : null}
     </div>
   );
 }
@@ -50,7 +58,10 @@ function FieldNote(props: { id: string; error: boolean; note: React.ReactNode })
     <p
       id={props.id}
       role={props.error ? "alert" : undefined}
-      className={cn("m-0 text-xs leading-4", props.error ? "text-cream-bright" : "text-cream-muted")}
+      className={cn(
+        "m-0 text-xs leading-4",
+        props.error ? "text-cream-bright" : "text-cream-muted",
+      )}
     >
       {props.note}
     </p>

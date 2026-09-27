@@ -33,11 +33,7 @@ import type { CompareMode } from "../model/types/workspace/ExplorerCompareDialog
 import { formatBytes } from "../utils/fileFormat";
 import { compareStyles } from "./ExplorerDesktopDialogStyles";
 import { leftDiffKind, rightDiffKind } from "./compareDialog/compareDiff";
-import {
-  CompareDiffLine,
-  joinLocalPath,
-  parentPath,
-} from "./compareDialog/ComparePresentation";
+import { CompareDiffLine, joinLocalPath, parentPath } from "./compareDialog/ComparePresentation";
 export type {
   CompareDialogSeed,
   CompareImagePreview,
@@ -51,14 +47,8 @@ export type {
 } from "../model/types/workspace/ExplorerCompareDialog";
 
 export interface CompareDialogRuntime {
-  compareFiles(request: {
-    leftPath: string;
-    rightPath: string;
-  }): Promise<CompareFilesResult>;
-  compareFolders(request: {
-    leftPath: string;
-    rightPath: string;
-  }): Promise<CompareFoldersResult>;
+  compareFiles(request: { leftPath: string; rightPath: string }): Promise<CompareFilesResult>;
+  compareFolders(request: { leftPath: string; rightPath: string }): Promise<CompareFoldersResult>;
   textDiff(left: string, right: string): Promise<CompareTextDiffState | null>;
   images(left: string, right: string): Promise<CompareImageState | null>;
   merge(text: string, target: string): Promise<unknown>;
@@ -78,21 +68,14 @@ export function CompareDialogView(props: {
   const [leftPath, setLeftPath] = useState(props.seed.leftPath);
   const [rightPath, setRightPath] = useState(props.seed.rightPath ?? "");
   const [running, setRunning] = useState(false);
-  const [applyingMerge, setApplyingMerge] = useState<"left" | "right" | null>(
-    null,
-  );
+  const [applyingMerge, setApplyingMerge] = useState<"left" | "right" | null>(null);
   const [mergeTarget, setMergeTarget] = useState<"left" | "right" | null>(null);
   const [fileResult, setFileResult] = useState<CompareFilesResult | null>(null);
-  const [folderResult, setFolderResult] = useState<CompareFoldersResult | null>(
-    null,
-  );
+  const [folderResult, setFolderResult] = useState<CompareFoldersResult | null>(null);
   const [textDiff, setTextDiff] = useState<CompareTextDiffState | null>(null);
-  const [imageCompare, setImageCompare] = useState<CompareImageState | null>(
-    null,
-  );
+  const [imageCompare, setImageCompare] = useState<CompareImageState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const changedRows =
-    folderResult?.rows.filter((row) => row.disposition !== "same") ?? [];
+  const changedRows = folderResult?.rows.filter((row) => row.disposition !== "same") ?? [];
 
   const runCompare = useCallback(async () => {
     if (!leftPath.trim() || !rightPath.trim()) {
@@ -119,15 +102,9 @@ export function CompareDialogView(props: {
           rightPath: rightPath.trim(),
         });
         setFileResult(result);
-        const nextTextDiff = await runtime.textDiff(
-          leftPath.trim(),
-          rightPath.trim(),
-        );
+        const nextTextDiff = await runtime.textDiff(leftPath.trim(), rightPath.trim());
         setTextDiff(nextTextDiff);
-        if (!nextTextDiff)
-          setImageCompare(
-            await runtime.images(leftPath.trim(), rightPath.trim()),
-          );
+        if (!nextTextDiff) setImageCompare(await runtime.images(leftPath.trim(), rightPath.trim()));
       }
     } catch (compareError) {
       setError(errorText(compareError));
@@ -140,8 +117,7 @@ export function CompareDialogView(props: {
     async (target: "left" | "right") => {
       if (!textDiff) return;
       const targetPath = target === "left" ? leftPath.trim() : rightPath.trim();
-      const mergedText =
-        target === "left" ? textDiff.rightText : textDiff.leftText;
+      const mergedText = target === "left" ? textDiff.rightText : textDiff.leftText;
       if (!targetPath) return;
       setApplyingMerge(target);
       setError(null);
@@ -159,23 +135,14 @@ export function CompareDialogView(props: {
   );
 
   const queueFolderCopy = useCallback(
-    async (
-      row: CompareFolderRow,
-      direction: "left_to_right" | "right_to_left",
-    ) => {
+    async (row: CompareFolderRow, direction: "left_to_right" | "right_to_left") => {
       if (!folderResult) return;
       const sourceRoot =
-        direction === "left_to_right"
-          ? folderResult.leftPath
-          : folderResult.rightPath;
+        direction === "left_to_right" ? folderResult.leftPath : folderResult.rightPath;
       const destinationRoot =
-        direction === "left_to_right"
-          ? folderResult.rightPath
-          : folderResult.leftPath;
+        direction === "left_to_right" ? folderResult.rightPath : folderResult.leftPath;
       const sourcePath = joinLocalPath(sourceRoot, row.relativePath);
-      const destinationDirectory = parentPath(
-        joinLocalPath(destinationRoot, row.relativePath),
-      );
+      const destinationDirectory = parentPath(joinLocalPath(destinationRoot, row.relativePath));
       try {
         await runtime.copy(sourcePath, destinationDirectory);
         runtime.notify("Queued compare copy.");
@@ -226,9 +193,7 @@ export function CompareDialogView(props: {
                   Compare files by hash or folders by relative inventory.
                 </DialogDescription>
               </div>
-              <Badge variant="secondary">
-                {mode === "folder" ? "Folder" : "File"}
-              </Badge>
+              <Badge variant="secondary">{mode === "folder" ? "Folder" : "File"}</Badge>
             </DialogHeader>
             <div className={`${compareStyles.body} min-h-0 overflow-auto p-4`}>
               <div className="flex flex-wrap items-center gap-2">
@@ -252,10 +217,7 @@ export function CompareDialogView(props: {
               <div className={compareStyles.fields}>
                 <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                   <span>Left</span>
-                  <Input
-                    value={leftPath}
-                    onChange={(event) => setLeftPath(event.target.value)}
-                  />
+                  <Input value={leftPath} onChange={(event) => setLeftPath(event.target.value)} />
                 </label>
                 <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                   <span>Right</span>
@@ -270,21 +232,13 @@ export function CompareDialogView(props: {
               {fileResult ? (
                 <div className={compareStyles.result}>
                   <strong>{fileResult.message}</strong>
-                  <span>
-                    {textDiff ? "text compare" : `${fileResult.kind} compare`}
-                  </span>
+                  <span>{textDiff ? "text compare" : `${fileResult.kind} compare`}</span>
                   <span>Left SHA-256</span>
-                  <span
-                    className={compareStyles.hash}
-                    title={fileResult.leftSha256}
-                  >
+                  <span className={compareStyles.hash} title={fileResult.leftSha256}>
                     {fileResult.leftSha256}
                   </span>
                   <span>Right SHA-256</span>
-                  <span
-                    className={compareStyles.hash}
-                    title={fileResult.rightSha256}
-                  >
+                  <span className={compareStyles.hash} title={fileResult.rightSha256}>
                     {fileResult.rightSha256}
                   </span>
                 </div>
@@ -293,14 +247,8 @@ export function CompareDialogView(props: {
                 <div className={compareStyles.diffShell}>
                   <div className={compareStyles.diffHeader}>
                     <span>
-                      {
-                        textDiff.rows.filter((row) => row.kind !== "same")
-                          .length
-                      }{" "}
-                      changed lines
-                      {textDiff.truncated
-                        ? " shown from the first 800 lines"
-                        : ""}
+                      {textDiff.rows.filter((row) => row.kind !== "same").length} changed lines
+                      {textDiff.truncated ? " shown from the first 800 lines" : ""}
                     </span>
                     <span className={compareStyles.diffActions}>
                       <Button
@@ -310,9 +258,7 @@ export function CompareDialogView(props: {
                         disabled={Boolean(applyingMerge)}
                         onClick={() => setMergeTarget("right")}
                       >
-                        {applyingMerge === "right"
-                          ? "Applying"
-                          : "Apply L to R"}
+                        {applyingMerge === "right" ? "Applying" : "Apply L to R"}
                       </Button>
                       <Button
                         variant="outline"
@@ -386,14 +332,12 @@ export function CompareDialogView(props: {
                   <div className={compareStyles.result}>
                     <strong>{folderResult.message}</strong>
                     <span>
-                      {changedRows.length} changed,{" "}
-                      {folderResult.rows.length - changedRows.length} same.
+                      {changedRows.length} changed, {folderResult.rows.length - changedRows.length}{" "}
+                      same.
                     </span>
                   </div>
                   {changedRows.length === 0 ? (
-                    <div className={compareStyles.empty}>
-                      No folder differences found.
-                    </div>
+                    <div className={compareStyles.empty}>No folder differences found.</div>
                   ) : (
                     <div className={compareStyles.rowList}>
                       {changedRows.slice(0, 250).map((row) => (
@@ -401,10 +345,7 @@ export function CompareDialogView(props: {
                           className={compareStyles.row}
                           key={`${row.disposition}:${row.relativePath}`}
                         >
-                          <span
-                            className={compareStyles.rowPath}
-                            title={row.relativePath}
-                          >
+                          <span className={compareStyles.rowPath} title={row.relativePath}>
                             {row.relativePath}
                           </span>
                           <span className={compareStyles.rowMeta}>
@@ -420,9 +361,7 @@ export function CompareDialogView(props: {
                                 variant="outline"
                                 size="sm"
                                 type="button"
-                                onClick={() =>
-                                  void queueFolderCopy(row, "left_to_right")
-                                }
+                                onClick={() => void queueFolderCopy(row, "left_to_right")}
                               >
                                 Copy R
                               </Button>
@@ -432,9 +371,7 @@ export function CompareDialogView(props: {
                                 variant="outline"
                                 size="sm"
                                 type="button"
-                                onClick={() =>
-                                  void queueFolderCopy(row, "right_to_left")
-                                }
+                                onClick={() => void queueFolderCopy(row, "right_to_left")}
                               >
                                 Copy L
                               </Button>
@@ -444,9 +381,7 @@ export function CompareDialogView(props: {
                                 variant="outline"
                                 size="sm"
                                 type="button"
-                                onClick={() =>
-                                  void queueFolderDelete(row, "left")
-                                }
+                                onClick={() => void queueFolderDelete(row, "left")}
                               >
                                 Trash L
                               </Button>
@@ -456,9 +391,7 @@ export function CompareDialogView(props: {
                                 variant="outline"
                                 size="sm"
                                 type="button"
-                                onClick={() =>
-                                  void queueFolderDelete(row, "right")
-                                }
+                                onClick={() => void queueFolderDelete(row, "right")}
                               >
                                 Trash R
                               </Button>
@@ -496,8 +429,8 @@ export function CompareDialogView(props: {
               <strong className="break-all font-medium text-cream">
                 {mergeTarget === "left" ? leftPath.trim() : rightPath.trim()}
               </strong>{" "}
-              with the {mergeTarget === "left" ? "right" : "left"} file’s text.
-              This overwrites the current contents.
+              with the {mergeTarget === "left" ? "right" : "left"} file’s text. This overwrites the
+              current contents.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

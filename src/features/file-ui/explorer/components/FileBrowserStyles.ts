@@ -18,8 +18,7 @@ export const fileBrowserStyles = {
   tableWrap:
     "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-sidebar",
   tableHeaderWrap: "min-w-0 overflow-hidden",
-  tableResetButton:
-    "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent text-cream-muted hover:bg-charcoal-hover hover:text-cream focus-visible:border-charcoal-active max-[720px]:hidden",
+  tableResetButton: "absolute right-2 top-1.5 z-[4] max-[720px]:hidden",
   tableScroll:
     "misty-transient-scrollbar misty-file-browser-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   table:

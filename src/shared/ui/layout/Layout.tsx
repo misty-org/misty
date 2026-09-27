@@ -21,8 +21,7 @@ const boxVariants = cva("min-w-0", {
 });
 
 export interface BoxProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof boxVariants> {
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof boxVariants> {
   asChild?: boolean;
 }
 
@@ -75,8 +74,7 @@ const stackVariants = cva("flex flex-col min-w-0", {
 });
 
 export interface StackProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof stackVariants> {
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof stackVariants> {
   asChild?: boolean;
 }
 
@@ -134,8 +132,7 @@ const flexRowVariants = cva("flex flex-row min-w-0 items-center", {
 });
 
 export interface FlexRowProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof flexRowVariants> {
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof flexRowVariants> {
   asChild?: boolean;
 }
 

@@ -20,7 +20,11 @@ export function HelpMenu({ className }: { className: string }) {
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-charcoal-border px-5 py-5 pr-16">
           <DialogTitle className="text-base font-semibold">Help</DialogTitle>
           {import.meta.env.DEV ? (
-            <Button variant="outline" size="xs" onClick={() => void openUiGallery(() => setOpen(false))}>
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => void openUiGallery(() => setOpen(false))}
+            >
               UI gallery
             </Button>
           ) : null}

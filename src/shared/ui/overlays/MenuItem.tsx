@@ -37,6 +37,8 @@ type SubmenuProps = Omit<RowProps, "shortcut"> & {
   children: React.ReactNode;
   width?: MenuWidth;
   disabled?: boolean;
+  /** Native tooltip on the row, e.g. why it is disabled. */
+  title?: string;
 };
 
 /** The one dropdown row: icon · label · shortcut. Every dropdown menu is built from these. */
@@ -51,10 +53,10 @@ const MenuItem = React.forwardRef<
 MenuItem.displayName = "MenuItem";
 
 /** A dropdown row that opens a nested menu; the right chevron comes from the sub-trigger. */
-function MenuSubmenu({ icon, label, children, width = "md", disabled }: SubmenuProps) {
+function MenuSubmenu({ icon, label, children, width = "md", disabled, title }: SubmenuProps) {
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={disabled}>
+      <DropdownMenuSubTrigger disabled={disabled} title={title}>
         <RowBody icon={icon} label={label} />
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent className={menuWidthClass[width]}>{children}</DropdownMenuSubContent>
@@ -73,10 +75,17 @@ const ContextMenuAction = React.forwardRef<
 ));
 ContextMenuAction.displayName = "ContextMenuAction";
 
-function ContextMenuSubmenu({ icon, label, children, width = "md", disabled }: SubmenuProps) {
+function ContextMenuSubmenu({
+  icon,
+  label,
+  children,
+  width = "md",
+  disabled,
+  title,
+}: SubmenuProps) {
   return (
     <ContextMenuSub>
-      <ContextMenuSubTrigger disabled={disabled}>
+      <ContextMenuSubTrigger disabled={disabled} title={title}>
         <RowBody icon={icon} label={label} />
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className={menuWidthClass[width]}>{children}</ContextMenuSubContent>

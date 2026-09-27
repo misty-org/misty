@@ -1,9 +1,8 @@
 import { openTerminalAtPath } from "@/features/files/workspace/native";
 import { reportSystemError } from "@/features/activity";
-import { Button } from "@/shared/ui";
+import { IconButton, toolbarIconProps } from "@/shared/ui";
 import { PanelsTopLeft, Terminal } from "lucide-react";
 import { useCallback, useState } from "react";
-import { explorerTrayStyles } from "../ExplorerDesktopPluginStyles";
 
 export function ExplorerTray(props: {
   terminalEnabled: boolean;
@@ -27,27 +26,24 @@ export function ExplorerTray(props: {
 
   return (
     <>
-      {errorMessage ? <span role="alert" className="text-xs text-cream-muted">{errorMessage}</span> : null}
-      <Button
-        className={explorerTrayStyles.trigger}
-        type="button"
-        title="Open Spaces"
-        aria-label="Open Spaces"
-        onClick={props.onToggleFileManagerMode}
-      >
-        <PanelsTopLeft size={16} />
-      </Button>
+      {errorMessage ? (
+        <span role="alert" className="text-xs text-cream-muted">
+          {errorMessage}
+        </span>
+      ) : null}
+      <IconButton label="Open Spaces" tooltip={false} onClick={props.onToggleFileManagerMode}>
+        <PanelsTopLeft {...toolbarIconProps} />
+      </IconButton>
       <span className="mx-0.5 h-4 w-px bg-charcoal-border" aria-hidden="true" />
-      <Button
-        className={explorerTrayStyles.trigger}
-        type="button"
+      <IconButton
+        label="Open terminal"
+        tooltip={false}
         title={props.terminalEnabled ? "Open terminal" : "Terminal unavailable for this view"}
-        aria-label="Open terminal"
         disabled={!props.terminalEnabled}
         onClick={openTerminal}
       >
-        <Terminal size={16} />
-      </Button>
+        <Terminal {...toolbarIconProps} />
+      </IconButton>
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { Button, Slider } from "@/shared/ui";
+import { Button, IconButton, Slider, toolbarIconProps } from "@/shared/ui";
 import type Konva from "konva";
 import { Pen, Redo2, Trash2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -178,9 +178,6 @@ export default function VideoAnnotator({
             type="button"
             variant={drawing ? "default" : "ghost"}
             size="sm"
-            className={
-              drawing ? "" : "text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
-            }
             aria-pressed={drawing}
             onClick={toggleDraw}
           >
@@ -217,39 +214,15 @@ export default function VideoAnnotator({
                   onValueChange={([value]) => setBrush(value ?? brush)}
                 />
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
-                aria-label="Undo"
-                disabled={strokes.length === 0}
-                onClick={undo}
-              >
-                <Undo2 size={16} />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
-                aria-label="Redo"
-                disabled={redo.length === 0}
-                onClick={redoStroke}
-              >
-                <Redo2 size={16} />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
-                aria-label="Clear drawing"
-                disabled={strokes.length === 0}
-                onClick={clear}
-              >
-                <Trash2 size={16} />
-              </Button>
+              <IconButton label="Undo" disabled={strokes.length === 0} onClick={undo}>
+                <Undo2 {...toolbarIconProps} />
+              </IconButton>
+              <IconButton label="Redo" disabled={redo.length === 0} onClick={redoStroke}>
+                <Redo2 {...toolbarIconProps} />
+              </IconButton>
+              <IconButton label="Clear drawing" disabled={strokes.length === 0} onClick={clear}>
+                <Trash2 {...toolbarIconProps} />
+              </IconButton>
             </>
           ) : null}
         </div>

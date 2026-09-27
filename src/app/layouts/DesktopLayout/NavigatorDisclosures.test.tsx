@@ -137,7 +137,7 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(trigger?.className).toContain("w-full");
     expect(
-      trigger?.querySelector('[data-chevron-placement]')?.getAttribute("data-chevron-placement"),
+      trigger?.querySelector("[data-chevron-placement]")?.getAttribute("data-chevron-placement"),
     ).toBe("inline");
 
     const destinations = container.querySelector(
@@ -160,7 +160,9 @@ describe("GlobalNavigator disclosures", () => {
       "/spaces/space-1/planner/tasks/board",
     );
 
-    const library = container.querySelector('[data-space-tool="library"] button[aria-label="Library"]');
+    const library = container.querySelector(
+      '[data-space-tool="library"] button[aria-label="Library"]',
+    );
     expect(
       Boolean(
         destinations &&

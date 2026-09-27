@@ -18,10 +18,7 @@ export function BrowserMenu(props: {
 }) {
   const setOverlay = useCallback(
     async (reason: string, active: boolean) => {
-      setBrowserWebviewsSuspended(
-        active,
-        `browser-${reason}:${browserRuntimeId(props.tab)}`,
-      );
+      setBrowserWebviewsSuspended(active, `browser-${reason}:${browserRuntimeId(props.tab)}`);
       await browserOverlayReady();
     },
     [props.tab.instanceKey],
@@ -29,10 +26,7 @@ export function BrowserMenu(props: {
   const reportError = (error: unknown) =>
     useBrowserRuntimeStore
       .getState()
-      .setError(
-        props.tab.id,
-        error instanceof Error ? error.message : String(error),
-      );
+      .setError(props.tab.id, error instanceof Error ? error.message : String(error));
   return (
     <BrowserMenuView
       {...props}

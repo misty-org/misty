@@ -29,10 +29,18 @@ const ranges = [
 type Choice = "history" | "downloads" | BrowserWebsiteDataKind;
 
 const choices: { id: Choice; label: string; detail: string }[] = [
-  { id: "history", label: "Browsing history", detail: "Pages you visited, and their address bar suggestions." },
+  {
+    id: "history",
+    label: "Browsing history",
+    detail: "Pages you visited, and their address bar suggestions.",
+  },
   { id: "downloads", label: "Download list", detail: "Downloaded files stay on disk." },
   { id: "cookies", label: "Cookies and site data", detail: "Signs you out of most websites." },
-  { id: "cache", label: "Cached images and files", detail: "Some sites may load more slowly next time." },
+  {
+    id: "cache",
+    label: "Cached images and files",
+    detail: "Some sites may load more slowly next time.",
+  },
 ];
 
 /** Clear browsing data for this tab's browser profile. */
@@ -122,8 +130,8 @@ export function BrowserClearDataDialog(props: {
         </div>
         {selected.has("cookies") ? (
           <p className="rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted">
-            If Sync is on, website sign-ins saved from another device can be restored the next
-            time this device syncs.
+            If Sync is on, website sign-ins saved from another device can be restored the next time
+            this device syncs.
           </p>
         ) : null}
         {error ? (

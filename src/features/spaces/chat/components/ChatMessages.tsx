@@ -1,9 +1,5 @@
 import type { FormEvent, RefObject, UIEventHandler } from "react";
-import type {
-  SpaceLibraryItem,
-  SpaceMessage,
-  SpaceNode,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceActionSuggestionBatch } from "@/api/spaces/dto/interfaces/actionSuggestionTypes";
 
 export type SpaceChatStarter = "mention" | "files" | "library";
@@ -135,7 +131,6 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
             );
           })
         )}
-
 
         <div ref={props.endRef} />
       </div>

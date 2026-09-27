@@ -91,7 +91,12 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
       >
         {commands ? (
           <>
-            <Item icon={<Plus />} label="New tab" shortcut="workspace.new_tab" onSelect={commands.newTab} />
+            <Item
+              icon={<Plus />}
+              label="New tab"
+              shortcut="workspace.new_tab"
+              onSelect={commands.newTab}
+            />
             <Item
               icon={<AppWindow />}
               label="New window"
@@ -123,23 +128,23 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               onSelect={() => commands.openPage("downloads")}
             />
             <MenuSubmenu icon={<Bookmark />} label="Bookmarks" width="lg">
-                <Item
-                  icon={<BookmarkPlus />}
-                  label="Bookmark this page"
-                  shortcut="browser.bookmark"
-                  onSelect={commands.bookmark}
-                />
-                <Item
-                  icon={<BookmarkCheck />}
-                  label="Bookmark all tabs"
-                  onSelect={commands.bookmarkAllTabs}
-                />
-                <Item
-                  icon={<Library />}
-                  label="Bookmark manager"
-                  onSelect={() => commands.openPage("bookmarks")}
-                />
-              </MenuSubmenu>
+              <Item
+                icon={<BookmarkPlus />}
+                label="Bookmark this page"
+                shortcut="browser.bookmark"
+                onSelect={commands.bookmark}
+              />
+              <Item
+                icon={<BookmarkCheck />}
+                label="Bookmark all tabs"
+                onSelect={commands.bookmarkAllTabs}
+              />
+              <Item
+                icon={<Library />}
+                label="Bookmark manager"
+                onSelect={() => commands.openPage("bookmarks")}
+              />
+            </MenuSubmenu>
             <DropdownMenuSeparator />
           </>
         ) : null}
@@ -147,28 +152,38 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         <DropdownMenuSeparator />
         {commands ? (
           <>
-            <Item icon={<Search />} label="Find…" shortcut="browser.find" onSelect={commands.find} />
-            <Item icon={<Printer />} label="Print…" shortcut="browser.print" onSelect={commands.print} />
+            <Item
+              icon={<Search />}
+              label="Find…"
+              shortcut="browser.find"
+              onSelect={commands.find}
+            />
+            <Item
+              icon={<Printer />}
+              label="Print…"
+              shortcut="browser.print"
+              onSelect={commands.print}
+            />
             <MenuSubmenu icon={<Share2 />} label="Share" width="md">
-                <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
-                <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
-              </MenuSubmenu>
+              <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
+              <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
+            </MenuSubmenu>
             <MenuSubmenu icon={<Wrench />} label="More tools" width="lg">
-                <Item icon={<FileDown />} label="Save page as…" onSelect={commands.savePage} />
-                <Item
-                  icon={<Eraser />}
-                  label="Clear browsing data…"
-                  shortcut="browser.clear_data"
-                  onSelect={commands.clearBrowsingData}
-                />
-                <DropdownMenuSeparator />
-                <Item
-                  icon={<Code2 />}
-                  label="Developer tools"
-                  shortcut="browser.developer_tools"
-                  onSelect={commands.developerTools}
-                />
-              </MenuSubmenu>
+              <Item icon={<FileDown />} label="Save page as…" onSelect={commands.savePage} />
+              <Item
+                icon={<Eraser />}
+                label="Clear browsing data…"
+                shortcut="browser.clear_data"
+                onSelect={commands.clearBrowsingData}
+              />
+              <DropdownMenuSeparator />
+              <Item
+                icon={<Code2 />}
+                label="Developer tools"
+                shortcut="browser.developer_tools"
+                onSelect={commands.developerTools}
+              />
+            </MenuSubmenu>
             <DropdownMenuSeparator />
           </>
         ) : null}
@@ -183,9 +198,17 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         />
         {commands ? (
           <>
-            <Item icon={<Puzzle />} label="Extensions" onSelect={() => commands.openPage("extensions")} />
+            <Item
+              icon={<Puzzle />}
+              label="Extensions"
+              onSelect={() => commands.openPage("extensions")}
+            />
             <Item icon={<CircleHelp />} label="Help" onSelect={commands.help} />
-            <Item icon={<Settings2 />} label="Settings" onSelect={() => commands.openPage("settings")} />
+            <Item
+              icon={<Settings2 />}
+              label="Settings"
+              onSelect={() => commands.openPage("settings")}
+            />
           </>
         ) : null}
       </DropdownMenuContent>

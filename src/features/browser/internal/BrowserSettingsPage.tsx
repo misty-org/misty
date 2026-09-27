@@ -14,20 +14,12 @@ export function BrowserSettingsPage(props: BrowserInternalPageProps) {
       title="Browser settings"
       icon={Settings2}
       actions={
-        <Button
-          variant="toolbar"
-          size="xs"
-          onClick={props.clearBrowsingData}
-        >
+        <Button variant="toolbar" size="xs" onClick={props.clearBrowsingData}>
           Clear browsing data…
         </Button>
       }
     >
-      <Button
-        variant="toolbar"
-        size="xs"
-        onClick={openBrowserSettings}
-      >
+      <Button variant="toolbar" size="xs" onClick={openBrowserSettings}>
         Open Browser settings
       </Button>
     </InternalPageFrame>

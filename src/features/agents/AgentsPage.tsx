@@ -1025,10 +1025,7 @@ function AgentEditor({
         </p>
       )}
       <div className="flex flex-wrap gap-3 border-t border-charcoal-border pt-4">
-        <Button
-          disabled={busy || !draft.name.trim()}
-          type="submit"
-        >
+        <Button disabled={busy || !draft.name.trim()} type="submit">
           {busy ? "Saving…" : profile ? "Save changes" : "Create agent"}
         </Button>
         {profile && !profile.system_managed && (
@@ -1050,12 +1047,7 @@ function AgentEditor({
             Delete {profile?.name}? Active work will stop. Existing conversation history is
             retained.
           </p>
-          <Button
-            variant="outline"
-            type="button"
-            size="sm"
-            onClick={() => setConfirmDelete(false)}
-          >
+          <Button variant="outline" type="button" size="sm" onClick={() => setConfirmDelete(false)}>
             Keep agent
           </Button>{" "}
           <Button

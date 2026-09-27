@@ -127,60 +127,16 @@
       "hash": "0d6076bdd5155271"
     },
     {
-      "length": 313,
-      "hash": "9456c2b3e5ef24d2"
-    },
-    {
-      "length": 322,
-      "hash": "dbfd1795f077325e"
-    },
-    {
       "length": 207,
       "hash": "86d65be9ead7a342"
-    },
-    {
-      "length": 192,
-      "hash": "cda4c5d14206bc12"
-    },
-    {
-      "length": 165,
-      "hash": "1977511f1629dfc7"
     },
     {
       "length": 249,
       "hash": "b5d044864529f73a"
     },
     {
-      "length": 317,
-      "hash": "94dbbc66b9f00e80"
-    },
-    {
-      "length": 285,
-      "hash": "c529b4ccb7e826b7"
-    },
-    {
-      "length": 187,
-      "hash": "2280bac6ece3dc9e"
-    },
-    {
       "length": 346,
       "hash": "7339bb7b260d5539"
-    },
-    {
-      "length": 245,
-      "hash": "c8f24a824f3840f4"
-    },
-    {
-      "length": 188,
-      "hash": "f92f6eb3932b07b9"
-    },
-    {
-      "length": 212,
-      "hash": "80ad36c2114b99c6"
-    },
-    {
-      "length": 245,
-      "hash": "e53f69af37473d31"
     }
   ],
   "src/features/files/workspace/explorer/workspace/ExplorerDesktopStatus.tsx": [

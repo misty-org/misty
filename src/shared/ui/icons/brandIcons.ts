@@ -202,9 +202,7 @@ const aliases: Record<string, BrandId> = {
   onenote: "microsoft-onenote",
 };
 
-export function brandIconAsset(
-  value: string,
-): { id: BrandId; src: string } | undefined {
+export function brandIconAsset(value: string): { id: BrandId; src: string } | undefined {
   const normalized = value
     .trim()
     .toLowerCase()

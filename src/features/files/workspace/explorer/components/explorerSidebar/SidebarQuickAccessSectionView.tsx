@@ -9,6 +9,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  IconButton,
 } from "@/shared/ui";
 import { ExternalLink, Folder, PinOff, Plus, RefreshCcw, X } from "lucide-react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
@@ -46,11 +47,10 @@ export function SidebarQuickAccessSectionView({
               onToggle={() => onToggle()}
               actions={
                 sidebar.onChooseFolder ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={"Add folder"}
+                  <IconButton
+                    size="xs"
+                    tooltip={false}
+                    label="Add folder"
                     className={sidebarStyles.sectionActionButton}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -58,7 +58,7 @@ export function SidebarQuickAccessSectionView({
                     }}
                   >
                     <Plus size={15} />
-                  </Button>
+                  </IconButton>
                 ) : undefined
               }
             />

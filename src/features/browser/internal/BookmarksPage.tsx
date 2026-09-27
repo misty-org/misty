@@ -3,11 +3,7 @@ import { ListRow, ListRowButton } from "@/shared/ui";
 import { useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/features/workspace";
 import { WebsiteGroupsManager } from "@/features/browser-workspace/WebsiteGroupsManager";
-import {
-  InternalPageEmpty,
-  InternalPageFrame,
-  SiteIcon,
-} from "./InternalPageFrame";
+import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 
 /** Bookmarks are Misty's saved websites, organized in groups. */
@@ -24,8 +20,7 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
         site.fields.url.toLowerCase().includes(needle),
     );
   }, [text, websites]);
-  const groupLabel = (id: string) =>
-    groups.find((group) => group.id === id)?.fields.label ?? "";
+  const groupLabel = (id: string) => groups.find((group) => group.id === id)?.fields.label ?? "";
 
   return (
     <InternalPageFrame
@@ -40,7 +35,6 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
               <ListRow key={site.id}>
                 <SiteIcon url={site.fields.url} />
                 <ListRowButton
-                 
                   title={site.fields.url}
                   onClick={(event) =>
                     event.metaKey || event.ctrlKey

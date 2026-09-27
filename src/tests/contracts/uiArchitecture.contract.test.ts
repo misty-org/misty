@@ -58,7 +58,10 @@ describe("UI architecture contract", () => {
       .map(repositoryPath)
       .filter((path) => !/\.test\.tsx$/.test(path))
       .filter((path) => {
-        const name = path.split("/").pop()!.replace(/\.tsx$/, "");
+        const name = path
+          .split("/")
+          .pop()!
+          .replace(/\.tsx$/, "");
         return !/^[A-Z]/.test(name) && !/^[a-z]+$/.test(name) && !/^use[A-Z]/.test(name);
       });
     expect(failures, failures.join("\n")).toEqual([]);

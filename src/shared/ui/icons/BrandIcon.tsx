@@ -11,14 +11,7 @@ export interface BrandIconProps {
 }
 
 /** Shared original SVG artwork; never inherit an inactive row's foreground color. */
-export function BrandIcon({
-  brand,
-  size = 24,
-  className,
-  style,
-  title,
-  ...aria
-}: BrandIconProps) {
+export function BrandIcon({ brand, size = 24, className, style, title, ...aria }: BrandIconProps) {
   const asset = brandIconAsset(brand);
   if (!asset) return null;
   // Embedded SVG media queries can follow the OS rather than the surrounding
@@ -72,9 +65,7 @@ export function BrandIcon({
         asset.id === "gmail" || asset.id === "outlook" ? asset.id : undefined
       }
       data-social-provider-icon={
-        ["instagram", "messenger", "x", "discord"].includes(asset.id)
-          ? asset.id
-          : undefined
+        ["instagram", "messenger", "x", "discord"].includes(asset.id) ? asset.id : undefined
       }
     />
   );

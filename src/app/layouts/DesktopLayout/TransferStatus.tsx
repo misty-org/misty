@@ -88,13 +88,11 @@ export const TransferCompletionNotifier = memo(function TransferCompletionNotifi
     );
     trackerRef.current = advanced.tracker;
     const pushNotification = (title: string, level: string, _duration: number) => {
-      useActivityStore
-        .getState()
-        .ingestLocal({
-          title,
-          kind: level === "success" ? "completion" : "failure",
-          appId: "files",
-        });
+      useActivityStore.getState().ingestLocal({
+        title,
+        kind: level === "success" ? "completion" : "failure",
+        appId: "files",
+      });
     };
     for (const row of advanced.changed) {
       if (row.status === "completed") {

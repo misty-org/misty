@@ -73,9 +73,7 @@ describe("Browser site permissions", () => {
     HTMLElement.prototype.scrollIntoView = scrollIntoView;
   });
   async function open(url = info.url) {
-    await act(async () =>
-      root.render(<BrowserSiteInfo id="tab-one" url={url} active />),
-    );
+    await act(async () => root.render(<BrowserSiteInfo id="tab-one" url={url} active />));
     await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   }
   async function choosePermission(kind: "Camera" | "Microphone", choice: string) {
@@ -110,9 +108,7 @@ describe("Browser site permissions", () => {
     );
     await open();
     await act(async () =>
-      root.render(
-        <BrowserSiteInfo id="tab-one" url="https://other.example" active />,
-      ),
+      root.render(<BrowserSiteInfo id="tab-one" url="https://other.example" active />),
     );
     await act(async () => resolve(info));
     expect(container.querySelector('[data-open="false"]')).not.toBeNull();

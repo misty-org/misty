@@ -2,9 +2,7 @@ import { useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button, cn, DropdownMenuItem } from "@/shared/ui";
 
-const levels = [
-  25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500,
-];
+const levels = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
 /** Keep the displayed value tied to the page that actually accepted the change. */
 export function useBrowserZoom(
@@ -24,8 +22,7 @@ export function useBrowserZoom(
     setState({ id, percent, pending: true });
     try {
       await apply(next / 100);
-      if (currentId.current === id)
-        setState({ id, percent: next, pending: false });
+      if (currentId.current === id) setState({ id, percent: next, pending: false });
     } catch (error) {
       if (currentId.current === id) {
         setState({ id, percent, pending: false });

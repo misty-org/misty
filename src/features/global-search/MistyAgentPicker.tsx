@@ -9,12 +9,7 @@ import {
 import { finishLocalExecution, useLocalExecution } from "@/features/agents/localExecution";
 import { betaExecutionMode } from "@/features/agents/betaModes";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  MenuTrigger,
-} from "@/shared/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
 
 export function MistyAgentPicker({ accountId }: { accountId: string }) {
   const agents = usePersonalAgentsStore((state) => state.agents);

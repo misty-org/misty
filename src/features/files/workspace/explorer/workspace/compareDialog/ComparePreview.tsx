@@ -38,17 +38,13 @@ export async function loadCompareImagePreview(
   }
 }
 
-export async function previewTextForCompare(
-  path: string,
-): Promise<string | null> {
+export async function previewTextForCompare(path: string): Promise<string | null> {
   const payload = await explorerPreviewItem(path);
   if (!comparePreviewIsText(payload.mimeType)) return null;
   return new TextDecoder("utf-8").decode(Uint8Array.from(payload.bytes));
 }
 
-export async function previewImageForCompare(
-  path: string,
-): Promise<CompareImagePreview | null> {
+export async function previewImageForCompare(path: string): Promise<CompareImagePreview | null> {
   const payload = await explorerPreviewItem(path);
   if (!payload.mimeType.toLowerCase().startsWith("image/")) return null;
   return {
@@ -77,8 +73,4 @@ export function base64FromBytes(bytes: number[]): string {
   return window.btoa(binary);
 }
 
-export {
-  CompareDiffLine,
-  parentPath,
-  joinLocalPath,
-} from "./ComparePresentation";
+export { CompareDiffLine, parentPath, joinLocalPath } from "./ComparePresentation";

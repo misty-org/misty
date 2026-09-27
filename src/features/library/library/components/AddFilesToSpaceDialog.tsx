@@ -168,7 +168,12 @@ export function AddFilesToSpaceDialog({
         ? `${succeeded} added to ${destination}; ${failed} failed.`
         : `${succeeded} ${succeeded === 1 ? "copy" : "copies"} added to ${destination}.`;
     setMessage(summary);
-    useActivityStore.getState().ingestLocal({ title: summary, kind: failed || controller.signal.aborted ? "system" : "completion", appId: "library", spaceId });
+    useActivityStore.getState().ingestLocal({
+      title: summary,
+      kind: failed || controller.signal.aborted ? "system" : "completion",
+      appId: "library",
+      spaceId,
+    });
     if (succeeded > 0) {
       window.dispatchEvent(
         new CustomEvent("misty:space-library-event", { detail: { space_id: spaceId } }),

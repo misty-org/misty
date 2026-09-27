@@ -1,14 +1,7 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import {
-  Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui";
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui";
 import { MousePointer2, Square } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";

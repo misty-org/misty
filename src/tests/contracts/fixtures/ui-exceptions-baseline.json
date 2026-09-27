@@ -5,12 +5,6 @@
   "src/features/editor/PhotoEditorView.tsx": [
     "full-screen-overlay"
   ],
-  "src/features/files/workspace/explorer/components/ExplorerToolbarView.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/features/files/workspace/explorer/workspace/ExplorerContextMenuView.tsx": [
-    "portal"
-  ],
   "src/features/journal/drawings/components/DrawingPreviewView.tsx": [
     "raw-control",
     "hex-color"

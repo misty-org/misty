@@ -7,14 +7,8 @@ import {
 } from "@/features/files/workspace/native";
 import { SystemErrorActivity } from "@/features/activity";
 import { useExplorerStore, useOperationQueueStore } from "../store";
-import {
-  loadCompareImagePreview,
-  loadCompareTextDiff,
-} from "./compareDialog/ComparePreview";
-import {
-  CompareDialogView,
-  type CompareDialogRuntime,
-} from "./ExplorerCompareDialogView";
+import { loadCompareImagePreview, loadCompareTextDiff } from "./compareDialog/ComparePreview";
+import { CompareDialogView, type CompareDialogRuntime } from "./ExplorerCompareDialogView";
 import type { CompareDialogSeed } from "../model/interfaces/workspace/ExplorerCompareDialog";
 export type * from "../model/interfaces/workspace/ExplorerCompareDialog";
 export type * from "../model/types/workspace/ExplorerCompareDialog";
@@ -36,8 +30,7 @@ const runtime: CompareDialogRuntime = {
     await explorerQueueDeleteItems({ paths: [path], permanent: false });
     void useOperationQueueStore.getState().load({ silent: true });
   },
-  notify: (message) =>
-    useExplorerStore.getState().pushNotification(message, "success", 3500),
+  notify: (message) => useExplorerStore.getState().pushNotification(message, "success", 3500),
   Error: ({ error }) => (
     <SystemErrorActivity
       error={error}
@@ -47,9 +40,6 @@ const runtime: CompareDialogRuntime = {
     />
   ),
 };
-export function CompareDialog(props: {
-  seed: CompareDialogSeed;
-  onClose(): void;
-}) {
+export function CompareDialog(props: { seed: CompareDialogSeed; onClose(): void }) {
   return <CompareDialogView {...props} runtime={runtime} />;
 }

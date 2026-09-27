@@ -91,7 +91,11 @@ export function BrowserFindBar(props: {
         }}
       />
       <span className="w-20 text-center text-xs tabular-nums text-cream-muted" aria-live="polite">
-        {query && result ? (result.total ? `${result.current} of ${result.total}` : "No matches") : ""}
+        {query && result
+          ? result.total
+            ? `${result.current} of ${result.total}`
+            : "No matches"
+          : ""}
       </span>
       <IconButton
         label="Previous match"

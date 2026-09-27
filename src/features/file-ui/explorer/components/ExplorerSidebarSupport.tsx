@@ -56,8 +56,7 @@ export const sidebarStyles = {
   sectionActions: "ml-auto flex flex-none items-center gap-0",
   sectionActionsReveal:
     "opacity-0 transition-opacity group-hover/section-title:opacity-100 group-focus-within/section-title:opacity-100",
-  sectionActionButton:
-    "misty-sidebar-icon-target size-6 text-cream-muted shadow-none hover:bg-charcoal-hover hover:text-cream-bright [&_svg]:!size-3.5",
+  sectionActionButton: "misty-sidebar-icon-target [&_svg]:!size-3.5",
   spinning: "[&>svg]:animate-spin",
   treeRow: `${navigationTreeRowClass} mr-0 h-auto min-h-[var(--navigation-row-height,32px)]`,
   treeSurface: `${navigationTreeSurfaceClass} h-auto min-h-[var(--navigation-row-height,32px)] gap-0 pl-0 pr-0 group-hover/tree-row:bg-charcoal-card`,
@@ -95,8 +94,7 @@ export const sidebarStyles = {
   deviceGroupHeader: "flex h-full min-w-0 flex-1 items-center gap-1",
   deviceGroupToggle: `h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-1 rounded-md text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
   deviceGroupLabel: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  deviceGroupAction:
-    "misty-sidebar-icon-target size-6 text-cream-muted shadow-none hover:bg-charcoal-hover hover:text-cream-bright [&_svg]:!size-3.5",
+  deviceGroupAction: "misty-sidebar-icon-target [&_svg]:!size-3.5",
   deviceGroupEmpty: "ml-3 mr-2 px-2.5 py-1 text-[11px] text-cream-muted",
   errorText: "m-0 text-sm text-cream-bright",
   smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",

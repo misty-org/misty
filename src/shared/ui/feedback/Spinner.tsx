@@ -17,7 +17,10 @@ function Spinner({ className, label = "Loading", size = "default", ...props }: S
       )}
       {...props}
     >
-      <LoaderCircle aria-hidden="true" className="size-full animate-spin motion-reduce:animate-none" />
+      <LoaderCircle
+        aria-hidden="true"
+        className="size-full animate-spin motion-reduce:animate-none"
+      />
     </span>
   );
 }

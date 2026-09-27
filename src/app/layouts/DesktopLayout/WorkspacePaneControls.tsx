@@ -145,7 +145,9 @@ export function WorkspacePaneControls({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <IconButton size="xs" tooltip={false}
+          <IconButton
+            size="xs"
+            tooltip={false}
             label="Close pane"
             title="Close pane"
             onClick={onClose}
