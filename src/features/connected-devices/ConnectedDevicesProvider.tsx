@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useConnectedDevices as useConnectedDevicesController } from "./useConnectedDevices";
+import { cn } from "@/shared/ui";
 type ConnectedDevicesController = ReturnType<typeof useConnectedDevicesController>;
 const ConnectedDevicesContext = createContext<ConnectedDevicesController | null>(null);
 export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
@@ -44,7 +45,11 @@ export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
       {children}
       {notice ? (
         <div
-          className="fixed bottom-5 right-5 layer-blocking-backdrop rounded-lg border border-charcoal-border bg-charcoal-active px-4 py-3 text-sm text-cream-bright shadow-xl"
+          className={cn(
+            "fixed bottom-5 right-5 layer-blocking-backdrop rounded-lg border",
+            "border-charcoal-border bg-charcoal-active px-4 py-3 text-sm",
+            "text-cream-bright shadow-xl",
+          )}
           role="status"
         >
           {notice}

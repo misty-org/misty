@@ -67,7 +67,9 @@ export function WebsiteGroupsManager() {
                 aria-current={group?.id === item.id ? "true" : undefined}
                 className={cn(
                   "hover:bg-cream/[0.045] rounded-md",
-                  `flex min-h-8 min-w-0 items-center gap-2 text-left text-[13px] outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted ${group?.id === item.id ? "font-medium text-cream-bright" : "text-cream-muted"}`,
+                  "flex min-h-8 min-w-0 items-center gap-2 text-left text-[13px] outline-none",
+                  "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted",
+                  group?.id === item.id ? "font-medium text-cream-bright" : "text-cream-muted",
                 )}
                 onClick={() => {
                   setSelected(item.id);

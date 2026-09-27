@@ -62,7 +62,13 @@ export const FileGridItem = memo(function FileGridItem(props: {
   return (
     <div
       ref={drop.ref}
-      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${source.dragging ? fileBrowserStyles.gridItemDragging : ""} ${props.cut ? fileBrowserStyles.gridItemCut : ""}`}
+      className={[
+        fileBrowserStyles.gridItem,
+        props.selected ? fileBrowserStyles.gridItemSelected : "",
+        entry.isDeleted ? fileBrowserStyles.gridItemDeleted : "",
+        source.dragging ? fileBrowserStyles.gridItemDragging : "",
+        props.cut ? fileBrowserStyles.gridItemCut : "",
+      ].join(" ")}
       style={props.style}
       aria-disabled={entry.isDeleted || undefined}
       aria-pressed={props.selected}

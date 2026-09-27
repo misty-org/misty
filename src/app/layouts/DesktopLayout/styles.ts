@@ -75,8 +75,11 @@ export const navigatorFocusRingClass = [
 
 export const navigatorPrimaryRowLayoutClass = navigationMenuPrimaryLayoutClass;
 
-export const navigatorSubsectionIconClass =
-  "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0 place-items-center text-cream-bright [contain:layout_paint] [&_img]:!size-5 [&_svg]:!size-5";
+export const navigatorSubsectionIconClass = cn(
+  "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0",
+  "place-items-center text-cream-bright [contain:layout_paint]",
+  "[&_img]:!size-5 [&_svg]:!size-5",
+);
 
 export const navigatorIslandActionClass = [
   "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",

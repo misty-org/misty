@@ -49,7 +49,11 @@ export function BrowserPermissionSettings() {
   return (
     <DesktopSettingsSection
       title="Website permissions"
-      description="Saved choices for open browser profiles. Websites ask before using your camera or microphone. Change a site's choices from the information button beside its address. Resetting stops capture in that browser profile."
+      description={
+        "Saved choices for open browser profiles. Websites ask before using your camera or " +
+        "microphone. Change a site's choices from the information button beside its address. " +
+        "Resetting stops capture in that browser profile."
+      }
     >
       {loading ? (
         <p role="status" className="p-4 text-sm text-cream-muted">

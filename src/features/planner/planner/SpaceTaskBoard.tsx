@@ -374,7 +374,13 @@ function TaskCard({
           </div>
           <div className="flex items-center gap-0.5">
             {busy ? <Spinner size="sm" label={false} className="text-cream-muted" /> : null}
-            <div className="invisible flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+            <div
+              className={cn(
+                "invisible flex items-center gap-0.5 opacity-0 transition-opacity",
+                "group-focus-within:visible group-focus-within:opacity-100",
+                "group-hover:visible group-hover:opacity-100",
+              )}
+            >
               <IconButton
                 size="xs"
                 label={`Edit ${task.title}`}

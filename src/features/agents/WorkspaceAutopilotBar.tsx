@@ -1,6 +1,6 @@
 import { MessageSquare, Pause, Play, Square, Check } from "lucide-react";
 import { useEffect, useState } from "react";
-import { IconButton } from "@/shared/ui";
+import { cn, IconButton } from "@/shared/ui";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
   finishLocalExecution,
@@ -10,8 +10,11 @@ import {
 } from "./localExecution";
 import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
 
-export const agentOverlayBarClass =
-  "pointer-events-auto fixed bottom-4 left-1/2 layer-workspace-overlay flex w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg bg-charcoal-card p-1 text-cream shadow-lg";
+export const agentOverlayBarClass = cn(
+  "pointer-events-auto fixed bottom-4 left-1/2 layer-workspace-overlay flex",
+  "w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg",
+  "bg-charcoal-card p-1 text-cream shadow-lg",
+);
 
 export function WorkspaceAutopilotBar({ execution, name }: { execution: Execution; name: string }) {
   const [error, setError] = useState("");

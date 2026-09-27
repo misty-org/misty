@@ -1,6 +1,7 @@
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import {
+  cn,
   Button,
   Card,
   IconButton,
@@ -147,7 +148,12 @@ export function SpaceTaskList({
                       title="Delete task"
                       disabled={taskBusy}
                       onClick={() => onDelete(task)}
-                      className="invisible opacity-0 transition-opacity group-focus-within/task-row:visible group-focus-within/task-row:opacity-100 group-hover/task-row:visible group-hover/task-row:opacity-100 hover:text-notification-red"
+                      className={cn(
+                        "invisible opacity-0 transition-opacity",
+                        "group-focus-within/task-row:visible",
+                        "group-focus-within/task-row:opacity-100 group-hover/task-row:visible",
+                        "group-hover/task-row:opacity-100 hover:text-notification-red",
+                      )}
                     >
                       <Trash2 className="size-3.5" />
                     </IconButton>

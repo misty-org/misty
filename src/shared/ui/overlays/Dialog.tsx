@@ -80,7 +80,10 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "fixed inset-0 layer-dialog-backdrop bg-black/45 duration-160 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none",
+      "fixed inset-0 layer-dialog-backdrop bg-black/45 duration-160",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out",
+      "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "data-[state=closed]:pointer-events-none",
       className,
     )}
     {...props}
@@ -127,7 +130,12 @@ const DialogContent = React.forwardRef<
         {children}
         <DialogPrimitive.Close
           data-slot="dialog-close"
-          className="absolute right-4 top-4 grid size-8 place-items-center rounded-md text-cream-muted outline-none transition-colors hover:bg-charcoal-card hover:text-cream focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40 disabled:pointer-events-none"
+          className={cn(
+            "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
+            "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
+            "hover:text-cream focus-visible:ring-[3px]",
+            "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
+          )}
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>

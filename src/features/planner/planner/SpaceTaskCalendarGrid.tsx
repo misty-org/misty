@@ -87,7 +87,10 @@ export function SpaceTaskCalendar({
                 ))}
                 {dayTasks.slice(0, 3).map((task) => (
                   <Pressable
-                    className="flex items-center rounded-md h-6 truncate border-l-2 border-sage-fg bg-sage-bg px-1.5 text-[10px] text-sage-fg hover:bg-sage-bg text-sage-fg"
+                    className={[
+                      "flex items-center rounded-md h-6 truncate border-l-2 border-sage-fg",
+                      "bg-sage-bg px-1.5 text-[10px] text-sage-fg hover:bg-sage-bg text-sage-fg",
+                    ].join(" ")}
                     title={`${task.task_key} · ${taskAssigneeName(members, task)}`}
                     key={task.id}
                     onClick={() => onOpenTask(task)}

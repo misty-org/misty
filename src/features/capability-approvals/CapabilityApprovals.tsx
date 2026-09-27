@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button, Pressable } from "@/shared/ui";
+import { cn, Button, Pressable } from "@/shared/ui";
 import { capabilityApprovalsApi, type CapabilityApprovalReview } from "./api";
 import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useCapabilityApprovals } from "./store";
@@ -235,7 +235,11 @@ export function CapabilityApprovalDetail({ id, onClose }: { id: string; onClose(
             </p>
             <pre
               dir="auto"
-              className="misty-transient-scrollbar mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md bg-charcoal-card p-3 font-mono text-sm leading-6 text-cream [overflow-wrap:anywhere]"
+              className={cn(
+                "misty-transient-scrollbar mt-2 max-h-80 overflow-auto",
+                "whitespace-pre-wrap break-words rounded-md bg-charcoal-card p-3",
+                "font-mono text-sm leading-6 text-cream [overflow-wrap:anywhere]",
+              )}
               tabIndex={0}
             >
               {typeof details!.input === "string"

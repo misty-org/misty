@@ -1,6 +1,7 @@
 import type { DuplicateGroup, DuplicateScanResult } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
+  cn,
   Badge,
   Button,
   Card,
@@ -227,7 +228,10 @@ export function DuplicateFinderDialogView(props: {
                       const selected = selectedSet.has(item.path);
                       return (
                         <label
-                          className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0"
+                          className={cn(
+                            "grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3",
+                            "border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0",
+                          )}
                           key={item.path}
                         >
                           <Checkbox

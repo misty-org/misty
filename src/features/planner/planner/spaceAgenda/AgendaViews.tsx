@@ -302,7 +302,13 @@ export function AgendaTimelineView({
               aria-label={`Current time ${currentTimeLabel}`}
               data-agenda-current-time-label
             >
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-avatar-red px-2 py-0.5 text-[10px] font-semibold tabular-nums text-charcoal-bg shadow-sm">
+              <span
+                className={cn(
+                  "absolute right-2 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full",
+                  "bg-avatar-red px-2 py-0.5 text-[10px] font-semibold tabular-nums",
+                  "text-charcoal-bg shadow-sm",
+                )}
+              >
                 {currentTimeLabel}
               </span>
             </div>

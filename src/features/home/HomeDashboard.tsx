@@ -162,7 +162,13 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
   const overviewDates = contributionDates(now, contributionDays);
   if (!global && !space) return null;
   return (
-    <main className="misty-transient-scrollbar h-full min-h-0 overflow-x-hidden overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25 selection:text-cream-bright">
+    <main
+      className={cn(
+        "misty-transient-scrollbar h-full min-h-0 overflow-x-hidden",
+        "overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25",
+        "selection:text-cream-bright",
+      )}
+    >
       <div
         className={cn(
           "mx-auto w-full max-w-[1240px] [@media(min-width:1024px)_and_(min-height:800px)]:h-full",
@@ -198,7 +204,11 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                     <DashboardLink
                       key={toolId}
                       to={route}
-                      className="group flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors hover:bg-charcoal-active/65 focus-visible:ring-2 focus-visible:ring-sage-fg/60"
+                      className={cn(
+                        "group flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left",
+                        "outline-none transition-colors hover:bg-charcoal-active/65",
+                        "focus-visible:ring-2 focus-visible:ring-sage-fg/60",
+                      )}
                     >
                       <WorkspaceAppIcon
                         appId={toolId}
@@ -430,7 +440,11 @@ function SpaceRow(props: { space: Space }) {
   return (
     <DashboardLink
       to={`/spaces/${encodedId}/home`}
-      className="group flex min-w-0 items-center gap-3 rounded-xl px-3 py-1 outline-none transition-colors hover:bg-charcoal-active/65 focus-visible:ring-2 focus-visible:ring-sage-fg/60"
+      className={cn(
+        "group flex min-w-0 items-center gap-3 rounded-xl px-3 py-1 outline-none",
+        "transition-colors hover:bg-charcoal-active/65 focus-visible:ring-2",
+        "focus-visible:ring-sage-fg/60",
+      )}
     >
       <SpaceAvatar space={props.space} className="size-9" />
       <span className="min-w-0 flex-1">
@@ -508,8 +522,11 @@ function DashboardLink(props: ComponentProps<typeof Link>) {
   };
   return <Link {...props} onClick={handleClick} />;
 }
-const sectionLinkClass =
-  "rounded-md px-1.5 py-1 text-xs font-medium text-sage-fg outline-none underline-offset-4 hover:text-cream-bright hover:underline focus-visible:ring-2 focus-visible:ring-sage-fg/60";
+const sectionLinkClass = cn(
+  "rounded-md px-1.5 py-1 text-xs font-medium text-sage-fg outline-none",
+  "underline-offset-4 hover:text-cream-bright hover:underline",
+  "focus-visible:ring-2 focus-visible:ring-sage-fg/60",
+);
 function routeForTool(toolId: WorkspaceToolId, space: Space, accountId: string): string | null {
   const encodedId = encodeURIComponent(space.id);
   if (toolId === "journal") return rememberedJournalRoute(accountId, space.id);

@@ -1,5 +1,5 @@
 import type { SmartLibraryAsset } from "@/native/ipc";
-import { Pressable } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 import { File } from "lucide-react";
 import { GlobalPreviewDialog } from "../GlobalPreview";
 import { libraryAssetPreview } from "./LibraryDetailPrimitives";
@@ -32,7 +32,11 @@ function LibraryGalleryTile(props: {
   const preview = libraryAssetPreview(props.asset, props.rootPath);
   return (
     <Pressable
-      className="hover:bg-cream/[0.045] group block min-w-0 overflow-hidden rounded-lg bg-charcoal-card p-0 shadow-xs inset-ring-1 inset-ring-cream/10 hover:-translate-y-0.5 hover:shadow-md"
+      className={cn(
+        "hover:bg-cream/[0.045] group block min-w-0 overflow-hidden rounded-lg",
+        "bg-charcoal-card p-0 shadow-xs inset-ring-1 inset-ring-cream/10",
+        "hover:-translate-y-0.5 hover:shadow-md",
+      )}
       aria-label={`View ${props.asset.name}`}
       title={props.asset.name}
       onClick={props.onOpen}

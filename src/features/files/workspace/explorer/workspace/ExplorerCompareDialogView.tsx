@@ -1,6 +1,7 @@
 import type { CompareFilesResult, CompareFolderRow, CompareFoldersResult } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import {
+  cn,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -175,7 +176,12 @@ export function CompareDialogView(props: {
           if (!open) props.onClose();
         }}
       >
-        <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream">
+        <DialogContent
+          className={cn(
+            "flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))]",
+            "max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream",
+          )}
+        >
           <form
             className="contents"
             onSubmit={(event) => {

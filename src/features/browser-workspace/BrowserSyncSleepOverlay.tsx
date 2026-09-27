@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { BlockingScreen, Pressable } from "@/shared/ui";
+import { cn, BlockingScreen, Pressable } from "@/shared/ui";
 import misty from "@/assets/branding/misty-icon.png?inline";
 import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
@@ -26,7 +26,11 @@ export function SyncSleepScreen({
           aria-busy={busy}
           disabled={busy}
           onClick={onWake}
-          className="group mb-6 rounded-full p-3 transition-transform duration-200 hover:scale-105 active:scale-95 disabled:cursor-wait disabled:opacity-100 motion-reduce:transform-none"
+          className={cn(
+            "group mb-6 rounded-full p-3 transition-transform duration-200",
+            "hover:scale-105 active:scale-95 disabled:cursor-wait",
+            "disabled:opacity-100 motion-reduce:transform-none",
+          )}
         >
           <img
             src={misty}

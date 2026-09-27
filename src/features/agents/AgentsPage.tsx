@@ -511,7 +511,11 @@ export default function NativeAgentsPage() {
           side="right"
           portal={false}
           overlay={false}
-          className="flex w-[min(560px,94vw)] flex-col overflow-hidden border-l border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl sm:max-w-[560px]"
+          className={cn(
+            "flex w-[min(560px,94vw)] flex-col overflow-hidden border-l",
+            "border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl",
+            "sm:max-w-[560px]",
+          )}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Agent activity</SheetTitle>

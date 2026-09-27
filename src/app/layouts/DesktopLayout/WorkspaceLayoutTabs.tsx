@@ -220,7 +220,9 @@ export function WorkspaceLayoutTabs(
                 data-reorder-preview="true"
                 data-misty-window-drag-block="true"
                 className={cn(
-                  "group/tab flex items-center rounded-md border text-xs transition-colors duration-150 select-none focus-within:ring-1 focus-within:ring-cream-muted/50",
+                  "group/tab flex items-center rounded-md border text-xs transition-colors",
+                  "duration-150 select-none focus-within:ring-1",
+                  "focus-within:ring-cream-muted/50",
                   vertical
                     ? "h-9 w-full shrink-0"
                     : "h-7 min-w-[80px] max-w-[160px] flex-[1_1_120px]",

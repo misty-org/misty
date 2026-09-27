@@ -1,5 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type * as React from "react";
+import { cn } from "../utils";
 
 type BlockingScreenProps = {
   /** Artwork above the title, such as the Misty mark or a button made of it. */
@@ -26,7 +27,11 @@ function BlockingScreen({ media, title, description, children, attributes }: Blo
         <DialogPrimitive.Content
           data-slot="dialog-content"
           {...attributes}
-          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
+          className={cn(
+            "fixed inset-x-0 bottom-0 top-[38px] layer-blocking flex flex-col",
+            "items-center justify-center overflow-y-auto p-8 text-center text-cream",
+            "outline-none",
+          )}
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}

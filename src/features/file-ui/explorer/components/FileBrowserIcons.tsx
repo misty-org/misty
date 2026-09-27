@@ -28,9 +28,13 @@ const fileTypes: ReadonlyArray<readonly [LucideIcon, ReadonlySet<string>]> = [
   [
     FileCode,
     new Set(
-      "js jsx ts tsx mjs cjs json jsonc html htm css scss sass less vue svelte py rs go java kt swift c h cpp hpp cs rb php sh bash zsh fish sql xml yaml yml toml ini conf env".split(
-        " ",
-      ),
+      [
+        "js jsx ts tsx mjs cjs json jsonc html htm css scss sass less vue svelte",
+        "py rs go java kt swift c h cpp hpp cs rb php sh bash zsh fish sql",
+        "xml yaml yml toml ini conf env",
+      ]
+        .join(" ")
+        .split(" "),
     ),
   ],
 ];

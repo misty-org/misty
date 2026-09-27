@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { ChevronLeft, Pencil, Trash2, Folder, Globe, Search } from "lucide-react";
 import { mistyBrowserProviders } from "@/shared/schemas";
 import {
+  cn,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -415,7 +416,12 @@ export function EditableGroupRow({
       <div className="group/edit-row flex min-h-9 min-w-0 items-center gap-2 text-sm">
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <div className="flex shrink-0 items-center opacity-0 group-hover/edit-row:opacity-100 group-focus-within/edit-row:opacity-100 [@media(hover:none)]:opacity-100">
+        <div
+          className={cn(
+            "flex shrink-0 items-center opacity-0 group-hover/edit-row:opacity-100",
+            "group-focus-within/edit-row:opacity-100 [@media(hover:none)]:opacity-100",
+          )}
+        >
           <IconButton
             label={editLabel}
             className="[@media(hover:none)]:size-11"
