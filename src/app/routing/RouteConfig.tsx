@@ -136,6 +136,14 @@ export const router = createBrowserRouter([
                 path: "account/settings",
                 element: <SettingsPage />,
               },
+              ...(import.meta.env.DEV
+                ? [
+                    {
+                      path: "dev/ui",
+                      lazy: async () => ({ Component: (await import("../dev/UiGallery")).default }),
+                    },
+                  ]
+                : []),
             ],
           },
           {

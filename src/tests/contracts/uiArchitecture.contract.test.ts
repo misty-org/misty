@@ -1,24 +1,17 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { repositoryPath, walk } from "./repositoryPolicy";
+import { repositoryPath, sourcePath, walk } from "./repositoryPolicy";
+import {
+  isUiRuleSubject,
+  uiExceptionsBaselinePath,
+  uiRules,
+  uiViolations,
+  type UiRuleId,
+} from "./uiRules";
 
 const extensions = new Set([".ts", ".tsx"]);
 const uiImplementationRoots = ["src/shared/ui/"];
-const protectedRoots = [
-  "src/features/files/workspace/explorer/",
-  "src/features/files/workspace/preview/",
-  "src/features/files/workspace/search/",
-  "src/features/settings/",
-  "src/features/spaces/chat/",
-  "src/features/library/library/",
-  "src/features/spaces/members/",
-  "src/features/planner/planner/",
-  "src/features/planner/roadmap/",
-  "src/features/spaces/",
-  "src/features/transfers/",
-];
-
 const allowedSourceRoots = new Set([
   "api",
   "app",
@@ -86,16 +79,29 @@ describe("UI architecture contract", () => {
       if (/var\(--|["']--[a-z][a-z0-9-]*["']\s*:/.test(text)) {
         failures.push(`${relative}: use Tailwind classes instead of CSS custom properties`);
       }
-      if (!protectedRoots.some((root) => relative.startsWith(root))) continue;
-      const forbidden = [
-        [/<(?:button|input|select|textarea)\b/g, "use a shared control"],
-        [/\bfixed\s+inset-0\b/g, "use a shared overlay"],
-        [/\bcreatePortal\s*\(/g, "let the overlay primitive own its portal"],
-        [/\bz-\[\d{4,}\]/g, "use a named layer token"],
-      ] as const;
-      for (const [pattern, guidance] of forbidden) {
-        if (pattern.test(text)) failures.push(`${relative}: ${guidance}`);
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("composes shared UI everywhere, with a baseline that only shrinks", () => {
+    const baseline: Record<string, UiRuleId[]> = JSON.parse(
+      readFileSync(sourcePath(uiExceptionsBaselinePath), "utf8"),
+    );
+    const failures: string[] = [];
+    const seen = new Set<string>();
+    for (const path of walk("src", extensions).map(repositoryPath).filter(isUiRuleSubject)) {
+      seen.add(path);
+      const allowed = new Set(baseline[path] ?? []);
+      const found = uiViolations(path, readFileSync(sourcePath(path), "utf8"));
+      for (const id of found) {
+        if (!allowed.has(id)) failures.push(`${path}: ${uiRules[id].guidance} [${id}]`);
       }
+      for (const id of allowed) {
+        if (!found.includes(id)) failures.push(`${path}: fixed ${id}; remove it from the baseline`);
+      }
+    }
+    for (const path of Object.keys(baseline)) {
+      if (!seen.has(path)) failures.push(`${path}: gone; remove it from the baseline`);
     }
     expect(failures, failures.join("\n")).toEqual([]);
   });

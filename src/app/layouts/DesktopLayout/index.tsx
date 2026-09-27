@@ -607,7 +607,7 @@ export function DesktopLayout(props: {
 }
 
 function standaloneWorkspaceRouteTitle(pathname: string): string | null {
-  if (import.meta.env.DEV && pathname === "/roadmap-preview") return "Roadmap preview";
+  if (import.meta.env.DEV && pathname === "/dev/ui") return "UI gallery";
   if (pathname === "/activity") return "Activity";
   if (pathname.startsWith("/invite/")) return "Space invitation";
   return null;

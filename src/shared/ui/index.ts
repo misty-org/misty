@@ -3,13 +3,11 @@
 // controls
 export * from "./controls/Button";
 export * from "./controls/Checkbox";
-export { IconButton as PrimitiveIconButton } from "./controls/IconButton";
-export type { IconButtonProps as PrimitiveIconButtonProps } from "./controls/IconButton";
+export * from "./controls/Field";
+export * from "./controls/IconButton";
 export * from "./controls/Input";
 export * from "./controls/InputGroup";
 export * from "./controls/Label";
-export { IconButton } from "./controls/OutlinedIconButton";
-export type { IconButtonProps } from "./controls/OutlinedIconButton";
 export * from "./controls/RadioGroup";
 export * from "./controls/Select";
 export * from "./controls/Slider";
@@ -24,6 +22,8 @@ export * from "./overlays/Command";
 export * from "./overlays/ContextMenu";
 export * from "./overlays/Dialog";
 export * from "./overlays/DropdownMenu";
+export * from "./overlays/MenuItem";
+export * from "./overlays/MenuTrigger";
 export * from "./overlays/Popover";
 export * from "./overlays/Portal";
 export * from "./overlays/Sheet";
