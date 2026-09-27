@@ -2,38 +2,6 @@
   "src/features/activity/ActivityPanelToolbar.tsx": [
     "raw-control"
   ],
-  "src/features/agents/AgentExecutionSurface.tsx": [
-    "raw-control",
-    "full-screen-overlay"
-  ],
-  "src/features/agents/AgentsPage.tsx": [
-    "raw-control"
-  ],
-  "src/features/agents/companion/AgentCompanionPanel.tsx": [
-    "raw-control"
-  ],
-  "src/features/agents/companion/CompanionAppearanceSettings.tsx": [
-    "raw-control"
-  ],
-  "src/features/agents/components/AgentSettingsModal.tsx": [
-    "raw-control"
-  ],
-  "src/features/agents/components/AgentWorkspaceConversation.tsx": [
-    "raw-control"
-  ],
-  "src/features/agents/mcp/McpConnectionsSheet.tsx": [
-    "hex-color"
-  ],
-  "src/features/ai-surface/AiSelectionMenu.tsx": [
-    "raw-control",
-    "popup-class"
-  ],
-  "src/features/ai-surface/MistyRegionCapture.tsx": [
-    "portal"
-  ],
-  "src/features/ai-surface/VoiceInputMenu.tsx": [
-    "manual-menu-chevron"
-  ],
   "src/features/editor/PhotoEditorView.tsx": [
     "full-screen-overlay"
   ],
@@ -42,19 +10,6 @@
   ],
   "src/features/files/workspace/explorer/workspace/ExplorerContextMenuView.tsx": [
     "portal"
-  ],
-  "src/features/global-search/GlobalMisty.tsx": [
-    "full-screen-overlay"
-  ],
-  "src/features/global-search/GlobalMistyPanelContent.tsx": [
-    "raw-control",
-    "manual-menu-chevron"
-  ],
-  "src/features/global-search/MistyAgentPicker.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/features/global-search/MistyComposer.tsx": [
-    "raw-control"
   ],
   "src/features/journal/drawings/components/DrawingPreviewView.tsx": [
     "raw-control",

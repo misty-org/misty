@@ -354,19 +354,6 @@
   color: #ddd;
   font-size: 12px;
 }
-.agents-workspace input.agent-custom-answer {
-  width: 100%;
-  height: 32px;
-  margin-top: 10px;
-  padding: 0 10px;
-  background: var(--agent-canvas);
-  border: 1px solid #292929;
-  border-radius: 8px;
-  color: var(--agent-text);
-}
-.agent-custom-answer::placeholder {
-  color: var(--agent-muted);
-}
 .agent-create-action {
   margin-top: 16px;
   padding: 8px 12px;
@@ -702,13 +689,6 @@
   gap: 8px;
   flex: 1;
   color: var(--agent-muted);
-}
-.agent-recipient-input input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  color: var(--agent-text);
-  border: 0;
 }
 .agent-new-chat {
   flex: 1;

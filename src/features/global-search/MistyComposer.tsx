@@ -1,10 +1,12 @@
 import {
   Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  cn,
+  FileInput,
+  Textarea,
 } from "@/shared/ui";
 import { ArrowUp, Camera, ImagePlus, Loader2, Plus, Search, X } from "lucide-react";
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
@@ -141,7 +143,8 @@ export function MistyComposer(props: {
           ))}
         </div>
       ) : null}
-      <textarea
+      <Textarea
+        variant="composer"
         ref={props.textareaRef}
         data-global-misty-launcher-input
         value={props.value}
@@ -156,7 +159,7 @@ export function MistyComposer(props: {
             : "Ask Misty anything…")
         }
         className={cn(
-          "max-h-40 min-h-12 w-full resize-none overflow-x-hidden bg-transparent px-4 pb-2.5 pt-3 text-[15px] leading-6 text-cream outline-none placeholder:text-cream-muted",
+          "max-h-40 min-h-12 px-4 pb-2.5 pt-3 text-[15px] leading-6",
           props.compact && "min-h-11 px-3.5 pb-2 pt-2.5 text-sm leading-5",
           props.inputFirst && "min-h-20 px-4 pb-3 pt-3 text-base leading-6",
         )}
@@ -167,10 +170,8 @@ export function MistyComposer(props: {
           !props.inputFirst && "border-t border-charcoal-border pt-1.5",
         )}
       >
-        <input
+        <FileInput
           ref={fileRef}
-          hidden
-          type="file"
           accept={
             props.mode === "search"
               ? "image/jpeg,image/png,image/webp"

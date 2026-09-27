@@ -5,7 +5,7 @@ import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMis
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/contracts";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
+import { Button, Input } from "@/shared/ui";
 import { Loader2, Mic, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
@@ -206,8 +206,8 @@ export function AgentWorkspaceConversation({
                     </Button>
                   ))}
                 </div>
-                <input
-                  className="agent-custom-answer"
+                <Input
+                  className="mt-2.5 h-8"
                   aria-label="Custom answer"
                   placeholder="Type your own answer"
                   value={draft}

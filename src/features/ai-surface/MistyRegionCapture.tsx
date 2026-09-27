@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
+import { Portal } from "@/shared/ui";
 import { captureAttachmentFromDataUrl } from "./captureAttachment";
 import type { AiCaptureAttachment } from "./types";
 
@@ -63,7 +63,8 @@ export function MistyRegionCapture({
     }
   };
 
-  return createPortal(
+  return (
+    <Portal>
     <div
       className="misty-region-capture"
       data-html2canvas-ignore="true"
@@ -90,8 +91,8 @@ export function MistyRegionCapture({
           style={{ left: region.x, top: region.y, width: region.width, height: region.height }}
         />
       ) : null}
-    </div>,
-    document.body,
+    </div>
+    </Portal>
   );
 }
 

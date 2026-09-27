@@ -11,7 +11,7 @@ import {
   steerLocalExecution,
   useLocalExecution,
 } from "./localExecution";
-import { Button } from "@/shared/ui";
+import { Button, Input, ViewportLayer } from "@/shared/ui";
 
 import { TaskArtifacts } from "./TaskArtifactList";
 
@@ -87,8 +87,10 @@ export function AgentExecutionSurface() {
     void task().catch((e) => setError(String(e)));
   };
   return (
-    <section
-      className="fixed inset-0 layer-agent-surface flex flex-col bg-charcoal-bg text-cream"
+    <ViewportLayer
+      layer="agent-surface"
+      role="region"
+      className="flex flex-col bg-charcoal-bg text-cream"
       aria-label={`${agent?.name ?? "Agent"} workspace`}
     >
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-charcoal-border px-4">
@@ -194,9 +196,9 @@ export function AgentExecutionSurface() {
         <label className="sr-only" htmlFor="agent-steering">
           Message this agent
         </label>
-        <input
+        <Input
           id="agent-steering"
-          className="min-w-0 flex-1 rounded bg-charcoal-card px-3 text-sm focus-visible:ring-2 focus-visible:ring-cream-muted"
+          className="h-auto min-w-0 flex-1"
           value={steering}
           onChange={(e) => setSteering(e.target.value)}
           placeholder="Message this agent…"
@@ -210,6 +212,6 @@ export function AgentExecutionSurface() {
           {error}
         </p>
       )}
-    </section>
+    </ViewportLayer>
   );
 }

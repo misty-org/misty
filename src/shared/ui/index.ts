@@ -30,6 +30,7 @@ export * from "./overlays/Portal";
 export * from "./overlays/Sheet";
 export * from "./overlays/SuggestionList";
 export * from "./overlays/Tooltip";
+export * from "./overlays/ViewportLayer";
 export * from "./overlays/WorkspaceOverlay";
 export * from "./overlays/popupStyles";
 
