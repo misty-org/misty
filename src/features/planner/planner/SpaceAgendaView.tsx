@@ -15,17 +15,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   Input,
+  MenuTrigger,
   Popover,
   PopoverContent,
-  PopoverTrigger,
 } from "@/shared/ui";
 import {
   CalendarCheck2,
   CalendarDays,
   CalendarPlus,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   LoaderCircle,
@@ -411,16 +409,12 @@ export function SpaceAgendaView({
                 <ChevronLeft className="size-4" />
               </Button>
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-8 min-w-32 justify-between gap-2 px-2.5 text-xs font-medium"
-                    aria-label="Choose calendar date"
-                  >
-                    {agendaTitle(anchor, view)}
-                    <ChevronDown className="size-3.5 text-cream-muted" />
-                  </Button>
-                </PopoverTrigger>
+                <MenuTrigger
+                  kind="popover"
+                  label="Choose calendar date"
+                  value={agendaTitle(anchor, view)}
+                  className="h-8 min-w-32 justify-between px-2.5 text-xs font-medium"
+                />
                 <PopoverContent align="start" className="w-auto p-3">
                   <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                     Go to date
@@ -458,17 +452,12 @@ export function SpaceAgendaView({
             </div>
 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 min-w-24 justify-between gap-1.5 px-2.5 text-xs font-medium"
-                  aria-label="Calendar view"
-                >
-                  <CalendarDays className="size-3.5" />
-                  {view[0].toUpperCase() + view.slice(1)}
-                  <ChevronDown className="size-3.5 text-cream-muted" />
-                </Button>
-              </DropdownMenuTrigger>
+              <MenuTrigger
+                label="Calendar view"
+                value={view[0].toUpperCase() + view.slice(1)}
+                icon={<CalendarDays className="size-3.5" />}
+                className="h-8 min-w-24 justify-between px-2.5 text-xs font-medium"
+              />
               <DropdownMenuContent align="start">
                 {(["month", "week", "day"] as const).map((option) => (
                   <DropdownMenuItem

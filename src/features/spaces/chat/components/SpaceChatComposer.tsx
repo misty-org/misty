@@ -224,8 +224,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 ) : null}
                 <InputGroupButton
                   className={cn(
-                    "rounded-full bg-charcoal-active p-2 text-cream-bright transition-colors hover:bg-[#494949]",
-                    false,
+                    "rounded-full p-2",
                     draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
                   )}
                   size="icon-sm"
