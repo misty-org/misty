@@ -7,14 +7,14 @@
 #[cfg(not(target_os = "macos"))]
 use crate::app::commands::agents_prepare_document;
 mod app;
+#[cfg(all(desktop, debug_assertions))]
+mod development_profile;
 mod domain;
 mod error;
 mod infra;
 mod platform;
 mod shell_plugins;
 mod telemetry;
-#[cfg(all(desktop, debug_assertions))]
-mod development_profile;
 
 #[cfg(desktop)]
 use app::commands::{
@@ -25,18 +25,17 @@ use app::commands::{
     media_search_set_asset_state, media_search_snapshot,
 };
 use app::commands::{
-    agents_device_snapshot, agents_open_citation,
-    agents_prepare_scoped_document, agents_register_folder_scope, agents_revoke_folder_scope, app_configure_server,
+    agents_device_snapshot, agents_open_citation, agents_prepare_scoped_document,
+    agents_register_folder_scope, agents_revoke_folder_scope, app_configure_server,
     app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
     claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
     clipboard_write_file_bytes, clipboard_write_file_refs, coding_ai_clear_api_key,
     coding_ai_read_api_key, coding_ai_write_api_key, compare_apply_text_merge, compare_files,
-    compare_folders, devices_snapshot, devices_unmount, duplicates_cancel,
-    duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
-    explorer_cancel_drag_preparation, explorer_create_item, explorer_delete_items,
-    explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
+    compare_folders, devices_snapshot, devices_unmount, duplicates_cancel, duplicates_scan,
+    explorer_calculate_directory_sizes, explorer_cancel_drag_preparation, explorer_create_item,
+    explorer_delete_items, explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
     explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_set_tags,
     explorer_library_snapshot, explorer_list_directory, explorer_open_association,
     explorer_open_path, explorer_open_with, explorer_paste_items, explorer_path_exists,
@@ -44,34 +43,27 @@ use app::commands::{
     explorer_preview_item, explorer_queue_create_item, explorer_queue_delete_items,
     explorer_queue_paste_blob, explorer_queue_paste_items, explorer_queue_paste_text,
     explorer_queue_rename_item, explorer_queue_rename_items, explorer_rename_item,
-    explorer_save_preview_item, explorer_set_open_association,
-    file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
-    file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
-    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, mail_cache_read,
-    mail_cache_remove, mail_cache_write, navigation_names_snapshot, navigation_names_update,
-    notes_store_asset, open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
+    explorer_save_preview_item, explorer_set_open_association, file_metadata_snapshot,
+    file_sync_apply, file_sync_compare, file_sync_pair_remove, file_sync_pair_save,
+    file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod, file_tools_create_symlink,
+    file_tools_read_symlink, file_tools_set_readonly, mail_cache_read, mail_cache_remove,
+    mail_cache_write, navigation_names_snapshot, navigation_names_update, notes_store_asset,
+    open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
     operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
     operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
     operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
     operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
-
-    providers_backend_actions, providers_config_paths, providers_config_security,
-    providers_configure_remote, providers_disconnect_remote, providers_harden_config,
-    providers_import_cloud_connection, providers_job_cancel, providers_job_status,
-    providers_refresh, providers_repair_config_security, providers_run_backend_action,
-    providers_save_remote, providers_select_remote, providers_snapshot, providers_test_remote,
-    providers_verify_result, providers_verify_start, saved_searches_delete, saved_searches_save,
-    saved_searches_snapshot, search_cancel_scan, search_get_status, search_init, search_query,
-    search_start_scan,
+    saved_searches_delete, saved_searches_save, saved_searches_snapshot, search_cancel_scan,
+    search_get_status, search_init, search_query, search_start_scan,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
-    settings_open_with_associations, settings_remove_open_with_association, settings_save,
-    settings_snapshot, settings_profile_state, settings_profile_commit, smart_library_apply_results, smart_library_assets_page,
-    smart_library_delete, smart_library_import_files, smart_library_preflight_import,
-    smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
-    smart_library_search, smart_library_set_server_folder_id, smart_library_snapshot,
-    storage_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
-    workspaces_save, workspaces_snapshot,
+    settings_open_with_associations, settings_profile_commit, settings_profile_state,
+    settings_remove_open_with_association, settings_save, settings_snapshot,
+    smart_library_apply_results, smart_library_assets_page, smart_library_delete,
+    smart_library_import_files, smart_library_preflight_import, smart_library_prepare_previews,
+    smart_library_resolve_assets, smart_library_scan, smart_library_search,
+    smart_library_set_server_folder_id, smart_library_snapshot, transfers_delete_all,
+    transfers_delete_selected, transfers_snapshot, workspaces_save, workspaces_snapshot,
 };
 
 #[cfg(desktop)]
@@ -91,26 +83,16 @@ use infra::browser::{
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
     browser_webview_create, browser_webview_forward, browser_webview_hide,
     browser_webview_navigate, browser_webview_reconcile, browser_webview_reload,
-    browser_webview_set_bounds, browser_webview_set_theme, browser_webview_set_zoom,
-    browser_webview_show, browser_webviews_hide_all, browser_webviews_park_all,
-    browser_webview_set_pane_dim, browser_webviews_set_companion, browser_webviews_set_overlay_active,
+    browser_webview_set_bounds, browser_webview_set_pane_dim, browser_webview_set_theme,
+    browser_webview_set_zoom, browser_webview_show, browser_webviews_hide_all,
+    browser_webviews_park_all, browser_webviews_set_companion, browser_webviews_set_overlay_active,
     browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble, BrowserSessionState,
-};
-use infra::browser_search_suggest::browser_search_suggest;
-#[cfg(desktop)]
-use infra::browser_history::{
-    browser_history_clear, browser_history_delete, browser_history_query, browser_history_record,
-    browser_history_forget, browser_history_set_title, browser_history_suggest,
-};
-#[cfg(desktop)]
-use infra::browser_library::{
-    browser_download_cancel, browser_download_open, browser_download_reveal,
-    browser_downloads_list, browser_downloads_progress, browser_downloads_remove,
 };
 #[cfg(desktop)]
 use infra::browser::{
-    browser_clear_website_data, browser_set_download_directory, browser_set_download_prompt, browser_webview_set_muted, browser_webview_developer_tools, browser_webview_find, browser_webview_print,
-    browser_webview_save_page, browser_webview_stop,
+    browser_clear_website_data, browser_set_download_directory, browser_set_download_prompt,
+    browser_webview_developer_tools, browser_webview_find, browser_webview_print,
+    browser_webview_save_page, browser_webview_set_muted, browser_webview_stop,
 };
 #[cfg(desktop)]
 use infra::browser_agent_control::{
@@ -118,15 +100,24 @@ use infra::browser_agent_control::{
     BrowserExecutionState,
 };
 #[cfg(desktop)]
+use infra::browser_history::{
+    browser_history_clear, browser_history_delete, browser_history_forget, browser_history_query,
+    browser_history_record, browser_history_set_title, browser_history_suggest,
+};
+#[cfg(desktop)]
+use infra::browser_library::{
+    browser_download_cancel, browser_download_open, browser_download_reveal,
+    browser_downloads_list, browser_downloads_progress, browser_downloads_remove,
+};
+use infra::browser_search_suggest::browser_search_suggest;
+#[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(all(desktop, not(target_os = "macos")))]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
 use infra::misty::{
-    check_system, ensure_local_access_token, fetch_misty_releases,
-    get_misty_process_status, launch_misty,
-    open_external_url, probe_paths,
-    restart_misty, save_authenticated_user, save_verified_license,
-    sign_out_misty, stop_misty,
+    check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
+    launch_misty, open_external_url, probe_paths, restart_misty, save_authenticated_user,
+    save_verified_license, sign_out_misty, stop_misty,
 };
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
@@ -135,20 +126,25 @@ use infra::misty_template::{
 use infra::ssh_terminal::{
     terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
 };
-#[cfg(target_os = "macos")]
-use platform::mini_app::permissions::mini_app_duplicate_file_grant;
-#[cfg(target_os = "macos")]
-use platform::mini_app::permissions::peer::{space_peer_local_identity,space_peer_start,space_peer_snapshot,space_peer_set_peers,space_peer_stop,space_peer_connect,space_peer_request,space_peer_read,space_peer_prepare};
-#[cfg(target_os = "macos")]
-use infra::terminal_service::{
-    terminal_service_call, terminal_service_close, terminal_service_create, terminal_service_request,
-};
 #[cfg(desktop)]
 use infra::terminal::{
     terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
 };
+#[cfg(target_os = "macos")]
+use infra::terminal_service::{
+    terminal_service_call, terminal_service_close, terminal_service_create,
+    terminal_service_request,
+};
 #[cfg(desktop)]
 use infra::tray;
+#[cfg(target_os = "macos")]
+use platform::mini_app::permissions::mini_app_duplicate_file_grant;
+#[cfg(target_os = "macos")]
+use platform::mini_app::permissions::peer::{
+    space_peer_connect, space_peer_local_identity, space_peer_prepare, space_peer_read,
+    space_peer_request, space_peer_set_peers, space_peer_snapshot, space_peer_start,
+    space_peer_stop,
+};
 use platform::plugins::mac_rounded_corners;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -193,13 +189,15 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())
-        .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_notification::init()))
+        .plugin(shell_plugins::ShellScriptPlugin(
+            tauri_plugin_notification::init(),
+        ))
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
             #[cfg(all(desktop, debug_assertions))]
-            if let Ok(profile) = std::env::var("MISTY_DESKTOP_PROFILE")
-                .or_else(|_| std::env::var("MISTY_PROFILE"))
+            if let Ok(profile) =
+                std::env::var("MISTY_DESKTOP_PROFILE").or_else(|_| std::env::var("MISTY_PROFILE"))
             {
                 if let Some(window) = app.get_webview_window("main") {
                     window.set_title(&profile)?;
@@ -207,7 +205,9 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             misty_browser_sync::secure_store::configure_device_store(
-                app.path().local_data_dir()?.join("com.misty.desktop/device-keys"),
+                app.path()
+                    .local_data_dir()?
+                    .join("com.misty.desktop/device-keys"),
             )?;
 
             let runtime = MistyRuntime::new();
@@ -227,7 +227,9 @@ pub fn run() {
             app.manage(BrowserSessionState::default());
             app.manage(infra::agent_workspace::AgentWorkspaceState::default());
             #[cfg(any(target_os = "macos", windows))]
-            app.manage(std::sync::Arc::new(infra::cursor_companion::CursorCompanionState::default()));
+            app.manage(std::sync::Arc::new(
+                infra::cursor_companion::CursorCompanionState::default(),
+            ));
             #[cfg(desktop)]
             app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
@@ -247,8 +249,7 @@ pub fn run() {
         });
 
     #[cfg(desktop)]
-    let builder = builder
-        .manage(platform::mini_app::MiniAppState::default());
+    let builder = builder.manage(platform::mini_app::MiniAppState::default());
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
@@ -596,7 +597,6 @@ pub fn run() {
                     browser_agent_execution_cancel,
                     #[cfg(desktop)]
                     browser_agent_execution_renew,
-                    storage_snapshot,
                     clipboard_snapshot,
                     clipboard_set_local,
                     clipboard_publish_shared,
@@ -610,7 +610,6 @@ pub fn run() {
                     devices_snapshot,
                     devices_unmount,
                     explorer_list_directory,
-
                     explorer_directory_size_snapshot,
                     explorer_calculate_directory_sizes,
                     explorer_create_item,
@@ -703,24 +702,6 @@ pub fn run() {
                     shortcuts_update,
                     shortcuts_reassign,
                     shortcuts_reset,
-                    providers_snapshot,
-                    providers_refresh,
-                    providers_import_cloud_connection,
-                    providers_select_remote,
-                    providers_save_remote,
-                    providers_test_remote,
-                    providers_config_paths,
-                    providers_configure_remote,
-                    providers_verify_start,
-                    providers_job_status,
-                    providers_job_cancel,
-                    providers_verify_result,
-                    providers_backend_actions,
-                    providers_run_backend_action,
-                    providers_config_security,
-                    providers_harden_config,
-                    providers_repair_config_security,
-                    providers_disconnect_remote,
                     transfers_snapshot,
                     transfers_delete_selected,
                     transfers_delete_all,
@@ -747,7 +728,6 @@ pub fn run() {
                     archive_extract,
                     duplicates_scan,
                     duplicates_cancel,
-                    duplicates_hash_remote_candidates,
                     saved_searches_snapshot,
                     saved_searches_save,
                     saved_searches_delete,

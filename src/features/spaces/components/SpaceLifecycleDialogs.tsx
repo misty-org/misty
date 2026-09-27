@@ -113,7 +113,6 @@ export function SpaceLifecycleDialog(props: {
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
             disabled={busy || (deleting && confirmation !== space.name)}
             onClick={(event) => {
               event.preventDefault();

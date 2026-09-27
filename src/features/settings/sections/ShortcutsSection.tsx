@@ -4,15 +4,15 @@ import {
   shortcutFromEvent,
   type ShortcutSlot,
 } from "@/features/shortcuts";
-import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/contracts";
-import { Button, Input, cn } from "@/shared/ui";
+import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
+import { Button, cn, IconButton, Input, Pressable } from "@/shared/ui";
 import { RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, SwitchControl } from "../settingsControls";
+import { booleanSetting, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import {
   findShortcutConflict,
@@ -329,15 +329,9 @@ export function ShortcutsSection(props: SettingsContentProps) {
                               onKeyDown={record}
                               onClear={(target) => void updateBinding({ ...target, value: null })}
                             />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className={cn(
-                                "grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream",
-                                settingsDisabledControlClass,
-                              )}
-                              aria-label={`Restore ${definition.label}`}
+                            <IconButton
+                              label={`Restore ${definition.label}`}
+                              className={settingsDisabledControlClass}
                               title="Restore this command"
                               disabled={props.working || !customized}
                               onClick={() =>
@@ -345,7 +339,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
                               }
                             >
                               <RotateCcw size={13} />
-                            </Button>
+                            </IconButton>
                           </div>
                           {capture?.commandId === definition.id &&
                           (captureError || pendingConflict) ? (
@@ -427,16 +421,14 @@ function BindingSlot(props: {
   const target = { commandId: props.commandId, slot: props.slot };
   return (
     <div className="group/slot relative min-w-[106px]">
-      <Button
-        type="button"
-        variant="ghost"
+      <Pressable
         disabled={props.disabled}
         aria-label={`${props.label} shortcut${props.value ? `: ${props.value}` : ": unbound"}`}
         onClick={() => props.onBegin(target)}
         onKeyDown={(event) => (props.capturing ? props.onKeyDown(event, target) : undefined)}
         className={cn(
           "flex h-8 w-full items-center justify-center gap-0.5 rounded border px-2",
-          "text-xs outline-none transition",
+          "text-xs",
           props.capturing
             ? "border-charcoal-active bg-charcoal-hover text-cream ring-1 ring-charcoal-active/40"
             : "border-charcoal-border bg-charcoal-bg text-cream-muted hover:border-charcoal-active",
@@ -454,25 +446,24 @@ function BindingSlot(props: {
         ) : (
           <span className="text-cream-muted">Unbound</span>
         )}
-      </Button>
+      </Pressable>
       {props.value ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
+        <IconButton
+          size="2xs"
+          variant="secondary"
+          shape="round"
+          label={`Clear ${props.label.toLowerCase()} shortcut`}
           className={cn(
-            "absolute -right-1 -top-1 grid size-4 place-items-center rounded-full",
-            "bg-charcoal-border text-cream-muted opacity-0 transition-opacity hover:text-cream",
+            "absolute -right-1 -top-1 opacity-0 transition-opacity",
             "group-hover/slot:opacity-100 group-focus-within/slot:opacity-100 max-[720px]:opacity-100",
           )}
-          aria-label={`Clear ${props.label.toLowerCase()} shortcut`}
           onClick={(event) => {
             event.stopPropagation();
             props.onClear(target);
           }}
         >
           <Trash2 size={9} />
-        </Button>
+        </IconButton>
       ) : null}
       <span className="sr-only">{props.source === "user" ? "Custom" : "Default"}</span>
     </div>

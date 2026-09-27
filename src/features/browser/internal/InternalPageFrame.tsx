@@ -1,5 +1,5 @@
 import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
-import { cn, Input } from "@/shared/ui";
+import { Input } from "@/shared/ui";
 import type { LucideIcon } from "lucide-react";
 import { Search } from "lucide-react";
 import type { ReactNode } from "react";
@@ -57,17 +57,6 @@ export function InternalPageEmpty(props: { title: string; detail?: string }) {
     </div>
   );
 }
-
-export const internalRowClass = cn(
-  "group flex min-h-11 items-center gap-3 rounded-md px-2 py-1.5",
-  "hover:bg-charcoal-hover focus-within:bg-charcoal-hover",
-);
-
-export const internalActionClass = cn(
-  "rounded-md px-2 py-1 text-xs text-cream-muted transition-colors",
-  "hover:bg-charcoal-card hover:text-cream-bright disabled:pointer-events-none disabled:opacity-50",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
-);
 
 export function SiteIcon({ url }: { url: string }) {
   return (

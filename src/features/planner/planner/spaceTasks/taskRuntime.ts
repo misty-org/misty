@@ -14,7 +14,7 @@ export interface PlannerTaskRuntime {
   api: PlannerTaskServices;
   userId?: string;
   members: SpaceMember[];
-  
+
   subscribeChanges(listener: () => void): () => void;
   renderIntegration(input: PlannerTaskIntegration): ReactNode;
   renderError(message: string): ReactNode;

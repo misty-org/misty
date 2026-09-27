@@ -1,4 +1,4 @@
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { LibrarySearchFacets } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState } from "react";
 import { libraryFacetPrefix } from "../libraryFormat";

@@ -1,3 +1,4 @@
+import type { DisplayCapture } from "@/features/agents";
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
@@ -172,7 +173,7 @@ export interface AiSurfaceAdapter {
 export interface AiInvocationRequest {
   companionMode?: "team" | "auto";
   companionModel?: string;
-  displayCaptures?: import("@/features/agents/companion/protocol").DisplayCapture[];
+  displayCaptures?: DisplayCapture[];
   agentId?: string;
   taskId?: string;
   executionMode?: "user" | "agent" | "team";

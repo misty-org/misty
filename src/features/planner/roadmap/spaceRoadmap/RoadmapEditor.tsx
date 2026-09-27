@@ -3,12 +3,11 @@ import type {
   SpaceRoadmapSnapshot,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton, Spinner } from "@/shared/ui";
 import {
   ArrowLeft,
   Check,
   CircleAlert,
-  LoaderCircle,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -32,7 +31,7 @@ import { RoadmapInspector } from "./RoadmapInspector";
 import type { RoadmapPaletteItem } from "./roadmapNodeCatalog";
 import { RoadmapNodeDrawer } from "./RoadmapNodeDrawer";
 import { RoadmapOutline } from "./RoadmapOutline";
-import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./roadmapRuntime";
+import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./RoadmapRuntime";
 import { roadmapEndpoint } from "./RoadmapWorkspaceHelpers";
 export type RoadmapMutation = <T>(
   action: (version: number) => Promise<T>,
@@ -214,11 +213,8 @@ export function RoadmapEditor(props: {
             {snapshot.goal_done}/{snapshot.goal_total} goals · {snapshot.progress_percentage}%
           </span>
           <SaveStatus state={saveState} />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            aria-label={
+          <IconButton
+            label={
               saveState === "unsaved" || saveState === "conflict"
                 ? "Retry saving roadmap"
                 : "Refresh roadmap"
@@ -233,7 +229,7 @@ export function RoadmapEditor(props: {
             }
           >
             <RefreshCcw className={`size-4 ${saveState === "saving" ? "animate-spin" : ""}`} />
-          </Button>
+          </IconButton>
         </header>
       }
       {error ? (
@@ -474,15 +470,14 @@ export function RoadmapEditor(props: {
           role="dialog"
           aria-label="Edit roadmap selection"
         >
-          <Button
-            size="icon"
-            variant="ghost"
-            className={cn("absolute right-2 z-10 rounded-full", "top-2 size-7")}
-            aria-label="Close editor"
+          <IconButton
+            shape="round"
+            label="Close editor"
+            className="absolute right-2 top-2 z-10"
             onClick={() => selectForEditing("")}
           >
             <X className="size-3.5" />
-          </Button>
+          </IconButton>
           <RoadmapInspector
             compact
             snapshot={snapshot}
@@ -711,7 +706,7 @@ function SaveStatus({ state }: { state: SpaceRoadmapSaveState }) {
       aria-live="polite"
     >
       {state === "saving" ? (
-        <LoaderCircle className="size-3.5 animate-spin" />
+        <Spinner size="sm" label={false} />
       ) : failed ? (
         <CircleAlert className="size-3.5" />
       ) : (

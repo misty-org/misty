@@ -49,6 +49,13 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     CommandSpec::new("go")
         .args(["vet", "./..."])
         .run(&workspace.server)?;
+    CommandSpec::new("./scripts/check-go-file-sizes.sh").run(&workspace.server)?;
+    CommandSpec::new(npm())
+        .args(["ci"])
+        .run(&workspace.server)?;
+    CommandSpec::new(npm())
+        .args(["run", "contracts:check"])
+        .run(&workspace.server)?;
 
     #[cfg(windows)]
     CommandSpec::new("go")
@@ -92,7 +99,7 @@ pub fn builtin_tools(workspace: &Workspace) -> Result<()> {
         bail!("built-in features directory is missing");
     }
     CommandSpec::new(npm())
-        .args(["test", "--", "src/features", "src/shared/toolAssets"])
+        .args(["test", "--", "src/features"])
         .run(&workspace.misty)
 }
 

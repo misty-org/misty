@@ -4,7 +4,7 @@ import {
   searchAgents as executeGlobalSearch,
   visualSearchAgents as executeGlobalVisualSearch,
   subscribeAgentsInvocation as subscribeToAiInvocation,
-} from "@/features/agents/agentsRuntime";
+} from "@/features/agents/AgentsRuntime";
 import { betaExecutionMode } from "@/features/agents/betaModes";
 import {
   finishLocalExecution,

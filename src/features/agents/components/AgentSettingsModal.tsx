@@ -1,5 +1,15 @@
 import { CompanionAppearanceSettings } from "../companion/CompanionAppearanceSettings";
-import { Dialog, DialogContent, DialogDescription, DialogTitle, cn } from "@/shared/ui";
+import {
+  cn,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/shared/ui";
 import { Cable, Plus, SlidersHorizontal } from "lucide-react";
 import { McpConnectionsView } from "../mcp/McpConnectionsSheet";
 
@@ -24,7 +34,11 @@ export function AgentSettingsModal(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent
         container={props.container}
-        className="flex max-h-[85%] w-[min(680px,94%)] sm:max-w-[680px] flex-col overflow-hidden rounded-xl border border-charcoal-border/80 bg-charcoal-card p-0 shadow-2xl"
+        className={cn(
+          "flex max-h-[85%] w-[min(680px,94%)] sm:max-w-[680px] flex-col",
+          "overflow-hidden rounded-xl border border-charcoal-border/80",
+          "bg-charcoal-card p-0 shadow-2xl",
+        )}
         aria-describedby="agent-settings-dialog-description"
       >
         <DialogHeaderWithTabs
@@ -76,66 +90,47 @@ function DialogHeaderWithTabs(props: {
 
       <div className="flex items-center gap-2">
         {props.showTabs !== false && (
-          <div
-            role="tablist"
-            aria-label="Agent settings tabs"
-            className="flex items-center gap-1 rounded-lg border border-charcoal-border/80 bg-charcoal-bg p-0.5"
+          <Tabs
+            value={props.activeTab}
+            onValueChange={(tab) => props.onTabChange(tab as AgentSettingsTab)}
           >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={props.activeTab === "settings"}
-              onClick={() => props.onTabChange("settings")}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                props.activeTab === "settings"
-                  ? "bg-charcoal-active text-cream-bright shadow-xs"
-                  : "text-cream-muted hover:text-cream-bright hover:bg-charcoal-card",
-              )}
-            >
-              <SlidersHorizontal className="size-3.5" />
-              <span>Settings</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={props.activeTab === "connections"}
-              onClick={() => props.onTabChange("connections")}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                props.activeTab === "connections"
-                  ? "bg-charcoal-active text-cream-bright shadow-xs"
-                  : "text-cream-muted hover:text-cream-bright hover:bg-charcoal-card",
-              )}
-            >
-              <Cable className="size-3.5" />
-              <span>Tool connections</span>
-            </button>
-          </div>
+            <TabsList aria-label="Agent settings tabs" className="h-8">
+              <TabsTrigger value="settings" className="text-xs">
+                <SlidersHorizontal className="size-3.5" />
+                Settings
+              </TabsTrigger>
+              <TabsTrigger value="connections" className="text-xs">
+                <Cable className="size-3.5" />
+                Tool connections
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         )}
 
         {props.onNewConversation && props.showTabs !== false && (
-          <button
-            type="button"
-            onClick={props.onNewConversation}
-            className="flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-cream-muted hover:text-cream-bright hover:bg-charcoal-card transition-colors cursor-pointer border border-charcoal-border/70 ml-1"
+          <Button
+            variant="outline"
+            size="xs"
+            className="ml-1"
             title="Start a new conversation"
+            onClick={props.onNewConversation}
           >
             <Plus className="size-3.5" />
-            <span>New chat</span>
-          </button>
+            New chat
+          </Button>
         )}
 
         {props.onCreateAgent && props.showTabs !== false && (
-          <button
-            type="button"
-            onClick={props.onCreateAgent}
-            className="flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-cream-muted hover:text-cream-bright hover:bg-charcoal-card transition-colors cursor-pointer border border-charcoal-border/70 ml-1"
+          <Button
+            variant="outline"
+            size="xs"
+            className="ml-1"
             title="Create new agent"
+            onClick={props.onCreateAgent}
           >
             <Plus className="size-3.5" />
-            <span>New agent</span>
-          </button>
+            New agent
+          </Button>
         )}
       </div>
     </div>

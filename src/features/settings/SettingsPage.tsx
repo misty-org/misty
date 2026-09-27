@@ -2,7 +2,7 @@ import { openAccountSettingsInBrowser } from "@/features/account";
 import { useAppStore } from "@/features/app-shell";
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
+import { Button, Input, Pressable } from "@/shared/ui";
 import { Bot, ExternalLink, Folder, Globe, Layers, Settings2, type LucideIcon } from "lucide-react";
 import { memo, useEffect, useRef, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,6 @@ import {
   AgentPermissionsSection,
   CompanionSection,
   DevicesSection,
-  FileConnectionsSection,
   ManageSpacesSection,
   ModelsSection,
   NativeAvailability,
@@ -147,7 +146,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "device",
     true,
   ),
-  page("files", "files-connections", "Connections", FileConnectionsSection, "resource"),
   page("files", "search", "Search", (p) => <SearchSection {...p} page="search" />, "device", true),
   page(
     "files",
@@ -318,11 +316,9 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
           {query && (
             <div aria-label="Settings search results" className="grid gap-1">
               {matches.map((d) => (
-                <Button
-                  variant="ghost"
-                  type="button"
+                <Pressable
                   key={d.id}
-                  className="h-auto flex-col items-start whitespace-normal rounded px-2 py-2 text-left text-xs"
+                  className="flex items-center hover:bg-cream/[0.045] flex-col items-start rounded px-2 py-2 text-xs"
                   onClick={() => select(d.page as SettingsSection, d.label)}
                 >
                   {d.label}
@@ -330,14 +326,15 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
                     {groups[settingsRegistry.find((p) => p.id === d.page)!.group].label} /{" "}
                     {settingsRegistry.find((p) => p.id === d.page)!.label}
                   </span>
-                </Button>
+                </Pressable>
               ))}
               {matchingPages.map((p) => (
                 <Button
                   variant="ghost"
                   type="button"
                   key={p.id}
-                  className="px-2 py-2 text-left text-xs hover:bg-charcoal-hover"
+                  justify="start"
+                  className="text-xs"
                   onClick={() => select(p.id)}
                 >
                   {groups[p.group].label} / {p.label}

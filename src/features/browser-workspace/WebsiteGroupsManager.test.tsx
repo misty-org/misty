@@ -3,10 +3,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace";
 import { WebsiteGroupsManager } from "./WebsiteGroupsManager";
 import { createWebsiteGroup } from "./navigation";
-import { groupIcons } from "./groupIcons";
+import { groupIcons } from "./GroupIcons";
+import type * as GroupIconUploadModule from "./groupIconUpload";
 const { readIcon } = vi.hoisted(() => ({ readIcon: vi.fn() }));
 vi.mock("./groupIconUpload", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./groupIconUpload")>()),
+  ...(await importOriginal<typeof GroupIconUploadModule>()),
   readGroupIcon: readIcon,
 }));
 beforeEach(() => {

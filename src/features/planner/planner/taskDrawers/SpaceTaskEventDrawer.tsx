@@ -1,5 +1,6 @@
 import type { SpaceCalendarEvent } from "@/api/spaces/dto/interfaces/types";
 import {
+  cn,
   Button,
   Checkbox,
   Dialog,
@@ -9,9 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Spinner,
   Textarea,
 } from "@/shared/ui";
-import { CalendarDays, Clock3, ExternalLink, LoaderCircle, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, Clock3, ExternalLink, Trash2, UserRound } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 type EventDraft = {
@@ -65,7 +67,13 @@ export function SpaceTaskEventDrawer({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
-      <DialogContent className="w-[min(560px,calc(100vw-2rem))] max-w-[560px] gap-0 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card p-0 shadow-xl ring-0">
+      <DialogContent
+        className={cn(
+          "w-[min(560px,calc(100vw-2rem))] max-w-[560px] gap-0 overflow-hidden",
+          "rounded-2xl border border-charcoal-border bg-charcoal-card p-0 shadow-xl",
+          "ring-0",
+        )}
+      >
         {editable ? (
           <form onSubmit={submit}>
             <DialogHeader className="border-b border-charcoal-border px-6 py-5 pr-14 text-left">
@@ -180,7 +188,7 @@ export function SpaceTaskEventDrawer({
                   Cancel
                 </Button>
                 <Button type="submit" disabled={busy || !draft.title.trim() || !datesValid}>
-                  {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                  {busy ? <Spinner label={false} /> : null}
                   {busy ? "Saving…" : "Save changes"}
                 </Button>
               </div>

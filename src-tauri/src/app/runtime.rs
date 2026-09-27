@@ -13,19 +13,14 @@ use crate::infra::{
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
     explorer::ExplorerService, explorer_library::ExplorerLibraryService,
     file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
-    power_pack::PowerPackService, providers::ProviderService, search::SearchService,
-    settings::SettingsService, smart_library::SmartLibraryService, storage::StorageService,
-    storage_runtime::StorageRuntimeService, transfers::TransferService,
-    workspaces::WorkspaceService,
+    power_pack::PowerPackService, search::SearchService, settings::SettingsService,
+    smart_library::SmartLibraryService, transfers::TransferService, workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
     pub navigation_names: crate::infra::navigation_names::NavigationNamesService,
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
-    pub storage_runtime: StorageRuntimeService,
-    pub storage: StorageService,
-    pub providers: ProviderService,
     pub transfers: TransferService,
     pub sync_pairs: FileSyncPairStore,
     pub file_sync: FileSyncService,
@@ -56,7 +51,6 @@ impl MistyRuntime {
 
     pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         let environment = AppEnvironmentService::new_with_data_root(data_root);
-        let storage_runtime = StorageRuntimeService::start(&environment);
         #[cfg(desktop)]
         let connected_devices = ConnectedDevicesService::new(environment.cache_dir());
         #[cfg(desktop)]
@@ -78,24 +72,17 @@ impl MistyRuntime {
             }));
             let _ = clipboard.start();
         }
-        let storage = StorageService::new_with_storage_runtime(
-            environment.clone(),
-            Some(storage_runtime.clone()),
-        );
-        let providers = ProviderService::new(storage.clone());
         let transfers = TransferService::new(environment.clone());
         let sync_pairs = FileSyncPairStore::new(environment.misty_db_path());
         let settings = SettingsService::new(environment.clone());
         let commands = CommandService::new(environment.clone());
         let devices = DeviceService::new();
-        let directory_size = DirectorySizeService::new(environment.clone(), storage.clone());
+        let directory_size = DirectorySizeService::new(environment.clone());
         let metadata = MetadataService::new();
         let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let search = SearchService::new(environment.clone(), providers.clone(), storage.clone());
+        let search = SearchService::new(environment.clone());
         let explorer = ExplorerService::new(
             environment.clone(),
-            storage.clone(),
-            providers.clone(),
             transfers.clone(),
             explorer_library.clone(),
         );
@@ -124,9 +111,6 @@ impl MistyRuntime {
             ),
             environment,
             clipboard,
-            storage_runtime,
-            storage,
-            providers,
             transfers,
             sync_pairs,
             file_sync,

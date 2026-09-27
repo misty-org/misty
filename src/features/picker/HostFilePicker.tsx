@@ -1,9 +1,7 @@
-import { useProvidersStore } from "@/features/providers";
 import { SystemErrorActivity } from "@/features/activity";
-import { formatBytes } from "@/shared/lib/fileFormat";
-import { PickerFileBrowser, type PickerBrowserState } from "./PickerFileBrowser";
+import type { FileEntry } from "@/native/ipc";
 import { explorerPrepareOpenItem } from "@/native/filesystem";
-import type { FileEntry } from "@/native/contracts";
+import { formatBytes } from "@/shared/lib/fileFormat";
 import { errorText } from "@/shared/lib/format";
 import {
   Badge,
@@ -13,10 +11,11 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  Spinner,
 } from "@/shared/ui";
-import { Check, Folder, FileText, Loader2 } from "lucide-react";
+import { Check, FileText, Folder } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { PickerFileBrowser, type PickerBrowserState } from "./PickerFileBrowser";
 import {
   preparePickerSelections,
   type MistyFilePickerPreparedSelection,
@@ -33,7 +32,7 @@ export interface MistyFilePickerProps {
   initialPath?: string | null;
   allowedExtensions?: string[];
   sourceToggle?: ReactNode;
-  allowRemoteFiles?: boolean;
+  allowDeviceFiles?: boolean;
   onCancel: () => void;
   onSelect: (path: string) => void;
   onSelectMany?: (paths: string[]) => void;
@@ -55,14 +54,17 @@ export function MistyFilePicker({
   initialPath,
   allowedExtensions,
   sourceToggle,
-  allowRemoteFiles = false,
+  allowDeviceFiles = false,
   onCancel,
   onSelect,
   onSelectMany,
   onSelectPreparedMany,
 }: MistyFilePickerProps) {
-  const [pane, setPane] = useState<PickerBrowserState>({listing:null,selectedIds:[],loading:true});
-  const remotes = useProvidersStore(useShallow((state) => state.providers?.remotes ?? []));
+  const [pane, setPane] = useState<PickerBrowserState>({
+    listing: null,
+    selectedIds: [],
+    loading: true,
+  });
 
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,11 +85,15 @@ export function MistyFilePicker({
   const isValidFileEntry = useCallback(
     (entry: FileEntry) => {
       if (entry.kind !== "file") return false;
-      if (entry.location.kind !== "local" && !allowRemoteFiles) return false;
+      if (
+        entry.location.kind !== "local" &&
+        !(allowDeviceFiles && entry.location.kind === "peer_device")
+      )
+        return false;
       if (!selectableExtensions) return true;
       return selectableExtensions.has(entry.extension.toLowerCase().replace(/^\./, ""));
     },
-    [allowRemoteFiles, selectableExtensions],
+    [allowDeviceFiles, selectableExtensions],
   );
 
   const selectedFiles = useMemo(
@@ -109,7 +115,15 @@ export function MistyFilePicker({
       return selectedFiles.length > 0;
     }
     return selectedFiles.length === 1;
-  }, [activePath, mode, multiple, preparing, pane.loading, selectedFiles.length, selectedFolder?.path]);
+  }, [
+    activePath,
+    mode,
+    multiple,
+    preparing,
+    pane.loading,
+    selectedFiles.length,
+    selectedFolder?.path,
+  ]);
 
   const handleChoose = async () => {
     if (!canChoose) return;
@@ -128,7 +142,7 @@ export function MistyFilePicker({
 
     setPreparing(true);
     try {
-      const prepared = await preparePickerSelections(chosen, remotes, async (entry) => {
+      const prepared = await preparePickerSelections(chosen, async (entry) => {
         const local = await explorerPrepareOpenItem({
           path: entry.path,
           sizeBytes: entry.sizeBytes,
@@ -230,7 +244,7 @@ export function MistyFilePicker({
         >
           {preparing ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
+              <Spinner size="sm" label={false} />
               Preparing…
             </>
           ) : (
@@ -251,7 +265,12 @@ export function MistyFilePicker({
   const pickerContent = (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden bg-charcoal-workspace">
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <PickerFileBrowser state={pane} onChange={setPane} initialPath={initialPath} multiple={multiple} remotes={allowRemoteFiles ? remotes : []} />
+        <PickerFileBrowser
+          state={pane}
+          onChange={setPane}
+          initialPath={initialPath}
+          multiple={multiple}
+        />
       </div>
       {bottomActionBar}
     </div>
@@ -289,7 +308,12 @@ export function MistyFilePicker({
 
         <div className="min-h-0 flex-1 overflow-hidden">
           <div className="relative size-full overflow-hidden">
-            <PickerFileBrowser state={pane} onChange={setPane} initialPath={initialPath} multiple={multiple} remotes={allowRemoteFiles ? remotes : []} />
+            <PickerFileBrowser
+              state={pane}
+              onChange={setPane}
+              initialPath={initialPath}
+              multiple={multiple}
+            />
           </div>
         </div>
 

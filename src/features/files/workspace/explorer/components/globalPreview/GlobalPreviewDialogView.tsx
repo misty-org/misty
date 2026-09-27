@@ -1,16 +1,26 @@
 import { PhotoEditorView } from "@/features/editor/PhotoEditorView";
 import { errorText } from "@/shared/lib/format";
-import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
-import { Copy, ExternalLink, FileQuestion, Loader2, Save, X } from "lucide-react";
+import { cn, Button, Dialog, DialogContent, DialogTitle, Spinner } from "@/shared/ui";
+import { Copy, ExternalLink, FileQuestion, Save, X } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import type { GlobalPreviewSource } from "../../model/interfaces/components/GlobalPreview";
-import { formatBytes, formatDate } from "../../utils/fileFormat";
+import {
+  type GlobalPreviewSource,
+  formatBytes,
+  formatDate,
+  type PreviewRuntime,
+} from "@/features/file-ui";
 import { PreviewBodyView } from "./PreviewBodyView";
-import { fileName, friendlyType, imageOutputMimeType, sourceExtension } from "./previewFormat";
-import { InspectorDetail, PreviewMessage, ToolbarButton } from "./previewPrimitives";
-import { globalPreviewKindForSource } from "./previewDocument";
+import {
+  fileName,
+  friendlyType,
+  imageOutputMimeType,
+  sourceExtension,
+  InspectorDetail,
+  PreviewMessage,
+  ToolbarButton,
+  globalPreviewKindForSource,
+} from "@/features/resource-preview";
 import { usePreviewResource } from "./usePreviewResource";
-import type { PreviewRuntime } from "./PreviewRuntime";
 
 export function GlobalPreviewDialogView(props: {
   runtime: PreviewRuntime;
@@ -133,7 +143,12 @@ export function GlobalPreviewDialogView(props: {
       <DialogContent
         ref={previewRef}
         aria-describedby={undefined}
-        className="left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0 rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 [&>[data-slot=dialog-close]]:hidden"
+        className={cn(
+          "left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0",
+          "rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0",
+          "data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100",
+          "[&>[data-slot=dialog-close]]:hidden",
+        )}
       >
         <section className="grid h-full min-h-0 grid-rows-[58px_minmax(0,1fr)]">
           <header className="grid min-w-0 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-3 border-b border-charcoal-border px-4">
@@ -156,11 +171,7 @@ export function GlobalPreviewDialogView(props: {
                     disabled={!dirty || Boolean(saving)}
                     onClick={() => void save(true)}
                   >
-                    {saving === "copy" ? (
-                      <Loader2 className="animate-spin" size={14} />
-                    ) : (
-                      <Copy size={14} />
-                    )}
+                    {saving === "copy" ? <Spinner size="sm" label={false} /> : <Copy size={14} />}
                     Save as Copy
                   </Button>
                   <Button
@@ -169,11 +180,7 @@ export function GlobalPreviewDialogView(props: {
                     disabled={!dirty || props.source.readonly || Boolean(saving)}
                     onClick={() => void save(false)}
                   >
-                    {saving === "save" ? (
-                      <Loader2 className="animate-spin" size={14} />
-                    ) : (
-                      <Save size={14} />
-                    )}
+                    {saving === "save" ? <Spinner size="sm" label={false} /> : <Save size={14} />}
                     Save
                   </Button>
                 </>
@@ -202,7 +209,7 @@ export function GlobalPreviewDialogView(props: {
               <div className="min-h-0 overflow-auto">
                 {loading ? (
                   <PreviewMessage
-                    icon={<Loader2 className="animate-spin" size={28} />}
+                    icon={<Spinner size="lg" label={false} className="size-7" />}
                     title="Preparing preview"
                     detail="Loading the best available reader…"
                   />

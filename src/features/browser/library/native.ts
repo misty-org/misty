@@ -1,11 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type BrowserDownloadState =
-  | "in_progress"
-  | "finished"
-  | "failed"
-  | "cancelled"
-  | "interrupted";
+  "in_progress" | "finished" | "failed" | "cancelled" | "interrupted";
 
 export interface BrowserDownloadEntry {
   id: string;
@@ -59,7 +55,9 @@ export const browserLibrary = {
   openDownload: (id: string) => invoke<void>("browser_download_open", { request: { id } }),
   revealDownload: (id: string) => invoke<void>("browser_download_reveal", { request: { id } }),
   removeDownloads: (request: { ids?: string[]; since?: number }) =>
-    invoke<void>("browser_downloads_remove", { request: { ids: request.ids ?? [], since: request.since } }),
+    invoke<void>("browser_downloads_remove", {
+      request: { ids: request.ids ?? [], since: request.since },
+    }),
 
   recordVisit: (request: { profileId?: string; url: string; title: string; typed?: boolean }) =>
     invoke<void>("browser_history_record", { request }),

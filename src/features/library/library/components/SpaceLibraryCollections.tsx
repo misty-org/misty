@@ -1,6 +1,6 @@
 import { Folder, Pencil, Plus, Trash2 } from "lucide-react";
 
-import { Button } from "@/shared/ui";
+import { Button, Pressable } from "@/shared/ui";
 
 import { formatBytes, formatTime } from "../libraryFormat";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
@@ -56,8 +56,9 @@ export function SpaceLibraryAlbumsOverview() {
         <div className="flex items-center gap-2">
           {currentAlbumFolder ? (
             <Button
-              className="border-0 bg-transparent p-0 text-xs text-cream-muted"
-              type="button"
+              variant="link"
+              size="none"
+              className="text-xs text-cream-muted"
               onClick={() => setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")}
             >
               ←
@@ -107,9 +108,8 @@ export function SpaceLibraryAlbumsOverview() {
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {visibleAlbumFolders.map((folder) => (
-          <Button
+          <Pressable
             className={`${collectionCardClassName} p-4`}
-            type="button"
             key={folder.id}
             onClick={() => setSelectedAlbumFolderId(folder.id)}
           >
@@ -119,12 +119,11 @@ export function SpaceLibraryAlbumsOverview() {
             <span className="mt-1 block text-[10px] text-cream-muted">
               {folder.album_count + folder.folder_count} items
             </span>
-          </Button>
+          </Pressable>
         ))}
         {visibleAlbumsForFolder.map((album) => (
-          <Button
+          <Pressable
             className={collectionCardClassName}
-            type="button"
             key={album.id}
             onClick={() => selectCollection("albums", album.id)}
           >
@@ -135,7 +134,7 @@ export function SpaceLibraryAlbumsOverview() {
                 {album.item_count} items
               </span>
             </span>
-          </Button>
+          </Pressable>
         ))}
       </div>
       {visibleAlbumFolders.length === 0 && visibleAlbumsForFolder.length === 0 ? (

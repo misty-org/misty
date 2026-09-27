@@ -4,20 +4,27 @@ import { useAuth } from "@/features/auth";
 import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import { openMisty } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import type { AgentProfile, AgentProfileInput } from "@/shared/contracts";
+import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
   Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  Field,
+  IconButton,
+  Input,
+  ListRowButton,
+  MenuItem,
   NavigationChevron,
+  Pressable,
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
+  Textarea,
+  Toggle,
 } from "@/shared/ui";
 import {
   Activity,
@@ -52,10 +59,6 @@ function relativeTime(value: string | number | undefined): string {
     day: "numeric",
   });
 }
-const field =
-  "w-full rounded-md border border-charcoal-border bg-charcoal-bg px-3 py-2 text-sm text-cream";
-const button =
-  "rounded-md border border-charcoal-border px-3 py-2 text-sm enabled:hover:bg-charcoal-active disabled:text-cream-muted disabled:cursor-not-allowed disabled:opacity-100";
 const emptyProfile: AgentProfileInput = {
   name: "",
   role: "",
@@ -70,6 +73,8 @@ const emptyProfile: AgentProfileInput = {
   reasoning_effort: "",
   enabled: true,
 };
+const recipientRowClass = "h-auto w-full justify-start gap-3 p-2.5 text-left";
+
 export default function NativeAgentsPage() {
   const { user } = useAuth();
   // New work is personal. Historical conversations retain their saved scope when reopened.
@@ -175,7 +180,7 @@ export default function NativeAgentsPage() {
       setActivity(false);
     });
   return (
-    <main className={`agents-workspace${""}`}>
+    <main className="agents-workspace">
       <aside className="agents-roster" aria-label="Your agents">
         <header
           className="agents-roster-heading"
@@ -186,20 +191,10 @@ export default function NativeAgentsPage() {
             Agents
           </span>
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="agent-icon-button"
-              onClick={showSettings}
-              aria-label="Agent settings"
-              title="Agent settings"
-            >
+            <IconButton onClick={showSettings} label="Agent settings">
               <SlidersHorizontal className="size-4 shrink-0" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="agent-icon-button"
+            </IconButton>
+            <IconButton
               onClick={() =>
                 change(() => {
                   setNewChat(true);
@@ -208,12 +203,11 @@ export default function NativeAgentsPage() {
                   setSettingsModalOpen(false);
                 })
               }
-              aria-label="New chat"
-              title="New chat"
+              label="New chat"
               disabled={working || editorStatus.busy}
             >
               <Plus className="size-4 shrink-0" />
-            </Button>
+            </IconButton>
           </div>
         </header>
         <div className="agents-roster-list">
@@ -241,9 +235,8 @@ export default function NativeAgentsPage() {
                           : "hover:bg-charcoal-card text-cream",
                     )}
                   >
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 flex-1 min-w-0 h-full py-0.5 text-left border-none bg-transparent outline-none cursor-pointer text-inherit"
+                    <ListRowButton
+                      className="h-full items-center gap-2 py-0.5 text-inherit"
                       aria-pressed={isAgentSelected}
                       disabled={working || editorStatus.busy}
                       onClick={() => {
@@ -268,7 +261,7 @@ export default function NativeAgentsPage() {
                           <NavigationChevron open={expanded} />
                         </span>
                       </div>
-                    </button>
+                    </ListRowButton>
 
                     <div
                       className={cn(
@@ -278,12 +271,9 @@ export default function NativeAgentsPage() {
                           : "opacity-0 group-hover/agent-row:opacity-100 focus-within:opacity-100",
                       )}
                     >
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="size-6 text-cream-muted hover:text-cream-bright p-0"
-                        aria-label="New conversation"
-                        title="New conversation"
+                      <IconButton
+                        size="xs"
+                        label="New conversation"
                         disabled={working || editorStatus.busy}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -291,42 +281,40 @@ export default function NativeAgentsPage() {
                         }}
                       >
                         <Plus className="size-3.5 shrink-0" />
-                      </Button>
+                      </IconButton>
                       <DropdownMenu
                         open={isDropdownOpen}
                         onOpenChange={(open) => setActiveDropdownAgentId(open ? agent.id : null)}
                       >
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            className={cn(
-                              "size-6 text-cream-muted hover:text-cream-bright p-0",
-                              isDropdownOpen && "text-cream-bright",
-                            )}
-                            aria-label="Agent options"
+                          <IconButton
+                            size="xs"
+                            label="Agent options"
+                            tooltip={false}
+                            className={cn(isDropdownOpen && "text-cream-bright")}
                           >
                             <MoreHorizontal className="size-3.5 shrink-0" />
-                          </Button>
+                          </IconButton>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="agent-options-menu">
-                          <DropdownMenuItem onSelect={() => select(agent.id, true)}>
-                            <Plus className="size-3.5 shrink-0" />
-                            New conversation
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
+                        <DropdownMenuContent align="end" width="md">
+                          <MenuItem
+                            icon={<Plus className="size-3.5" />}
+                            label="New conversation"
+                            onSelect={() => select(agent.id, true)}
+                          />
+                          <MenuItem
+                            icon={<SlidersHorizontal className="size-3.5" />}
+                            label="Agent settings"
                             onSelect={() => {
                               setSelected(agent.id);
                               openSettingsModal("settings");
                             }}
-                          >
-                            <SlidersHorizontal className="size-3.5 shrink-0" />
-                            Agent settings
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={create}>
-                            <Plus className="size-3.5 shrink-0" />
-                            Create new agent
-                          </DropdownMenuItem>
+                          />
+                          <MenuItem
+                            icon={<Plus className="size-3.5" />}
+                            label="Create new agent"
+                            onSelect={create}
+                          />
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -350,13 +338,14 @@ export default function NativeAgentsPage() {
                               key={c.id}
                               className="relative flex items-center h-7 pr-1 text-[12px] group/branch-row"
                             >
-                              <button
-                                type="button"
+                              <Pressable
+                                aria-current={isActiveConvo ? "true" : undefined}
                                 className={cn(
-                                  "flex items-center gap-1.5 w-full h-full rounded-md px-2 text-left transition-colors truncate",
+                                  "flex items-center hover:bg-cream/[0.045] rounded-md",
+                                  "h-full w-full gap-1.5 truncate px-2 text-[12px]",
                                   isActiveConvo
-                                    ? "bg-charcoal-active text-cream-bright font-medium"
-                                    : "text-cream-muted hover:text-cream-bright hover:bg-charcoal-card",
+                                    ? "bg-cream/[0.06] font-medium text-cream-bright"
+                                    : "text-cream-muted",
                                 )}
                                 onClick={() => {
                                   change(() => {
@@ -379,7 +368,7 @@ export default function NativeAgentsPage() {
                                 <span className="text-[10px] text-cream-muted/50 tabular-nums shrink-0 ml-1">
                                   {relativeTime(c.updatedAt)}
                                 </span>
-                              </button>
+                              </Pressable>
                             </div>
                           );
                         })
@@ -404,12 +393,12 @@ export default function NativeAgentsPage() {
               You have unsaved changes or an unsent message. Keep editing, or discard them to
               switch.
             </p>
-            <Button variant="ghost" className={button} onClick={() => setPendingChange(undefined)}>
+            <Button variant="outline" size="sm" onClick={() => setPendingChange(undefined)}>
               Keep editing
             </Button>
             <Button
-              variant="ghost"
-              className={button}
+              variant="outline"
+              size="sm"
               onClick={() => {
                 pendingChange();
                 setPendingChange(undefined);
@@ -426,7 +415,7 @@ export default function NativeAgentsPage() {
         {error && (
           <div role="alert" className="agents-notice">
             <p>{error}</p>
-            <Button variant="ghost" className={button} onClick={() => void load(user?.id ?? "")}>
+            <Button variant="outline" size="sm" onClick={() => void load(user?.id ?? "")}>
               Retry
             </Button>
           </div>
@@ -440,7 +429,8 @@ export default function NativeAgentsPage() {
             <>
               <label className="agent-recipient-input">
                 <span>To:</span>
-                <input
+                <Input
+                  variant="bare"
                   autoFocus
                   aria-label="Search or create agents"
                   placeholder="Search or create agents"
@@ -448,15 +438,9 @@ export default function NativeAgentsPage() {
                   onChange={(e) => setRecipientSearch(e.target.value)}
                 />
               </label>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="agent-icon-button"
-                aria-label="Close new chat"
-                onClick={() => setNewChat(false)}
-              >
+              <IconButton label="Close new chat" onClick={() => setNewChat(false)}>
                 <X size={18} />
-              </Button>
+              </IconButton>
             </>
           ) : (
             <>
@@ -475,27 +459,20 @@ export default function NativeAgentsPage() {
                       : profile?.name || "Misty"}
                 </h2>
               </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn(
-                  "agent-icon-button",
-                  activity && "bg-charcoal-active text-cream-bright",
-                )}
-                aria-label={activity ? "Hide activity" : "View agent activity"}
-                title={activity ? "Hide activity" : "Agent activity and details"}
+              <IconButton
+                label={activity ? "Hide activity" : "View agent activity"}
                 aria-pressed={activity}
                 onClick={() => setActivity((prev) => !prev)}
               >
                 <Activity size={18} />
-              </Button>
+              </IconButton>
             </>
           )}
         </header>
         {newChat ? (
           <div className="agent-new-chat">
             <div className="agent-recipient-results" role="group" aria-label="Choose an agent">
-              <Button variant="ghost" onClick={create}>
+              <Button variant="ghost" className={recipientRowClass} onClick={create}>
                 <Plus size={20} />
                 Create new agent
               </Button>
@@ -504,7 +481,12 @@ export default function NativeAgentsPage() {
                   a.name.toLocaleLowerCase().includes(recipientSearch.trim().toLocaleLowerCase()),
                 )
                 .map((a) => (
-                  <Button variant="ghost" key={a.id} onClick={() => select(a.id, true)}>
+                  <Button
+                    variant="ghost"
+                    key={a.id}
+                    className={recipientRowClass}
+                    onClick={() => select(a.id, true)}
+                  >
                     <AgentAvatar agent={a} />
                     {a.name}
                   </Button>
@@ -529,7 +511,11 @@ export default function NativeAgentsPage() {
           side="right"
           portal={false}
           overlay={false}
-          className="flex w-[min(560px,94vw)] flex-col overflow-hidden border-l border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl sm:max-w-[560px]"
+          className={cn(
+            "flex w-[min(560px,94vw)] flex-col overflow-hidden border-l",
+            "border-charcoal-border bg-charcoal-bg p-0 text-cream shadow-2xl",
+            "sm:max-w-[560px]",
+          )}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Agent activity</SheetTitle>
@@ -564,12 +550,12 @@ export default function NativeAgentsPage() {
               You have unsaved changes or an unsent message. Keep editing, or discard them to
               switch.
             </p>
-            <Button variant="ghost" className={button} onClick={() => setPendingChange(undefined)}>
+            <Button variant="outline" size="sm" onClick={() => setPendingChange(undefined)}>
               Keep editing
             </Button>
             <Button
-              variant="ghost"
-              className={button}
+              variant="outline"
+              size="sm"
               onClick={() => {
                 pendingChange();
                 setPendingChange(undefined);
@@ -607,7 +593,7 @@ export default function NativeAgentsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn(button, "h-7 text-xs gap-1.5")}
+                  className="h-7 gap-1.5 text-xs"
                   disabled={working}
                   onClick={() => {
                     if (profile) select(profile.id, true);
@@ -771,11 +757,10 @@ function AgentEditor({
       }}
     >
       <div className="flex items-center gap-4 pb-1">
-        <button
-          type="button"
+        <Pressable
           aria-label="Edit agent avatar"
           onClick={() => setAvatarEditing(!avatarEditing)}
-          className="group relative flex size-14 items-center justify-center rounded-xl border border-charcoal-border bg-charcoal-bg hover:border-cream-muted/60 transition-colors cursor-pointer overflow-hidden p-1 shrink-0"
+          className="flex items-center group relative size-14 shrink-0 overflow-hidden rounded-xl p-1"
         >
           <AgentAvatar
             agent={
@@ -790,15 +775,16 @@ function AgentEditor({
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
             <Pencil className="size-3.5 text-cream-bright" />
           </div>
-        </button>
+        </Pressable>
         <div className="flex-1 min-w-0">
-          <button
-            type="button"
+          <Button
+            variant="link"
+            size="none"
+            className="h-auto p-0 text-sm"
             onClick={() => setAvatarEditing(!avatarEditing)}
-            className="text-sm font-medium text-cream-bright hover:underline cursor-pointer flex items-center gap-1.5"
           >
-            <span>{avatarEditing ? "Hide avatar options" : "Change avatar"}</span>
-          </button>
+            {avatarEditing ? "Hide avatar options" : "Change avatar"}
+          </Button>
           <p className="text-xs text-cream-muted mt-0.5">
             Pick a companion style or enter an emoji.
           </p>
@@ -808,7 +794,7 @@ function AgentEditor({
         <div className="rounded-xl border border-charcoal-border/70 bg-charcoal-bg/50 p-4 space-y-4">
           <div>
             <div className="text-xs font-medium text-cream-muted mb-2 uppercase tracking-wider">
-              Misty mark
+              Cloud avatar
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {agentCloudVariants.map((variant) => {
@@ -821,25 +807,20 @@ function AgentEditor({
                     system_managed: profile?.system_managed ?? false,
                   }).id === variant.id;
                 return (
-                  <button
+                  <Toggle
                     key={variant.id}
-                    type="button"
+                    variant="outline"
                     aria-label={`${variant.name}, ${variant.expression}`}
-                    aria-pressed={chosen}
+                    pressed={chosen}
                     disabled={busy}
-                    onClick={() =>
+                    onPressedChange={() =>
                       update("avatar", {
                         ...draft.avatar,
                         emoji: "",
                         cloudVariant: variant.id,
                       })
                     }
-                    className={cn(
-                      "flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all text-center gap-1 cursor-pointer",
-                      chosen
-                        ? "border-cream-bright/80 bg-charcoal-active text-cream-bright shadow-xs ring-1 ring-cream-bright/30"
-                        : "border-charcoal-border bg-charcoal-card/60 text-cream-muted hover:border-charcoal-border hover:bg-charcoal-active/40 hover:text-cream",
-                    )}
+                    className="h-auto flex-col gap-1 whitespace-normal rounded-lg p-2.5 text-center text-cream-muted data-[state=on]:border-cream-bright/80"
                   >
                     <div className="size-10 shrink-0 flex items-center justify-center">
                       <AgentCloudImage variant={variant} />
@@ -850,7 +831,7 @@ function AgentEditor({
                     <span className="text-[10px] text-cream-muted leading-tight">
                       {variant.expression}
                     </span>
-                  </button>
+                  </Toggle>
                 );
               })}
             </div>
@@ -862,9 +843,9 @@ function AgentEditor({
             >
               Custom emoji
             </label>
-            <input
+            <Input
               id="agent-custom-emoji"
-              className={cn(field, "w-24 text-center text-base py-1 px-2")}
+              className="w-24 text-center text-base"
               aria-label="Avatar emoji"
               maxLength={12}
               value={typeof draft.avatar?.emoji === "string" ? draft.avatar.emoji : ""}
@@ -881,54 +862,44 @@ function AgentEditor({
           </div>
         </div>
       )}
-      <label className="block space-y-1.5 text-sm">
-        <span className="text-cream-muted text-xs font-medium uppercase tracking-wider">Name</span>
-        <input
-          className={field}
+      <Field label="Name">
+        <Input
           required
           maxLength={80}
           value={draft.name}
           readOnly={profile?.system_managed}
           onChange={(e) => update("name", e.target.value)}
         />
-      </label>
-      <label className="block space-y-1.5 text-sm">
-        <span className="text-cream-muted text-xs font-medium uppercase tracking-wider">
-          Label (optional)
-        </span>
-        <input
-          className={field}
+      </Field>
+      <Field label="Label (optional)">
+        <Input
           maxLength={160}
           placeholder="Manage launch communications"
           value={draft.role}
           onChange={(e) => update("role", e.target.value)}
         />
-      </label>
-      <label className="block space-y-1.5 text-sm">
-        <span className="text-cream-muted text-xs font-medium uppercase tracking-wider">
-          Description
-        </span>
-        <textarea
-          className={`${field} min-h-20 resize-y`}
+      </Field>
+      <Field label="Description">
+        <Textarea
+          className="min-h-20 resize-y"
           maxLength={2000}
           placeholder="What this agent helps you with"
           value={draft.description}
           onChange={(e) => update("description", e.target.value)}
         />
-      </label>
+      </Field>
       <details className="agent-advanced-settings">
         <summary>Instructions and memory</summary>
         <div>
-          <label className="block space-y-2 text-sm">
-            <span>Instructions</span>
-            <textarea
-              className={`${field} min-h-32 resize-y`}
+          <Field label="Instructions">
+            <Textarea
+              className="min-h-32 resize-y"
               maxLength={16000}
               placeholder="What should this agent know about how you work?"
               value={draft.instructions}
               onChange={(e) => update("instructions", e.target.value)}
             />
-          </label>
+          </Field>
           {!!memories.length && (
             <section className="border-t border-charcoal-border pt-5">
               <h3 className="mb-2 text-sm font-medium">Remembered preferences</h3>
@@ -938,17 +909,16 @@ function AgentEditor({
                     {editingMemory === memory.id ? (
                       <label className="block">
                         <span className="sr-only">Preference</span>
-                        <textarea
-                          className={field}
+                        <Textarea
                           maxLength={1000}
                           value={memoryDraft}
                           onChange={(e) => setMemoryDraft(e.target.value)}
                         />
                         <div className="mt-2 flex gap-2">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             type="button"
-                            className={button}
+                            size="sm"
                             disabled={!memoryDraft.trim()}
                             onClick={() => {
                               void personalAgentsApi
@@ -972,9 +942,9 @@ function AgentEditor({
                             Save preference
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             type="button"
-                            className={button}
+                            size="sm"
                             onClick={() => setEditingMemory(undefined)}
                           >
                             Cancel
@@ -989,9 +959,9 @@ function AgentEditor({
                     </span>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     type="button"
-                    className={button}
+                    size="sm"
                     onClick={() => {
                       setEditingMemory(memory.id);
                       setMemoryDraft(memory.content);
@@ -1000,9 +970,9 @@ function AgentEditor({
                     Edit
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     type="button"
-                    className={button}
+                    size="sm"
                     onClick={() => {
                       void personalAgentsApi
                         .forget(profile!.id, memory.id)
@@ -1034,19 +1004,14 @@ function AgentEditor({
         </p>
       )}
       <div className="flex flex-wrap gap-3 border-t border-charcoal-border pt-4">
-        <Button
-          variant="ghost"
-          className={`${button} bg-charcoal-active`}
-          disabled={busy || !draft.name.trim()}
-          type="submit"
-        >
+        <Button disabled={busy || !draft.name.trim()} type="submit">
           {busy ? "Saving…" : profile ? "Save changes" : "Create agent"}
         </Button>
         {profile && !profile.system_managed && (
           <Button
-            variant="ghost"
+            variant="outline"
             type="button"
-            className={`${button} ml-auto`}
+            className="ml-auto"
             disabled={busy}
             onClick={() => setConfirmDelete(true)}
           >
@@ -1061,18 +1026,13 @@ function AgentEditor({
             Delete {profile?.name}? Active work will stop. Existing conversation history is
             retained.
           </p>
-          <Button
-            variant="ghost"
-            type="button"
-            className={button}
-            onClick={() => setConfirmDelete(false)}
-          >
+          <Button variant="outline" type="button" size="sm" onClick={() => setConfirmDelete(false)}>
             Keep agent
           </Button>{" "}
           <Button
-            variant="ghost"
+            variant="outline"
             type="button"
-            className={button}
+            size="sm"
             disabled={busy}
             onClick={() => {
               setBusy(true);

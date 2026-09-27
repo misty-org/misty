@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { createPortal } from "react-dom";
+import { Portal } from "@/shared/ui";
 import { captureAttachmentFromDataUrl } from "./captureAttachment";
 import type { AiCaptureAttachment } from "./types";
 
@@ -57,77 +57,93 @@ export function MistyRegionCapture({
     try {
       onCapture(await captureMistyRegion(selected));
     } catch (error) {
-      setCaptureError(error instanceof Error ? error.message : "Capture failed. Select the region again.");
+      setCaptureError(
+        error instanceof Error ? error.message : "Capture failed. Select the region again.",
+      );
     } finally {
       setCapturing(false);
     }
   };
 
-  return createPortal(
-    <div
-      className="misty-region-capture"
-      data-html2canvas-ignore="true"
-      aria-label="Select a region for Misty"
-      onPointerDown={(event) => {
-        if (capturing) return;
-        event.currentTarget.setPointerCapture(event.pointerId);
-        startRef.current = { x: event.clientX, y: event.clientY };
-        setRegion({ x: event.clientX, y: event.clientY, width: 0, height: 0 });
-      }}
-      onPointerMove={move}
-      onPointerUp={(event) => void finish(event)}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onCancel();
-      }}
-    >
-      <div className="misty-region-capture-hint">
-        {captureError || (capturing ? "Attaching capture…" : "Drag around anything Misty should see · Esc to cancel")}
+  return (
+    <Portal>
+      <div
+        className="misty-region-capture"
+        data-html2canvas-ignore="true"
+        aria-label="Select a region for Misty"
+        onPointerDown={(event) => {
+          if (capturing) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          startRef.current = { x: event.clientX, y: event.clientY };
+          setRegion({ x: event.clientX, y: event.clientY, width: 0, height: 0 });
+        }}
+        onPointerMove={move}
+        onPointerUp={(event) => void finish(event)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onCancel();
+        }}
+      >
+        <div className="misty-region-capture-hint">
+          {captureError ||
+            (capturing
+              ? "Attaching capture…"
+              : "Drag around anything Misty should see · Esc to cancel")}
+        </div>
+        {region ? (
+          <div
+            className="misty-region-capture-selection"
+            style={{ left: region.x, top: region.y, width: region.width, height: region.height }}
+          />
+        ) : null}
       </div>
-      {region ? (
-        <div
-          className="misty-region-capture-selection"
-          style={{ left: region.x, top: region.y, width: region.width, height: region.height }}
-        />
-      ) : null}
-    </div>,
-    document.body,
+    </Portal>
   );
 }
 
 export async function captureMistyRegion(region: Region): Promise<AiCaptureAttachment> {
   if (import.meta.env.MISTY_NATIVE_MACOS_CAPTURE) {
-    const hidden = Array.from(document.querySelectorAll<HTMLElement>("[data-html2canvas-ignore], .misty-presence"))
-      .map(element => ({ element, visibility: element.style.visibility }));
+    const hidden = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-html2canvas-ignore], .misty-presence"),
+    ).map((element) => ({ element, visibility: element.style.visibility }));
     try {
-      hidden.forEach(({ element }) => { element.style.visibility = "hidden"; });
-      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      hidden.forEach(({ element }) => {
+        element.style.visibility = "hidden";
+      });
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
       const { invoke } = await import("@tauri-apps/api/core");
-      const capture = await invoke<{dataUrl: string; width: number; height: number}>("host_webview_capture_region", { ...region });
+      const capture = await invoke<{ dataUrl: string; width: number; height: number }>(
+        "host_webview_capture_region",
+        { ...region },
+      );
       return captureAttachmentFromDataUrl(capture.dataUrl, capture.width, capture.height);
     } finally {
-      hidden.forEach(({ element, visibility }) => { element.style.visibility = visibility; });
+      hidden.forEach(({ element, visibility }) => {
+        element.style.visibility = visibility;
+      });
     }
   } else {
-  const { default: html2canvas } = await import("html2canvas");
-  const scale = Math.min(2, 1280 / Math.max(region.width, region.height));
-  const canvas = await html2canvas(document.documentElement, {
-    x: region.x + window.scrollX,
-    y: region.y + window.scrollY,
-    width: region.width,
-    height: region.height,
-    scale,
-    useCORS: true,
-    logging: false,
-    backgroundColor: null,
-    ignoreElements: (element) =>
-      element instanceof HTMLElement &&
-      (element.hasAttribute("data-html2canvas-ignore") ||
-        element.classList.contains("misty-presence")),
-  });
-  const output = resizeCapture(canvas, 1280);
-  const dataUrl = output.toDataURL("image/jpeg", 0.82);
-  return captureAttachmentFromDataUrl(dataUrl, output.width, output.height);
+    const { default: html2canvas } = await import("html2canvas");
+    const scale = Math.min(2, 1280 / Math.max(region.width, region.height));
+    const canvas = await html2canvas(document.documentElement, {
+      x: region.x + window.scrollX,
+      y: region.y + window.scrollY,
+      width: region.width,
+      height: region.height,
+      scale,
+      useCORS: true,
+      logging: false,
+      backgroundColor: null,
+      ignoreElements: (element) =>
+        element instanceof HTMLElement &&
+        (element.hasAttribute("data-html2canvas-ignore") ||
+          element.classList.contains("misty-presence")),
+    });
+    const output = resizeCapture(canvas, 1280);
+    const dataUrl = output.toDataURL("image/jpeg", 0.82);
+    return captureAttachmentFromDataUrl(dataUrl, output.width, output.height);
   }
 }
 

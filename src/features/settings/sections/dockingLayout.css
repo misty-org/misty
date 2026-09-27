@@ -1,17 +1,3 @@
-.misty-docking-preset {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 9px;
-  border: 1px solid var(--misty-theme-border);
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--misty-theme-text-muted);
-}
-.misty-docking-preset[aria-pressed="true"] {
-  border-color: var(--misty-theme-text-muted);
-  color: var(--misty-theme-text-bright);
-}
 .misty-docking-preview {
   position: relative;
   display: block;
@@ -66,25 +52,4 @@
 }
 .preview-tabs.nav-bottom {
   bottom: 9px;
-}
-.misty-docking-positions {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--misty-theme-border);
-  border-radius: 6px;
-  background: var(--misty-theme-workspace);
-}
-.misty-docking-positions > button {
-  flex: 1;
-  height: 30px;
-  border-radius: 3px;
-  font-size: 12px;
-}
-.misty-docking-positions > button[aria-pressed="true"] {
-  color: var(--misty-theme-text-bright);
-}
-.misty-docking-positions > button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }

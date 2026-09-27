@@ -1,4 +1,4 @@
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -8,8 +8,8 @@ import {
   defaultFileActionOptions,
   fileViewModeOptions,
   settingsAssociationRowClass,
+  settingsDisabledControlClass,
   settingsEmptyClass,
-  settingsIconDangerClass,
   settingsReferenceHeaderClass,
   settingsReferenceListClass,
   settingsReferenceSpanClass,
@@ -23,7 +23,7 @@ import {
   SwitchControl,
   TextControl,
   WorkspaceRootControl,
-} from "../settingsControls";
+} from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function FilesSection(props: SettingsContentProps & { page?: "browsing" | "locations" }) {
@@ -115,17 +115,15 @@ export function FilesSection(props: SettingsContentProps & { page?: "browsing" |
                 >
                   {association.applicationPath}
                 </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  type="button"
-                  className={settingsIconDangerClass}
-                  aria-label={`Remove ${association.key}`}
+                <IconButton
+                  variant="destructive"
+                  label={`Remove ${association.key}`}
+                  className={settingsDisabledControlClass}
                   disabled={props.working}
                   onClick={() => void props.onRemoveOpenWithAssociation(association.key)}
                 >
                   <Trash2 size={15} />
-                </Button>
+                </IconButton>
               </div>
             ))}
             {props.openWithAssociations.length === 0 ? (

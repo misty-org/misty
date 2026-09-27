@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  const actual = await vi.importActual<typeof ReactRouterDomModule>("react-router-dom");
   return {
     ...actual,
     useNavigate: () => mocks.navigate,
@@ -36,6 +36,7 @@ vi.mock("@/api/deployment/api", () => ({
 }));
 
 import RegisterPage from "./RegisterPage";
+import type * as ReactRouterDomModule from "react-router-dom";
 
 function setInputValue(input: HTMLInputElement, value: string) {
   const valueSetter = Object.getOwnPropertyDescriptor(

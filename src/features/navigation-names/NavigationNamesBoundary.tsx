@@ -1,4 +1,4 @@
-import { LoadingScreen } from "@/shared/ui/loading-screen";
+import { LoadingScreen } from "@/shared/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -90,7 +90,7 @@ function AccountNavigationNamesBoundary({
       {state.error && (
         <div
           role="alert"
-          className="fixed bottom-3 left-3 z-[2147483401] max-w-md rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-lg"
+          className="fixed bottom-3 left-3 layer-menu-raised max-w-md rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-lg"
         >
           {state.error} Your last valid names are retained. Fix navigation.json to retry.
         </div>

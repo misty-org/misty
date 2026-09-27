@@ -7,7 +7,7 @@ const fixture = vi.hoisted(() => ({
   cancelRun: vi.fn(async () => {}),
   openMisty: vi.fn(async () => {}),
 }));
-vi.mock("../agentsRuntime", () => ({
+vi.mock("../AgentsRuntime", () => ({
   runtimeAiApi: {
     activity: fixture.activity,
     cancelInvocation: fixture.cancelInvocation,

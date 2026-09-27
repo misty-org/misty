@@ -1,7 +1,7 @@
 import { ClipboardCopy, Star, Trash2, X } from "lucide-react";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
 
-import { Button } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";
@@ -288,15 +288,14 @@ function SpaceLibrarySelectionToolbar({
           </>
         )
       ) : null}
-      <Button
-        className="ml-auto grid size-7 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream"
-        type="button"
+      <IconButton
+        label="Clear selection"
+        className="ml-auto"
         disabled={bulkSaving}
         onClick={onClear}
-        aria-label="Clear selection"
       >
         <X size={13} />
-      </Button>
+      </IconButton>
     </div>
   );
 }

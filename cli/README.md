@@ -61,6 +61,15 @@ one device. Do not copy sync databases between profiles or reset IDs to test syn
 Their Vite dependency caches are separate, and Control lists the profile name
 alongside its host and device ID.
 
+Native Cargo artifacts and intermediate files are isolated per profile under
+`src-tauri/target/dev-profiles/<profile>`; bundled workers also have private build
+directories. This prevents dev1 and dev2 from sharing build locks or overwriting
+compiled profile configuration. Custom `CARGO_TARGET_DIR` (or
+`CARGO_BUILD_TARGET_DIR`) and `CARGO_BUILD_BUILD_DIR` roots receive the same
+`dev-profiles/<profile>` suffix. The first build of each profile creates its own
+cache. Restart existing dev commands to pick up launcher changes; no CLI reinstall
+is needed.
+
 Enable **Full sync** on both devices. Only the **Active** device publishes tab
 and workspace changes. In the other profile, use **Control → Switch to This
 device** to reverse direction. Website sign-in capture/restoration has its own

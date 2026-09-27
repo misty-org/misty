@@ -4,12 +4,12 @@ import type {
   GlobalAiConversation,
   GlobalAiMessage,
 } from "@/features/global-search/types";
-import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRuntime";
+import { AgentsError as SystemErrorActivity } from "@/features/agents/AgentsRuntime";
 
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
-import mistyCompanion from "@/assets/branding/misty-icon.png?inline";
-import { Button, cn } from "@/shared/ui";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
+import { Button, cn, Spinner } from "@/shared/ui";
 import {
   AlertCircle,
   Check,
@@ -79,7 +79,7 @@ export function AgentConversationView(props: {
             <MistyAvatar />
             <div className="min-w-0 pt-1">
               <div className="flex items-center gap-2 text-[13px] font-medium text-cream">
-                <Loader2 className="size-3.5 animate-spin" /> Misty is working
+                <Spinner size="sm" label={false} /> Misty is working
               </div>
               <p className="mb-0 mt-1 text-xs text-cream-muted">
                 You can leave this conversation while the task continues.
@@ -328,10 +328,7 @@ function FeedbackButton(props: { label: string; onClick: () => void; children: R
       aria-label={props.label}
       title={props.label}
       onClick={props.onClick}
-      className={cn(
-        "grid size-7 place-items-center rounded-md text-cream-muted transition-colors",
-        "hover:bg-charcoal-hover hover:text-cream",
-      )}
+      className={cn("grid size-7 place-items-center text-cream-muted", "hover:text-cream")}
     >
       {props.children}
     </Button>

@@ -1,6 +1,6 @@
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
-import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, cn, Pressable } from "@/shared/ui";
 import { ImageIcon } from "lucide-react";
 import {
   hasAnyAttachment,
@@ -30,10 +30,8 @@ export function MessageReplyPreview({
       <div aria-hidden="true" className="relative">
         <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-cream-muted/55" />
       </div>
-      <Button
-        variant="ghost"
-        className="h-auto min-w-0 justify-start gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-cream-muted shadow-none hover:bg-transparent hover:text-cream"
-        type="button"
+      <Pressable
+        className="flex min-w-0 items-center gap-1.5 self-start overflow-hidden text-[13px] leading-5 text-cream-muted hover:text-cream"
         onClick={onOpen}
         aria-label={
           message ? `Jump to ${message.sender_name}'s message` : "Original message unavailable"
@@ -67,7 +65,7 @@ export function MessageReplyPreview({
         ) : (
           <span className="truncate italic">Original message unavailable</span>
         )}
-      </Button>
+      </Pressable>
     </div>
   );
 }

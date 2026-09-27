@@ -6,7 +6,7 @@ import type {
   ResetShortcutRequest,
   ShortcutsSnapshot,
   UpdateShortcutRequest,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { type LucideIcon } from "lucide-react";
 
 export type SettingsSection =
@@ -22,7 +22,6 @@ export type SettingsSection =
   | "spaces-agenda"
   | "spaces-manage"
   | "files-locations"
-  | "files-connections"
   | "files-indexing"
   | "agents-defaults"
   | "agents-memory"

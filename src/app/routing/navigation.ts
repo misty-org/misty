@@ -1,7 +1,7 @@
 import type { DesktopNavItem } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { routes } from "@/features/app-shell";
-import { appIcons } from "@/shared/ui/app-icons";
+import { appIcons } from "@/shared/ui";
 
 export const desktopNavItems: DesktopNavItem[] = [
   { id: "home", label: "Home", path: routes.home, icon: appIcons.home, exact: true },

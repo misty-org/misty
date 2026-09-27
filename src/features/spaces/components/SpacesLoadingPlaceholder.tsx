@@ -1,5 +1,4 @@
-import { Button, ErrorState } from "@/shared/ui";
-import { LoadingScreen } from "@/shared/ui/loading-screen";
+import { Button, ErrorState, LoadingScreen } from "@/shared/ui";
 
 export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: () => void }) {
   // These callers supply retry only after a request has failed.

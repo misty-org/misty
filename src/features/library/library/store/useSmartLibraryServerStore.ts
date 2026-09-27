@@ -11,13 +11,13 @@ import type {
   SmartLibraryPreviewInput,
   SmartLibraryProgress,
   SmartLibraryResultsResponse,
-} from "@/features/files/workspace/explorer";
+} from "@/features/files/workspace";
 import type {
   AnalysisEstimate,
   AnalysisResult,
   FolderPreflight,
   SmartLibraryAsset,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { SMART_LIBRARY_PILOT } from "../smartLibrary";
 export type {
   RegisterSmartLibraryFolderRequest,
@@ -34,7 +34,7 @@ export type {
   SmartLibraryPreviewInput,
   SmartLibraryProgress,
   SmartLibraryResultsResponse,
-} from "@/features/files/workspace/explorer";
+} from "@/features/files/workspace";
 
 export function registerSmartLibraryFolder(
   body: RegisterSmartLibraryFolderRequest,

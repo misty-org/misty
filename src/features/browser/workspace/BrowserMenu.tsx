@@ -11,29 +11,23 @@ import { BrowserMenuView } from "./BrowserMenuView";
 import { useCallback } from "react";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 export function BrowserMenu(props: {
-  iconButtonClass: string;
   nativeRuntime: boolean;
   tab: WorkspaceTab;
   url: string;
   commands?: BrowserPageCommands;
 }) {
+  const runtimeId = browserRuntimeId(props.tab);
   const setOverlay = useCallback(
     async (reason: string, active: boolean) => {
-      setBrowserWebviewsSuspended(
-        active,
-        `browser-${reason}:${browserRuntimeId(props.tab)}`,
-      );
+      setBrowserWebviewsSuspended(active, `browser-${reason}:${runtimeId}`);
       await browserOverlayReady();
     },
-    [props.tab.instanceKey],
+    [runtimeId],
   );
   const reportError = (error: unknown) =>
     useBrowserRuntimeStore
       .getState()
-      .setError(
-        props.tab.id,
-        error instanceof Error ? error.message : String(error),
-      );
+      .setError(props.tab.id, error instanceof Error ? error.message : String(error));
   return (
     <BrowserMenuView
       {...props}

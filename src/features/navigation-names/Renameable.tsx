@@ -1,12 +1,13 @@
 import { Pencil, RotateCcw } from "lucide-react";
 import { cloneElement, useEffect, useRef, useState, type ReactElement } from "react";
-import { createPortal } from "react-dom";
 import {
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
-} from "@/shared/ui/context-menu";
+  Input,
+  Portal,
+} from "@/shared/ui";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import {
   setNavigationName,
@@ -84,7 +85,7 @@ export function Renameable({
   };
   const rect = anchor.current?.getBoundingClientRect();
   const renderEditor = (editor: ReactElement) =>
-    portalEditor ? createPortal(editor, document.body) : editor;
+    portalEditor ? <Portal>{editor}</Portal> : editor;
   return (
     <>
       <ContextMenu
@@ -109,26 +110,24 @@ export function Renameable({
             } else if (editing) event.preventDefault();
           }}
         >
-          <ContextMenuItem
+          <ContextMenuAction
+            icon={<Pencil aria-hidden="true" />}
+            label="Rename"
             onSelect={() => {
               done.current = false;
               setError("");
               pendingRename.current = true;
             }}
-          >
-            <Pencil aria-hidden="true" />
-            Rename
-          </ContextMenuItem>
-          <ContextMenuItem
+          />
+          <ContextMenuAction
+            icon={<RotateCcw aria-hidden="true" />}
+            label={resetLabel}
             disabled={!custom}
             onSelect={() => {
               if (onRename) onRename(null);
               else void setNavigationName(nameKey, null).catch((e) => setError(String(e)));
             }}
-          >
-            <RotateCcw aria-hidden="true" />
-            {resetLabel}
-          </ContextMenuItem>
+          />
         </ContextMenuContent>
       </ContextMenu>
       {editing &&
@@ -137,7 +136,7 @@ export function Renameable({
           <div
             data-misty-window-drag-block="true"
             data-navigation-name-editor="true"
-            className={portalEditor ? "fixed z-[2147483401]" : "absolute z-[2147483401]"}
+            className={portalEditor ? "fixed layer-menu-raised" : "absolute layer-menu-raised"}
             style={{
               left: portalEditor ? Math.max(4, rect.left) : anchor.current?.offsetLeft,
               top: portalEditor ? rect.top : anchor.current?.offsetTop,
@@ -146,11 +145,11 @@ export function Renameable({
                 : anchor.current?.offsetWidth,
             }}
           >
-            <input
+            <Input
               ref={input}
               aria-label={`Rename ${name}`}
               defaultValue={name}
-              className="h-8 w-full rounded border border-cream-muted bg-charcoal-card px-2 text-sm text-cream outline-none"
+              className="h-8 text-sm"
               onBlur={() => void commit()}
               onKeyDown={(e) => {
                 e.stopPropagation();

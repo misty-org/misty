@@ -2,20 +2,24 @@ import { useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
+  Button,
+  cn,
   Dialog,
   DialogContent,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
-  Button,
+  DialogTitle,
+  FileInput,
+  IconButton,
   Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Pressable,
 } from "@/shared/ui";
 import { EditableGroupRow } from "./WebsiteSitePicker";
 import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
-import { GroupIcon, groupIcons } from "./groupIcons";
+import { GroupIcon, groupIcons } from "./GroupIcons";
 import { readGroupIcon } from "./groupIconUpload";
 import {
   addWebsite,
@@ -58,14 +62,15 @@ export function WebsiteGroupsManager() {
         <div className="flex min-w-0 flex-col border-r border-charcoal-border p-4 max-sm:p-2">
           <nav aria-label="Website groups" className="grid content-start gap-1">
             {ordered.map((item) => (
-              <Button
-                variant="ghost"
-                size="none"
-                justify="start"
+              <Pressable
                 key={item.id}
-                type="button"
                 aria-current={group?.id === item.id ? "true" : undefined}
-                className={`flex min-h-8 min-w-0 items-center gap-2 text-left text-[13px] outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted ${group?.id === item.id ? "font-medium text-cream-bright" : "text-cream-muted"}`}
+                className={cn(
+                  "hover:bg-cream/[0.045] rounded-md",
+                  "flex min-h-8 min-w-0 items-center gap-2 text-left text-[13px] outline-none",
+                  "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted",
+                  group?.id === item.id ? "font-medium text-cream-bright" : "text-cream-muted",
+                )}
                 onClick={() => {
                   setSelected(item.id);
                   setAdding(false);
@@ -74,7 +79,7 @@ export function WebsiteGroupsManager() {
               >
                 <GroupIcon name={item.fields.icon} size={18} />
                 <span className="truncate">{item.fields.label}</span>
-              </Button>
+              </Pressable>
             ))}
           </nav>
           <div className="mt-auto pt-6">
@@ -163,15 +168,13 @@ export function WebsiteGroupsManager() {
               </div>
               <div className="group/manager-row mb-2 mt-5 flex h-6 items-center justify-between">
                 <h3 className="text-xs text-cream-muted">Sites</h3>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Add site to group"
-                  className={`text-cream-muted ${reveal}`}
+                <IconButton
+                  label="Add site to group"
+                  className={reveal}
                   onClick={() => setAdding(!adding)}
                 >
                   <Plus className="size-4" />
-                </Button>
+                </IconButton>
               </div>
               <div className="grid gap-1">
                 {sites.map((site) => (
@@ -261,23 +264,15 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Choose group icon"
-          title="Choose group icon"
-          className="text-cream-muted"
-        >
+        <IconButton label="Choose group icon" tooltip={false}>
           <GroupIcon name={value} size={18} />
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3" aria-label="Group icons">
-        <input
+        <FileInput
           ref={fileInput}
-          type="file"
           accept="image/png,image/jpeg,image/webp"
           aria-label="Upload group icon"
-          className="hidden"
           onChange={async (event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";
@@ -328,16 +323,10 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
           {Object.entries(groupIcons)
             .filter(([id]) => id.replace(/-/g, " ").includes(query.trim().toLowerCase()))
             .map(([id, Icon]) => (
-              <Button
+              <IconButton
+                label={id.replace(/-/g, " ")}
                 key={id}
-                variant="ghost"
-                size="icon-sm"
-                aria-label={id.replace(/-/g, " ")}
-                title={id.replace(/-/g, " ")}
                 aria-pressed={value === id}
-                className={
-                  value === id ? "text-cream-bright ring-1 ring-cream-muted" : "text-cream-muted"
-                }
                 onClick={() => {
                   uploadRequest.current++;
                   setUploading(false);
@@ -348,7 +337,7 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
                 }}
               >
                 <Icon className="size-[18px]" />
-              </Button>
+              </IconButton>
             ))}
         </div>
         {!Object.keys(groupIcons).some((id) =>

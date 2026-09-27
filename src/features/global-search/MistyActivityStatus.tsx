@@ -1,5 +1,5 @@
-import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Spinner } from "@/shared/ui";
 
 const calmPhrases = [
   "Thinking it through…",
@@ -56,7 +56,7 @@ export function MistyActivityStatus({
       role="status"
       aria-live="polite"
     >
-      <Loader2 className="size-3.5 shrink-0 animate-spin" />
+      <Spinner size="sm" label={false} />
       <span>{phrase}</span>
     </div>
   );

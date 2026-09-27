@@ -27,7 +27,6 @@ function baseProps(overrides: Partial<Parameters<typeof BrowserOmniboxView>[0]> 
     currentUrl: "https://example.com/",
     context,
     providers: providers(),
-    lightChrome: false,
     suspensionReason: "test-address",
     setOverlay: vi.fn(async () => {}),
     onNavigate: vi.fn(),
@@ -60,17 +59,22 @@ it("searches typed text and does not count it as a typed address", async () => {
   fireEvent.change(input, { target: { value: "misty weather" } });
   await screen.findByText("Search with Google");
   fireEvent.submit(input.closest("form")!);
-  expect(props.onNavigate).toHaveBeenCalledWith(
-    "https://www.google.com/search?q=misty%20weather",
-    { typed: false },
-  );
+  expect(props.onNavigate).toHaveBeenCalledWith("https://www.google.com/search?q=misty%20weather", {
+    typed: false,
+  });
 });
 
 it("completes a familiar address inline and opens it on Enter", async () => {
   const props = baseProps({
     providers: providers({
       historySuggestions: async () => [
-        { url: "https://github.com/", title: "GitHub", visits: 5, typedVisits: 3, lastVisitedAt: Date.now() },
+        {
+          url: "https://github.com/",
+          title: "GitHub",
+          visits: 5,
+          typedVisits: 3,
+          lastVisitedAt: Date.now(),
+        },
       ],
     }),
   });

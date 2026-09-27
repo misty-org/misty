@@ -21,7 +21,7 @@ import {
   SelectControl,
   stringSetting,
   SwitchControl,
-} from "../settingsControls";
+} from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { Button } from "@/shared/ui";
 
@@ -93,7 +93,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             />
             <Button
               variant="link"
-              className={`h-auto p-0 rounded-sm text-xs text-cream-muted hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted ${displayedAppZoom === appZoomDefault ? "invisible pointer-events-none" : ""}`}
+              className={`h-auto p-0 text-xs text-cream-muted hover:text-cream ${displayedAppZoom === appZoomDefault ? "invisible pointer-events-none" : ""}`}
               disabled={props.working || displayedAppZoom === appZoomDefault}
               aria-hidden={displayedAppZoom === appZoomDefault}
               onClick={() => {

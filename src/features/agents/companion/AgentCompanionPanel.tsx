@@ -1,11 +1,23 @@
-import sprite from "@/assets/branding/misty-icon.png?inline";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
+import {
+  Button,
+  SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui";
 import { MousePointer2, Square } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
 import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+
+// Radix Select has no empty value, so the server default gets a stand-in.
+const serverDefaultModel = "__server_default__";
+
 export function AgentCompanionPanel() {
   const { presentation: state, control } = useCompanionState();
   const working = useMistyStore((s) => s.working);
@@ -74,52 +86,16 @@ export function AgentCompanionPanel() {
         )}
       </div>
       <div className="agent-companion-mode-row">
-        <div className="agent-mode-selector" role="radiogroup" aria-label="Companion mode">
-          {(["team", "auto"] as const).map((mode) => (
-            <Button
-              key={mode}
-              variant="ghost"
-              role="radio"
-              className={`agent-mode-pill ${state.mode === mode ? "active" : ""}`}
-              aria-checked={state.mode === mode}
-              data-companion-mode={mode}
-              tabIndex={state.mode === mode ? 0 : -1}
-              onKeyDown={(event) => {
-                if (
-                  !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(
-                    event.key,
-                  )
-                )
-                  return;
-                event.preventDefault();
-                const next =
-                  event.key === "Home"
-                    ? "team"
-                    : event.key === "End"
-                      ? "auto"
-                      : mode === "team"
-                        ? "auto"
-                        : "team";
-                event.currentTarget.parentElement
-                  ?.querySelector<HTMLButtonElement>(`[data-companion-mode="${next}"]`)
-                  ?.focus();
-                act({
-                  kind: "mode",
-                  mode: next,
-                });
-              }}
-              disabled={!control}
-              onClick={() =>
-                act({
-                  kind: "mode",
-                  mode,
-                })
-              }
-            >
-              {mode === "team" ? "Team" : "Auto"}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Companion mode"
+          value={state.mode}
+          disabled={!control}
+          options={[
+            { value: "team", label: "Team", attributes: { "data-companion-mode": "team" } },
+            { value: "auto", label: "Auto", attributes: { "data-companion-mode": "auto" } },
+          ]}
+          onChange={(mode) => act({ kind: "mode", mode })}
+        />
         <p>
           {state.mode === "team"
             ? "Ask questions or hand off a step. You stay in control."
@@ -136,24 +112,25 @@ export function AgentCompanionPanel() {
         )}
         <label>
           Model
-          <select
-            aria-label="Companion model"
-            value={state.model}
+          <Select
+            value={state.model || serverDefaultModel}
             disabled={!control}
-            onChange={(e) =>
-              act({
-                kind: "model",
-                model: e.target.value,
-              })
+            onValueChange={(model) =>
+              act({ kind: "model", model: model === serverDefaultModel ? "" : model })
             }
           >
-            <option value="">OpenAI · server default</option>
-            {state.models?.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger aria-label="Companion model" className="h-8 min-w-0 max-w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={serverDefaultModel}>OpenAI · server default</SelectItem>
+              {state.models?.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
       </details>
       {(error || state.error) && (

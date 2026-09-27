@@ -14,21 +14,20 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  IconButton,
   Input,
+  MenuItem,
+  MenuTrigger,
   Popover,
   PopoverContent,
-  PopoverTrigger,
+  Spinner,
 } from "@/shared/ui";
 import {
   CalendarCheck2,
   CalendarDays,
   CalendarPlus,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  LoaderCircle,
   Minus,
   Plus,
   RotateCw,
@@ -401,26 +400,19 @@ export function SpaceAgendaView({
             </Button>
 
             <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Previous range"
+              <IconButton
+                label="Previous range"
                 onClick={() => updateAnchor(moveAnchor(anchor, view, -1))}
               >
                 <ChevronLeft className="size-4" />
-              </Button>
+              </IconButton>
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-8 min-w-32 justify-between gap-2 px-2.5 text-xs font-medium"
-                    aria-label="Choose calendar date"
-                  >
-                    {agendaTitle(anchor, view)}
-                    <ChevronDown className="size-3.5 text-cream-muted" />
-                  </Button>
-                </PopoverTrigger>
+                <MenuTrigger
+                  kind="popover"
+                  label="Choose calendar date"
+                  value={agendaTitle(anchor, view)}
+                  className="h-8 min-w-32 justify-between px-2.5 text-xs font-medium"
+                />
                 <PopoverContent align="start" className="w-auto p-3">
                   <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                     Go to date
@@ -436,48 +428,36 @@ export function SpaceAgendaView({
                   </label>
                 </PopoverContent>
               </Popover>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Next range"
+              <IconButton
+                label="Next range"
                 onClick={() => updateAnchor(moveAnchor(anchor, view, 1))}
               >
                 <ChevronRight className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Go to today"
+              </IconButton>
+              <IconButton
+                label="Go to today"
                 title="Today"
                 onClick={() => updateAnchor(new Date())}
               >
                 <CalendarCheck2 className="size-4" />
-              </Button>
+              </IconButton>
             </div>
 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 min-w-24 justify-between gap-1.5 px-2.5 text-xs font-medium"
-                  aria-label="Calendar view"
-                >
-                  <CalendarDays className="size-3.5" />
-                  {view[0].toUpperCase() + view.slice(1)}
-                  <ChevronDown className="size-3.5 text-cream-muted" />
-                </Button>
-              </DropdownMenuTrigger>
+              <MenuTrigger
+                label="Calendar view"
+                value={view[0].toUpperCase() + view.slice(1)}
+                icon={<CalendarDays className="size-3.5" />}
+                className="h-8 min-w-24 justify-between px-2.5 text-xs font-medium"
+              />
               <DropdownMenuContent align="start">
                 {(["month", "week", "day"] as const).map((option) => (
-                  <DropdownMenuItem
+                  <MenuItem
+                    label={option[0].toUpperCase() + option.slice(1)}
                     key={option}
                     className={view === option ? "bg-charcoal-hover text-cream" : undefined}
                     onSelect={() => updateView(option)}
-                  >
-                    {option[0].toUpperCase() + option.slice(1)}
-                  </DropdownMenuItem>
+                  />
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -487,37 +467,29 @@ export function SpaceAgendaView({
                 className="flex h-8 items-center overflow-hidden rounded-md border border-charcoal-border/70"
                 aria-label="Calendar time interval"
               >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-none border-r border-charcoal-border/60"
-                  aria-label="Zoom out calendar"
+                <IconButton
+                  label="Zoom out calendar"
                   disabled={zoomMinutes === 60}
                   onClick={() => updateZoom("out")}
                 >
                   <Minus className="size-3.5" />
-                </Button>
+                </IconButton>
                 <span className="min-w-14 px-2 text-center text-xs font-medium">
                   {zoomMinutes} min
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-none border-l border-charcoal-border/60"
-                  aria-label="Zoom in calendar"
+                <IconButton
+                  label="Zoom in calendar"
                   disabled={zoomMinutes === 15}
                   onClick={() => updateZoom("in")}
                 >
                   <Plus className="size-3.5" />
-                </Button>
+                </IconButton>
               </div>
             ) : null}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
-              aria-label="Refresh calendar"
+            <IconButton
+              label="Refresh calendar"
+              className="text-cream-muted/70"
               onClick={() =>
                 void run("sync", async () => {
                   await spacesApi.syncCalendarTasks(spaceId);
@@ -525,12 +497,8 @@ export function SpaceAgendaView({
                 })
               }
             >
-              {loading ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <RotateCw className="size-4" />
-              )}
-            </Button>
+              {loading ? <Spinner label={false} /> : <RotateCw className="size-4" />}
+            </IconButton>
           </div>
         </header>
       }

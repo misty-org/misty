@@ -1,5 +1,5 @@
-import type { MountedDevice } from "@/native/contracts";
-import type { ClipboardOperation } from "@/native/contracts/primitives";
+import type { MountedDevice } from "@/native/ipc";
+import type { ClipboardOperation } from "@/native/ipc/primitives";
 import type { ExplorerDragItem } from "../model/interfaces/drag/types";
 import { normalizedDragPath, pathContainsPath } from "./geometry";
 

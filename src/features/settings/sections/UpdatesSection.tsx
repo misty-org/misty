@@ -4,7 +4,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, SwitchControl } from "../settingsControls";
+import { booleanSetting, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function UpdatesSection(props: SettingsContentProps) {

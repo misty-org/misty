@@ -23,11 +23,7 @@ impl ExplorerService {
                 "Edited files are limited to 100 MB.".to_string(),
             ));
         }
-        if self.remote_target(&request.path).is_some() {
-            return Err(ApiError::Message(
-                "Save a copy locally before editing a remote file.".to_string(),
-            ));
-        }
+
         self.reject_virtual_mount_container(&request.path, "save")?;
         let source = PathBuf::from(&request.path);
         let metadata = tokio::fs::metadata(&source).await.map_err(|error| {
@@ -57,40 +53,7 @@ impl ExplorerService {
     pub async fn preview_item(&self, path: &str) -> ApiResult<ExplorerPreviewPayload> {
         #[cfg(target_os = "macos")]
         self.image_service()?;
-        if let Some(source) = self.remote_target(path) {
-            let parent = RemoteBrowseTarget {
-                provider_type: source.provider_type.clone(),
-                remote_name: source.remote_name.clone(),
-                remote_path: remote_parent_path(&source.remote_path),
-            };
-            let items = self.fetch_remote_items(&parent).await?;
-            let Some((size_bytes, remote_modified)) =
-                remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
-            else {
-                return Err(ApiError::Message(format!(
-                    "Remote file {} was not found.",
-                    source.remote_path
-                )));
-            };
-            let remote_modified = if remote_modified.trim().is_empty() {
-                None
-            } else {
-                Some(remote_modified)
-            };
-            let prepared = self
-                .prepare_remote_file_for_local_use(
-                    &source,
-                    Some(size_bytes),
-                    remote_modified.as_deref(),
-                    "Preparing remote file for preview",
-                    false,
-                    None,
-                )
-                .await?;
-            return self
-                .preview_local_item(Path::new(&prepared.local_path))
-                .await;
-        }
+
         self.reject_virtual_mount_container(path, "preview")?;
         self.preview_local_item(Path::new(path)).await
     }
@@ -100,73 +63,12 @@ impl ExplorerService {
         path: &str,
         max_dimension: u32,
         modified_ms: Option<u64>,
-        remote_modified: Option<&str>,
+        _remote_modified: Option<&str>,
         size_bytes: Option<u64>,
     ) -> ApiResult<GeneratedImageThumbnail> {
         #[cfg(target_os = "macos")]
         self.image_service()?;
-        if let Some(source) = self.remote_target(path) {
-            let (cache_size_bytes, prepare_size_bytes, remote_modified) =
-                if let Some(size_bytes) = size_bytes {
-                    (
-                        size_bytes,
-                        i64::try_from(size_bytes).ok(),
-                        remote_modified.map(str::to_string),
-                    )
-                } else {
-                    let parent = RemoteBrowseTarget {
-                        provider_type: source.provider_type.clone(),
-                        remote_name: source.remote_name.clone(),
-                        remote_path: remote_parent_path(&source.remote_path),
-                    };
-                    let items = self.fetch_remote_items(&parent).await?;
-                    let Some((size_bytes, remote_modified)) =
-                        remote_preview_metadata_from_items(&parent, &source.remote_path, &items)?
-                    else {
-                        return Err(ApiError::Message(format!(
-                            "Remote file {} was not found.",
-                            source.remote_path
-                        )));
-                    };
-                    (
-                        u64::try_from(size_bytes).unwrap_or_default(),
-                        Some(size_bytes),
-                        Some(remote_modified),
-                    )
-                };
-            let remote_modified = if remote_modified
-                .as_deref()
-                .unwrap_or_default()
-                .trim()
-                .is_empty()
-            {
-                None
-            } else {
-                remote_modified
-            };
-            let prepared = self
-                .prepare_remote_file_for_local_use(
-                    &source,
-                    prepare_size_bytes,
-                    remote_modified.as_deref(),
-                    "Preparing remote file thumbnail",
-                    false,
-                    None,
-                )
-                .await?;
-            let identity = ImageThumbnailIdentity {
-                path: path.to_string(),
-                size_bytes: cache_size_bytes,
-                modified_fingerprint: remote_modified,
-            };
-            return self
-                .generate_local_image_thumbnail(
-                    Path::new(&prepared.local_path),
-                    max_dimension,
-                    Some(identity),
-                )
-                .await;
-        }
+
         self.reject_virtual_mount_container(path, "thumbnail")?;
         let identity = size_bytes.map(|size_bytes| ImageThumbnailIdentity {
             path: path.to_string(),
@@ -222,10 +124,15 @@ impl ExplorerService {
         let source_path = path.to_path_buf();
         let output_path = thumbnail_path.clone();
         #[cfg(target_os = "macos")]
-        let service=self.image_service()?;
+        let service = self.image_service()?;
         let rendered = tokio::task::spawn_blocking(move || {
             #[cfg(target_os = "macos")]
-            return render_packaged_image_thumbnail(&source_path,&output_path,max_dimension,&service);
+            return render_packaged_image_thumbnail(
+                &source_path,
+                &output_path,
+                max_dimension,
+                &service,
+            );
             #[cfg(not(target_os = "macos"))]
             render_image_thumbnail_file_blocking(&source_path, &output_path, format, max_dimension)
         })
@@ -263,10 +170,12 @@ impl ExplorerService {
             PreviewFormat::Image(image_format) => {
                 let path = path.to_path_buf();
                 #[cfg(target_os = "macos")]
-                let service=self.image_service()?;
+                let service = self.image_service()?;
                 let bytes = tokio::task::spawn_blocking(move || {
                     #[cfg(target_os = "macos")]
-                    return service.process_explorer_image(&path,MAX_IMAGE_PREVIEW_DIMENSION).map_err(ApiError::Message);
+                    return service
+                        .process_explorer_image(&path, MAX_IMAGE_PREVIEW_DIMENSION)
+                        .map_err(ApiError::Message);
                     #[cfg(not(target_os = "macos"))]
                     render_image_preview_png_blocking(&path, image_format)
                 })
@@ -289,10 +198,12 @@ impl ExplorerService {
             PreviewFormat::TranscodeImage(image_format) => {
                 let path = path.to_path_buf();
                 #[cfg(target_os = "macos")]
-                let service=self.image_service()?;
+                let service = self.image_service()?;
                 let bytes = tokio::task::spawn_blocking(move || {
                     #[cfg(target_os = "macos")]
-                    return service.process_explorer_image(&path,MAX_IMAGE_PREVIEW_DIMENSION).map_err(ApiError::Message);
+                    return service
+                        .process_explorer_image(&path, MAX_IMAGE_PREVIEW_DIMENSION)
+                        .map_err(ApiError::Message);
                     #[cfg(not(target_os = "macos"))]
                     render_image_preview_png_blocking(&path, image_format)
                 })
@@ -308,10 +219,19 @@ impl ExplorerService {
             PreviewFormat::Psd => {
                 #[cfg(target_os = "macos")]
                 {
-                    let service=self.image_service()?;
-                    let path=path.to_path_buf();
-                    let bytes=tokio::task::spawn_blocking(move ||service.process_explorer_image(&path,MAX_IMAGE_PREVIEW_DIMENSION).map_err(ApiError::Message)).await.map_err(|e|ApiError::Message(e.to_string()))??;
-                    return Ok(ExplorerPreviewPayload{mime_type:"image/png".into(),bytes});
+                    let service = self.image_service()?;
+                    let path = path.to_path_buf();
+                    let bytes = tokio::task::spawn_blocking(move || {
+                        service
+                            .process_explorer_image(&path, MAX_IMAGE_PREVIEW_DIMENSION)
+                            .map_err(ApiError::Message)
+                    })
+                    .await
+                    .map_err(|e| ApiError::Message(e.to_string()))??;
+                    return Ok(ExplorerPreviewPayload {
+                        mime_type: "image/png".into(),
+                        bytes,
+                    });
                 }
                 #[cfg(not(target_os = "macos"))]
                 let bytes = read_preview_file(path).await?;

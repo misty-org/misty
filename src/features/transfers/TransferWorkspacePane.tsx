@@ -1,11 +1,9 @@
-import { useProvidersStore } from "@/features/providers";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
-import type { TransferRecord } from "@/native/contracts";
-import { prettyLabel } from "@/shared/lib/format";
+import type { TransferRecord } from "@/native/ipc";
 import { Input, Toolbar, ToolbarGroup } from "@/shared/ui";
 import { Search } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -96,8 +94,6 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
     pageIndex,
     focusedTransferId,
   } = workspace;
-  const providerSnapshot = useProvidersStore((state) => state.providers);
-  const loadProviders = useProvidersStore((state) => state.load);
   const rows = useMemo(() => transfers?.rows ?? [], [transfers?.rows]);
   const transferSummary = useMemo(() => {
     let active = 0;
@@ -143,16 +139,7 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
     void loadQueue();
   }, [ensureWorkspace, loadQueue, loadTransfers, props.workspaceId]);
 
-  useEffect(() => {
-    if (!providerSnapshot) void loadProviders(false);
-  }, [loadProviders, providerSnapshot]);
-
-  const providerLabels = useMemo(() => {
-    const labels = new Map<string, string>();
-    for (const remote of providerSnapshot?.remotes ?? [])
-      labels.set(remote.name, `${prettyLabel(remote.type)} · ${remote.name}`);
-    return labels;
-  }, [providerSnapshot?.remotes]);
+  const providerLabels = useMemo(() => new Map<string, string>(), []);
   const providerGroups = useMemo(
     () => transferProviderGroups(rows, providerLabels),
     [providerLabels, rows],

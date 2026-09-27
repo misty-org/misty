@@ -1,10 +1,22 @@
-import { mistyBrowserProviders } from "@/shared/contracts";
+import { mistyBrowserProviders } from "@/shared/schemas";
 import { providerLoginUrls } from "./providerLoginUrls";
 export type WebsiteAppId = "journal" | "planner" | "library";
 export const websiteIntegrations = {
-  "google-drive": { label: "Google Drive", category: "Cloud storage", description: "Open your files and shared drives." },
-  dropbox: { label: "Dropbox", category: "Cloud storage", description: "Browse your Dropbox files and folders." },
-  onedrive: { label: "OneDrive", category: "Cloud storage", description: "Open your personal and work files." },
+  "google-drive": {
+    label: "Google Drive",
+    category: "Cloud storage",
+    description: "Open your files and shared drives.",
+  },
+  dropbox: {
+    label: "Dropbox",
+    category: "Cloud storage",
+    description: "Browse your Dropbox files and folders.",
+  },
+  onedrive: {
+    label: "OneDrive",
+    category: "Cloud storage",
+    description: "Open your personal and work files.",
+  },
   "google-docs": {
     label: "Google Docs",
     category: "Documents",
@@ -113,8 +125,7 @@ export function savedWebsiteUrl(
       return;
     if (
       !mistyBrowserProviders[id].domains.some(
-        (domain) =>
-          url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+        (domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`),
       )
     )
       return;
@@ -125,10 +136,7 @@ export function savedWebsiteUrl(
       )
     )
       return;
-    const params = [
-      ...url.searchParams.keys(),
-      ...new URLSearchParams(url.hash.slice(1)).keys(),
-    ];
+    const params = [...url.searchParams.keys(), ...new URLSearchParams(url.hash.slice(1)).keys()];
     if (
       params.some((key) =>
         /^(?:code|state|token|access_token|id_token|refresh_token|session_state|samlresponse|relaystate|ticket|authuser)$/i.test(

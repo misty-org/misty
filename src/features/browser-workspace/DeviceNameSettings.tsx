@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useUserStore } from "@/features/auth/core";
 import { DesktopSettingsRow as SettingsRow } from "@/features/settings/desktop";
-import { TextControl } from "@/features/settings/settingsControls";
+import { TextControl } from "@/features/settings/SettingsControls";
 import { deviceRows } from "./deviceControl";
 import { readNativeSync, renameNativeDevice, type NativeSyncView } from "./native";
 import { useBrowserSyncStore } from "./store";

@@ -47,7 +47,11 @@ export function ActivityFeed({
       {state.error ? (
         <div role="status" className="flex items-center gap-2 px-4 py-2 text-sm text-cream-muted">
           <span>Activity couldn’t refresh. Your saved requests are still here.</span>
-          <Button variant="link" className="min-h-11 underline" onClick={() => void state.refresh()}>
+          <Button
+            variant="link"
+            className="min-h-11 underline"
+            onClick={() => void state.refresh()}
+          >
             Retry
           </Button>
         </div>

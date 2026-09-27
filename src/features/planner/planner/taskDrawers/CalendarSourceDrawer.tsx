@@ -14,11 +14,15 @@ import {
   DialogTitle,
   Input,
   Separator,
+  Spinner,
   Switch,
 } from "@/shared/ui";
-import { CalendarDays, CheckCircle2, LoaderCircle, Plus, Search } from "lucide-react";
+import { CalendarDays, CheckCircle2, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { TaskInlineSelect } from "../SpaceTaskPrimitives";
+
+// Google's own calendar color marks the primary Google calendar; it is brand data, not theme.
+const googleCalendarBlue = "#4285F4";
 
 export interface CalendarSourceDrawerProps {
   integrations: SpaceIntegration[];
@@ -242,7 +246,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
 
                 {busy === "calendars" ? (
                   <div className="grid min-h-32 place-items-center text-cream-muted">
-                    <LoaderCircle className="size-5 animate-spin" aria-label="Loading calendars" />
+                    <Spinner size="lg" label="Loading calendars" />
                   </div>
                 ) : selectedIntegration ? (
                   <div className="grid gap-1">
@@ -290,11 +294,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
               disabled={busy === "connect-google"}
               onClick={props.onConnect}
             >
-              {busy === "connect-google" ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}
+              {busy === "connect-google" ? <Spinner label={false} /> : <Plus className="size-4" />}
               Add another account
             </Button>
             <Button onClick={props.onClose}>Done</Button>
@@ -338,11 +338,8 @@ function CalendarChoiceSwitch(props: {
   return (
     <div className="flex min-h-14 items-center gap-3 rounded-md px-2 hover:bg-charcoal-card has-[:disabled]:opacity-60">
       <span
-        className={
-          props.choice.primary
-            ? "size-3 rounded-full bg-[#4285F4]"
-            : "size-3 rounded-full bg-sage-fg"
-        }
+        className={props.choice.primary ? "size-3 rounded-full" : "size-3 rounded-full bg-sage-fg"}
+        style={props.choice.primary ? { backgroundColor: googleCalendarBlue } : undefined}
         aria-hidden="true"
       />
       <span className="min-w-0 flex-1">
@@ -351,7 +348,7 @@ function CalendarChoiceSwitch(props: {
           {props.choice.primary ? "Primary calendar" : props.choice.timeZone}
         </span>
       </span>
-      {props.busy ? <LoaderCircle className="size-4 animate-spin text-cream-muted" /> : null}
+      {props.busy ? <Spinner label={false} className="text-cream-muted" /> : null}
       <Switch
         checked={props.active}
         aria-label={`Share ${props.choice.summary}`}
@@ -376,9 +373,7 @@ function GoogleConnectionStatus(props: { unavailable: boolean; connected: boolea
 }
 
 function GoogleCalendarIcon({ className }: { className?: string }) {
-  return (
-    <CalendarDays className={`shrink-0 ${className ?? ""}`} aria-hidden="true" />
-  );
+  return <CalendarDays className={`shrink-0 ${className ?? ""}`} aria-hidden="true" />;
 }
 
 function calendarCheckedState(values: boolean[]): boolean | "indeterminate" {

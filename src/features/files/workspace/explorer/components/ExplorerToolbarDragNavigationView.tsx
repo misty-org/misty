@@ -1,7 +1,7 @@
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { ArrowUp, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import type { ExplorerToolbarRuntime } from "./ExplorerToolbarRuntime";
-import { toolbarStyles } from "./ExplorerToolbarSupport";
+import { toolbarStyles } from "@/features/file-ui";
 
 export function ExplorerToolbarDragNavigationView(props: {
   DropTarget: ExplorerToolbarRuntime["DropTarget"];
@@ -54,18 +54,15 @@ function NavigationButton(props: {
   const Icon = props.icon;
   const DropTarget = props.DropTarget;
   const button = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      aria-label={props.label}
-      title={props.label}
+    <IconButton
+      size="md"
+      label={props.label}
       className={toolbarStyles.navigationButton}
       disabled={!props.path}
       onClick={props.onNavigate}
     >
       <Icon size={18} />
-    </Button>
+    </IconButton>
   );
   if (!props.path) return button;
   return (

@@ -1,5 +1,5 @@
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton, Pressable } from "@/shared/ui";
 import {
   ArrowRight,
   CalendarClock,
@@ -32,16 +32,9 @@ export function RoadmapExecutionRail(props: {
           <ListChecks className="size-4 text-sage-fg" />
           <h2 className="text-sm font-semibold text-cream">Daily plan</h2>
           {props.onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="ml-auto size-7"
-              aria-label="Hide daily plan"
-              onClick={props.onClose}
-            >
+            <IconButton label="Hide daily plan" className="ml-auto" onClick={props.onClose}>
               <PanelRightClose className="size-4" />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
         <div className="mt-3 flex items-center gap-3 text-[11px] text-cream-muted">
@@ -66,13 +59,15 @@ export function RoadmapExecutionRail(props: {
                 Next up
                 <span className="ml-auto tabular-nums text-cream-muted">{plan.next.progress}%</span>
               </div>
-              <button
-                type="button"
-                className="mt-2 block w-full text-left text-sm font-semibold leading-5 text-cream outline-none hover:text-cream-bright focus-visible:underline"
+              <Button
+                variant="link"
+                size="none"
+                justify="start"
+                className="mt-2 h-auto w-full whitespace-normal text-left text-sm font-semibold leading-5 text-cream"
                 onClick={() => props.onFocus(plan.next!.id)}
               >
                 {plan.next.title}
-              </button>
+              </Button>
               {plan.next.nextTask ? (
                 <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-cream-muted">
                   Start with {plan.next.nextTask.title}
@@ -144,12 +139,11 @@ function ExecutionRow(props: {
   const stateLabel = item.state === "done" ? "Done" : item.state === "ready" ? "Ready" : "Blocked";
   return (
     <li className="relative">
-      <button
-        type="button"
+      <Pressable
+        aria-current={props.selected ? "true" : undefined}
         className={cn(
-          "group flex w-full items-start gap-2.5 rounded-lg px-2 py-2.5 text-left outline-none transition-colors",
-          "hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-sage-fg/50",
-          props.selected && "bg-charcoal-card",
+          "group w-full items-start gap-2.5 rounded-lg px-2 py-2.5",
+          props.selected && "bg-cream/[0.06]",
         )}
         onClick={props.onFocus}
       >
@@ -183,7 +177,7 @@ function ExecutionRow(props: {
             </span>
           ) : null}
         </span>
-      </button>
+      </Pressable>
     </li>
   );
 }

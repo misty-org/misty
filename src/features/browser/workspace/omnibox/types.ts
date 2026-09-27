@@ -26,14 +26,7 @@ export type OmniboxTarget =
   | { type: "open-in-app"; url: string };
 
 export type OmniboxMatchKind =
-  | "url"
-  | "history"
-  | "bookmark"
-  | "tab"
-  | "search"
-  | "suggestion"
-  | "action"
-  | "content";
+  "url" | "history" | "bookmark" | "tab" | "search" | "suggestion" | "action" | "content";
 
 export interface OmniboxMatch {
   /** Stable across updates, so the highlighted row survives slower results arriving. */

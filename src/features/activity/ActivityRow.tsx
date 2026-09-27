@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { ArrowUpRight, Check, MoreHorizontal } from "lucide-react";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
-  Button,
+  IconButton,
+  MenuItem,
+  Pressable,
 } from "@/shared/ui";
 import { activityMuteKeys, isPendingRequest } from "./activityPolicy";
 import type { ActivityItem } from "./types";
-
-const actionClass =
-  "grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:text-cream-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright";
 
 export function ActivityRow({
   item,
@@ -54,59 +53,49 @@ export function ActivityRow({
           </p>
         </div>
         {item.target.kind !== "none" ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:text-cream-bright"
+          <IconButton
+            label={`Open destination for ${item.title}`}
             title="Open destination"
-            aria-label={`Open destination for ${item.title}`}
             onClick={onOpen}
           >
             <ArrowUpRight size={14} />
-          </Button>
+          </IconButton>
         ) : null}
         {!pending && !item.readAt ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className={actionClass}
-            title="Mark read"
-            aria-label={`Mark update read: ${item.title}`}
-            onClick={onRead}
-          >
+          <IconButton label={`Mark update read: ${item.title}`} title="Mark read" onClick={onRead}>
             <Check size={15} aria-hidden="true" />
-          </Button>
+          </IconButton>
         ) : null}
         {keys.length || (item.dismissible && pending) ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={actionClass}
-                aria-label={`Options for ${source}`}
-              >
+              <IconButton label={`Options for ${source}`} tooltip={false}>
                 <MoreHorizontal size={14} />
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {keys.map((key) => (
-                <DropdownMenuItem key={key} onSelect={() => onMute(key, !muted.includes(key))}>
-                  {muted.includes(key) ? "Unmute" : "Mute"}{" "}
-                  {key.startsWith("space:") ? "Space" : "app"}
-                </DropdownMenuItem>
+                <MenuItem
+                  label={
+                    <>
+                      {muted.includes(key) ? "Unmute" : "Mute"}{" "}
+                      {key.startsWith("space:") ? "Space" : "app"}
+                    </>
+                  }
+                  key={key}
+                  onSelect={() => onMute(key, !muted.includes(key))}
+                />
               ))}
               {item.dismissible && pending ? (
-                <DropdownMenuItem onSelect={onDismiss}>Dismiss notice</DropdownMenuItem>
+                <MenuItem label="Dismiss notice" onSelect={onDismiss} />
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
       </div>
-      <Button
-        variant="ghost"
+      <Pressable
         onClick={onOpen}
-        className="flex h-auto w-full items-start gap-2 px-3 py-2 text-left hover:bg-charcoal-hover/50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
+        className="rounded-md flex w-full items-start gap-2 px-3 py-2 hover:bg-charcoal-hover/50"
       >
         <span className="min-w-0 flex-1">
           <span className="mb-1 flex flex-wrap items-baseline gap-x-2 text-[11px] text-cream-muted">
@@ -126,14 +115,14 @@ export function ActivityRow({
             {item.title}
           </span>
         </span>
-      </Button>
+      </Pressable>
       {item.body ? (
         <Button
           variant="ghost"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           title={expanded ? "Collapse details" : "Expand details"}
-          className="block h-auto w-full px-3 pb-2 text-left text-xs leading-4 text-cream-muted hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
+          className="block h-auto w-full px-3 pb-2 text-left text-xs leading-4 text-cream-muted hover:text-cream"
         >
           <span className={`${expanded ? "" : "line-clamp-1"} [overflow-wrap:anywhere]`}>
             {item.body}

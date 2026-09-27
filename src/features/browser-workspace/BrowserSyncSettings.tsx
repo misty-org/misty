@@ -12,7 +12,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSection,
 } from "@/features/settings/desktop";
-import { SettingsNote } from "@/features/settings/settingsControls";
+import { SettingsNote } from "@/features/settings/SettingsControls";
 import {
   generateSyncSecret,
   unlockNativeSync,

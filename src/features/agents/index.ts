@@ -18,6 +18,7 @@ export * from "./store/useAiServerStore";
 
 export { companionReply } from "./companion/companionReply";
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
+export { CursorCompanionController } from "./companion/CursorCompanionController";
 
 export { McpConnectionsView } from "./mcp/McpConnectionsSheet";
 export type { AgentScope } from "./model/interfaces/types";

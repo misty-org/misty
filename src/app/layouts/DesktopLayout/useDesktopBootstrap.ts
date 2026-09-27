@@ -1,10 +1,9 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { useMediaSearchStore } from "@/features/global-search/indexing/useMediaSearchStore";
+import { useMediaSearchStore } from "@/features/global-search/indexing";
 import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
-import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
+import { useTransfersStore } from "@/features/transfers";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";
@@ -16,7 +15,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
   const loadApp = useAppStore((state) => state.loadApp);
-  const providerLoad = useProvidersStore((state) => state.load);
   const transferLoad = useTransfersStore((state) => state.load);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
@@ -103,12 +101,9 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
     if (!hasTauriInternals()) return;
-    if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
-      void providerLoad(routeId === "providers");
-    }
     if (routeId === "transfers") void transferLoad("");
     if (routeId === "settings" && !settings) void settingsLoad();
-  }, [providerLoad, routeId, settings, settingsLoad, transferLoad]);
+  }, [routeId, settings, settingsLoad, transferLoad]);
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;

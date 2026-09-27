@@ -1,15 +1,9 @@
 import { Pencil } from "lucide-react";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { AiSelectionMenu } from "@/features/ai-surface/AiSelectionMenu";
-import type {
-  AiSuggestedAction,
-  AiCompanionAnchor,
-} from "@/features/ai-surface/types";
-import type { MistyAiControlsSnapshot } from "@/shared/contracts";
-import {
-  noteSelectionActions,
-  type NoteAiSelection,
-} from "./NoteBlockEditorView";
+import type { AiSuggestedAction, AiCompanionAnchor } from "@/features/ai-surface/types";
+import type { MistyAiControlsSnapshot } from "@/shared/schemas";
+import { noteSelectionActions, type NoteAiSelection } from "./NoteBlockEditorView";
 
 export function NoteAiSelectionMenuView({
   snapshot,
@@ -20,10 +14,7 @@ export function NoteAiSelectionMenuView({
   snapshot: MistyAiControlsSnapshot;
   reportError?(error: unknown): void;
   selection: NoteAiSelection;
-  runAction(
-    action: AiSuggestedAction,
-    anchor?: AiCompanionAnchor,
-  ): Promise<void>;
+  runAction(action: AiSuggestedAction, anchor?: AiCompanionAnchor): Promise<void>;
   decideProposal(decision: "accept" | "reject" | "refine"): Promise<void>;
 }) {
   if (!snapshot.available) return null;
@@ -36,15 +27,9 @@ export function NoteAiSelectionMenuView({
       <AiSelectionMenu
         actions={noteSelectionActions}
         trigger={
-          <Button
-            type="button"
-            size="icon"
-            variant="secondary"
-            className="size-7 rounded-full"
-            aria-label="Edit selection with Misty"
-          >
+          <IconButton variant="secondary" shape="round" label="Edit selection with Misty">
             <Pencil className="size-3.5" />
-          </Button>
+          </IconButton>
         }
         onAction={(action) => {
           void runAction(action, {

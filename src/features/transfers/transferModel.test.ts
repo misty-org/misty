@@ -1,4 +1,4 @@
-import type { OperationQueueSnapshot, TransferRecord } from "@/native/contracts";
+import type { OperationQueueSnapshot, TransferRecord } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
 import {
   aggregateTransferProgress,

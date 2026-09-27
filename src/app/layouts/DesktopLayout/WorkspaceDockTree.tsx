@@ -95,8 +95,7 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
             agents: "Agents",
             transfers: "Transfers",
           } as Record<string, string>
-        )[id] ??
-        "Tool";
+        )[id] ?? "Tool";
       contextLabel = label;
     }
     const existing = map.get(key);

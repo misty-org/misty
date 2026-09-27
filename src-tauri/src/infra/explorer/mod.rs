@@ -25,7 +25,7 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-use crate::domain::clipboard::{ClipboardCache, ClipboardRemoteFileCacheKey};
+use crate::domain::clipboard::ClipboardCache;
 use crate::domain::explorer::{
     list_directory, paste_items, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
     ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult, ExplorerPreviewPayload,
@@ -34,10 +34,6 @@ use crate::domain::explorer::{
     PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItem, PreparedDragItemsResult,
     PreparedDragSkippedItem, PreparedOpenItem, RenameItemRequest,
 };
-use crate::domain::file_master::{
-    join_remote_path, normalize_remote_path, virtual_path_parts, RemoteBrowseTarget,
-    RemoteJobStart, RemoteJobStatus, RemoteListItem,
-};
 use crate::domain::file_transfer::now_epoch_ms;
 use crate::domain::file_transfer::{FileTransferItemType, FileTransferRecord, FileTransferType};
 use crate::domain::listing_cache::ListingCache;
@@ -45,8 +41,6 @@ use crate::error::{ApiError, ApiResult};
 use crate::infra::{
     environment::AppEnvironmentService,
     explorer_library::{ExplorerLibraryItem, ExplorerLibraryService},
-    providers::{ProviderRemote, ProviderService},
-    storage::{StorageResponse, StorageService},
     transfers::TransferService,
 };
 
@@ -64,32 +58,18 @@ const IMAGE_THUMBNAIL_RESIZE_FILTER: FilterType = FilterType::Triangle;
 const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
 #[cfg(not(target_os = "macos"))]
 const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
-const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
-const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
-const REMOTE_JOB_STALE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
-const REMOTE_JOB_MAX_WAIT: Duration = Duration::from_secs(24 * 60 * 60);
 
 static IMAGE_THUMBNAIL_CACHE_FILE_LOCK: LazyLock<StdMutex<()>> =
     LazyLock::new(|| StdMutex::new(()));
 static TEMPORARY_THUMBNAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Debug, Clone, Copy)]
-struct TransferProgress {
-    base_bytes: i64,
-    total_bytes: i64,
-}
-
 #[derive(Clone)]
 pub struct ExplorerService {
     home_dir: PathBuf,
     mount_root: PathBuf,
-    proxy: StorageService,
-    providers: ProviderService,
     transfers: TransferService,
     explorer_library: ExplorerLibraryService,
     listing_cache: ListingCache,
-    remote_file_cache: Arc<Mutex<ClipboardCache>>,
-    drag_stage_dir: PathBuf,
     drag_preparation_cancellations: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     clipboard_text_cache_dir: PathBuf,
     clipboard_blob_cache_dir: PathBuf,
@@ -97,50 +77,47 @@ pub struct ExplorerService {
     image_thumbnail_cache_dir: PathBuf,
     #[cfg(target_os = "macos")]
     image_service: Option<Arc<crate::infra::document_intelligence::ServiceLease>>,
-    #[cfg(test)]
-    remote_job_cancellation_log: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl ExplorerService {
     #[cfg(target_os = "macos")]
-    pub(crate) fn with_image_service(mut self, service: Arc<crate::infra::document_intelligence::ServiceLease>) -> Self {
-        let key=hex::encode(Sha256::digest(service.namespace.as_bytes()));
-        self.image_thumbnail_cache_dir=self.image_thumbnail_cache_dir.join("space-owned-v1").join(key);
-        self.image_service=Some(service);
+    pub(crate) fn with_image_service(
+        mut self,
+        service: Arc<crate::infra::document_intelligence::ServiceLease>,
+    ) -> Self {
+        let key = hex::encode(Sha256::digest(service.namespace.as_bytes()));
+        self.image_thumbnail_cache_dir = self
+            .image_thumbnail_cache_dir
+            .join("space-owned-v1")
+            .join(key);
+        self.image_service = Some(service);
         self
     }
     #[cfg(target_os = "macos")]
-    fn image_service(&self)->ApiResult<Arc<crate::infra::document_intelligence::ServiceLease>> {
-        let service=self.image_service.as_ref().ok_or_else(||ApiError::Message("Open Files in this Space to use previews.".into()))?;
-        if service.cancelled() {return Err(ApiError::Message("Files preview access changed.".into()));}
+    fn image_service(&self) -> ApiResult<Arc<crate::infra::document_intelligence::ServiceLease>> {
+        let service = self
+            .image_service
+            .as_ref()
+            .ok_or_else(|| ApiError::Message("Open Files in this Space to use previews.".into()))?;
+        if service.cancelled() {
+            return Err(ApiError::Message("Files preview access changed.".into()));
+        }
         Ok(service.clone())
     }
 
     pub fn new(
         environment: AppEnvironmentService,
-        proxy: StorageService,
-        providers: ProviderService,
         transfers: TransferService,
         explorer_library: ExplorerLibraryService,
     ) -> Self {
         let cache_dir = environment.cache_dir();
         let mount_root = environment.mount_root();
-        let mut remote_file_cache = ClipboardCache::new(cache_dir.join("remote-files").join("v1"));
-        remote_file_cache
-            .import_remote_file_entries_from(&cache_dir.join("remote-open").join("v1"));
-        remote_file_cache.cleanup_expired();
-        let drag_stage_dir = cache_dir.join("drag-out").join("v1");
-        cleanup_expired_drag_stage_dirs(&drag_stage_dir);
         Self {
             home_dir: environment.home_dir(),
             mount_root,
-            proxy,
-            providers,
             transfers,
             explorer_library,
             listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
-            remote_file_cache: Arc::new(Mutex::new(remote_file_cache)),
-            drag_stage_dir,
             drag_preparation_cancellations: Arc::new(Mutex::new(HashMap::new())),
             clipboard_text_cache_dir: cache_dir.join("clipboard-paste").join("text"),
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
@@ -148,15 +125,7 @@ impl ExplorerService {
             image_thumbnail_cache_dir: cache_dir.join("thumbnails"),
             #[cfg(target_os = "macos")]
             image_service: None,
-            #[cfg(test)]
-            remote_job_cancellation_log: None,
         }
-    }
-
-    #[cfg(test)]
-    fn with_remote_job_cancellation_log(mut self, log: Arc<Mutex<Vec<String>>>) -> Self {
-        self.remote_job_cancellation_log = Some(log);
-        self
     }
 }
 
@@ -172,18 +141,13 @@ mod path_helpers;
 mod preview;
 mod preview_render;
 mod preview_types;
-mod remote_download;
-mod remote_jobs;
-mod remote_listing;
-mod remote_upload;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
 mod tests_local;
 #[cfg(test)]
 mod tests_preview;
-#[cfg(test)]
-mod tests_remote;
+mod transfer_progress;
 
 use cancellation::*;
 use local_mutations::*;

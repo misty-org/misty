@@ -8,11 +8,10 @@ import {
 } from "@/features/agents";
 import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
 import { ConnectedDevicePairingDialog } from "@/features/files/workspace";
-import { ConnectedStoragePanel } from "@/features/providers";
 import { useSpacesStore } from "@/features/spaces";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
+import { Button, Input, OptionSelect } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,11 +20,9 @@ import {
 } from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { SwitchControl, TextControl } from "../settingsControls";
+import { SwitchControl, TextControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
-const field =
-  "min-h-9 w-full max-w-72 rounded-md border border-charcoal-border bg-charcoal-bg px-3 py-2 text-sm text-cream";
 export function PreferenceRow({ id }: { id: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
@@ -47,19 +44,14 @@ export function PreferenceRow({ id }: { id: string }) {
           onChange={update}
         />
       ) : d.enum ? (
-        <select
-          className={field}
+        <OptionSelect
+          className="w-[220px] max-w-full"
           aria-label={d.label}
           disabled={store.working || !ready}
           value={String(value)}
-          onChange={(e) => update(e.target.value)}
-        >
-          {d.enum.map((v) => (
-            <option value={v} key={v}>
-              {v || "Model default"}
-            </option>
-          ))}
-        </select>
+          onValueChange={update}
+          options={d.enum.map((v) => ({ value: v, label: v || "Model default" }))}
+        />
       ) : (
         <TextControl value={String(value)} disabled={store.working || !ready} onCommit={update} />
       )}
@@ -204,49 +196,43 @@ export function AgentDefaultsSection(props: SettingsContentProps) {
       description="Individual agent and conversation choices take precedence. Existing conversations stay unchanged."
     >
       <Row label="Default model">
-        <select
-          className={field}
+        <OptionSelect
+          className="w-[220px] max-w-full"
           aria-label="Default model"
           value={model}
           disabled={loading || !!error || props.working}
-          onChange={(e) => {
-            const next = models.find((m) => m.id === (e.target.value || defaultModel));
-            props.onSettingChange("agent", "default_model_id", e.target.value);
+          onValueChange={(value) => {
+            const next = models.find((m) => m.id === (value || defaultModel));
+            props.onSettingChange("agent", "default_model_id", value);
             if (reasoning && !next?.reasoning_levels.some((level) => level === reasoning))
               props.onSettingChange("agent", "default_reasoning_effort", "");
           }}
-        >
-          <option value="">Server default</option>
-          {model && !chosen && (
-            <option value={model}>{loading ? "Loading…" : `${model} (unavailable)`}</option>
-          )}
-          {models.map((m) => (
-            <option value={m.id} key={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Server default" },
+            ...(model && !chosen
+              ? [{ value: model, label: loading ? "Loading…" : `${model} (unavailable)` }]
+              : []),
+            ...models.map((m) => ({ value: m.id, label: m.name })),
+          ]}
+        />
       </Row>
       <Row
         label="Default reasoning"
         description={!levels.length ? "This model uses its own reasoning defaults." : undefined}
       >
-        <select
-          className={field}
+        <OptionSelect
+          className="w-[220px] max-w-full"
           aria-label="Default reasoning"
           value={levels.some((level) => level === reasoning) ? reasoning : ""}
           disabled={!levels.length || props.working}
-          onChange={(e) =>
-            props.onSettingChange("agent", "default_reasoning_effort", e.target.value)
+          onValueChange={(value) =>
+            props.onSettingChange("agent", "default_reasoning_effort", value)
           }
-        >
-          <option value="">Model default</option>
-          {levels.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Model default" },
+            ...levels.map((l) => ({ value: l, label: l })),
+          ]}
+        />
       </Row>
       {error && (
         <div className="p-5">
@@ -267,14 +253,6 @@ export function NativeAvailability({ feature }: { feature: string }) {
         preferences remain available here.
       </p>
     </Section>
-  );
-}
-export function FileConnectionsSection(props: SettingsContentProps) {
-  const navigate = useNavigate();
-  return hasTauriInternals() ? (
-    <ConnectedStoragePanel onClose={() => (props.onOpenResource ?? navigate)("/files")} />
-  ) : (
-    <NativeAvailability feature="File connections" />
   );
 }
 export function AgentConnectionsSection() {

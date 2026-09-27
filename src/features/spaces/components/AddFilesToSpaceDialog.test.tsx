@@ -46,9 +46,10 @@ vi.mock("../store/useSpacesStore", () => ({
 
 // The dialog behavior is under test, not Radix Select's portal and pointer mechanics.
 // This keeps the test deterministic in jsdom while preserving the component contract.
-vi.mock("@/shared/ui", () => {
+vi.mock("@/shared/ui", async (importOriginal) => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return {
+    ...(await importOriginal<typeof UiModule>()),
     Badge: Wrapper,
     Button: ({ children, variant: _variant, ...props }: Record<string, unknown>) => (
       <button {...props}>{children as ReactNode}</button>
@@ -96,6 +97,7 @@ vi.mock("@/shared/ui", () => {
 });
 
 import { AddFilesToSpaceDialog } from "@/features/library/library";
+import type * as UiModule from "@/shared/ui";
 
 describe("AddFilesToSpaceDialog", () => {
   let container: HTMLDivElement;

@@ -8,21 +8,21 @@ import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type {
-  ExplorerDragItem,
-  ExplorerDragModifiers,
-  ExplorerDragPayload,
-  ExplorerDragViewState,
-  ExplorerDropZoneSpec,
-} from "../model/interfaces/drag/types";
+import {
+  type ExplorerDragItem,
+  type ExplorerDragModifiers,
+  type ExplorerDragPayload,
+  type ExplorerDragViewState,
+  type ExplorerDropZoneSpec,
+  ExplorerDragContext,
+  type ArmedDrag,
+  type ExplorerDragContextValue,
+  type PreparedEgress,
+  type RegisteredZone,
+  dragDistance,
+  selectDropCandidate,
+} from "@/features/file-ui";
 import { dragAnnouncement, ExplorerDragPreview, setWebviewDragActive } from "./ExplorerDragPreview";
-import { ExplorerDragContext } from "./ExplorerDragState";
-import type {
-  ArmedDrag,
-  ExplorerDragContextValue,
-  PreparedEgress,
-  RegisteredZone,
-} from "./ExplorerDragTypes";
 import {
   autoScrollAt,
   dragPreviewDataUrl,
@@ -30,7 +30,7 @@ import {
   isInteractiveDragTarget,
   modifiersFromEvent,
 } from "./explorerDragHelpers";
-import { dragDistance, selectDropCandidate } from "./geometry";
+import type { explorerPrepareDragItems } from "../../native";
 
 const DRAG_THRESHOLD = 6;
 const SPRING_LOAD_MS = 700;
@@ -45,14 +45,28 @@ const initialState: ExplorerDragViewState = {
 };
 
 export interface ExplorerDragRuntime {
-  prepare: typeof import("@/features/files/workspace/native").explorerPrepareDragItems;
+  prepare: typeof explorerPrepareDragItems;
   cancelPreparation(sessionId: string): Promise<unknown>;
   notify(message: string): void;
-  startDrag(paths: string[], icon: string, mode: "move" | "copy", done: (dropped: boolean) => void): Promise<void>;
+  startDrag(
+    paths: string[],
+    icon: string,
+    mode: "move" | "copy",
+    done: (dropped: boolean) => void,
+  ): Promise<void>;
   refresh(): void;
-  subscribeNative?(listener: (event: {type: "enter" | "over" | "drop" | "leave"; position: {x: number; y: number}; paths?: string[]}) => void): Promise<() => void>;
+  subscribeNative?(
+    listener: (event: {
+      type: "enter" | "over" | "drop" | "leave";
+      position: { x: number; y: number };
+      paths?: string[];
+    }) => void,
+  ): Promise<() => void>;
 }
-export function ExplorerDragProviderView(props: { children: ReactNode; runtime: ExplorerDragRuntime }) {
+export function ExplorerDragProviderView(props: {
+  children: ReactNode;
+  runtime: ExplorerDragRuntime;
+}) {
   const runtime = props.runtime;
   const [state, setState] = useState(initialState);
   const stateRef = useRef(state);
@@ -72,23 +86,26 @@ export function ExplorerDragProviderView(props: { children: ReactNode; runtime: 
     stateRef.current = state;
   }, [state]);
 
-  const cancel = useCallback((message?: string) => {
-    const prepared = preparedRef.current;
-    if (prepared && !prepared.settled)
-      void runtime.cancelPreparation(prepared.sessionId).catch(() => undefined);
-    preparedRef.current = null;
-    armedRef.current = null;
-    pointerHeldRef.current = false;
-    if (springTimerRef.current !== null) window.clearTimeout(springTimerRef.current);
-    springTimerRef.current = null;
-    if (hitFrameRef.current !== null) window.cancelAnimationFrame(hitFrameRef.current);
-    hitFrameRef.current = null;
-    zonesRef.current.forEach(({ element }) => delete element.dataset.explorerDropActive);
-    setWebviewDragActive(false);
-    const next = message ? { ...initialState, error: message } : initialState;
-    stateRef.current = next;
-    setState(next);
-  }, [runtime]);
+  const cancel = useCallback(
+    (message?: string) => {
+      const prepared = preparedRef.current;
+      if (prepared && !prepared.settled)
+        void runtime.cancelPreparation(prepared.sessionId).catch(() => undefined);
+      preparedRef.current = null;
+      armedRef.current = null;
+      pointerHeldRef.current = false;
+      if (springTimerRef.current !== null) window.clearTimeout(springTimerRef.current);
+      springTimerRef.current = null;
+      if (hitFrameRef.current !== null) window.cancelAnimationFrame(hitFrameRef.current);
+      hitFrameRef.current = null;
+      zonesRef.current.forEach(({ element }) => delete element.dataset.explorerDropActive);
+      setWebviewDragActive(false);
+      const next = message ? { ...initialState, error: message } : initialState;
+      stateRef.current = next;
+      setState(next);
+    },
+    [runtime],
+  );
 
   const resolveTargetAt = useCallback((x: number, y: number) => {
     const payload = stateRef.current.payload;
@@ -123,7 +140,7 @@ export function ExplorerDragProviderView(props: { children: ReactNode; runtime: 
     stateRef.current = next;
     setState(next);
     autoScrollAt(x, y);
-  }, [runtime]);
+  }, []);
 
   const scheduleHitTest = useCallback(
     (x: number, y: number) => {
@@ -152,50 +169,54 @@ export function ExplorerDragProviderView(props: { children: ReactNode; runtime: 
     [scheduleHitTest],
   );
 
-  const beginPreparation = useCallback((payload: ExplorerDragPayload) => {
-    const remoteItems = payload.items.filter(
-      (item) => item.location && item.location.kind !== "local",
-    );
-    const localPaths = payload.items
-      .filter((item) => !item.location || item.location.kind === "local")
-      .map((item) => item.path);
-    const sessionId = payload.sessionId;
-    const preparation: PreparedEgress = {
-      sessionId,
-      settled: remoteItems.length === 0,
-      paths: remoteItems.length === 0 ? localPaths : null,
-      error: null,
-      promise: Promise.resolve(localPaths),
-    };
-    if (remoteItems.length > 0) {
-      preparation.promise = runtime.prepare({
+  const beginPreparation = useCallback(
+    (payload: ExplorerDragPayload) => {
+      const remoteItems = payload.items.filter(
+        (item) => item.location && item.location.kind !== "local",
+      );
+      const localPaths = payload.items
+        .filter((item) => !item.location || item.location.kind === "local")
+        .map((item) => item.path);
+      const sessionId = payload.sessionId;
+      const preparation: PreparedEgress = {
         sessionId,
-        items: remoteItems.map((item) => ({
-          path: item.path,
-          isDirectory: item.isDirectory,
-          sizeBytes: item.sizeBytes,
-          remoteModified: item.remoteModified,
-        })),
-      })
-        .then((result) => {
-          if (result.skipped.length > 0) {
-            runtime.notify(`Skipped ${result.skipped.length} item(s) while preparing drag-out.`);
-          }
-          const paths = [...localPaths, ...result.items.map((item) => item.localPath)];
-          if (paths.length === 0) throw new Error("No items could be prepared for drag-out.");
-          preparation.paths = paths;
-          preparation.settled = true;
-          return paths;
-        })
-        .catch((error: unknown) => {
-          preparation.settled = true;
-          preparation.error = error instanceof Error ? error.message : String(error);
-          throw error;
-        });
-      void preparation.promise.catch(() => undefined);
-    }
-    preparedRef.current = preparation;
-  }, [runtime]);
+        settled: remoteItems.length === 0,
+        paths: remoteItems.length === 0 ? localPaths : null,
+        error: null,
+        promise: Promise.resolve(localPaths),
+      };
+      if (remoteItems.length > 0) {
+        preparation.promise = runtime
+          .prepare({
+            sessionId,
+            items: remoteItems.map((item) => ({
+              path: item.path,
+              isDirectory: item.isDirectory,
+              sizeBytes: item.sizeBytes,
+              remoteModified: item.remoteModified,
+            })),
+          })
+          .then((result) => {
+            if (result.skipped.length > 0) {
+              runtime.notify(`Skipped ${result.skipped.length} item(s) while preparing drag-out.`);
+            }
+            const paths = [...localPaths, ...result.items.map((item) => item.localPath)];
+            if (paths.length === 0) throw new Error("No items could be prepared for drag-out.");
+            preparation.paths = paths;
+            preparation.settled = true;
+            return paths;
+          })
+          .catch((error: unknown) => {
+            preparation.settled = true;
+            preparation.error = error instanceof Error ? error.message : String(error);
+            throw error;
+          });
+        void preparation.promise.catch(() => undefined);
+      }
+      preparedRef.current = preparation;
+    },
+    [runtime],
+  );
 
   const beginInternal = useCallback(
     (armed: ArmedDrag, point: { x: number; y: number }) => {
@@ -253,13 +274,12 @@ export function ExplorerDragProviderView(props: { children: ReactNode; runtime: 
       setState(stateRef.current);
       nativeEgressRef.current = true;
       await runtime.startDrag(paths, dragPreviewDataUrl(current.payload.items), mode, (dropped) => {
-          if (dropped && mode === "move") runtime.refresh();
-          cancel();
-          window.setTimeout(() => {
-            nativeEgressRef.current = false;
-          }, 250);
-        },
-      );
+        if (dropped && mode === "move") runtime.refresh();
+        cancel();
+        window.setTimeout(() => {
+          nativeEgressRef.current = false;
+        }, 250);
+      });
     } catch (error) {
       nativeEgressRef.current = false;
       const message = error instanceof Error ? error.message : String(error);
@@ -386,20 +406,42 @@ export function ExplorerDragProviderView(props: { children: ReactNode; runtime: 
     if (!runtime.subscribeNative) return;
     let disposed = false;
     let unsubscribe: (() => void) | undefined;
-    void runtime.subscribeNative(payload => {
-      if (disposed || nativeEgressRef.current || stateRef.current.phase === "native-egress") return;
-      if (payload.type === "leave") return cancel();
-      const point = payload.position;
-      if (payload.type === "enter") {
-        stateRef.current = { ...initialState, phase: "external", pointer: point,
-          payload: {sessionId: crypto.randomUUID(), origin: "external", items: (payload.paths ?? []).map(path => ({path, name: fileName(path), isDirectory: false}))}};
-        setState(stateRef.current);
-        setWebviewDragActive(true);
-      }
-      scheduleHitTest(point.x, point.y);
-      if (payload.type === "drop") window.requestAnimationFrame(() => void performDrop());
-    }).then(remove => { if (disposed) remove(); else unsubscribe = remove; }).catch(runtime.notify);
-    return () => { disposed = true; unsubscribe?.(); };
+    void runtime
+      .subscribeNative((payload) => {
+        if (disposed || nativeEgressRef.current || stateRef.current.phase === "native-egress")
+          return;
+        if (payload.type === "leave") return cancel();
+        const point = payload.position;
+        if (payload.type === "enter") {
+          stateRef.current = {
+            ...initialState,
+            phase: "external",
+            pointer: point,
+            payload: {
+              sessionId: crypto.randomUUID(),
+              origin: "external",
+              items: (payload.paths ?? []).map((path) => ({
+                path,
+                name: fileName(path),
+                isDirectory: false,
+              })),
+            },
+          };
+          setState(stateRef.current);
+          setWebviewDragActive(true);
+        }
+        scheduleHitTest(point.x, point.y);
+        if (payload.type === "drop") window.requestAnimationFrame(() => void performDrop());
+      })
+      .then((remove) => {
+        if (disposed) remove();
+        else unsubscribe = remove;
+      })
+      .catch(runtime.notify);
+    return () => {
+      disposed = true;
+      unsubscribe?.();
+    };
   }, [cancel, performDrop, scheduleHitTest, runtime]);
 
   useEffect(() => () => cancel(), [cancel]);
@@ -422,4 +464,4 @@ export function ExplorerDragProviderView(props: { children: ReactNode; runtime: 
   );
 }
 
-export * from "./ExplorerDragHooks";
+export * from "@/features/file-ui";

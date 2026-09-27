@@ -1,9 +1,4 @@
-import type {
-  SpaceEvent,
-  SpaceMember,
-  SpaceMessage,
-  SpaceStudioResource,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceEvent, SpaceMember, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 
 export function mergeSpaceMessages(
@@ -42,13 +37,8 @@ export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefin
   return payload as unknown as SpaceMessage;
 }
 
-export function buildMessageSpans(
-  text: string,
-  members: SpaceMember[],
-): MessageSpan[] {
-  const candidates = [
-    ...members.map((member) => ({ label: member.name, userId: member.user_id })),
-  ]
+export function buildMessageSpans(text: string, members: SpaceMember[]): MessageSpan[] {
+  const candidates = [...members.map((member) => ({ label: member.name, userId: member.user_id }))]
     .filter((item) => item.label.trim())
     .sort((left, right) => right.label.length - left.label.length);
   if (candidates.length === 0) return [{ type: "text", text }];

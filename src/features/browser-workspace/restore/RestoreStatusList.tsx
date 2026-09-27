@@ -1,5 +1,5 @@
-import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { Button } from "@/shared/ui/button";
+import { CircleAlert, CircleCheck } from "lucide-react";
+import { Button, Spinner } from "@/shared/ui";
 import { usePageRestoreStore } from "./store";
 
 /** Per-tab result of restoring pages after a device switch. */
@@ -13,10 +13,7 @@ export function RestoreStatusList() {
         {tabs.map((tab) => (
           <li key={tab.tabId} className="flex items-center gap-2">
             {tab.status === "restoring" ? (
-              <LoaderCircle
-                aria-hidden
-                className="size-4 shrink-0 animate-spin motion-reduce:animate-none text-cream-muted"
-              />
+              <Spinner label="Restoring" className="shrink-0 text-cream-muted" />
             ) : tab.status === "restored" ? (
               <CircleCheck aria-hidden className="size-4 shrink-0 text-status-green" />
             ) : (

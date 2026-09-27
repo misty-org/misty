@@ -30,7 +30,7 @@ import type {
   SettingsSnapshot,
   ShortcutsSnapshot,
   UpdateShortcutRequest,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import {
   publishNavigatorLayout,
   readNavigatorLayout,

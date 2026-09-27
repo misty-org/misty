@@ -1,4 +1,4 @@
-import type { FileEntry, ProviderRemote } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 
 export interface MistyFilePickerPreparedSelection {
   localPath: string;
@@ -6,28 +6,24 @@ export interface MistyFilePickerPreparedSelection {
     provider: string;
     remoteName: string;
     remotePath: string;
-    connectionId?: string;
-    connectionSource?: "connected_account" | "legacy_cloud";
   };
 }
 
 export async function preparePickerSelections(
   entries: FileEntry[],
-  remotes: ProviderRemote[],
-  prepareRemote: (entry: FileEntry) => Promise<string>,
+  prepareDevice: (entry: FileEntry) => Promise<string>,
 ): Promise<MistyFilePickerPreparedSelection[]> {
   return Promise.all(
     entries.map(async (entry) => {
       if (entry.location.kind === "local") return { localPath: entry.path };
-      const remote = remotes.find((candidate) => candidate.name === entry.location.remoteName);
+      if (entry.location.kind !== "peer_device")
+        throw new Error("Only local and LAN device files are supported.");
       return {
-        localPath: await prepareRemote(entry),
+        localPath: await prepareDevice(entry),
         source: {
-          provider: entry.location.providerType || remote?.type || "remote",
-          remoteName: entry.location.remoteName || remote?.name || "Remote",
+          provider: "misty_peer",
+          remoteName: entry.location.peerDeviceId || "Device",
           remotePath: entry.location.remotePath || entry.path,
-          connectionId: remote?.connectionId || undefined,
-          connectionSource: remote?.connectionSource || undefined,
         },
       };
     }),

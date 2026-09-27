@@ -9,6 +9,7 @@ import { useWorkspaceTabTitle } from "@/features/workspace";
 import { SpaceTasksView } from "../SpaceTasksView";
 import { useCreateTaskShortcut } from "./useCreateTaskShortcut";
 import type { PlannerTaskIntegration } from "./taskRuntime";
+import type { AiCitation } from "@/features/ai-surface/types";
 
 const emptyMembers: SpaceMember[] = [];
 
@@ -39,7 +40,7 @@ export function HostSpaceTasks(props: {
         api: spacesApi,
         userId: user?.id,
         members,
-        
+
         subscribeChanges,
         renderIntegration: (input) => (
           <HostTaskIntegration {...input} workspaceTabId={props.workspaceTabId} />
@@ -60,7 +61,7 @@ function HostTaskIntegration(props: PlannerTaskIntegration & { workspaceTabId?: 
   const adapter = useMemo(
     () => ({
       ...props.adapter,
-      openCitation: (citation: import("@/features/ai-surface/types").AiCitation) => {
+      openCitation: (citation: AiCitation) => {
         window.dispatchEvent(new CustomEvent("misty:open-ai-citation", { detail: citation }));
       },
     }),

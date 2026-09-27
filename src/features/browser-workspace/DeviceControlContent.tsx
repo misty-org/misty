@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, LoaderCircle, Monitor, MousePointer2 } from "lucide-react";
-import { Button } from "@/shared/ui/button";
-import { Switch } from "@/shared/ui/switch";
-import { cn } from "@/shared/ui/utils";
+import { Check, Monitor, MousePointer2 } from "lucide-react";
+import { Button, cn, Spinner, Switch } from "@/shared/ui";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import {
   activateNativeDevice,
@@ -164,8 +162,14 @@ export function DeviceControlContent({
                   <span
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center",
-                      !(pending?.deviceId === device.device_id && pending.fullSync === null) &&
-                        "pointer-events-none opacity-0 group-hover/device:pointer-events-auto group-hover/device:opacity-100 group-focus-within/device:pointer-events-auto group-focus-within/device:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100",
+                      !(pending?.deviceId === device.device_id && pending.fullSync === null) && [
+                        "pointer-events-none opacity-0 group-hover/device:pointer-events-auto",
+                        "group-hover/device:opacity-100",
+                        "group-focus-within/device:pointer-events-auto",
+                        "group-focus-within/device:opacity-100",
+                        "[@media(hover:none)]:pointer-events-auto",
+                        "[@media(hover:none)]:opacity-100",
+                      ],
                     )}
                   >
                     <Button
@@ -187,11 +191,7 @@ export function DeviceControlContent({
                     >
                       {pending?.deviceId === device.device_id && pending.fullSync === null ? (
                         <>
-                          <LoaderCircle
-                            aria-hidden
-                            className="size-4 animate-spin motion-reduce:animate-none"
-                          />
-                          <span className="sr-only">Switching…</span>
+                          <Spinner label="Switching…" />
                         </>
                       ) : (
                         <MousePointer2 aria-hidden className="size-4" />

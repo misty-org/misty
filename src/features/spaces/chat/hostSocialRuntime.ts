@@ -9,7 +9,7 @@ import { MistyPicker } from "@/features/picker";
 import { useSpacesStore } from "@/features/spaces";
 import { useWorkspaceTabTitle } from "@/features/workspace";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
-import { configureSocialRuntime } from "./socialRuntime";
+import { configureSocialRuntime } from "./SocialRuntime";
 export function initializeHostSocialRuntime() {
   configureSocialRuntime({
     events: window,

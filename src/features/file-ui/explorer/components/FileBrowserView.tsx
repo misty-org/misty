@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { memo, useDeferredValue, useEffect, useMemo } from "react";
 import { useExplorerDropZone } from "../drag/ExplorerDragHooks";
 import { storageIdForPath } from "../drag/operations";
@@ -6,7 +6,7 @@ import type { FileBrowserProps } from "../model/interfaces/components/FileBrowse
 import type { ExplorerDragModifiers, ExplorerDragPayload } from "../model/interfaces/drag/types";
 import { entrySizeBytes } from "../utils/entrySize";
 import { formatBytes } from "../utils/fileFormat";
-import { selectedEntriesForListing } from "./fileBrowser/entryPresentation";
+import { selectedEntriesForListing } from "./fileBrowser/EntryPresentation";
 import { FileGrid } from "./fileBrowser/FileGrid";
 import { FileTable } from "./fileBrowser/FileTable";
 import { useFileBrowserRuntime } from "./fileBrowser/FileBrowserRuntime";
