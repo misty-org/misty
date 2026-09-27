@@ -29,18 +29,6 @@
     "raw-control",
     "portal"
   ],
-  "src/features/planner/planner/SpaceAgendaView.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/features/planner/planner/taskDrawers/CalendarSourceDrawer.tsx": [
-    "hex-color"
-  ],
-  "src/features/planner/planner/taskDrawers/TaskDrawerProperties.tsx": [
-    "manual-menu-chevron"
-  ],
-  "src/features/planner/roadmap/spaceRoadmap/RoadmapExecutionRail.tsx": [
-    "raw-control"
-  ],
   "src/features/settings/profiles/ProfileControls.tsx": [
     "raw-control"
   ],
@@ -49,15 +37,6 @@
   ],
   "src/features/settings/sections/LayoutSection.tsx": [
     "raw-control"
-  ],
-  "src/features/spaces/chat/components/ChatPresencePill.tsx": [
-    "popup-class"
-  ],
-  "src/features/spaces/chat/components/SpaceChatComposer.tsx": [
-    "hex-color"
-  ],
-  "src/features/spaces/components/SpaceSwitcher.tsx": [
-    "manual-menu-chevron"
   ],
   "src/features/support/SupportRecoverySection.tsx": [
     "raw-control"

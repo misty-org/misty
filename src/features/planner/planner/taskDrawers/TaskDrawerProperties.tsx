@@ -1,14 +1,7 @@
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  cn,
-} from "@/shared/ui";
-import { Bot, ChevronDown, Flag, User } from "lucide-react";
+import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
+import { Bot, Flag, User } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   statusDot,
@@ -55,25 +48,18 @@ export function TaskDrawerProperties({
         {/* Status */}
         <PropertyRow label="Status">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={!canManage}
-                className={cn(
-                  "flex h-8 w-full items-center justify-between gap-2 rounded-lg border-charcoal-border/70",
-                  "bg-charcoal-workspace/60 px-2.5 text-xs text-cream shadow-none transition-all",
-                  "hover:border-charcoal-border hover:bg-charcoal-card",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
+            <MenuTrigger
+              label="Status"
+              variant="outline"
+              disabled={!canManage}
+              className="h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+              value={
+                <span className="flex items-center gap-2">
                   <span className={`size-2 shrink-0 rounded-full ${statusDot(draft.status)}`} />
                   <span className="font-medium">{currentStatusLabel}</span>
-                </div>
-                <ChevronDown className="size-3.5 shrink-0 text-cream-muted" />
-              </Button>
-            </DropdownMenuTrigger>
+                </span>
+              }
+            />
             <DropdownMenuContent align="start" className="w-48">
               {taskStatusOptions.map(([statusKey, label]) => (
                 <DropdownMenuItem
@@ -92,19 +78,13 @@ export function TaskDrawerProperties({
         {/* Priority */}
         <PropertyRow label="Priority">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={!canManage}
-                className={cn(
-                  "flex h-8 w-full items-center justify-between gap-2 rounded-lg border-charcoal-border/70",
-                  "bg-charcoal-workspace/60 px-2.5 text-xs text-cream shadow-none transition-all",
-                  "hover:border-charcoal-border hover:bg-charcoal-card",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
+            <MenuTrigger
+              label="Priority"
+              variant="outline"
+              disabled={!canManage}
+              className="h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+              value={
+                <span className="flex items-center gap-2">
                   <Flag
                     className={cn(
                       "size-3.5 shrink-0",
@@ -116,10 +96,9 @@ export function TaskDrawerProperties({
                     )}
                   />
                   <span className="font-medium">{currentPriorityLabel}</span>
-                </div>
-                <ChevronDown className="size-3.5 shrink-0 text-cream-muted" />
-              </Button>
-            </DropdownMenuTrigger>
+                </span>
+              }
+            />
             <DropdownMenuContent align="start" className="w-44">
               {taskPriorityOptions.map(([priorityKey, label]) => (
                 <DropdownMenuItem
@@ -149,29 +128,22 @@ export function TaskDrawerProperties({
         {/* Assignee */}
         <PropertyRow label="Assignee">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={!canManage}
-                className={cn(
-                  "flex h-8 w-full items-center justify-between gap-2 rounded-lg border-charcoal-border/70",
-                  "bg-charcoal-workspace/60 px-2.5 text-xs text-cream shadow-none transition-all",
-                  "hover:border-charcoal-border hover:bg-charcoal-card",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
+            <MenuTrigger
+              label="Assignee"
+              variant="outline"
+              disabled={!canManage}
+              className="h-8 w-full justify-between rounded-lg px-2.5 text-xs"
+              value={
+                <span className="flex items-center gap-2">
                   {assignedMember ? (
                     <TaskMemberAvatar member={assignedMember} size="sm" />
                   ) : (
                     <User className="size-3.5 shrink-0 text-cream-muted" />
                   )}
                   <span className="truncate font-medium">{assigneeDisplay}</span>
-                </div>
-                <ChevronDown className="size-3.5 shrink-0 text-cream-muted" />
-              </Button>
-            </DropdownMenuTrigger>
+                </span>
+              }
+            />
             <DropdownMenuContent align="start" className="w-56 max-h-60 overflow-y-auto">
               <DropdownMenuItem
                 onClick={() => setDraft({ ...draft, assignee_user_id: "" })}

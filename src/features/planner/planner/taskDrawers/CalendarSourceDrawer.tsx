@@ -20,6 +20,9 @@ import { CalendarDays, CheckCircle2, LoaderCircle, Plus, Search } from "lucide-r
 import { useMemo, useState, type ReactNode } from "react";
 import { TaskInlineSelect } from "../SpaceTaskPrimitives";
 
+// Google's own calendar color marks the primary Google calendar; it is brand data, not theme.
+const googleCalendarBlue = "#4285F4";
+
 export interface CalendarSourceDrawerProps {
   integrations: SpaceIntegration[];
   accounts: AccountConnection[];
@@ -338,11 +341,8 @@ function CalendarChoiceSwitch(props: {
   return (
     <div className="flex min-h-14 items-center gap-3 rounded-md px-2 hover:bg-charcoal-card has-[:disabled]:opacity-60">
       <span
-        className={
-          props.choice.primary
-            ? "size-3 rounded-full bg-[#4285F4]"
-            : "size-3 rounded-full bg-sage-fg"
-        }
+        className={props.choice.primary ? "size-3 rounded-full" : "size-3 rounded-full bg-sage-fg"}
+        style={props.choice.primary ? { backgroundColor: googleCalendarBlue } : undefined}
         aria-hidden="true"
       />
       <span className="min-w-0 flex-1">
@@ -376,9 +376,7 @@ function GoogleConnectionStatus(props: { unavailable: boolean; connected: boolea
 }
 
 function GoogleCalendarIcon({ className }: { className?: string }) {
-  return (
-    <CalendarDays className={`shrink-0 ${className ?? ""}`} aria-hidden="true" />
-  );
+  return <CalendarDays className={`shrink-0 ${className ?? ""}`} aria-hidden="true" />;
 }
 
 function calendarCheckedState(values: boolean[]): boolean | "indeterminate" {
