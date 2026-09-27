@@ -3,6 +3,8 @@
 // controls
 export * from "./controls/Button";
 export * from "./controls/Checkbox";
+export * from "./controls/ColorSwatch";
+export * from "./controls/DragHandleButton";
 export * from "./controls/Field";
 export * from "./controls/FileInput";
 export * from "./controls/IconButton";

@@ -9,6 +9,7 @@ import type { JournalImageLease } from "@/features/journal/journalAssets";
 import {
   Button,
   cn,
+  DragHandleButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -16,6 +17,8 @@ import {
   DropdownMenuTrigger,
   Input,
   Separator,
+  SuggestionItem,
+  SuggestionList,
 } from "@/shared/ui";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
@@ -819,10 +822,8 @@ function BlockHandle(props: {
     : null;
   return (
     <div className="misty-tiptap-block-handle" data-misty-window-drag-block="true">
-      <button
-        type="button"
-        aria-label="Add block"
-        title="Add block"
+      <DragHandleButton
+        label="Add block"
         onClick={() =>
           editor
             .chain()
@@ -833,13 +834,13 @@ function BlockHandle(props: {
             .run()
         }
       >
-        <Plus size={16} />
-      </button>
+        <Plus />
+      </DragHandleButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Block actions" title="Drag or open block actions">
-            <GripVertical size={16} />
-          </button>
+          <DragHandleButton label="Block actions" title="Drag or open block actions">
+            <GripVertical />
+          </DragHandleButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="left" className="w-52">
           <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
@@ -1018,20 +1019,21 @@ function SuggestionMenu(props: {
     .filter((note) => note.title.toLowerCase().includes(props.suggestion.query.toLowerCase()))
     .slice(0, 8);
   return (
-    <div
-      className="misty-tiptap-suggestion"
+    <SuggestionList
+      className="fixed layer-menu max-h-[360px] min-w-[250px] overflow-auto"
       style={{
         left: props.suggestion.x,
         top: props.suggestion.y,
       }}
-      role="listbox"
     >
-      <p>{props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}</p>
+      <p className="mx-2 mb-1.5 mt-1 text-[11px] font-semibold text-cream-muted">
+        {props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}
+      </p>
       {props.suggestion.type === "slash"
         ? slashItems.map((item) => (
-            <button
+            <SuggestionItem
               key={item.label}
-              type="button"
+              selected={false}
               onClick={() => {
                 props.editor
                   .chain()
@@ -1045,14 +1047,14 @@ function SuggestionMenu(props: {
                 props.onClose();
               }}
             >
-              <item.icon size={16} />
+              <item.icon />
               {item.label}
-            </button>
+            </SuggestionItem>
           ))
         : notes.map((note) => (
-            <button
+            <SuggestionItem
               key={note.id}
-              type="button"
+              selected={false}
               onClick={() => {
                 props.editor
                   .chain()
@@ -1077,14 +1079,14 @@ function SuggestionMenu(props: {
                 props.onClose();
               }}
             >
-              <Link2 size={16} />
+              <Link2 />
               {note.title}
-            </button>
+            </SuggestionItem>
           ))}
       {props.suggestion.type === "wiki" && notes.length === 0 ? (
-        <span>No matching notes</span>
+        <span className="p-2 text-xs text-cream-muted">No matching notes</span>
       ) : null}
-    </div>
+    </SuggestionList>
   );
 }
 type FindCommands = {

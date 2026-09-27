@@ -1,4 +1,4 @@
-import { Button, IconButton, Slider, toolbarIconProps } from "@/shared/ui";
+import { Button, ColorSwatch, IconButton, Slider, toolbarIconProps } from "@/shared/ui";
 import type Konva from "konva";
 import { Pen, Redo2, Trash2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -188,18 +188,11 @@ export default function VideoAnnotator({
             <>
               <div className="flex items-center gap-1">
                 {COLORS.map((swatch) => (
-                  <Button
+                  <ColorSwatch
                     key={swatch}
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Pen color ${swatch}`}
-                    className={`size-5 rounded-full border p-0 transition ${
-                      color === swatch
-                        ? "border-charcoal-border ring-2 ring-charcoal-border/40"
-                        : "border-charcoal-border/20"
-                    }`}
-                    style={{ backgroundColor: swatch }}
+                    color={swatch}
+                    label={`Pen color ${swatch}`}
+                    selected={color === swatch}
                     onClick={() => setColor(swatch)}
                   />
                 ))}
