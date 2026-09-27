@@ -3,6 +3,20 @@ import { Button, type ButtonProps } from "./Button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../overlays/Tooltip";
 import { cn } from "../utils";
 
+const iconButtonSizes = {
+  xs: "size-6 [&_svg:not([class*='size-'])]:size-3.5",
+  sm: "size-[30px]",
+  md: "size-9",
+  lg: "size-10",
+} as const;
+
+/** Glyph geometry for icons inside toolbar-sized icon buttons. */
+export const toolbarIconProps = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
+
+/**
+ * The one icon-only button. Defaults to the browser chrome's toolbar look at 30px;
+ * `label` is required and doubles as the tooltip unless `tooltip={false}`.
+ */
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
     {
@@ -10,10 +24,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       children,
       className,
       label,
-      size = "default",
+      size = "sm",
       tooltip = label,
       type = "button",
-      variant = "ghost",
+      variant = "toolbar",
       ...props
     },
     ref,
@@ -23,16 +37,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         ref={ref}
         type={type}
         variant={variant}
-        size="icon"
+        size="none"
         aria-label={ariaLabel ?? label}
         title={tooltip === false ? label : undefined}
-        className={cn(
-          "shrink-0 shadow-none",
-          size === "sm" && "size-8",
-          size === "default" && "size-9",
-          size === "lg" && "size-10",
-          className,
-        )}
+        className={cn("shrink-0 p-0 shadow-none", iconButtonSizes[size], className)}
         {...props}
       >
         {children}
@@ -58,5 +66,5 @@ export type IconButtonProps = Omit<ButtonProps, "asChild" | "size"> & {
   children: React.ReactNode;
   label: string;
   tooltip?: string | false;
-  size?: "sm" | "default" | "lg";
+  size?: keyof typeof iconButtonSizes;
 };

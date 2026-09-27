@@ -6,6 +6,8 @@ import {
   menuLabelClass,
   menuSeparatorClass,
   menuShortcutClass,
+  menuWidthClass,
+  type MenuWidth,
 } from "./popupStyles";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
@@ -73,15 +75,15 @@ DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayNam
 
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, align = "start", sideOffset = 4, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & { width?: MenuWidth }
+>(({ className, align = "start", sideOffset = 4, width, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       data-slot="dropdown-menu-content"
       sideOffset={sideOffset}
       align={align}
-      className={cn(menuContentClass, className)}
+      className={cn(menuContentClass, width && menuWidthClass[width], className)}
       {...props}
     />
   </DropdownMenuPrimitive.Portal>

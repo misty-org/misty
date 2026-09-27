@@ -30,3 +30,12 @@ export const menuIndicatorClass =
 export const menuLabelClass = "px-2 py-1 text-xs font-medium text-cream-muted data-inset:pl-8";
 export const menuSeparatorClass = "-mx-1 h-px bg-charcoal-border";
 export const menuShortcutClass = "ml-auto text-xs tracking-widest text-cream-muted";
+
+/** Standard menu widths, so menus across features line up. */
+export type MenuWidth = "sm" | "md" | "lg" | "xl";
+export const menuWidthClass: Record<MenuWidth, string> = {
+  sm: "w-48",
+  md: "w-56",
+  lg: "w-64",
+  xl: "w-72",
+};

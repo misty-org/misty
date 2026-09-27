@@ -9,7 +9,8 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
       role="toolbar"
       aria-label={label}
       className={cn(
-        "flex min-h-11 min-w-0 items-center gap-2 px-3 py-1.5",
+        // The browser chrome's geometry: 44px bar, 4px rhythm, 30px icon buttons.
+        "flex min-h-11 min-w-0 shrink-0 items-center gap-1 px-2 py-1",
         wrap ? "flex-wrap" : "overflow-x-auto",
         variant === "default" && "border-b border-charcoal-border/60 bg-charcoal-bg",
         variant === "floating" &&
@@ -30,7 +31,7 @@ const ToolbarGroup = React.forwardRef<HTMLDivElement, ToolbarGroupProps>(
       className={cn(
         "flex min-w-0 items-center gap-1",
         align === "end" && "ml-auto",
-        separated && "border-l border-charcoal-border/60 pl-2",
+        separated && "border-l border-charcoal-border/60 pl-1",
         className,
       )}
       {...props}

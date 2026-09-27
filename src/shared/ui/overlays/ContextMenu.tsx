@@ -8,6 +8,8 @@ import {
   menuLabelClass,
   menuSeparatorClass,
   menuShortcutClass,
+  menuWidthClass,
+  type MenuWidth,
 } from "./popupStyles";
 
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
@@ -62,13 +64,13 @@ ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
 
 const ContextMenuContent = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content> & { width?: MenuWidth }
+>(({ className, width, ...props }, ref) => (
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content
       ref={ref}
       data-slot="context-menu-content"
-      className={cn(menuContentClass, className)}
+      className={cn(menuContentClass, width && menuWidthClass[width], className)}
       {...props}
     />
   </ContextMenuPrimitive.Portal>
