@@ -1,6 +1,6 @@
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
-import { useLibraryShortcut as useShortcutHandler } from "@/features/library/library/LibraryRuntime";
-import { useLibraryFocused as useWorkspaceTabFocused } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
+import { useLibraryShortcut as useShortcutHandler } from "../LibraryRuntime";
+import { useLibraryFocused as useWorkspaceTabFocused } from "../LibraryRuntime";
 import type { LibrarySharedReference, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useCallback } from "react";
 import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "../libraryClipboard";

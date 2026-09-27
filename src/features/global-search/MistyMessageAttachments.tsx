@@ -37,7 +37,7 @@ function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment })
       active = false;
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
-  }, [attachment.previewUrl]);
+  }, [attachment.id, attachment.previewUrl]);
   return source ? (
     <img
       src={source}

@@ -42,7 +42,9 @@ export function GlobalNavigator(props: {
   return (
     <nav
       className={cn(
-        "misty-navigation-icons relative z-20 flex h-full min-h-0 w-full select-none flex-col items-stretch [--navigation-row-height:32px] [--navigation-row-font-size:14px]",
+        "misty-navigation-icons relative z-20 flex h-full min-h-0 w-full",
+        "select-none flex-col items-stretch [--navigation-row-height:32px]",
+        "[--navigation-row-font-size:14px]",
         "misty-global-navigator overflow-hidden border-charcoal-border bg-charcoal-workspace",
       )}
       data-dock-position={props.position ?? "left"}

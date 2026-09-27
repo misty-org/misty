@@ -4,8 +4,8 @@ import {
   Collapsible,
   CollapsibleContent,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   IconButton,
 } from "@/shared/ui";
@@ -14,9 +14,9 @@ import { memo, useMemo, useState } from "react";
 import type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
 import type { ExplorerSidebarRuntime } from "./explorerSidebar/ExplorerSidebarRuntime";
 import { SidebarQuickAccessSectionView } from "./explorerSidebar/SidebarQuickAccessSectionView";
-import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
-import type { SidebarDeviceEntry } from "./ExplorerSidebarSupport";
 import {
+  SmartFolderDialog,
+  type SidebarDeviceEntry,
   buildDeviceEntries,
   deviceCapacityLabel,
   pathIsInside,
@@ -26,7 +26,7 @@ import {
   smartFolderMatchMode,
   smartFolderQueryFromRules,
   visibleSmartFolderRules,
-} from "./ExplorerSidebarSupport";
+} from "@/features/file-ui";
 export type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
 export type { QuickAccessItem } from "../model/types/components/ExplorerSidebar";
 export const ExplorerSidebarView = memo(function ExplorerSidebarView(
@@ -137,16 +137,13 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                       </small>
                     </span>
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
+                  <IconButton
+                    label={`Edit ${search.name}`}
                     className={sidebarStyles.pinnedUnpinButton}
-                    aria-label={`Edit ${search.name}`}
                     onClick={() => openSmartFolderDialog(search)}
                   >
                     <Pencil size={15} />
-                  </Button>
+                  </IconButton>
                 </div>
               );
             })}
@@ -231,21 +228,20 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                         </div>
                       </ContextMenuTrigger>
                       <ContextMenuContent>
-                        <ContextMenuItem
+                        <ContextMenuAction
+                          icon={<Unplug size={15} />}
+                          label={
+                            device.isSystem
+                              ? "Startup disk — protected"
+                              : canUnmountMountedDevice(device)
+                                ? "Unmount…"
+                                : "Unmount unavailable"
+                          }
                           disabled={!canUnmountMountedDevice(device)}
                           onSelect={() =>
                             void unmountMountedDevice(device, setDeviceActionError, props.runtime)
                           }
-                        >
-                          <Unplug size={15} />
-                          <span>
-                            {device.isSystem
-                              ? "Startup disk — protected"
-                              : canUnmountMountedDevice(device)
-                                ? "Unmount…"
-                                : "Unmount unavailable"}
-                          </span>
-                        </ContextMenuItem>
+                        />
                       </ContextMenuContent>
                     </ContextMenu>
                   );

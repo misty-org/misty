@@ -15,8 +15,6 @@ import { Button, Input, ViewportLayer } from "@/shared/ui";
 
 import { TaskArtifacts } from "./TaskArtifactList";
 
-const control =
-  "rounded border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-cream-muted disabled:bg-charcoal-bg disabled:border-charcoal-border disabled:text-cream-muted disabled:cursor-not-allowed";
 export function AgentExecutionSurface() {
   const execution = useLocalExecution((s) => s.execution);
   const agent = usePersonalAgentsStore((s) => s.agents.find((a) => a.id === execution?.agentId));
@@ -27,6 +25,8 @@ export function AgentExecutionSurface() {
   useEffect(() => {
     if (execution?.state === "finished" && !execution.normalTabs)
       void continueQueuedLocalWork(execution.taskId).catch((e) => setError(String(e)));
+    // Continue queued work once per finish, not whenever the execution object is replaced.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution?.taskId, execution?.state]);
   const viewport = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -71,15 +71,18 @@ export function AgentExecutionSurface() {
       disposed = true;
       observer.disconnect();
     };
+    // Re-lay out only when the task, its state, or its views change, not on every progress update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution?.taskId, execution?.state, execution?.views.length, active]);
+  const executionTaskId = execution?.taskId;
   useEffect(() => {
-    if (!execution) return;
+    if (!executionTaskId) return;
     const close = () => {
       void pauseLocalExecution();
     };
     window.addEventListener("pagehide", close);
     return () => window.removeEventListener("pagehide", close);
-  }, [execution?.taskId]);
+  }, [executionTaskId]);
   if (!execution) return null;
   if (execution.autopilot || execution.normalTabs) return null;
   const action = (task: () => Promise<unknown>) => {
@@ -102,21 +105,17 @@ export function AgentExecutionSurface() {
               ? "Paused — you can use this page"
               : "Task finished — review the result"}
         </strong>
-        <Button
-          variant="ghost"
-          className={control}
-          onClick={() => useMistyStore.getState().openPanel()}
-        >
+        <Button variant="outline" size="sm" onClick={() => useMistyStore.getState().openPanel()}>
           Chat
         </Button>
         {execution.state === "running" ? (
-          <Button variant="ghost" className={control} onClick={() => action(pauseLocalExecution)}>
+          <Button variant="outline" size="sm" onClick={() => action(pauseLocalExecution)}>
             Pause
           </Button>
         ) : (
           <Button
-            variant="ghost"
-            className={control}
+            variant="outline"
+            size="sm"
             onClick={() =>
               action(() =>
                 steerLocalExecution(
@@ -129,8 +128,8 @@ export function AgentExecutionSurface() {
           </Button>
         )}
         <Button
-          variant="ghost"
-          className={control}
+          variant="outline"
+          size="sm"
           onClick={() =>
             action(async () => {
               await pauseLocalExecution();
@@ -141,7 +140,7 @@ export function AgentExecutionSurface() {
           Stop
         </Button>
         {execution.state !== "running" && (
-          <Button variant="ghost" className={control} onClick={() => action(finishLocalExecution)}>
+          <Button variant="outline" size="sm" onClick={() => action(finishLocalExecution)}>
             Close workspace
           </Button>
         )}
@@ -163,8 +162,8 @@ export function AgentExecutionSurface() {
             {execution.context.map((view, index) => (
               <Button
                 key={view.id}
-                variant="ghost"
-                className={control}
+                variant="outline"
+                size="sm"
                 aria-pressed={active === index}
                 onClick={() => setActive(index)}
               >
@@ -203,7 +202,7 @@ export function AgentExecutionSurface() {
           onChange={(e) => setSteering(e.target.value)}
           placeholder="Message this agent…"
         />
-        <Button variant="ghost" className={control} disabled={routing || !steering.trim()}>
+        <Button variant="outline" size="sm" disabled={routing || !steering.trim()}>
           {routing ? "Interpreting…" : "Send"}
         </Button>
       </form>

@@ -40,14 +40,17 @@ export const socialApi = new Proxy({} as typeof spacesApi, {
     runtimeProperty(target, key, () => socialRuntime().api[key as keyof typeof spacesApi]),
 });
 function hook<K extends keyof SocialRuntime>(name: K): SocialRuntime[K] {
-  return new Proxy((...args: unknown[]) => (socialRuntime()[name] as Function)(...args), {
-    get: (target, key) =>
-      runtimeProperty(
-        target,
-        key,
-        () => (socialRuntime()[name] as unknown as Record<string | symbol, unknown>)[key],
-      ),
-  }) as SocialRuntime[K];
+  return new Proxy(
+    (...args: unknown[]) => (socialRuntime()[name] as (...args: unknown[]) => unknown)(...args),
+    {
+      get: (target, key) =>
+        runtimeProperty(
+          target,
+          key,
+          () => (socialRuntime()[name] as unknown as Record<string | symbol, unknown>)[key],
+        ),
+    },
+  ) as SocialRuntime[K];
 }
 export const useSocialSpaces = hook("useSpacesStore"),
   useSocialAuth = hook("useAuth"),

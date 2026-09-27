@@ -12,6 +12,7 @@ import {
   SelectValue,
   Slider,
   Switch,
+  SegmentedControl,
   Textarea,
   Toggle,
   ToggleGroup,
@@ -23,6 +24,7 @@ import { GalleryRow, GallerySection } from "./GalleryLayout";
 
 export function FormsSection() {
   const [name, setName] = useState("Quarterly plan");
+  const [view, setView] = useState<"board" | "list" | "timeline">("board");
   return (
     <GallerySection
       title="Forms"
@@ -84,6 +86,18 @@ export function FormsSection() {
             <Grid2x2 />
           </ToggleGroupItem>
         </ToggleGroup>
+      </GalleryRow>
+      <GalleryRow label="Segmented">
+        <SegmentedControl
+          label="View"
+          value={view}
+          options={[
+            { value: "board", label: "Board" },
+            { value: "list", label: "List" },
+            { value: "timeline", label: "Timeline" },
+          ]}
+          onChange={setView}
+        />
       </GalleryRow>
     </GallerySection>
   );

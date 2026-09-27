@@ -1,15 +1,11 @@
 export { newestUndoableTransfer, transferTypeLabel } from "./explorerCommands/transferLabels";
-import { useTransfersStore } from "@/features/transfers";
+import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import { dockLeaves, multiPanelStoreForPane, useWorkspaceStore } from "@/features/workspace";
-import {
-  operationQueueRedo,
-  operationQueueUndo,
-  transfersSnapshot,
-} from "@/features/files/workspace/native";
+import { operationQueueRedo, operationQueueUndo, transfersSnapshot } from "../../native";
 import { errorText } from "@/shared/lib/format";
-import { selectedPathsForPane, useExplorerStore, useOperationQueueStore } from "../store";
+import { selectedPathsForPane, useExplorerStore } from "../store";
 import { openCompareWith } from "./ExplorerContextMenu";
-import { useSearchStore } from "@/features/files/workspace/search";
+import { useSearchStore } from "../../search";
 import { invokeShortcutCommand } from "@/features/shortcuts";
 import { openTransfersTab, toggleActiveTabPanelVisibility } from "./ExplorerDesktopPlugins";
 import { applySharedClipboardToSystem } from "./explorerCommands/clipboardPayloads";

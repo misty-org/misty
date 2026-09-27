@@ -13,6 +13,7 @@ import {
 import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/workspace";
 import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
 import {
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
@@ -91,7 +92,16 @@ export function WorkspacePaneControls({
         <div
           style={bounds}
           data-visible={hovered || open}
-          className="pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-card p-0.5 opacity-0 transition-opacity data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100 hover:pointer-events-auto hover:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+          className={cn(
+            "pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5",
+            "rounded-md border border-charcoal-border bg-charcoal-card p-0.5",
+            "opacity-0 transition-opacity data-[visible=true]:pointer-events-auto",
+            "data-[visible=true]:opacity-100 hover:pointer-events-auto",
+            "hover:opacity-100 has-[:focus-visible]:pointer-events-auto",
+            "has-[:focus-visible]:opacity-100",
+            "[@media(hover:none)]:pointer-events-auto",
+            "[@media(hover:none)]:opacity-100",
+          )}
           onPointerDown={(event) => event.stopPropagation()}
         >
           <IconButton

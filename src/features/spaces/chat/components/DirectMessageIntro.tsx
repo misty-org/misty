@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { socialApi as spacesApi } from "@/features/spaces/chat/SocialRuntime";
+import { socialApi as spacesApi } from "../SocialRuntime";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
 
 export interface DirectRecipient {

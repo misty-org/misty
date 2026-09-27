@@ -49,7 +49,7 @@ vi.mock("../store/useSpacesStore", () => ({
 vi.mock("@/shared/ui", async (importOriginal) => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return {
-    ...(await importOriginal<typeof import("@/shared/ui")>()),
+    ...(await importOriginal<typeof UiModule>()),
     Badge: Wrapper,
     Button: ({ children, variant: _variant, ...props }: Record<string, unknown>) => (
       <button {...props}>{children as ReactNode}</button>
@@ -97,6 +97,7 @@ vi.mock("@/shared/ui", async (importOriginal) => {
 });
 
 import { AddFilesToSpaceDialog } from "@/features/library/library";
+import type * as UiModule from "@/shared/ui";
 
 describe("AddFilesToSpaceDialog", () => {
   let container: HTMLDivElement;

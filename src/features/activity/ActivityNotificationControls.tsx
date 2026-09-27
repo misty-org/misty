@@ -2,10 +2,7 @@ import { activityCategories } from "./activityPolicy";
 import { activityAccountKey } from "./activityState";
 import { useActivityStore } from "./useActivityStore";
 import type { ActivityCategory } from "./types";
-import {
-  DesktopSettingsRow,
-  DesktopSettingsSection,
-} from "@/features/settings/components/DesktopSettingsUI";
+import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
 import { Button } from "@/shared/ui";
 

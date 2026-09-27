@@ -9,7 +9,7 @@ import type {
   NoteAssetStoreRequest,
   NoteAssetStoreResult,
   PasteItem,
-} from "@/native/contracts";
+} from "@/native/ipc";
 
 import { invoke } from "./invoke";
 export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<void> {

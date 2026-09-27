@@ -7,12 +7,14 @@ import type {
 import { errorText } from "@/shared/lib/format";
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  IconButton,
   Input,
   Select,
   SelectContent,
@@ -21,7 +23,6 @@ import {
   SelectValue,
   Switch,
   Textarea,
-  cn,
 } from "@/shared/ui";
 import { Archive, ArrowDown, ArrowUp, Plus } from "lucide-react";
 import { useState } from "react";
@@ -239,34 +240,22 @@ export function RoadmapNodeDefinitionManager(props: {
                         </SelectContent>
                       </Select>
                       <div className="flex items-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
+                        <IconButton
+                          label={`Move ${field.label} up`}
                           disabled={index === 0}
-                          aria-label={`Move ${field.label} up`}
                           onClick={() => moveField(setDraft, draft, index, index - 1)}
                         >
                           <ArrowUp className="size-3" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
+                        </IconButton>
+                        <IconButton
+                          label={`Move ${field.label} down`}
                           disabled={index === (draft.field_schema?.length ?? 0) - 1}
-                          aria-label={`Move ${field.label} down`}
                           onClick={() => moveField(setDraft, draft, index, index + 1)}
                         >
                           <ArrowDown className="size-3" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
-                          aria-label={field.archived ? "Restore field" : "Archive field"}
+                        </IconButton>
+                        <IconButton
+                          label={field.archived ? "Restore field" : "Archive field"}
                           onClick={() =>
                             updateField(setDraft, draft, index, { archived: !field.archived })
                           }
@@ -274,7 +263,7 @@ export function RoadmapNodeDefinitionManager(props: {
                           <Archive
                             className={cn("size-3.5", field.archived && "text-cream-bright")}
                           />
-                        </Button>
+                        </IconButton>
                       </div>
                       {field.type === "select" ? (
                         <Input

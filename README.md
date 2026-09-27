@@ -20,3 +20,11 @@ Misty is in development. Everyday browser features and cross-device sync are act
 Current desktop sync work targets **macOS and Windows**. To build from source, you need **Git, Node.js 24.12+, npm 11+, Rust**, your platform’s native build tools, and access to a running Misty backend. macOS development also requires an Apple Development signing certificate. Running your own backend requires Docker and additional setup.
 
 **[Get started in the wiki →](https://github.com/misty-org/misty/wiki/Getting-started)** · [Full requirements](https://github.com/misty-org/misty/wiki/Requirements)
+
+## Checks
+
+GitHub Actions runs only the code tests: the frontend suite and the server suites (Go with Postgres, the agent runtime, and journal collaboration), plus a secret scan. Everything else runs locally before you push.
+
+- `npm run check` — formatting, types, lint, frontend tests, and the production dependency audit.
+- `npm run cli -- check all` — the full local gate: `npm run check`, the release task tests, the native desktop crate (format, clippy, tests), the server (Go format, vet, tests, contracts, app suites), the website, built-in tools, and the CLI.
+- `npm run cli -- check app|server|cli|tasks` — one area at a time.

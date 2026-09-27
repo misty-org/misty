@@ -40,7 +40,10 @@ export function matchQuality(text: string, url: string, title: string): MatchQua
   return "none";
 }
 
-export function baseRelevance(quality: MatchQuality, prefix: number = relevance.addressPrefix): number {
+export function baseRelevance(
+  quality: MatchQuality,
+  prefix: number = relevance.addressPrefix,
+): number {
   switch (quality) {
     case "address-prefix":
       return prefix;

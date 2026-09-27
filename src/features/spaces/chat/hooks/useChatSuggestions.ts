@@ -1,9 +1,5 @@
-import { socialApi as spacesApi } from "@/features/spaces/chat/SocialRuntime";
-import type {
-  SpaceLibraryItem,
-  SpaceMember,
-  SpaceStudioResource,
-} from "@/api/spaces/dto/interfaces/types";
+import { socialApi as spacesApi } from "../SocialRuntime";
+import type { SpaceLibraryItem, SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
 import { useEffect, useMemo, useState } from "react";
 

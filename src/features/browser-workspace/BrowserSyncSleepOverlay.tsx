@@ -1,9 +1,8 @@
-import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
+import { cn, BlockingScreen, Pressable } from "@/shared/ui";
 import misty from "@/assets/branding/misty-icon.png?inline";
 import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
@@ -19,60 +18,49 @@ export function SyncSleepScreen({
   onWake: () => void;
 }) {
   return (
-    <Dialog.Root open modal={false}>
-      <Dialog.Portal>
-        <div
-          aria-hidden="true"
-          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking-backdrop bg-black/75 backdrop-blur-sm"
-        />
-        <Dialog.Content
-          data-slot="dialog-content"
-          data-device-sync-sleep=""
-          className="fixed inset-x-0 bottom-0 top-[38px] layer-blocking flex flex-col items-center justify-center overflow-y-auto p-8 text-center text-cream outline-none"
-          onEscapeKeyDown={(event) => event.preventDefault()}
-          onPointerDownOutside={(event) => event.preventDefault()}
-          onCloseAutoFocus={(event) => event.preventDefault()}
-          onKeyDown={(event) => event.stopPropagation()}
+    <BlockingScreen
+      attributes={{ "data-device-sync-sleep": "" }}
+      media={
+        <Pressable
+          aria-label="Wake Misty and use this device"
+          aria-busy={busy}
+          disabled={busy}
+          onClick={onWake}
+          className={cn(
+            "group mb-6 rounded-full p-3 transition-transform duration-200",
+            "hover:scale-105 active:scale-95 disabled:cursor-wait",
+            "disabled:opacity-100 motion-reduce:transform-none",
+          )}
         >
-          <Button
-            variant="ghost"
-            size="none"
-            type="button"
-            aria-label="Wake Misty and use this device"
-            aria-busy={busy}
-            disabled={busy}
-            onClick={onWake}
-            className="group mb-6 rounded-full p-3 outline-none transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-300/80 focus-visible:ring-offset-8 focus-visible:ring-offset-transparent disabled:cursor-wait disabled:opacity-100 motion-reduce:transform-none"
-          >
-            <img
-              src={misty}
-              alt=""
-              width={176}
-              height={176}
-              draggable={false}
-              className="size-44 select-none object-contain"
-            />
-          </Button>
-          <Dialog.Title className="text-xl font-medium tracking-tight">
-            Misty’s resting here
-          </Dialog.Title>
-          <Dialog.Description className="mt-3 max-w-xs text-sm leading-relaxed text-cream-muted">
-            Your workspace is following along.
-            <br />
-            Click Misty to continue on this device.
-          </Dialog.Description>
-          <div className="mt-6 min-h-10 max-w-sm text-sm" aria-live="polite">
-            {error ? (
-              <p role="alert" className="text-red-300">
-                {error}
-              </p>
-            ) : busy ? (
-              <p className="text-cream-muted">Waking up…</p>
-            ) : null}
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          <img
+            src={misty}
+            alt=""
+            width={176}
+            height={176}
+            draggable={false}
+            className="size-44 select-none object-contain"
+          />
+        </Pressable>
+      }
+      title="Misty’s resting here"
+      description={
+        <>
+          Your workspace is following along.
+          <br />
+          Click Misty to continue on this device.
+        </>
+      }
+    >
+      <div className="mt-6 min-h-10 max-w-sm text-sm" aria-live="polite">
+        {error ? (
+          <p role="alert" className="text-red-300">
+            {error}
+          </p>
+        ) : busy ? (
+          <p className="text-cream-muted">Waking up…</p>
+        ) : null}
+      </div>
+    </BlockingScreen>
   );
 }
 

@@ -1,11 +1,11 @@
-import { useTransfersStore } from "@/features/transfers";
+import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import {
   maxMultiPanelPanes,
   useMultiPanelStore,
   type MultiPanelStoreHook,
 } from "@/features/workspace";
-import type { FileEntry } from "@/native/contracts";
-import { Button } from "@/shared/ui";
+import type { FileEntry } from "@/native/ipc";
+import { IconButton } from "@/shared/ui";
 import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -14,12 +14,7 @@ import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/Explo
 import { FileInspector } from "../components/FileInspector";
 import type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
 import type { ExplorerSortColumn } from "../store";
-import {
-  selectedEntriesForPane,
-  selectedEntryForPane,
-  useExplorerStore,
-  useOperationQueueStore,
-} from "../store";
+import { selectedEntriesForPane, selectedEntryForPane, useExplorerStore } from "../store";
 import { revealSearchResultInPane } from "../utils/searchNavigation";
 import {
   newestUndoableTransfer,
@@ -351,42 +346,30 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
 
   return (
     <>
-      <Button
-        className={explorerShellStyles.paneActionButton}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
+      <IconButton
+        label="Split file pane vertically"
         title="Split vertically"
-        aria-label="Split file pane vertically"
         onClick={() => splitPane(props.paneId, "vertical")}
         disabled={!canSplit}
       >
         <Columns2 size={15} />
-      </Button>
-      <Button
-        className={explorerShellStyles.paneActionButton}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
+      </IconButton>
+      <IconButton
+        label="Split file pane horizontally"
         title="Split horizontally"
-        aria-label="Split file pane horizontally"
         onClick={() => splitPane(props.paneId, "horizontal")}
         disabled={!canSplit}
       >
         <Rows2 size={15} />
-      </Button>
-      <Button
-        className={explorerShellStyles.paneActionButton}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
+      </IconButton>
+      <IconButton
+        label="Close file pane"
         title="Close pane"
-        aria-label="Close file pane"
         onClick={() => closePane(props.paneId)}
         disabled={!canClose}
       >
         <PanelTopClose size={15} />
-      </Button>
+      </IconButton>
     </>
   );
 });

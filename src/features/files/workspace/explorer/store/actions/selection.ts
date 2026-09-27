@@ -1,8 +1,4 @@
-import {
-  explorerOpenPath,
-  explorerOpenWith,
-  explorerPathIsDirectory,
-} from "@/features/files/workspace/native";
+import { explorerOpenPath, explorerOpenWith, explorerPathIsDirectory } from "../../../native";
 import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
 import { userFacingErrorText } from "@/shared/lib/format";
 import { hasTauriInternals } from "@/shared/platform/tauri";

@@ -4,9 +4,9 @@ import type {
   SpaceMessage,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import "@/features/spaces/chat/SocialRuntime";
-import { socialApi as spacesApi } from "@/features/spaces/chat/SocialRuntime";
-import { buildMessageSpans } from "@/features/spaces/chat/store/useSpaceMessageSpansStore";
+import "../SocialRuntime";
+import { socialApi as spacesApi } from "../SocialRuntime";
+import { buildMessageSpans } from "../store/useSpaceMessageSpansStore";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
 import type { MessageEditingState } from "./useMessageEditing";

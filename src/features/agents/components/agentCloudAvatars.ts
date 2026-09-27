@@ -2,7 +2,7 @@ import lavender from "@/shared/assets/agents/cloud-lavender.webp?inline";
 import mint from "@/shared/assets/agents/cloud-mint.webp?inline";
 import peach from "@/shared/assets/agents/cloud-peach.webp?inline";
 import sky from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 
 import lavenderPoster from "@/shared/assets/agents/cloud-lavender-poster.webp?inline";
 import mintPoster from "@/shared/assets/agents/cloud-mint-poster.webp?inline";

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from "react";
-import { commandsForApp } from "@/shared/contracts";
+import { commandsForApp } from "@/shared/schemas";
 import { spacesApi } from "@/api/spaces/api";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";
@@ -37,6 +37,8 @@ export function HostRoadmapRuntimeProvider(props: {
           formatShortcutLabel(effectiveShortcut(command).primary, detectShortcutPlatform()),
         ]),
       ),
+    // Shortcut labels read the settings store; recompute when document settings change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [settings],
   );
   const subscribeChanges = useCallback(

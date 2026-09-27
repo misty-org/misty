@@ -1,4 +1,4 @@
-import type { MountedDevice } from "@/native/contracts";
+import type { MountedDevice } from "@/native/ipc";
 
 export const minSidebarWidth = 212;
 export const maxSidebarWidth = 380;

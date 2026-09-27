@@ -2,7 +2,7 @@ import { useSettingsStore } from "../store/useSettingsStore";
 import { formatDate } from "@/shared/lib/fileFormat";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
-import type { SearchStatus } from "@/native/contracts";
+import type { SearchStatus } from "@/native/ipc";
 import { Badge, Button, Spinner, cn } from "@/shared/ui";
 import { Cloud, FolderOpen, HardDrive, Search } from "lucide-react";
 import { useEffect, type ReactNode } from "react";

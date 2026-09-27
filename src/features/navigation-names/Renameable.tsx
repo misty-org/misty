@@ -2,8 +2,8 @@ import { Pencil, RotateCcw } from "lucide-react";
 import { cloneElement, useEffect, useRef, useState, type ReactElement } from "react";
 import {
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   Input,
   Portal,
@@ -110,26 +110,24 @@ export function Renameable({
             } else if (editing) event.preventDefault();
           }}
         >
-          <ContextMenuItem
+          <ContextMenuAction
+            icon={<Pencil aria-hidden="true" />}
+            label="Rename"
             onSelect={() => {
               done.current = false;
               setError("");
               pendingRename.current = true;
             }}
-          >
-            <Pencil aria-hidden="true" />
-            Rename
-          </ContextMenuItem>
-          <ContextMenuItem
+          />
+          <ContextMenuAction
+            icon={<RotateCcw aria-hidden="true" />}
+            label={resetLabel}
             disabled={!custom}
             onSelect={() => {
               if (onRename) onRename(null);
               else void setNavigationName(nameKey, null).catch((e) => setError(String(e)));
             }}
-          >
-            <RotateCcw aria-hidden="true" />
-            {resetLabel}
-          </ContextMenuItem>
+          />
         </ContextMenuContent>
       </ContextMenu>
       {editing &&

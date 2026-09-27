@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  MenuItem,
   MenuTrigger,
   OverflowFadeText,
   Tooltip,
@@ -25,8 +26,11 @@ import {
   spaceLifecycleAction,
   type SpaceLifecycleAction,
 } from "./SpaceLifecycleDialogs";
-const navigatorHierarchyTriggerClass =
-  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1 text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted";
+const navigatorHierarchyTriggerClass = cn(
+  "flex items-center gap-2 h-8 rounded-md border-0 bg-transparent px-2 py-1",
+  "text-left text-cream hover:bg-charcoal-hover hover:text-cream-bright",
+  "focus-visible:ring-2 focus-visible:ring-cream-muted",
+);
 
 export function SpaceSwitcher(props: {
   iconOnly?: boolean;
@@ -181,31 +185,31 @@ export function SpaceSwitcher(props: {
             </div>
 
             <DropdownMenuSeparator />
-            <DropdownMenuItem
+            <MenuItem
+              icon={<Plus size={14} aria-hidden="true" />}
+              label="New Space"
               disabled={!props.canAddSpace}
               title={props.canAddSpace ? undefined : "Space limit reached"}
               onSelect={() => {
                 setMenuOpen(false);
                 openCreateSpaceDialog();
               }}
-            >
-              <Plus size={14} aria-hidden="true" />
-              New Space
-            </DropdownMenuItem>
+            />
             {availableAction ? (
-              <DropdownMenuItem
+              <MenuItem
+                icon={
+                  availableAction === "delete" ? (
+                    <Trash2 size={14} aria-hidden="true" />
+                  ) : (
+                    <LogOut size={14} aria-hidden="true" />
+                  )
+                }
+                label={availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
                 onSelect={() => {
                   setMenuOpen(false);
                   setPendingAction(availableAction);
                 }}
-              >
-                {availableAction === "delete" ? (
-                  <Trash2 size={14} aria-hidden="true" />
-                ) : (
-                  <LogOut size={14} aria-hidden="true" />
-                )}
-                {availableAction === "delete" ? "Delete Space…" : "Leave Space…"}
-              </DropdownMenuItem>
+              />
             ) : null}
           </DropdownMenuContent>
           {props.activeSpace ? (

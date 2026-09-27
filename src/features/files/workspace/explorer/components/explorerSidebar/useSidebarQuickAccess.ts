@@ -2,13 +2,13 @@ import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import { useMemo } from "react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
 import type { QuickAccessItem } from "../../model/types/components/ExplorerSidebar";
-import type { QuickAccessMenuItem } from "../../model/types/components/ExplorerSidebarSupport";
 import {
+  type QuickAccessMenuItem,
   addHiddenQuickAccessPath,
   dedupePinnedPathsForQuickAccess,
   normalizeSidebarPath,
   quickAccessPathHidden,
-} from "../ExplorerSidebarSupport";
+} from "@/features/file-ui";
 import { buildQuickAccessItems } from "./quickAccessItems";
 
 /**

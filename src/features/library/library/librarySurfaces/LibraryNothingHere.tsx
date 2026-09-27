@@ -14,8 +14,9 @@ export function BackToCollections({ label = "Collections" }: { label?: string })
   const { collectionActions } = useSpaceLibraryContext();
   return (
     <Button
-      className="mb-4 border-0 bg-transparent p-0 text-xs text-cream-muted"
-      type="button"
+      variant="link"
+      size="none"
+      className="mb-4 text-xs text-cream-muted"
       onClick={() => collectionActions.selectCollection("collections")}
     >
       ← {label}

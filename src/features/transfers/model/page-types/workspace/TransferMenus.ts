@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/native/contracts";
+import type { TransferRecord } from "@/native/ipc";
 import type { ReactNode } from "react";
 
 export type TransferActionHandlers = {

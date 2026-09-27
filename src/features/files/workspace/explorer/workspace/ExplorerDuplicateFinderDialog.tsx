@@ -4,10 +4,10 @@ import {
   duplicatesScan,
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
-} from "@/features/files/workspace/native";
-import { useTransfersStore } from "@/features/transfers";
+} from "../../native";
+import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import { useMemo } from "react";
-import { useExplorerStore, useOperationQueueStore } from "../store";
+import { useExplorerStore } from "../store";
 import {
   DuplicateFinderDialogView,
   type DuplicateFinderRuntime,

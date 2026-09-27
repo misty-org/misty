@@ -1,6 +1,6 @@
 import {
-  Button,
   cn,
+  IconButton,
   navigationMenuGroupClass,
   NavigationSectionButton,
   NavigationTreeItem,
@@ -117,15 +117,9 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               </h1>
             </div>
             {overlay ? (
-              <Button
-                aria-label={`Close ${props.ariaLabel.toLowerCase()}`}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-                onClick={props.onClose}
-              >
+              <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
                 <X className="size-4" strokeWidth={1.8} />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         </header>

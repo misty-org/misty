@@ -16,6 +16,7 @@ import type {
   AiCitation,
   AiContextReference,
 } from "./types";
+import type { MistyActivityEntry } from "@/features/misty/activity";
 
 export interface AiUserSettings {
   enabled: boolean;
@@ -124,7 +125,7 @@ export const aiSurfaceApi = {
   forgetMemory: (memoryId: string) =>
     apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
   activity: (spaceId: string, agentId?: string) =>
-    apiRequest<{ entries: import("@/features/misty/activity").MistyActivityEntry[] }>(
+    apiRequest<{ entries: MistyActivityEntry[] }>(
       `/ai/activity?${new URLSearchParams({ space_id: spaceId, ...(agentId ? { agent_id: agentId } : {}) })}`,
     ),
   conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),

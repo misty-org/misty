@@ -12,7 +12,7 @@ vi.mock("@/features/capability-approvals/api", () => ({
 }));
 
 vi.mock("@/features/agent-interventions/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/features/agent-interventions/api")>()),
+  ...(await importOriginal<typeof ApiModule>()),
   agentInterventionsApi: { list: vi.fn(async () => ({ waits: [] })), decide: vi.fn() },
 }));
 
@@ -26,6 +26,7 @@ import { useAgentInterventions } from "@/features/agent-interventions/store";
 import { publishNativeActivity } from "./nativeNotifications";
 import { ActivityBridge } from "./ActivityBridge";
 import { useActivityStore } from "./useActivityStore";
+import type * as ApiModule from "@/features/agent-interventions/api";
 
 describe("ActivityBridge", () => {
   let container: HTMLDivElement;

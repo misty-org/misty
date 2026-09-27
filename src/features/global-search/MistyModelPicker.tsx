@@ -7,6 +7,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
+  IconButton,
 } from "@/shared/ui";
 import { Brain } from "lucide-react";
 import { useState } from "react";
@@ -77,16 +78,14 @@ export function MistyModelPicker(props: {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Thinking: ${selected === "deep" ? "Deep thinking" : "Normal"}`}
+          <IconButton
+            label={`Thinking: ${selected === "deep" ? "Deep thinking" : "Normal"}`}
+            tooltip={false}
             title="Thinking mode"
             disabled={props.disabled || saving}
-            className="text-cream-muted"
           >
             <Brain className="size-4" />
-          </Button>
+          </IconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" data-misty-layer-portal>
           <DropdownMenuRadioGroup

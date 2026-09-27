@@ -1,6 +1,6 @@
 import { History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Checkbox, ListRow, ListRowButton } from "@/shared/ui";
+import { Button, Checkbox, IconButton, ListRow, ListRowButton } from "@/shared/ui";
 import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
 import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
@@ -159,16 +159,15 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                     {hostOf(visit.url)}
                   </span>
                 </ListRowButton>
-                <Button
-                  variant="toolbar"
+                <IconButton
                   size="xs"
-                  className="opacity-0 group-hover/row:opacity-100 focus:opacity-100"
-                  aria-label={`Remove ${visit.title || visit.url} from history`}
-                  title="Remove from history"
+                  label={`Remove ${visit.title || visit.url} from history`}
+                  tooltip="Remove from history"
+                  className="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
                   onClick={() => void remove([visit.id])}
                 >
                   <Trash2 className="size-3.5" />
-                </Button>
+                </IconButton>
               </ListRow>
             ))}
           </ul>

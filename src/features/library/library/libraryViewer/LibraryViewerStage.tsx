@@ -1,12 +1,9 @@
-import { LibraryPreview as EmbeddedUniversalPreview } from "@/features/library/library/LibraryRuntime";
+import { LibraryPreview as EmbeddedUniversalPreview } from "../LibraryRuntime";
 import type { LibraryAssetStack } from "@/api/spaces/dto/interfaces/types";
-import { Button } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
 import { LibraryStackChips, LibraryStackEffectChips } from "./LibraryStackChips";
-
-const arrowClass =
-  "absolute top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-charcoal-border/10 bg-charcoal-workspace text-cream-bright disabled:opacity-20";
 
 export interface LibraryViewerStageProps {
   displayName: string;
@@ -79,24 +76,28 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
 
       {itemCount > 1 ? (
         <>
-          <Button
-            className={`${arrowClass} left-4`}
-            type="button"
+          <IconButton
+            variant="overlay"
+            shape="round"
+            size="lg"
+            label="Previous item"
+            className="absolute left-4 top-1/2 z-20 -translate-y-1/2 disabled:opacity-20"
             disabled={index <= 0}
             onClick={props.onPrevious}
-            aria-label="Previous item"
           >
             <ChevronLeft size={20} />
-          </Button>
-          <Button
-            className={`${arrowClass} right-4`}
-            type="button"
+          </IconButton>
+          <IconButton
+            variant="overlay"
+            shape="round"
+            size="lg"
+            label="Next item"
+            className="absolute right-4 top-1/2 z-20 -translate-y-1/2 disabled:opacity-20"
             disabled={index < 0 || index >= itemCount - 1}
             onClick={props.onNext}
-            aria-label="Next item"
           >
             <ChevronRight size={20} />
-          </Button>
+          </IconButton>
         </>
       ) : null}
     </div>

@@ -13,7 +13,10 @@ export function PrivacySection(props: SettingsContentProps & { page?: "app" | "b
           <SettingsSectionBlock title="Switching devices">
             <SettingsRow
               label="Restore page state when switching devices"
-              description="Bring back half-filled forms, open sections and scroll position on the device you switch to. Passwords and payment details are never saved."
+              description={
+                "Bring back half-filled forms, open sections and scroll position on the device " +
+                "you switch to. Passwords and payment details are never saved."
+              }
             >
               <SwitchControl
                 checked={booleanSetting(props.document, "privacy", "page_state_restore", true)}
@@ -23,7 +26,10 @@ export function PrivacySection(props: SettingsContentProps & { page?: "app" | "b
             </SettingsRow>
             <SettingsRow
               label="Let agents finish restoring"
-              description="When fields only appear after a click, Misty's agent fills them in. Those field values go through Misty's server to the AI provider and are not stored."
+              description={
+                "When fields only appear after a click, Misty's agent fills them in. Those field " +
+                "values go through Misty's server to the AI provider and are not stored."
+              }
             >
               <SwitchControl
                 checked={

@@ -1,5 +1,4 @@
 import type { SocialProviderId } from "@/api/social";
-import { spaceNotesEnabled } from "@/features/journal/notes/availability";
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -44,7 +43,7 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const location = useLocation();
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const routeParts = location.pathname.split("/").filter(Boolean);
-  const defaultJournalSection = spaceNotesEnabled ? "notes" : "drawings";
+  const defaultJournalSection = "notes";
   const requestedSection = routeParts[2] ?? "home";
   const routeSection =
     requestedSection === "files"

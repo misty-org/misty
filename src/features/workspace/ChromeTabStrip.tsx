@@ -1,7 +1,7 @@
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationNames, navigationName, tabNameKey } from "@/features/navigation-names/store";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, Input } from "@/shared/ui";
+import { IconButton, Input, Pressable } from "@/shared/ui";
 import { Plus, X } from "lucide-react";
 import { memo, useEffect, useRef, useState, type WheelEvent } from "react";
 import type { ChromeTabStripProps } from "./model/interfaces";
@@ -11,25 +11,13 @@ const chromeTabShellClass = [
   "chrome-tab-strip flex h-[46px] min-w-0 overflow-hidden border-b border-charcoal-border bg-charcoal-sidebar",
 ].join(" ");
 
-const tabCloseButtonClass = [
-  "mr-1.5 grid size-6 flex-none place-items-center rounded-full border-0",
-  "bg-transparent text-current transition-colors hover:text-cream-bright focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-].join(" ");
-
 const chromeTabTrayClass = [
   "mt-1.5 mr-2 flex h-8 flex-none items-center justify-end gap-0.5 rounded-lg p-0.5",
 ].join(" ");
 
 const tabSelectButtonClass = [
-  "flex h-full min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden border-0",
-  "bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit focus-visible:outline-none",
-  "focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted",
-].join(" ");
-
-const addTabButtonClass = [
-  "grid size-7 place-items-center rounded-full border-0 bg-transparent p-0 text-cream-muted",
-  "hover:text-cream-bright focus-visible:outline-none focus-visible:ring-1",
-  "focus-visible:ring-cream-muted",
+  "flex h-full min-w-0 flex-1 items-center justify-start gap-2 overflow-hidden",
+  "py-0 pl-3 pr-1.5 text-inherit focus-visible:ring-inset",
 ].join(" ");
 
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {
@@ -163,10 +151,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                     }}
                   />
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    justify="start"
+                  <Pressable
                     className={tabSelectButtonClass}
                     role="tab"
                     data-reorder-handle={props.onReorderTab || props.onMoveTab ? "true" : undefined}
@@ -202,15 +187,16 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                       </span>
                     ) : null}
                     <span className="min-w-0 truncate text-[13px] font-medium">{tab.title}</span>
-                  </Button>
+                  </Pressable>
                 )}
                 {canClose ? (
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    className={tabCloseButtonClass}
+                  <IconButton
+                    size="xs"
+                    shape="round"
+                    tooltip={false}
+                    className="mr-1.5 text-current hover:text-cream-bright"
                     tabIndex={active ? 0 : -1}
-                    aria-label={`Close ${tab.title}`}
+                    label={`Close ${tab.title}`}
                     title={`Close ${tab.title}`}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -234,7 +220,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                     ) : (
                       <X className="size-3.5" size={13} strokeWidth={2} />
                     )}
-                  </Button>
+                  </IconButton>
                 ) : null}
               </div>
             </Renameable>
@@ -245,16 +231,15 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         {props.showAddTabControl === false ? null : (
           <div className="flex h-9 flex-none items-center pl-1">
             {props.addTabControl ?? (
-              <Button
-                variant="ghost"
-                size="none"
-                className={addTabButtonClass}
+              <IconButton
+                shape="round"
+                tooltip={false}
                 title="New tab"
-                aria-label="New tab"
+                label="New tab"
                 onClick={props.onAddTab}
               >
                 <Plus className="size-[17px]" size={17} strokeWidth={2.4} />
-              </Button>
+              </IconButton>
             )}
           </div>
         )}

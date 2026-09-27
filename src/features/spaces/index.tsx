@@ -35,3 +35,5 @@ export * from "./store/useSpaceAgendaPreferences";
 export * from "./store/useSpacesStore";
 export * from "./store/useSpacesTabsStore";
 export { WorkspaceSpaceNavigation } from "./components/WorkspaceSpaceNavigation";
+export { SpaceInvitationRedemption } from "./components/SpaceInvitationRedemption";
+export { SocialPicker } from "./chat/SocialRuntime";

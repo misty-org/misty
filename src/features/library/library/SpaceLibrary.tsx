@@ -2,7 +2,7 @@ import type { AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import {
   useLibraryAi as useAiSurfaceAdapter,
   useLibraryTitle as useWorkspaceTabTitle,
-} from "@/features/library/library/LibraryRuntime";
+} from "./LibraryRuntime";
 import { ComingSoonSurface } from "@/shared/ui";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";

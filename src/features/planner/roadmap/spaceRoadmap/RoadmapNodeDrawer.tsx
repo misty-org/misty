@@ -1,5 +1,5 @@
 import type { SpaceRoadmapNodeDefinition } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, Input, cn } from "@/shared/ui";
+import { Button, cn, IconButton, Input } from "@/shared/ui";
 import { GripVertical, PanelLeftClose, Search, Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { RoadmapNodeDefinitionManager } from "./RoadmapNodeDefinitionManager";
@@ -36,16 +36,9 @@ export function RoadmapNodeDrawer(props: {
     >
       <header className="flex h-11 items-center gap-2 border-b border-charcoal-border/60 px-3">
         <strong className="text-xs">Node tools</strong>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="ml-auto size-7"
-          aria-label="Hide node tools"
-          onClick={props.onClose}
-        >
+        <IconButton label="Hide node tools" className="ml-auto" onClick={props.onClose}>
           <PanelLeftClose className="size-4" />
-        </Button>
+        </IconButton>
       </header>
       <div className="relative m-2">
         <Search className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-cream-muted" />

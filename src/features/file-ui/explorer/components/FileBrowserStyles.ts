@@ -1,3 +1,4 @@
+import { cn } from "@/shared/ui";
 export const fileBrowserStyles = {
   browser: [
     "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden",
@@ -12,8 +13,12 @@ export const fileBrowserStyles = {
   skeletonCell: "relative animate-pulse overflow-hidden rounded-md bg-charcoal-card",
   tableSkeletonHeaderCell: "h-[13px]",
   tableSkeletonCell: "h-3 first:h-4",
-  gridSkeleton:
-    "grid min-h-0 min-w-0 content-start gap-[18px] overflow-hidden p-1 [grid-template-columns:repeat(auto-fill,minmax(144px,1fr))] [[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:p-0.5 [[data-compact-mode=true]_&]:[grid-template-columns:repeat(auto-fill,minmax(124px,1fr))]",
+  gridSkeleton: cn(
+    "grid min-h-0 min-w-0 content-start gap-[18px] overflow-hidden p-1",
+    "[grid-template-columns:repeat(auto-fill,minmax(144px,1fr))]",
+    "[[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:p-0.5",
+    "[[data-compact-mode=true]_&]:[grid-template-columns:repeat(auto-fill,minmax(124px,1fr))]",
+  ),
   gridSkeletonCell: "h-[156px] [[data-compact-mode=true]_&]:h-[132px]",
   tableWrap:
     "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-sidebar",
@@ -21,21 +26,42 @@ export const fileBrowserStyles = {
   tableResetButton: "absolute right-2 top-1.5 z-[4] max-[720px]:hidden",
   tableScroll:
     "misty-transient-scrollbar misty-file-browser-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
-  table:
-    "w-full min-w-[720px] table-fixed border-collapse max-[720px]:min-w-0 max-[720px]:[&_td:first-child]:w-[64%] max-[720px]:[&_td:nth-child(2)]:w-[36%] max-[720px]:[&_td:nth-child(n+3)]:hidden max-[720px]:[&_th:first-child]:w-[64%] max-[720px]:[&_th:nth-child(2)]:w-[36%] max-[720px]:[&_th:nth-child(n+3)]:hidden",
+  table: cn(
+    "w-full min-w-[720px] table-fixed border-collapse max-[720px]:min-w-0",
+    "max-[720px]:[&_td:first-child]:w-[64%]",
+    "max-[720px]:[&_td:nth-child(2)]:w-[36%]",
+    "max-[720px]:[&_td:nth-child(n+3)]:hidden",
+    "max-[720px]:[&_th:first-child]:w-[64%]",
+    "max-[720px]:[&_th:nth-child(2)]:w-[36%]",
+    "max-[720px]:[&_th:nth-child(n+3)]:hidden",
+  ),
   tableHeadCell: "group/header relative overflow-hidden whitespace-nowrap",
   tableHeadFiller: "bg-transparent p-0 shadow-none max-[720px]:hidden",
-  tableSort:
-    "-mx-2 flex h-10 w-[calc(100%+1rem)] min-w-0 justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent px-2 py-0 text-left font-medium text-cream-muted shadow-none hover:bg-transparent hover:text-cream",
+  tableSort: cn(
+    "-mx-2 flex h-10 w-[calc(100%+1rem)] min-w-0 justify-start gap-1.5",
+    "overflow-hidden rounded-none border-0 bg-transparent px-2 py-0 text-left",
+    "font-medium text-cream-muted shadow-none hover:bg-transparent",
+    "hover:text-cream",
+  ),
   tableSortLabel: "min-w-0 overflow-hidden text-ellipsis",
   tableSortActive: "text-cream",
   tableSortIndicator:
     "inline-flex size-[13px] flex-none items-center justify-center text-cream-muted",
-  tableResizeHandle:
-    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2 cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2 after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent after:content-[''] group-hover/header:after:bg-charcoal-border max-[720px]:hidden",
+  tableResizeHandle: cn(
+    "absolute right-0 top-0 z-[2] h-full w-[8px] translate-x-1/2",
+    "cursor-col-resize after:absolute after:bottom-[8px] after:left-1/2",
+    "after:top-[8px] after:w-px after:-translate-x-1/2 after:bg-transparent",
+    "after:content-[''] group-hover/header:after:bg-charcoal-border",
+    "max-[720px]:hidden",
+  ),
   tableResizeHandleActive: "after:!bg-charcoal-active",
-  tableRow:
-    "group/file-row cursor-default select-none border-b-0 outline-none hover:bg-charcoal-card data-[state=selected]:bg-charcoal-hover data-[state=selected]:text-cream focus-visible:relative focus-visible:z-[2] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-charcoal-active/50",
+  tableRow: cn(
+    "group/file-row cursor-default select-none border-b-0 outline-none",
+    "hover:bg-charcoal-card data-[state=selected]:bg-charcoal-hover",
+    "data-[state=selected]:text-cream focus-visible:relative",
+    "focus-visible:z-[2] focus-visible:ring-2 focus-visible:ring-inset",
+    "focus-visible:ring-charcoal-active/50",
+  ),
   tableRowDragging: "opacity-50",
   tableRowCut: "opacity-55",
   tableRowDeleted: "text-cream-muted opacity-55",
@@ -58,9 +84,23 @@ export const fileBrowserStyles = {
   gridScroll:
     "misty-transient-scrollbar misty-file-browser-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   gridSizer: "relative min-w-0",
-  grid: "absolute left-[3px] right-[3px] grid content-start gap-[18px] [[data-compact-mode=true]_&]:left-0.5 [[data-compact-mode=true]_&]:right-0.5 [[data-compact-mode=true]_&]:gap-2.5",
-  gridItem:
-    "group/file-row relative grid min-h-[156px] min-w-0 content-start cursor-default justify-items-center gap-3 rounded-md border border-transparent bg-transparent px-1.5 py-4 text-cream-muted outline-none hover:bg-charcoal-card hover:text-cream focus-visible:border-charcoal-active focus-visible:ring-1 focus-visible:ring-charcoal-active [[data-compact-mode=true]_&]:min-h-[132px] [[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:px-1 [[data-compact-mode=true]_&]:py-3",
+  grid: cn(
+    "absolute left-[3px] right-[3px] grid content-start gap-[18px]",
+    "[[data-compact-mode=true]_&]:left-0.5",
+    "[[data-compact-mode=true]_&]:right-0.5",
+    "[[data-compact-mode=true]_&]:gap-2.5",
+  ),
+  gridItem: cn(
+    "group/file-row relative grid min-h-[156px] min-w-0 content-start",
+    "cursor-default justify-items-center gap-3 rounded-md border",
+    "border-transparent bg-transparent px-1.5 py-4 text-cream-muted",
+    "outline-none hover:bg-charcoal-card hover:text-cream",
+    "focus-visible:border-charcoal-active focus-visible:ring-1",
+    "focus-visible:ring-charcoal-active",
+    "[[data-compact-mode=true]_&]:min-h-[132px]",
+    "[[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:px-1",
+    "[[data-compact-mode=true]_&]:py-3",
+  ),
   gridItemSelected:
     "selected bg-charcoal-hover text-cream hover:bg-charcoal-hover hover:text-cream",
   gridItemDragging: "opacity-50",
@@ -91,8 +131,12 @@ export const fileBrowserStyles = {
   passiveDraftExtension: "flex-none text-[inherit] text-cream-muted",
   passiveDraftCaret:
     "ml-0.5 h-4 w-px flex-none animate-[passive-rename-caret_1.1s_step-end_infinite] bg-cream-muted opacity-75",
-  footer:
-    "flex min-h-9 min-w-0 items-center justify-between gap-3 overflow-hidden border-t border-transparent bg-transparent px-3 py-1.5 text-xs text-cream-muted max-[720px]:min-h-8 max-[720px]:px-2.5 max-[720px]:py-0 max-[720px]:text-[11px]",
+  footer: cn(
+    "flex min-h-9 min-w-0 items-center justify-between gap-3 overflow-hidden",
+    "border-t border-transparent bg-transparent px-3 py-1.5 text-xs",
+    "text-cream-muted max-[720px]:min-h-8 max-[720px]:px-2.5 max-[720px]:py-0",
+    "max-[720px]:text-[11px]",
+  ),
   footerGroup: "flex min-w-0 items-center gap-2 overflow-hidden",
   footerItem: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   empty: "p-6 text-cream-muted",

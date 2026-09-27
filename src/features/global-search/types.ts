@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask" | "action";
 
@@ -143,7 +143,16 @@ export interface GlobalAiMessage {
 export interface MistyImageAttachment {
   id: string;
   name: string;
-  mimeType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf" | "text/plain" | "text/markdown" | "text/csv" | "application/json" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  mimeType:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp"
+    | "application/pdf"
+    | "text/plain"
+    | "text/markdown"
+    | "text/csv"
+    | "application/json"
+    | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   byteSize: number;
   width: number;
   height: number;
@@ -154,7 +163,7 @@ export interface MistyImageAttachment {
 }
 
 export interface GlobalAiConversation {
-  agentId?:string;
+  agentId?: string;
   id: string;
   title: string;
   spaceId?: string;

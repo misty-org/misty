@@ -1,5 +1,5 @@
-import type { SavedSearchRule } from "@/native/contracts";
-import type { SearchQueryScope } from "@/native/contracts/primitives";
+import type { SavedSearchRule } from "@/native/ipc";
+import type { SearchQueryScope } from "@/native/ipc/primitives";
 
 export interface ExplorerSearchOptions {
   currentPath?: string | null;

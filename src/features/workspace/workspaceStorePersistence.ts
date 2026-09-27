@@ -162,7 +162,10 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
   const closedVirtualWindowsByScope = Object.fromEntries(
     Object.entries(state.closedVirtualWindowsByScope).map(([scope, windows]) => [
       scope,
-      windows?.map((window) => ({ ...window, layout: mapLayoutViews(window.layout, scrubPrivateTab) })),
+      windows?.map((window) => ({
+        ...window,
+        layout: mapLayoutViews(window.layout, scrubPrivateTab),
+      })),
     ]),
   ) as WorkspaceStore["closedVirtualWindowsByScope"];
   state = { ...state, ...scrubbed, closedVirtualWindowsByScope };

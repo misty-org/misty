@@ -196,7 +196,7 @@ export function BrowserOmniboxView(props: {
           id="browser-omnibox-suggestions"
           className="absolute left-0 right-0 top-[calc(100%+7px)]"
         >
-          {matches.map((match, index) => (
+          {matches.map((match) => (
             <OmniboxRow
               key={match.id}
               match={match}

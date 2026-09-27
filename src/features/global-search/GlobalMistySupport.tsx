@@ -3,18 +3,8 @@ import type {
   AiContextReference,
   AiSelectionSnapshot,
 } from "@/features/ai-surface";
-import { Button, cn } from "@/shared/ui";
-import {
-  Bot,
-  Camera,
-  Command,
-  FileText,
-  FolderOpen,
-  Loader2,
-  MessageCircle,
-  Search,
-  X,
-} from "lucide-react";
+import { Button, cn, IconButton, SegmentedControl, Spinner } from "@/shared/ui";
+import { Bot, Camera, Command, FileText, FolderOpen, MessageCircle, Search, X } from "lucide-react";
 import type {
   GlobalAiContextRef,
   GlobalAiMode,
@@ -41,47 +31,28 @@ export function SearchAskToggle(props: {
   compact?: boolean;
   onChange: (mode: "search" | "ask") => void;
 }) {
-  const activeMode = props.mode === "search" ? "search" : "ask";
-  const options = [
-    { mode: "search" as const, label: "Search", icon: Search },
-    { mode: "ask" as const, label: "Ask", icon: MessageCircle },
-  ];
-
   return (
-    <div className={cn("flex", !props.compact && "px-4 pb-3")}>
-      <div
-        className={cn(
-          "flex items-center gap-0.5 rounded-xl border border-charcoal-border bg-charcoal-bg/70 p-0.5",
-          props.compact && "rounded-lg border-white/10 bg-white/[0.035]",
-        )}
-        role="group"
-        aria-label="Search or Ask"
-      >
-        {options.map((option) => {
-          const Icon = option.icon;
-          const active = activeMode === option.mode;
-          return (
-            <Button
-              variant="ghost"
-              key={option.mode}
-              data-misty-mode={option.mode}
-              aria-pressed={active}
-              onClick={() => props.onChange(option.mode)}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors",
-                props.compact && "h-6 rounded-md px-2 text-[11px]",
-                active
-                  ? "bg-charcoal-hover text-cream shadow-sm"
-                  : "text-cream-muted hover:text-cream",
-              )}
-            >
-              <Icon className="size-3.5" strokeWidth={1.9} />
-              {option.label}
-            </Button>
-          );
-        })}
-      </div>
-    </div>
+    <SegmentedControl
+      label="Search or Ask"
+      size={props.compact ? "xs" : "sm"}
+      className={props.compact ? undefined : "mx-4 mb-3"}
+      value={props.mode === "search" ? "search" : "ask"}
+      options={[
+        {
+          value: "search",
+          label: "Search",
+          icon: <Search strokeWidth={1.9} />,
+          attributes: { "data-misty-mode": "search" },
+        },
+        {
+          value: "ask",
+          label: "Ask",
+          icon: <MessageCircle strokeWidth={1.9} />,
+          attributes: { "data-misty-mode": "ask" },
+        },
+      ]}
+      onChange={props.onChange}
+    />
   );
 }
 
@@ -97,7 +68,7 @@ export function CandidateList(props: {
     <div className="p-2" role="listbox" aria-label="Misty candidates">
       {props.searching ? (
         <div className="flex h-7 items-center px-2 text-[11px] text-cream-muted">
-          <Loader2 className="mr-1.5 size-3 animate-spin" /> Enriching results…
+          <Spinner size="sm" label={false} className="size-3 mr-1.5" /> Enriching results…
         </div>
       ) : null}
       {props.candidates.map((candidate) => {
@@ -137,7 +108,7 @@ export function CandidateList(props: {
             {result ? (
               <Button
                 variant="ghost"
-                className="rounded-md px-2 py-1 text-[11px] text-cream-muted opacity-0 hover:text-cream group-hover:opacity-100 focus:opacity-100"
+                className="px-2 py-1 text-[11px] text-cream-muted opacity-0 hover:text-cream group-hover:opacity-100 focus:opacity-100"
                 onClick={() => props.onAddContext(result)}
               >
                 + Context
@@ -180,27 +151,20 @@ export function ContextReceipt(props: {
         >
           {item.title}
           {item.localPath && !item.attached ? " · device only" : ""}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Remove ${item.title} context`}
+          <IconButton
+            label={`Remove ${item.title} context`}
             onClick={() => props.onRemove(item.id)}
           >
             <X className="size-3" />
-          </Button>
+          </IconButton>
         </span>
       ))}
       {props.capture ? (
         <span className="flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-charcoal-border bg-charcoal-bg px-2 text-[11px] text-cream-muted">
           <Camera className="size-3" /> Region capture
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Remove region capture"
-            onClick={() => props.onRemoveCapture?.()}
-          >
+          <IconButton label="Remove region capture" onClick={() => props.onRemoveCapture?.()}>
             <X className="size-3" />
-          </Button>
+          </IconButton>
         </span>
       ) : null}
       {props.selection ? (
@@ -296,15 +260,12 @@ export function FilterBar(props: {
     >
       {buttons.map((button) => (
         <Button
-          variant="ghost"
+          variant="chip"
+          size="xs"
+          aria-pressed={button.active}
           key={button.label}
           onClick={button.run}
-          className={cn(
-            "h-6 shrink-0 rounded-full border px-2.5 text-[11px] transition-colors",
-            button.active
-              ? "border-cream-muted bg-cream text-charcoal-bg"
-              : "border-charcoal-border bg-charcoal-bg text-cream-muted hover:text-cream",
-          )}
+          className="shrink-0"
         >
           {button.label}
           {button.active ? " ×" : ""}

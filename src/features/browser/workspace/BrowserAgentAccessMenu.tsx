@@ -1,7 +1,6 @@
 import { MessageCirclePlus } from "lucide-react";
 import {
   Button,
-  cn,
   IconButton,
   Popover,
   PopoverContent,
@@ -25,7 +24,7 @@ export function BrowserAgentAccessMenu(props: {
         <IconButton
           label={`Agent access: ${props.agentAccess ? "On" : "Off"}`}
           tooltip={false}
-          className={cn(props.agentAccess && "bg-cream/[0.06] text-cream")}
+          data-active={props.agentAccess}
         >
           <MessageCirclePlus {...toolbarIconProps} />
         </IconButton>

@@ -3,6 +3,7 @@ import { act, type ReactNode, type ButtonHTMLAttributes } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
+import type * as UiModule from "@/shared/ui";
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("./useBrowserOverlayControl", async () => {
@@ -16,7 +17,7 @@ vi.mock("./useBrowserOverlayControl", async () => {
 });
 // Exercise the panel lifecycle without depending on Radix pointer-event internals in jsdom.
 vi.mock("@/shared/ui", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/ui")>()),
+  ...(await importOriginal<typeof UiModule>()),
   Button: ({
     variant: _variant,
     size: _size,

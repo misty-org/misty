@@ -1,8 +1,11 @@
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
-import { useBrowserDownloadsStore } from "@/features/browser/library/downloadsStore";
-import { browserTabUrl, recordBrowserVisitTitle } from "@/features/browser/library/historyRecorder";
-import { useBrowserMediaStore } from "@/features/browser/library/mediaStore";
+import {
+  browserTabUrl,
+  recordBrowserVisitTitle,
+  useBrowserDownloadsStore,
+  useBrowserMediaStore,
+} from "@/features/browser/library";
 import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
 import {
   dockLeaves,

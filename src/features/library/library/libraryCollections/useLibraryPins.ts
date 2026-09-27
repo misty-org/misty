@@ -1,4 +1,4 @@
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { LibraryPinnedCollection } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 

@@ -1,9 +1,9 @@
-import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/native/contracts";
+import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/native/ipc";
 import {
   Button,
+  cn,
   Collapsible,
   CollapsibleContent,
-  cn,
   navigationDisclosureChevronClass,
   navigationDisclosureLabelClass,
   navigationTreeContentInsetClass,
@@ -11,6 +11,7 @@ import {
   navigationTreeIconClass,
   navigationTreeRowClass,
   navigationTreeSurfaceClass,
+  Pressable,
 } from "@/shared/ui";
 import { ChevronRight } from "lucide-react";
 import { useId, type MouseEvent, type ReactNode } from "react";
@@ -46,11 +47,15 @@ const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
 const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 export const sidebarStyles = {
-  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-charcoal-sidebar px-3 py-3 text-cream-muted [overscroll-behavior:contain]",
+  root: cn(
+    "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden",
+    "overflow-y-auto bg-charcoal-sidebar px-3 py-3 text-cream-muted",
+    "[overscroll-behavior:contain]",
+  ),
   section: `${navigationTreeGroupClass} [&+&]:mt-3`,
   sectionTitle: "group/section-title flex h-9 min-w-0 items-center gap-1 px-2.5",
   sectionToggle:
-    "misty-navigator-row-target h-9 min-w-0 flex-1 justify-start gap-1 rounded-md px-0 text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-bright",
+    "misty-navigator-row-target flex h-9 min-w-0 flex-1 items-center gap-1 rounded-md px-0 text-[13px] font-semibold text-cream-bright",
   sectionToggleLabel: navigationDisclosureLabelClass,
   sectionChevron: navigationDisclosureChevronClass,
   sectionActions: "ml-auto flex flex-none items-center gap-0",
@@ -63,20 +68,43 @@ export const sidebarStyles = {
   quickAccessSurface:
     "group-hover/tree-row:bg-charcoal-card group-hover/tree-row:text-cream-bright",
   itemIcon: navigationTreeIconClass,
-  itemButton: `h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-2.5 rounded-md border-0 bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-hover hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  itemButton: cn(
+    "h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-2.5 rounded-md",
+    "border-0 bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none",
+    "hover:bg-charcoal-hover hover:text-cream-bright active:translate-y-0",
+    navigationTreeContentInsetClass,
+  ),
   itemSelected: "bg-charcoal-hover text-cream-bright",
   remoteIcon: navigationTreeIconClass,
   pinnedRow:
     "group/pin flex min-h-[var(--navigation-row-height,32px)] min-w-0 items-center rounded-md text-cream-muted transition-colors",
-  pinnedButton: `h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-2.5 border-0 text-left text-[13px] font-medium text-inherit shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright active:translate-y-0 aria-expanded:!bg-transparent ${navigationTreeContentInsetClass}`,
-  pinnedUnpinButton:
-    "mr-0.5 size-7 flex-none !bg-transparent text-inherit opacity-0 shadow-none hover:!bg-transparent hover:text-cream-bright hover:opacity-100 focus-visible:opacity-100 active:translate-y-0 aria-expanded:!bg-transparent",
-  workspaceSelect:
-    "h-10 w-full justify-start gap-2.5 border border-charcoal-border/55 bg-charcoal-active px-2.5 text-left text-sm font-medium shadow-none hover:border-charcoal-border/80 hover:bg-charcoal-active [&_svg]:!size-5",
+  pinnedButton: cn(
+    "h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-2.5 border-0",
+    "text-left text-[13px] font-medium text-inherit shadow-none !bg-transparent",
+    "hover:!bg-transparent hover:text-cream-bright active:translate-y-0",
+    "aria-expanded:!bg-transparent",
+    navigationTreeContentInsetClass,
+  ),
+  pinnedUnpinButton: cn(
+    "mr-0.5 size-7 flex-none !bg-transparent text-inherit opacity-0",
+    "shadow-none hover:!bg-transparent hover:text-cream-bright",
+    "hover:opacity-100 focus-visible:opacity-100 active:translate-y-0",
+    "aria-expanded:!bg-transparent",
+  ),
+  workspaceSelect: cn(
+    "h-10 w-full justify-start gap-2.5 border border-charcoal-border/55",
+    "bg-charcoal-active px-2.5 text-left text-sm font-medium shadow-none",
+    "hover:border-charcoal-border/80 hover:bg-charcoal-active [&_svg]:!size-5",
+  ),
   workspaceSelectLabel: "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
   list: navigationTreeGroupClass,
   muted: "ml-3 mr-2 px-2.5 py-1 text-[13px] text-cream-muted",
-  deviceButton: `h-auto min-h-12 min-w-0 flex-1 items-start justify-start gap-2 rounded-md border-0 bg-transparent py-1.5 text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-hover hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  deviceButton: cn(
+    "h-auto min-h-12 min-w-0 flex-1 items-start justify-start gap-2 rounded-md border-0",
+    "bg-transparent py-1.5 text-left text-[13px] font-medium text-cream-muted shadow-none",
+    "hover:bg-charcoal-hover hover:text-cream-bright active:translate-y-0",
+    navigationTreeContentInsetClass,
+  ),
   deviceIcon: cn(navigationTreeIconClass, "pt-px"),
   deviceRow: "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] items-stretch",
   deviceCopy: "grid min-w-0 flex-1 gap-0.5",
@@ -92,7 +120,13 @@ export const sidebarStyles = {
   // Nested groups read as a smaller copy of the section header: bare text and
   // chevron, no row surface in any state. Only the action button gets a chip.
   deviceGroupHeader: "flex h-full min-w-0 flex-1 items-center gap-1",
-  deviceGroupToggle: `h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-1 rounded-md text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  deviceGroupToggle: cn(
+    "h-[var(--navigation-row-height,32px)] min-w-0 flex-1 justify-start gap-1 rounded-md",
+    "text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent",
+    "hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent",
+    "aria-expanded:!bg-transparent aria-expanded:text-cream-bright active:translate-y-0",
+    navigationTreeContentInsetClass,
+  ),
   deviceGroupLabel: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
   deviceGroupAction: "misty-sidebar-icon-target [&_svg]:!size-3.5",
   deviceGroupEmpty: "ml-3 mr-2 px-2.5 py-1 text-[11px] text-cream-muted",
@@ -112,10 +146,7 @@ export function SidebarSectionHeader(props: {
 }) {
   return (
     <div className={sidebarStyles.sectionTitle} onContextMenu={props.onContextMenu}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
+      <Pressable
         className={sidebarStyles.sectionToggle}
         onClick={props.onToggle}
         aria-expanded={!props.collapsed}
@@ -133,7 +164,7 @@ export function SidebarSectionHeader(props: {
             data-chevron-placement="inline"
           />
         </span>
-      </Button>
+      </Pressable>
       {props.actions ? (
         <div className={`${sidebarStyles.sectionActions} ${sidebarStyles.sectionActionsReveal}`}>
           {props.actions}

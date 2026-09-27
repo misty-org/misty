@@ -43,7 +43,8 @@ export function useOmniboxAutocomplete(
     for (const [id, promise] of pending) {
       promise.then(
         (matches) => {
-          if (!controller.signal.aborted) setResults((previous) => ({ ...previous, [id]: matches }));
+          if (!controller.signal.aborted)
+            setResults((previous) => ({ ...previous, [id]: matches }));
         },
         () => undefined,
       );

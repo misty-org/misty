@@ -42,7 +42,7 @@ import type {
   SmartLibraryImportPreflight,
   SmartLibraryImportResult,
   SmartLibrarySnapshot,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { supportsBundledDocumentWorkers } from "@/shared/platform/nativeServices";
 import { invoke } from "@tauri-apps/api/core";
 

@@ -1,7 +1,15 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui";
+import {
+  Button,
+  SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui";
 import { MousePointer2, Square } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
@@ -78,52 +86,16 @@ export function AgentCompanionPanel() {
         )}
       </div>
       <div className="agent-companion-mode-row">
-        <div className="agent-mode-selector" role="radiogroup" aria-label="Companion mode">
-          {(["team", "auto"] as const).map((mode) => (
-            <Button
-              key={mode}
-              variant="ghost"
-              role="radio"
-              className={`agent-mode-pill ${state.mode === mode ? "active" : ""}`}
-              aria-checked={state.mode === mode}
-              data-companion-mode={mode}
-              tabIndex={state.mode === mode ? 0 : -1}
-              onKeyDown={(event) => {
-                if (
-                  !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(
-                    event.key,
-                  )
-                )
-                  return;
-                event.preventDefault();
-                const next =
-                  event.key === "Home"
-                    ? "team"
-                    : event.key === "End"
-                      ? "auto"
-                      : mode === "team"
-                        ? "auto"
-                        : "team";
-                event.currentTarget.parentElement
-                  ?.querySelector<HTMLButtonElement>(`[data-companion-mode="${next}"]`)
-                  ?.focus();
-                act({
-                  kind: "mode",
-                  mode: next,
-                });
-              }}
-              disabled={!control}
-              onClick={() =>
-                act({
-                  kind: "mode",
-                  mode,
-                })
-              }
-            >
-              {mode === "team" ? "Team" : "Auto"}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Companion mode"
+          value={state.mode}
+          disabled={!control}
+          options={[
+            { value: "team", label: "Team", attributes: { "data-companion-mode": "team" } },
+            { value: "auto", label: "Auto", attributes: { "data-companion-mode": "auto" } },
+          ]}
+          onChange={(mode) => act({ kind: "mode", mode })}
+        />
         <p>
           {state.mode === "team"
             ? "Ask questions or hand off a step. You stay in control."

@@ -22,7 +22,7 @@ vi.mock("@/api/client/session", () => ({
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/shared/ui", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/ui")>()),
+  ...(await importOriginal<typeof UiModule>()),
   Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,
 }));
 vi.mock("@/features/settings/desktop", () => ({
@@ -60,6 +60,7 @@ vi.mock("./SyncVaultForm", () => ({ SyncVaultForm: () => <div>Unlock sync</div> 
 import { BrowserSyncSettings } from "./BrowserSyncSettings";
 import { useBrowserSyncStore } from "./store";
 import type { NativeSyncView } from "./native";
+import type * as UiModule from "@/shared/ui";
 
 describe("BrowserSyncSettings", () => {
   let container: HTMLDivElement;

@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { useEffect, useState } from "react";
 import { FileIcon } from "../FileBrowserIcons";
 import { fileBrowserStyles } from "../FileBrowserStyles";

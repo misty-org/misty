@@ -1,5 +1,5 @@
 import { SystemErrorActivity } from "@/features/activity";
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import { explorerPrepareOpenItem } from "@/native/filesystem";
 import { formatBytes } from "@/shared/lib/fileFormat";
 import { errorText } from "@/shared/lib/format";
@@ -11,8 +11,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  Spinner,
 } from "@/shared/ui";
-import { Check, FileText, Folder, Loader2 } from "lucide-react";
+import { Check, FileText, Folder } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { PickerFileBrowser, type PickerBrowserState } from "./PickerFileBrowser";
 import {
@@ -243,7 +244,7 @@ export function MistyFilePicker({
         >
           {preparing ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
+              <Spinner size="sm" label={false} />
               Preparing…
             </>
           ) : (

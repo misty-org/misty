@@ -1,4 +1,4 @@
-import { explorerPreviewItem } from "@/features/files/workspace/native";
+import { explorerPreviewItem } from "../../../native";
 import type {
   CompareImagePreview,
   CompareImageState,

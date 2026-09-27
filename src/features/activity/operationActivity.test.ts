@@ -6,7 +6,7 @@ vi.mock("./nativeNotifications", () => ({
 vi.mock("@/features/spaces", () => ({ useSpacesStore: { getState: () => ({}) } }));
 import { createOperationActivityObserver } from "./operationActivity";
 import { useActivityStore } from "./useActivityStore";
-import type { OperationQueueSnapshot, OperationDescriptor } from "@/native/contracts";
+import type { OperationQueueSnapshot, OperationDescriptor } from "@/native/ipc";
 const op = (id: number, status: OperationDescriptor["status"]) =>
   ({ operationId: id, batchId: 10, kind: "copy", status }) as OperationDescriptor;
 const snapshot = (operations: OperationDescriptor[]) =>

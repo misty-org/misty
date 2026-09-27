@@ -11,23 +11,22 @@ describe("Button CVA variants", () => {
     expect(btn.getAttribute("data-size")).toBe("default");
   });
 
-  it("renders pill variant with rounded-full and charcoal hover", () => {
+  it("renders chip variant that fills while pressed", () => {
     const { getByRole } = render(
-      <Button variant="pill" size="pill">
-        Pill
+      <Button variant="chip" size="chip" aria-pressed>
+        Tag
       </Button>,
     );
-    const btn = getByRole("button", { name: "Pill" });
+    const btn = getByRole("button", { name: "Tag" });
     expect(btn.className).toContain("rounded-full");
-    expect(btn.className).toContain("bg-charcoal-hover");
-    expect(btn.className).toContain("text-cream");
-    expect(btn.getAttribute("data-variant")).toBe("pill");
-    expect(btn.getAttribute("data-size")).toBe("pill");
+    expect(btn.className).toContain("aria-pressed:bg-charcoal-active");
+    expect(btn.getAttribute("data-variant")).toBe("chip");
+    expect(btn.getAttribute("data-size")).toBe("chip");
   });
 
   it("renders reveal row-hover variant with opacity-0 and hover classes", () => {
     const { getByRole } = render(
-      <Button variant="pill" size="pill" reveal="row-hover">
+      <Button variant="chip" size="chip" reveal="row-hover">
         Hover Pill
       </Button>,
     );

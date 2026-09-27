@@ -1,6 +1,6 @@
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { confirmLibraryAction as confirmAction } from "@/features/library/library/LibraryRuntime";
+import { confirmLibraryAction as confirmAction } from "../LibraryRuntime";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
 export type LibraryItemPatch = Partial<

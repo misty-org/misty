@@ -70,9 +70,10 @@ function Item(props: { icon: ReactNode; label: string; shortcut?: string; onSele
 export function BrowserMenuView(props: BrowserMenuViewProps) {
   const zoom = useBrowserZoom(props.zoomId, props.setZoom ?? (async () => {}), props.reportError);
   const overlay = useBrowserOverlay(props.overlayReason ?? "menu", props.setOverlay);
+  const setOverlayOpen = overlay.onOpenChange;
   useEffect(() => {
-    if (props.active === false) overlay.onOpenChange(false);
-  }, [props.active, overlay.onOpenChange]);
+    if (props.active === false) setOverlayOpen(false);
+  }, [props.active, setOverlayOpen]);
   const commands = props.commands;
   const canOpenExternal = props.canOpenExternal ?? /^https?:\/\//i.test(props.url);
   return (

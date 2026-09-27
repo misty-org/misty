@@ -1,4 +1,4 @@
-import type { AgentProfile } from "@/shared/contracts";
+import type { AgentProfile } from "@/shared/schemas";
 import "./AgentAvatar.css";
 import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";
 

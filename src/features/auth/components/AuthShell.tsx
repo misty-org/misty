@@ -1,4 +1,4 @@
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -6,17 +6,14 @@ export default function AuthShell({ title, description, children, onBack }: Auth
   return (
     <div className="relative flex min-h-full flex-col overflow-y-auto bg-charcoal-bg px-4 pb-24 pt-28 sm:px-6 sm:pt-32">
       {onBack ? (
-        <Button
-          className="absolute left-4 top-4 z-10 text-cream-muted sm:left-7 sm:top-7"
-          size="icon"
-          variant="ghost"
-          type="button"
-          aria-label="Back"
-          title="Back"
+        <IconButton
+          size="md"
+          label="Back"
+          className="absolute left-4 top-4 z-10 sm:left-7 sm:top-7"
           onClick={onBack}
         >
           <ChevronLeft size={20} strokeWidth={1.9} />
-        </Button>
+        </IconButton>
       ) : null}
 
       <div className="mx-auto flex w-full max-w-md flex-col gap-8">

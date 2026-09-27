@@ -17,7 +17,7 @@ import type { BulkLibraryItemAction } from "@/api/spaces/dto/types/types";
 import { libraryPreviewPath, libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { LibraryUploadOptions } from "./library-upload";
 export type LibraryTransfers = Pick<
-  typeof import("./library-upload"),
+  typeof LibraryUploadModule,
   | "downloadProtectedFile"
   | "fetchProtectedBlob"
   | "replaceLibraryItemContent"
@@ -25,6 +25,7 @@ export type LibraryTransfers = Pick<
   | "uploadLibraryPath"
 >;
 import type { SpaceRequest } from "./types";
+import type * as LibraryUploadModule from "./library-upload";
 export function createSpaceLibraryItemsApi(
   spaceRequest: SpaceRequest,
   transfers: LibraryTransfers,

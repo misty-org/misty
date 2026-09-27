@@ -3,10 +3,9 @@ import type { spacesApi } from "@/api/spaces/api";
 import type { useSpacesStore } from "@/features/spaces";
 import type { useWorkspaceTabTitle, useWorkspaceTabFocused } from "@/features/workspace";
 import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import type { useShortcutHandler } from "@/features/shortcuts";
 import type { MistyFilePicker } from "@/features/picker";
 import type { SystemErrorActivity } from "@/features/activity";
-import type { EmbeddedUniversalPreview } from "@/features/files/workspace/explorer";
+import type { EmbeddedUniversalPreview } from "@/features/resource-preview";
 import type { PhotoEditor } from "@/features/editor";
 export interface LibraryRuntime {
   api: typeof spacesApi;

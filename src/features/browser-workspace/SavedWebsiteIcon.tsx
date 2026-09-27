@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Globe } from "lucide-react";
-import { mistyBrowserProviders } from "@/shared/contracts";
+import { mistyBrowserProviders } from "@/shared/schemas";
 import { BrandIcon, brandIconAsset } from "@/shared/ui";
 
 /** Resolve branding from the saved launch address, independent of the current page. */

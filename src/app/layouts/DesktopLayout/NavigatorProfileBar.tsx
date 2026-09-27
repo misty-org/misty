@@ -1,8 +1,8 @@
 import {
-  Button,
   cn,
   DropdownMenu,
   DropdownMenuTrigger,
+  IconButton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -60,16 +60,15 @@ export function NavigatorProfileBar(props: {
         <TooltipProvider delayDuration={450}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              <IconButton
+                label="Settings"
+                tooltip={false}
                 className={navigatorIslandActionClass}
-                aria-label="Settings"
                 aria-pressed={props.settingsOpen}
                 onClick={props.onSettingsClick}
               >
                 <Settings aria-hidden="true" />
-              </Button>
+              </IconButton>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>

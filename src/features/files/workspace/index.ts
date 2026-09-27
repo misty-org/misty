@@ -1,2 +1,11 @@
 export { ConnectedDevicePairingDialog } from "./connected-devices/ConnectedDevicePairingDialog";
-export type { PreviewErrorComponent } from "./explorer/components/globalPreview/PreviewRuntime";
+export { default as FilesPage, preloadDesktopFilesPage } from "./explorer";
+export type * from "./explorer/model/stores/media/interfaces/useSmartLibraryServerStore";
+export {
+  mergeHybridSearchResults,
+  queryIndexedExplorerSearch,
+  querySemanticExplorerSearch,
+  semanticQueryMinimumCharacters,
+  semanticSearchDebounceMs,
+} from "./explorer/utils/globalSearch";
+export { openFilesTabRevealing } from "./explorer/workspace/explorerWorkspace/filesTabReveal";

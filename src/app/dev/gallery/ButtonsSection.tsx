@@ -13,7 +13,16 @@ import {
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 
-const variants = ["default", "secondary", "outline", "ghost", "toolbar", "pill", "link"] as const;
+const variants = [
+  "default",
+  "primary",
+  "secondary",
+  "outline",
+  "ghost",
+  "toolbar",
+  "chip",
+  "link",
+] as const;
 
 export function ButtonsSection() {
   const [starred, setStarred] = useState(false);

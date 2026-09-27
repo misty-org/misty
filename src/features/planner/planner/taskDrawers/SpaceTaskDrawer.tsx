@@ -9,11 +9,13 @@ import {
   DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   Input,
+  MenuItem,
+  Spinner,
 } from "@/shared/ui";
-import { Check, Copy, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { Check, Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   useState,
   type Dispatch,
@@ -107,34 +109,24 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 {editing ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        type="button"
-                        className={cn("shrink-0 text-cream-muted hover:text-cream", "size-9")}
-                        aria-label="Task actions"
-                      >
+                      <IconButton size="md" label="Task actions" tooltip={false}>
                         <MoreHorizontal className="size-4" />
-                      </Button>
+                      </IconButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem onSelect={copyTaskKey}>
-                        {copiedKey ? (
-                          <Check className="mr-2 size-4 text-status-green" />
-                        ) : (
-                          <Copy className="mr-2 size-4" />
-                        )}
-                        {copiedKey ? "Task ID copied" : `Copy task ID (${editing.task_key})`}
-                      </DropdownMenuItem>
+                      <MenuItem
+                        icon={copiedKey ? <Check className="text-status-green" /> : <Copy />}
+                        label={copiedKey ? "Task ID copied" : `Copy task ID (${editing.task_key})`}
+                        onSelect={copyTaskKey}
+                      />
                       {props.onArchive ? (
-                        <DropdownMenuItem
+                        <MenuItem
+                          icon={<Trash2 className="size-4" />}
+                          label="Delete task"
                           disabled={busy}
-                          variant="destructive"
+                          destructive
                           onSelect={props.onArchive}
-                        >
-                          <Trash2 className="mr-2 size-4" />
-                          Delete task
-                        </DropdownMenuItem>
+                        />
                       ) : null}
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -187,14 +179,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               to save
             </div>
             <div className="ml-auto flex items-center gap-2.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(false)}
-                type="button"
-                disabled={busy}
-                onClick={onClose}
-              >
+              <Button variant="ghost" size="sm" type="button" disabled={busy} onClick={onClose}>
                 Cancel
               </Button>
               <Button
@@ -203,7 +188,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 type="submit"
                 className={cn("px-4", false)}
               >
-                {busy ? <LoaderCircle className="mr-1.5 size-3.5 animate-spin" /> : null}
+                {busy ? <Spinner size="sm" label={false} className="mr-1.5" /> : null}
                 {editing ? "Save changes" : "Create task"}
               </Button>
             </div>

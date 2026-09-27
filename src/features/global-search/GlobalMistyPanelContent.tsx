@@ -7,8 +7,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  IconButton,
   Input,
+  MenuItem,
   MenuTrigger,
+  Spinner,
 } from "@/shared/ui";
 import {
   Bell,
@@ -22,7 +25,6 @@ import {
   FolderKanban,
   History,
   Library,
-  Loader2,
   Map as MapIcon,
   MessageCircle,
   NotebookPen,
@@ -70,7 +72,7 @@ export function SearchResults(props: {
   return (
     <div className="p-2">
       <div className="flex h-7 items-center px-2 text-[11px] text-cream-muted">
-        {props.searching ? <Loader2 className="mr-1.5 size-3 animate-spin" /> : null}
+        {props.searching ? <Spinner size="sm" label={false} className="size-3 mr-1.5" /> : null}
         Showing {props.results.length} {props.results.length === 1 ? "result" : "results"}
       </div>
       {props.results.map((result) => {
@@ -333,9 +335,11 @@ export function ConversationMenu(props: {
         />
       )}
       <DropdownMenuContent align="end" width="xl" data-misty-layer-portal>
-        <DropdownMenuItem onSelect={props.onNew}>
-          <Plus className="size-4" /> New conversation
-        </DropdownMenuItem>
+        <MenuItem
+          icon={<Plus className="size-4" />}
+          label="New conversation"
+          onSelect={props.onNew}
+        />
         {props.conversations.length ? (
           <>
             <DropdownMenuSeparator />
@@ -392,11 +396,9 @@ export function ConversationMenu(props: {
               )}
               {renaming ? (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Save ${conversation.title}`}
+                  <IconButton
+                    label={`Save ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -404,12 +406,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Check className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Cancel renaming ${conversation.title}`}
+                  </IconButton>
+                  <IconButton
+                    label={`Cancel renaming ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -417,15 +417,13 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <X className="size-3.5" />
-                  </Button>
+                  </IconButton>
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Rename ${conversation.title}`}
+                  <IconButton
+                    label={`Rename ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -434,12 +432,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Pencil className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-red-300"
-                    aria-label={`Delete ${conversation.title}`}
+                  </IconButton>
+                  <IconButton
+                    label={`Delete ${conversation.title}`}
+                    className="p-1 hover:text-red-300"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -447,7 +443,7 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Trash2 className="size-3.5" />
-                  </Button>
+                  </IconButton>
                 </>
               )}
             </DropdownMenuItem>

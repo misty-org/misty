@@ -1,5 +1,5 @@
 import { libraryRuntime } from "./LibraryRuntime";
-import { libraryApi as spacesApi } from "@/features/library/library/LibraryRuntime";
+import { libraryApi as spacesApi } from "./LibraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 
 export async function copyLibraryItemsToClipboard(

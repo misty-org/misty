@@ -8,18 +8,19 @@ import {
   Button,
   cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  IconButton,
   Input,
   ListRowButton,
+  MenuItem,
   Skeleton,
 } from "@/shared/ui";
 import { MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
@@ -494,58 +495,64 @@ function NoteRows(props: NoteRowsProps) {
             </ListRowButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
+                <IconButton
+                  label={`More actions for ${title}`}
+                  tooltip={false}
                   className={cn(
-                    "mr-2 shrink-0 text-cream-muted hover:text-cream-bright aria-expanded:opacity-100",
-                    "size-7 opacity-0 group-hover/note:opacity-100",
+                    "mr-2 aria-expanded:opacity-100",
+                    "opacity-0 group-hover/note:opacity-100",
                   )}
-                  aria-label={`More actions for ${title}`}
                 >
                   <MoreHorizontal className="size-4" aria-hidden="true" />
-                </Button>
+                </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onSelect={() => props.onTogglePin(note.id)}>
-                  {isPinned ? <PinOff /> : <Pin />}
-                  {isPinned ? "Unpin" : "Pin"}
-                </DropdownMenuItem>
+                <MenuItem
+                  icon={isPinned ? <PinOff /> : <Pin />}
+                  label={isPinned ? "Unpin" : "Pin"}
+                  onSelect={() => props.onTogglePin(note.id)}
+                />
                 {canRename || note.canDelete ? <DropdownMenuSeparator /> : null}
                 {canRename ? (
-                  <DropdownMenuItem onSelect={() => props.onRename(note)}>
-                    <Pencil />
-                    Rename
-                  </DropdownMenuItem>
+                  <MenuItem
+                    icon={<Pencil />}
+                    label="Rename"
+                    onSelect={() => props.onRename(note)}
+                  />
                 ) : null}
                 {note.canDelete ? (
-                  <DropdownMenuItem variant="destructive" onSelect={() => props.onDelete(note)}>
-                    <Trash2 />
-                    Delete
-                  </DropdownMenuItem>
+                  <MenuItem
+                    icon={<Trash2 />}
+                    label="Delete"
+                    destructive
+                    onSelect={() => props.onDelete(note)}
+                  />
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">
-          <ContextMenuItem onSelect={() => props.onTogglePin(note.id)}>
-            {isPinned ? <PinOff /> : <Pin />}
-            {isPinned ? "Unpin" : "Pin"}
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={isPinned ? <PinOff /> : <Pin />}
+            label={isPinned ? "Unpin" : "Pin"}
+            onSelect={() => props.onTogglePin(note.id)}
+          />
           {canRename || note.canDelete ? <ContextMenuSeparator /> : null}
           {canRename ? (
-            <ContextMenuItem onSelect={() => props.onRename(note)}>
-              <Pencil />
-              Rename
-            </ContextMenuItem>
+            <ContextMenuAction
+              icon={<Pencil />}
+              label="Rename"
+              onSelect={() => props.onRename(note)}
+            />
           ) : null}
           {note.canDelete ? (
-            <ContextMenuItem variant="destructive" onSelect={() => props.onDelete(note)}>
-              <Trash2 />
-              Delete
-            </ContextMenuItem>
+            <ContextMenuAction
+              icon={<Trash2 />}
+              label="Delete"
+              destructive
+              onSelect={() => props.onDelete(note)}
+            />
           ) : null}
         </ContextMenuContent>
       </ContextMenu>

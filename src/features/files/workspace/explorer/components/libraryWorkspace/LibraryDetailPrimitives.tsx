@@ -1,4 +1,4 @@
-import type { SmartLibraryAsset } from "@/native/contracts";
+import type { SmartLibraryAsset } from "@/native/ipc";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { Images } from "lucide-react";
 import { joinPath } from "./savedSearchRules";

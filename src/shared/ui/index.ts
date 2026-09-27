@@ -19,9 +19,12 @@ export * from "./controls/Switch";
 export * from "./controls/Textarea";
 export * from "./controls/Toggle";
 export * from "./controls/ToggleGroup";
+export * from "./controls/Pressable";
+export * from "./controls/SegmentedControl";
 
 // overlays
 export * from "./overlays/AlertDialog";
+export * from "./overlays/BlockingScreen";
 export * from "./overlays/Command";
 export * from "./overlays/ContextMenu";
 export * from "./overlays/Dialog";
@@ -67,7 +70,6 @@ export * from "./feedback/Spinner";
 export * from "./feedback/StateView";
 
 // navigation
-export * from "./navigation/Breadcrumb";
 export * from "./navigation/NavIsland";
 export * from "./navigation/NavigationMenu";
 export * from "./navigation/NavigationTree";
@@ -76,14 +78,11 @@ export * from "./navigation/NavigationTree";
 export * from "./icons/AssetIcon";
 export * from "./icons/BrandIcon";
 export * from "./icons/MailProviderIcon";
-export * from "./icons/ProviderBrandIcon";
-export * from "./icons/WebsiteBrandIcon";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
 
 // patterns
 export * from "./patterns/ComingSoonSurface";
-export * from "./patterns/DesktopAccessState";
 export * from "./patterns/DiscoverCard";
 
 export * from "./utils";

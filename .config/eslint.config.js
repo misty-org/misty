@@ -227,7 +227,12 @@ export default tseslint.config(
 
   // Tests get node globals and a looser leash.
   {
-    files: ["src/**/*.test.{ts,tsx}", "src/tests/**/*.{ts,tsx}"],
+    files: [
+      "src/**/*.test.{ts,tsx}",
+      "src/tests/**/*.{ts,tsx}",
+      "server/**/*.test.ts",
+      "server/**/test/**/*.ts",
+    ],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",

@@ -51,7 +51,12 @@ function notice(tabId: string, message: string) {
 }
 
 function safeFileName(title: string): string {
-  return title.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 120) || "Page";
+  return (
+    title
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .trim()
+      .slice(0, 120) || "Page"
+  );
 }
 
 /**
@@ -150,7 +155,10 @@ export function useBrowserPageCommands(input: {
           title: "Save page as",
           defaultPath: `${safeFileName(tab.title)}.${mac ? "webarchive" : "html"}`,
           filters: mac
-            ? [{ name: "Web Archive", extensions: ["webarchive"] }, { name: "HTML", extensions: ["html"] }]
+            ? [
+                { name: "Web Archive", extensions: ["webarchive"] },
+                { name: "HTML", extensions: ["html"] },
+              ]
             : [{ name: "HTML", extensions: ["html"] }],
         });
         if (!path) return;
@@ -175,8 +183,18 @@ export function useBrowserPageCommands(input: {
   useShortcutHandler("browser.new_private_tab", run(commands.newPrivateTab), focused, 100);
   useShortcutHandler("browser.find", run(commands.find), focused, 100);
   useShortcutHandler("browser.print", run(commands.print), focused, 100);
-  useShortcutHandler("browser.history", run(() => openPage("history")), focused, 100);
-  useShortcutHandler("browser.downloads", run(() => openPage("downloads")), focused, 100);
+  useShortcutHandler(
+    "browser.history",
+    run(() => openPage("history")),
+    focused,
+    100,
+  );
+  useShortcutHandler(
+    "browser.downloads",
+    run(() => openPage("downloads")),
+    focused,
+    100,
+  );
   useShortcutHandler("browser.bookmark", run(commands.bookmark), focused, 100);
   useShortcutHandler("browser.developer_tools", run(commands.developerTools), focused, 100);
   useShortcutHandler("browser.clear_data", run(commands.clearBrowsingData), focused, 100);

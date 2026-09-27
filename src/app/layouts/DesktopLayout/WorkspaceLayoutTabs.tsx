@@ -1,5 +1,5 @@
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { BrowserTabAudioButton } from "@/features/browser/workspace/BrowserTabAudioButton";
+import { BrowserTabAudioButton } from "@/features/browser/workspace";
 import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
 import {
   Button,
@@ -8,8 +8,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   IconButton,
+  MenuItem,
   MenuTrigger,
   OverflowFadeText,
+  Pressable,
 } from "@/shared/ui";
 import {
   Blocks,
@@ -146,17 +148,20 @@ export function WorkspaceLayoutTabs(
       ?.closest("[data-reorder-item]")
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeLayoutTabId, position]);
-  const newTabButton = (
-    <IconButton
-      size="xs"
-      tooltip={false}
-      className={vertical ? "misty-side-new-tab" : undefined}
-      label="New tab"
-      title="New tab"
+  const newTabButton = vertical ? (
+    <Button
+      variant="toolbar"
+      size="sm"
+      justify="start"
+      className="w-full gap-2 px-2 text-xs"
       onClick={props.onNewTab}
     >
-      <Plus className="size-3.5" size={14} />
-      {vertical && <span>New tab</span>}
+      <Plus className="size-3.5" />
+      New tab
+    </Button>
+  ) : (
+    <IconButton size="xs" tooltip={false} label="New tab" onClick={props.onNewTab}>
+      <Plus className="size-3.5" />
     </IconButton>
   );
   const select = (id: string) => {
@@ -215,7 +220,9 @@ export function WorkspaceLayoutTabs(
                 data-reorder-preview="true"
                 data-misty-window-drag-block="true"
                 className={cn(
-                  "group/tab flex items-center rounded-md border text-xs transition-colors duration-150 select-none focus-within:ring-1 focus-within:ring-cream-muted/50",
+                  "group/tab flex items-center rounded-md border text-xs transition-colors",
+                  "duration-150 select-none focus-within:ring-1",
+                  "focus-within:ring-cream-muted/50",
                   vertical
                     ? "h-9 w-full shrink-0"
                     : "h-7 min-w-[80px] max-w-[160px] flex-[1_1_120px]",
@@ -224,16 +231,13 @@ export function WorkspaceLayoutTabs(
                     : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
                 )}
               >
-                <Button
-                  variant="ghost"
-                  size="none"
-                  justify="start"
+                <Pressable
                   role="tab"
                   aria-selected={active}
                   tabIndex={active ? 0 : -1}
                   title={label}
                   data-reorder-handle="true"
-                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden rounded-none border-0 bg-transparent pl-2 pr-1 text-left outline-none hover:bg-transparent focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted"
+                  className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-1"
                   onClick={() => select(tab.id)}
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);
@@ -273,7 +277,7 @@ export function WorkspaceLayoutTabs(
                       {panes.length}
                     </span>
                   ) : null}
-                </Button>
+                </Pressable>
                 <BrowserTabAudioButton tabs={panes.flatMap((pane) => pane.tabs)} />
                 {panes.length > 1 ? (
                   <DropdownMenu modal={false}>
@@ -309,9 +313,11 @@ export function WorkspaceLayoutTabs(
                               </span>
                               {focused ? <Check size={14} aria-hidden /> : null}
                             </DropdownMenuItem>
-                            <DropdownMenuItem
+                            <MenuItem
+                              icon={<X size={14} aria-hidden />}
+                              label=""
                               aria-label={`Close pane ${paneViewLabel(itemView)}`}
-                              className="shrink-0 justify-center px-2"
+                              className="shrink-0 justify-center"
                               onSelect={() => {
                                 if (!useWorkspaceStore.getState().closeTab(itemView.id)) return;
                                 const current = activeLayoutView(
@@ -319,9 +325,7 @@ export function WorkspaceLayoutTabs(
                                 );
                                 if (current) props.onOpen(current);
                               }}
-                            >
-                              <X size={14} aria-hidden />
-                            </DropdownMenuItem>
+                            />
                           </div>
                         );
                       })}

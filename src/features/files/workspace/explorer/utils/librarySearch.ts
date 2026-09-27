@@ -4,8 +4,8 @@ import type {
   ExplorerLocation,
   FileEntry,
   SearchResult,
-} from "@/native/contracts";
-import type { FileKind, SearchQueryScope, SearchSourceKind } from "@/native/contracts/primitives";
+} from "@/native/ipc";
+import type { FileKind, SearchQueryScope, SearchSourceKind } from "@/native/ipc/primitives";
 
 export function mergeLibrarySearchResults(
   backendResults: SearchResult[],

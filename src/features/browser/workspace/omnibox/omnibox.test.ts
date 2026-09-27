@@ -138,7 +138,9 @@ describe("omnibox ranking", () => {
     });
     const matches = await suggest(
       "secret",
-      deps({ openTabs: () => [tab("private", { private: true }), tab("agent", { agentOwned: true })] }),
+      deps({
+        openTabs: () => [tab("private", { private: true }), tab("agent", { agentOwned: true })],
+      }),
     );
     expect(matches.some((match) => match.kind === "tab")).toBe(false);
   });
@@ -154,7 +156,13 @@ describe("before typing", () => {
     const matches = await suggest(
       "",
       deps({ historySuggestions: async () => [visited("https://news.example/", 9, 2)] }),
-      { sessionHistory: ["https://one.example/", "https://two.example/path", "https://current.example/"] },
+      {
+        sessionHistory: [
+          "https://one.example/",
+          "https://two.example/path",
+          "https://current.example/",
+        ],
+      },
     );
     expect(matches[0].target.url).toBe("https://current.example/");
     expect(matches.map((match) => match.detail)).toEqual(
@@ -191,10 +199,9 @@ describe("search suggestions", () => {
   it("adds engine suggestions below the typed search", async () => {
     const matches = await suggest("misty", enabled(["misty copeland", "misty step"]));
     expect(matches[0].title).toBe("misty");
-    expect(matches.filter((match: OmniboxMatch) => match.kind === "suggestion").map((m) => m.title)).toEqual([
-      "misty copeland",
-      "misty step",
-    ]);
+    expect(
+      matches.filter((match: OmniboxMatch) => match.kind === "suggestion").map((m) => m.title),
+    ).toEqual(["misty copeland", "misty step"]);
   });
 
   it("never sends addresses, private text or anything when turned off", async () => {
@@ -219,7 +226,9 @@ describe("Misty content and copied links", () => {
     const matches = await suggest(
       "trip",
       deps({
-        mistyContent: () => [{ id: "note:1", title: "Trip plan", detail: "note", route: "/spaces/s1/journal" }],
+        mistyContent: () => [
+          { id: "note:1", title: "Trip plan", detail: "note", route: "/spaces/s1/journal" },
+        ],
       }),
     );
     const note = matches.find((match) => match.kind === "content");

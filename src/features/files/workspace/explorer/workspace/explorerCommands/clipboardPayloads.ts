@@ -3,8 +3,8 @@ import {
   clipboardSharedImageBytes,
   clipboardWriteFileRefs,
   explorerPrepareDragItems,
-} from "@/features/files/workspace/native";
-import type { ClipboardPayload } from "@/native/contracts";
+} from "../../../native";
+import type { ClipboardPayload } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useExplorerStore } from "../../store";

@@ -8,7 +8,7 @@ import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalNavigator } from "./GlobalNavigator";
 
 vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" } }),
+  useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" }, accounts: [] }),
   useAccountAvatarUrl: () => null,
   useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
 }));

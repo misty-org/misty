@@ -1,6 +1,6 @@
 import { mediaSearchApi } from "@/api/ai/media-search";
 import type { MediaChunkIndexResponse, MediaSearchResponse } from "./mediaSearchTypes";
-import type { PreparedMediaChunk } from "@/native/contracts";
+import type { PreparedMediaChunk } from "@/native/ipc";
 export type {
   MediaChunkIndexResponse,
   MediaSearchHit,
