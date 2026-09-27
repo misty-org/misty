@@ -26,7 +26,7 @@ import {
 } from "@/features/workspace";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton } from "@/shared/ui";
 import { Minus, Square, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
@@ -448,16 +448,14 @@ export function DesktopLayout(props: {
                 transformOrigin: "top right",
               }}
             >
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              <IconButton
+                label="Minimize window"
                 className={styles.windowsTitlebarControlButtonClass}
-                aria-label="Minimize window"
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
                 <Minus size={16} strokeWidth={1.5} />
-              </Button>
+              </IconButton>
               <Button
                 variant="ghost"
                 className={styles.windowsTitlebarControlButtonClass}
@@ -467,16 +465,14 @@ export function DesktopLayout(props: {
               >
                 {isWindowMaximized ? <RestoreGlyph /> : <Square size={13} strokeWidth={1.5} />}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              <IconButton
+                label="Close window"
                 className={styles.windowsTitlebarCloseButtonClass}
-                aria-label="Close window"
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
                 <X size={18} strokeWidth={1.65} />
-              </Button>
+              </IconButton>
             </div>
           ) : null}
         </header>

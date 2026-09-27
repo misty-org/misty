@@ -2,7 +2,7 @@ import { loadPdfPreview } from "@/features/resource-preview";
 import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import { type PreviewRuntime, formatBytes, formatDate } from "@/features/file-ui";
 import type * as PreviewHooks from "./FileInspectorPreview";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { FileSearch, Maximize2 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import {
@@ -129,16 +129,15 @@ export function FileInspectorView(props: FileInspectorProps & { runtime: FileIns
           <span className={inspectorStyles.previewStatus}>Open the full reader</span>
         ) : null}
         {canOpenPreview ? (
-          <Button
+          <IconButton
+            size="md"
             variant="secondary"
-            size="icon"
+            label={`Open preview of ${title}`}
             className={inspectorStyles.previewOpenButton}
-            type="button"
-            aria-label={`Open preview of ${title}`}
             onClick={() => setPreviewOpen(true)}
           >
             <Maximize2 size={15} />
-          </Button>
+          </IconButton>
         ) : null}
         {showPreviewTransition ? (
           <span className={inspectorStyles.previewLoadingOverlay} aria-hidden="true" />

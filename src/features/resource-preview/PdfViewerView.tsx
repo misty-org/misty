@@ -1,5 +1,5 @@
 import type { PreviewErrorComponent } from "@/features/file-ui";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { Loader2, Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -97,31 +97,23 @@ export default function PdfViewerView({
               {numPages ? `Page ${currentPage} of ${numPages}` : "—"}
             </span>
             <div className="flex items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Zoom out"
+              <IconButton
+                label="Zoom out"
                 disabled={zoom <= MIN_ZOOM}
                 onClick={() => changeZoom(-ZOOM_STEP)}
               >
                 <Minus size={16} />
-              </Button>
+              </IconButton>
               <span className="w-12 text-center text-xs tabular-nums text-cream-muted">
                 {Math.round(zoom * 100)}%
               </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Zoom in"
+              <IconButton
+                label="Zoom in"
                 disabled={zoom >= MAX_ZOOM}
                 onClick={() => changeZoom(ZOOM_STEP)}
               >
                 <Plus size={16} />
-              </Button>
+              </IconButton>
             </div>
           </div>
         </div>

@@ -189,7 +189,6 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
               >
                 {props.canUploadAttachments || props.canBrowseLibrary ? (
                   <InputGroupButton
-                    className={cn(false)}
                     variant="ghost"
                     size="icon-xs"
                     type="button"
@@ -204,7 +203,6 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 ) : null}
                 <PopoverTrigger asChild>
                   <InputGroupButton
-                    className={cn(false)}
                     variant="ghost"
                     size="icon-xs"
                     type="button"

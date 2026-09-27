@@ -3,7 +3,7 @@ import type {
   SpaceRoadmapSnapshot,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton } from "@/shared/ui";
 import {
   ArrowLeft,
   Check,
@@ -214,11 +214,8 @@ export function RoadmapEditor(props: {
             {snapshot.goal_done}/{snapshot.goal_total} goals · {snapshot.progress_percentage}%
           </span>
           <SaveStatus state={saveState} />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            aria-label={
+          <IconButton
+            label={
               saveState === "unsaved" || saveState === "conflict"
                 ? "Retry saving roadmap"
                 : "Refresh roadmap"
@@ -233,7 +230,7 @@ export function RoadmapEditor(props: {
             }
           >
             <RefreshCcw className={`size-4 ${saveState === "saving" ? "animate-spin" : ""}`} />
-          </Button>
+          </IconButton>
         </header>
       }
       {error ? (
@@ -474,15 +471,13 @@ export function RoadmapEditor(props: {
           role="dialog"
           aria-label="Edit roadmap selection"
         >
-          <Button
-            size="icon"
-            variant="ghost"
-            className={cn("absolute right-2 z-10 rounded-full", "top-2 size-7")}
-            aria-label="Close editor"
+          <IconButton
+            label="Close editor"
+            className={cn("absolute right-2 z-10 rounded-full", "top-2")}
             onClick={() => selectForEditing("")}
           >
             <X className="size-3.5" />
-          </Button>
+          </IconButton>
           <RoadmapInspector
             compact
             snapshot={snapshot}

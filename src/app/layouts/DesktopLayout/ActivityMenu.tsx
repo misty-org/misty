@@ -1,6 +1,6 @@
 import { formatActivityBadge } from "@/features/activity/activityModel";
 import { useActivityStore } from "@/features/activity/useActivityStore";
-import { Button, cn } from "@/shared/ui";
+import { cn, IconButton } from "@/shared/ui";
 import { Bell } from "lucide-react";
 import { openActivityPanel } from "@/features/activity/activityPanelState";
 
@@ -8,20 +8,18 @@ export function ActivityMenu(props: { className: string }) {
   const count = useActivityStore((state) => state.attentionCount);
   const unseen = useActivityStore((state) => state.hasUnseenHistory);
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className={cn(props.className, "relative")}
-      title="Activity"
-      aria-haspopup="dialog"
-      onClick={() => openActivityPanel()}
-      aria-label={
+    <IconButton
+      label={
         count > 0
           ? `Activity, ${count} needing attention`
           : unseen
             ? "Activity, unseen updates"
             : "Activity"
       }
+      className={cn(props.className, "relative")}
+      title="Activity"
+      aria-haspopup="dialog"
+      onClick={() => openActivityPanel()}
     >
       <Bell className="size-4" size={16} strokeWidth={2} aria-hidden="true" />
       {count > 0 ? (
@@ -35,6 +33,6 @@ export function ActivityMenu(props: { className: string }) {
           className="absolute right-1 top-1 size-1.5 rounded-full bg-cream-bright ring-2 ring-charcoal-workspace"
         />
       ) : null}
-    </Button>
+    </IconButton>
   );
 }

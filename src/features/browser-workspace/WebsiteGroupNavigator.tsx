@@ -5,25 +5,25 @@ import { useShallow } from "zustand/react/shallow";
 import { activeLayoutView, parseBrowserTabState, useWorkspaceStore } from "@/features/workspace";
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
+  AlertDialogTitle,
   Collapsible,
   CollapsibleContent,
-  NavigationSectionButton,
-  NavigationTreeItem,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+  IconButton,
+  NavigationSectionButton,
+  NavigationTreeItem,
 } from "@/shared/ui";
 import type { SharedRecord } from "./model";
 import { userWebsiteGroups } from "./navigationDefaults";
@@ -90,15 +90,13 @@ export function WebsiteGroupNavigator({ onOpen }: { onOpen?: () => void } = {}) 
         <div className="flex items-center">
           <Dialog open={configuring} onOpenChange={setConfiguring}>
             <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Configure groups"
-                title="Configure groups"
-                className="misty-navigator-icon-target size-8 text-cream-muted hover:text-cream-bright"
+              <IconButton
+                label="Configure groups"
+                tooltip={false}
+                className="misty-navigator-icon-target"
               >
                 <Settings2 className="size-4" size={16} aria-hidden="true" />
-              </Button>
+              </IconButton>
             </DialogTrigger>
             <DialogContent
               aria-describedby={undefined}

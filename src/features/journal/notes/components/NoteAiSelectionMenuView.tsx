@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { AiSelectionMenu } from "@/features/ai-surface/AiSelectionMenu";
 import type { AiSuggestedAction, AiCompanionAnchor } from "@/features/ai-surface/types";
 import type { MistyAiControlsSnapshot } from "@/shared/schemas";
@@ -27,15 +27,13 @@ export function NoteAiSelectionMenuView({
       <AiSelectionMenu
         actions={noteSelectionActions}
         trigger={
-          <Button
-            type="button"
-            size="icon"
+          <IconButton
             variant="secondary"
-            className="size-7 rounded-full"
-            aria-label="Edit selection with Misty"
+            label="Edit selection with Misty"
+            className="rounded-full"
           >
             <Pencil className="size-3.5" />
-          </Button>
+          </IconButton>
         }
         onAction={(action) => {
           void runAction(action, {

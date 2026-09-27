@@ -1,5 +1,5 @@
 import type { ArchiveEntry } from "@/native/ipc";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { FileArchive } from "lucide-react";
 import { formatBytes } from "@/shared/lib/fileFormat";
 
@@ -53,17 +53,9 @@ export function ToolbarButton(props: {
   children: React.ReactNode;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label={props.label}
-      title={props.label}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
+    <IconButton label={props.label} disabled={props.disabled} onClick={props.onClick}>
       {props.children}
-    </Button>
+    </IconButton>
   );
 }
 

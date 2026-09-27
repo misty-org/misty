@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   FileInput,
+  IconButton,
   Textarea,
 } from "@/shared/ui";
 import { ArrowUp, Camera, ImagePlus, Loader2, Plus, Search, X } from "lucide-react";
@@ -186,17 +187,9 @@ export function MistyComposer(props: {
         {props.onCapture ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-cream-muted"
-                aria-label="Add attachments"
-                title="Add attachments"
-                disabled={props.disabled}
-              >
+              <IconButton label="Add attachments" tooltip={false} disabled={props.disabled}>
                 <Plus className="size-4" />
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" data-misty-layer-portal>
               <DropdownMenuItem onSelect={() => fileRef.current?.click()}>
@@ -208,17 +201,13 @@ export function MistyComposer(props: {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-cream-muted"
-            aria-label="Attach files"
+          <IconButton
+            label="Attach files"
             disabled={props.disabled}
             onClick={() => fileRef.current?.click()}
           >
             <Plus className="size-4" />
-          </Button>
+          </IconButton>
         )}
         {props.onModeChange ? (
           <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
@@ -232,17 +221,14 @@ export function MistyComposer(props: {
         )}
         <div className="min-w-0 flex-1" />
         {props.voiceControl}
-        <Button
-          type="button"
-          size="icon"
-          className="size-8 shrink-0"
+        <IconButton
+          label={props.mode === "search" ? "Search" : "Send to Misty"}
           disabled={
             props.disabled ||
             props.busy ||
             !canSend ||
             props.attachments.some((item) => item.state !== "ready")
           }
-          aria-label={props.mode === "search" ? "Search" : "Send to Misty"}
           onClick={props.onSubmit}
         >
           {props.busy ? (
@@ -250,7 +236,7 @@ export function MistyComposer(props: {
           ) : (
             <ArrowUp className="size-4" />
           )}
-        </Button>
+        </IconButton>
         {props.trailingControl}
       </div>
     </div>

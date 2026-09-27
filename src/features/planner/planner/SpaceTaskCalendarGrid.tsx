@@ -1,5 +1,5 @@
 import type { SpaceCalendarEvent, SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import { Badge, Button, Card } from "@/shared/ui";
+import { Badge, Button, Card, IconButton } from "@/shared/ui";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { taskAssigneeName } from "./SpaceTaskPrimitives";
 
@@ -29,30 +29,18 @@ export function SpaceTaskCalendar({
   return (
     <Card className="min-w-[720px] gap-0 overflow-hidden py-0">
       <header className="flex min-h-12 items-center justify-between border-b border-charcoal-border/60 px-3">
-        <Button
-          size="icon"
-          variant="ghost"
-          type="button"
-          onClick={() => onMonth(addMonths(month, -1))}
-          aria-label="Previous month"
-        >
+        <IconButton size="md" label="Previous month" onClick={() => onMonth(addMonths(month, -1))}>
           <ChevronLeft className="size-4" />
-        </Button>
+        </IconButton>
         <div className="flex items-center gap-2">
           <CalendarDays className="size-4 text-cream-muted" />
           <strong className="text-sm">
             {month.toLocaleDateString([], { month: "long", year: "numeric" })}
           </strong>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          type="button"
-          onClick={() => onMonth(addMonths(month, 1))}
-          aria-label="Next month"
-        >
+        <IconButton size="md" label="Next month" onClick={() => onMonth(addMonths(month, 1))}>
           <ChevronRight className="size-4" />
-        </Button>
+        </IconButton>
       </header>
 
       <div className="grid grid-cols-7 border-b border-charcoal-border/60 bg-charcoal-card">

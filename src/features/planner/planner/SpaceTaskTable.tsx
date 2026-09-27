@@ -3,6 +3,7 @@ import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/
 import {
   Button,
   Card,
+  IconButton,
   Input,
   Table,
   TableBody,
@@ -141,18 +142,15 @@ export function SpaceTaskList({
                 </TableCell>
                 <TableCell>
                   {canManage ? (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      type="button"
+                    <IconButton
+                      label={`Delete ${task.title}`}
                       title="Delete task"
-                      aria-label={`Delete ${task.title}`}
                       disabled={taskBusy}
                       onClick={() => onDelete(task)}
-                      className="invisible size-7 text-cream-muted opacity-0 transition-opacity group-focus-within/task-row:visible group-focus-within/task-row:opacity-100 group-hover/task-row:visible group-hover/task-row:opacity-100 hover:bg-charcoal-card hover:text-notification-red"
+                      className="invisible opacity-0 transition-opacity group-focus-within/task-row:visible group-focus-within/task-row:opacity-100 group-hover/task-row:visible group-hover/task-row:opacity-100 hover:text-notification-red"
                     >
                       <Trash2 className="size-3.5" />
-                    </Button>
+                    </IconButton>
                   ) : null}
                 </TableCell>
               </TableRow>

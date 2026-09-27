@@ -9,6 +9,7 @@ import {
   DialogFooter,
   DialogTitle,
   FileInput,
+  IconButton,
   Input,
   Popover,
   PopoverContent,
@@ -164,15 +165,13 @@ export function WebsiteGroupsManager() {
               </div>
               <div className="group/manager-row mb-2 mt-5 flex h-6 items-center justify-between">
                 <h3 className="text-xs text-cream-muted">Sites</h3>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Add site to group"
-                  className={`text-cream-muted ${reveal}`}
+                <IconButton
+                  label="Add site to group"
+                  className={reveal}
                   onClick={() => setAdding(!adding)}
                 >
                   <Plus className="size-4" />
-                </Button>
+                </IconButton>
               </div>
               <div className="grid gap-1">
                 {sites.map((site) => (
@@ -262,15 +261,9 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Choose group icon"
-          title="Choose group icon"
-          className="text-cream-muted"
-        >
+        <IconButton label="Choose group icon" tooltip={false}>
           <GroupIcon name={value} size={18} />
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-3" aria-label="Group icons">
         <FileInput
@@ -327,16 +320,11 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
           {Object.entries(groupIcons)
             .filter(([id]) => id.replace(/-/g, " ").includes(query.trim().toLowerCase()))
             .map(([id, Icon]) => (
-              <Button
+              <IconButton
+                label={id.replace(/-/g, " ")}
                 key={id}
-                variant="ghost"
-                size="icon-sm"
-                aria-label={id.replace(/-/g, " ")}
-                title={id.replace(/-/g, " ")}
                 aria-pressed={value === id}
-                className={
-                  value === id ? "text-cream-bright ring-1 ring-cream-muted" : "text-cream-muted"
-                }
+                className={value === id ? "text-cream-bright ring-1 ring-cream-muted" : ""}
                 onClick={() => {
                   uploadRequest.current++;
                   setUploading(false);
@@ -347,7 +335,7 @@ function GroupIconPicker({ value, onChange }: { value: string; onChange(value: s
                 }}
               >
                 <Icon className="size-[18px]" />
-              </Button>
+              </IconButton>
             ))}
         </div>
         {!Object.keys(groupIcons).some((id) =>

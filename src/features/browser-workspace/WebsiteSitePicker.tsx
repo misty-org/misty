@@ -16,6 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  IconButton,
   Input,
 } from "@/shared/ui";
 import { providers, type ProviderId } from "@/features/webviews/providers";
@@ -415,11 +416,9 @@ export function EditableGroupRow({
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         <div className="flex shrink-0 items-center opacity-0 group-hover/edit-row:opacity-100 group-focus-within/edit-row:opacity-100 [@media(hover:none)]:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={editLabel}
-            className="text-cream-muted [@media(hover:none)]:size-11"
+          <IconButton
+            label={editLabel}
+            className="[@media(hover:none)]:size-11"
             onClick={() => {
               setValue(label);
               setError(null);
@@ -427,19 +426,17 @@ export function EditableGroupRow({
             }}
           >
             <Pencil className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={deleteLabel}
-            className="text-cream-muted [@media(hover:none)]:size-11"
+          </IconButton>
+          <IconButton
+            label={deleteLabel}
+            className="[@media(hover:none)]:size-11"
             onClick={() => {
               setError(null);
               setDeleting(true);
             }}
           >
             <Trash2 className="size-4" />
-          </Button>
+          </IconButton>
         </div>
       </div>
       <Dialog open={editing} onOpenChange={setEditing}>

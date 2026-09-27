@@ -4,8 +4,8 @@ import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspa
 import {
   appIcons,
   appIconStrokeWidth,
-  Button,
   cn,
+  IconButton,
   navigationMenuLinkClass,
   Tooltip,
   TooltipContent,
@@ -74,12 +74,12 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
     <TooltipProvider delayDuration={450}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
+          <IconButton
             variant="nav-action"
-            size="icon-sm"
+            label="Search"
+            tooltip={false}
             className={cn(navigatorFocusRingClass, props?.className)}
             onClick={openSearchPanel}
-            aria-label="Search"
             data-misty-window-drag-block="true"
           >
             <Search
@@ -88,7 +88,7 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
               strokeWidth={appIconStrokeWidth}
               aria-hidden="true"
             />
-          </Button>
+          </IconButton>
         </TooltipTrigger>
         <TooltipContent>{searchShortcutTitle}</TooltipContent>
       </Tooltip>

@@ -1,5 +1,5 @@
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton } from "@/shared/ui";
 import {
   ArrowRight,
   CalendarClock,
@@ -32,16 +32,9 @@ export function RoadmapExecutionRail(props: {
           <ListChecks className="size-4 text-sage-fg" />
           <h2 className="text-sm font-semibold text-cream">Daily plan</h2>
           {props.onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="ml-auto size-7"
-              aria-label="Hide daily plan"
-              onClick={props.onClose}
-            >
+            <IconButton label="Hide daily plan" className="ml-auto" onClick={props.onClose}>
               <PanelRightClose className="size-4" />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
         <div className="mt-3 flex items-center gap-3 text-[11px] text-cream-muted">

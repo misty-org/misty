@@ -1,6 +1,5 @@
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import {
-  Button,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -9,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
+  IconButton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -48,12 +48,8 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
   return (
     <>
       <div role="toolbar" aria-label="Layout" className={paneToolbarActionStyles.section}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="View as grid"
-          title="View as grid"
+        <IconButton
+          label="View as grid"
           className={cx(
             paneToolbarActionStyles.button,
             props.viewMode === "grid" && paneToolbarActionStyles.buttonActive,
@@ -62,13 +58,9 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
           onClick={() => props.onViewMode("grid")}
         >
           <Grid2X2 size={15} />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="View as list"
-          title="View as list"
+        </IconButton>
+        <IconButton
+          label="View as list"
           className={cx(
             paneToolbarActionStyles.button,
             props.viewMode === "list" && paneToolbarActionStyles.buttonActive,
@@ -77,51 +69,41 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
           onClick={() => props.onViewMode("list")}
         >
           <List size={15} />
-        </Button>
+        </IconButton>
       </div>
       <div
         role="toolbar"
         aria-label="Item scale and file actions"
         className={paneToolbarActionStyles.section}
       >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Zoom out"
-          title="Zoom out"
+        <IconButton
+          label="Zoom out"
           className={paneToolbarActionStyles.button}
           disabled={!canZoomOut}
           onClick={() => props.onItemScale(props.itemScale - 1)}
         >
           <Minus size={15} />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Zoom in"
-          title="Zoom in"
+        </IconButton>
+        <IconButton
+          label="Zoom in"
           className={paneToolbarActionStyles.button}
           disabled={!canZoomIn}
           onClick={() => props.onItemScale(props.itemScale + 1)}
         >
           <Plus size={15} />
-        </Button>
+        </IconButton>
         <DropdownMenu>
           <TooltipProvider delayDuration={450}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="More file actions"
+                  <IconButton
+                    label="More file actions"
+                    tooltip={false}
                     className={paneToolbarActionStyles.button}
                   >
                     <MoreHorizontal size={16} />
-                  </Button>
+                  </IconButton>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent>More file actions</TooltipContent>

@@ -5,7 +5,7 @@ import {
   type MultiPanelStoreHook,
 } from "@/features/workspace";
 import type { FileEntry } from "@/native/ipc";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -346,42 +346,33 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
 
   return (
     <>
-      <Button
+      <IconButton
+        label="Split file pane vertically"
         className={explorerShellStyles.paneActionButton}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
         title="Split vertically"
-        aria-label="Split file pane vertically"
         onClick={() => splitPane(props.paneId, "vertical")}
         disabled={!canSplit}
       >
         <Columns2 size={15} />
-      </Button>
-      <Button
+      </IconButton>
+      <IconButton
+        label="Split file pane horizontally"
         className={explorerShellStyles.paneActionButton}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
         title="Split horizontally"
-        aria-label="Split file pane horizontally"
         onClick={() => splitPane(props.paneId, "horizontal")}
         disabled={!canSplit}
       >
         <Rows2 size={15} />
-      </Button>
-      <Button
+      </IconButton>
+      <IconButton
+        label="Close file pane"
         className={explorerShellStyles.paneActionButton}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
         title="Close pane"
-        aria-label="Close file pane"
         onClick={() => closePane(props.paneId)}
         disabled={!canClose}
       >
         <PanelTopClose size={15} />
-      </Button>
+      </IconButton>
     </>
   );
 });

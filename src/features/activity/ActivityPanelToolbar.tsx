@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { ArrowDownUp, Search, SlidersHorizontal, X } from "lucide-react";
 import {
-  Button,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -11,6 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
   Input,
   NavIsland,
   NavIslandItem,
@@ -60,19 +60,17 @@ export function ActivityPanelToolbar({
         <div className="ml-auto flex shrink-0 items-center gap-1 min-w-0">
           <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              <IconButton
+                label="Filter activity"
+                tooltip={false}
                 className={iconButton}
-                aria-label="Filter activity"
-                title="Filter activity"
                 data-active={active || undefined}
               >
                 <SlidersHorizontal size={16} />
                 {active && (
                   <span className="absolute right-1 top-1 size-1 rounded-full bg-cream-bright" />
                 )}
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               onEscapeKeyDown={(event) => {
@@ -136,15 +134,9 @@ export function ActivityPanelToolbar({
           </DropdownMenu>
           <DropdownMenu open={sortOpen} onOpenChange={setSortOpen}>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={iconButton}
-                aria-label="Sort activity"
-                title="Sort activity"
-              >
+              <IconButton label="Sort activity" tooltip={false} className={iconButton}>
                 <ArrowDownUp size={16} />
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
@@ -165,13 +157,10 @@ export function ActivityPanelToolbar({
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="icon-sm"
+          <IconButton
+            label="Search activity"
             ref={searchTrigger}
             className={iconButton}
-            aria-label="Search activity"
-            title="Search activity"
             aria-expanded={searchOpen}
             onClick={() => setSearchOpen(!searchOpen)}
           >
@@ -179,7 +168,7 @@ export function ActivityPanelToolbar({
             {view.query && (
               <span className="absolute right-1 top-1 size-1 rounded-full bg-cream-bright" />
             )}
-          </Button>
+          </IconButton>
         </div>
       </div>
       {searchOpen && (
@@ -203,15 +192,13 @@ export function ActivityPanelToolbar({
               }
             }}
           />
-          <Button
-            variant="ghost"
-            size="icon-sm"
+          <IconButton
+            label="Clear search"
             className={iconButton}
-            aria-label="Clear search"
             onClick={() => onChange({ ...view, query: "" })}
           >
             <X size={14} />
-          </Button>
+          </IconButton>
         </div>
       )}
     </div>

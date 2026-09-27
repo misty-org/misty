@@ -6,15 +6,15 @@ import {
   Avatar,
   AvatarFallback,
   Badge,
-  Button,
   Card,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
   Skeleton,
-  cn,
 } from "@/shared/ui";
 import { Ellipsis, Mail, ShieldCheck, Trash2, Users } from "lucide-react";
 import { MemberPermissionControls } from "./MemberPermissionControls";
@@ -103,9 +103,9 @@ function MemberActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" type="button" aria-label={`Actions for ${member.name}`}>
+        <IconButton size="md" label={`Actions for ${member.name}`} tooltip={false}>
           <Ellipsis className="size-4" />
-        </Button>
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {canTransferOwnership ? (

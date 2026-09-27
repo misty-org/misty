@@ -137,16 +137,13 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
                       </small>
                     </span>
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
+                  <IconButton
+                    label={`Edit ${search.name}`}
                     className={sidebarStyles.pinnedUnpinButton}
-                    aria-label={`Edit ${search.name}`}
                     onClick={() => openSmartFolderDialog(search)}
                   >
                     <Pencil size={15} />
-                  </Button>
+                  </IconButton>
                 </div>
               );
             })}

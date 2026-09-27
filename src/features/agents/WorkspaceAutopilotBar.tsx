@@ -1,6 +1,6 @@
 import { MessageSquare, Pause, Play, Square, Check } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
   finishLocalExecution,
@@ -86,20 +86,16 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
               : "Paused — you have control.")}
       </p>
       <div className="flex items-center gap-1" role="group" aria-label="Playback controls">
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Show chat"
-          aria-label="Show chat"
+        <IconButton
+          size="md"
+          label="Show chat"
           onClick={() => useMistyStore.getState().openPanel()}
         >
           <MessageSquare className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Resume"
-          aria-label="Resume"
+        </IconButton>
+        <IconButton
+          size="md"
+          label="Resume"
           disabled={pending || execution.state !== "paused"}
           onClick={() =>
             act(() =>
@@ -110,22 +106,18 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
           }
         >
           <Play className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Pause"
-          aria-label="Pause"
+        </IconButton>
+        <IconButton
+          size="md"
+          label="Pause"
           disabled={pending || !running}
           onClick={() => act(() => pauseLocalExecution(execution.taskId))}
         >
           <Pause className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={execution.state === "finished" ? "Done" : "Stop task"}
-          aria-label={execution.state === "finished" ? "Done" : "Stop task"}
+        </IconButton>
+        <IconButton
+          size="md"
+          label={execution.state === "finished" ? "Done" : "Stop task"}
           disabled={pending}
           onClick={() => act(finishLocalExecution)}
         >
@@ -134,7 +126,7 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
           ) : (
             <Square className="size-4" />
           )}
-        </Button>
+        </IconButton>
       </div>
     </aside>
   );

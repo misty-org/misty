@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  IconButton,
   Input,
   MenuTrigger,
 } from "@/shared/ui";
@@ -392,11 +393,9 @@ export function ConversationMenu(props: {
               )}
               {renaming ? (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Save ${conversation.title}`}
+                  <IconButton
+                    label={`Save ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -404,12 +403,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Check className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Cancel renaming ${conversation.title}`}
+                  </IconButton>
+                  <IconButton
+                    label={`Cancel renaming ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -417,15 +414,13 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <X className="size-3.5" />
-                  </Button>
+                  </IconButton>
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Rename ${conversation.title}`}
+                  <IconButton
+                    label={`Rename ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -434,12 +429,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Pencil className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-red-300"
-                    aria-label={`Delete ${conversation.title}`}
+                  </IconButton>
+                  <IconButton
+                    label={`Delete ${conversation.title}`}
+                    className="p-1 hover:text-red-300"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -447,7 +440,7 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Trash2 className="size-3.5" />
-                  </Button>
+                  </IconButton>
                 </>
               )}
             </DropdownMenuItem>

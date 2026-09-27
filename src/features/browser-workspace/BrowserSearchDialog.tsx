@@ -2,7 +2,14 @@ import { accountScopeWillResetEvent } from "@/features/auth";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ArrowUpRight, Loader2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from "@/shared/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  IconButton,
+  Input,
+} from "@/shared/ui";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { openFilesTabRevealing } from "@/features/files/workspace";
@@ -160,15 +167,13 @@ export function BrowserSearchDialog() {
               spellCheck={false}
               className="min-w-0 flex-1"
             />
-            <Button
+            <IconButton
+              label="Open in new tab"
               type="submit"
-              size="icon-sm"
-              variant="ghost"
               disabled={scope === "browser" ? !query.trim() && !items.length : !items.length}
-              aria-label="Open in new tab"
             >
               <ArrowUpRight size={18} />
-            </Button>
+            </IconButton>
           </div>
           {error && (
             <p role="alert" className="mt-2 text-sm text-destructive">

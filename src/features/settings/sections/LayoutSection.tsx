@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { Check, Trash2 } from "lucide-react";
-import { Button, cn, Input } from "@/shared/ui";
+import { Button, cn, IconButton, Input } from "@/shared/ui";
 import {
   dockingPresets,
   dockPositions,
@@ -125,14 +125,12 @@ function WindowLayoutEditor() {
                 >
                   <span className="truncate">{saved.name}</span>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Delete layout ${saved.name}`}
+                <IconButton
+                  label={`Delete layout ${saved.name}`}
                   onClick={() => removeLayout(saved.id)}
                 >
                   <Trash2 size={14} />
-                </Button>
+                </IconButton>
               </div>
             ))}
           </div>

@@ -5,7 +5,7 @@ import {
   type ShortcutSlot,
 } from "@/features/shortcuts";
 import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
-import { Button, Input, cn } from "@/shared/ui";
+import { Button, cn, IconButton, Input } from "@/shared/ui";
 import { RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -329,15 +329,9 @@ export function ShortcutsSection(props: SettingsContentProps) {
                               onKeyDown={record}
                               onClear={(target) => void updateBinding({ ...target, value: null })}
                             />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className={cn(
-                                "grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:bg-cream/[0.045] hover:text-cream",
-                                settingsDisabledControlClass,
-                              )}
-                              aria-label={`Restore ${definition.label}`}
+                            <IconButton
+                              label={`Restore ${definition.label}`}
+                              className={settingsDisabledControlClass}
                               title="Restore this command"
                               disabled={props.working || !customized}
                               onClick={() =>
@@ -345,7 +339,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
                               }
                             >
                               <RotateCcw size={13} />
-                            </Button>
+                            </IconButton>
                           </div>
                           {capture?.commandId === definition.id &&
                           (captureError || pendingConflict) ? (
@@ -456,23 +450,21 @@ function BindingSlot(props: {
         )}
       </Button>
       {props.value ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
+        <IconButton
+          size="xs"
+          label={`Clear ${props.label.toLowerCase()} shortcut`}
           className={cn(
-            "absolute -right-1 -top-1 grid size-4 place-items-center rounded-full",
-            "bg-charcoal-border text-cream-muted opacity-0 transition-opacity hover:text-cream",
+            "absolute -right-1 -top-1 rounded-full",
+            "bg-charcoal-border opacity-0 transition-opacity",
             "group-hover/slot:opacity-100 group-focus-within/slot:opacity-100 max-[720px]:opacity-100",
           )}
-          aria-label={`Clear ${props.label.toLowerCase()} shortcut`}
           onClick={(event) => {
             event.stopPropagation();
             props.onClear(target);
           }}
         >
           <Trash2 size={9} />
-        </Button>
+        </IconButton>
       ) : null}
       <span className="sr-only">{props.source === "user" ? "Custom" : "Default"}</span>
     </div>

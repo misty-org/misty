@@ -1,7 +1,7 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
 import type { PreviewErrorComponent } from "@/features/file-ui";
-import { Button, ViewportLayer } from "@/shared/ui";
+import { IconButton, ViewportLayer } from "@/shared/ui";
 import { Copy, Loader2, X } from "lucide-react";
 import {
   lazy,
@@ -168,16 +168,14 @@ function EditorStatus(props: {
               Preparing image…
             </>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="mt-2 size-10 rounded-xl bg-charcoal-active text-cream-bright/60 hover:bg-charcoal-active hover:text-cream-bright"
-            aria-label="Close editor"
+          <IconButton
+            size="lg"
+            label="Close editor"
+            className="mt-2 rounded-xl bg-charcoal-active text-cream-bright/60"
             onClick={props.onClose}
           >
             <X size={19} />
-          </Button>
+          </IconButton>
         </div>
       </div>
     </EditorShell>

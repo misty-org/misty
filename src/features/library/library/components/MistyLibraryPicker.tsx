@@ -3,6 +3,7 @@ import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -10,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  IconButton,
   Input,
   ScrollArea,
   Select,
@@ -18,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
-  cn,
 } from "@/shared/ui";
 import { Check, File, Image, Music2, Search, Video, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -134,16 +135,9 @@ export function MistyLibraryPicker({
             placeholder="Search names, filenames, and tags"
           />
           {query ? (
-            <Button
-              className="size-6 shrink-0"
-              size="icon"
-              variant="ghost"
-              type="button"
-              aria-label="Clear Library search"
-              onClick={() => setQuery("")}
-            >
+            <IconButton size="xs" label="Clear Library search" onClick={() => setQuery("")}>
               <X size={13} />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
         <Select

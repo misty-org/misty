@@ -1,5 +1,5 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, IconButton } from "@/shared/ui";
 import { Gauge, Settings2, UsersRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { SpaceMembersPopover } from "../members";
@@ -26,31 +26,25 @@ export function SpaceRowActions({
       <SpaceUsagePopover
         space={space}
         trigger={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
+          <IconButton
+            label={`${space.name} usage`}
             className={cn(spaceRowActionClass, actionClassName)}
-            aria-label={`${space.name} usage`}
             title="Usage"
           >
             <Gauge size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Button>
+          </IconButton>
         }
       />
       <SpaceMembersPopover
         space={space}
         trigger={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
+          <IconButton
+            label={`${space.name} members`}
             className={cn(spaceRowActionClass, actionClassName)}
-            aria-label={`${space.name} members`}
             title="Members"
           >
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Button>
+          </IconButton>
         }
       />
       <Button

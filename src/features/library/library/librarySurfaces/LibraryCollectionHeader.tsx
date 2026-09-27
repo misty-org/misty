@@ -4,6 +4,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from "@/shared/ui";
 import { EllipsisVertical, Pencil, Play, Trash2 } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
@@ -62,9 +63,9 @@ export function LibraryCollectionHeader() {
         {canEditLibrary ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="outline" aria-label="Album actions">
+              <IconButton size="md" variant="outline" label="Album actions" tooltip={false}>
                 <EllipsisVertical size={15} />
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={collectionActions.openEditAlbum}>

@@ -2,7 +2,7 @@ import { MistyFilePicker } from "@/features/picker";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSmartLibraryStore } from "@/features/library/library";
 import type { SearchResult } from "@/native/ipc";
-import { Button, Input } from "@/shared/ui";
+import { Button, IconButton, Input } from "@/shared/ui";
 import {
   BrainCircuit,
   Film,
@@ -261,16 +261,9 @@ export function LibraryWorkspace(props: {
                   onChange={(event) => setTagQuery(event.target.value)}
                 />
                 {tagQuery ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Clear tag search"
-                    className="shrink-0"
-                    onClick={() => setTagQuery("")}
-                  >
+                  <IconButton size="xs" label="Clear tag search" onClick={() => setTagQuery("")}>
                     <X size={14} />
-                  </Button>
+                  </IconButton>
                 ) : null}
               </div>
             </div>

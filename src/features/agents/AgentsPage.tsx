@@ -7,13 +7,13 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
   Button,
-  IconButton,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   Field,
+  IconButton,
   Input,
   ListRowButton,
   NavigationChevron,
@@ -270,12 +270,9 @@ export default function NativeAgentsPage() {
                           : "opacity-0 group-hover/agent-row:opacity-100 focus-within:opacity-100",
                       )}
                     >
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="size-6 text-cream-muted hover:text-cream-bright p-0"
-                        aria-label="New conversation"
-                        title="New conversation"
+                      <IconButton
+                        size="xs"
+                        label="New conversation"
                         disabled={working || editorStatus.busy}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -283,23 +280,20 @@ export default function NativeAgentsPage() {
                         }}
                       >
                         <Plus className="size-3.5 shrink-0" />
-                      </Button>
+                      </IconButton>
                       <DropdownMenu
                         open={isDropdownOpen}
                         onOpenChange={(open) => setActiveDropdownAgentId(open ? agent.id : null)}
                       >
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            className={cn(
-                              "size-6 text-cream-muted hover:text-cream-bright p-0",
-                              isDropdownOpen && "text-cream-bright",
-                            )}
-                            aria-label="Agent options"
+                          <IconButton
+                            size="xs"
+                            label="Agent options"
+                            tooltip={false}
+                            className={cn(isDropdownOpen && "text-cream-bright")}
                           >
                             <MoreHorizontal className="size-3.5 shrink-0" />
-                          </Button>
+                          </IconButton>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" width="md">
                           <DropdownMenuItem onSelect={() => select(agent.id, true)}>

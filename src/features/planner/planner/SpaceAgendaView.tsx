@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  IconButton,
   Input,
   MenuTrigger,
   Popover,
@@ -399,15 +400,12 @@ export function SpaceAgendaView({
             </Button>
 
             <div className="flex items-center gap-1.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Previous range"
+              <IconButton
+                label="Previous range"
                 onClick={() => updateAnchor(moveAnchor(anchor, view, -1))}
               >
                 <ChevronLeft className="size-4" />
-              </Button>
+              </IconButton>
               <Popover>
                 <MenuTrigger
                   kind="popover"
@@ -430,25 +428,19 @@ export function SpaceAgendaView({
                   </label>
                 </PopoverContent>
               </Popover>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Next range"
+              <IconButton
+                label="Next range"
                 onClick={() => updateAnchor(moveAnchor(anchor, view, 1))}
               >
                 <ChevronRight className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Go to today"
+              </IconButton>
+              <IconButton
+                label="Go to today"
                 title="Today"
                 onClick={() => updateAnchor(new Date())}
               >
                 <CalendarCheck2 className="size-4" />
-              </Button>
+              </IconButton>
             </div>
 
             <DropdownMenu>
@@ -476,37 +468,31 @@ export function SpaceAgendaView({
                 className="flex h-8 items-center overflow-hidden rounded-md border border-charcoal-border/70"
                 aria-label="Calendar time interval"
               >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-none border-r border-charcoal-border/60"
-                  aria-label="Zoom out calendar"
+                <IconButton
+                  label="Zoom out calendar"
+                  className="rounded-none border-r border-charcoal-border/60"
                   disabled={zoomMinutes === 60}
                   onClick={() => updateZoom("out")}
                 >
                   <Minus className="size-3.5" />
-                </Button>
+                </IconButton>
                 <span className="min-w-14 px-2 text-center text-xs font-medium">
                   {zoomMinutes} min
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-none border-l border-charcoal-border/60"
-                  aria-label="Zoom in calendar"
+                <IconButton
+                  label="Zoom in calendar"
+                  className="rounded-none border-l border-charcoal-border/60"
                   disabled={zoomMinutes === 15}
                   onClick={() => updateZoom("in")}
                 >
                   <Plus className="size-3.5" />
-                </Button>
+                </IconButton>
               </div>
             ) : null}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
-              aria-label="Refresh calendar"
+            <IconButton
+              label="Refresh calendar"
+              className="text-cream-muted/70 shadow-none"
               onClick={() =>
                 void run("sync", async () => {
                   await spacesApi.syncCalendarTasks(spaceId);
@@ -519,7 +505,7 @@ export function SpaceAgendaView({
               ) : (
                 <RotateCw className="size-4" />
               )}
-            </Button>
+            </IconButton>
           </div>
         </header>
       }

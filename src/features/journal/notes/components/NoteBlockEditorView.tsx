@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
   Input,
   Separator,
   SuggestionItem,
@@ -770,9 +771,9 @@ function SearchReplacePanel(props: {
       <Button size="sm" variant="ghost" onClick={() => commands.replaceAll()}>
         All
       </Button>
-      <Button size="icon" variant="ghost" aria-label="Close search" onClick={props.onClose}>
+      <IconButton size="md" label="Close search" onClick={props.onClose}>
         <Minus size={16} />
-      </Button>
+      </IconButton>
     </div>
   );
 }

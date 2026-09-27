@@ -123,16 +123,13 @@ export function SidebarQuickAccessSectionView({
                         </Button>
                       </DropTarget>
                       {
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
+                        <IconButton
+                          label={`Unpin ${item.label} from Quick access`}
                           className={sidebarStyles.pinnedUnpinButton}
-                          aria-label={`Unpin ${item.label} from Quick access`}
                           onClick={() => quick.hideQuickAccessPath(item.path)}
                         >
                           <PinOff size={15} />
-                        </Button>
+                        </IconButton>
                       }
                     </div>
                   </div>
@@ -196,16 +193,13 @@ export function SidebarQuickAccessSectionView({
                           </span>
                         </Button>
                       </DropTarget>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
+                      <IconButton
+                        label={`Unpin ${path} from Quick access`}
                         className={sidebarStyles.pinnedUnpinButton}
-                        aria-label={`Unpin ${path} from Quick access`}
                         onClick={() => sidebar.onUnpinPinnedPath(path)}
                       >
                         <PinOff size={15} />
-                      </Button>
+                      </IconButton>
                     </div>
                   </div>
                 </ContextMenuTrigger>

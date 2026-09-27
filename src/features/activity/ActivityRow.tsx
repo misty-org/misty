@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { ArrowUpRight, Check, MoreHorizontal } from "lucide-react";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Button,
+  IconButton,
 } from "@/shared/ui";
 import { activityMuteKeys, isPendingRequest } from "./activityPolicy";
 import type { ActivityItem } from "./types";
@@ -54,40 +55,30 @@ export function ActivityRow({
           </p>
         </div>
         {item.target.kind !== "none" ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:text-cream-bright"
+          <IconButton
+            label={`Open destination for ${item.title}`}
             title="Open destination"
-            aria-label={`Open destination for ${item.title}`}
             onClick={onOpen}
           >
             <ArrowUpRight size={14} />
-          </Button>
+          </IconButton>
         ) : null}
         {!pending && !item.readAt ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
+          <IconButton
+            label={`Mark update read: ${item.title}`}
             className={actionClass}
             title="Mark read"
-            aria-label={`Mark update read: ${item.title}`}
             onClick={onRead}
           >
             <Check size={15} aria-hidden="true" />
-          </Button>
+          </IconButton>
         ) : null}
         {keys.length || (item.dismissible && pending) ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={actionClass}
-                aria-label={`Options for ${source}`}
-              >
+              <IconButton label={`Options for ${source}`} tooltip={false} className={actionClass}>
                 <MoreHorizontal size={14} />
-              </Button>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {keys.map((key) => (

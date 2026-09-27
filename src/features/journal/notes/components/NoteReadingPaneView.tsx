@@ -1,4 +1,4 @@
-import { Button, cn, EmptyState, Input, Skeleton } from "@/shared/ui";
+import { Button, cn, EmptyState, IconButton, Input, Skeleton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import type { Text as YText } from "yjs";
@@ -250,15 +250,9 @@ function InspectorHeader(props: {
       <span className="text-cream-muted">{props.icon}</span>
       <h2 className="m-0 flex-1 text-sm font-semibold text-cream-bright">{props.title}</h2>
       {props.children}
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-8"
-        aria-label={`Close ${props.title}`}
-        onClick={props.onClose}
-      >
+      <IconButton label={`Close ${props.title}`} onClick={props.onClose}>
         <PanelRightClose size={16} />
-      </Button>
+      </IconButton>
     </header>
   );
 }

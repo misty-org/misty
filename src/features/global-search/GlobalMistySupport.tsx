@@ -3,7 +3,7 @@ import type {
   AiContextReference,
   AiSelectionSnapshot,
 } from "@/features/ai-surface";
-import { Button, cn, SegmentedControl } from "@/shared/ui";
+import { Button, cn, IconButton, SegmentedControl } from "@/shared/ui";
 import {
   Bot,
   Camera,
@@ -161,27 +161,20 @@ export function ContextReceipt(props: {
         >
           {item.title}
           {item.localPath && !item.attached ? " · device only" : ""}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Remove ${item.title} context`}
+          <IconButton
+            label={`Remove ${item.title} context`}
             onClick={() => props.onRemove(item.id)}
           >
             <X className="size-3" />
-          </Button>
+          </IconButton>
         </span>
       ))}
       {props.capture ? (
         <span className="flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-charcoal-border bg-charcoal-bg px-2 text-[11px] text-cream-muted">
           <Camera className="size-3" /> Region capture
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Remove region capture"
-            onClick={() => props.onRemoveCapture?.()}
-          >
+          <IconButton label="Remove region capture" onClick={() => props.onRemoveCapture?.()}>
             <X className="size-3" />
-          </Button>
+          </IconButton>
         </span>
       ) : null}
       {props.selection ? (

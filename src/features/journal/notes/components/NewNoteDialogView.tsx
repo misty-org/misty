@@ -62,7 +62,6 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
             type="button"
             variant="ghost"
             size="sm"
-            className={cn(false)}
             onClick={() => props.onOpenChange(false)}
           >
             Cancel
@@ -70,7 +69,6 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
           <Button
             type="button"
             size="sm"
-            className={cn(false)}
             disabled={submitting}
             onClick={() => void submit()}
           >

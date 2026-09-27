@@ -1,6 +1,14 @@
 import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 import { SpaceViewModeToggle } from "@/features/spaces";
-import { Badge, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import {
+  Badge,
+  Button,
+  IconButton,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/shared/ui";
 import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -70,39 +78,28 @@ export function SpacePlannerHeader({
               onBlur={() => !query && setSearchOpen(false)}
             />
             {query ? (
-              <Button
-                className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
-                size="icon"
-                variant="ghost"
-                type="button"
+              <IconButton
+                size="xs"
+                label="Clear search"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
                 onClick={() => onQuery("")}
-                aria-label="Clear search"
               >
                 <X className="size-3.5" />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         ) : (
-          <Button
-            className="size-8"
-            size="icon"
-            variant="ghost"
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            aria-label="Search tasks"
-          >
+          <IconButton label="Search tasks" onClick={() => setSearchOpen(true)}>
             <Search className="size-4" />
-          </Button>
+          </IconButton>
         )}
 
         <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
           <PopoverTrigger asChild>
-            <Button
-              className="relative size-8"
-              size="icon"
-              variant="ghost"
-              type="button"
-              aria-label={`Filter tasks${activeFilterCount ? ` (${activeFilterCount} active)` : ""}`}
+            <IconButton
+              label={`Filter tasks${activeFilterCount ? ` (${activeFilterCount} active)` : ""}`}
+              tooltip={false}
+              className="relative"
             >
               <SlidersHorizontal className="size-4" />
               {activeFilterCount ? (
@@ -113,20 +110,16 @@ export function SpacePlannerHeader({
                   {activeFilterCount}
                 </Badge>
               ) : null}
-            </Button>
+            </IconButton>
           </PopoverTrigger>
           <PopoverContent className="w-[min(420px,calc(100vw-24px))]" align="end">
             {filters}
           </PopoverContent>
         </Popover>
 
-        <Button
-          aria-label="Refresh tasks"
-          className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
-          size="icon"
-          title="Refresh tasks"
-          variant="ghost"
-          type="button"
+        <IconButton
+          label="Refresh tasks"
+          className="text-cream-muted/70 shadow-none"
           onClick={onSync}
         >
           {loading ? (
@@ -134,7 +127,7 @@ export function SpacePlannerHeader({
           ) : (
             <RotateCw className="size-4" aria-hidden />
           )}
-        </Button>
+        </IconButton>
 
         {canManage ? (
           <Button className="h-8 gap-1.5 text-xs" type="button" onClick={onCreate}>

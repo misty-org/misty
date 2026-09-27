@@ -4,6 +4,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   Input,
 } from "@/shared/ui";
 import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
@@ -127,15 +128,9 @@ export function DrawingPreviewHeader({
       {!renaming && hasActions ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="size-8 shrink-0 text-cream-muted hover:text-cream-bright"
-              aria-label={`Actions for ${title || "untitled drawing"}`}
-            >
+            <IconButton label={`Actions for ${title || "untitled drawing"}`} tooltip={false}>
               <MoreHorizontal className="size-4" />
-            </Button>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             {canRename ? (

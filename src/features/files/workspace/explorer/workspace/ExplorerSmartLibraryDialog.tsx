@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  IconButton,
 } from "@/shared/ui";
 import {
   BrainCircuit,
@@ -132,16 +133,9 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                   {library.displayName} · Local
                 </Badge>
               ) : null}
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                aria-label="Close Library"
-                disabled={busy}
-                onClick={props.onClose}
-              >
+              <IconButton size="md" label="Close Library" disabled={busy} onClick={props.onClose}>
                 <X size={18} />
-              </Button>
+              </IconButton>
             </div>
           </DialogHeader>
 
@@ -186,17 +180,13 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                       <RefreshCw size={14} />
                       Rescan
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-cream-muted hover:text-cream-bright"
-                      type="button"
-                      aria-label="Remove Library"
+                    <IconButton
+                      label="Remove Library"
                       disabled={busy}
                       onClick={() => setConfirmDelete(true)}
                     >
                       <Trash2 size={15} />
-                    </Button>
+                    </IconButton>
                   </div>
                 </div>
                 <div className="min-h-0 p-6">

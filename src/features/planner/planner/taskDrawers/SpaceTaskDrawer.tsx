@@ -11,6 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   Input,
 } from "@/shared/ui";
 import { Check, Copy, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
@@ -107,15 +108,9 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 {editing ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        type="button"
-                        className={cn("shrink-0 text-cream-muted hover:text-cream", "size-9")}
-                        aria-label="Task actions"
-                      >
+                      <IconButton size="md" label="Task actions" tooltip={false}>
                         <MoreHorizontal className="size-4" />
-                      </Button>
+                      </IconButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
                       <DropdownMenuItem onSelect={copyTaskKey}>
@@ -190,7 +185,6 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(false)}
                 type="button"
                 disabled={busy}
                 onClick={onClose}

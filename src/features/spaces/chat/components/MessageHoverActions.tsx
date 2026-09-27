@@ -1,5 +1,5 @@
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import { Button } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { Pencil, Reply, Trash2 } from "lucide-react";
 import { quickReactionEmojis } from "./messageHelpers";
 
@@ -25,21 +25,16 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
         const reacted =
           message.reactions?.find((item) => item.emoji === emoji)?.reacted_by_me === true;
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`flex size-7 items-center justify-center rounded text-sm leading-none transition-colors ${
-              reacted ? "bg-charcoal-active" : "hover:bg-charcoal-card"
-            }`}
-            type="button"
+          <IconButton
+            label={`${reacted ? "Remove" : "Add"} ${emoji} reaction`}
+            className={`text-sm leading-none ${reacted ? "bg-charcoal-active" : ""}`}
             key={emoji}
             onClick={() => props.onToggleReaction(message, emoji, reacted)}
             aria-pressed={reacted}
-            aria-label={`${reacted ? "Remove" : "Add"} ${emoji} reaction`}
             title={`${reacted ? "Remove" : "Add"} ${emoji}`}
           >
             {emoji}
-          </Button>
+          </IconButton>
         );
       })}
       <span className="mx-0.5 h-5 w-px bg-charcoal-border" aria-hidden="true" />
@@ -81,17 +76,14 @@ function ActionButton({
   onClick: () => void;
 }) {
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className={`size-7 ${className ?? ""}`}
-      type="button"
+    <IconButton
+      label={label}
+      className={className}
       disabled={disabled}
       onClick={onClick}
-      aria-label={label}
       title={title ?? label}
     >
       {icon}
-    </Button>
+    </IconButton>
   );
 }

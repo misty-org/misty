@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  IconButton,
   Input,
   ListRowButton,
   Skeleton,
@@ -494,18 +495,16 @@ function NoteRows(props: NoteRowsProps) {
             </ListRowButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
+                <IconButton
+                  label={`More actions for ${title}`}
+                  tooltip={false}
                   className={cn(
-                    "mr-2 shrink-0 text-cream-muted hover:text-cream-bright aria-expanded:opacity-100",
-                    "size-7 opacity-0 group-hover/note:opacity-100",
+                    "mr-2 aria-expanded:opacity-100",
+                    "opacity-0 group-hover/note:opacity-100",
                   )}
-                  aria-label={`More actions for ${title}`}
                 >
                   <MoreHorizontal className="size-4" aria-hidden="true" />
-                </Button>
+                </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onSelect={() => props.onTogglePin(note.id)}>

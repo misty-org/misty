@@ -7,7 +7,7 @@ import {
   type KnownDeployment,
 } from "@/features/deployment";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
+import { Button, IconButton, Input } from "@/shared/ui";
 import { Check, Cloud, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -105,17 +105,16 @@ export function ServerSection(props: SettingsContentProps) {
                   )}
                 </Button>
                 {!current ? (
-                  <Button
+                  <IconButton
+                    size="md"
                     variant="outline"
-                    size="icon"
-                    type="button"
+                    label={`Forget ${server.name}`}
                     className={settingsIconDangerClass}
-                    aria-label={`Forget ${server.name}`}
                     disabled={switchingTo !== null || props.working}
                     onClick={() => setServers(forgetDeployment(server.url))}
                   >
                     <Trash2 size={15} aria-hidden="true" />
-                  </Button>
+                  </IconButton>
                 ) : null}
               </div>
             </SettingsRow>
