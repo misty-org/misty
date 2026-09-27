@@ -2,7 +2,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, CopyableValueText, SwitchControl, ValueText } from "../settingsControls";
+import { booleanSetting, CopyableValueText, SwitchControl } from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function AdvancedSection(props: SettingsContentProps) {
@@ -30,19 +30,6 @@ export function AdvancedSection(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Storage">
-        <SettingsRow
-          label="Remote runtime"
-          description="Provider requests run through the embedded Misty runtime."
-        >
-          <ValueText
-            value={
-              props.app?.storageRuntime.ready
-                ? `Ready (${props.app.storageRuntime.version})`
-                : (props.app?.storageRuntime.error ?? "Loading")
-            }
-            muted={!props.app?.storageRuntime.ready}
-          />
-        </SettingsRow>
         <SettingsRow
           label="Config path"
           description="Where Misty stores local configuration files on this device."

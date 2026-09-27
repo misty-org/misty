@@ -1,6 +1,4 @@
-import { providerIconForType } from "@/shared/assets/icons";
 import {
-  AssetIcon,
   Button,
   cn,
   Collapsible,
@@ -10,7 +8,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/shared/ui";
-import { HardDrive, Pencil, Plus, Search, SlidersHorizontal, Unplug } from "lucide-react";
+import { HardDrive, Pencil, Plus, Search, Unplug } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
 import type { ExplorerSidebarRuntime } from "./explorerSidebar/ExplorerSidebarRuntime";
@@ -20,7 +18,6 @@ import type { SidebarDeviceEntry } from "./ExplorerSidebarSupport";
 import {
   buildDeviceEntries,
   deviceCapacityLabel,
-  joinPath,
   pathIsInside,
   SidebarDeviceGroup,
   SidebarSectionHeader,
@@ -156,88 +153,6 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
           </div>
         ) : null}
       </section>
-
-      <Collapsible className={sidebarStyles.section} open={!collapsedSections.remote}>
-        <SidebarSectionHeader
-          title="Remote"
-          collapsed={collapsedSections.remote}
-          onToggle={() => toggleSection("remote")}
-          actions={
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Manage remotes"
-                className={sidebarStyles.sectionActionButton}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onManageRemotes();
-                }}
-              >
-                <SlidersHorizontal size={14} />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Add remote"
-                className={sidebarStyles.sectionActionButton}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onAddRemote();
-                }}
-              >
-                <Plus size={13} />
-              </Button>
-            </>
-          }
-        />
-        <CollapsibleContent>
-          {props.remoteLoading && props.remotes.length === 0 ? (
-            <div className={sidebarStyles.muted}>Loading remote...</div>
-          ) : props.remotes.length === 0 ? (
-            <div className={sidebarStyles.muted}>No remotes connected</div>
-          ) : (
-            <div className={sidebarStyles.list}>
-              {props.remotes.map((remote) => {
-                const path = joinPath(props.mountRoot, remote.name);
-                const providerIcon = providerIconForType(remote.type);
-                const selected =
-                  props.activePath === path || props.activePath.startsWith(`${path}/`);
-                return (
-                  <props.runtime.DropTarget
-                    key={`${remote.type}:${remote.name}`}
-                    id={`sidebar:remote:${remote.name}`}
-                    path={path}
-                    remoteName={remote.name}
-                    springLoad
-                    onSpringLoad={() => props.onNavigate(path)}
-                  >
-                    <div className={sidebarStyles.treeRow}>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className={cn(
-                          sidebarStyles.treeSurface,
-                          sidebarStyles.itemButton,
-                          selected && sidebarStyles.itemSelected,
-                        )}
-                        onClick={() => props.onNavigate(path)}
-                      >
-                        <span className={sidebarStyles.remoteIcon}>
-                          <AssetIcon src={providerIcon.src} color={providerIcon.color} size={24} />
-                        </span>
-                        <span className="min-w-0 truncate">{remote.name}</span>
-                      </Button>
-                    </div>
-                  </props.runtime.DropTarget>
-                );
-              })}
-            </div>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
 
       <Collapsible className={sidebarStyles.section} open={!collapsedSections.devices}>
         <SidebarSectionHeader

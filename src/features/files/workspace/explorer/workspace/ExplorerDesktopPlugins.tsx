@@ -4,7 +4,6 @@ export {
   canOpenTerminalPath,
   ensureFilesBrowseTab,
   isChromeTabPath,
-  isRemotesTabPath,
   isTransfersTabPath,
   openTransfersTab,
   parsePluginTabPath,

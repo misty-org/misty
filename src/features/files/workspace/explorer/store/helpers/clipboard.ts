@@ -1,5 +1,3 @@
-import { useAppStore } from "@/features/app-shell";
-import { selectAdvancedPreferences, useSettingsStore } from "@/features/settings";
 import {
   clipboardNativeFileRefs,
   clipboardWriteFileRefs,
@@ -247,9 +245,9 @@ export function clipboardPayloadForPane(pane: PaneExplorerState | undefined): Cl
     file_refs: entries.map((entry) => ({
       display_name: entry.name,
       local_path: entry.location.kind === "local" ? entry.path : "",
-      provider_type: entry.location.providerType ?? "",
-      remote_name: entry.location.remoteName ?? "",
-      remote_path: entry.location.remotePath ?? "",
+      provider_type: entry.location.kind === "peer_device" ? "misty_peer" : "",
+      remote_name: entry.location.peerDeviceId ?? "",
+      remote_path: entry.location.kind === "peer_device" ? entry.path : "",
       is_dir: entry.kind === "folder",
     })),
     images: [],
@@ -358,41 +356,10 @@ export function pasteItemFromClipboardRef(
   if (fileRef.local_path.trim()) {
     return { path: fileRef.local_path, isDirectory: fileRef.is_dir };
   }
-  if (!fileRef.provider_type.trim() || !fileRef.remote_name.trim() || !fileRef.remote_path.trim()) {
-    return null;
+  if (fileRef.provider_type === "misty_peer" && fileRef.remote_path.startsWith("misty://device/")) {
+    return { path: fileRef.remote_path, isDirectory: fileRef.is_dir };
   }
-  const environment = useAppStore.getState().app?.environment;
-  if (!environment?.mountPath) return null;
-  const settingsMountPath = selectAdvancedPreferences(
-    useSettingsStore.getState().settings?.document,
-  ).mountPath;
-  const mountPath = H.resolveMountRoot(
-    environment.homeDir,
-    settingsMountPath || environment.mountPath,
-  );
-  return {
-    path: H.remoteClipboardVirtualPath(
-      mountPath,
-      fileRef.provider_type,
-      fileRef.remote_name,
-      fileRef.remote_path,
-    ),
-    isDirectory: fileRef.is_dir,
-  };
-}
-
-export function remoteClipboardVirtualPath(
-  mountPath: string,
-  _providerType: string,
-  remoteName: string,
-  remotePath: string,
-): string {
-  const base = [mountPath, remoteName]
-    .map((part, index) => (index === 0 ? part.replace(/\/+$/, "") : part.replace(/^\/+|\/+$/g, "")))
-    .filter(Boolean)
-    .join("/");
-  const child = remotePath.trim().replace(/^\/+/, "");
-  return child ? `${base}/${child}` : base;
+  return null;
 }
 
 export function resolveMountRoot(homePath: string, configuredPath: string): string {

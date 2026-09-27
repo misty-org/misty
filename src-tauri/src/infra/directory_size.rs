@@ -7,12 +7,8 @@ use std::{
 };
 
 use crate::{
-    domain::file_master::RemoteBrowseTarget,
     error::{ApiError, ApiResult},
-    infra::{
-        directory_size_local::local_directory_size, environment::AppEnvironmentService,
-        storage::StorageService,
-    },
+    infra::{directory_size_local::local_directory_size, environment::AppEnvironmentService},
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -31,7 +27,6 @@ struct DirectorySizeInner {
     db_lock: Arc<Mutex<()>>,
     home_dir: PathBuf,
     mount_root: PathBuf,
-    proxy: StorageService,
     calculating: AsyncMutex<HashSet<String>>,
 }
 
@@ -79,18 +74,16 @@ enum StoredDirectorySizeStatus {
 
 enum DirectorySizeTarget {
     Local(PathBuf),
-    Remote(RemoteBrowseTarget),
 }
 
 impl DirectorySizeService {
-    pub fn new(environment: AppEnvironmentService, proxy: StorageService) -> Self {
+    pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
             inner: Arc::new(DirectorySizeInner {
                 db_path: environment.misty_db_path(),
                 db_lock: Arc::new(Mutex::new(())),
                 home_dir: environment.home_dir(),
                 mount_root: environment.mount_root(),
-                proxy,
                 calculating: AsyncMutex::new(HashSet::new()),
             }),
         }
@@ -159,12 +152,10 @@ impl DirectorySizeService {
                 continue;
             }
             let path = PathBuf::from(trimmed);
-            let target = if let Some(remote) =
-                RemoteBrowseTarget::from_virtual_path(&self.inner.mount_root, &path)
-            {
-                let normalized_path = display_path(&remote.virtual_path(&self.inner.mount_root));
-                (normalized_path, DirectorySizeTarget::Remote(remote))
-            } else {
+            if path.starts_with(&self.inner.mount_root) {
+                continue;
+            }
+            let target = {
                 let normalized_path = path
                     .canonicalize()
                     .unwrap_or(path)
@@ -220,40 +211,7 @@ impl DirectorySizeService {
                     .map_err(|error| format!("Directory size worker failed: {error}"))
                     .and_then(|result| result)
             }
-            DirectorySizeTarget::Remote(target) => self.remote_directory_size(&target).await,
         }
-    }
-
-    async fn remote_directory_size(&self, target: &RemoteBrowseTarget) -> Result<u64, String> {
-        let response = self
-            .inner
-            .proxy
-            .get_with_query(
-                "/api/remote/file/size",
-                &[
-                    ("remote", target.remote_name.as_str()),
-                    ("path", target.remote_path.as_str()),
-                ],
-            )
-            .await
-            .map_err(|error| error.to_string())?;
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        if !status.is_success() {
-            return Err(if body.is_empty() {
-                format!(
-                    "Failed to calculate remote directory size (HTTP {})",
-                    status.as_u16()
-                )
-            } else {
-                body
-            });
-        }
-        let value = serde_json::from_str::<Value>(&body)
-            .map_err(|error| format!("Failed to parse remote directory size: {error}"))?;
-        remote_size_from_value(&value).ok_or_else(|| {
-            "Remote directory size response did not include a byte count.".to_string()
-        })
     }
 
     async fn store_result(

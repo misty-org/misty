@@ -159,11 +159,6 @@ export function DesktopLayout(props: {
         );
     });
   }, []);
-  const openRemotesOverlay = useCallback(() => {
-    useSettingsStore.getState().setActiveSection("files-connections");
-    openSettingsOverlay();
-  }, [openSettingsOverlay]);
-
   useEffect(() => {
     if (!user?.id || transitioning) return;
     const tourState = useTourStore.getState();
@@ -201,11 +196,10 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     if (!location.pathname.startsWith("/providers")) return;
-    openRemotesOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
+  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate]);
 
   useEffect(() => {
     const currentRoute = `${location.pathname}${location.search}${location.hash}`;

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { returnToBrowseTab } from "./ExplorerDesktopPlugins";
 
 /**
- * Wraps a file manager chrome tab (Transfers, Remotes) with a way back.
+ * Wraps a file manager chrome tab (Transfers) with a way back.
  *
  * The embedded file manager hides its own tab strip because the dock supplies
  * one, which leaves these tabs with no visible exit. The standalone route keeps

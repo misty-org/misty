@@ -50,7 +50,7 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
         showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
         selectedCount: selectedEntries.length,
         selectedEntryPath: selectedEntry?.path ?? null,
-        hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
+        hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "peer_device"),
         canOpenWithSelected: Boolean(
           selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink",
         ),
@@ -264,7 +264,9 @@ const ConnectedExplorerPaneToolbarActions = memo(
           showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
           selectedCount: selectedEntries.length,
           selectedEntryPath: selectedEntry?.path ?? null,
-          hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "remote"),
+          hasRemoteSelection: selectedEntries.some(
+            (entry) => entry.location.kind === "peer_device",
+          ),
           canOpenWithSelected: Boolean(
             selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink",
           ),

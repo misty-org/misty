@@ -1,5 +1,6 @@
 import type { MultiPanelTab, useMultiPanelStore } from "@/features/workspace";
-import type { ExplorerLibrarySnapshot, MountedDevice, ProviderRemote } from "@/native/contracts";
+import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/contracts";
+import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import {
   explorerPathKey,
   explorerPathName,
@@ -52,14 +53,13 @@ export function buildExplorerLocationResults(
   homePath: string,
   mountRoot: string,
   pinnedPaths: string[],
-  remotes: ProviderRemote[],
   library: ExplorerLibrarySnapshot | null,
   workspacePaths: string[],
 ): ExplorerLocationResult[] {
   const results: ExplorerLocationResult[] = [];
   const seen = new Set<string>();
   const add = (label: string, path: string, badge: string) => {
-    if (!path) return;
+    if (!path || isRetiredCloudLocation(path, mountRoot)) return;
     const normalized = normalizedPath(path) || "/";
     const key = explorerPathKey(normalized);
     if (seen.has(key)) return;
@@ -90,9 +90,6 @@ export function buildExplorerLocationResults(
   }
   for (const item of library?.recentFiles ?? []) {
     add(item.name || titleFromPath(item.path), item.path, "Recent");
-  }
-  for (const remote of remotes) {
-    add(remote.name, joinPath(mountRoot, remote.name), remote.type);
   }
   return results;
 }

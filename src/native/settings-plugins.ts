@@ -1,26 +1,15 @@
-import { openExternalLink } from "@/shared/platform/openExternalLink";
 import type {
-  CloudConfigPaths,
   LaunchOnLoginSnapshot,
-  OpenWithAssociation,
-  ProviderConfigRequest,
-  ProviderConfigStep,
-  ProviderJobStart,
-  ProviderJobStatus,
-  ProvidersSnapshot,
   NativeShortcutsSnapshot,
+  OpenWithAssociation,
   ReassignShortcutRequest,
-  RemoteEditDraft,
-  RemoteTestResult,
-  SaveRemoteRequest,
-  SaveSettingsRequest,
   ResetShortcutRequest,
+  SaveSettingsRequest,
   SettingsSnapshot,
   ShortcutsSnapshot,
   UpdateShortcutRequest,
-  VerifyResult,
-  VerifyStartRequest,
 } from "@/native/contracts";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 // eslint-disable-next-line no-restricted-imports -- shortcut hydration is the adapter boundary for the native snapshot
 import { detectShortcutPlatform, normalizeShortcut } from "@/features/shortcuts/bindings";
 // eslint-disable-next-line no-restricted-imports -- the registry supplies transport-neutral command metadata
@@ -138,68 +127,6 @@ function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsS
 
 export function openExternalUrl(url: string): Promise<void> {
   return openExternalLink(url);
-}
-
-export function providersSnapshot(): Promise<ProvidersSnapshot> {
-  return invoke("providers_snapshot");
-}
-
-export function providersRefresh(): Promise<ProvidersSnapshot> {
-  return invoke("providers_refresh");
-}
-
-export function providersImportCloudConnection(request: {
-  name: string;
-  providerType: string;
-  connectionId: string;
-  connectionSource?: "connected_account" | "legacy_cloud";
-  connectedAccountId?: string;
-  handoff: string;
-  redeemUrl: string;
-}): Promise<ProvidersSnapshot> {
-  return invoke("providers_import_cloud_connection", request);
-}
-
-export function providersSelectRemote(name: string): Promise<RemoteEditDraft> {
-  return invoke("providers_select_remote", { name });
-}
-
-export function providersSaveRemote(request: SaveRemoteRequest): Promise<RemoteEditDraft> {
-  return invoke("providers_save_remote", { request });
-}
-
-export function providersTestRemote(name: string): Promise<RemoteTestResult> {
-  return invoke("providers_test_remote", { name });
-}
-
-export function providersConfigPaths(): Promise<CloudConfigPaths> {
-  return invoke("providers_config_paths");
-}
-
-export function providersConfigureRemote(
-  request: ProviderConfigRequest,
-): Promise<ProviderConfigStep> {
-  return invoke("providers_configure_remote", { request });
-}
-
-export function providersVerifyStart(request: VerifyStartRequest): Promise<ProviderJobStart> {
-  return invoke("providers_verify_start", { request });
-}
-
-export function providersJobStatus(jobId: string): Promise<ProviderJobStatus> {
-  return invoke("providers_job_status", { jobId });
-}
-
-export function providersJobCancel(jobId: string): Promise<unknown> {
-  return invoke("providers_job_cancel", { jobId });
-}
-
-export function providersVerifyResult(jobId: string): Promise<VerifyResult> {
-  return invoke("providers_verify_result", { jobId });
-}
-
-export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {
-  return invoke("providers_disconnect_remote", { name });
 }
 
 export function codingAiReadApiKey(providerId: string): Promise<string | null> {

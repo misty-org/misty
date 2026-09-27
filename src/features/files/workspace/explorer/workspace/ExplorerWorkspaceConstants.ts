@@ -1,4 +1,4 @@
-import type { MountedDevice, ProviderRemote } from "@/native/contracts";
+import type { MountedDevice } from "@/native/contracts";
 
 export const minSidebarWidth = 212;
 export const maxSidebarWidth = 380;
@@ -10,5 +10,4 @@ export const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 export const explorerCompareWithEvent = "misty:explorer-compare-with";
 
 export const emptyPinnedPaths: string[] = [];
-export const emptyProviderRemotes: ProviderRemote[] = [];
 export const emptyMountedDevices: MountedDevice[] = [];

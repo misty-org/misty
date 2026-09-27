@@ -15,7 +15,6 @@ use walkdir::WalkDir;
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 use crate::domain::explorer::{FileKind, ListDirectoryRequest};
-use crate::domain::file_master::{normalize_remote_path, RemoteBrowseTarget};
 use crate::error::{ApiError, ApiResult};
 use crate::infra::{
     environment::AppEnvironmentService, explorer::ExplorerService,
@@ -314,20 +313,12 @@ impl PowerPackService {
             .filter(|root| !root.trim().starts_with("misty://"))
             .cloned()
             .collect::<Vec<_>>();
-        let remote_roots = request
-            .roots
-            .iter()
-            .filter(|root| root.trim().starts_with("misty://"))
-            .cloned()
-            .collect::<Vec<_>>();
         let local_sources = tokio::task::spawn_blocking(move || {
             duplicate_local_sources_blocking(worker_scan_id, local_roots, cancellations)
         })
         .await
         .map_err(|err| ApiError::Message(format!("Duplicate scan worker failed: {err}")))??;
-        let remote_sources = self.duplicate_remote_sources(&remote_roots).await?;
-        let mut sources = local_sources;
-        sources.extend(remote_sources);
+        let sources = local_sources;
         let remote_candidate_count = sources.iter().filter(|source| source.remote).count();
         let hash_now = request.hash_all && remote_candidate_count == 0;
         let result =
@@ -349,43 +340,6 @@ impl PowerPackService {
         };
         *value = true;
         Ok(true)
-    }
-
-    pub async fn duplicates_hash_remote_candidates(
-        &self,
-        scan_id: String,
-    ) -> ApiResult<DuplicateScanResult> {
-        let scan_id = scan_id.trim().to_owned();
-        let Some(state) = self.duplicate_scans.lock().await.get(&scan_id).cloned() else {
-            return Err(ApiError::Message(format!(
-                "Duplicate scan {scan_id} was not found."
-            )));
-        };
-        let mut sources = Vec::with_capacity(state.sources.len());
-        for mut source in state.sources {
-            if source.remote {
-                let prepared = self
-                    .explorer
-                    .prepare_open_item(crate::domain::explorer::PrepareOpenItemRequest {
-                        path: source.candidate.path.clone(),
-                        size_bytes: Some(source.candidate.size_bytes.min(i64::MAX as u64) as i64),
-                        remote_modified: source.remote_modified.clone(),
-                    })
-                    .await?;
-                let checksum = checksum_file(&PathBuf::from(prepared.local_path))?.sha256;
-                source.candidate.sha256 = Some(checksum);
-            }
-            sources.push(source);
-        }
-        let result = duplicate_result_from_sources(scan_id.clone(), sources.clone(), true, true)?;
-        self.duplicate_scans.lock().await.insert(
-            scan_id,
-            DuplicateScanState {
-                sources,
-                requested_hash_all: state.requested_hash_all,
-            },
-        );
-        Ok(result)
     }
 
     pub async fn saved_searches_snapshot(&self) -> ApiResult<SavedSearchesSnapshot> {
@@ -501,68 +455,27 @@ impl PowerPackService {
             .await
             .map_err(|err| ApiError::Message(format!("Symlink worker failed: {err}")))?
     }
-
-    async fn duplicate_remote_sources(
-        &self,
-        roots: &[String],
-    ) -> ApiResult<Vec<DuplicateCandidateSource>> {
-        let mut sources = Vec::new();
-        for root in roots {
-            let Some(root_path) = remote_root_uri_to_mount_path(root, &self.mount_root)? else {
-                continue;
-            };
-            let mut pending = vec![root_path];
-            while let Some(path) = pending.pop() {
-                let listing = self
-                    .explorer
-                    .list_directory(ListDirectoryRequest {
-                        path: Some(path),
-                        show_hidden: Some(true),
-                        force_remote_refresh: Some(true),
-                    })
-                    .await?;
-                for entry in listing.entries {
-                    match entry.kind {
-                        FileKind::Folder => pending.push(entry.path),
-                        FileKind::File => {
-                            let size_bytes = entry.size_bytes.unwrap_or(0);
-                            sources.push(DuplicateCandidateSource {
-                                remote_modified: entry.remote_modified.clone(),
-                                remote: true,
-                                candidate: DuplicateCandidate {
-                                    path: entry.path,
-                                    size_bytes,
-                                    modified_ms: 0,
-                                    sha256: None,
-                                    remote: true,
-                                },
-                            });
-                        }
-                        FileKind::Symlink | FileKind::Other => {}
-                    }
-                }
-            }
-        }
-        Ok(sources)
-    }
 }
 
 /// The host explorer and SDK preview share the same ZIP metadata reader.
-pub(crate) fn archive_zip_entries<R: Read + io::Seek>(file: R, limit: usize) -> ApiResult<Vec<ArchiveEntry>> {
+pub(crate) fn archive_zip_entries<R: Read + io::Seek>(
+    file: R,
+    limit: usize,
+) -> ApiResult<Vec<ArchiveEntry>> {
     let mut archive = ZipArchive::new(file)
-            .map_err(|err| ApiError::Message(format!("Could not read ZIP archive: {err}")))?;
-        let mut entries = Vec::new();
-        for index in 0..archive.len().min(limit) {
-            let entry = archive
-                .by_index(index)
-                .map_err(|err| ApiError::Message(format!("Could not read ZIP entry: {err}")))?;
-            entries.push(ArchiveEntry {
-                path: entry.name().to_owned(),
-                is_dir: entry.is_dir(),
-                compressed_size: entry.compressed_size(),
-                uncompressed_size: entry.size(),
-            });
-        }
+        .map_err(|err| ApiError::Message(format!("Could not read ZIP archive: {err}")))?;
+    let mut entries = Vec::new();
+    for index in 0..archive.len().min(limit) {
+        let entry = archive
+            .by_index(index)
+            .map_err(|err| ApiError::Message(format!("Could not read ZIP entry: {err}")))?;
+        entries.push(ArchiveEntry {
+            path: entry.name().to_owned(),
+            is_dir: entry.is_dir(),
+            compressed_size: entry.compressed_size(),
+            uncompressed_size: entry.size(),
+        });
+    }
     Ok(entries)
 }
 
@@ -1055,46 +968,6 @@ fn read_symlink_blocking(
     })
 }
 
-fn remote_target_from_misty_uri(value: &str) -> ApiResult<Option<RemoteBrowseTarget>> {
-    let Some(rest) = value.trim().strip_prefix("misty://") else {
-        return Ok(None);
-    };
-    let (remote_name, remote_path) = rest.split_once('/').unwrap_or((rest, ""));
-    let remote_name = validate_remote_name(remote_name)?;
-    let remote_path = if remote_path.trim().is_empty() {
-        "/".to_owned()
-    } else {
-        normalize_remote_path(&format!("/{remote_path}"))?
-    };
-    Ok(Some(RemoteBrowseTarget {
-        provider_type: String::new(),
-        remote_name: remote_name.to_owned(),
-        remote_path,
-    }))
-}
-
-fn validate_remote_name(value: &str) -> ApiResult<&str> {
-    let value = value.trim();
-    if value.is_empty()
-        || value == "."
-        || value == ".."
-        || value.contains('/')
-        || value.contains('\\')
-        || value.contains(':')
-    {
-        return Err(ApiError::Message(format!("Invalid remote name '{value}'.")));
-    }
-    Ok(value)
-}
-
-fn remote_root_uri_to_mount_path(root: &str, mount_root: &Path) -> ApiResult<Option<String>> {
-    let root = root.trim();
-    if let Some(target) = remote_target_from_misty_uri(root)? {
-        return Ok(Some(target.virtual_path(mount_root).display().to_string()));
-    }
-    Ok(None)
-}
-
 async fn read_json_file<T>(path: &Path) -> ApiResult<T>
 where
     T: for<'de> Deserialize<'de> + Default,
@@ -1298,19 +1171,6 @@ fn new_id(prefix: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn remote_root_uri_maps_to_mount_path() {
-        let mount_root = Path::new("/Users/misty/.misty/mnt");
-        let path = remote_root_uri_to_mount_path("misty://drive-work/Reports", mount_root)
-            .unwrap()
-            .expect("remote path");
-
-        assert_eq!(
-            Path::new(&path),
-            mount_root.join("drive-work").join("Reports")
-        );
-    }
 
     #[test]
     fn duplicate_result_reports_remote_candidates_before_approval() {

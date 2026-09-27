@@ -85,7 +85,7 @@ describe("global semantic Explorer search", () => {
       }),
     ).toHaveLength(0);
     expect(semanticHitsToSearchResults([hit], [remote], { scope: "local" })).toHaveLength(0);
-    expect(semanticHitsToSearchResults([hit], [remote], { scope: "remotes" })).toHaveLength(1);
+    expect(semanticHitsToSearchResults([hit], [remote], { scope: "remotes" })).toHaveLength(0);
     expect(isPathWithin("C:\\Photos\\one.png", "C:\\Photos")).toBe(true);
   });
 

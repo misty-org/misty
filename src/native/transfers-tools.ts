@@ -24,7 +24,6 @@ import type {
   FileToolsSymlinkTargetRequest,
   FileToolsSymlinkTargetResult,
   OperationQueueSnapshot,
-  ProviderRemote,
   SavedSearch,
   SavedSearchesSnapshot,
   TransferFilter,
@@ -135,10 +134,6 @@ export function duplicatesCancel(scanId: string): Promise<boolean> {
   return invoke("duplicates_cancel", { scanId });
 }
 
-export function duplicatesHashRemoteCandidates(scanId: string): Promise<DuplicateScanResult> {
-  return invoke("duplicates_hash_remote_candidates", { scanId });
-}
-
 export function savedSearchesSnapshot(): Promise<SavedSearchesSnapshot> {
   return invoke("saved_searches_snapshot");
 }
@@ -224,8 +219,4 @@ export function fileSyncCompare(request: FileSyncCompareRequest): Promise<FileSy
 
 export function fileSyncApply(request: FileSyncApplyRequest): Promise<FileSyncApplyResult> {
   return invoke("file_sync_apply", { request });
-}
-
-export function remoteDisplayName(remote: ProviderRemote): string {
-  return remote.name || "(unnamed remote)";
 }

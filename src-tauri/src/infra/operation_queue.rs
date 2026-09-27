@@ -91,9 +91,6 @@ impl OperationQueueService {
         if request.sources.is_empty() {
             return Ok(self.snapshot_with_redo_state().await);
         }
-        if let Some(snapshot) = self.enqueue_local_folder_upload_tree(&request).await? {
-            return Ok(snapshot);
-        }
 
         let mut descriptors = Vec::with_capacity(request.sources.len());
         let mut payloads = Vec::with_capacity(request.sources.len());
@@ -145,74 +142,6 @@ impl OperationQueueService {
         };
         self.enqueue_operations(label, false, descriptors, payloads)
             .await
-    }
-
-    async fn enqueue_local_folder_upload_tree(
-        &self,
-        request: &PasteItemsRequest,
-    ) -> ApiResult<Option<OperationQueueSnapshot>> {
-        if request.sources.len() != 1
-            || request.target_name.is_some()
-            || !matches!(request.operation, ClipboardOperation::Copy)
-        {
-            return Ok(None);
-        }
-        let Some(source) = request.sources.first() else {
-            return Ok(None);
-        };
-        if !source.is_directory
-            || self.explorer.remote_target_for_path(&source.path).is_some()
-            || self
-                .explorer
-                .remote_target_for_path(&request.destination_directory)
-                .is_none()
-        {
-            return Ok(None);
-        }
-
-        let source_path = Path::new(&source.path);
-        let source_name = source_path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .ok_or_else(|| ApiError::Message("Source folder has no name.".to_string()))?;
-        let expanded_destination = Path::new(&request.destination_directory)
-            .join(source_name)
-            .to_string_lossy()
-            .to_string();
-        let source_endpoint = self.endpoint_for_path(source.path.clone());
-        let target_endpoint = self.endpoint_for_path(expanded_destination.clone());
-        let parent_kind =
-            operation_kind_for_paste(request.operation, &source_endpoint, &target_endpoint);
-        let mut parent_descriptor = OperationDescriptor {
-            kind: parent_kind,
-            source: source_endpoint,
-            target: target_endpoint,
-            supports_replace: true,
-            supports_keep_both: true,
-            title: format!("{} {}", operation_action_label(parent_kind), source_name),
-            ..OperationDescriptor::default()
-        };
-        let parent_transfer_id = self
-            .transfers
-            .create_transfer(transfer_record_for_operation(&parent_descriptor))
-            .await?;
-        parent_descriptor.transfer_id = parent_transfer_id;
-        let descriptors = vec![parent_descriptor];
-        let payloads = vec![QueuedExplorerOperation::Paste(PasteItemsRequest {
-            sources: vec![source.clone()],
-            destination_directory: request.destination_directory.clone(),
-            operation: request.operation,
-            target_name: None,
-        })];
-        Ok(Some(
-            self.enqueue_operations(
-                format!("{} {}", operation_action_label(parent_kind), source_name),
-                false,
-                descriptors,
-                payloads,
-            )
-            .await?,
-        ))
     }
 
     pub async fn enqueue_create_item(
@@ -371,9 +300,6 @@ impl OperationQueueService {
     }
 
     async fn should_fan_out_delete_path(&self, path: &str) -> ApiResult<bool> {
-        if self.explorer.remote_target_for_path(path).is_some() {
-            return Ok(false);
-        }
         Ok(self.explorer.item_is_directory(path).await? == Some(true))
     }
 
@@ -588,8 +514,7 @@ impl OperationQueueService {
     }
 
     fn endpoint_for_path(&self, path: String) -> OperationEndpoint {
-        let remote = self.explorer.remote_target_for_path(&path);
-        endpoint_for_path(path, remote)
+        endpoint_for_path(path, None)
     }
 
     pub async fn enqueue_file_sync_apply(
@@ -901,32 +826,9 @@ impl OperationQueueService {
         row: &crate::domain::file_transfer::FileTransferRecord,
     ) -> ApiResult<OperationQueueSnapshot> {
         if row.item_type == FileTransferItemType::Remote {
-            if row.remote_source_name.is_empty()
-                || row.remote_source_path.is_empty()
-                || row.remote_dest_name.is_empty()
-                || row.remote_dest_path.is_empty()
-            {
-                return Err(ApiError::Message(
-                    "Remote rename undo is missing source or destination metadata.".to_string(),
-                ));
-            }
-            let current_path = self
-                .explorer
-                .remote_virtual_path(&row.remote_dest_name, &row.remote_dest_path)
-                .await?;
-            let original_name = file_name_for_path(&row.remote_source_path)?;
-            let source_is_directory = self
-                .explorer
-                .item_is_directory(&current_path)
-                .await?
-                .unwrap_or(false);
-            return self
-                .enqueue_rename_item_inner(RenameItemRequest {
-                    path: current_path,
-                    new_name: original_name,
-                    source_is_directory: Some(source_is_directory),
-                })
-                .await;
+            return Err(ApiError::Message(
+                "Cloud file transfers are no longer supported.".into(),
+            ));
         }
 
         if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
@@ -953,43 +855,9 @@ impl OperationQueueService {
         row: &crate::domain::file_transfer::FileTransferRecord,
     ) -> ApiResult<OperationQueueSnapshot> {
         if row.item_type == FileTransferItemType::Remote {
-            if row.remote_source_name.is_empty()
-                || row.remote_source_path.is_empty()
-                || row.remote_dest_name.is_empty()
-                || row.remote_dest_path.is_empty()
-            {
-                return Err(ApiError::Message(
-                    "Remote move undo is missing source or destination metadata.".to_string(),
-                ));
-            }
-            let current_path = self
-                .explorer
-                .remote_virtual_path(&row.remote_dest_name, &row.remote_dest_path)
-                .await?;
-            let original_parent_path = remote_parent_for_path(&row.remote_source_path)?;
-            let original_parent = self
-                .explorer
-                .remote_virtual_path(&row.remote_source_name, &original_parent_path)
-                .await?;
-            let original_name = file_name_for_path(&row.remote_source_path)?;
-            let is_directory = self
-                .explorer
-                .item_is_directory(&current_path)
-                .await?
-                .unwrap_or(false);
-            return self
-                .enqueue_paste_items_inner(PasteItemsRequest {
-                    sources: vec![PasteItem {
-                        path: current_path,
-                        is_directory,
-                        size_bytes: None,
-                        remote_modified: None,
-                    }],
-                    destination_directory: original_parent,
-                    operation: ClipboardOperation::Move,
-                    target_name: Some(original_name),
-                })
-                .await;
+            return Err(ApiError::Message(
+                "Cloud file transfers are no longer supported.".into(),
+            ));
         }
 
         if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
@@ -1041,8 +909,9 @@ impl OperationQueueService {
         row: &FileTransferRecord,
     ) -> ApiResult<OperationQueueSnapshot> {
         match row.transfer_type {
-            FileTransferType::Upload => self.enqueue_retry_upload(row).await,
-            FileTransferType::Download => self.enqueue_retry_download(row).await,
+            FileTransferType::Upload | FileTransferType::Download => Err(ApiError::Message(
+                "Cloud file transfers are no longer supported.".into(),
+            )),
             FileTransferType::Copy => {
                 self.enqueue_retry_paste(row, ClipboardOperation::Copy)
                     .await
@@ -1060,82 +929,6 @@ impl OperationQueueService {
         }
     }
 
-    async fn enqueue_retry_upload(
-        &self,
-        row: &FileTransferRecord,
-    ) -> ApiResult<OperationQueueSnapshot> {
-        if row.local_source_path.is_empty()
-            || row.remote_dest_name.is_empty()
-            || row.remote_dest_path.is_empty()
-        {
-            return Err(ApiError::Message(
-                "Upload retry is missing source or destination metadata.".to_string(),
-            ));
-        }
-        let destination_parent_path = remote_parent_for_path(&row.remote_dest_path)?;
-        let destination_directory = self
-            .explorer
-            .remote_virtual_path(&row.remote_dest_name, &destination_parent_path)
-            .await?;
-        let is_directory = self
-            .explorer
-            .item_is_directory(&row.local_source_path)
-            .await?
-            .unwrap_or(false);
-        self.enqueue_paste_items_inner(PasteItemsRequest {
-            sources: vec![PasteItem {
-                path: row.local_source_path.clone(),
-                is_directory,
-                size_bytes: None,
-                remote_modified: None,
-            }],
-            destination_directory,
-            operation: ClipboardOperation::Copy,
-            target_name: Some(file_name_for_path(&row.remote_dest_path)?),
-        })
-        .await
-    }
-
-    async fn enqueue_retry_download(
-        &self,
-        row: &FileTransferRecord,
-    ) -> ApiResult<OperationQueueSnapshot> {
-        if row.remote_source_name.is_empty()
-            || row.remote_source_path.is_empty()
-            || row.local_dest_path.is_empty()
-        {
-            return Err(ApiError::Message(
-                "Download retry is missing source or destination metadata.".to_string(),
-            ));
-        }
-        let source_path = self
-            .explorer
-            .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
-            .await?;
-        let destination_directory = Path::new(&row.local_dest_path)
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .to_string_lossy()
-            .to_string();
-        let is_directory = self
-            .explorer
-            .item_is_directory(&source_path)
-            .await?
-            .unwrap_or(false);
-        self.enqueue_paste_items_inner(PasteItemsRequest {
-            sources: vec![PasteItem {
-                path: source_path,
-                is_directory,
-                size_bytes: None,
-                remote_modified: None,
-            }],
-            destination_directory,
-            operation: ClipboardOperation::Copy,
-            target_name: Some(file_name_for_path(&row.local_dest_path)?),
-        })
-        .await
-    }
-
     async fn enqueue_retry_paste(
         &self,
         row: &FileTransferRecord,
@@ -1143,10 +936,6 @@ impl OperationQueueService {
     ) -> ApiResult<OperationQueueSnapshot> {
         let source_path = if !row.local_source_path.is_empty() {
             row.local_source_path.clone()
-        } else if !row.remote_source_name.is_empty() && !row.remote_source_path.is_empty() {
-            self.explorer
-                .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
-                .await?
         } else {
             return Err(ApiError::Message(
                 "Transfer retry is missing source metadata.".to_string(),
@@ -1160,14 +949,6 @@ impl OperationQueueService {
                     .to_string_lossy()
                     .to_string(),
                 file_name_for_path(&row.local_dest_path)?,
-            )
-        } else if !row.remote_dest_name.is_empty() && !row.remote_dest_path.is_empty() {
-            let parent_path = remote_parent_for_path(&row.remote_dest_path)?;
-            (
-                self.explorer
-                    .remote_virtual_path(&row.remote_dest_name, &parent_path)
-                    .await?,
-                file_name_for_path(&row.remote_dest_path)?,
             )
         } else {
             return Err(ApiError::Message(
@@ -1199,10 +980,6 @@ impl OperationQueueService {
     ) -> ApiResult<OperationQueueSnapshot> {
         let target_path = if !row.local_dest_path.is_empty() {
             row.local_dest_path.clone()
-        } else if !row.remote_dest_name.is_empty() && !row.remote_dest_path.is_empty() {
-            self.explorer
-                .remote_virtual_path(&row.remote_dest_name, &row.remote_dest_path)
-                .await?
         } else {
             return Err(ApiError::Message(
                 "Create retry is missing destination metadata.".to_string(),
@@ -1226,20 +1003,9 @@ impl OperationQueueService {
         row: &FileTransferRecord,
     ) -> ApiResult<OperationQueueSnapshot> {
         let (source_path, target_name) = if row.item_type == FileTransferItemType::Remote {
-            if row.remote_source_name.is_empty()
-                || row.remote_source_path.is_empty()
-                || row.remote_dest_path.is_empty()
-            {
-                return Err(ApiError::Message(
-                    "Rename retry is missing source or destination metadata.".to_string(),
-                ));
-            }
-            (
-                self.explorer
-                    .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
-                    .await?,
-                file_name_for_path(&row.remote_dest_path)?,
-            )
+            return Err(ApiError::Message(
+                "Cloud file transfers are no longer supported.".into(),
+            ));
         } else {
             if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
                 return Err(ApiError::Message(
@@ -1270,10 +1036,6 @@ impl OperationQueueService {
     ) -> ApiResult<OperationQueueSnapshot> {
         let path = if !row.local_source_path.is_empty() {
             row.local_source_path.clone()
-        } else if !row.remote_source_name.is_empty() && !row.remote_source_path.is_empty() {
-            self.explorer
-                .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
-                .await?
         } else {
             return Err(ApiError::Message(
                 "Delete retry is missing source metadata.".to_string(),
@@ -1291,31 +1053,9 @@ impl OperationQueueService {
         row: &FileTransferRecord,
     ) -> ApiResult<OperationQueueSnapshot> {
         if row.item_type == FileTransferItemType::Remote {
-            if row.remote_source_name.is_empty()
-                || row.remote_source_path.is_empty()
-                || row.remote_dest_path.is_empty()
-            {
-                return Err(ApiError::Message(
-                    "Remote rename redo is missing source or destination metadata.".to_string(),
-                ));
-            }
-            let current_path = self
-                .explorer
-                .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
-                .await?;
-            let redone_name = file_name_for_path(&row.remote_dest_path)?;
-            let source_is_directory = self
-                .explorer
-                .item_is_directory(&current_path)
-                .await?
-                .unwrap_or(false);
-            return self
-                .enqueue_rename_item_inner(RenameItemRequest {
-                    path: current_path,
-                    new_name: redone_name,
-                    source_is_directory: Some(source_is_directory),
-                })
-                .await;
+            return Err(ApiError::Message(
+                "Cloud file transfers are no longer supported.".into(),
+            ));
         }
 
         if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
@@ -1342,43 +1082,9 @@ impl OperationQueueService {
         row: &FileTransferRecord,
     ) -> ApiResult<OperationQueueSnapshot> {
         if row.item_type == FileTransferItemType::Remote {
-            if row.remote_source_name.is_empty()
-                || row.remote_source_path.is_empty()
-                || row.remote_dest_name.is_empty()
-                || row.remote_dest_path.is_empty()
-            {
-                return Err(ApiError::Message(
-                    "Remote move redo is missing source or destination metadata.".to_string(),
-                ));
-            }
-            let current_path = self
-                .explorer
-                .remote_virtual_path(&row.remote_source_name, &row.remote_source_path)
-                .await?;
-            let redone_parent_path = remote_parent_for_path(&row.remote_dest_path)?;
-            let redone_parent = self
-                .explorer
-                .remote_virtual_path(&row.remote_dest_name, &redone_parent_path)
-                .await?;
-            let redone_name = file_name_for_path(&row.remote_dest_path)?;
-            let is_directory = self
-                .explorer
-                .item_is_directory(&current_path)
-                .await?
-                .unwrap_or(false);
-            return self
-                .enqueue_paste_items_inner(PasteItemsRequest {
-                    sources: vec![PasteItem {
-                        path: current_path,
-                        is_directory,
-                        size_bytes: None,
-                        remote_modified: None,
-                    }],
-                    destination_directory: redone_parent,
-                    operation: ClipboardOperation::Move,
-                    target_name: Some(redone_name),
-                })
-                .await;
+            return Err(ApiError::Message(
+                "Cloud file transfers are no longer supported.".into(),
+            ));
         }
 
         if row.local_source_path.is_empty() || row.local_dest_path.is_empty() {
@@ -2228,7 +1934,7 @@ mod tests {
     use super::*;
     use crate::infra::{
         environment::AppEnvironmentService, explorer_library::ExplorerLibraryService,
-        providers::ProviderService, storage::StorageService, transfers::TransferFilter,
+        transfers::TransferFilter,
     };
 
     #[test]
@@ -3353,17 +3059,9 @@ mod tests {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-upload-home"));
         let mount_root = environment.mount_root();
-        let proxy = StorageService::new(environment.clone());
-        let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let explorer = ExplorerService::new(
-            environment,
-            proxy,
-            providers,
-            transfers.clone(),
-            explorer_library,
-        );
+        let explorer = ExplorerService::new(environment, transfers.clone(), explorer_library);
         let service = OperationQueueService::new(explorer, transfers.clone());
         service.pause_all().await;
 
@@ -3416,17 +3114,9 @@ mod tests {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-delete-home"));
         let mount_root = environment.mount_root();
-        let proxy = StorageService::new(environment.clone());
-        let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let explorer = ExplorerService::new(
-            environment,
-            proxy,
-            providers,
-            transfers.clone(),
-            explorer_library,
-        );
+        let explorer = ExplorerService::new(environment, transfers.clone(), explorer_library);
         let service = OperationQueueService::new(explorer, transfers.clone());
         service.pause_all().await;
 
@@ -3455,17 +3145,9 @@ mod tests {
 
     fn test_operation_queue_service() -> OperationQueueService {
         let environment = AppEnvironmentService::for_test_home(unique_test_dir("service-home"));
-        let proxy = StorageService::new(environment.clone());
-        let providers = ProviderService::new(proxy.clone());
         let transfers = TransferService::new(environment.clone());
         let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let explorer = ExplorerService::new(
-            environment,
-            proxy,
-            providers,
-            transfers.clone(),
-            explorer_library,
-        );
+        let explorer = ExplorerService::new(environment, transfers.clone(), explorer_library);
         OperationQueueService::new(explorer, transfers)
     }
 

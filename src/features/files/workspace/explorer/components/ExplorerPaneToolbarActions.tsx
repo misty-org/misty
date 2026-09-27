@@ -184,10 +184,12 @@ export const ExplorerPaneToolbarActions = memo(function ExplorerPaneToolbarActio
                   <AppWindow />
                   Open With…
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={!props.hasRemoteSelection} onSelect={props.onDownload}>
-                  <Download />
-                  Download
-                </DropdownMenuItem>
+                {props.hasRemoteSelection ? (
+                  <DropdownMenuItem onSelect={props.onDownload}>
+                    <Download />
+                    Save to Downloads
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   disabled={props.selectedCount !== 1 || !props.selectedEntryPath}
                   onSelect={() => {

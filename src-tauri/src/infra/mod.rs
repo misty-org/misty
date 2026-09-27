@@ -1,31 +1,30 @@
-pub mod agent_workspace;
-#[cfg(desktop)]
-pub mod browser_agent_control;
 #[cfg(desktop)]
 pub mod agent_device_identity;
+pub mod agent_workspace;
 pub mod agents;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
+#[cfg(desktop)]
+pub mod browser_agent_control;
 
 #[cfg(desktop)]
-pub(crate) mod browser_macos;
+pub mod browser_history;
 #[cfg(desktop)]
 pub mod browser_library;
 #[cfg(desktop)]
-pub mod browser_history;
-pub mod browser_search_suggest;
+pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
 #[cfg(desktop)]
 mod browser_scripts;
+pub mod browser_search_suggest;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
 mod browser_theme;
 pub mod claude;
-pub(crate) mod cloud_handoff;
 #[cfg(all(desktop, not(target_os = "macos")))]
 pub mod code_lsp;
 pub mod command_defaults;
@@ -33,8 +32,8 @@ pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;
 pub mod credential_store;
+pub mod credentials;
 pub mod devices;
-mod direct_cloud;
 pub mod directory_size;
 mod directory_size_local;
 pub mod document_intelligence;
@@ -42,7 +41,6 @@ pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 pub mod file_sync;
-pub mod credentials;
 mod macos_privacy;
 pub mod mail_cache;
 #[cfg(desktop)]
@@ -60,7 +58,6 @@ pub mod peer_identity;
 #[cfg(desktop)]
 mod plugin_routes;
 pub mod power_pack;
-pub mod providers;
 pub mod search;
 pub mod settings;
 mod settings_migration;
@@ -68,8 +65,6 @@ pub mod smart_library;
 mod smart_library_ingestion;
 #[cfg(desktop)]
 pub mod ssh_terminal;
-pub mod storage;
-pub mod storage_runtime;
 #[cfg(desktop)]
 pub mod system_dependencies;
 #[cfg(desktop)]
@@ -87,7 +82,10 @@ pub mod page_state;
 pub mod browser_provider;
 
 #[cfg(all(debug_assertions, target_os = "macos"))]
-pub(crate) async fn evaluate_probe_javascript(webview: tauri::Webview, script: String) -> Result<String, String> {
+pub(crate) async fn evaluate_probe_javascript(
+    webview: tauri::Webview,
+    script: String,
+) -> Result<String, String> {
     browser_macos::evaluate_browser_async_javascript(webview, script).await
 }
 
@@ -98,11 +96,11 @@ pub(crate) mod native_process_worker;
 #[cfg(target_os = "macos")]
 pub(crate) mod peer_transport_worker;
 #[cfg(target_os = "macos")]
-pub(crate) mod space_peer_session;
+pub(crate) mod space_peer_files;
 #[cfg(target_os = "macos")]
 pub(crate) mod space_peer_roots;
 #[cfg(target_os = "macos")]
-pub(crate) mod space_peer_files;
+pub(crate) mod space_peer_session;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod terminal_service;
@@ -121,21 +119,21 @@ pub mod workspace_autopilot;
 pub mod browser_sync;
 pub mod workspace_recovery;
 
-#[cfg(target_os = "macos")]
-pub(crate) mod browser_cookie_store;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_cookie_restore;
-#[cfg(any(target_os = "macos", windows))]
-pub(crate) mod browser_website_storage;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_storage_restore;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_session_storage;
 #[cfg(any(windows, test))]
 mod browser_cookie_cdp;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_cookie_restore;
+#[cfg(target_os = "macos")]
+pub(crate) mod browser_cookie_store;
 #[cfg(windows)]
 #[path = "browser_cookie_store_windows.rs"]
 pub(crate) mod browser_cookie_store;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_session_storage;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_storage_restore;
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) mod browser_website_storage;
 
 #[cfg(desktop)]
 pub mod cursor_companion;

@@ -73,7 +73,7 @@ export function selectedEntriesForPane(pane: PaneExplorerState | undefined): Fil
 
 export function selectedRemotePasteItemsForPane(pane: PaneExplorerState | undefined): PasteItem[] {
   return H.selectedEntriesForPane(pane)
-    .filter((entry) => !entry.isDeleted && entry.location.kind === "remote")
+    .filter((entry) => !entry.isDeleted && entry.location.kind === "peer_device")
     .map(H.pasteItemForEntry);
 }
 
@@ -338,9 +338,9 @@ export function deleteQueuedMessage(count: number, permanent: boolean): string {
 }
 
 export {
-  splitRenameParts,
-  validateRenameValue,
-  validateBatchRenameItems,
   renameTargetPath,
+  splitRenameParts,
+  validateBatchRenameItems,
+  validateRenameValue,
   withInlineEditValidation,
 } from "../../utils/inlineEdit";

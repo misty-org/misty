@@ -1,5 +1,3 @@
-import { useAppStore } from "@/features/app-shell";
-import { selectAdvancedPreferences, useSettingsStore } from "@/features/settings";
 import {
   clipboardApplyShared,
   clipboardSharedImageBytes,
@@ -130,7 +128,12 @@ export async function sharedClipboardRemotePasteItems(payload: ClipboardPayload)
       localPath: clipboardRefValue(ref.local_path),
       isDirectory: ref.is_dir,
     }))
-    .filter((ref) => !ref.localPath && ref.providerType && ref.remoteName && ref.remotePath);
+    .filter(
+      (ref) =>
+        !ref.localPath &&
+        ref.providerType === "misty_peer" &&
+        ref.remotePath.startsWith("misty://device/"),
+    );
   if (remoteRefs.length === 0) return [];
   useExplorerStore
     .getState()
@@ -143,7 +146,7 @@ export async function sharedClipboardRemotePasteItems(payload: ClipboardPayload)
   try {
     const prepared = await explorerPrepareDragItems({
       items: remoteRefs.map((ref) => ({
-        path: remoteClipboardMountPath(ref),
+        path: ref.remotePath,
         isDirectory: ref.isDirectory,
       })),
     });
@@ -171,38 +174,6 @@ export async function sharedClipboardRemotePasteItems(payload: ClipboardPayload)
   }
 }
 
-export function remoteClipboardMountPath(ref: {
-  providerType: string;
-  remoteName: string;
-  remotePath: string;
-}): string {
-  const app = useAppStore.getState().app;
-  const homePath = app?.environment.homeDir ?? "/";
-  const settingsMountPath = selectAdvancedPreferences(
-    useSettingsStore.getState().settings?.document,
-  ).mountPath;
-  const mountRoot = resolveMountRoot(
-    homePath,
-    settingsMountPath || app?.environment.mountPath || ".misty/mnt",
-  );
-  return joinPath(mountRoot, ref.remoteName, ref.remotePath);
-}
-
 export function clipboardRefValue(value: string): string {
   return value.trim();
-}
-
-function resolveMountRoot(homePath: string, configuredPath: string): string {
-  if (configuredPath.startsWith("/")) return configuredPath;
-  return joinPath(homePath, configuredPath);
-}
-
-function joinPath(...parts: string[]): string {
-  const [first, ...rest] = parts.filter(Boolean);
-  if (!first) return "/";
-  return (
-    [first.replace(/\/+$/, ""), ...rest.map((part) => part.replace(/^\/+|\/+$/g, ""))]
-      .filter(Boolean)
-      .join("/") || "/"
-  );
 }

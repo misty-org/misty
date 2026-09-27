@@ -257,9 +257,9 @@ Show one 48px avatar and one 16px agent name per 68px row, separated by a 12px g
 
 ### Cloud avatars
 
-All four color presets use the current monochrome Misty mark, bundled inline and tinted with a CSS mask. The mark is static, including under reduced-motion preferences. The picker and agent identities share the same asset.
+Agent identities use the original animated WebP cloud sprites: Sky (Original), Lavender (Wink), Mint (Focused), and Peach (Joyful). Assets are bundled inline for packaged reliability, with static WebP posters selected for reduced-motion preferences. The cursor companion and its size preview use the original Sky expression cycle.
 
-The canonical mark is `src/assets/branding/misty-white.png`; the desktop icon is `src/assets/branding/misty-icon.png`. The identity picker previews immediately and persists through Save changes as `avatar.cloudVariant`, retaining that field and the existing color IDs for profile compatibility. Existing custom `avatar.emoji` values remain authoritative until a mark color is selected. New agents start with Lavender; older personal agents without a saved choice receive a stable ID-based variant. Other avatar metadata is preserved.
+The identity picker previews immediately and persists through Save changes as `avatar.cloudVariant`. Existing custom `avatar.emoji` values remain authoritative until a cloud is selected. New agents start with Lavender; older personal agents without a saved choice receive a stable ID-based variant. Other avatar metadata is preserved.
 
 ### Inline companion controls
 

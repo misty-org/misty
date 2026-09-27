@@ -1,4 +1,5 @@
 import { useSmartLibraryStore } from "@/features/library/library";
+import { MistyFilePicker } from "@/features/picker";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -14,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui";
-import { MistyFilePicker } from "@/features/picker";
 import {
   BrainCircuit,
   Cloud,
@@ -129,7 +129,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                   className="hidden max-w-72 truncate md:inline-flex"
                   title={library.rootPath}
                 >
-                  {library.displayName} · {library.sourceKind === "cloud" ? "Cloud" : "Local"}
+                  {library.displayName} · Local
                 </Badge>
               ) : null}
               <Button
@@ -168,11 +168,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                 <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-charcoal-border bg-charcoal-card px-6 py-3 ">
                   <div className="flex min-w-0 items-center gap-2">
                     <Badge variant="secondary">
-                      {library.sourceKind === "cloud" ? (
-                        <Cloud size={13} />
-                      ) : (
-                        <HardDrive size={13} />
-                      )}
+                      <HardDrive size={13} />
                       {library.preflight.totalImages.toLocaleString()} files
                     </Badge>
                     <Badge variant="secondary">
@@ -385,8 +381,7 @@ function LibraryOnboarding(props: {
           </Button>
         </div>
         <span className="text-xs text-cream-muted">
-          Connected-cloud folders can be selected by opening them in Files and choosing Use Current
-          Folder.
+          Choose a folder on this device or a mounted network drive.
         </span>
       </div>
     </div>

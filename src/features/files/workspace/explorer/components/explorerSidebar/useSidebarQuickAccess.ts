@@ -1,3 +1,4 @@
+import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import { useMemo } from "react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
 import type { QuickAccessItem } from "../../model/types/components/ExplorerSidebar";
@@ -34,12 +35,12 @@ export function useSidebarQuickAccess(options: {
   const visiblePinnedPaths = useMemo(
     () =>
       dedupePinnedPathsForQuickAccess(
-        sidebar.pinnedPaths,
+        sidebar.pinnedPaths.filter((path) => !isRetiredCloudLocation(path, sidebar.mountRoot)),
         quickAccess
           .filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths))
           .map((item) => item.path),
       ),
-    [hiddenQuickAccessPaths, sidebar.pinnedPaths, quickAccess],
+    [hiddenQuickAccessPaths, sidebar.pinnedPaths, sidebar.mountRoot, quickAccess],
   );
   const visibleQuickAccess = useMemo(
     () => quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),

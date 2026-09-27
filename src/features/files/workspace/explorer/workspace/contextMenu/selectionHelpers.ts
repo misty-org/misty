@@ -16,8 +16,7 @@ export function fileStem(path: string) {
 }
 
 export function primaryShortcutLabel(): string {
-  if (typeof navigator !== "undefined" && /Mac/i.test(navigator.platform))
-    return "Cmd";
+  if (typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)) return "Cmd";
   return "Ctrl";
 }
 
@@ -45,7 +44,7 @@ export function selectedRemoteEntryCount(
   if (!pane?.listing) return 0;
   const selected = new Set(pane.selectedIds);
   return pane.listing.entries.filter(
-    (entry) => selected.has(entry.id) && !entry.isDeleted && entry.location.kind === "remote",
+    (entry) => selected.has(entry.id) && !entry.isDeleted && entry.location.kind !== "local",
   ).length;
 }
 

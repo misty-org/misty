@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import type { MistyFilePickerMode } from "../types/FilePicker";
 import type { MistyFilePickerPreparedSelection } from "../../preparePickerSelections";
+import type { MistyFilePickerMode } from "../types/FilePicker";
 
 export interface MistyFilePickerProps {
   mode: MistyFilePickerMode;
@@ -15,7 +15,7 @@ export interface MistyFilePickerProps {
   allowedExtensions?: string[];
   /** Source switcher rendered in the header when this picker is hosted by MistyPicker. */
   sourceToggle?: ReactNode;
-  allowRemoteFiles?: boolean;
+  allowDeviceFiles?: boolean;
   onCancel: () => void;
   onSelect: (path: string) => void;
   onSelectMany?: (paths: string[]) => void;

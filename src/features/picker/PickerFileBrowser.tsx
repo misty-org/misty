@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "@/features/app-shell";
-import { useProvidersStore } from "@/features/providers";
+import type { ExplorerSortState } from "@/features/file-ui";
 import {
-  useSettingsStore,
+  ExplorerPickerToolbar,
+  FileBrowserRuntimeProvider,
+  FileBrowserView,
+} from "@/features/file-ui";
+import {
   selectAdvancedPreferences,
   selectGeneralPreferences,
+  useSettingsStore,
 } from "@/features/settings";
+import type { DirectoryListing, MountedDevice } from "@/native/contracts";
 import { devicesSnapshot, explorerListDirectory } from "@/native/filesystem";
-import { FileBrowserView } from "@/features/file-ui";
-import { FileBrowserRuntimeProvider } from "@/features/file-ui";
-import { ExplorerPickerToolbar } from "@/features/file-ui";
-import type { ExplorerSortState } from "@/features/file-ui";
-import type { DirectoryListing, MountedDevice, ProviderRemote } from "@/native/contracts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PickerPlaces } from "./PickerPlaces";
 import { resolveMountRoot, resolvePreferredRoot } from "./filePickerPaths";
 
@@ -40,13 +41,11 @@ export function PickerFileBrowser({
   onChange,
   initialPath,
   multiple,
-  remotes,
 }: {
   state: PickerBrowserState;
   onChange(state: PickerBrowserState): void;
   initialPath?: string | null;
   multiple: boolean;
-  remotes: ProviderRemote[];
 }) {
   const app = useAppStore((s) => s.app);
   const preferences = useSettingsStore((s) => s.settings?.document);
@@ -130,7 +129,6 @@ export function PickerFileBrowser({
         if (active) setDevices(value.devices);
       })
       .catch(noAction);
-    void useProvidersStore.getState().load().catch(noAction);
     return () => {
       active = false;
     };
@@ -179,8 +177,6 @@ export function PickerFileBrowser({
             homePath={home}
             activePath={path}
             mountRoot={mount}
-            remotes={remotes}
-            remoteLoading={false}
             devices={devices}
             devicesLoading={false}
             pinnedPaths={pinnedPaths}

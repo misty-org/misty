@@ -22,7 +22,6 @@ export type SettingsSection =
   | "spaces-agenda"
   | "spaces-manage"
   | "files-locations"
-  | "files-connections"
   | "files-indexing"
   | "agents-defaults"
   | "agents-memory"
