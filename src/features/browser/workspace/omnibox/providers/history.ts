@@ -1,10 +1,4 @@
-import {
-  baseRelevance,
-  frecencyBonus,
-  inlineWorthy,
-  matchQuality,
-  relevance,
-} from "../relevance";
+import { baseRelevance, frecencyBonus, inlineWorthy, matchQuality, relevance } from "../relevance";
 import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "../types";
 import { describeUrl, inlineCompletion, urlKey } from "../urlText";
 import { wait, type OmniboxDeps } from "./deps";
@@ -20,12 +14,17 @@ interface PageStats {
   lastVisitedAt: number;
 }
 
-function historyMatch(input: OmniboxInput, page: PageStats, removable: boolean): OmniboxMatch | null {
+function historyMatch(
+  input: OmniboxInput,
+  page: PageStats,
+  removable: boolean,
+): OmniboxMatch | null {
   const described = describeUrl(page.url);
   if (!described || urlKey(page.url) === urlKey(input.currentUrl)) return null;
   const quality = matchQuality(input.text, page.url, page.title);
   if (quality === "none") return null;
-  const completion = quality === "address-prefix" ? inlineCompletion(input.text, page.url) : undefined;
+  const completion =
+    quality === "address-prefix" ? inlineCompletion(input.text, page.url) : undefined;
   const inline = completion !== undefined && inlineWorthy(page);
   const score = inline
     ? relevance.inlineAddress + frecencyBonus(page, 100)
@@ -79,7 +78,13 @@ export function sessionHistoryProvider(): OmniboxProvider {
           historyMatch(
             input,
             // Later entries are more recent; one visit each, none known to be typed.
-            { url, title: "", visits: 1, typedVisits: 0, lastVisitedAt: now - (entries.length - index) * 60_000 },
+            {
+              url,
+              title: "",
+              visits: 1,
+              typedVisits: 0,
+              lastVisitedAt: now - (entries.length - index) * 60_000,
+            },
             false,
           ),
         )

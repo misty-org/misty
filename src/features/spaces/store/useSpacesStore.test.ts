@@ -112,8 +112,6 @@ describe("buildMessageSpans", () => {
       { type: "text", text: "@Nonexistent summarize these files" },
     ]);
   });
-
-
 });
 
 describe("Space loading access boundary", () => {
@@ -305,8 +303,6 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
   });
 
-
-
   it("shows a message immediately and reconciles it after the server confirms", async () => {
     const request = deferred<{ message: SpaceMessage; triggered_runs: never[] }>();
     const optimistic = messageFixture({
@@ -356,8 +352,6 @@ describe("Spaces mutations", () => {
       { ...optimistic, local_delivery_state: "failed" },
     ]);
   });
-
-
 
   // Regression coverage: these actions previously had no error handling at all,
   // so a failed request left `error` untouched and the UI's error banner (which

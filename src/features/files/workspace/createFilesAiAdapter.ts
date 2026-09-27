@@ -1,4 +1,7 @@
-import type { AiSurfaceAdapter as MistySurfaceAdapter, AiArtifact as AiArtifact } from "@/features/ai-surface/types";
+import type {
+  AiSurfaceAdapter as MistySurfaceAdapter,
+  AiArtifact as AiArtifact,
+} from "@/features/ai-surface/types";
 
 import type { FileEntry } from "@/native/ipc";
 
@@ -24,11 +27,7 @@ export function createFilesAiAdapter(options: {
   }));
   const content = JSON.stringify({ selected: entries }).slice(0, 32 << 10);
   const applicablePlan = (artifact: AiArtifact) => {
-    if (
-      artifact.kind !== "file_plan" ||
-      !options.canMutate ||
-      selectedEntries.length === 0
-    )
+    if (artifact.kind !== "file_plan" || !options.canMutate || selectedEntries.length === 0)
       return null;
     const operations = artifact.operations as {
       steps?: Array<{
@@ -42,23 +41,15 @@ export function createFilesAiAdapter(options: {
     const steps = operations.steps;
     if (!steps?.length || steps.length > 100) return null;
     const byScope = new Map<string, (typeof selectedEntries)[number]>(
-      selectedEntries.map(
-        (entry) => [`file-${filesAiHash(entry.id)}`, entry] as const,
-      ),
+      selectedEntries.map((entry) => [`file-${filesAiHash(entry.id)}`, entry] as const),
     );
     if (
       steps.some(
-        (step) =>
-          !byScope.has(step.source_scope_id ?? "") ||
-          step.conflict_policy !== "ask",
+        (step) => !byScope.has(step.source_scope_id ?? "") || step.conflict_policy !== "ask",
       )
     )
       return null;
-    if (
-      selectedEntries.length === 1 &&
-      steps.length === 1 &&
-      steps[0].action === "rename"
-    ) {
+    if (selectedEntries.length === 1 && steps.length === 1 && steps[0].action === "rename") {
       const entry = byScope.get(steps[0].source_scope_id ?? "");
       const name = steps[0].display_name?.trim() ?? "";
       return entry &&
@@ -135,8 +126,7 @@ export function createFilesAiAdapter(options: {
       {
         id: "find-patterns",
         label: "Find patterns",
-        prompt:
-          "Find naming, type, size, and recency patterns in the selected file metadata.",
+        prompt: "Find naming, type, size, and recency patterns in the selected file metadata.",
       },
       {
         id: "search-strategy",
@@ -163,11 +153,8 @@ export function createFilesAiAdapter(options: {
             entry.readonly !== selectedEntries[index].readonly,
         )
       )
-        throw new Error(
-          "The file selection changed. Ask Misty to regenerate this plan.",
-        );
-      if (plan.kind === "rename")
-        await options.rename(selectedEntries[0], plan.name);
+        throw new Error("The file selection changed. Ask Misty to regenerate this plan.");
+      if (plan.kind === "rename") await options.rename(selectedEntries[0], plan.name);
       else await options.trash();
     },
   };

@@ -66,7 +66,6 @@ export function useGlobalMistyResults(input: {
       useWorkspaceStore.getState().focusTab(tab.id);
     }
     navigate(filesRoute);
-
   };
   const addResultContext = (result: GlobalSearchResult) => {
     const localPath =

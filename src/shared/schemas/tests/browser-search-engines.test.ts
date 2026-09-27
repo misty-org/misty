@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import engines from "../browser-search-engines.json";
 import definitions from "@/features/settings/profiles/definitions.json";
 
-const setting = (
-  definitions as { id: string; enum?: string[]; legacyValues?: string[] }[]
-).find((definition) => definition.id === "browser.searchEngine")!;
+const setting = (definitions as { id: string; enum?: string[]; legacyValues?: string[] }[]).find(
+  (definition) => definition.id === "browser.searchEngine",
+)!;
 
 describe("browser search engine table", () => {
   it("lists exactly the engines the synced setting accepts", () => {

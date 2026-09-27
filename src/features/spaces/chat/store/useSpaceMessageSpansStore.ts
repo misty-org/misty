@@ -42,13 +42,8 @@ export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefin
   return payload as unknown as SpaceMessage;
 }
 
-export function buildMessageSpans(
-  text: string,
-  members: SpaceMember[],
-): MessageSpan[] {
-  const candidates = [
-    ...members.map((member) => ({ label: member.name, userId: member.user_id })),
-  ]
+export function buildMessageSpans(text: string, members: SpaceMember[]): MessageSpan[] {
+  const candidates = [...members.map((member) => ({ label: member.name, userId: member.user_id }))]
     .filter((item) => item.label.trim())
     .sort((left, right) => right.label.length - left.label.length);
   if (candidates.length === 0) return [{ type: "text", text }];

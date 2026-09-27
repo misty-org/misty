@@ -77,7 +77,8 @@ export function isUiRuleSubject(path: string): boolean {
   );
 }
 
-export const uiExceptionsBaselinePath = "src/tests/architecture/fixtures/ui-exceptions-baseline.json";
+export const uiExceptionsBaselinePath =
+  "src/tests/architecture/fixtures/ui-exceptions-baseline.json";
 
 function collect(root: string, directory: string, found: Record<string, UiRuleId[]>) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {

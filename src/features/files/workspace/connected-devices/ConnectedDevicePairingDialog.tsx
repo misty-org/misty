@@ -79,7 +79,11 @@ export function ConnectedDevicePairingDialog({
         }}
       >
         <DialogContent className="max-w-md border-charcoal-border bg-charcoal-card text-cream">
-          {failureMessage ? <p role="alert" className="text-sm text-cream-muted">{failureMessage}</p> : null}
+          {failureMessage ? (
+            <p role="alert" className="text-sm text-cream-muted">
+              {failureMessage}
+            </p>
+          ) : null}
           <DialogHeader>
             <DialogTitle>Connect another device</DialogTitle>
             <DialogDescription>

@@ -312,7 +312,9 @@ describe("browser native view synchronization", () => {
 
   it("reasserts idle native ownership after the host reloads", async () => {
     reconcileBrowserOverlayState();
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }));
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }),
+    );
     expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(false);
   });
 
@@ -320,10 +322,14 @@ describe("browser native view synchronization", () => {
     setBrowserWebviewsSuspended(true, "recovery-test");
     setBrowserPointerGestureActive(true);
     reconcileBrowserOverlayState();
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: true }));
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: true }),
+    );
     invoke.mockClear();
     setBrowserWebviewsSuspended(false, "recovery-test");
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }));
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }),
+    );
   });
 
   it("keeps the native page live underneath app overlays", async () => {

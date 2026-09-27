@@ -1,4 +1,8 @@
-import { semanticCache, semanticInFlight, semanticCacheVersion } from "@/features/global-search/semanticSearchCache";
+import {
+  semanticCache,
+  semanticInFlight,
+  semanticCacheVersion,
+} from "@/features/global-search/semanticSearchCache";
 export { clearSemanticExplorerSearchCache } from "@/features/global-search/semanticSearchCache";
 export type { ExplorerSearchOptions } from "../model/interfaces/utils/globalSearch";
 export { mediaHitsToSearchResults } from "./globalSearch/resultMapping";
@@ -176,7 +180,6 @@ function spaceLibraryHitsToSearchResults(hits: GlobalSpaceLibraryHit[]): SearchR
     } satisfies SearchResult;
   });
 }
-
 
 /**
  * Weighted reciprocal-rank fusion avoids comparing incompatible native-index and

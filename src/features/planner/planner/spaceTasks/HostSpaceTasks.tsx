@@ -39,7 +39,7 @@ export function HostSpaceTasks(props: {
         api: spacesApi,
         userId: user?.id,
         members,
-        
+
         subscribeChanges,
         renderIntegration: (input) => (
           <HostTaskIntegration {...input} workspaceTabId={props.workspaceTabId} />

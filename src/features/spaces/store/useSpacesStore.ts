@@ -237,7 +237,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     try {
       const { resources } = await spacesApi.studio(spaceId, kind);
       if (generation !== spacesAccountGeneration) return;
-      set((state) => ({ workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources }, error: null }));
+      set((state) => ({
+        workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources },
+        error: null,
+      }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
       set({ error: errorText(error) });
@@ -396,7 +399,7 @@ export function resetSpacesAccountState(): void {
     inbox: { unreads: [], mentions: [] },
     presenceBySpace: {},
     snapshotReady: false,
-  inboxError: null,
+    inboxError: null,
     referenceOnly: false,
     lastSyncedAt: null,
     // Stay in a loading state rather than flashing an empty "no Spaces yet"

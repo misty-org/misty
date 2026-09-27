@@ -27,10 +27,7 @@ vi.mock("@/features/files/workspace/native", () => ({
   smartLibrarySnapshot: vi.fn().mockResolvedValue({ activeLibrary: null }),
 }));
 
-import {
-  clearSemanticExplorerSearchCache,
-  querySemanticExplorerSearch,
-} from "./globalSearch";
+import { clearSemanticExplorerSearchCache, querySemanticExplorerSearch } from "./globalSearch";
 
 describe("global media search cache resilience", () => {
   beforeEach(() => {

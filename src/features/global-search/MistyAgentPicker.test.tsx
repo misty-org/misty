@@ -7,9 +7,12 @@ import { MistyAgentPicker } from "./MistyAgentPicker";
 vi.mock("@/api/accountEvents", () => ({ observeAccountChanges: () => () => {} }));
 vi.mock("@/features/agents/localExecution", () => ({
   finishLocalExecution: vi.fn(),
-  useLocalExecution: Object.assign((select: (state: { execution: null }) => unknown) => select({ execution: null }), {
-    getState: () => ({ execution: null }),
-  }),
+  useLocalExecution: Object.assign(
+    (select: (state: { execution: null }) => unknown) => select({ execution: null }),
+    {
+      getState: () => ({ execution: null }),
+    },
+  ),
 }));
 const agents = [
   { id: "misty", name: "Misty", enabled: true, system_managed: true, avatar: {} },
