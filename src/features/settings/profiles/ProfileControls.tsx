@@ -1,10 +1,8 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, Input } from "@/shared/ui";
+import { Button, Input, OptionSelect } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { effectiveValues } from "./model";
 import { useSettingsProfiles } from "./store";
-const selectClass =
-  "min-h-9 w-full rounded-md border border-charcoal-border bg-charcoal-bg px-2 text-sm text-cream focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-muted";
 export function ProfileSelector() {
   const store = useSettingsProfiles();
   return (
@@ -12,20 +10,19 @@ export function ProfileSelector() {
       <span className="flex items-center justify-between gap-2">
         Settings profile <span className="text-[10px]">This device</span>
       </span>
-      <select
+      <OptionSelect
         aria-label="Settings profile"
-        className={selectClass}
         value={store.state?.selectedProfileId ?? ""}
         disabled={!store.ready}
-        onChange={(e) => void store.select(e.target.value || null).catch(() => {})}
-      >
-        <option value="">Local only</option>
-        {Object.values(store.state?.profiles ?? {}).map((p) => (
-          <option value={p.id} key={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+        onValueChange={(value) => void store.select(value || null).catch(() => {})}
+        options={[
+          { value: "", label: "Local only" },
+          ...Object.values(store.state?.profiles ?? {}).map((p) => ({
+            value: p.id,
+            label: p.name,
+          })),
+        ]}
+      />
     </label>
   );
 }
@@ -83,19 +80,19 @@ export function ProfilesSection() {
         />
         <label className="grid gap-1 text-xs text-cream-muted">
           Start with
-          <select
-            className={selectClass}
+          <OptionSelect
+            aria-label="Start with"
             value={source}
-            onChange={(e) => setSource(e.target.value)}
-          >
-            <option value="current">Current preferences</option>
-            <option value="defaults">Built-in defaults</option>
-            {Object.values(store.state?.profiles ?? {}).map((p) => (
-              <option key={p.id} value={p.id}>
-                Copy of {p.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSource}
+            options={[
+              { value: "current", label: "Current preferences" },
+              { value: "defaults", label: "Built-in defaults" },
+              ...Object.values(store.state?.profiles ?? {}).map((p) => ({
+                value: p.id,
+                label: `Copy of ${p.name}`,
+              })),
+            ]}
+          />
         </label>
         <Button
           type="submit"

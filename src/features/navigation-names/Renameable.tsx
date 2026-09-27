@@ -1,7 +1,13 @@
 import { Pencil, RotateCcw } from "lucide-react";
 import { cloneElement, useEffect, useRef, useState, type ReactElement } from "react";
-import { createPortal } from "react-dom";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/shared/ui";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  Input,
+  Portal,
+} from "@/shared/ui";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import {
   setNavigationName,
@@ -79,7 +85,7 @@ export function Renameable({
   };
   const rect = anchor.current?.getBoundingClientRect();
   const renderEditor = (editor: ReactElement) =>
-    portalEditor ? createPortal(editor, document.body) : editor;
+    portalEditor ? <Portal>{editor}</Portal> : editor;
   return (
     <>
       <ContextMenu
@@ -141,11 +147,11 @@ export function Renameable({
                 : anchor.current?.offsetWidth,
             }}
           >
-            <input
+            <Input
               ref={input}
               aria-label={`Rename ${name}`}
               defaultValue={name}
-              className="h-8 w-full rounded border border-cream-muted bg-charcoal-card px-2 text-sm text-cream outline-none"
+              className="h-8 text-sm"
               onBlur={() => void commit()}
               onKeyDown={(e) => {
                 e.stopPropagation();

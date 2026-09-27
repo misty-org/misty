@@ -1,3 +1,4 @@
+import { ViewportLayer } from "@/shared/ui";
 import { useEffect, useState } from "react";
 
 export interface SpotlightRect {
@@ -49,38 +50,37 @@ export function TourOverlay(props: { targetSelector?: string; padding?: number; 
 
   return (
     <>
-      <svg
-        className="fixed inset-0 z-[90] size-full pointer-events-none transition-opacity duration-200"
-        aria-hidden="true"
-      >
-        <defs>
-          <mask id="misty-tour-spotlight-mask">
-            <rect width="100%" height="100%" fill="white" />
-            {targetRect && (
-              <rect
-                x={targetRect.left - padding}
-                y={targetRect.top - padding}
-                width={targetRect.width + padding * 2}
-                height={targetRect.height + padding * 2}
-                rx={radius}
-                ry={radius}
-                fill="black"
-              />
-            )}
-          </mask>
-        </defs>
-        <rect
-          width="100%"
-          height="100%"
-          fill="rgba(0, 0, 0, 0.72)"
-          mask="url(#misty-tour-spotlight-mask)"
-          className="pointer-events-auto"
-        />
-      </svg>
+      <ViewportLayer layer="chrome" passthrough aria-hidden="true">
+        <svg className="size-full transition-opacity duration-200">
+          <defs>
+            <mask id="misty-tour-spotlight-mask">
+              <rect width="100%" height="100%" fill="white" />
+              {targetRect && (
+                <rect
+                  x={targetRect.left - padding}
+                  y={targetRect.top - padding}
+                  width={targetRect.width + padding * 2}
+                  height={targetRect.height + padding * 2}
+                  rx={radius}
+                  ry={radius}
+                  fill="black"
+                />
+              )}
+            </mask>
+          </defs>
+          <rect
+            width="100%"
+            height="100%"
+            fill="rgba(0, 0, 0, 0.72)"
+            mask="url(#misty-tour-spotlight-mask)"
+            className="pointer-events-auto"
+          />
+        </svg>
+      </ViewportLayer>
 
       {targetRect && (
         <div
-          className="pointer-events-none fixed z-[95] transition-all duration-200"
+          className="pointer-events-none fixed layer-chrome transition-all duration-200"
           style={{
             top: targetRect.top - padding,
             left: targetRect.left - padding,

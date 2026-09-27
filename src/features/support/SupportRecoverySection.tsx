@@ -1,6 +1,6 @@
 import { clientMetadata } from "@/telemetry/metadata";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, cn, Input, Textarea } from "@/shared/ui";
+import { Button, cn, Input, OptionSelect, Textarea } from "@/shared/ui";
 import {
   AlertTriangle,
   Compass,
@@ -220,16 +220,10 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <FeedbackField label="Area">
-              <select
-                className={cn(
-                  "h-9 rounded-md border border-charcoal-border bg-charcoal-bg px-3",
-                  "text-sm text-cream outline-none focus:border-charcoal-active",
-                  "focus:ring-2 focus:ring-charcoal-active/40",
-                )}
+              <OptionSelect
                 value={draft.area}
-                onChange={(event) => updateDraft("area", event.target.value)}
-              >
-                {[
+                onValueChange={(value) => updateDraft("area", value)}
+                options={[
                   "General",
                   "Onboarding",
                   "Spaces",
@@ -241,28 +235,22 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
                   "Browser",
                   "Misty AI",
                   "Settings",
-                ].map((area) => (
-                  <option key={area}>{area}</option>
-                ))}
-              </select>
+                ].map((area) => ({ value: area, label: area }))}
+              />
             </FeedbackField>
             <FeedbackField label="How often?">
-              <select
-                className={cn(
-                  "h-9 rounded-md border border-charcoal-border bg-charcoal-bg px-3",
-                  "text-sm text-cream outline-none focus:border-charcoal-active",
-                  "focus:ring-2 focus:ring-charcoal-active/40",
-                )}
+              <OptionSelect
                 value={draft.frequency}
-                onChange={(event) =>
-                  updateDraft("frequency", event.target.value as FeedbackDraft["frequency"])
+                onValueChange={(value) =>
+                  updateDraft("frequency", value as FeedbackDraft["frequency"])
                 }
-              >
-                <option value="unknown">Not sure</option>
-                <option value="once">Once</option>
-                <option value="sometimes">Sometimes</option>
-                <option value="always">Every time</option>
-              </select>
+                options={[
+                  { value: "unknown", label: "Not sure" },
+                  { value: "once", label: "Once" },
+                  { value: "sometimes", label: "Sometimes" },
+                  { value: "always", label: "Every time" },
+                ]}
+              />
             </FeedbackField>
           </div>
 

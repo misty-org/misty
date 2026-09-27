@@ -1,7 +1,7 @@
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationNames, navigationName, tabNameKey } from "@/features/navigation-names/store";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button } from "@/shared/ui";
+import { Button, Input } from "@/shared/ui";
 import { Plus, X } from "lucide-react";
 import { memo, useEffect, useRef, useState, type WheelEvent } from "react";
 import type { ChromeTabStripProps } from "./model/interfaces";
@@ -225,7 +225,11 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                         >
                           •
                         </span>
-                        <X className="hidden group-hover:block size-3.5" size={13} strokeWidth={2} />
+                        <X
+                          className="hidden group-hover:block size-3.5"
+                          size={13}
+                          strokeWidth={2}
+                        />
                       </>
                     ) : (
                       <X className="size-3.5" size={13} strokeWidth={2} />
@@ -289,8 +293,9 @@ function TabTitleInput(props: {
   const canceledRef = useRef(false);
 
   return (
-    <input
-      className="h-full min-w-0 flex-1 border-none bg-transparent px-3 text-[13px] font-medium text-cream-bright outline-none"
+    <Input
+      variant="bare"
+      className="h-full flex-1 px-3 text-[13px] font-medium text-cream-bright"
       value={value}
       autoFocus
       maxLength={60}

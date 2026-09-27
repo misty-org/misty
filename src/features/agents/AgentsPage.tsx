@@ -444,8 +444,7 @@ export default function NativeAgentsPage() {
               <label className="agent-recipient-input">
                 <span>To:</span>
                 <Input
-                  variant="toolbar"
-                  className="border-0 hover:bg-transparent focus:bg-transparent"
+                  variant="bare"
                   autoFocus
                   aria-label="Search or create agents"
                   placeholder="Search or create agents"

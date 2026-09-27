@@ -1,16 +1,17 @@
 import { useRef, useState } from "react";
 import { ArrowDownUp, Search, SlidersHorizontal, X } from "lucide-react";
 import {
+  Button,
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
+  DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  Button,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Input,
   NavIsland,
   NavIslandItem,
 } from "@/shared/ui";
@@ -184,12 +185,13 @@ export function ActivityPanelToolbar({
       {searchOpen && (
         <div className="mx-3 mb-1.5 flex h-7 items-center gap-2 rounded-md border border-charcoal-border bg-charcoal-card px-2 text-cream-muted">
           <Search size={16} className="shrink-0 text-cream-muted" aria-hidden="true" />
-          <input
+          <Input
+            variant="bare"
             autoFocus
             type="search"
             aria-label="Search activity text"
             placeholder="Search activity"
-            className="flex-1 min-w-0 bg-transparent text-sm text-cream outline-none placeholder:text-cream-muted caret-cream-bright"
+            className="flex-1 caret-cream-bright"
             value={view.query}
             onChange={(event) => onChange({ ...view, query: event.target.value })}
             onKeyDown={(event) => {

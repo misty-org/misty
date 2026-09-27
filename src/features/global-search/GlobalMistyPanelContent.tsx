@@ -342,13 +342,13 @@ export function ConversationMenu(props: {
             <div className="flex items-center gap-2 px-2 py-1.5">
               <Search className="size-3.5 text-cream-muted" />
               <Input
-                variant="toolbar"
+                variant="bare"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => event.stopPropagation()}
                 placeholder="Search conversations"
                 aria-label="Search conversations"
-                className="h-7 min-w-0 flex-1 border-0 px-0 hover:bg-transparent focus:bg-transparent"
+                className="h-7 flex-1 text-xs"
               />
             </div>
             <DropdownMenuSeparator />
