@@ -1,5 +1,5 @@
 import type { SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
-import { Button, Input } from "@/shared/ui";
+import { Input, Pressable } from "@/shared/ui";
 
 export const blankTemplateFallback: SpaceTemplate[] = [
   {
@@ -57,11 +57,10 @@ export function CreateSpaceTemplateStep({
       </p>
       <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1">
         {(templates.length ? templates : blankTemplateFallback).map((template) => (
-          <Button
+          <Pressable
+            aria-pressed={templateId === template.id}
             key={template.id}
-            variant="outline"
             className={cardClass(templateId === template.id)}
-            type="button"
             onClick={() => onTemplate(template.id)}
           >
             <span className="block text-sm font-medium">
@@ -71,7 +70,7 @@ export function CreateSpaceTemplateStep({
             <span className="mt-1 block text-xs leading-relaxed text-cream-muted">
               {template.description}
             </span>
-          </Button>
+          </Pressable>
         ))}
       </div>
     </section>

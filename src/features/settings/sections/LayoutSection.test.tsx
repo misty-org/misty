@@ -15,12 +15,12 @@ it("disables occupied edges in both directions and updates them with presets", (
   render(<LayoutSection />);
   const nav = within(screen.getByRole("group", { name: "Navigation" }));
   const tabs = within(screen.getByRole("group", { name: "Tabs" }));
-  expect((nav.getByRole("button", { name: "top" }) as HTMLButtonElement).disabled).toBe(true);
-  expect((tabs.getByRole("button", { name: "left" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((nav.getByRole("radio", { name: "top" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((tabs.getByRole("radio", { name: "left" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Bottom dock" }));
-  expect((tabs.getByRole("button", { name: "bottom" }) as HTMLButtonElement).disabled).toBe(true);
-  expect((nav.getByRole("button", { name: "left" }) as HTMLButtonElement).disabled).toBe(true);
-  expect((tabs.getByRole("button", { name: "top" }) as HTMLButtonElement).disabled).toBe(false);
+  expect((tabs.getByRole("radio", { name: "bottom" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((nav.getByRole("radio", { name: "left" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((tabs.getByRole("radio", { name: "top" }) as HTMLButtonElement).disabled).toBe(false);
 });
 it("saves, restores, and deletes a named layout", () => {
   render(<LayoutSection />);

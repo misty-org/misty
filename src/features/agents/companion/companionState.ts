@@ -1,12 +1,34 @@
 import { create } from "zustand";
-import type { CompanionMode, Presentation } from "./protocol";
+import type { Presentation } from "./protocol";
+import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
+export interface CompanionSubmission {
+  prompt: string;
+  attachments?: Parameters<GlobalSearchState["submitAnswer"]>[1];
+  conversationId: string;
+}
 export type CompanionControl =
-  | { kind: "size"; size: number }
-  | { kind: "visibility"; visible: boolean }
-  | { kind: "mode"; mode: CompanionMode }
-  | { kind: "model"; model: string }
-  | { kind: "stop" }
-  | { kind: "retry" };
+  | {
+      kind: "size";
+      size: number;
+    }
+  | {
+      kind: "visibility";
+      visible: boolean;
+    }
+  | {
+      kind: "ask";
+      ask: boolean;
+    }
+  | {
+      kind: "model";
+      model: string;
+    }
+  | {
+      kind: "stop";
+    }
+  | {
+      kind: "retry";
+    };
 export const initialCompanionPresentation: Presentation = {
   generation: 0,
   phase: "idle",
@@ -14,15 +36,17 @@ export const initialCompanionPresentation: Presentation = {
   showCompanion: true,
   size: 100,
   enabled: false,
-  mode: "team",
+  mode: "auto", // Historical wire value; there is one interaction policy now.
+  ask: false,
   model: "",
 };
 interface CompanionState {
   accountId: string;
   presentation: Presentation;
   control?: (control: CompanionControl) => Promise<void>;
+  submit?: (request: CompanionSubmission) => Promise<void>;
 }
-/** Main-window bridge: the Agents page and native voice share one controller and mode. */
+/** Main-window bridge: the Agents page and native voice share one controller. */
 export const useCompanionState = create<CompanionState>(() => ({
   accountId: "",
   presentation: initialCompanionPresentation,

@@ -3,6 +3,7 @@ use misty_browser_sync::{
     store::Store,
     transport::SyncApi,
     worker::{Phase, Worker},
+    Error,
 };
 use std::{
     sync::{
@@ -91,6 +92,67 @@ fn endpoints_reject_insecure_remote_hosts_credentials_and_query_injection() {
     ] {
         assert!(SyncApi::new(base, client()).is_err(), "{base}");
     }
+}
+
+#[tokio::test]
+async fn denied_device_ticket_reports_access_failure_without_refreshing_sign_in() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let api = SyncApi::new(
+        &format!("http://{}/v1", listener.local_addr().unwrap()),
+        client(),
+    )
+    .unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = vec![0; 8192];
+        let read = stream.read(&mut request).await.unwrap();
+        assert!(String::from_utf8_lossy(&request[..read]).starts_with("POST /v1/sync/ticket "));
+        let body = r#"{"code":"sync_device_forbidden"}"#;
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 403 Forbidden\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        // Dropping the listener makes an incorrect refresh attempt fail as a
+        // network error instead of accidentally passing this classification.
+    });
+    let directory = tempfile::tempdir().unwrap();
+    let root = VaultRoot::generate();
+    let device = DeviceKey::generate();
+    let scope = VaultScope {
+        deployment: api.deployment(),
+        account_id: "fixture".into(),
+        workspace_id: Uuid::new_v4().to_string(),
+    };
+    let grant = root
+        .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)
+        .unwrap();
+    let store = Store::initialize(
+        &directory.path().join("sync.sqlite"),
+        scope.clone(),
+        grant,
+        &root,
+        &device,
+        b"",
+    )
+    .unwrap();
+    let (worker, handle) = Worker::new(api, scope, root, device, store, |state, _, _| {
+        Ok(Zeroizing::new(state.to_vec()))
+    })
+    .unwrap();
+    let result = timeout(Duration::from_secs(2), worker.run()).await.unwrap();
+    assert!(matches!(result, Err(Error::DeviceForbidden)));
+    assert!(handle.status.borrow().phase == Phase::Attention);
+    assert_eq!(
+        handle.status.borrow().issue.as_deref(),
+        Some("sync_device_forbidden")
+    );
+    server.await.unwrap();
 }
 
 #[tokio::test]

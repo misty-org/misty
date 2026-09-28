@@ -1,14 +1,13 @@
-import { useMemo } from "react";
-import { useTransfersStore } from "@/features/transfers";
+import { useOperationQueueStore } from "../store/useOperationQueueStore";
 import { SystemErrorActivity } from "@/features/activity";
 import {
   duplicatesCancel,
-  duplicatesHashRemoteCandidates,
   duplicatesScan,
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
-} from "@/features/files/workspace/native";
-import { useExplorerStore, useOperationQueueStore } from "../store";
+} from "../../native";
+import { useMemo } from "react";
+import { useExplorerStore } from "../store";
 import {
   DuplicateFinderDialogView,
   type DuplicateFinderRuntime,
@@ -35,8 +34,6 @@ export function DuplicateFinderDialog(props: {
       cancel: async (id = scanId) => {
         if (id) await duplicatesCancel(id);
       },
-      hashRemote: async (id) =>
-        retain(await duplicatesHashRemoteCandidates(id)),
       async cleanup(paths, mode, destinationDirectory) {
         if (mode === "move") {
           for (const selected of [
@@ -50,14 +47,10 @@ export function DuplicateFinderDialog(props: {
                 operation: "move",
               });
         } else await explorerQueueDeleteItems({ paths, permanent: false });
-        void useTransfersStore.getState().load(undefined, { silent: true });
         void useOperationQueueStore.getState().load({ silent: true });
         useExplorerStore
           .getState()
-          .pushNotification(
-            `Queued ${mode} cleanup for ${paths.length} items`,
-            "success",
-          );
+          .pushNotification(`Queued ${mode} cleanup for ${paths.length} items`, "success");
         void useExplorerStore.getState().refreshPane(props.paneId);
       },
       Error: ({ error }) => (

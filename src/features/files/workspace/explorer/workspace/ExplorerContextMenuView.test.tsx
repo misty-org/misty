@@ -6,9 +6,13 @@ afterEach(cleanup);
 it("anchors viewport coordinates outside the pane's layout containment", () => {
   const view = render(
     <div data-testid="pane" style={{ contain: "layout paint", transform: "translateX(240px)" }}>
-      <ExplorerContextMenuView open x={480} y={320} menuEntries={[
-        { id: "open", icon: null, label: "Open", onRun: vi.fn() },
-      ]} onClose={vi.fn()} />
+      <ExplorerContextMenuView
+        open
+        x={480}
+        y={320}
+        menuEntries={[{ id: "open", icon: null, label: "Open", onRun: vi.fn() }]}
+        onClose={vi.fn()}
+      />
     </div>,
   );
   const anchor = document.body.querySelector<HTMLElement>('span[aria-haspopup="menu"]')!;

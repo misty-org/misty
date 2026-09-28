@@ -9,7 +9,6 @@ export type AppTab =
   | "assistant"
   | "agents"
   | "marketplace"
-  | "transfers"
   | "providers"
   | "settings"
   | "account"

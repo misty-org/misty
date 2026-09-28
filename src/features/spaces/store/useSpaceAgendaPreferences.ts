@@ -1,3 +1,4 @@
+import { useSettingsStore } from "@/features/settings";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -7,9 +8,16 @@ export interface SpaceAgendaVisibility {
   hiddenSources: string[];
 }
 
-const defaults: SpaceAgendaVisibility = { tasks: true, roadmap: true, hiddenSources: [] };
-
 export function useSpaceAgendaPreferences(accountId: string, spaceId: string) {
+  const profileTasks = useSettingsStore(
+    (s) =>
+      (s.settings?.document.spaces as Record<string, unknown> | undefined)?.agenda_tasks !== false,
+  );
+  const profileRoadmap = useSettingsStore(
+    (s) =>
+      (s.settings?.document.spaces as Record<string, unknown> | undefined)?.agenda_roadmap !==
+      false,
+  );
   const baseKey = useMemo(
     () => `misty:agenda-visibility:${accountId || "anonymous"}:${spaceId}`,
     [accountId, spaceId],
@@ -25,7 +33,7 @@ export function useSpaceAgendaPreferences(accountId: string, spaceId: string) {
     };
     window.addEventListener("misty:agenda-visibility", handleChange);
     return () => window.removeEventListener("misty:agenda-visibility", handleChange);
-  }, [baseKey, key]);
+  }, [baseKey, key, profileTasks, profileRoadmap]);
 
   const setVisibility = useCallback(
     (next: SpaceAgendaVisibility | ((current: SpaceAgendaVisibility) => SpaceAgendaVisibility)) => {
@@ -49,13 +57,20 @@ export function useSpaceAgendaPreferences(accountId: string, spaceId: string) {
 }
 
 function read(key: string): SpaceAgendaVisibility {
+  const preferences = useSettingsStore.getState().settings?.document.spaces as
+    Record<string, unknown> | undefined;
+  const defaults = {
+    tasks: preferences?.agenda_tasks !== false,
+    roadmap: preferences?.agenda_roadmap !== false,
+    hiddenSources: [],
+  };
   try {
     const value = JSON.parse(
       readDeploymentStorageItem(key) ?? "null",
     ) as Partial<SpaceAgendaVisibility> | null;
     return {
-      tasks: value?.tasks !== false,
-      roadmap: value?.roadmap !== false,
+      tasks: typeof value?.tasks === "boolean" ? value.tasks : defaults.tasks,
+      roadmap: typeof value?.roadmap === "boolean" ? value.roadmap : defaults.roadmap,
       hiddenSources: Array.isArray(value?.hiddenSources) ? value.hiddenSources : [],
     };
   } catch {

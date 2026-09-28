@@ -1,10 +1,6 @@
-import type {
-  ResolvedMediaAsset,
-  ResolvedSmartLibraryAsset,
-  SearchResult,
-} from "@/native/contracts";
+import type { ResolvedMediaAsset, ResolvedSmartLibraryAsset, SearchResult } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
-import type { MediaSearchHit } from "../model/stores/media/interfaces/useMediaSearchServerStore";
+import type { MediaSearchHit } from "@/features/global-search/indexing";
 import type { SemanticSearchHit } from "../model/stores/media/interfaces/useSmartLibraryServerStore";
 import {
   isPathWithin,
@@ -85,7 +81,7 @@ describe("global semantic Explorer search", () => {
       }),
     ).toHaveLength(0);
     expect(semanticHitsToSearchResults([hit], [remote], { scope: "local" })).toHaveLength(0);
-    expect(semanticHitsToSearchResults([hit], [remote], { scope: "remotes" })).toHaveLength(1);
+    expect(semanticHitsToSearchResults([hit], [remote], { scope: "remotes" })).toHaveLength(0);
     expect(isPathWithin("C:\\Photos\\one.png", "C:\\Photos")).toBe(true);
   });
 

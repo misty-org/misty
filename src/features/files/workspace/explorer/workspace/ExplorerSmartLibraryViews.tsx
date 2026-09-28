@@ -1,5 +1,5 @@
 import type { useSmartLibraryStore } from "@/features/library/library";
-import type { SmartLibraryAsset } from "@/native/contracts";
+import type { SmartLibraryAsset } from "@/native/ipc";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { Badge, Button, Progress } from "@/shared/ui";
 import {

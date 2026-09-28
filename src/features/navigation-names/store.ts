@@ -24,7 +24,7 @@ export function navigationName(key: string, automatic: string) {
 }
 export function validateNavigationName(value: string): string {
   const name = value.trim();
-  if (!name || [...name].length > 120 || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(name))
+  if (!name || [...name].length > 120 || /[\p{Cc}\u2028\u2029]/u.test(name))
     throw new Error("Choose a single-line name of 1–120 characters.");
   return name;
 }

@@ -8,16 +8,6 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     app: &AppHandle<R>,
     _api: PluginApi<R, C>,
 ) -> crate::Result<Keystore<R>> {
-    #[cfg(mobile)]
-    {
-        use tauri::Manager;
-        let root = app
-            .path()
-            .app_local_data_dir()
-            .map_err(|error| std::io::Error::other(error.to_string()))?;
-        std::fs::create_dir_all(&root)?;
-        misty_credential_store::configure_root(root.join(".auth"))?;
-    }
     Ok(Keystore(app.clone()))
 }
 

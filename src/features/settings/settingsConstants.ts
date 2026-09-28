@@ -1,5 +1,4 @@
 export const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
-export const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
 export const fileViewModeOptions = ["List", "Grid"];
 // The store already consumes and clamps this to 5-240; these are the values the
 // UI offers.
@@ -31,11 +30,6 @@ export const settingsReferenceHeaderClass =
   "min-h-10 bg-charcoal-card text-xs font-medium text-cream-muted";
 
 export const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
-
-export const settingsIconDangerClass =
-  "size-[30px] border-charcoal-active/25 text-cream-bright " +
-  "hover:bg-charcoal-active hover:text-cream-bright " +
-  settingsDisabledControlClass;
 
 export const settingsInlineActionsClass = "flex items-center gap-3 px-5 py-4";
 

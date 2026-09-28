@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 const gridThumbnailImageExtensions = new Set([
   "png",
   "jpg",

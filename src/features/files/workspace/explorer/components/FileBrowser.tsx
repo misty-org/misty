@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { SystemErrorActivity } from "@/features/activity";
 import { selectAppearancePreferences, useSettingsStore } from "@/features/settings";
-import { FileBrowserView } from "./FileBrowserView";
-import { FileBrowserRuntimeProvider } from "./fileBrowser/FileBrowserRuntime";
+import {
+  FileBrowserView,
+  FileBrowserRuntimeProvider,
+  type FileBrowserProps,
+} from "@/features/file-ui";
 import { prewarmGridThumbnails, requestGridThumbnail } from "./fileBrowser/gridThumbnails";
-import type { FileBrowserProps } from "../model/interfaces/components/FileBrowser";
 export type {
   FileBrowserProps,
   GridThumbnailJob,
@@ -12,7 +14,7 @@ export type {
   FileTableColumnWidths,
   GridThumbnailSubscriber,
   FileBrowserDragItem,
-} from "./FileBrowserView";
+} from "@/features/file-ui";
 
 function ErrorView({ error, paneId }: { error: string; paneId: string }) {
   return (

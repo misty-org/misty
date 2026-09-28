@@ -1,20 +1,54 @@
 //! Native transport for website storage. Plaintext stays between the website's
 //! own origin and the native vault; it never crosses the Misty renderer bridge.
-use misty_browser_sync::{
-    document::{credentials::Area, CredentialRecord},
-    store::BrowserObservation,
-};
+use super::browser_data_budget::Held;
+use misty_browser_sync::document::{credentials::Area, CredentialRecord};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use tauri::{Manager, Webview};
 
 const SCRIPT: &str = include_str!("browser_website_storage.js");
+/// Reading another profile's store is never skipped past: it aborts capture.
+pub(super) const PROFILE_UNVERIFIED: &str = "Website profile could not be verified";
 
-async fn evaluate(
+pub(super) async fn evaluate(
     view: &Webview,
     physical: &str,
     origin: &str,
     write: Option<Value>,
+) -> Result<Value, String> {
+    evaluate_request(
+        view,
+        physical,
+        origin,
+        json!({"origin":origin, "write":write}),
+    )
+    .await
+}
+
+/// A periodic read: `read` names the areas wanted and `known` the stamps of
+/// what the caller already holds. Areas whose stamp still matches come back
+/// listed in `unchanged` instead of exported again.
+pub(super) async fn evaluate_read(
+    view: &Webview,
+    physical: &str,
+    origin: &str,
+    read: Value,
+    known: Value,
+) -> Result<Value, String> {
+    evaluate_request(
+        view,
+        physical,
+        origin,
+        json!({"origin":origin, "write":null, "read":read, "known":known}),
+    )
+    .await
+}
+
+async fn evaluate_request(
+    view: &Webview,
+    physical: &str,
+    origin: &str,
+    request: Value,
 ) -> Result<Value, String> {
     let url = view.url().map_err(|_| "Website storage is unavailable")?;
     if url.origin().ascii_serialization() != origin {
@@ -25,9 +59,8 @@ async fn evaluate(
     #[cfg(target_os = "macos")]
     super::browser_cookie_store::verify_storage_profile(view, physical)
         .await
-        .map_err(|_| "Website profile could not be verified")?;
-    let request = serde_json::to_string(&json!({"origin":origin, "write":write}))
-        .map_err(|_| "Invalid website storage request")?;
+        .map_err(|_| PROFILE_UNVERIFIED)?;
+    let request = serde_json::to_string(&request).map_err(|_| "Invalid website storage request")?;
     let script = SCRIPT.replace("__MISTY_STORAGE_REQUEST__", &request);
     #[cfg(target_os = "macos")]
     let raw = super::browser_macos::evaluate_browser_async_javascript(view.clone(), script)
@@ -36,7 +69,10 @@ async fn evaluate(
     #[cfg(windows)]
     let raw = super::browser_cookie_store::evaluate_storage(view, physical, script)
         .await
-        .map_err(|_| "This website's storage could not be transferred")?;
+        .map_err(|error| match error {
+            super::browser_cookie_store::CookieStoreError::Profile => PROFILE_UNVERIFIED,
+            _ => "This website's storage could not be transferred",
+        })?;
     let raw = zeroize::Zeroizing::new(raw);
     if raw.len() > 8 << 20 {
         return Err("Website storage exceeds the sync limit".into());
@@ -46,101 +82,6 @@ async fn evaluate(
         return Err("Website changed origin during sync".into());
     }
     Ok(value)
-}
-
-pub(super) async fn capture(
-    app: &tauri::AppHandle,
-    physical: &str,
-    previous: &[CredentialRecord],
-    extra: Option<(Webview, Vec<String>)>,
-) -> Result<Vec<BrowserObservation>, String> {
-    // Keep already captured, closed origins in the complete observation. They
-    // cannot be mistaken for deletions merely because their tab isn't mounted.
-    let mut areas = BTreeMap::new();
-    for record in previous {
-        if !matches!(record.area, Area::Cookies) {
-            areas.insert(
-                record
-                    .area
-                    .key(&record.profile_id)
-                    .map_err(|_| "Invalid website origin")?,
-                BrowserObservation {
-                    area: record.area.clone(),
-                    payload: record.payload.clone(),
-                },
-            );
-        }
-    }
-    let mut origins = std::collections::BTreeSet::new();
-    for (tab_id, view) in super::browser::sync_storage_views(app, physical)? {
-        let url = view.url().map_err(|_| "Website storage is unavailable")?;
-        if !matches!(url.scheme(), "http" | "https") {
-            continue;
-        }
-        let origin = url.origin().ascii_serialization();
-        let fresh_origin = origins.insert(origin.clone());
-        let value = evaluate(&view, physical, &origin, None).await?;
-        let mut fields = vec![(
-            Area::SessionStorage {
-                origin: origin.clone(),
-                tab_id,
-            },
-            "session",
-        )];
-        if fresh_origin {
-            fields.extend([
-                (
-                    Area::LocalStorage {
-                        origin: origin.clone(),
-                    },
-                    "local",
-                ),
-                (Area::IndexedDb { origin }, "indexed"),
-            ]);
-        }
-        for (area, field) in fields {
-            let payload = value[field].clone();
-            area.validate_payload(&payload)
-                .map_err(|_| "Unsupported website storage")?;
-            // A fixed valid profile is sufficient to canonicalize this area key.
-            let key = area
-                .key(&"a".repeat(64))
-                .map_err(|_| "Invalid website origin")?;
-            areas.retain(|_, old| {
-                serde_json::to_value(&old.area).ok() != serde_json::to_value(&area).ok()
-            });
-            areas.insert(key, BrowserObservation { area, payload });
-        }
-    }
-    if let Some((owner, extra)) = extra {
-        let mut storage = WebsiteStorage::new(owner, physical.into());
-        for origin in extra {
-            if !origins.insert(origin.clone()) {
-                continue;
-            }
-            let view = storage.origin(&origin, None).await?;
-            let value = evaluate(view, physical, &origin, None).await?;
-            for (area, field) in [
-                (
-                    Area::LocalStorage {
-                        origin: origin.clone(),
-                    },
-                    "local",
-                ),
-                (Area::IndexedDb { origin }, "indexed"),
-            ] {
-                let payload = value[field].clone();
-                area.validate_payload(&payload)
-                    .map_err(|_| "Unsupported website storage")?;
-                areas.insert(
-                    area.key(&"a".repeat(64))
-                        .map_err(|_| "Invalid website origin")?,
-                    BrowserObservation { area, payload },
-                );
-            }
-        }
-    }
-    Ok(areas.into_values().collect())
 }
 
 struct OriginView(Webview);
@@ -156,6 +97,7 @@ pub(super) struct WebsiteStorage {
     owner: Webview,
     physical: String,
     origins: BTreeMap<String, OriginView>,
+    held: Held,
 }
 impl WebsiteStorage {
     pub fn new(owner: Webview, physical: String) -> Self {
@@ -163,7 +105,17 @@ impl WebsiteStorage {
             owner,
             physical,
             origins: BTreeMap::new(),
+            held: Held::default(),
         }
+    }
+    /// Local data that could not sync keeps its local value: restore neither
+    /// writes its synced stand-in nor reports a difference on readback.
+    pub fn with_held(mut self, held: Held) -> Self {
+        self.held = held;
+        self
+    }
+    pub(super) async fn origin_view(&mut self, origin: &str) -> Result<&Webview, String> {
+        self.origin(origin, None).await
     }
     async fn origin(&mut self, origin: &str, tab_id: Option<&str>) -> Result<&Webview, String> {
         let key = serde_json::to_string(&(origin, tab_id)).map_err(|_| "Invalid website origin")?;
@@ -252,7 +204,10 @@ impl WebsiteStorage {
     pub async fn apply(&mut self, target: &[CredentialRecord]) -> Result<(), String> {
         let mut values: BTreeMap<(String, Option<String>), serde_json::Map<String, Value>> =
             BTreeMap::new();
-        for record in target {
+        for record in target
+            .iter()
+            .filter(|record| !self.held.holds(&record.area))
+        {
             let (origin, tab, field) = match &record.area {
                 Area::LocalStorage { origin } => (origin, None, "local"),
                 Area::IndexedDb { origin } => (origin, None, "indexed"),
@@ -261,10 +216,16 @@ impl WebsiteStorage {
                 }
                 Area::Cookies => continue,
             };
-            values
-                .entry((origin.clone(), tab))
-                .or_default()
-                .insert(field.into(), record.payload.clone());
+            let write = values.entry((origin.clone(), tab)).or_default();
+            write.insert(field.into(), record.payload.clone());
+            if let Some(hold) = self
+                .held
+                .databases
+                .get(origin)
+                .filter(|_| field == "indexed")
+            {
+                write.insert("hold".into(), json!(hold));
+            }
         }
         for ((origin, tab), write) in values {
             let physical = self.physical.clone();
@@ -280,6 +241,10 @@ impl WebsiteStorage {
         let mut values = BTreeMap::new();
         let mut observed = vec![];
         for record in target {
+            if self.held.holds(&record.area) {
+                observed.push(record.clone());
+                continue;
+            }
             let (origin, tab, field) = match &record.area {
                 Area::LocalStorage { origin } => (origin, None, "local"),
                 Area::IndexedDb { origin } => (origin, None, "indexed"),
@@ -295,11 +260,43 @@ impl WebsiteStorage {
                 values.insert(key.clone(), evaluate(view, &physical, origin, None).await?);
             }
             let mut record = record.clone();
-            record.payload = values[&key][field].clone();
+            let actual = values[&key][field].clone();
+            record.payload = match self
+                .held
+                .databases
+                .get(origin)
+                .filter(|_| field == "indexed")
+            {
+                Some(hold) => with_held_databases(actual, &record.payload, hold),
+                None => actual,
+            };
             observed.push(record);
         }
         Ok(observed)
     }
+}
+
+/// Held databases were not written, so report their synced copies in place of
+/// whatever local version the page holds.
+fn with_held_databases(
+    mut actual: Value,
+    target: &Value,
+    hold: &std::collections::BTreeSet<String>,
+) -> Value {
+    let named = |db: &Value| db["name"].as_str().is_some_and(|name| hold.contains(name));
+    if let Some(databases) = actual["databases"].as_array_mut() {
+        databases.retain(|db| !named(db));
+        databases.extend(
+            target["databases"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|db| named(db))
+                .cloned(),
+        );
+        databases.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    }
+    actual
 }
 
 /// Build an inert same-origin document without making a website request or
@@ -355,12 +352,18 @@ pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
     let owner = app.get_webview("main").ok_or("Missing probe window")?;
     async fn assert_background(owner: &Webview) -> Result<(), String> {
         let (send, receive) = tokio::sync::oneshot::channel();
-        owner.with_webview(move |_| {
-            let marker = objc2::MainThreadMarker::new().expect("native callback runs on main thread");
-            let active = objc2_app_kit::NSApplication::sharedApplication(marker).isActive();
-            let _ = send.send(active);
-        }).map_err(|_| "Could not inspect probe activation")?;
-        if receive.await.map_err(|_| "Could not inspect probe activation")? {
+        owner
+            .with_webview(move |_| {
+                let marker =
+                    objc2::MainThreadMarker::new().expect("native callback runs on main thread");
+                let active = objc2_app_kit::NSApplication::sharedApplication(marker).isActive();
+                let _ = send.send(active);
+            })
+            .map_err(|_| "Could not inspect probe activation")?;
+        if receive
+            .await
+            .map_err(|_| "Could not inspect probe activation")?
+        {
             return Err("Background storage activated the application".into());
         }
         Ok(())
@@ -371,22 +374,50 @@ pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
     let origin = "https://sync-fixture.invalid";
     let mut storage = WebsiteStorage::new(owner.clone(), physical.clone());
     let view = storage.origin(origin, None).await?;
-    if super::browser_cookie_store::verify_storage_profile(view, &other).await.is_ok() {
+    if super::browser_cookie_store::verify_storage_profile(view, &other)
+        .await
+        .is_ok()
+    {
         return Err("Website storage accepted the wrong profile".into());
     }
-    if super::browser_cookie_store::preflight(view, &physical, vec![]).await.is_ok() {
+    if super::browser_cookie_store::preflight(view, &physical, vec![])
+        .await
+        .is_ok()
+    {
         return Err("Cookie import accepted an origin document".into());
     }
-    let written = evaluate(view, &physical, origin, Some(json!({
-        "local": {"sync-probe": "persisted"},
-        "session": {"sync-probe": "tab-only"},
-        "indexed": {"codec_version": 1, "databases": []}
-    }))).await?;
-    if written["local"]["sync-probe"] != "persisted" || written["session"]["sync-probe"] != "tab-only" {
+    let written = evaluate(
+        view,
+        &physical,
+        origin,
+        Some(json!({
+            "local": {"sync-probe": "persisted"},
+            "session": {"sync-probe": "tab-only"},
+            "indexed": {"codec_version": 1, "databases": []}
+        })),
+    )
+    .await?;
+    if written["local"]["sync-probe"] != "persisted"
+        || written["session"]["sync-probe"] != "tab-only"
+    {
         return Err("Website storage round trip failed".into());
     }
-    let observed = capture(&app, &physical, &[], Some((owner.clone(), vec![origin.into()]))).await?;
-    if !observed.iter().any(|observation| matches!(observation.area, Area::LocalStorage { .. }) && observation.payload["sync-probe"] == "persisted") {
+    let mut coverage = super::browser_data_coverage::Coverage::default();
+    let observed = super::browser_website_capture::capture(
+        &app,
+        &physical,
+        &[],
+        Some((owner.clone(), vec![origin.into()])),
+        &mut coverage,
+    )
+    .await?;
+    if !observed.candidates.iter().any(|candidate| {
+        matches!(candidate.area, Area::LocalStorage { .. })
+            && candidate
+                .fresh
+                .as_ref()
+                .is_some_and(|payload| payload["sync-probe"] == "persisted")
+    }) {
         return Err("Website capture did not read the stored origin data".into());
     }
     assert_background(&owner).await?;

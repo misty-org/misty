@@ -1,4 +1,4 @@
-import type { DirectoryListing } from "@/native/contracts";
+import type { DirectoryListing } from "@/native/ipc";
 import type { PaneExplorerState } from "../model/interfaces/store/types";
 import type { NavigationMode } from "../model/types/store/types";
 import { explorerPathKey } from "@/shared/lib/pathNormalization";

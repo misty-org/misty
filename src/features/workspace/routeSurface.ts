@@ -15,6 +15,30 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     path === "/activity"
   )
     return null;
+  const url = new URL(pathname, "https://misty.local");
+  if (
+    path === "/scheduled" ||
+    ((path === "/agents" || path === "/apps/agents") &&
+      url.searchParams.get("view") === "scheduled")
+  ) {
+    url.searchParams.delete("view");
+    return {
+      ...request(
+        "scheduled",
+        "tool:scheduled",
+        "Scheduled",
+        `/scheduled${url.search}${url.hash}`,
+        "scheduled",
+        "single",
+      ),
+      scopeKey: "global",
+    };
+  }
+  if (path === "/home")
+    return {
+      ...request("home", "tool:home", "Home", "/home", "home", "single"),
+      scopeKey: "global",
+    };
   if (path === "/spaces" || path.startsWith("/spaces/")) {
     const parts = path.split("/").filter(Boolean);
     let spaceId = "";
@@ -69,7 +93,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       scopeKey: "global",
     };
   if (
-    ["/", "/home", "/new", "/browser", "/apps/browser"].includes(path) ||
+    ["/", "/new", "/browser", "/apps/browser"].includes(path) ||
     path.startsWith("/apps") ||
     path === "/discover"
   ) {

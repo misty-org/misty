@@ -4,7 +4,7 @@ import {
   type ShortcutCommandDefinition,
   type ShortcutSlot,
 } from "@/features/shortcuts";
-import type { ShortcutBindingSet } from "@/native/contracts";
+import type { ShortcutBindingSet } from "@/native/ipc";
 
 interface ConflictTarget {
   commandId: string;

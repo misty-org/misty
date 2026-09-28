@@ -1,4 +1,4 @@
-import type { DirectoryListing } from "@/native/contracts";
+import type { DirectoryListing } from "@/native/ipc";
 import * as H from "./index";
 
 export function placeholderListing(path: string): DirectoryListing {

@@ -117,6 +117,7 @@ fn create_popup(
         .focused(false)
         .background_throttling(BackgroundThrottlingPolicy::Throttle)
         .initialization_script(browser_viewport_script(&shortcut_token, false))
+        .initialization_script(browser_status_script())
         .on_navigation(move |url| {
             #[cfg(target_os = "macos")]
             if context_menu::forward(&navigation_app, &navigation_id, url) {
@@ -150,6 +151,7 @@ fn create_popup(
                 webview,
                 renderer(webview.window().label()).tracking,
             );
+            let _ = webview.eval(browser_status_update_script(&json!({ "loading": started })));
             let _ = page_app.emit(
                 "misty://browser-page",
                 BrowserPageEvent {

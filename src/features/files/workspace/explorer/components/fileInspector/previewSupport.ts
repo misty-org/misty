@@ -3,8 +3,8 @@ import {
   explorerGenerateImageThumbnail,
   explorerPrepareOpenItem,
   connectedDevicesMediaUrl,
-} from "@/features/files/workspace/native";
-import type { FileEntry } from "@/native/contracts";
+} from "../../../native";
+import type { FileEntry } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import type {

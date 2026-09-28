@@ -9,20 +9,20 @@ import {
 import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
-  NavigationChevron,
+  Button,
+  TooltipHint,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Button,
+  MenuItem,
 } from "@/shared/ui";
 import { Cloud, Plus, Server } from "lucide-react";
 import { useState } from "react";
-import { navigatorHierarchyTriggerClass } from "./styles";
+import { navigatorIslandActionClass } from "./styles";
 
 export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
   const environment = useAppStore((state) => state.app?.environment);
@@ -62,27 +62,23 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
         if (nextOpen) setServers(readKnownDeployments());
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className={`${navigatorHierarchyTriggerClass} w-fit max-w-full`}
-          aria-label={`Misty server menu, current server: ${currentName}`}
-          data-misty-window-drag-block="true"
-        >
-          <img
-            src={mistyLogo}
-            alt=""
-            aria-hidden="true"
-            className="block size-[var(--misty-navigation-icon-size)] shrink-0 object-contain"
-          />
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="text-[length:calc(var(--navigation-row-font-size,14px)+2px)] font-semibold tracking-[-0.015em] text-inherit">
-              Misty
-            </span>
-            <NavigationChevron open={open} />
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
+      <TooltipHint content={`Misty · ${currentName}`}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className={`${navigatorIslandActionClass} misty-navigator-logo`}
+            aria-label={`Misty server menu, current server: ${currentName}`}
+            data-misty-window-drag-block="true"
+          >
+            <img
+              src={mistyLogo}
+              alt=""
+              aria-hidden="true"
+              className="block size-[var(--misty-navigation-icon-size)] shrink-0 object-contain"
+            />
+          </Button>
+        </DropdownMenuTrigger>
+      </TooltipHint>
       <DropdownMenuContent align="start" className="w-[240px]" aria-label="Misty servers">
         <DropdownMenuLabel>Server · {currentName}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={selfHosted ? currentUrl : "hosted"}>
@@ -119,16 +115,15 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <MenuItem
+          icon={<Plus aria-hidden="true" />}
+          label="Connect another server…"
           disabled={switching}
           onSelect={() => {
             useSettingsStore.getState().setActiveSection("server");
             props.onSettingsClick();
           }}
-        >
-          <Plus aria-hidden="true" />
-          Connect another server…
-        </DropdownMenuItem>
+        />
         <p className="px-2 py-1 text-xs text-cream-muted" role="status">
           {switching
             ? "Connecting… Misty will restart."

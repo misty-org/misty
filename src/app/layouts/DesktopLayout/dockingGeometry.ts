@@ -1,15 +1,12 @@
 import type { CSSProperties } from "react";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
+import { navigatorRailWidth } from "./navigatorMode";
 
 /** Top tabs share the native chrome band; other tab edges leave it reserved. */
-export function dockingGeometry(
-  position: DockPosition,
-  width: number,
-  hidden: boolean,
-  shareTopBand = true,
-) {
+export function dockingGeometry(position: DockPosition, hidden: boolean, shareTopBand = true) {
   const side = isSideDock(position);
-  const size = hidden ? 0 : side ? width : 56;
+  const width = navigatorRailWidth;
+  const size = hidden ? 0 : width;
   const frame: CSSProperties = side
     ? {
         gridTemplateColumns:
@@ -47,7 +44,7 @@ export function dockingGeometry(
     : {
         left: 0,
         right: 0,
-        height: 56,
+        height: width,
         [position]: position === "top" ? 38 : 0,
       };
   const reveal: CSSProperties = side ? { ...floating, width: 8 } : { ...floating, height: 8 };

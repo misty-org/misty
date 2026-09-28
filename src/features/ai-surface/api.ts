@@ -16,6 +16,7 @@ import type {
   AiCitation,
   AiContextReference,
 } from "./types";
+import type { MistyActivityEntry } from "@/features/misty/activity";
 
 export interface AiUserSettings {
   enabled: boolean;
@@ -124,7 +125,7 @@ export const aiSurfaceApi = {
   forgetMemory: (memoryId: string) =>
     apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
   activity: (spaceId: string, agentId?: string) =>
-    apiRequest<{ entries: import("@/features/misty/activity").MistyActivityEntry[] }>(
+    apiRequest<{ entries: MistyActivityEntry[] }>(
       `/ai/activity?${new URLSearchParams({ space_id: spaceId, ...(agentId ? { agent_id: agentId } : {}) })}`,
     ),
   conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
@@ -267,13 +268,13 @@ async function streamAiInvocation(
   const headers = new Headers({ Accept: "text/event-stream" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
   await readInvocationStream(
-    (lastEventId) => {
+    (lastEventId, connectionSignal) => {
       if (lastEventId) headers.set("Last-Event-ID", lastEventId);
       return httpRequest(`${base}${eventsUrl}`, {
         method: "GET",
         credentials: apiRequestCredentials(),
         headers,
-        signal,
+        signal: connectionSignal,
       });
     },
     signal,
@@ -301,6 +302,9 @@ function toServerInvocation(input: AiInvocationRequest) {
       content_hash: c.contentHash,
       screen: c.screen,
       primary: c.primary,
+      captured_at: c.capturedAt,
+      display_id: c.display.id,
+      source: c.source,
     })),
     capture: input.capture
       ? {

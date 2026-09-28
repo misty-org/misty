@@ -1,12 +1,12 @@
-import { useMediaViewerStore } from "@/features/files/workspace/preview";
+import { useMediaViewerStore } from "../../preview";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import {
-  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  IconButton,
 } from "@/shared/ui";
 import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
@@ -68,14 +68,9 @@ export function MediaSearchViewer() {
         </div>
         <div className="grid gap-3 border-t border-charcoal-border p-5">
           <div className="flex items-start gap-3">
-            <Button
-              size="icon"
-              type="button"
-              onClick={togglePlayback}
-              aria-label={playing ? "Pause" : "Play"}
-            >
+            <IconButton size="md" label={playing ? "Pause" : "Play"} onClick={togglePlayback}>
               {playing ? <Pause size={17} /> : <Play size={17} />}
-            </Button>
+            </IconButton>
             <div className="min-w-0">
               <h2 className="m-0 truncate text-lg font-semibold">{result.entry.name}</h2>
               <p className="m-0 mt-1 text-sm text-cream-muted">

@@ -1,5 +1,5 @@
 import { Bot, File, Folder, History, LayoutGrid, Library, type LucideIcon } from "lucide-react";
-import { cn } from "@/shared/ui/utils";
+import { cn } from "@/shared/ui";
 import type { SearchCommand } from "./searchCommands";
 import type { ScopedSearchResult } from "./useScopedSearch";
 

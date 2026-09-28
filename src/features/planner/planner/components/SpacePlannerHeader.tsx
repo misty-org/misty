@@ -1,20 +1,17 @@
 import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
-import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { SpaceViewModeToggle } from "@/features/spaces";
 import {
   Badge,
   Button,
+  IconButton,
   Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
+  Spinner,
 } from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
-import { SpaceViewModeToggle } from "@/features/spaces/components/SpaceViewModeToggle";
+import { Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 /** Compact task controls shared by the Board and List presentations. */
 export function SpacePlannerHeader({
@@ -41,103 +38,10 @@ export function SpacePlannerHeader({
   onSync: () => void;
   onCreate: () => void;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   // The search field stays collapsed until wanted, but never hides a live query.
   const [searchOpen, setSearchOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const showSearch = searchOpen || Boolean(query);
-
-  if (mobile) {
-    return (
-      <header className="grid shrink-0 gap-2 border-b border-charcoal-border bg-charcoal-bg p-3">
-        <div className="flex min-h-11 items-center gap-2">
-          {view && onViewChange ? (
-            <SpaceViewModeToggle
-              label="Task presentation"
-              value={view === "list" ? "list" : "board"}
-              options={[
-                { value: "list", label: "List" },
-                { value: "board", label: "Board" },
-              ]}
-              onChange={onViewChange}
-            />
-          ) : null}
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              className="size-11"
-              size="icon"
-              variant="ghost"
-              onClick={onSync}
-              aria-label="Refresh tasks"
-            >
-              {loading ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <RotateCw className="size-4" />
-              )}
-            </Button>
-            <Button
-              className="relative size-11"
-              size="icon"
-              variant="ghost"
-              onClick={() => setFiltersOpen(true)}
-              aria-label="Filter tasks"
-            >
-              <SlidersHorizontal className="size-4" />
-              {activeFilterCount ? (
-                <Badge
-                  className="absolute right-0 top-0 size-4 justify-center p-0 text-[10px]"
-                  variant="secondary"
-                >
-                  {activeFilterCount}
-                </Badge>
-              ) : null}
-            </Button>
-            {canManage ? (
-              <Button className="min-h-11" onClick={onCreate}>
-                <Plus className="size-4" /> New
-              </Button>
-            ) : null}
-          </div>
-        </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cream-muted" />
-          <Input
-            className="h-11 bg-charcoal-card pl-10 pr-10 text-base"
-            aria-label="Search tasks"
-            placeholder="Search tasks"
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-          />
-          {query ? (
-            <Button
-              className="absolute right-0 top-0 size-11"
-              size="icon"
-              variant="ghost"
-              onClick={() => onQuery("")}
-              aria-label="Clear search"
-            >
-              <X className="size-4" />
-            </Button>
-          ) : null}
-        </div>
-        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <SheetContent
-            side="bottom"
-            className="max-h-[88dvh] rounded-t-2xl border-x-0 border-b-0 bg-charcoal-bg px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
-          >
-            <SheetHeader>
-              <SheetTitle>Filter tasks</SheetTitle>
-            </SheetHeader>
-            <div className="misty-scrollbar mt-4 max-h-[calc(88dvh-80px)] overflow-y-auto">
-              {filters}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </header>
-    );
-  }
-
   return (
     <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
       <div className="flex items-center gap-3">
@@ -147,8 +51,14 @@ export function SpacePlannerHeader({
             label="Task presentation"
             value={view === "list" ? "list" : "board"}
             options={[
-              { value: "board", label: "Board" },
-              { value: "list", label: "List" },
+              {
+                value: "board",
+                label: "Board",
+              },
+              {
+                value: "list",
+                label: "List",
+              },
             ]}
             onChange={onViewChange}
           />
@@ -158,7 +68,7 @@ export function SpacePlannerHeader({
       <div className="ml-auto flex items-center gap-3">
         {showSearch ? (
           <div className="relative w-44">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+            <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
             <Input
               autoFocus
               className="h-8 pl-8 pr-8 text-xs"
@@ -169,39 +79,28 @@ export function SpacePlannerHeader({
               onBlur={() => !query && setSearchOpen(false)}
             />
             {query ? (
-              <Button
-                className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
-                size="icon"
-                variant="ghost"
-                type="button"
+              <IconButton
+                size="xs"
+                label="Clear search"
+                className="absolute inset-y-0 right-1 my-auto"
                 onClick={() => onQuery("")}
-                aria-label="Clear search"
               >
                 <X className="size-3.5" />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         ) : (
-          <Button
-            className="size-8"
-            size="icon"
-            variant="ghost"
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            aria-label="Search tasks"
-          >
+          <IconButton label="Search tasks" onClick={() => setSearchOpen(true)}>
             <Search className="size-4" />
-          </Button>
+          </IconButton>
         )}
 
         <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
           <PopoverTrigger asChild>
-            <Button
-              className="relative size-8"
-              size="icon"
-              variant="ghost"
-              type="button"
-              aria-label={`Filter tasks${activeFilterCount ? ` (${activeFilterCount} active)` : ""}`}
+            <IconButton
+              label={`Filter tasks${activeFilterCount ? ` (${activeFilterCount} active)` : ""}`}
+              tooltip={false}
+              className="relative"
             >
               <SlidersHorizontal className="size-4" />
               {activeFilterCount ? (
@@ -212,28 +111,16 @@ export function SpacePlannerHeader({
                   {activeFilterCount}
                 </Badge>
               ) : null}
-            </Button>
+            </IconButton>
           </PopoverTrigger>
           <PopoverContent className="w-[min(420px,calc(100vw-24px))]" align="end">
             {filters}
           </PopoverContent>
         </Popover>
 
-        <Button
-          aria-label="Refresh tasks"
-          className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
-          size="icon"
-          title="Refresh tasks"
-          variant="ghost"
-          type="button"
-          onClick={onSync}
-        >
-          {loading ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <RotateCw className="size-4" aria-hidden />
-          )}
-        </Button>
+        <IconButton label="Refresh tasks" className="text-cream-muted/70" onClick={onSync}>
+          {loading ? <Spinner label={false} /> : <RotateCw className="size-4" aria-hidden />}
+        </IconButton>
 
         {canManage ? (
           <Button className="h-8 gap-1.5 text-xs" type="button" onClick={onCreate}>

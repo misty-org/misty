@@ -1,26 +1,26 @@
-import { semanticCache, semanticInFlight, semanticCacheVersion } from "@/features/global-search/semanticSearchCache";
+import {
+  semanticCache,
+  semanticInFlight,
+  semanticCacheVersion,
+} from "@/features/global-search/semanticSearchCache";
 export { clearSemanticExplorerSearchCache } from "@/features/global-search/semanticSearchCache";
 export type { ExplorerSearchOptions } from "../model/interfaces/utils/globalSearch";
 export { mediaHitsToSearchResults } from "./globalSearch/resultMapping";
 export { isPathWithin } from "./globalSearch/searchPaths";
 import type { GlobalSpaceLibraryHit } from "@/features/agents";
-import { ensureMediaSearchDeviceReady, searchMedia } from "@/features/files/workspace/search";
+import { ensureMediaSearchDeviceReady, searchMedia } from "@/features/global-search/indexing";
 import { searchSemanticAssets } from "@/features/library/library";
-import {
-  mediaSearchResolveAssets,
-  mediaSearchSnapshot,
-  searchQuery,
-} from "@/features/files/workspace/native";
+import { mediaSearchResolveAssets, mediaSearchSnapshot, searchQuery } from "../../native";
 import type {
   ExplorerLibrarySnapshot,
   ResolvedMediaAsset,
   ResolvedSmartLibraryAsset,
   SearchQueryRequest,
   SearchResult,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { searchApi } from "@/api/search/api";
 import type { ExplorerSearchOptions } from "../model/interfaces/utils/globalSearch";
-import type { MediaSearchHit } from "../model/stores/media/interfaces/useMediaSearchServerStore";
+import type { MediaSearchHit } from "@/features/global-search/indexing";
 import type { SemanticSearchHit } from "../model/stores/media/interfaces/useSmartLibraryServerStore";
 import {
   fileEntryFromSemanticLocation,
@@ -176,7 +176,6 @@ function spaceLibraryHitsToSearchResults(hits: GlobalSpaceLibraryHit[]): SearchR
     } satisfies SearchResult;
   });
 }
-
 
 /**
  * Weighted reciprocal-rank fusion avoids comparing incompatible native-index and

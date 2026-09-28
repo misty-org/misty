@@ -1,16 +1,12 @@
 import type { CommonClientProperties } from "@/telemetry/model/interfaces/types";
 import type { DistributionChannel, Platform, ReleaseChannel } from "@/telemetry/model/types/types";
-import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { getVersion } from "@tauri-apps/api/app";
 import { arch, platform, version } from "@tauri-apps/plugin-os";
-
 let cached: Promise<CommonClientProperties> | undefined;
-
 export function clientMetadata(): Promise<CommonClientProperties> {
   cached ??= loadMetadata();
   return cached;
 }
-
 async function loadMetadata(): Promise<CommonClientProperties> {
   const [rawPlatform, osVersion, architecture, appVersion] = await Promise.all([
     safely(platform, navigator.platform),
@@ -20,16 +16,23 @@ async function loadMetadata(): Promise<CommonClientProperties> {
   ]);
   return {
     platform: normalizePlatform(rawPlatform),
-    ...(osVersion ? { os_version: osVersion } : {}),
+    ...(osVersion
+      ? {
+          os_version: osVersion,
+        }
+      : {}),
     app_version: appVersion,
-    ...(architecture ? { architecture } : {}),
+    ...(architecture
+      ? {
+          architecture,
+        }
+      : {}),
     release_channel: releaseChannel(),
     distribution_channel: distributionChannel(),
-    device_class: isNativeMobileBuild ? "tablet" : "desktop",
+    device_class: "desktop",
     environment: appEnvironment(),
   };
 }
-
 async function safely(fn: () => string | Promise<string>, fallback: string): Promise<string> {
   try {
     return await fn();
@@ -37,16 +40,12 @@ async function safely(fn: () => string | Promise<string>, fallback: string): Pro
     return fallback;
   }
 }
-
 function normalizePlatform(value: string): Platform {
-  if (isAndroidBuild) return "android";
-  if (isNativeMobileBuild) return "ios";
   const normalized = value.toLowerCase();
   if (normalized.includes("win")) return "windows";
   if (normalized.includes("mac")) return "macos";
   return "linux";
 }
-
 function releaseChannel(): ReleaseChannel {
   const value = import.meta.env.VITE_RELEASE_CHANNEL?.trim();
   return (
@@ -64,24 +63,14 @@ function releaseChannel(): ReleaseChannel {
       ? "development"
       : "production";
 }
-
 function distributionChannel(): DistributionChannel {
   const value = import.meta.env.VITE_DISTRIBUTION_CHANNEL?.trim();
   return (
-    [
-      "direct",
-      "microsoft_store",
-      "mac_app_store",
-      "apple_app_store",
-      "google_play",
-      "linux_package",
-      "unknown",
-    ] as const
+    ["direct", "microsoft_store", "mac_app_store", "linux_package", "unknown"] as const
   ).includes(value as DistributionChannel)
     ? (value as DistributionChannel)
     : "unknown";
 }
-
 function appEnvironment(): CommonClientProperties["environment"] {
   if (import.meta.env.MODE === "test") return "test";
   if (import.meta.env.DEV) return "development";

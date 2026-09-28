@@ -46,6 +46,13 @@ pub(crate) mod agent_files_probe;
 #[path = "browser_context_menu.rs"]
 mod context_menu;
 
+#[path = "browser_page_tools.rs"]
+mod page_tools;
+pub use page_tools::{
+    browser_clear_website_data, browser_webview_developer_tools, browser_webview_set_muted, browser_webview_find, browser_webview_print,
+    browser_webview_save_page, browser_webview_stop,
+};
+
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn browser_context_menu_select(app: AppHandle, webview: Webview, key: String, action: String) -> Result<(), String> {
@@ -71,8 +78,9 @@ use super::browser_macos::{
     unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
-    browser_pointer_navigation, browser_viewport_script, emit_browser_pointer,
-    BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
+    browser_pointer_navigation, browser_scrollbar_script, browser_status_script,
+    browser_status_update_script, browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
+    BROWSER_COMPATIBILITY_SCRIPT, BROWSER_MEDIA_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 use super::browser_shortcuts::{
     apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
@@ -128,6 +136,8 @@ struct BrowserSession {
     element_targets: HashMap<String, String>,
     downloads: Vec<BrowserDownload>,
     pending_agent_download: Option<PendingAgentDownload>,
+    /// Private tabs keep no download list and share one throwaway data store.
+    private: bool,
 }
 
 impl BrowserSession {
@@ -168,6 +178,9 @@ fn popup_download_authority(source: &BrowserSession, popup_id: &str) -> Option<(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewCreateRequest {
+    /// Temporary offscreen Home capture: no media, popups, downloads, or tab events.
+    #[serde(default)]
+    pub preview_only: bool,
     #[serde(default)]
     pub origin_space_id: Option<String>,
     #[serde(default)]
@@ -190,6 +203,9 @@ pub struct BrowserWebviewCreateRequest {
     pub theme: String,
     #[serde(default)]
     pub native_live_resize: bool,
+    /// A private tab: shared throwaway website data, nothing saved or synced.
+    #[serde(default)]
+    pub private: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -761,8 +777,13 @@ pub async fn browser_webview_create(
     state: State<'_, BrowserSessionState>,
     mut request: BrowserWebviewCreateRequest,
 ) -> Result<(), String> {
-    let profile_lease = super::browser_sync::browser_profile_lease(Some(&app), request.profile_id.as_deref(), request.workspace_tab_id.as_deref().map(|id| (id, request.url.as_str()))).await?;
-    request.profile_id = profile_lease.profile_id.clone();
+    // Private tabs never restore a synced session or bind an account profile.
+    let profile_lease = if request.private {
+        super::browser_sync::browser_profile_lease(Some(&app), None, None).await?
+    } else {
+        super::browser_sync::browser_profile_lease(Some(&app), request.profile_id.as_deref(), request.workspace_tab_id.as_deref().map(|id| (id, request.url.as_str()))).await?
+    };
+    request.profile_id = if request.private { None } else { profile_lease.profile_id.clone() };
     let profile_identifier = browser_profile_identifier(request.profile_id.as_deref())?;
     // Integrations use Browser's navigation rules. Provider metadata identifies
     // the account and automation permissions, not where a person may browse.
@@ -771,9 +792,9 @@ pub async fn browser_webview_create(
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     let window = caller.window();
-    window
-        .set_theme(browser_theme(&request.theme)?)
-        .map_err(|error| error.to_string())?;
+    if !request.preview_only {
+        window.set_theme(browser_theme(&request.theme)?).map_err(|error| error.to_string())?;
+    }
     // A live webview's cookie store cannot be changed by updating its metadata.
     // Account switches must close/reopen through the owning host view.
     if app.get_webview(&label).is_some() {
@@ -786,9 +807,10 @@ pub async fn browser_webview_create(
     }
     register_session(&state, &request.id, &request.scope_id)?;
     if let Some(session) = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?.get_mut(&request.id) {
-        session.workspace_tab_id = request.workspace_tab_id.clone();
+        session.workspace_tab_id = if request.preview_only { None } else { request.workspace_tab_id.clone() };
         session.origin_space_id = request.origin_space_id.clone();
         session.provider_id = request.provider_id.clone();
+        session.private = request.private;
         if request.profile_id.is_some() { session.profile_id = request.profile_id.clone(); session.logical_profile_id = profile_lease.logical_profile_id.clone(); }
         if request.profile_provider_id.is_some() || request.provider_id.is_some() { session.profile_provider = request.profile_provider_id.clone().or(request.provider_id.clone()); }
     }
@@ -826,12 +848,19 @@ pub async fn browser_webview_create(
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
     let restoring_tab_session = profile_lease.tab_session.is_some();
+    let preview_only = request.preview_only;
     let initial_url = if restoring_tab_session { "about:blank".parse().map_err(|_| "Invalid bootstrap URL")? } else { external_url(&request.url)? };
     let builder = WebviewBuilder::new(label, WebviewUrl::External(initial_url))
         .background_throttling(BackgroundThrottlingPolicy::Disabled)
-        .data_directory(browser_data_directory(&app, request.profile_id.as_deref())?)
-        .data_store_identifier(profile_identifier)
-        .incognito(browser_requires_ephemeral_store());
+        .data_directory(browser_data_directory(&app, request.profile_id.as_deref())?);
+    // With no named store, an incognito view joins the shared private session.
+    let builder = if request.private {
+        builder.incognito(true)
+    } else {
+        builder
+            .data_store_identifier(profile_identifier)
+            .incognito(browser_requires_ephemeral_store())
+    };
     // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
     // such as Google serve their legacy compatibility UI. Derive the desktop
     // Safari identity from the installed Safari bundle instead of pinning a
@@ -843,17 +872,38 @@ pub async fn browser_webview_create(
     };
     let builder = builder
         .focused(false)
+        .initialization_script(if preview_only {
+            "HTMLMediaElement.prototype.play = function(){ return Promise.resolve(); }; document.addEventListener('play', event => { if (event.target instanceof HTMLMediaElement) { event.target.muted = true; event.target.pause(); } }, true); if (window.AudioContext) window.AudioContext.prototype.resume = function(){ return Promise.resolve(); };"
+        } else { "" })
         .accept_first_mouse(true)
         .background_color(browser_background(&request.theme))
+        .initialization_script_for_all_frames(browser_scrollbar_script())
         .initialization_script(browser_viewport_script(
             &shortcut_token,
             renderer(caller.window().label()).tracking,
         ))
+        .initialization_script(browser_status_script())
+        .initialization_script(BROWSER_MEDIA_SCRIPT)
         .on_navigation(move |url| {
             if restoring_tab_session && url.as_str() == "about:blank" { return true; }
             #[cfg(target_os = "macos")]
             if context_menu::forward(&navigation_app, &navigation_id, url) { return false; }
-            if let Some(pointer) = browser_pointer_navigation(url) {
+            if url.scheme() == "misty-media" {
+                let audible = url.query_pairs().any(|(key, value)| key == "audible" && value == "1");
+                let _ = navigation_app.emit_to(
+                    browser_owner_label(&navigation_app, &navigation_id),
+                    "misty://browser-media",
+                    json!({ "id": navigation_id, "audible": audible }),
+                );
+                false
+            } else if url.scheme() == "misty-status" {
+                let _ = navigation_app.emit_to(
+                    browser_owner_label(&navigation_app, &navigation_id),
+                    "misty://browser-stopped",
+                    BrowserFocusEvent { id: navigation_id.clone() },
+                );
+                false
+            } else if let Some(pointer) = browser_pointer_navigation(url) {
                 emit_browser_pointer(&navigation_app, &navigation_id, pointer);
                 false
             } else if forward_focus_navigation(&navigation_app, &navigation_id, url) {
@@ -869,6 +919,7 @@ pub async fn browser_webview_create(
             }
         })
         .on_new_window(move |url, features| {
+            if preview_only { return NewWindowResponse::Deny; }
             #[cfg(target_os = "macos")]
             if let Some(response) = provider_popup(&popup_app, &popup_id, &url, features) { return response; }
             if external_url(url.as_str()).is_ok() {
@@ -884,6 +935,7 @@ pub async fn browser_webview_create(
             NewWindowResponse::Deny
         })
         .on_page_load(move |webview, payload| {
+            if preview_only { return; }
             if restoring_tab_session && payload.url().as_str() == "about:blank" { return; }
             #[cfg(any(target_os = "macos", windows))]
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { super::browser_session_storage::clear(&webview); }
@@ -907,6 +959,7 @@ pub async fn browser_webview_create(
                 tauri::webview::PageLoadEvent::Started => "started",
                 tauri::webview::PageLoadEvent::Finished => "finished",
             };
+            let _ = webview.eval(browser_status_update_script(&json!({ "loading": phase == "started" })));
             let _ = page_app.emit(
                 "misty://browser-page",
                 BrowserPageEvent {
@@ -923,6 +976,7 @@ pub async fn browser_webview_create(
             }
         })
         .on_document_title_changed(move |webview, title| {
+            if preview_only { return; }
             let _ = title_app.emit(
                 "misty://browser-title",
                 BrowserTitleEvent {
@@ -934,6 +988,7 @@ pub async fn browser_webview_create(
             request_browser_compatibility(&webview, &title_app, &title_id);
         })
         .on_download(move |_webview, event| {
+            if preview_only { return false; }
             handle_download_event(&download_app, &download_id, event)
         });
     let webview = window
@@ -960,7 +1015,6 @@ pub async fn browser_webview_create(
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     present_macos_webview(&webview)
 }
-
 
 fn forward_focus_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
     if url.scheme() != "misty-focus" {
@@ -1103,18 +1157,58 @@ fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>
                 .unwrap_or("download");
             let path =
                 reserve_download_path(&state, &download_dir, &sanitize_download_name(suggested));
+            #[cfg(target_os = "macos")]
+            let path = if !agent_download && ask_download_location() {
+                if let Ok(mut reserved) = state.reserved_downloads.lock() {
+                    reserved.remove(&path);
+                }
+                let Some(chosen) = super::browser_macos::ask_download_destination(&path) else {
+                    return false;
+                };
+                // The save panel already confirmed replacing an existing file,
+                // and WebKit will not write over one.
+                if chosen.is_file() {
+                    let _ = std::fs::remove_file(&chosen);
+                }
+                if let Ok(mut reserved) = state.reserved_downloads.lock() {
+                    reserved.insert(chosen.clone());
+                }
+                chosen
+            } else {
+                path
+            };
             *destination = path.clone();
             let record = requested_download(&state, tab_id, &url, &path);
+            if record.initiator == "human" && !tab_is_private(&state, tab_id) {
+                super::browser_library::download_started(app, &record.download_id, &record.url, &path);
+            }
             let _ = app.emit_to(browser_owner_label(app,tab_id),"misty://browser-download", record);
             true
         }
         DownloadEvent::Finished { url, path, success } => {
             let record = finish_download(&state, tab_id, &url, path.as_deref(), success);
+            if record.initiator == "human" {
+                super::browser_library::download_finished(
+                    app,
+                    &record.download_id,
+                    record.success,
+                    record.error.as_deref(),
+                );
+            }
             let _ = app.emit_to(browser_owner_label(app,tab_id),"misty://browser-download", record);
             true
         }
         _ => true,
     }
+}
+
+fn tab_is_private(state: &BrowserSessionState, tab_id: &str) -> bool {
+    state
+        .sessions
+        .lock()
+        .ok()
+        .and_then(|sessions| sessions.get(tab_id).map(|session| session.private))
+        .unwrap_or(false)
 }
 
 fn browser_download_directory(app: &AppHandle, agent_download: bool) -> Option<PathBuf> {
@@ -1128,18 +1222,49 @@ fn browser_download_directory(app: &AppHandle, agent_download: bool) -> Option<P
     if agent_download {
         return app.path().app_cache_dir().ok().map(|path| path.join("agent-downloads"));
     }
-    #[cfg(target_os = "ios")]
+
     {
-        return app
-            .path()
-            .app_data_dir()
+        let chosen = user_download_directory()
+            .lock()
             .ok()
-            .map(|path| path.join("browser-downloads"));
+            .and_then(|directory| directory.clone());
+        chosen.or_else(|| dirs::download_dir().filter(|path| path.is_absolute()))
     }
-    #[cfg(not(target_os = "ios"))]
-    {
-        dirs::download_dir().filter(|path| path.is_absolute())
-    }
+}
+
+static ASK_DOWNLOAD_LOCATION: AtomicBool = AtomicBool::new(false);
+
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn ask_download_location() -> bool {
+    ASK_DOWNLOAD_LOCATION.load(Ordering::Relaxed)
+}
+
+/// Whether to ask where to save each download (macOS).
+#[tauri::command]
+pub fn browser_set_download_prompt(enabled: bool) {
+    ASK_DOWNLOAD_LOCATION.store(enabled, Ordering::Relaxed);
+}
+
+fn user_download_directory() -> &'static Mutex<Option<PathBuf>> {
+    static DIRECTORY: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+    DIRECTORY.get_or_init(Mutex::default)
+}
+
+/// The folder chosen in Browser settings; empty restores the Downloads folder.
+#[tauri::command]
+pub fn browser_set_download_directory(directory: String) -> Result<(), String> {
+    let path = PathBuf::from(directory.trim());
+    let chosen = if directory.trim().is_empty() {
+        None
+    } else if path.is_absolute() {
+        Some(path)
+    } else {
+        return Err("Choose a folder for downloads.".to_owned());
+    };
+    *user_download_directory()
+        .lock()
+        .map_err(|_| "Download settings are unavailable.".to_owned())? = chosen;
+    Ok(())
 }
 
 fn emit_download_failure(
@@ -1163,6 +1288,7 @@ fn emit_download_failure(
         file: None,
         error: Some(error.to_owned()),
     };
+    super::browser_library::download_failed(app, &record.download_id, &record.url, error);
     if let Ok(mut sessions) = state.sessions.lock() {
         let downloads = &mut sessions.entry(tab_id.to_owned()).or_default().downloads;
         downloads.push(record.clone());
@@ -1331,6 +1457,33 @@ pub fn browser_webview_set_bounds(
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
     set_webview_bounds_if_changed(&app, &webview, position, size)
+}
+
+#[tauri::command]
+pub async fn browser_webview_preview_document(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserWebviewIdRequest,
+) -> Result<Value, String> {
+    if tab_is_private(&state, &request.id) { return Err("Private tabs have no previews.".into()); }
+    let view = app.get_webview(&webview_label(&request.id)?).ok_or("Browser page is unavailable.")?;
+    let source = include_str!("../../../src/features/workspace/pageSnapshot.js").replace("export function snapshotPage", "function snapshotPage");
+    let result = evaluate_browser_async_javascript(view.clone(), format!("{source}\nif (document.readyState !== 'complete') throw new Error('Page is still loading'); return JSON.stringify({{ url: location.href, document: snapshotPage(document.documentElement) }});")).await?;
+    let mut result: Value = serde_json::from_str(&result).map_err(|error| error.to_string())?;
+    let size = view.size().map_err(|e| e.to_string())?.to_logical::<f64>(view.window().scale_factor().map_err(|e| e.to_string())?);
+    #[cfg(target_os = "macos")]
+    let image = super::browser_macos::capture_webview_region_sized(view, 0.0, 0.0, size.width, size.height, 2560.0).await;
+    #[cfg(windows)]
+    let image = super::browser_capture_windows::capture(view).await;
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let image: Result<Value, String> = Err("Native preview images are unavailable.".into());
+    if let Ok(image) = image {
+        result["dataUrl"] = image["dataUrl"].clone();
+        result["width"] = image["width"].clone();
+        result["height"] = image["height"].clone();
+    }
+    if result["document"].is_null() && result["dataUrl"].is_null() { return Err("Preview is unavailable.".into()); }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1596,6 +1749,19 @@ pub fn browser_webviews_set_pointer_tracking(caller:Webview, app: AppHandle, ena
     }
 }
 
+/// Shows or hides the hovered-link and loading bubble in every browser page.
+#[tauri::command]
+pub fn browser_webviews_set_status_bubble(app: AppHandle, enabled: bool) -> Result<(), String> {
+    set_status_bubble_enabled(enabled);
+    let script = browser_status_update_script(&json!({ "enabled": enabled }));
+    for (label, webview) in app.webviews() {
+        if label.starts_with("misty-browser-") {
+            let _ = webview.eval(&script);
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn browser_webviews_set_companion(
     app: AppHandle,
@@ -1711,10 +1877,17 @@ pub fn browser_webview_close(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
-    let children = {
+    let (children, private_session_ended) = {
         let mut sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?;
-        sessions.remove(&request.id);
-        sessions.iter().filter(|(_, session)| session.popup_parent.as_deref() == Some(&request.id)).map(|(id, _)| id.clone()).collect::<Vec<_>>()
+        let closed_private = sessions.remove(&request.id).is_some_and(|session| session.private);
+        let private_session_ended =
+            closed_private && !sessions.values().any(|session| session.private);
+        let children = sessions
+            .iter()
+            .filter(|(_, session)| session.popup_parent.as_deref() == Some(&request.id))
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        (children, private_session_ended)
     };
     for id in children {
         browser_webview_close(app.clone(), app.state::<BrowserSessionState>(), BrowserWebviewIdRequest { id })?;
@@ -1728,6 +1901,13 @@ pub fn browser_webview_close(
         let _ = staging.destroy();
     }
     forget_shortcut_token(&state, &request.id);
+    // The last private tab closed: the next one starts with no cookies or data.
+    #[cfg(target_os = "macos")]
+    if private_session_ended {
+        let _ = app.run_on_main_thread(wry::reset_private_data_store);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = private_session_ended;
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
@@ -2484,7 +2664,6 @@ mod tests {
 
 #[tauri::command]
 pub fn browser_profile_persistence() -> bool { !browser_requires_ephemeral_store() }
-
 
 #[path = "browser_profile_cleanup.rs"]
 mod profile_cleanup;

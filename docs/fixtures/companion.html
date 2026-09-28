@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Misty companion verification</title>
+<style>body{font:24px system-ui;background:#f5f5ef;color:#182838;margin:0;padding:64px}h1{font-size:48px}#target{display:block;background:#164bbd;color:white;border:0;border-radius:8px;padding:24px 48px;font-size:30px;cursor:pointer;margin:64px 0}#status{font-size:32px}small{display:block;margin-top:100px}</style>
+<h1>Misty companion verification</h1><p>This is a synthetic local page. No external effects.</p>
+<button id="target">BLUE LANTERN</button><p id="status" role="status">Count: 0</p>
+<label for="phrase">Verification phrase</label> <input id="phrase" autocomplete="off">
+<p id="entered" role="status">Entered: (empty)</p>
+<button id="change">Change label</button><small>Point at the large blue button. Only click when explicitly requested.</small>
+<script>let count=0;const target=document.querySelector('#target');target.onclick=()=>document.querySelector('#status').textContent=`Count: ${++count}`;document.querySelector('#change').onclick=()=>target.textContent=target.textContent==='BLUE LANTERN'?'GREEN HARBOR':'BLUE LANTERN';document.querySelector('#phrase').oninput=event=>document.querySelector('#entered').textContent=`Entered: ${event.target.value}`;</script></html>

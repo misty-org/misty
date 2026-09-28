@@ -4,11 +4,13 @@ const contextSemanticSnapshot = (__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__);
 new MutationObserver(() => { contextDocumentRevision += 1; }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
 document.addEventListener('contextmenu', event => {
   if (!event.isTrusted) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
   const target = event.target instanceof Element ? event.target : event.target?.parentElement;
   if (!target) return;
   const editable = target.closest('input,textarea,[contenteditable="true"],[role="textbox"]');
+  // Fields keep WebKit's own menu so AutoFill, passwords, and spelling suggestions still work.
+  if (editable) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
   const sensitive = editable?.matches('input[type="password"]');
   const fieldSelection = editable && typeof editable.selectionStart === 'number'
     ? editable.value.slice(editable.selectionStart, editable.selectionEnd) : '';

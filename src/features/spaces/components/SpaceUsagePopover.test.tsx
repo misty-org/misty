@@ -5,11 +5,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearUsageCache } from "../store/usageCache";
 
-const auth = vi.hoisted(() => ({ userId: "owner" }));
-vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ user: { id: auth.userId }, transitioning: false }),
-}));
-
 const { SpaceUsagePopover } = await import("../components/SpaceUsagePopover");
 
 const space: Space = {
@@ -30,7 +25,6 @@ describe("SpaceUsagePopover", () => {
   let root: Root;
 
   beforeEach(() => {
-    auth.userId = "owner";
     clearUsageCache();
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -56,7 +50,7 @@ describe("SpaceUsagePopover", () => {
     });
   };
 
-  it("keeps both quotas out of the sidebar until the gauge is opened", async () => {
+  it("defers storage requests until the gauge is opened", async () => {
     const storage = vi.spyOn(spacesApi, "libraryUsage");
     const agent = vi.spyOn(spacesApi, "agentUsage");
 
@@ -69,7 +63,7 @@ describe("SpaceUsagePopover", () => {
     expect(agent).not.toHaveBeenCalled();
   });
 
-  it("loads and shows both quotas once opened", async () => {
+  it("loads only storage without requesting account AI usage", async () => {
     vi.spyOn(spacesApi, "libraryUsage").mockResolvedValue({
       space_id: "space-1",
       personal: {
@@ -86,53 +80,23 @@ describe("SpaceUsagePopover", () => {
       },
       storage_available: true,
     });
-    vi.spyOn(spacesApi, "agentUsage").mockResolvedValue({
-      personal: {
-        ai: {
-          used: 43,
-          reserved: 0,
-          limit: 100,
-          remaining: 57,
-          used_ratio: 0.428,
-          available: true,
-          paused: false,
-        },
-      },
-      spaces: [
-        {
-          space_id: "space-1",
-          name: "Design team",
-          role: "owner",
-          owner_user_id: "owner",
-          ai: {
-            used: 20,
-            reserved: 0,
-            limit: 100,
-            remaining: 80,
-            used_ratio: 0.2,
-            available: true,
-            paused: false,
-          },
-        },
-      ],
-    });
+    const agent = vi.spyOn(spacesApi, "agentUsage");
 
     await act(async () => root.render(<SpaceUsagePopover space={space} />));
     await open();
 
     const text = document.body.textContent ?? "";
-    expect(text).toContain("Personal AI");
-    expect(text).toContain("Space AI");
-    expect(text).toContain("43%");
-    expect(text).toContain("Personal storage");
-    expect(text).toContain("Space storage");
-    expect(text).toContain("2 GB");
-    expect(text).toContain("50 GB");
-    expect(text).toContain("Provided by your plan as this Space’s owner");
+    expect(agent).not.toHaveBeenCalled();
+    expect(text).toContain("Storage");
+    expect(text).toContain("1.5 MB / 50 GB");
+    expect(text).not.toContain("Personal");
+    expect(text).not.toContain("AI");
+    expect(text).not.toContain("allowance");
+    expect(text).not.toContain("Provided by");
+    expect(document.querySelectorAll('[role="progressbar"]')).toHaveLength(1);
   });
 
-  it("explains owner-plan capacity to members", async () => {
-    auth.userId = "member";
+  it("does not present a legacy placeholder as an unlimited allowance", async () => {
     vi.spyOn(spacesApi, "libraryUsage").mockResolvedValue({
       space_id: "space-1",
       personal: {
@@ -144,21 +108,24 @@ describe("SpaceUsagePopover", () => {
       space: {
         used_bytes: 0,
         reserved_bytes: 0,
-        limit_bytes: 50_000_000_000,
-        remaining_bytes: 50_000_000_000,
+        limit_bytes: Number.MAX_SAFE_INTEGER,
+        remaining_bytes: Number.MAX_SAFE_INTEGER,
       },
-    });
-    vi.spyOn(spacesApi, "agentUsage").mockResolvedValue({
-      agent_usage: { percentage_used: 0, available: true, paused: false },
     });
 
     await act(async () => root.render(<SpaceUsagePopover space={space} />));
     await open();
 
-    expect(document.body.textContent).toContain("Provided by the Space owner’s plan");
+    expect(document.body.textContent).toContain("0 B / —");
+    expect(document.body.textContent).not.toContain("Unlimited");
+    expect(document.body.textContent).not.toContain("9007.2 TB");
+    expect(
+      document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
+    ).toBeNull();
+    expect(document.querySelectorAll('[role="progressbar"]')).toHaveLength(1);
   });
 
-  it("uses cached data when reopened and rechecks after 5 minutes", async () => {
+  it("reuses cached storage when reopened without fetching AI usage", async () => {
     const librarySpy = vi.spyOn(spacesApi, "libraryUsage").mockResolvedValue({
       space_id: "space-1",
       space_used_bytes: 1000,
@@ -167,19 +134,18 @@ describe("SpaceUsagePopover", () => {
       remaining_bytes: 9000,
       storage_available: true,
     });
-    const agentSpy = vi.spyOn(spacesApi, "agentUsage").mockResolvedValue({
-      agent_usage: { percentage_used: 20, available: true, paused: false },
-    });
+    const agentSpy = vi.spyOn(spacesApi, "agentUsage");
 
     await act(async () => root.render(<SpaceUsagePopover space={space} />));
     await open();
 
     expect(librarySpy).toHaveBeenCalledTimes(1);
-    expect(agentSpy).toHaveBeenCalledTimes(1);
+    expect(agentSpy).not.toHaveBeenCalled();
 
-    // Reopening does not immediately refetch because data is cached
+    // Close, then reopen: the storage response remains cached.
+    await open();
     await open();
     expect(librarySpy).toHaveBeenCalledTimes(1);
-    expect(agentSpy).toHaveBeenCalledTimes(1);
+    expect(agentSpy).not.toHaveBeenCalled();
   });
 });

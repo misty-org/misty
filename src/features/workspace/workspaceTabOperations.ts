@@ -1,3 +1,4 @@
+import { useBrowserSyncStore } from "@/features/browser-workspace/store";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { workspaceViewHasUnsavedChanges } from "@/features/workspace/unsavedChanges";
 import type {
@@ -73,6 +74,31 @@ export function lastUsedUpdatesForTab(
 }
 
 export function canCloseWorkspaceTab(_tab?: WorkspaceTab, _scopedTabs?: WorkspaceTab[]): boolean {
+  const session = useBrowserSyncStore.getState().session;
+  const live = (deviceId?: string | null) =>
+    !!deviceId && (session?.presence?.find((item) => item.device_id === deviceId)?.online ?? true);
+  const allSeatsAbandoned = (driven: { driver_device_id: string | null }[]) =>
+    driven.length > 0 && driven.every((tree) => !live(tree.driver_device_id));
+  // Following means another device that is actually connected holds the
+  // workspace. A seat left behind by a device that quit does not block closing.
+  const following =
+    session &&
+    session.full_sync !== false &&
+    (session.trees
+      ? session.trees.trees.length > 0 &&
+        !session.trees.driving_tree &&
+        !allSeatsAbandoned(session.trees.trees.filter((tree) => tree.driver_device_id))
+      : !!session.workspace.active_device?.device_id &&
+        session.workspace.active_device.device_id !== session.device_id &&
+        live(session.workspace.active_device.device_id));
+  if (following) {
+    window.dispatchEvent(
+      new CustomEvent("misty:workspace-notice", {
+        detail: "Continue on this device before closing tabs in the synced workspace.",
+      }),
+    );
+    return false;
+  }
   if (_tab && workspaceViewHasUnsavedChanges(_tab.id)) {
     window.dispatchEvent(
       new CustomEvent("misty:workspace-notice", {
@@ -90,6 +116,7 @@ export function canCloseWorkspaceWindow(
 ): boolean {
   return (
     scopedWindows.length > 1 &&
+    canCloseWorkspaceTab() &&
     allLayoutViews(_workspaceWindow.layout).every((tab) => canCloseWorkspaceTab(tab))
   );
 }

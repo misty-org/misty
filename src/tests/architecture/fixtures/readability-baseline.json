@@ -1,0 +1,258 @@
+{
+  "src/app/layouts/RootLayout.tsx": [
+    {
+      "length": 315,
+      "hash": "7b915d8f1194d0ba"
+    }
+  ],
+  "src/features/files/workspace/explorer/components/MediaSearchViewer.tsx": [
+    {
+      "length": 168,
+      "hash": "346027b027925317"
+    }
+  ],
+  "src/features/files/workspace/explorer/workspace/ExplorerDesktopDialogStyles.ts": [
+    {
+      "length": 177,
+      "hash": "0c987fdfe42144b1"
+    }
+  ],
+  "src/features/files/workspace/explorer/workspace/ExplorerDesktopStatus.tsx": [
+    {
+      "length": 319,
+      "hash": "bc4f388a3f093c42"
+    },
+    {
+      "length": 249,
+      "hash": "ce8b49a0e0b4191d"
+    }
+  ],
+  "src/features/files/workspace/explorer/workspace/ExplorerSmartLibraryDialog.tsx": [
+    {
+      "length": 196,
+      "hash": "218f209fa74ac0aa"
+    },
+    {
+      "length": 169,
+      "hash": "e14c04fbf402a87e"
+    },
+    {
+      "length": 197,
+      "hash": "2557855985f15a9f"
+    },
+    {
+      "length": 214,
+      "hash": "8188dee7f6fe2905"
+    },
+    {
+      "length": 175,
+      "hash": "14edc727a51e276c"
+    },
+    {
+      "length": 344,
+      "hash": "4eb6b129628c27e7"
+    }
+  ],
+  "src/features/files/workspace/explorer/workspace/ExplorerSmartLibraryViews.tsx": [
+    {
+      "length": 206,
+      "hash": "927a2c3f702b9865"
+    }
+  ],
+  "src/features/journal/components/JournalAttribution.tsx": [
+    {
+      "length": 307,
+      "hash": "b696271c03ef9587"
+    }
+  ],
+  "src/features/settings/SettingsControls.tsx": [
+    {
+      "length": 173,
+      "hash": "a31d88740c6ecdc9"
+    },
+    {
+      "length": 184,
+      "hash": "de5f715a25619ef0"
+    }
+  ],
+  "src/features/spaces/chat/components/ChatReplyBanner.tsx": [
+    {
+      "length": 164,
+      "hash": "07c67054587410af"
+    }
+  ],
+  "src/features/spaces/chat/components/MessageHoverActions.tsx": [
+    {
+      "length": 269,
+      "hash": "97552c91ea127eaf"
+    }
+  ],
+  "src/features/library/library/SpaceLibraryPlayback.tsx": [
+    {
+      "length": 252,
+      "hash": "d2e929a3713d95d5"
+    },
+    {
+      "length": 175,
+      "hash": "6488f154a0db060e"
+    }
+  ],
+  "src/features/library/library/SpaceLibraryViewer.tsx": [
+    {
+      "length": 291,
+      "hash": "03af4067d4776828"
+    }
+  ],
+  "src/features/library/library/SpaceLibraryViewerUtils.tsx": [
+    {
+      "length": 642,
+      "hash": "54a785654ae45689"
+    },
+    {
+      "length": 167,
+      "hash": "3ef5be5894d35e4f"
+    }
+  ],
+  "src/features/library/library/libraryCollections/useLibraryMaintenance.ts": [
+    {
+      "length": 165,
+      "hash": "80b68ed6b80d10b1"
+    }
+  ],
+  "src/features/planner/planner/SpaceTaskCalendarGrid.tsx": [
+    {
+      "length": 172,
+      "hash": "47c6597f6ef6c873"
+    }
+  ],
+  "src/features/transfers/transferStyles.ts": [
+    {
+      "length": 172,
+      "hash": "4e25f08e16f5df05"
+    },
+    {
+      "length": 179,
+      "hash": "3e336e8feb21850b"
+    },
+    {
+      "length": 169,
+      "hash": "fa6dd583568aa7e4"
+    }
+  ],
+  "src/features/workspace/ChromeTabStrip.tsx": [
+    {
+      "length": 161,
+      "hash": "667b2934839f0389"
+    }
+  ],
+  "src/shared/ui/overlays/AlertDialog.tsx": [
+    {
+      "length": 191,
+      "hash": "2da9e6d54d271fbb"
+    }
+  ],
+  "src/shared/ui/feedback/Alert.tsx": [
+    {
+      "length": 318,
+      "hash": "99a36f81b1dcd188"
+    }
+  ],
+  "src/shared/ui/display/Avatar.tsx": [
+    {
+      "length": 202,
+      "hash": "ea35c9437cb52838"
+    },
+    {
+      "length": 169,
+      "hash": "c9c35b78676c2f0a"
+    },
+    {
+      "length": 359,
+      "hash": "b5d6686e3c7cf320"
+    }
+  ],
+  "src/shared/ui/display/Badge.tsx": [
+    {
+      "length": 344,
+      "hash": "c55227b71cc33062"
+    }
+  ],
+  "src/shared/ui/controls/Button.tsx": [
+    {
+      "length": 170,
+      "hash": "46fc84894a33e9df"
+    },
+    {
+      "length": 194,
+      "hash": "f9b1e240d32f08fd"
+    }
+  ],
+  "src/shared/ui/display/Card.tsx": [
+    {
+      "length": 285,
+      "hash": "6f80747f55e0d299"
+    },
+    {
+      "length": 301,
+      "hash": "0fd31895d3e806d9"
+    }
+  ],
+  "src/shared/ui/overlays/Command.tsx": [
+    {
+      "length": 388,
+      "hash": "df5bb95f1e54869e"
+    },
+    {
+      "length": 213,
+      "hash": "1bebac7966783bf3"
+    },
+    {
+      "length": 316,
+      "hash": "101e6de7ba486f2f"
+    }
+  ],
+  "src/shared/ui/layout/DragLayer.tsx": [
+    {
+      "length": 161,
+      "hash": "22b5ca7c8234c876"
+    }
+  ],
+  "src/shared/ui/controls/RadioGroup.tsx": [
+    {
+      "length": 278,
+      "hash": "50ba02f7e7e3ffe3"
+    }
+  ],
+  "src/shared/ui/layout/Tabs.tsx": [
+    {
+      "length": 231,
+      "hash": "b27539ee55cd7744"
+    },
+    {
+      "length": 802,
+      "hash": "196850d7f2ebf13c"
+    },
+    {
+      "length": 189,
+      "hash": "4eb744700a98828a"
+    }
+  ],
+  "src/shared/ui/controls/ToggleGroup.tsx": [
+    {
+      "length": 174,
+      "hash": "67c111461cb5f1b5"
+    }
+  ],
+  "src/features/misty/useMistyStore.ts": [
+    {
+      "length": 199,
+      "hash": "2bc1d4a949fb7989"
+    }
+  ],
+  "src/features/webviews/websiteIntegrations.ts": [
+    {
+      "length": 180,
+      "hash": "14da9d1749c3d36a"
+    }
+  ]
+}

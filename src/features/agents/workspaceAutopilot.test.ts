@@ -1,3 +1,4 @@
+import { initialCompanionPresentation, useCompanionState } from "./companion/companionState";
 import { beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -55,6 +56,7 @@ import {
 } from "./workspaceAutopilot";
 beforeEach(() => {
   vi.clearAllMocks();
+  useCompanionState.setState({ presentation: initialCompanionPresentation });
   mocks.state.accountId = "account";
   mocks.state.spaceId = "";
   mocks.watch = [];
@@ -85,4 +87,18 @@ it("closes the other beta modes without changing non-native behavior", () => {
   expect(betaExecutionMode("team")).toBe("agent");
   Object.defineProperty(navigator, "platform", { configurable: true, value: "Linux" });
   expect(betaExecutionMode("user")).toBe("user");
+});
+
+it("preserves desktop ownership and Ask across live context updates", async () => {
+  useCompanionState.setState({ presentation: { ...initialCompanionPresentation, ask: true } });
+  await startWorkspaceAutopilot("desktop", "account", "", true);
+  const dispose = watchWorkspaceAutopilot("desktop", "account", "", vi.fn(), true);
+  await vi.waitFor(() => expect(mocks.invoke).toHaveBeenCalledTimes(2));
+  for (const [, args] of mocks.invoke.mock.calls) {
+    expect(args).toMatchObject({
+      taskId: "desktop",
+      context: { desktopControl: true, askBeforeControl: true },
+    });
+  }
+  dispose();
 });

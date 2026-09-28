@@ -12,7 +12,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSection,
 } from "@/features/settings/desktop";
-import { SettingsNote } from "@/features/settings/settingsControls";
+import { SettingsNote } from "@/features/settings/SettingsControls";
 import {
   generateSyncSecret,
   unlockNativeSync,
@@ -23,6 +23,10 @@ import {
 } from "./native";
 import { useBrowserSyncStore } from "./store";
 import { SyncVaultForm } from "./SyncVaultForm";
+import { DeviceNameSettings } from "./DeviceNameSettings";
+import { viewingName } from "./treeControl";
+import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
+import { syncIssueMessage } from "./syncIssueMessage";
 
 function statusLabel(session: NativeSyncView) {
   if (session.status.issue) return "Needs attention";
@@ -155,9 +159,17 @@ export function BrowserSyncSettings() {
           <SettingsNote>Sign in to Misty before setting up sync.</SettingsNote>
         ) : session?.account_id === accountId ? (
           <>
-            <SettingsRow label="Active device">
+            <SettingsRow label="Workspace">
               <span className="text-sm text-cream-muted">
-                {activeDeviceEpoch(session) ? "This device" : "Wake Misty to use this device"}
+                {session.trees
+                  ? session.trees.driving_tree === session.device_id
+                    ? "This device’s workspace"
+                    : session.trees.driving_tree
+                      ? `${viewingName(session, user?.name)}’s workspace`
+                      : "Choose a workspace to continue"
+                  : activeDeviceEpoch(session)
+                    ? "This device"
+                    : "Wake Misty to use this device"}
               </span>
             </SettingsRow>
             <SettingsRow label="Workspace status">
@@ -177,7 +189,7 @@ export function BrowserSyncSettings() {
             {(issue || session.status.issue) && (
               <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                 <p role="alert" className="text-sm text-destructive">
-                  {issue ?? session.status.issue}
+                  {syncIssueMessage(issue ?? session.status.issue)}
                 </p>
                 <Button variant="outline" disabled={reconnecting} onClick={() => void reconnect()}>
                   {reconnecting ? "Reconnecting…" : "Reconnect"}
@@ -189,6 +201,7 @@ export function BrowserSyncSettings() {
                 {websiteDataLabel(session, issue)}
               </span>
             </SettingsRow>
+            <DeviceWebsiteDataList session={session} />
             {session.browser_profile_issue && (
               <p role="alert" className="px-5 py-3 text-sm text-destructive">
                 {session.browser_profile_issue}
@@ -214,6 +227,11 @@ export function BrowserSyncSettings() {
           </SettingsNote>
         )}
       </SettingsSection>
+      {native && session && session.account_id === accountId && (
+        <SettingsSection title="Device names">
+          <DeviceNameSettings session={session} />
+        </SettingsSection>
+      )}
       {available &&
         available.account.accountId === accountId &&
         !transitioning &&

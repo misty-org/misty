@@ -1,4 +1,4 @@
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { compareLibraryItems } from "../libraryFormat";
 import { libraryItemMIME } from "../SpaceLibraryPrimitives";

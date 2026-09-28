@@ -1,4 +1,4 @@
-import type { MountedDevice, SavedSearchRule } from "@/native/contracts";
+import type { MountedDevice, SavedSearchRule } from "@/native/ipc";
 
 import type { SmartFolderMatchMode } from "../../types/components/ExplorerSidebarSupport";
 

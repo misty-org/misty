@@ -92,7 +92,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         return Err("Popup fixture requires disposable loopback storage".into());
     }
     let source = origin
-        .join("/cli/tasks/sdk-oauth-popup-fixture.html")
+        .join("/cli/tasks/browser-oauth-popup-fixture.html")
         .unwrap();
     // A second loopback port is a real different origin without relying on
     // localhost DNS/IPv6 or a third-party login page's changing behavior.
@@ -100,8 +100,8 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
     let mut auth = source.clone();
     auth.set_port(Some(listener.local_addr().map_err(|e| e.to_string())?.port())).unwrap();
     let auth_server = tokio::spawn(async move {
-        let router = axum::Router::new().route("/cli/tasks/sdk-oauth-popup-fixture.html", axum::routing::get(|| async {
-            axum::response::Html(include_str!("../../../cli/tasks/sdk-oauth-popup-fixture.html"))
+        let router = axum::Router::new().route("/cli/tasks/browser-oauth-popup-fixture.html", axum::routing::get(|| async {
+            axum::response::Html(include_str!("../../../cli/tasks/browser-oauth-popup-fixture.html"))
         }));
         let _ = axum::serve(listener, router).await;
     });

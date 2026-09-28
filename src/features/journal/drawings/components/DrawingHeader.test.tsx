@@ -86,7 +86,12 @@ describe("DrawingHeader", () => {
   async function renderHeader(onRename = vi.fn(async () => undefined)) {
     await act(async () => {
       root.render(
-        <DrawingHeader reportError={reportSystemError} drawing={drawingFixture()} onBack={vi.fn()} onRename={onRename} />,
+        <DrawingHeader
+          reportError={reportSystemError}
+          drawing={drawingFixture()}
+          onBack={vi.fn()}
+          onRename={onRename}
+        />,
       );
     });
   }

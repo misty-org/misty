@@ -1,5 +1,7 @@
+import { contiguousTabs } from "@/features/workspace/tabGroups";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
+import { isPrivateBrowserTab } from "@/features/workspace/privateBrowsing";
 import {
   parseBrowserTabState,
   type WorkspaceDockNode,
@@ -14,6 +16,9 @@ export function retainDeviceState(
   previous: WorkspaceVirtualWindow[],
 ): WorkspaceVirtualWindow[] {
   const oldWindows = new Map(previous.map((window) => [window.id, window]));
+  const oldLayouts = new Map(
+    previous.flatMap((window) => layoutTabs(window.layout).map((tab) => [tab.id, tab] as const)),
+  );
   const oldPanes = new Map(
     previous.flatMap((window) =>
       layoutTabs(window.layout).flatMap((layout) =>
@@ -27,6 +32,8 @@ export function retainDeviceState(
   const retainTab = (tab: WorkspaceTab): WorkspaceTab => {
     const old = oldTabs.get(tab.id);
     if (!old || old.surfaceId !== tab.surfaceId) return tab;
+    // Sync only ever sees a private tab's placeholder; the page stays local.
+    if (isPrivateBrowserTab(old)) return { ...tab, ...old };
     let state = tab.state;
     if (tab.surfaceId === "files") state = old.state;
     if (tab.surfaceId === "browser") {
@@ -70,10 +77,13 @@ export function retainDeviceState(
   };
   return incoming.map((window) => {
     const old = oldWindows.get(window.id);
-    const tabs = layoutTabs(window.layout).map((layout) => ({
-      ...layout,
-      root: retainTree(layout.root),
-    }));
+    const tabs = contiguousTabs(
+      layoutTabs(window.layout).map((layout) => ({
+        ...layout,
+        tabGroupId: oldLayouts.get(layout.id)?.tabGroupId,
+        root: retainTree(layout.root),
+      })),
+    );
     const selected =
       tabs.find((layout) => layout.id === window.layout.activeLayoutTabId) ?? tabs[0];
     return {

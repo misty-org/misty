@@ -1,6 +1,7 @@
 import type { NativeSyncView, SyncDeviceInfo } from "./native";
+import { deviceLabels } from "./deviceNames";
 
-export function deviceRows(session: NativeSyncView) {
+export function deviceRows(session: NativeSyncView, ownerName?: string | null) {
   const revoked = new Set(
     (session.devices ?? []).filter((device) => device.revoked_at).map((device) => device.device_id),
   );
@@ -27,6 +28,7 @@ export function deviceRows(session: NativeSyncView) {
       full_sync: session.full_sync !== false,
     });
   const connected = session.status.phase === "ready" || session.status.phase === "catching_up";
+  const labels = deviceLabels([...roster.values()], ownerName);
   return [...roster.values()]
     .map((device) => {
       const local = device.device_id === session.device_id;
@@ -34,9 +36,7 @@ export function deviceRows(session: NativeSyncView) {
       return {
         ...device,
         local,
-        name: local
-          ? "This device"
-          : device.display_name || `Device ${device.device_id.slice(0, 8)}`,
+        name: labels.get(device.device_id) ?? "Device",
         connection: !connected ? "Unknown" : local || presence?.online ? "Connected" : "Offline",
         active: device.full_sync && session.workspace.active_device?.device_id === device.device_id,
       };

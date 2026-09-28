@@ -1,5 +1,5 @@
 import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
-import { LibraryError as SystemErrorActivity } from "@/features/library/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
 import { Button } from "@/shared/ui";
 import { RotateCw } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";

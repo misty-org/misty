@@ -1,46 +1,46 @@
 import { Renameable } from "@/features/navigation-names/Renameable";
 import {
-  useNavigationNames,
-  useNavigationName,
+  groupNameKey,
   navigationName,
   tabNameKey,
-  groupNameKey,
+  useNavigationName,
+  useNavigationNames,
 } from "@/features/navigation-names/store";
-import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import type { ReactNode } from "react";
-import { BrandIcon } from "../../../shared/toolAssets/BrandIcon";
-import { brandIconAsset } from "../../../shared/toolAssets/brandIcons";
-import { DestinationIcon } from "./NavigatorDestinationIcon";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import type { NavigatorAppId } from "@/features/workspace";
-import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
 import {
-  websiteIntegrations,
-  type WebsiteIntegrationId,
-} from "../../../shared/toolAssets/websiteIntegrations";
-import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
-import { providers, providerFromRoute } from "../../../shared/toolAssets/providers";
-import { appIconStrokeWidth } from "@/shared/ui/app-icons";
-import {
+  dockLeaves,
   parseBrowserTabState,
   spaceWorkspaceToolFromRoute,
+  useWorkspaceStore,
   type WorkspaceGroupKey,
   type WorkspaceSurfaceId,
   type WorkspaceTab,
 } from "@/features/workspace";
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
-import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import {
+  appIconStrokeWidth,
+  BrandIcon,
+  brandIconAsset,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-  cn,
-  Button,
+  IconButton,
+  MenuTrigger,
+  Pressable,
+  Spinner,
 } from "@/shared/ui";
-import { Blocks, ChevronDown, LoaderCircle, X, type LucideIcon } from "lucide-react";
+import { Blocks, ChevronDown, VenetianMask, X, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-
+import { providerFromRoute, providers } from "@/features/webviews/providers";
+import {
+  websiteIntegrations,
+  type WebsiteIntegrationId,
+} from "@/features/webviews/websiteIntegrations";
+import { DestinationIcon } from "./NavigatorDestinationIcon";
 export interface TabGroup {
   instanceId?: string;
   key: string;
@@ -50,7 +50,6 @@ export interface TabGroup {
   tabs: WorkspaceTab[];
   storeGroupKey: WorkspaceGroupKey | null;
 }
-
 interface Props {
   group: TabGroup;
   icon?: LucideIcon | null;
@@ -63,7 +62,6 @@ interface Props {
   onMoveTab: (tabId: string, dropIndex: number) => void;
   paneTabs?: WorkspaceTab[];
 }
-
 function getTabAppId(tab: WorkspaceTab | undefined): string {
   if (!tab) return "";
   if (tab.surfaceId === "official-app" || tab.surfaceId === "extension") {
@@ -77,17 +75,15 @@ function getTabAppId(tab: WorkspaceTab | undefined): string {
   }
   return tab.surfaceId;
 }
-
 function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): LucideIcon {
   return (
     workspaceAppIcon(getTabAppId(tab), tab?.surfaceId === "space" ? "space" : "app") ?? fallback
   );
 }
-
 export function TabIcon({
   tab,
   icon: DefaultIcon,
-  size = 14,
+  size = 16,
   isActive = false,
 }: {
   tab?: WorkspaceTab;
@@ -102,19 +98,26 @@ export function TabIcon({
     tab?.id ? Boolean(state.loading[tab.id]) : false,
   );
   const faviconUrl = browserState?.faviconUrl;
-
   useEffect(() => setFaviconFailed(false), [faviconUrl]);
-
-  if (isBrowser && isLoading) {
+  if (browserState?.private && !isLoading) {
     return (
-      <LoaderCircle
-        className={cn("shrink-0 animate-spin", isActive ? "text-cream-bright" : "text-cream-muted")}
+      <VenetianMask
+        className={cn("shrink-0", isActive ? "text-cream-bright" : "text-cream-muted")}
         size={size}
         strokeWidth={2}
+        aria-label="Private tab"
       />
     );
   }
-
+  if (isBrowser && isLoading) {
+    return (
+      <Spinner
+        label={false}
+        className={isActive ? "text-cream-bright" : "text-cream-muted"}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   if (isBrowser && faviconUrl && !faviconFailed) {
     return (
       <img
@@ -131,7 +134,6 @@ export function TabIcon({
       />
     );
   }
-
   const appId = getTabAppId(tab);
   if (brandIconAsset(appId)) return <BrandIcon brand={appId} size={size} />;
   const provider =
@@ -141,7 +143,7 @@ export function TabIcon({
   if (provider)
     return (
       <span className="inline-flex shrink-0">
-        <ProviderBrandIcon provider={provider} size={size} />
+        <BrandIcon brand={provider} size={size} />
       </span>
     );
   const website = tab
@@ -154,7 +156,7 @@ export function TabIcon({
   )
     return (
       <span className="inline-flex shrink-0">
-        <WebsiteBrandIcon id={website as WebsiteIntegrationId} size={size} />
+        <BrandIcon brand={website} size={size} />
       </span>
     );
   const section = tab ? new URL(tab.route, "https://misty.local").searchParams.get("view") : null;
@@ -169,7 +171,6 @@ export function TabIcon({
       "agenda",
       "roadmaps",
       "explorer",
-      "transfers",
       "recent",
       "favorites",
       "collections",
@@ -181,15 +182,15 @@ export function TabIcon({
       <span className="inline-flex shrink-0 [&_svg]:!size-4">
         <DestinationIcon
           appId={appId as NavigatorAppId}
-          item={{ id: section, label: section, route: tab.route }}
+          item={{
+            id: section,
+            label: section,
+            route: tab.route,
+          }}
         />
       </span>
     );
-  const ResolvedIcon =
-    appId === "files" && tab?.route.includes("view=transfers")
-      ? workspaceAppIcon("transfers")!
-      : getTabIcon(tab, DefaultIcon);
-
+  const ResolvedIcon = getTabIcon(tab, DefaultIcon);
   return (
     <ResolvedIcon
       size={size}
@@ -198,7 +199,6 @@ export function TabIcon({
     />
   );
 }
-
 export function WorkspaceTabGroupButton({
   group,
   icon,
@@ -231,7 +231,6 @@ export function WorkspaceTabGroupButton({
   const displayTab = containsActive
     ? (group.tabs.find((tab) => tab.id === activeTabId) ?? preferredTab)
     : preferredTab;
-
   const displayLabel = groupLabel;
   const contextLabel = group.contextLabel || group.label;
   const specificTitle = workspaceTabDisplayTitle(displayTab, group);
@@ -244,7 +243,6 @@ export function WorkspaceTabGroupButton({
   const canCloseDisplayedTab = Boolean(
     displayTab && canClose && (!canCloseTab || canCloseTab(displayTab)),
   );
-
   return (
     <Renameable nameKey={nameKey} automatic={group.label}>
       <div
@@ -263,15 +261,8 @@ export function WorkspaceTabGroupButton({
             : "border-transparent text-cream-muted hover:text-cream-bright hover:text-cream",
         )}
       >
-        <Button
-          variant="ghost"
-          size="none"
-          justify="start"
-          className={cn(
-            "flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden border-0 pl-2 pr-1",
-            "text-left outline-none focus:outline-none focus-visible:ring-1",
-            "focus-visible:ring-inset focus-visible:ring-cream-muted",
-          )}
+        <Pressable
+          className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-1"
           data-reorder-handle="true"
           aria-description="Drag to reorder. Alt+Shift+Left or Right also moves this tab group."
           aria-pressed={containsActive}
@@ -293,23 +284,17 @@ export function WorkspaceTabGroupButton({
               ({group.tabs.length})
             </span>
           ) : null}
-        </Button>
+        </Pressable>
         {showChevron ? (
           <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="none"
-                className={cn(
-                  "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted outline-none",
-                  " hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
-                )}
-                aria-label={`Show ${displayLabel} tabs`}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <ChevronDown aria-hidden size={12} className="size-3" />
-              </Button>
-            </DropdownMenuTrigger>
+            <MenuTrigger
+              iconOnly
+              size="xs"
+              className="mr-1"
+              label={`Show ${displayLabel} tabs`}
+              icon={<ChevronDown aria-hidden size={12} className="size-3" />}
+              onClick={(event) => event.stopPropagation()}
+            />
             <DropdownMenuContent
               align="start"
               className="min-w-[220px]"
@@ -342,16 +327,12 @@ export function WorkspaceTabGroupButton({
                         <TabIcon tab={tab} icon={Icon} size={13} isActive={isActive} />
                         <span className="min-w-0 flex-1 truncate">{tabTitle}</span>
                         {canClose && (!canCloseTab || canCloseTab(tab)) ? (
-                          <Button
-                            variant="ghost"
-                            size="none"
-                            className={cn(
-                              "grid size-5 shrink-0 place-items-center rounded border-0 text-cream-muted/70",
-                              " hover:text-cream focus-visible:outline-none",
-                              "focus-visible:ring-1 focus-visible:ring-cream-muted",
-                            )}
+                          <IconButton
+                            size="2xs"
+                            label={`Close ${tabTitle}`}
+                            tooltip={false}
+                            className="text-cream-muted/70"
                             data-reorder-ignore="true"
-                            aria-label={`Close ${tabTitle}`}
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
@@ -359,7 +340,7 @@ export function WorkspaceTabGroupButton({
                             }}
                           >
                             <X className="size-[11px]" size={11} />
-                          </Button>
+                          </IconButton>
                         ) : null}
                       </DropdownMenuItem>
                     </Renameable>
@@ -370,30 +351,27 @@ export function WorkspaceTabGroupButton({
           </DropdownMenu>
         ) : null}
         {!showChevron && canCloseDisplayedTab ? (
-          <Button
-            variant="ghost"
-            size="none"
-            aria-label={`Close ${displayTab ? workspaceTabDisplayTitle(displayTab, group) : displayLabel}`}
-            className={cn(
-              "mr-1 grid size-6 shrink-0 place-items-center rounded border-0 text-cream-muted opacity-0 outline-none",
-              " hover:text-cream focus:outline-none focus-visible:opacity-100",
-              "focus-visible:ring-1 focus-visible:ring-cream-muted group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100",
-            )}
+          <IconButton
+            size="xs"
+            tooltip={false}
+            label={`Close ${displayTab ? workspaceTabDisplayTitle(displayTab, group) : displayLabel}`}
+            className="mr-1 opacity-0 focus-visible:opacity-100 group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               if (displayTab) onClose(displayTab);
             }}
           >
             <X className="size-3" size={12} />
-          </Button>
+          </IconButton>
         ) : null}
       </div>
     </Renameable>
   );
 }
-
 function WorkspaceTabMenuList(
-  props: Pick<Props, "group" | "onMoveTab" | "paneTabs"> & { children: ReactNode },
+  props: Pick<Props, "group" | "onMoveTab" | "paneTabs"> & {
+    children: ReactNode;
+  },
 ) {
   const pane = () =>
     dockLeaves(useWorkspaceStore.getState().layout.root).find((leaf) =>
@@ -405,7 +383,12 @@ function WorkspaceTabMenuList(
     getDrag: (id) => {
       const tab = props.group.tabs.find((tab) => tab.id === id);
       return tab
-        ? { id, ids: [id], label: workspaceTabDisplayTitle(tab, props.group), paneId: pane()?.id }
+        ? {
+            id,
+            ids: [id],
+            label: workspaceTabDisplayTitle(tab, props.group),
+            paneId: pane()?.id,
+          }
         : null;
     },
     onDrop: (drag, target, after) => {
@@ -444,7 +427,6 @@ function WorkspaceTabMenuList(
   });
   return <div {...reorder}>{props.children}</div>;
 }
-
 export function workspaceTabDropIndex(
   paneTabs: WorkspaceTab[],
   movingTabId: string,
@@ -455,7 +437,6 @@ export function workspaceTabDropIndex(
   const sourceIndex = paneTabs.findIndex((tab) => tab.id === movingTabId);
   return sourceIndex >= 0 && sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
 }
-
 export function workspaceTabDisplayTitle(
   tab: WorkspaceTab | undefined,
   group: Pick<TabGroup, "surfaceId" | "label" | "contextLabel">,
@@ -464,7 +445,6 @@ export function workspaceTabDisplayTitle(
     ? navigationName(tabNameKey(tab.id), workspaceTabAutomaticTitle(tab, group))
     : group.label;
 }
-
 export function workspaceTabAutomaticTitle(
   tab: WorkspaceTab | undefined,
   group: Pick<TabGroup, "surfaceId" | "label" | "contextLabel">,
@@ -495,11 +475,28 @@ export function workspaceTabAutomaticTitle(
     const service = providerFromRoute(tab.route, appId === "inbox" ? "inbox" : "chat");
     if (service && ["inbox", "social", "chat"].includes(appId)) return providers[service].label;
     const sections: Record<string, Record<string, string>> = {
-      planner: { "": "Tasks", tasks: "Tasks", agenda: "Agenda", roadmaps: "Roadmaps" },
-      journal: { "": "Notes", notes: "Notes", drawings: "Drawings" },
-      files: { "": "Explorer", transfers: "Transfers" },
-      inbox: { "": "Misty Inbox", misty: "Misty Inbox" },
-      social: { "": "Misty Social", misty: "Misty Social" },
+      planner: {
+        "": "Tasks",
+        tasks: "Tasks",
+        agenda: "Agenda",
+        roadmaps: "Roadmaps",
+      },
+      journal: {
+        "": "Notes",
+        notes: "Notes",
+        drawings: "Drawings",
+      },
+      files: {
+        "": "Explorer",
+      },
+      inbox: {
+        "": "Misty Inbox",
+        misty: "Misty Inbox",
+      },
+      social: {
+        "": "Misty Social",
+        misty: "Misty Social",
+      },
       library: {
         "": "All items",
         recent: "All items",
@@ -508,7 +505,11 @@ export function workspaceTabAutomaticTitle(
         albums: "Albums",
         deleted: "Deleted",
       },
-      agents: { "": "Conversations", conversations: "Conversations", automations: "Automations" },
+      agents: {
+        "": "Conversations",
+        conversations: "Conversations",
+        automations: "Automations",
+      },
     };
     if (appId === "browser") {
       const url = parseBrowserTabState(tab.state).url;
@@ -521,7 +522,6 @@ export function workspaceTabAutomaticTitle(
     return sections[appId]?.[view] ?? title;
   }
   if (group.surfaceId !== "space") return title;
-
   const contextLabel = group.contextLabel || "";
   const separatorIndex = contextLabel.lastIndexOf(" · ");
   const spaceName = separatorIndex >= 0 ? contextLabel.slice(0, separatorIndex) : "";

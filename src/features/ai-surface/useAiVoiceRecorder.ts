@@ -1,4 +1,4 @@
-import { runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
+import { runtimeAgentsApi as agentsApi } from "@/features/agents/AgentsRuntime";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 

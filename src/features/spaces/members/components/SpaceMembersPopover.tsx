@@ -8,11 +8,12 @@ import {
   Avatar,
   AvatarFallback,
   Button,
+  cn,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
   Skeleton,
-  cn,
 } from "@/shared/ui";
 import { Settings2, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
@@ -79,23 +80,16 @@ export function SpaceMembersPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {trigger ?? (
-          <Button
-            className={cn(
-              "relative grid size-8 place-items-center rounded-md p-0 text-cream-muted shadow-none",
-              "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
-              open && "text-cream-bright",
-            )}
-            variant="ghost"
-            size="icon"
-            type="button"
+          <IconButton
+            label="Space team"
+            className={cn("relative", "", open && "text-cream-bright")}
             title="Team"
-            aria-label="Space team"
             aria-haspopup="dialog"
             aria-expanded={open}
             data-tour-target="space-share-button"
           >
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Button>
+          </IconButton>
         )}
       </PopoverTrigger>
 

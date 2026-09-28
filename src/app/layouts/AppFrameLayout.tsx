@@ -4,8 +4,9 @@ import { useWorkspaceRecoveryRetry } from "@/features/workspace/useWorkspaceReco
 import { BrowserSyncStartup } from "@/features/browser-workspace/BrowserSyncStartup";
 import { BrowserSyncSleepOverlay } from "@/features/browser-workspace/BrowserSyncSleepOverlay";
 import { BrowserSyncBridge } from "@/features/browser-workspace/BrowserSyncBridge";
+import { PageStateBridge } from "@/features/browser-workspace/PageStateBridge";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
-import { LoadingScreen } from "@/shared/ui/loading-screen";
+import { LoadingScreen } from "@/shared/ui";
 import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
 import { ActivityPanel } from "@/features/activity/ActivityPanel";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
@@ -15,7 +16,7 @@ import { useAuth } from "@/features/auth";
 import { desktopNavItems, desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 
-const PlatformLayout = lazy(() => import("@/app/platform-layout"));
+const PlatformLayout = lazy(() => import("@/app/PlatformLayout"));
 
 export function AppFrameLayout() {
   const { user, transitioning } = useAuth();
@@ -67,6 +68,7 @@ export function AppFrameLayout() {
         </Suspense>
       </BrowserSyncStartup>
       <BrowserSyncBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
+      <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
       <AgentExecutionSurface />
       <ActivityPanel />

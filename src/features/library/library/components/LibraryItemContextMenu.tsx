@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { LibraryAlbum, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import {
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuSub,
@@ -94,20 +94,24 @@ export function LibraryItemContextMenu(props: {
 
         {props.deleted ? (
           props.canEdit ? (
-            <MenuItem icon={<ArchiveRestore />} label="Restore" onSelect={props.onRestore} />
+            <ContextMenuAction
+              icon={<ArchiveRestore />}
+              label="Restore"
+              onSelect={props.onRestore}
+            />
           ) : null
         ) : (
           <>
             {props.canCopy ? (
-              <MenuItem icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
+              <ContextMenuAction icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
             ) : null}
             {props.canCopy && props.canEdit ? (
-              <MenuItem icon={<Copy />} label="Duplicate" onSelect={props.onDuplicate} />
+              <ContextMenuAction icon={<Copy />} label="Duplicate" onSelect={props.onDuplicate} />
             ) : null}
             {props.canEdit ? (
               <>
-                <MenuItem icon={<Pencil />} label="Rename" onSelect={props.onRename} />
-                <MenuItem icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
+                <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={props.onRename} />
+                <ContextMenuAction icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
                 {props.albums.length ? (
                   <ContextMenuSub>
                     <ContextMenuSubTrigger>
@@ -119,48 +123,33 @@ export function LibraryItemContextMenu(props: {
                       </ContextMenuLabel>
                       <ContextMenuSeparator />
                       {props.albums.map((album) => (
-                        <ContextMenuItem
+                        <ContextMenuAction
+                          icon={<FolderPlus className="size-4" />}
+                          label={album.name}
                           key={album.id}
                           onSelect={() => props.onAddToAlbum(album.id)}
-                        >
-                          <FolderPlus className="size-4" />
-                          <span className="truncate">{album.name}</span>
-                        </ContextMenuItem>
+                        />
                       ))}
                     </ContextMenuSubContent>
                   </ContextMenuSub>
                 ) : null}
-                <MenuItem
+                <ContextMenuAction
                   icon={<Star fill={props.item.favorite ? "currentColor" : "none"} />}
                   label={props.item.favorite ? "Remove from favorites" : "Add to favorites"}
                   onSelect={props.onToggleFavorite}
                 />
                 <ContextMenuSeparator />
-                <MenuItem danger icon={<Trash2 />} label="Delete" onSelect={props.onTrash} />
+                <ContextMenuAction
+                  destructive
+                  icon={<Trash2 />}
+                  label="Delete"
+                  onSelect={props.onTrash}
+                />
               </>
             ) : null}
           </>
         )}
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-function MenuItem({
-  danger,
-  icon,
-  label,
-  onSelect,
-}: {
-  danger?: boolean;
-  icon: React.ReactElement<{ className?: string }>;
-  label: string;
-  onSelect: () => void;
-}) {
-  return (
-    <ContextMenuItem variant={danger ? "destructive" : "default"} onSelect={onSelect}>
-      <span className="[&_svg]:size-4">{icon}</span>
-      {label}
-    </ContextMenuItem>
   );
 }

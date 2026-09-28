@@ -1,18 +1,19 @@
-import { agentTaskDisplayState } from "@/features/agents/agentWorkState";
-import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, cn } from "@/shared/ui";
-import { useSurfacePresentation } from "@/shared/mobile";
+import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
 import {
-  CheckSquare,
-  GripVertical,
-  LoaderCircle,
-  Maximize2,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  cn,
+  IconButton,
+  Input,
+  Pressable,
+  Spinner,
+} from "@/shared/ui";
+import { CheckSquare, GripVertical, Maximize2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -31,24 +32,31 @@ import {
   TaskPriorityBadge,
   taskStatusOptions,
 } from "./SpaceTaskPrimitives";
-
-const boardStatuses: Array<{ id: SpaceTaskStatus; label: string }> = [
-  { id: "todo", label: "To do" },
-  { id: "in_progress", label: "In progress" },
-  { id: "done", label: "Done" },
+const boardStatuses: Array<{
+  id: SpaceTaskStatus;
+  label: string;
+}> = [
+  {
+    id: "todo",
+    label: "To do",
+  },
+  {
+    id: "in_progress",
+    label: "In progress",
+  },
+  {
+    id: "done",
+    label: "Done",
+  },
 ];
-
 const TASK_DRAG_KIND = "space-task";
 
 /** Interactive controls inside a card own their own gestures and must not start a drag. */
 const NON_DRAGGABLE_SELECTOR = "button, input, select, textarea, [role='combobox']";
-
 const acceptsTask = (payload: PointerDragPayload) => payload.kind === TASK_DRAG_KIND;
-
 export function SpaceTaskBoard({
   tasks,
   members,
-
   totals,
   busy,
   canManage,
@@ -60,7 +68,6 @@ export function SpaceTaskBoard({
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
-
   totals: Record<string, number>;
   busy: string;
   canManage: boolean;
@@ -70,21 +77,15 @@ export function SpaceTaskBoard({
   onCreate: (title: string, status: SpaceTaskStatus) => void;
   onOpenFullCreate?: (status: SpaceTaskStatus, initialTitle?: string) => void;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const [creating, setCreating] = useState<SpaceTaskStatus>();
   const [title, setTitle] = useState("");
-
   const moveById = (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => {
     const task = tasks.find((item) => item.id === taskId);
     if (task) onMove(task, status, beforeTaskId);
   };
-
   return (
     <div
-      className={cn(
-        "flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden",
-        mobile && "snap-x snap-mandatory scroll-px-3 gap-3 px-3",
-      )}
+      className={cn("flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden", false)}
       aria-label="Task board"
     >
       {boardStatuses.map((column) => (
@@ -95,7 +96,6 @@ export function SpaceTaskBoard({
             .filter((task) => task.status === column.id)
             .sort((left, right) => left.rank - right.rank)}
           members={members}
-
           total={totals[column.id]}
           busy={busy}
           canManage={canManage}
@@ -128,12 +128,10 @@ export function SpaceTaskBoard({
     </div>
   );
 }
-
 function BoardColumn({
   column,
   tasks,
   members,
-
   total,
   busy,
   canManage,
@@ -149,10 +147,12 @@ function BoardColumn({
   onDelete,
   onMoveById,
 }: {
-  column: { id: SpaceTaskStatus; label: string };
+  column: {
+    id: SpaceTaskStatus;
+    label: string;
+  };
   tasks: SpaceTask[];
   members: SpaceMember[];
-
   total?: number;
   busy: string;
   canManage: boolean;
@@ -168,28 +168,24 @@ function BoardColumn({
   onDelete: (task: SpaceTask) => void;
   onMoveById: (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => void;
 }) {
-  const mobile = useSurfacePresentation() !== "desktop";
   const dropZone = useDropZone({
     id: `task-column:${column.id}`,
     accepts: acceptsTask,
     onDrop: (payload) => onMoveById(payload.id, column.id),
   });
-
   const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
       e.preventDefault();
       onCancelCreate();
     }
   };
-
   return (
     <section
       ref={dropZone.ref}
       className={cn(
         "flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col",
         "border-r border-charcoal-border/55 px-3 py-2 transition-colors last:border-r-0",
-        mobile &&
-          "w-[calc(100vw-48px)] max-w-[420px] flex-none snap-center rounded-xl border border-charcoal-border bg-charcoal-card/35",
+        false,
         dropZone.active ? "bg-charcoal-hover shadow-none" : "bg-transparent",
       )}
     >
@@ -198,16 +194,13 @@ function BoardColumn({
         <h2 className="m-0 text-xs font-semibold text-cream">{column.label}</h2>
         <span className="text-[11px] tabular-nums text-cream-muted">{total ?? tasks.length}</span>
         {canManage ? (
-          <Button
-            className="ml-auto size-7 text-cream-muted hover:bg-charcoal-card hover:text-cream"
-            size="icon"
-            variant="ghost"
-            type="button"
+          <IconButton
+            label={`Create in ${column.label}`}
+            className="ml-auto"
             onClick={onStartCreate}
-            aria-label={`Create in ${column.label}`}
           >
             <Plus className="size-3.5" />
-          </Button>
+          </IconButton>
         ) : null}
       </header>
 
@@ -227,16 +220,13 @@ function BoardColumn({
                   className="h-auto border-0 bg-transparent p-0 text-xs font-medium text-cream shadow-none placeholder:text-cream-faint/40 focus-visible:ring-0"
                 />
                 <div className="flex items-center justify-between gap-1 border-t border-charcoal-border/40 pt-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    type="button"
-                    title="Expand into full task editor"
+                  <IconButton
+                    size="xs"
+                    label="Expand into full task editor"
                     onClick={onOpenFullCreate}
-                    className="size-6 text-cream-muted hover:bg-charcoal-hover hover:text-cream"
                   >
                     <Maximize2 className="size-3" />
-                  </Button>
+                  </IconButton>
                   <div className="ml-auto flex items-center gap-1.5">
                     <Button
                       size="sm"
@@ -254,7 +244,7 @@ function BoardColumn({
                       className="h-6 px-2.5 text-[11px]"
                     >
                       {busy === `create:${column.id}` ? (
-                        <LoaderCircle className="size-3 animate-spin" />
+                        <Spinner size="sm" label={false} className="size-3" />
                       ) : (
                         "Add"
                       )}
@@ -270,7 +260,6 @@ function BoardColumn({
           <TaskCard
             task={task}
             members={members}
-
             busy={busy === task.id}
             canManage={canManage}
             onOpen={onOpen}
@@ -282,13 +271,12 @@ function BoardColumn({
         ))}
 
         {!tasks.length && !creating ? (
-          <Button
+          <Pressable
             className={cn(
-              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50 bg-transparent",
-              "text-xs text-cream-muted/70 shadow-none hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
+              "flex items-center",
+              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50",
+              "text-xs text-cream-muted/70 hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
             )}
-            variant="ghost"
-            type="button"
             disabled={!canManage}
             onClick={onStartCreate}
           >
@@ -296,17 +284,15 @@ function BoardColumn({
               <Plus className="size-3.5" />
             </span>
             <span>Drop or create</span>
-          </Button>
+          </Pressable>
         ) : null}
       </div>
     </section>
   );
 }
-
 function TaskCard({
   task,
   members,
-
   busy,
   canManage,
   onOpen,
@@ -316,7 +302,6 @@ function TaskCard({
 }: {
   task: SpaceTask;
   members: SpaceMember[];
-
   busy: boolean;
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
@@ -334,26 +319,32 @@ function TaskCard({
     accepts: (payload) => acceptsTask(payload) && payload.id !== task.id,
     onDrop: onDropBefore,
   });
-
   const checklistStats = useMemo(() => {
     if (!notes) return null;
     const matches = [...notes.matchAll(/- \[(x|X| )\]/g)];
     if (!matches.length) return null;
     const completed = matches.filter((m) => m[1].toLowerCase() === "x").length;
-    return { completed, total: matches.length };
+    return {
+      completed,
+      total: matches.length,
+    };
   }, [notes]);
-
   useEffect(() => {
     if (dragging) draggedRef.current = true;
   }, [dragging]);
-
   const beginDrag = (event: PointerEvent<HTMLElement>) => {
     if (!canManage) return;
     if ((event.target as HTMLElement).closest(NON_DRAGGABLE_SELECTOR)) return;
     draggedRef.current = false;
-    startDrag(event, { kind: TASK_DRAG_KIND, id: task.id }, <TaskDragPreview task={task} />);
+    startDrag(
+      event,
+      {
+        kind: TASK_DRAG_KIND,
+        id: task.id,
+      },
+      <TaskDragPreview task={task} />,
+    );
   };
-
   return (
     <Card
       ref={dropZone.ref}
@@ -382,38 +373,39 @@ function TaskCard({
             ) : null}
           </div>
           <div className="flex items-center gap-0.5">
-            {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
-            <div className="invisible flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-              <Button
-                size="icon"
-                variant="ghost"
-                type="button"
+            {busy ? <Spinner size="sm" label={false} className="text-cream-muted" /> : null}
+            <div
+              className={cn(
+                "invisible flex items-center gap-0.5 opacity-0 transition-opacity",
+                "group-focus-within:visible group-focus-within:opacity-100",
+                "group-hover:visible group-hover:opacity-100",
+              )}
+            >
+              <IconButton
+                size="xs"
+                label={`Edit ${task.title}`}
                 title="Edit task"
-                aria-label={`Edit ${task.title}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpen(task);
                 }}
-                className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream"
               >
                 <Pencil className="size-3" />
-              </Button>
+              </IconButton>
               {canManage ? (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  type="button"
+                <IconButton
+                  size="xs"
+                  label={`Delete ${task.title}`}
                   title="Delete task"
-                  aria-label={`Delete ${task.title}`}
                   disabled={busy}
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete(task);
                   }}
-                  className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-notification-red"
+                  className="hover:text-notification-red"
                 >
                   <Trash2 className="size-3" />
-                </Button>
+                </IconButton>
               ) : null}
             </div>
           </div>
@@ -464,7 +456,6 @@ function TaskCard({
     </Card>
   );
 }
-
 function TaskDragPreview({ task }: { task: SpaceTask }) {
   return (
     <div className="w-56 rounded-lg border border-charcoal-border bg-charcoal-card p-2.5 opacity-90 shadow-xl">

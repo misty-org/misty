@@ -22,10 +22,20 @@ const fixture = (): CapabilityApprovalReview => ({
     kind: "browser",
     runId: "invocation_10000000-0000-4000-8000-000000000002",
     effectId: "10000000-0000-4000-8000-000000000004",
-    callId: "fill-original", operation: "browser.interact",
+    callId: "fill-original",
+    operation: "browser.interact",
     input: { action: { kind: "fill", text: "Walk <script>alert(1)</script> 健康" } },
-    target: { contextId: "context-original", deviceId: "device-original", scopeId: "opaque-view", label: "Personal habit account", expiresAt: "2099-01-01T00:00:00Z" },
-    pageUrl: "https://example.org/habits", pageTitle: "Habits", elementLabel: "Note", deadline: "2099-01-01T00:00:00Z",
+    target: {
+      contextId: "context-original",
+      deviceId: "device-original",
+      scopeId: "opaque-view",
+      label: "Personal habit account",
+      expiresAt: "2099-01-01T00:00:00Z",
+    },
+    pageUrl: "https://example.org/habits",
+    pageTitle: "Habits",
+    elementLabel: "Note",
+    deadline: "2099-01-01T00:00:00Z",
   },
 });
 let root: Root, container: HTMLDivElement;

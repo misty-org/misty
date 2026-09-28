@@ -1,7 +1,7 @@
-import { libraryApi as spacesApi } from "@/features/library/library/libraryRuntime";
+import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { BulkLibraryItemOptions } from "@/api/spaces/dto/interfaces/types";
 import type { BulkLibraryItemAction } from "@/api/spaces/dto/types/types";
-import { confirmLibraryAction as confirmAction } from "@/features/library/library/libraryRuntime";
+import { confirmLibraryAction as confirmAction } from "../LibraryRuntime";
 import type { FormEvent } from "react";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 

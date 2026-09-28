@@ -1,7 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { PlannerTaskRuntime, PlannerTaskIntegration } from "../spaceTasks/taskRuntime";
 import type { PlannerCalendarServices, PlannerConnectionServices } from "./calendarServices";
-import type { SpaceAgendaVisibility } from "@/features/spaces/store/useSpaceAgendaPreferences";
+import type { SpaceAgendaVisibility } from "@/features/spaces";
 
 export interface PlannerCalendarRuntime extends Pick<
   PlannerTaskRuntime,

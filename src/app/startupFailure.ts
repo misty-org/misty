@@ -3,8 +3,11 @@ export function showStartupFailure(reload = () => window.location.reload()) {
   if (!root) return;
   const panel = document.createElement("main");
   panel.setAttribute("role", "alert");
-  panel.style.cssText =
-    "min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;box-sizing:border-box;background:#131313;color:#eee;font:14px/1.5 system-ui;text-align:center";
+  panel.style.cssText = [
+    "min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center",
+    "gap:14px;padding:32px;box-sizing:border-box;background:#131313;color:#eee",
+    "font:14px/1.5 system-ui;text-align:center",
+  ].join(";");
   const title = document.createElement("h1");
   title.textContent = "Misty couldn’t finish loading";
   title.style.cssText = "font-size:22px;margin:0;font-weight:600";

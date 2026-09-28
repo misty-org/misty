@@ -83,9 +83,16 @@ function validEvent(value: unknown): value is AccountEvent {
   if (!value || typeof value !== "object") return false;
   const event = value as AccountEvent;
   return (
-    ["reset", "runs", "invocations", "jobs", "agents", "approvals", "interventions"].includes(
-      event.topic,
-    ) &&
+    [
+      "settings-profiles",
+      "reset",
+      "runs",
+      "invocations",
+      "jobs",
+      "agents",
+      "approvals",
+      "interventions",
+    ].includes(event.topic) &&
     (event.id === undefined || (typeof event.id === "string" && event.id.length <= 200))
   );
 }

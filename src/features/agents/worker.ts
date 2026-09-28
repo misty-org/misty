@@ -294,8 +294,16 @@ async function executeWorkflowNodeOnDevice(
       });
     } catch (error) {
       if (job.operation.startsWith("browser.workspace.")) {
-        window.dispatchEvent(new CustomEvent("misty:autopilot-error", {detail: {taskId: browserAgentExecutionRequest(job).input.__mistyTaskId, message: String(error)}}));
-        if (job.operation === "browser.workspace.visual") throw new DeviceOperationNotAttempted(error);
+        window.dispatchEvent(
+          new CustomEvent("misty:autopilot-error", {
+            detail: {
+              taskId: browserAgentExecutionRequest(job).input.__mistyTaskId,
+              message: String(error),
+            },
+          }),
+        );
+        if (job.operation === "browser.workspace.visual")
+          throw new DeviceOperationNotAttempted(error);
       }
       if (String(error).startsWith("browser_snapshot_stale:"))
         throw new DeviceOperationNotAttempted(error);

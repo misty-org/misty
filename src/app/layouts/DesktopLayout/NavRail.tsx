@@ -4,7 +4,7 @@ import { useSetupStore } from "@/features/installer";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/shared/ui";
 import { Settings as SettingsIcon, UserCircle } from "lucide-react";
-import { forwardRef, memo } from "react";
+import { forwardRef, memo, type ButtonHTMLAttributes } from "react";
 import { NavLink } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { emailName, formatBadgeCount, initialsForProfile } from "./helpers";
@@ -97,9 +97,8 @@ export function SettingsNavButton(props: { open: boolean; onClick: () => void })
 export const ProfileNavButton = memo(
   forwardRef<
     HTMLButtonElement,
-    {
+    Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
       open: boolean;
-      onClick: () => void;
       /** Overrides the rail dock geometry so the navigator can align it to its rows. */
       className?: string;
       avatarClassName?: string;
@@ -107,7 +106,11 @@ export const ProfileNavButton = memo(
       /** Labels the button with the signed-in account's display name. */
       showAccountName?: boolean;
     }
-  >(function ProfileNavButton(props, ref) {
+  >(function ProfileNavButton(
+    { open, className, avatarClassName, label, showAccountName, ...buttonProps },
+    ref,
+  ) {
+    const props = { open, className, avatarClassName, label, showAccountName };
     const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
     const { user } = useAuth();
     const me = useUserStore(
@@ -135,24 +138,15 @@ export const ProfileNavButton = memo(
         aria-label="Profile"
         aria-haspopup="menu"
         aria-expanded={props.open}
-        onClick={props.onClick}
+        {...buttonProps}
       >
         {account ? (
-          <Avatar
-            className={cn(
-              "size-9 shrink-0 rounded-full transition duration-150",
-              props.open
-                ? "ring-2 ring-cream/70"
-                : "ring-1 ring-charcoal-border/55 group-hover/profile:ring-charcoal-border",
-              props.avatarClassName,
-            )}
-          >
+          <Avatar shape="tile" className={cn("shrink-0", props.avatarClassName)}>
             {avatarUrl ? (
               <AvatarImage src={avatarUrl} alt={`${displayName} profile picture`} />
             ) : null}
             <AvatarFallback
               className={cn(
-                "rounded-full text-[10px] font-bold",
                 account?.id
                   ? cn(avatarColorClass(account.id), avatarInkClass)
                   : "bg-charcoal-bg text-cream",

@@ -199,7 +199,7 @@ func remoteReleaseChannel(value string) bool {
 }
 func TestingSafePlatform(value string) bool {
 	switch value {
-	case "windows", "macos", "linux", "android", "ios":
+	case "windows", "macos", "linux":
 		return true
 	default:
 		return false

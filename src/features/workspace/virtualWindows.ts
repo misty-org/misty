@@ -1,4 +1,11 @@
-import { layoutTabs, mapLayoutViews, migrateLayoutTabs, selectLayoutTab } from "./layoutTabs";
+import {
+  recoverPaneHistoryViews,
+  isEmptyLayoutTab,
+  layoutTabs,
+  mapLayoutViews,
+  migrateLayoutTabs,
+  selectLayoutTab,
+} from "./layoutTabs";
 import { reconcileGroupIdentities } from "./groupIdentity";
 import {
   capDockLeaves,
@@ -38,13 +45,16 @@ export function normalizeWorkspaceLayout(
   layout: WorkspaceLayout,
   scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceLayout {
-  const migrated = migrateLayoutTabs(layout);
+  const migrated = recoverPaneHistoryViews(migrateLayoutTabs(layout));
   const activeId = migrated.activeLayoutTabId ?? layoutTabs(migrated)[0].id;
+  // Having no tabs at all is a real state; only fill panes when other tabs exist.
+  const noTabs = layoutTabs(migrated).every(isEmptyLayoutTab);
   const tabs = layoutTabs(migrated).map((tab) => {
     const source = tab.id === activeId ? migrated : tab;
     const root = normalizeDockNode(
-      fillEmptyDockLeaves(capDockLeaves(source.root, maxWorkspacePanels), () =>
-        createDefaultWorkspaceTab(scopeKey),
+      fillEmptyDockLeaves(
+        capDockLeaves(source.root, maxWorkspacePanels),
+        noTabs ? undefined : () => createDefaultWorkspaceTab(scopeKey),
       ),
     );
     const panes = dockLeaves(root);

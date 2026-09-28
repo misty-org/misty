@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { create } from "zustand";
 import { afterEach, expect, it, vi } from "vitest";
 import { SpaceSocial } from "./SpaceChat";
-import { configureSocialRuntime, type SocialRuntime } from "./socialRuntime";
+import { configureSocialRuntime, type SocialRuntime } from "./SocialRuntime";
 import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import type { SpaceChatThreadProps } from "./components/SpaceChatThread";
 

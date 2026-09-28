@@ -1,10 +1,6 @@
-import { WebsiteBrandIcon } from "../../../shared/toolAssets/WebsiteBrandIcon";
-import {
-  websiteIntegrations,
-  type WebsiteIntegrationId,
-} from "../../../shared/toolAssets/websiteIntegrations";
-import { ProviderBrandIcon } from "../../../shared/toolAssets/ProviderBrandIcon";
-import { providerFromRoute } from "../../../shared/toolAssets/providers";
+import { BrandIcon, MailProviderIcon } from "@/shared/ui";
+import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
+import { providerFromRoute } from "@/features/webviews/providers";
 import {
   NotesDestinationIcon,
   DrawingsDestinationIcon,
@@ -12,7 +8,6 @@ import {
   AgendaDestinationIcon,
   RoadmapsDestinationIcon,
   ExplorerDestinationIcon,
-  TransfersDestinationIcon,
   AllItemsDestinationIcon,
   FavoritesDestinationIcon,
   CollectionsDestinationIcon,
@@ -20,10 +15,9 @@ import {
   DeletedDestinationIcon,
 } from "./NavigatorDestinationIcons";
 import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
-import { MailProviderIcon } from "@/shared/ui/mail-provider-icon";
 import { Link2, Plug } from "lucide-react";
 import { BotMessageSquare, Workflow } from "lucide-react";
-import type { MistyNavigationItem } from "@misty/sdk";
+import type { NavigationItem as MistyNavigationItem } from "@/shared/navigation/NavigationItem";
 import { FileText } from "lucide-react";
 import type { NavigatorAppId } from "@/features/workspace";
 
@@ -43,12 +37,11 @@ export function DestinationIcon({
 }) {
   if (appId === "files") {
     if (item.id === "explorer") return <ExplorerDestinationIcon aria-hidden />;
-    if (item.id === "transfers") return <TransfersDestinationIcon aria-hidden />;
   }
   if (isPinnedDestination(item)) return <Link2 aria-hidden />;
   if (item.id === "misty") return <MistyBrandIcon size={18} />;
   if (Object.prototype.hasOwnProperty.call(websiteIntegrations, item.id))
-    return <WebsiteBrandIcon id={item.id as WebsiteIntegrationId} size={18} />;
+    return <BrandIcon brand={item.id} size={18} />;
   const nativeIcon = {
     notes: NotesDestinationIcon,
     tasks: TasksDestinationIcon,
@@ -68,7 +61,7 @@ export function DestinationIcon({
   if (appId === "social" || appId === "inbox" || appId === "music" || appId === "media") {
     const family = appId === "social" ? "chat" : appId;
     const provider = providerFromRoute(item.route, family);
-    if (provider) return <ProviderBrandIcon provider={provider} size={18} />;
+    if (provider) return <BrandIcon brand={provider} size={18} />;
   }
   if (appId === "inbox") {
     const provider =
@@ -82,7 +75,7 @@ export function DestinationIcon({
       `/apps/${appId}?provider=${encodeURIComponent(item.id)}`,
       family,
     );
-    if (provider) return <ProviderBrandIcon provider={provider} size={18} />;
+    if (provider) return <BrandIcon brand={provider} size={18} />;
   }
   if (appId === "library") {
     const Icon = {

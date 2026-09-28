@@ -34,7 +34,6 @@ export interface BillingEntitlements {
   personal_storage_limit_bytes?: number;
   space_storage_limit_bytes?: number;
   personal_ai_limit?: number;
-  space_ai_limit?: number;
   /** Compatibility fields from older servers. */
   space_limit?: number;
   storage_limit_bytes?: number;
@@ -48,7 +47,6 @@ export interface BillingSpaceUsage {
   role: "owner" | "member" | string;
   owner_user_id: string;
   storage?: SpaceStorageUsage;
-  ai?: AiQuotaUsage;
 }
 
 export interface BillingUsage {

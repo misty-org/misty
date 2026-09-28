@@ -8,17 +8,18 @@ import {
   explorerPathIsDirectory,
   explorerPrepareDragItems,
   explorerQueueDeleteItems,
-} from "@/features/files/workspace/native";
+} from "../../native";
 import { useMemo, type ReactNode } from "react";
-import { transferDropAcceptance } from "../components/FileBrowserDrag";
-import type {
-  ExplorerDragModifiers,
-  ExplorerDragPayload,
-  ExplorerDropZoneSpec,
-} from "../model/interfaces/drag/types";
+import {
+  transferDropAcceptance,
+  type ExplorerDragModifiers,
+  type ExplorerDragPayload,
+  type ExplorerDropZoneSpec,
+  groupItemsByOperation,
+  storageIdForPath,
+} from "@/features/file-ui";
 import { useExplorerStore } from "../store";
 import { Droppable } from "./ExplorerDragContext";
-import { groupItemsByOperation, storageIdForPath } from "./operations";
 
 export function ExplorerDropTarget(props: {
   id: string;

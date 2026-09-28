@@ -6,7 +6,7 @@ export interface FrontierModel {
   provider_id: string;
   provider_name: string;
   capabilities: string[];
-  reasoning_levels: Array<"default" | "low" | "medium" | "high">;
+  reasoning_levels: Array<"default" | "low" | "medium" | "high" | "xhigh">;
 }
 
 export interface FrontierModelCatalog {
@@ -46,10 +46,15 @@ export const assistantApi = {
     apiRequest<{ conversations: T[] }>(
       `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
     ),
-  createConversation: <T>(title: string, spaceId?: string, agentId?: string) =>
+  createConversation: <T>(
+    title: string,
+    spaceId?: string,
+    agentId?: string,
+    defaults?: { model_id?: string; reasoning_effort?: string },
+  ) =>
     apiRequest<T>("/misty/conversations", {
       method: "POST",
-      body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId }),
+      body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId, ...defaults }),
     }),
   deleteConversation: (conversationId: string) =>
     apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {

@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, Button } from "@/shared/ui";
+import { Avatar, AvatarFallback, Button, IconButton } from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -136,18 +136,15 @@ export default function SignIn() {
                     <span className="shrink-0 pr-1 text-xs text-cream-muted">Signing in…</span>
                   ) : null}
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Remove ${account.email}`}
+                <IconButton
+                  label={`Remove ${account.email}`}
                   title="Remove from this device"
-                  className="mr-1 text-cream-muted opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                  className="mr-1 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                   onClick={() => void handleRemove(account)}
                   disabled={Boolean(busyAccountId) || transitioning}
                 >
                   <Trash2 size={15} />
-                </Button>
+                </IconButton>
               </div>
             ))}
             {transitioning && !busyAccountId ? (
@@ -157,9 +154,8 @@ export default function SignIn() {
             ) : null}
             {error ? <AuthMessage tone="error" message={error} /> : null}
             <Button
-              type="button"
               variant="outline"
-              className="mt-1 h-11 justify-start border-dashed px-3 text-cream-muted"
+              className="mt-1 h-11 justify-start px-3 text-cream-muted"
               disabled={Boolean(busyAccountId) || transitioning}
               onClick={() => {
                 setError("");

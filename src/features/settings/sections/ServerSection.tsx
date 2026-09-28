@@ -7,14 +7,14 @@ import {
   type KnownDeployment,
 } from "@/features/deployment";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
+import { Button, IconButton, Input } from "@/shared/ui";
 import { Check, Cloud, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { settingsDisabledControlClass, settingsIconDangerClass } from "../settingsConstants";
+import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function ServerSection(props: SettingsContentProps) {
@@ -61,7 +61,6 @@ export function ServerSection(props: SettingsContentProps) {
     void switchTo({ mode: "self_hosted", url });
   };
 
-
   return (
     <>
       <SettingsSectionBlock
@@ -106,17 +105,15 @@ export function ServerSection(props: SettingsContentProps) {
                   )}
                 </Button>
                 {!current ? (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    type="button"
-                    className={settingsIconDangerClass}
-                    aria-label={`Forget ${server.name}`}
+                  <IconButton
+                    variant="destructive"
+                    label={`Forget ${server.name}`}
+                    className={settingsDisabledControlClass}
                     disabled={switchingTo !== null || props.working}
                     onClick={() => setServers(forgetDeployment(server.url))}
                   >
                     <Trash2 size={15} aria-hidden="true" />
-                  </Button>
+                  </IconButton>
                 ) : null}
               </div>
             </SettingsRow>
@@ -154,8 +151,6 @@ export function ServerSection(props: SettingsContentProps) {
           </div>
         </SettingsRow>
       </SettingsSectionBlock>
-
-
 
       {notice ? (
         <p className="-mt-2 mb-6 text-[13px] leading-[18px] text-cream-muted" role="status">

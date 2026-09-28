@@ -10,16 +10,17 @@ import {
   Avatar,
   AvatarFallback,
   Button,
+  cn,
   ContextMenu,
+  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuItem,
   ContextMenuTrigger,
   EmptyState,
   Input,
+  ListRowButton,
   PermissionState,
   Skeleton,
   Spinner,
-  cn,
 } from "@/shared/ui";
 import { Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -237,7 +238,7 @@ export function SpaceDrawingsView(props: {
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
                   <div className="shrink-0 border-b border-charcoal-border p-3">
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+                      <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
                       <Input
                         className="h-8 bg-charcoal-bg pl-8 text-xs"
                         aria-label="Search drawings"
@@ -429,10 +430,9 @@ function DrawingRows(props: {
                 : "bg-transparent hover:bg-charcoal-border/65",
             )}
           >
-            <button
-              type="button"
+            <ListRowButton
               aria-current={isSelected ? "true" : undefined}
-              className="flex min-w-0 flex-1 self-stretch items-center gap-2 border-0 bg-transparent px-3.5 text-left outline-none"
+              className="self-stretch items-center rounded-none px-3.5"
               onClick={() => props.onSelect(drawing)}
             >
               <h3 className="m-0 min-w-0 flex-1 truncate text-[13px] font-medium text-cream-bright">
@@ -441,19 +441,22 @@ function DrawingRows(props: {
               {isPinned ? (
                 <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
               ) : null}
-            </button>
+            </ListRowButton>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">
-          <ContextMenuItem onSelect={() => props.onTogglePin(drawing.id)}>
-            {isPinned ? <PinOff /> : <Pin />}
-            {isPinned ? "Unpin" : "Pin"}
-          </ContextMenuItem>
+          <ContextMenuAction
+            icon={isPinned ? <PinOff /> : <Pin />}
+            label={isPinned ? "Unpin" : "Pin"}
+            onSelect={() => props.onTogglePin(drawing.id)}
+          />
           {drawing.can_delete ? (
-            <ContextMenuItem variant="destructive" onSelect={() => props.onDelete(drawing)}>
-              <Trash2 />
-              Delete
-            </ContextMenuItem>
+            <ContextMenuAction
+              icon={<Trash2 />}
+              label="Delete"
+              destructive
+              onSelect={() => props.onDelete(drawing)}
+            />
           ) : null}
         </ContextMenuContent>
       </ContextMenu>
@@ -621,7 +624,7 @@ function DrawingWorkspace(props: {
         {room.notice ? (
           <div
             className={[
-              "absolute left-1/2 top-3 z-30 max-w-xl -translate-x-1/2 rounded-md border",
+              "absolute inset-x-0 top-3 z-30 mx-auto w-fit max-w-xl rounded-md border",
               "border-sage-fg/30 bg-charcoal-bg px-3 py-2 text-sm shadow-md",
             ].join(" ")}
           >

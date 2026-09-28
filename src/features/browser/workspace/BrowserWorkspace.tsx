@@ -1,67 +1,70 @@
-import { browserToolbarButtonClass, browserToolbarStyles } from "./browserToolbarStyles";
-import { Notification } from "@/shared/ui/notification";
-import {
-  blankBrowserUrl,
-  browserTabTitle,
-  createBrowserTabState,
-  parseBrowserTabState,
-  type WorkspaceTab,
-  dockLeaves,
-  useWorkspaceStore,
-} from "@/features/workspace";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { SystemErrorActivity } from "@/features/activity";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
+import { supportsSitePermissions } from "@/features/browser-workspace/sitePermissions";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { SystemErrorActivity } from "@/features/activity";
-import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
-import { useMobileSurfaceChrome } from "@/shared/mobile";
-import { normalizeBrowserAddress } from "./browserAddress";
-import { invoke } from "@tauri-apps/api/core";
 import {
-  ArrowLeft,
-  ArrowRight,
-  ExternalLink,
-  MessageCirclePlus,
-  Pencil,
-  RotateCw,
-  ShieldCheck,
-} from "lucide-react";
+  blankBrowserUrl,
+  browserInternalPage,
+  browserTabTitle,
+  createBrowserTabState,
+  dockLeaves,
+  parseBrowserTabState,
+  useWorkspaceStore,
+  type WorkspaceTab,
+} from "@/features/workspace";
+import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, cn, IconButton, Notification, toolbarIconProps } from "@/shared/ui";
+import { invoke } from "@tauri-apps/api/core";
+import { ArrowLeft, ArrowRight, Pencil, RotateCw, VenetianMask, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BrowserInternalPage } from "../internal/BrowserInternalPage";
+import { normalizeBrowserAddress } from "./browserAddress";
+import { BrowserAgentAccessMenu } from "./BrowserAgentAccessMenu";
+import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
+import { BrowserBookmarkDialog } from "./BrowserBookmarkDialog";
+import { BrowserBookmarkStar } from "./BrowserBookmarkStar";
+import { BrowserClearDataDialog } from "./BrowserClearDataDialog";
+import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
+import { BrowserFindBar } from "./BrowserFindBar";
+import { BrowserHelpDialog } from "./BrowserHelpDialog";
+import { BrowserMenu } from "./BrowserMenu";
+import { BrowserNativeRuntimeRequired } from "./BrowserNativeRuntimeRequired";
+import { BrowserOfflinePage } from "./BrowserOfflinePage";
+import { BrowserOmnibox } from "./BrowserOmnibox";
+import { BrowserQrCodeDialog } from "./BrowserQrCodeDialog";
 import {
   browserContentHash,
   browserRuntimeCreated,
   browserRuntimeId,
   browserScopeId,
+  setBrowserTabShowsInternalPage,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
   type BrowserInspection,
   type BrowserMistyPage,
 } from "./browserRuntime";
-import { BrowserMenu } from "./BrowserMenu";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
-import { supportsSitePermissions } from "@/features/browser-workspace/sitePermissions";
-import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
-import { BrowserOfflinePage } from "./BrowserOfflinePage";
-import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
+import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   browserViewportFrameStyle,
-  browserViewportStageStyle,
   BrowserViewportMenu,
+  browserViewportStageStyle,
   useBrowserViewport,
 } from "./BrowserViewportMenu";
-import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
-import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
-import { BrowserOmnibox } from "./BrowserOmnibox";
 import type { BrowserTheme } from "./types";
-
+import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
+import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
+import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
+import { useBrowserPageCommands } from "./useBrowserPageCommands";
+import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
+import { useBrowserPagePreview } from "./useBrowserPagePreview";
+export { normalizeBrowserAddress } from "./browserAddress";
 export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
-
 function browserThemeFromDocument(): BrowserTheme {
   const theme = document.documentElement.dataset.theme;
   if (theme === "light" || theme === "dark") return theme;
@@ -70,9 +73,6 @@ function browserThemeFromDocument(): BrowserTheme {
     ? "light"
     : "dark";
 }
-
-export { normalizeBrowserAddress } from "./browserAddress";
-
 export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
@@ -90,17 +90,12 @@ export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
   }
   return <ActiveBrowserWorkspace tab={tab} />;
 }
-
 function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const active = useWorkspaceStore((state) =>
     dockLeaves(state.layout.root).some((pane) => pane.activeTabId === tab.id),
   );
-  const nativeRuntime = hasTauriInternals() && !isAndroidBuild;
+  const nativeRuntime = hasTauriInternals();
   const state = parseBrowserTabState(tab.state);
-  useMobileSurfaceChrome({
-    title: tab.title || browserTabTitle(state.url),
-    level: "root",
-  });
   const pageHostRef = useRef<HTMLDivElement | null>(null);
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
@@ -111,8 +106,14 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const storedGrants = useBrowserRuntimeStore((runtime) => runtime.grants[tab.id]);
   const storedHistory = useBrowserRuntimeStore((runtime) => runtime.histories[tab.id]);
   const grants = storedGrants ?? [];
-  const history = storedHistory ?? { entries: [state.url], index: 0 };
+  const history = storedHistory ?? {
+    entries: [state.url],
+    index: 0,
+  };
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
+  const pageLoading = useBrowserRuntimeStore((runtime) => runtime.loading[tab.id] ?? false);
+  const internalPage = browserInternalPage(state.url);
+  useBrowserPagePreview(tab, pageHostRef, nativeRuntime && active && !pageLoading && !runtimeError);
   const downloadNotice = useBrowserRuntimeStore((runtime) => runtime.notices[tab.id] ?? null);
   const compatibilityIssue = useBrowserRuntimeStore(
     (runtime) => runtime.compatibilityIssues[tab.id] ?? null,
@@ -122,9 +123,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     state.url,
     nativeRuntime,
   );
-  const lightChrome = false;
   const browserChromeBackground = "#18191c";
-  const iconButtonClass = browserToolbarButtonClass(lightChrome);
   const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
   const agentMenuSuspensionReason = `browser-agent-menu:${browserRuntimeId(tab)}`;
@@ -164,7 +163,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         try {
           const url = new URL(step.value);
           return url.protocol === "https:" || url.protocol === "http:"
-            ? { operation: "browser.navigate", input: { url: url.toString() } }
+            ? {
+                operation: "browser.navigate",
+                input: {
+                  url: url.toString(),
+                },
+              }
             : null;
         } catch {
           return null;
@@ -177,7 +181,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       ) {
         return {
           operation: "browser.click",
-          input: { elementRef: step.target, expectDownload: false },
+          input: {
+            elementRef: step.target,
+            expectDownload: false,
+          },
         };
       }
       return null;
@@ -277,7 +284,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             },
           });
           if (action.operation === "browser.navigate") {
-            const url = String((action.input as { url: string }).url);
+            const url = String(
+              (
+                action.input as {
+                  url: string;
+                }
+              ).url,
+            );
             useWorkspaceStore.getState().updateBrowserTab(tab.id, {
               ...createBrowserTabState(url),
               title: browserTabTitle(url),
@@ -286,30 +299,34 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           }
         } finally {
           await invoke("browser_agent_grant_revoke", {
-            request: { id: browserRuntimeId(tab), grantId },
+            request: {
+              id: browserRuntimeId(tab),
+              grantId,
+            },
           }).catch(() => undefined);
         }
       },
     };
   }, [mistyPage, nativeRuntime, tab]);
   useAiSurfaceAdapter(aiAdapter);
-
   useBrowserWebviewGeometry({
     hostRef: pageHostRef,
     nativeRuntime,
-    nativeLiveResize: !isNativeMobileBuild && viewport === "responsive",
+    nativeLiveResize: viewport === "responsive",
     tab,
     url: state.url,
     theme: browserTheme,
-    offline: isOffline,
+    // Misty's own pages and the offline page replace the native page.
+    offline: isOffline || internalPage !== null,
   });
-
+  useEffect(() => {
+    setBrowserTabShowsInternalPage(tab.id, internalPage !== null);
+    return () => setBrowserTabShowsInternalPage(tab.id, false);
+  }, [internalPage, tab.id]);
   useEffect(() => {
     useBrowserRuntimeStore.getState().ensureHistory(tab.id, state.url);
   }, [state.url, tab.id]);
-
   useEffect(() => setMistyPage(null), [state.url]);
-
   useEffect(() => {
     if (!runtimeError && !downloadNotice) return;
     const timer = window.setTimeout(() => {
@@ -318,7 +335,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     }, 6000);
     return () => window.clearTimeout(timer);
   }, [runtimeError, downloadNotice, tab.id]);
-
   useEffect(() => {
     const root = document.documentElement;
     const colorScheme =
@@ -337,34 +353,38 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       colorScheme?.removeEventListener("change", syncTheme);
     };
   }, []);
-
   useEffect(() => {
     if (!nativeRuntime) return;
     void invoke("browser_webview_set_theme", {
-      request: { theme: browserTheme },
+      request: {
+        theme: browserTheme,
+      },
     }).catch((error: unknown) => setBrowserError(tab.id, error));
   }, [browserTheme, nativeRuntime, tab.id]);
-
   useEffect(() => {
     setBrowserWebviewsSuspended(annotationsActive, annotationSuspensionReason);
     return () => setBrowserWebviewsSuspended(false, annotationSuspensionReason);
   }, [annotationSuspensionReason, annotationsActive]);
-
   const navigateActiveTab = (rawAddress: string) => {
+    useWorkspaceStore.getState().commitPlaceholder(tab.id);
     const url = normalizeBrowserAddress(rawAddress);
     useWorkspaceStore.getState().updateBrowserTab(tab.id, {
       ...createBrowserTabState(url),
       title: browserTabTitle(url),
     });
     useBrowserRuntimeStore.getState().pushHistory(tab.id, url);
+    // Misty draws its own pages; the hidden native page keeps its place.
+    if (browserInternalPage(url)) return;
     useBrowserRuntimeStore.getState().setLoading(tab.id, true);
     if (nativeRuntime && browserRuntimeCreated(tab)) {
       void invoke("browser_webview_navigate", {
-        request: { id: browserRuntimeId(tab), url },
+        request: {
+          id: browserRuntimeId(tab),
+          url,
+        },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
     }
   };
-
   const attachPageToMisty = async () => {
     if (!nativeRuntime || !browserRuntimeCreated(tab)) {
       setBrowserError(
@@ -410,23 +430,41 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       setBrowserError(tab.id, error);
     } finally {
       await invoke("browser_agent_grant_revoke", {
-        request: { id: browserRuntimeId(tab), grantId },
+        request: {
+          id: browserRuntimeId(tab),
+          grantId,
+        },
       }).catch(() => undefined);
       setMistyPageLoading(false);
     }
   };
-
   const travel = (direction: -1 | 1): boolean => {
-    const url = useBrowserRuntimeStore.getState().moveHistory(tab.id, direction);
-    if (!url) return false;
+    const step = useBrowserRuntimeStore.getState().travelHistory(tab.id, direction);
+    if (!step) return false;
+    const url = step.url;
+    const leavingInternalPage = browserInternalPage(state.url) !== null;
     useWorkspaceStore.getState().updateBrowserTab(tab.id, {
       url,
       title: browserTabTitle(url),
     });
+    if (browserInternalPage(url)) return true;
     useBrowserRuntimeStore.getState().setLoading(tab.id, true);
-    if (nativeRuntime) {
+    if (nativeRuntime && (leavingInternalPage || !step.native)) {
+      // The native page's own history never saw the internal page, or this
+      // entry came from another device or an earlier session: load it.
+      if (browserRuntimeCreated(tab)) {
+        void invoke("browser_webview_navigate", {
+          request: {
+            id: browserRuntimeId(tab),
+            url,
+          },
+        }).catch((error: unknown) => setBrowserError(tab.id, error));
+      }
+    } else if (nativeRuntime) {
       void invoke(direction < 0 ? "browser_webview_back" : "browser_webview_forward", {
-        request: { id: browserRuntimeId(tab) },
+        request: {
+          id: browserRuntimeId(tab),
+        },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
     }
     return true;
@@ -452,77 +490,104 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       if (!nativeRuntime) return false;
       useBrowserRuntimeStore.getState().setLoading(tab.id, true);
       void invoke("browser_webview_reload", {
-        request: { id: browserRuntimeId(tab) },
+        request: {
+          id: browserRuntimeId(tab),
+        },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
       return true;
     },
     focused,
     100,
   );
-
+  const page = useBrowserPageCommands({
+    tab,
+    state,
+    nativeRuntime,
+    focused,
+    navigate: navigateActiveTab,
+  });
+  const reload = () => {
+    if (!nativeRuntime || internalPage) return;
+    useBrowserRuntimeStore.getState().setLoading(tab.id, true);
+    void invoke("browser_webview_reload", {
+      request: {
+        id: browserRuntimeId(tab),
+      },
+    }).catch((error: unknown) => setBrowserError(tab.id, error));
+  };
+  useBrowserMenuCommands({
+    tab,
+    commands: page.commands,
+    travel,
+    reload,
+    annotate: () => setAnnotationsActive(true),
+  });
+  const showStop = pageLoading && !internalPage && Boolean(page.commands.stop);
   return (
     <section
       className={cn(
         "grid h-full min-h-0 overflow-hidden",
-        "grid-rows-[44px_minmax(0,1fr)]",
-        lightChrome ? "text-[#202020]" : "text-cream",
+        "grid-rows-[44px_auto_minmax(0,1fr)] text-cream",
       )}
-      style={{ backgroundColor: browserChromeBackground }}
+      style={{
+        backgroundColor: browserChromeBackground,
+      }}
       data-browser-theme={browserTheme}
       data-browser-workspace-tab={tab.id}
     >
       <div
-        className={cn(
-          browserToolbarStyles.bar,
-          lightChrome ? "border-black/[0.08]" : "border-white/[0.055]",
-        )}
-        style={{ backgroundColor: browserChromeBackground }}
+        className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
+        style={{
+          backgroundColor: browserChromeBackground,
+        }}
         data-browser-toolbar
       >
         <div className={browserToolbarStyles.group}>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label="Back"
+          <IconButton
+            label="Back"
+            tooltip={false}
             disabled={history.index === 0}
             onClick={() => travel(-1)}
           >
-            <ArrowLeft {...browserToolbarStyles.icon} />
-          </button>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label="Forward"
+            <ArrowLeft {...toolbarIconProps} />
+          </IconButton>
+          <IconButton
+            label="Forward"
+            tooltip={false}
             disabled={history.index >= history.entries.length - 1}
             onClick={() => travel(1)}
           >
-            <ArrowRight {...browserToolbarStyles.icon} />
-          </button>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label="Reload"
-            onClick={() => {
-              if (nativeRuntime) {
-                useBrowserRuntimeStore.getState().setLoading(tab.id, true);
-                void invoke("browser_webview_reload", {
-                  request: { id: browserRuntimeId(tab) },
-                }).catch((error: unknown) => setBrowserError(tab.id, error));
-              }
-            }}
+            <ArrowRight {...toolbarIconProps} />
+          </IconButton>
+          <IconButton
+            label={showStop ? "Stop loading" : "Reload"}
+            tooltip={false}
+            disabled={!showStop && Boolean(internalPage)}
+            onClick={showStop ? page.commands.stop : reload}
           >
-            <RotateCw {...browserToolbarStyles.roundIcon} />
-          </button>
+            {showStop ? (
+              <X {...toolbarIconProps} />
+            ) : (
+              <RotateCw {...browserToolbarStyles.roundIcon} />
+            )}
+          </IconButton>
         </div>
 
-        {state.agentOwned ? (
+        {state.private ? (
           <span
             className={cn(
-              "shrink-0 rounded-md border px-2 py-1 text-[10px] font-medium",
-              lightChrome
-                ? "border-black/10 bg-black/[0.035] text-black/60"
-                : "border-white/[0.08] bg-white/[0.045] text-cream-muted",
+              "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
+              "bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted",
             )}
+            title="Private tab: no history, and cookies and site data are discarded when the last private tab closes"
+          >
+            <VenetianMask className="size-3" aria-hidden="true" />
+            Private
+          </span>
+        ) : null}
+        {state.agentOwned ? (
+          <span
+            className="shrink-0 rounded-md border border-cream/[0.08] bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
             title="This browser tab is scoped to Misty's current work"
           >
             Misty
@@ -530,12 +595,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         ) : null}
 
         {supportsSitePermissions() && /^https?:/.test(state.url) ? (
-          <BrowserSiteInfo
-            id={browserRuntimeId(tab)}
-            url={state.url}
-            active={active}
-            iconButtonClass={iconButtonClass}
-          />
+          <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
         ) : null}
         <BrowserOmnibox
           compact={Boolean(state.websiteId)}
@@ -543,107 +603,83 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           focusRequest={addressFocusRequest}
           currentUrl={state.url}
           historyEntries={history.entries}
-          lightChrome={lightChrome}
           tab={tab}
           onNavigate={navigateActiveTab}
         />
+        {page.commands.bookmark ? (
+          <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
+        ) : null}
 
         <div className={browserToolbarStyles.group}>
-          {!isNativeMobileBuild ? (
+          {
             <>
-              <button
-                type="button"
-                className={cn(
-                  iconButtonClass,
-                  annotationsActive &&
-                    (lightChrome
-                      ? "bg-black/[0.06] text-[#202020]"
-                      : "bg-white/[0.06] text-[#e9e9e9]"),
-                )}
-                aria-label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+              <IconButton
+                label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+                tooltip={false}
                 aria-pressed={annotationsActive}
-                title={annotationsActive ? "Exit annotation mode" : "Annotate page"}
                 onClick={() => setAnnotationsActive((active) => !active)}
               >
-                <Pencil {...browserToolbarStyles.icon} />
-              </button>
+                <Pencil {...toolbarIconProps} />
+              </IconButton>
               <BrowserViewportMenu
                 value={viewport}
                 onChange={setViewport}
                 sizes={sizes}
                 onSizeChange={setSize}
-                iconButtonClass={iconButtonClass}
-                lightChrome={lightChrome}
                 suspensionReason={viewportMenuSuspensionReason}
               />
             </>
-          ) : null}
-          <Popover open={agentMenuOverlay.open} onOpenChange={agentMenuOverlay.onOpenChange}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  iconButtonClass,
-                  agentAccess &&
-                    (lightChrome
-                      ? "bg-black/[0.06] text-[#202020]"
-                      : "bg-white/[0.06] text-[#e9e9e9]"),
-                )}
-                aria-label={`Agent access: ${agentAccess ? "On" : "Off"}`}
-              >
-                <MessageCirclePlus {...browserToolbarStyles.icon} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              sideOffset={8}
-              className="w-72 p-3 data-[state=closed]:animate-none data-[state=open]:animate-none"
-            >
-              <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
-              <p className="mb-3 mt-1 text-xs text-cream-muted">
-                Attach this tab when you ask an Agent to work. Access belongs only to that run and
-                expires automatically.
-              </p>
-              <p className="m-0 text-xs text-cream-muted">
-                {agentAccess
-                  ? "This tab is attached to active Agent work."
-                  : "No active Agent run is attached to this tab."}
-              </p>
-              <div className="mt-3 border-t border-charcoal-border pt-3">
-                <p className="m-0 text-xs font-medium">Misty page context</p>
-                <p className="mb-2 mt-1 text-[11px] text-cream-muted">
-                  A one-time inspection captures bounded page text. The temporary read grant is
-                  revoked immediately after capture.
-                </p>
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-charcoal-border bg-charcoal-card px-3 py-2 text-xs hover:bg-charcoal-hover disabled:opacity-50"
-                  disabled={mistyPageLoading || !nativeRuntime}
-                  onClick={() => void attachPageToMisty()}
-                >
-                  {mistyPageLoading
-                    ? "Reading page…"
-                    : mistyPage
-                      ? "Refresh page context"
-                      : "Allow one-time page read"}
-                </button>
-                {mistyPage ? (
-                  <p className="mb-0 mt-2 text-[10px] text-cream-muted">
-                    Attached: {mistyPage.title}
-                    {mistyPage.truncated ? " (bounded extract)" : ""}
-                  </p>
-                ) : null}
-              </div>
-            </PopoverContent>
-          </Popover>
+          }
+          <BrowserAgentAccessMenu
+            overlay={agentMenuOverlay}
+            agentAccess={agentAccess}
+            nativeRuntime={nativeRuntime}
+            mistyPage={mistyPage}
+            mistyPageLoading={mistyPageLoading}
+            onAttachPage={() => void attachPageToMisty()}
+          />
+          {
+            <BrowserDownloadsButton
+              suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
+              onShowAll={() => page.commands.openPage("downloads")}
+            />
+          }
           <BrowserMenu
-            iconButtonClass={iconButtonClass}
             nativeRuntime={nativeRuntime}
             tab={tab}
             url={state.url}
+            commands={page.commands}
           />
         </div>
       </div>
+      <div>
+        <BrowserFindBar
+          runtimeId={browserRuntimeId(tab)}
+          request={page.findRequest}
+          pageKey={state.url}
+        />
+      </div>
+      <BrowserBookmarkDialog
+        request={page.bookmarkRequest}
+        url={state.url}
+        title={tab.title}
+        suspensionReason={`browser-bookmark:${browserRuntimeId(tab)}`}
+      />
+      <BrowserQrCodeDialog
+        request={page.qrCodeRequest}
+        url={state.url}
+        suspensionReason={`browser-qr-code:${browserRuntimeId(tab)}`}
+      />
+      <BrowserHelpDialog
+        request={page.helpRequest}
+        suspensionReason={`browser-help:${browserRuntimeId(tab)}`}
+      />
+      <BrowserClearDataDialog
+        request={page.clearDataRequest}
+        tabId={tab.id}
+        profileId={state.profileId}
+        suspensionReason={`browser-clear-data:${browserRuntimeId(tab)}`}
+      />
 
       {runtimeError ? (
         <>
@@ -652,7 +688,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             error={runtimeError}
             scope={`browser:${tab.id}`}
             title="Browser needs attention"
-            target={{ kind: "route", href: "/browser" }}
+            target={{
+              kind: "route",
+              href: "/browser",
+            }}
           />
           <Notification
             key={runtimeError}
@@ -679,9 +718,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         >
           <p>{downloadNotice ?? "This site rejected Misty’s embedded browser verification."}</p>
           {compatibilityIssue ? (
-            <button
-              type="button"
-              className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-medium hover:bg-white/15"
+            <Button
+              variant="secondary"
+              size="xs"
+              className="shrink-0"
               onClick={() => {
                 void openSystemExternalLink(compatibilityIssue.url).catch((error: unknown) =>
                   setBrowserError(tab.id, error),
@@ -689,7 +729,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               }}
             >
               Open in browser
-            </button>
+            </Button>
           ) : null}
         </Notification>
       ) : null}
@@ -698,7 +738,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         className={cn(
           "flex min-h-0 min-w-0 items-center justify-center overflow-hidden",
           viewport === "responsive" ? "p-0" : "p-3",
-          viewport === "responsive" ? undefined : lightChrome ? "bg-[#e8e8e8]" : "bg-[#101010]",
+          viewport === "responsive" ? undefined : "bg-charcoal-workspace",
         )}
         style={{
           ...browserViewportStageStyle,
@@ -722,13 +762,17 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           data-browser-page-host
           data-browser-viewport={viewport}
         >
-          {isOffline ? (
-            <BrowserOfflinePage
-              url={state.url}
-              onRetry={handleRetry}
-              onGoHome={handleGoHome}
-              lightChrome={lightChrome}
+          {internalPage ? (
+            <BrowserInternalPage
+              page={internalPage}
+              profileId={state.profileId}
+              navigate={navigateActiveTab}
+              openInNewTab={page.commands.openInNewTab}
+              openPage={page.commands.openPage}
+              clearBrowsingData={page.commands.clearBrowsingData}
             />
+          ) : isOffline ? (
+            <BrowserOfflinePage url={state.url} onRetry={handleRetry} onGoHome={handleGoHome} />
           ) : !nativeRuntime && state.url !== blankBrowserUrl ? (
             <BrowserNativeRuntimeRequired
               url={state.url}
@@ -741,7 +785,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           ) : null}
           <BrowserAnnotationLayer
             active={annotationsActive}
-            lightChrome={lightChrome}
             onClose={() => setAnnotationsActive(false)}
           />
         </div>
@@ -749,40 +792,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     </section>
   );
 }
-
-function BrowserNativeRuntimeRequired(props: { url: string; onOpenExternal: () => void }) {
-  return (
-    <div
-      className="absolute inset-0 grid place-items-center overflow-y-auto bg-charcoal-bg p-6"
-      data-testid="browser-native-runtime-required"
-    >
-      <div className="flex w-full max-w-md flex-col items-center text-center">
-        <div className="mb-5 grid size-12 place-items-center rounded-xl bg-charcoal-card text-sage-fg">
-          <ShieldCheck className="size-6" aria-hidden="true" />
-        </div>
-        <h1 className="text-base font-semibold tracking-[-0.02em] text-cream-bright">
-          Open this page in the Misty desktop app
-        </h1>
-        <p className="mt-2 max-w-sm text-sm leading-5 text-cream-muted">
-          Misty runs websites in a separate native browser view. This build does not support
-          embedded browser views.
-        </p>
-        <p className="mt-4 max-w-full truncate rounded-md bg-charcoal-card px-3 py-2 font-mono text-xs text-cream-muted">
-          {props.url}
-        </p>
-        <button
-          type="button"
-          className="mt-5 inline-flex min-h-9 items-center gap-2 rounded-md bg-charcoal-active px-3 text-sm font-medium text-cream-bright transition-colors hover:bg-charcoal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted"
-          onClick={props.onOpenExternal}
-        >
-          <ExternalLink className="size-4" aria-hidden="true" />
-          Open in browser
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function setBrowserError(tabId: string, error: unknown) {
   useBrowserRuntimeStore
     .getState()

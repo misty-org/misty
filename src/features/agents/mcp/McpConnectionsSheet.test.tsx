@@ -35,14 +35,10 @@ describe("McpConnectionsSheet", () => {
     render(<McpConnectionsSheet open onOpenChange={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Tool connections" })).toBeTruthy();
-    expect(
-      screen.getByText(/Connect tools your agents can use/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/Connect tools your agents can use/i)).toBeTruthy();
     expect(screen.queryByText("Activepieces")).toBeNull();
     expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
   });
-
-
 });
 
 initializeHostAgentsRuntime();

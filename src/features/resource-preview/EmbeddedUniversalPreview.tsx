@@ -5,7 +5,7 @@ import {
   EmbeddedUniversalPreviewView,
   useEmbeddedDocument as useEmbeddedDocumentView,
 } from "./EmbeddedUniversalPreviewView";
-import { extractDocumentText } from "@/features/files/workspace/previews";
+import { extractDocumentText } from "./previewDocument";
 export function EmbeddedUniversalPreview(
   props: Omit<ComponentProps<typeof EmbeddedUniversalPreviewView>, "runtime">,
 ) {

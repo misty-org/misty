@@ -1,4 +1,4 @@
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import type { ComponentType, ComponentProps } from "react";
 import type { SystemErrorActivity } from "@/features/activity";
 import {
@@ -22,7 +22,7 @@ import {
   searchResultContext,
   searchResultSummary,
   toolbarStyles,
-} from "./ExplorerToolbarSupport";
+} from "@/features/file-ui";
 import type { SearchResultThumbnail } from "./SearchResultThumbnail";
 export interface ExplorerToolbarSearchRuntime {
   query(query: string, path: string, signal: AbortSignal): Promise<SearchResult[]>;

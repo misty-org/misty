@@ -1,13 +1,14 @@
 //! Foreground, task-bound whole-window control. No authority survives Stop or Space changes.
 use serde_json::{json, Value};
 use std::{sync::{Mutex, OnceLock}, time::{Duration, Instant}};
-use tauri::{AppHandle, Manager, Webview};
+use tauri::{AppHandle, Emitter, Manager, Webview};
 use super::browser::BrowserAgentExecuteRequest;
 
 #[derive(Default)]
 struct Session { task: String, context: Value, snapshot: Option<Snapshot> }
 struct Snapshot { id: String, captured: Instant, geometry: Value }
 static SESSION: OnceLock<Mutex<Session>> = OnceLock::new();
+static DESKTOP_APP: OnceLock<AppHandle> = OnceLock::new();
 fn session() -> &'static Mutex<Session> { SESSION.get_or_init(Mutex::default) }
 #[cfg(target_os="macos")]
 extern "C" {
@@ -16,6 +17,23 @@ extern "C" {
     fn misty_autopilot_action(input: *const std::ffi::c_char) -> *mut std::ffi::c_char;
     fn misty_autopilot_hide_cursor();
     fn misty_autopilot_focus_reason() -> *mut std::ffi::c_char;
+    fn misty_desktop_prepare(task: *const std::ffi::c_char, ask: bool, callback: extern "C" fn(*const std::ffi::c_char));
+    fn misty_desktop_renew(task: *const std::ffi::c_char);
+    fn misty_desktop_stop(task: *const std::ffi::c_char);
+    fn misty_desktop_capture(task: *const std::ffi::c_char) -> *mut std::ffi::c_char;
+    fn misty_desktop_action(input: *const std::ffi::c_char) -> *mut std::ffi::c_char;
+}
+#[cfg(target_os="macos")]
+extern "C" fn desktop_stopped(value: *const std::ffi::c_char) {
+    if value.is_null() { return; }
+    let payload = unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
+    if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
+        let _ = app.emit_to("main", "misty://desktop-control-stopped", payload);
+    }
+}
+pub fn renew(task: &str) {
+    #[cfg(target_os="macos")]
+    if let Ok(task) = std::ffi::CString::new(task) { unsafe { misty_desktop_renew(task.as_ptr()); } }
 }
 #[cfg(target_os="macos")]
 unsafe fn decode(pointer: *mut std::ffi::c_char) -> Result<Value,String> {
@@ -35,7 +53,18 @@ pub fn agent_workspace_context(app:AppHandle, webview:Webview, task_id:String, c
     if webview.label()!="main" || context.to_string().len()>32000 { return Err("Invalid workspace context".into()); }
     super::agent_workspace::authorize_window_task(&app,&task_id,context["accountId"].as_str().unwrap_or(""),context["spaceId"].as_str().unwrap_or(""))?;
     let mut state=session().lock().map_err(|_|"workspace_unavailable")?;
-    if start { *state=Session{task:task_id,context,snapshot:None}; }
+    if start {
+        let desktop = context["desktopControl"] == true;
+        let ask = context["askBeforeControl"] == true;
+        *state=Session{task:task_id.clone(),context,snapshot:None};
+        drop(state);
+        #[cfg(target_os="macos")]
+        if desktop {
+            DESKTOP_APP.get_or_init(|| app.clone());
+            let task = std::ffi::CString::new(task_id).map_err(|e|e.to_string())?;
+            unsafe { misty_desktop_prepare(task.as_ptr(), ask, desktop_stopped); }
+        }
+    }
     else {
         if state.task!=task_id { return Err("agent_task_paused".into()); }
         if state.context!=context { state.snapshot=None; }
@@ -46,16 +75,19 @@ pub fn agent_workspace_context(app:AppHandle, webview:Webview, task_id:String, c
 pub fn stop(task:&str) {
     if let Ok(mut state)=session().lock() { if state.task==task { *state=Session::default(); } else { return; } }
     #[cfg(target_os="macos")]
-    unsafe { misty_autopilot_hide_cursor(); }
+    unsafe {
+        misty_autopilot_hide_cursor();
+        if let Ok(task) = std::ffi::CString::new(task) { misty_desktop_stop(task.as_ptr()); }
+    }
 }
 fn authorize(app:&AppHandle,request:&BrowserAgentExecuteRequest) -> Result<Value,String> {
     let task=request.input["__mistyTaskId"].as_str().unwrap_or("");
     let state=session().lock().map_err(|_|"workspace_unavailable")?;
-    if task.is_empty() || state.task!=task { return Err("Start Agent mode to allow Misty window control".into()); }
+    if task.is_empty() || state.task!=task { return Err("Start or resume the task to allow desktop control".into()); }
     super::agent_workspace::authorize_window_task(app,task,state.context["accountId"].as_str().unwrap_or(""),state.context["spaceId"].as_str().unwrap_or(""))?;
     super::agent_workspace::authorize_scope(app,&request.scope_id,&request.agent_id,task)?;
     let window=app.get_window("main").ok_or("Misty window closed")?;
-    if !window.is_focused().unwrap_or(false) {
+    if state.context["desktopControl"] != true && !window.is_focused().unwrap_or(false) {
         #[cfg(target_os="macos")]
         return unsafe { decode(misty_autopilot_focus_reason()) };
         #[cfg(not(target_os="macos"))]
@@ -70,13 +102,23 @@ pub async fn execute(app:&AppHandle,request:&BrowserAgentExecuteRequest) -> Resu
     #[cfg(target_os="macos")]
     match request.operation.as_str() {
         "browser.workspace.visual" => {
-            let mut capture=tauri::async_runtime::spawn_blocking(|| unsafe { decode(misty_autopilot_capture()) }).await.map_err(|e|e.to_string())??;
+            let desktop = context["desktopControl"] == true;
+            let task = std::ffi::CString::new(request.input["__mistyTaskId"].as_str().unwrap_or("")).map_err(|e|e.to_string())?;
+            let mut capture=tauri::async_runtime::spawn_blocking(move || unsafe {
+                decode(if desktop { misty_desktop_capture(task.as_ptr()) } else { misty_autopilot_capture() })
+            }).await.map_err(|e|e.to_string())??;
             let latest=authorize(app,request)?;
             if context!=latest { return Err("browser_snapshot_stale: workspace changed while capturing".into()); }
             let id=uuid::Uuid::new_v4().to_string();
             let image=capture.as_object_mut().ok_or("Invalid capture")?.remove("image").ok_or("Missing image")?;
-            session().lock().map_err(|_|"workspace_unavailable")?.snapshot=Some(Snapshot{id:id.clone(),captured:Instant::now(),geometry:capture});
-            Ok(json!({"documentId":id,"url":"misty://workspace","title":"Misty workspace","context":context,"image":image,"interactive":[],"contentTrust":"untrusted-screen-content","text":"Full Misty window. Choose normalized coordinates from this image. The workspace controls and embedded apps are visible. Observe after every action. Do not interact with agent mode, permissions, Stop, or account/Space switching controls."}))
+            {
+                let mut state=session().lock().map_err(|_|"workspace_unavailable")?;
+                if state.task != request.input["__mistyTaskId"].as_str().unwrap_or("") || state.context != context {
+                    return Err("agent_task_paused: task changed during capture".into());
+                }
+                state.snapshot=Some(Snapshot{id:id.clone(),captured:Instant::now(),geometry:capture});
+            }
+            Ok(json!({"documentId":id,"url":if desktop {"misty://desktop"} else {"misty://workspace"},"title":if desktop {"Current desktop display"} else {"Misty workspace"},"context":context,"image":image,"interactive":[],"contentTrust":"untrusted-screen-content","text":if desktop {"Live ScreenCaptureKit desktop frame. Control is active: use normalized coordinates across this image for native clicks, typing and scrolling. Inspect after every action. Escape and the control strip's Stop button belong to the user; never operate or hide them."} else {"Full Misty window. Choose normalized coordinates from this image. Observe after every action. Stop or account changes end this task's execution ownership."}}))
         }
         "browser.workspace.interact" => {
             let action=request.input.get("action").ok_or("Missing action")?.clone();
@@ -94,12 +136,13 @@ pub async fn execute(app:&AppHandle,request:&BrowserAgentExecuteRequest) -> Resu
                     let mut state=session().lock().map_err(|_|"workspace_unavailable")?;
                     if state.task!=task { return Err("agent_task_paused".into()); }
                     let snapshot=state.snapshot.take().ok_or("browser_snapshot_stale: inspect before acting")?;
-                    if snapshot.id!=document || snapshot.captured.elapsed()>Duration::from_secs(90) { return Err("browser_snapshot_stale: inspect before acting".into()); }
+                    let desktop = state.context["desktopControl"] == true;
+                    if snapshot.id!=document || snapshot.captured.elapsed()>Duration::from_secs(if desktop { 20 } else { 90 }) { return Err("browser_snapshot_stale: inspect before acting".into()); }
                     let mut input=snapshot.geometry; input["action"]=action;
                     // Release state before native events invoke the app's event handlers.
                     drop(state);
                     let encoded=std::ffi::CString::new(input.to_string()).map_err(|e|e.to_string())?;
-                    unsafe { decode(misty_autopilot_action(encoded.as_ptr())) }
+                    unsafe { decode(if desktop { misty_desktop_action(encoded.as_ptr()) } else { misty_autopilot_action(encoded.as_ptr()) }) }
                 })();
                 let _=send.send(result);
             }).map_err(|e|e.to_string())?;
@@ -114,7 +157,7 @@ fn validate_action(action:&Value)->Result<(),String> {
         "point"=>coordinate("x")&&coordinate("y"),
         "scroll"=>coordinate("x")&&coordinate("y")&&["deltaX","deltaY"].iter().all(|key| action[*key].as_i64().is_some_and(|v|(-2000..=2000).contains(&v))),
         "type"=>action["text"].as_str().is_some_and(|v|v.len()<=16000),
-        "key"=>action["key"].as_str().is_some_and(|v|matches!(v,"Enter"|"Escape"|"Tab"|"Backspace"|"ArrowLeft"|"ArrowRight"|"ArrowUp"|"ArrowDown"|"SelectAll"|"Undo")),
+        "key"=>action["key"].as_str().is_some_and(|v|matches!(v,"Enter"|"Escape"|"Tab"|"Backspace"|"ArrowLeft"|"ArrowRight"|"ArrowUp"|"ArrowDown"|"SelectAll"|"Undo"|"AddressBar"|"NewTab"|"Find")),
         _=>false
     };
     if valid { Ok(()) } else { Err("Invalid workspace action".into()) }

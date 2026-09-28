@@ -50,7 +50,8 @@ describe("WorkspaceWindowMenu", () => {
     const trigger = screen.getByRole("button", { name: "Manage virtual windows" });
     expect(container.contains(trigger)).toBe(true);
     expect(container.querySelectorAll('[aria-label="Manage virtual windows"]')).toHaveLength(1);
-    expect(trigger.querySelector(".lucide-chevron-down")).not.toBeNull();
+    // The titlebar menu keeps its explicit dropdown affordance.
+    expect(trigger.querySelector(".lucide-chevron-down")).toBeTruthy();
 
     fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
       button: 0,

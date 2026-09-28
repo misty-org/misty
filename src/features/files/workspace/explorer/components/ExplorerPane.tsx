@@ -1,23 +1,17 @@
-import type { FileEntry } from "@/native/contracts";
-import { memo, useCallback, useEffect, useMemo, type MouseEvent, type ReactNode } from "react";
+import type { FileEntry } from "@/native/ipc";
+import { memo, useCallback, useEffect, useMemo, type MouseEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { groupItemsByOperation } from "../drag/operations";
-import type { ExplorerDragModifiers, ExplorerDragPayload } from "../model/interfaces/drag/types";
+import {
+  groupItemsByOperation,
+  type ExplorerDragModifiers,
+  type ExplorerDragPayload,
+} from "@/features/file-ui";
 import { useExplorerStore } from "../store";
 import { FileBrowser } from "./FileBrowser";
 
 const paneStyles = {
-  shell:
-    "grid h-full min-h-0 w-full min-w-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden max-[720px]:grid-rows-[36px_minmax(0,1fr)]",
+  shell: "grid h-full min-h-0 w-full min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden",
   shellInactive: "opacity-65 transition-opacity hover:opacity-85",
-  path: [
-    "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden",
-    "border-b border-charcoal-border/60 bg-charcoal-sidebar",
-    "py-0 pl-3 pr-3 text-xs text-cream-muted",
-    "max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px]",
-  ].join(" "),
-  pathText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-  pathActions: "flex h-full flex-none items-center overflow-hidden",
 } as const;
 
 const emptySelectedIds: string[] = [];
@@ -129,14 +123,6 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
       className={`${paneStyles.shell} ${props.isActive === false ? paneStyles.shellInactive : ""}`}
       data-explorer-pane-id={props.paneId}
     >
-      <div className={paneStyles.path}>
-        <span className={paneStyles.pathText} title={props.path}>
-          {compactPanePath(props.path)}
-        </span>
-        {props.paneActions ? (
-          <div className={paneStyles.pathActions}>{props.paneActions}</div>
-        ) : null}
-      </div>
       <FileBrowser
         paneId={props.paneId}
         listing={listing}
@@ -168,13 +154,6 @@ export const ExplorerPane = memo(function ExplorerPane(props: ExplorerPaneProps)
   );
 });
 
-function compactPanePath(path: string): string {
-  const normalized = path.replace(/\/+/g, "/");
-  const parts = normalized.split("/").filter(Boolean);
-  if (parts.length <= 4) return normalized || "/";
-  return `.../${parts.slice(-4).join("/")}`;
-}
-
 function inlineEditForPane(
   edit: ReturnType<typeof useExplorerStore.getState>["inlineEdit"],
   paneId: string,
@@ -191,5 +170,4 @@ export interface ExplorerPaneProps {
   paneId: string;
   path: string;
   isActive?: boolean;
-  paneActions?: ReactNode;
 }

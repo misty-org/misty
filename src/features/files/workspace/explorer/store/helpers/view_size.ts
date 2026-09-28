@@ -1,4 +1,4 @@
-import type { DirectoryListing, DirectorySizeRecord } from "@/native/contracts";
+import type { DirectoryListing, DirectorySizeRecord } from "@/native/ipc";
 import type {
   ExplorerSortState,
   ExplorerStore,
@@ -210,7 +210,7 @@ export function directorySizeRecordsEqual(
   );
 }
 
-export { directorySizeRecordForPath, entrySizeBytes } from "../../utils/entrySize";
+export { directorySizeRecordForPath, entrySizeBytes } from "@/features/file-ui";
 
 export {
   sortListing,

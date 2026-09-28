@@ -34,11 +34,6 @@ export function MemberActionDialog({ dialogs }: { dialogs: MemberDialogsState })
         <AlertDialogFooter>
           <AlertDialogCancel disabled={actionBusy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className={
-              memberAction?.kind === "remove"
-                ? "bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
-                : ""
-            }
             disabled={actionBusy}
             onClick={(event) => {
               event.preventDefault();

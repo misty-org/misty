@@ -1,10 +1,8 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { useMediaSearchStore } from "@/features/global-search/indexing/useMediaSearchStore";
+import { useMediaSearchStore } from "@/features/global-search/indexing";
 import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
-import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";
@@ -16,8 +14,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
   const loadApp = useAppStore((state) => state.loadApp);
-  const providerLoad = useProvidersStore((state) => state.load);
-  const transferLoad = useTransfersStore((state) => state.load);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
   const searchMaintenancePreferences = useMemo(
@@ -68,7 +64,10 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
           const search = useSearchIndexStore.getState();
           await search.initialize();
           const status = useSearchIndexStore.getState().status;
-          const stale = !status?.lastScanTimeMs || Date.now() - status.lastScanTimeMs >= intervalMs;
+          // A scan that failed or was canceled still counts as an attempt, so
+          // it is not retried on every focus change until the next interval.
+          const lastAttempt = Math.max(status?.lastScanTimeMs ?? 0, status?.lastScanStartedMs ?? 0);
+          const stale = !lastAttempt || Date.now() - lastAttempt >= intervalMs;
           if (!status?.scanInProgress && stale) {
             await useSearchIndexStore.getState().startScan(app?.environment.homeDir || "");
           }
@@ -103,12 +102,8 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     if (loadedRoutes.current.has(routeId)) return;
     loadedRoutes.current.add(routeId);
     if (!hasTauriInternals()) return;
-    if (routeId === "files" || routeId === "providers" || routeId === "diagnostics") {
-      void providerLoad(routeId === "providers");
-    }
-    if (routeId === "transfers") void transferLoad("");
     if (routeId === "settings" && !settings) void settingsLoad();
-  }, [providerLoad, routeId, settings, settingsLoad, transferLoad]);
+  }, [routeId, settings, settingsLoad]);
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;

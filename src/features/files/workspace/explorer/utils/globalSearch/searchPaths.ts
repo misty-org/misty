@@ -5,9 +5,10 @@ export function pathAllowed(
   sourceKind: "local" | "cloud",
   options: ExplorerSearchOptions,
 ): boolean {
+  if (sourceKind !== "local") return false;
   if (options.includeHidden === false && baseName(path).startsWith(".")) return false;
   if (options.scope === "local" && sourceKind !== "local") return false;
-  if (options.scope === "remotes" && sourceKind !== "cloud") return false;
+  if (options.scope === "remotes") return false;
   if (options.scope === "current" && options.currentPath)
     return isPathWithin(path, options.currentPath);
   return true;

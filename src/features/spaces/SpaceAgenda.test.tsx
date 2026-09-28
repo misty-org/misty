@@ -1,8 +1,8 @@
+import { SpaceAgenda } from "@/features/planner/planner/SpaceAgenda";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 const {
   agenda,
   archiveTask,
@@ -28,8 +28,13 @@ const {
   updateCalendarEvent: vi.fn(),
   updateTask: vi.fn(),
 }));
-
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "account-1" } }) }));
+vi.mock("@/features/auth", () => ({
+  useAuth: () => ({
+    user: {
+      id: "account-1",
+    },
+  }),
+}));
 vi.mock("@/api/connections", () => ({
   connectionsApi: {
     list: connections,
@@ -52,13 +57,9 @@ vi.mock("@/api/spaces/api", () => ({
     disableCalendarSource: vi.fn(),
   },
 }));
-
-import { SpaceAgenda } from "@/features/planner/planner/SpaceAgenda";
-
 describe("SpaceAgenda", () => {
   let container: HTMLDivElement;
   let root: Root;
-
   beforeEach(() => {
     container = document.createElement("div");
     document.body.append(container);
@@ -73,13 +74,26 @@ describe("SpaceAgenda", () => {
         },
       ],
     });
-    integrations.mockResolvedValue({ integrations: [] });
-    connections.mockResolvedValue({ connections: [] });
-    googleCalendars.mockResolvedValue({ calendars: [] });
-    syncCalendarTasks.mockResolvedValue({ tasks: [], sources: [], synced_at: "2026-08-01" });
+    integrations.mockResolvedValue({
+      integrations: [],
+    });
+    connections.mockResolvedValue({
+      connections: [],
+    });
+    googleCalendars.mockResolvedValue({
+      calendars: [],
+    });
+    syncCalendarTasks.mockResolvedValue({
+      tasks: [],
+      sources: [],
+      synced_at: "2026-08-01",
+    });
     updateCalendarEvent.mockResolvedValue({});
     deleteCalendarEvent.mockResolvedValue(undefined);
-    tasks.mockResolvedValue({ tasks: [], status_totals: {} });
+    tasks.mockResolvedValue({
+      tasks: [],
+      status_totals: {},
+    });
     agenda.mockResolvedValue({
       entries: [
         {
@@ -118,7 +132,6 @@ describe("SpaceAgenda", () => {
       ],
     });
   });
-
   afterEach(async () => {
     await act(async () => root.unmount());
     vi.useRealTimers();
@@ -126,7 +139,6 @@ describe("SpaceAgenda", () => {
     container.remove();
     vi.restoreAllMocks();
   });
-
   it.each(["month", "week", "day"] as const)("renders the %s presentation", async (view) => {
     await act(async () => {
       root.render(
@@ -148,11 +160,14 @@ describe("SpaceAgenda", () => {
     expect(container.querySelector(`main[aria-label="${view} agenda"]`)).not.toBeNull();
     expect(container.querySelector('[aria-label="Agenda view"]')).toBeNull();
   });
-
   it("applies account-and-Space visibility preferences", async () => {
     window.localStorage.setItem(
       "misty:agenda-visibility:account-1:space-1",
-      JSON.stringify({ tasks: false, roadmap: true, hiddenSources: [] }),
+      JSON.stringify({
+        tasks: false,
+        roadmap: true,
+        hiddenSources: [],
+      }),
     );
     await act(async () => {
       root.render(
@@ -167,10 +182,10 @@ describe("SpaceAgenda", () => {
     expect(container.textContent).toContain("Launch goal");
     expect(container.textContent).toContain("Launch dependency risk");
   });
-
   it("keeps the month calendar visible when there are no entries", async () => {
-    agenda.mockResolvedValue({ entries: [] });
-
+    agenda.mockResolvedValue({
+      entries: [],
+    });
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
@@ -180,11 +195,9 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(container.textContent).not.toContain("Your agenda is clear");
     expect(container.querySelectorAll('main[aria-label="month agenda"] section')).toHaveLength(42);
   });
-
   it("restores Google Calendar connection controls", async () => {
     await act(async () => {
       root.render(
@@ -195,13 +208,11 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(container.textContent).toContain("Calendars");
     expect(container.querySelector('[aria-label="Google Calendar"]')).not.toBeNull();
     expect(calendarSources).toHaveBeenCalledWith("space-1");
     expect(integrations).toHaveBeenCalledWith("space-1");
     expect(connections).toHaveBeenCalled();
-
     await act(async () => {
       container.querySelector<HTMLButtonElement>('[aria-label="Google Calendar"]')?.click();
     });
@@ -211,7 +222,6 @@ describe("SpaceAgenda", () => {
     expect(document.body.textContent).toContain("Not connected");
     expect(document.body.textContent).not.toContain("No Google account connected");
   });
-
   it("searches connected Google calendars in the calendar manager", async () => {
     integrations.mockResolvedValue({
       integrations: [
@@ -252,7 +262,6 @@ describe("SpaceAgenda", () => {
         },
       ],
     });
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
@@ -267,13 +276,11 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(document.body.textContent).toContain("Connected");
     expect(document.body.textContent).toContain("Manage account");
     expect(document.body.textContent).toContain("Choose calendars to share with this Space.");
     expect(document.body.textContent).toContain("mtccool668@gmail.com");
     expect(document.body.textContent).toContain("Holidays in United States");
-
     const search = document.body.querySelector<HTMLInputElement>(
       'input[aria-label="Search calendars"]',
     );
@@ -283,13 +290,15 @@ describe("SpaceAgenda", () => {
         search,
         "holiday",
       );
-      search.dispatchEvent(new Event("input", { bubbles: true }));
+      search.dispatchEvent(
+        new Event("input", {
+          bubbles: true,
+        }),
+      );
     });
-
     expect(document.body.textContent).not.toContain("Primary calendar");
     expect(document.body.textContent).toContain("Holidays in United States");
   });
-
   it("uses the shared top-bar layout and zooms the timeline precision", async () => {
     await act(async () => {
       root.render(
@@ -300,7 +309,6 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(container.querySelector("h1")).toBeNull();
     expect(container.querySelector("header button")?.textContent?.trim()).toBe("New");
     expect(container.querySelector('[aria-label="Go to today"]')).not.toBeNull();
@@ -314,7 +322,6 @@ describe("SpaceAgenda", () => {
       ),
     ).toBe(true);
     expect(container.textContent).not.toContain("New task");
-
     await act(async () => {
       container.querySelector<HTMLButtonElement>('[aria-label="Zoom in calendar"]')?.click();
     });
@@ -322,7 +329,6 @@ describe("SpaceAgenda", () => {
       "15 min",
     );
   });
-
   it("keeps the current-time marker in the gutter and behind overlapping events", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-04T17:15:00.000Z"));
@@ -342,7 +348,6 @@ describe("SpaceAgenda", () => {
         },
       ],
     });
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/day?date=2026-08-04"]}>
@@ -352,17 +357,14 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     const label = container.querySelector<HTMLElement>("[data-agenda-current-time-label]");
     const line = container.querySelector<HTMLElement>("[data-agenda-current-time-line]");
     const event = container.querySelector<HTMLElement>("[data-agenda-timed-event]");
-
     expect(label?.className).toContain("w-[72px]");
     expect(line?.className).toContain("z-10");
     expect(line?.className).toContain("pointer-events-none");
     expect(event?.className).toContain("z-20");
   });
-
   it("keeps time zoom out of Month view", async () => {
     await act(async () => {
       root.render(
@@ -373,11 +375,9 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(container.querySelector('[aria-label="Calendar time interval"]')).toBeNull();
     expect(container.querySelector('[aria-label="month agenda"]')).not.toBeNull();
   });
-
   it("opens task details inside Agenda without changing pages", async () => {
     tasks.mockResolvedValue({
       tasks: [
@@ -398,9 +398,10 @@ describe("SpaceAgenda", () => {
           updated_at: "2026-08-01T12:00:00Z",
         },
       ],
-      status_totals: { todo: 1 },
+      status_totals: {
+        todo: 1,
+      },
     });
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
@@ -411,7 +412,6 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     const taskChip = [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
       button.textContent?.includes("Ship beta"),
     );
@@ -421,7 +421,6 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(container.querySelector('[data-testid="agenda-location"]')?.textContent).toBe(
       "/spaces/space-1/planner/agenda/month?date=2026-08-04",
     );
@@ -433,7 +432,6 @@ describe("SpaceAgenda", () => {
     expect(document.body.textContent).not.toContain("Attached context");
     expect(document.body.textContent).not.toContain("Activity & Run History");
   });
-
   it("opens calendar event details in a centered popup", async () => {
     agenda.mockResolvedValue({
       entries: [
@@ -453,7 +451,6 @@ describe("SpaceAgenda", () => {
         },
       ],
     });
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
@@ -463,14 +460,12 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     const eventChip = [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
       button.textContent?.includes("Product review"),
     );
     await act(async () => {
       eventChip?.click();
     });
-
     const dialog = document.querySelector('[data-slot="dialog-content"]');
     expect(dialog?.textContent).toContain("Product review");
     expect(dialog?.textContent).toContain("Review the launch plan.");
@@ -479,7 +474,6 @@ describe("SpaceAgenda", () => {
     expect(dialog?.textContent).not.toContain("Delete event");
     expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull();
   });
-
   it("edits and deletes native Misty events from the popup", async () => {
     agenda.mockResolvedValue({
       entries: [
@@ -500,7 +494,6 @@ describe("SpaceAgenda", () => {
       ],
     });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
@@ -510,25 +503,26 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     await act(async () => {
       [...container.querySelectorAll<HTMLButtonElement>("button")]
         .find((button) => button.textContent?.includes("Product review"))
         ?.click();
     });
-
     const title = document.body.querySelector<HTMLInputElement>('[aria-label="Event title"]');
     expect(title?.value).toBe("Product review");
     expect(document.body.textContent).toContain("Delete event");
     expect(document.body.textContent).toContain("Save changes");
-
     await act(async () => {
       if (!title) return;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
         title,
         "Launch review",
       );
-      title.dispatchEvent(new Event("input", { bubbles: true }));
+      title.dispatchEvent(
+        new Event("input", {
+          bubbles: true,
+        }),
+      );
     });
     await act(async () => {
       [...document.body.querySelectorAll<HTMLButtonElement>("button")]
@@ -537,12 +531,14 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(updateCalendarEvent).toHaveBeenCalledWith(
       "space-1",
-      expect.objectContaining({ id: "native-event-1", title: "Launch review", version: 3 }),
+      expect.objectContaining({
+        id: "native-event-1",
+        title: "Launch review",
+        version: 3,
+      }),
     );
-
     await act(async () => {
       [...container.querySelectorAll<HTMLButtonElement>("button")]
         .find((button) => button.textContent?.includes("Product review"))
@@ -555,15 +551,16 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
     expect(window.confirm).toHaveBeenCalledWith("Delete “Product review”?");
     expect(deleteCalendarEvent).toHaveBeenCalledWith(
       "space-1",
-      expect.objectContaining({ id: "native-event-1", version: 3 }),
+      expect.objectContaining({
+        id: "native-event-1",
+        version: 3,
+      }),
     );
   });
 });
-
 function LocationProbe() {
   const location = useLocation();
   return (

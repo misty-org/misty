@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { InlineNameEditor } from "./FileBrowserInline";
+import { InlineNameEditor } from "@/features/file-ui/explorer/components/FileBrowserInline";
 import { ExplorerNotifications, ExplorerRenameStatus } from "../workspace/ExplorerDesktopStatus";
 import { useExplorerStore, type ExplorerInlineEditState } from "../store";
 

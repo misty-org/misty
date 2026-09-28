@@ -1,7 +1,7 @@
 import { act, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExplorerDragItem, ExplorerDropZoneSpec } from "../model/interfaces/drag/types";
+import type { ExplorerDragItem, ExplorerDropZoneSpec } from "@/features/file-ui";
 
 const mocks = vi.hoisted(() => ({
   cancelPreparation: vi.fn().mockResolvedValue(undefined),
@@ -41,11 +41,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 vi.mock("@crabnebula/tauri-plugin-drag", () => ({ startDrag: mocks.startDrag }));
 
-import {
-  Droppable,
-  ExplorerDragProvider,
-  useExplorerDragSource,
-} from "./ExplorerDragContext";
+import { Droppable, ExplorerDragProvider, useExplorerDragSource } from "./ExplorerDragContext";
 
 const item: ExplorerDragItem = {
   entryId: "entry",

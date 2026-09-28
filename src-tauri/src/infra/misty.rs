@@ -347,14 +347,7 @@ pub fn get_misty_process_status() -> MistyProcessStatus {
 pub fn launch_misty(
     state: tauri::State<'_, crate::app::runtime::MistyRuntime>,
 ) -> Result<String, String> {
-    let runtime = state.storage_runtime.snapshot();
-    if runtime.ready {
-        Ok("Embedded Misty runtime is already running.".to_string())
-    } else {
-        Err(runtime
-            .error
-            .unwrap_or_else(|| "Embedded Misty runtime is not ready.".to_string()))
-    }
+    Ok("Misty is running.".to_string())
 }
 
 fn wait_for_proxy_port() -> Option<u16> {
@@ -437,27 +430,18 @@ fn stop_named_processes(names: &[&str]) -> Result<usize, String> {
 
 #[tauri::command]
 pub fn stop_misty() -> Result<String, String> {
-    Ok("Storage is embedded in Misty and stops when the app exits.".to_string())
+    Ok("Misty stops when the app exits.".to_string())
 }
 
 #[tauri::command]
 pub fn restart_misty(
     state: tauri::State<'_, crate::app::runtime::MistyRuntime>,
 ) -> Result<String, String> {
-    let runtime = state.storage_runtime.snapshot();
-    if runtime.ready {
-        Ok("Embedded Misty runtime is app-managed; restart Misty to reload it.".to_string())
-    } else {
-        Err(runtime
-            .error
-            .unwrap_or_else(|| "Embedded Misty runtime is not ready.".to_string()))
-    }
+    Ok("Restart Misty to reload the application.".to_string())
 }
 
 #[tauri::command]
 pub fn sign_out_misty(state: tauri::State<'_, MistyRuntime>) -> Result<NativeSystemInfo, String> {
-    crate::infra::mobile_cache::purge_all(&state.environment.cache_dir())
-        .map_err(|error| format!("Could not purge mobile account data: {error}"))?;
     ensure_database()?;
     let conn = Connection::open(misty_db_path()?)
         .map_err(|error| format!("Could not open Misty database: {error}"))?;
@@ -480,10 +464,6 @@ pub fn sign_out_misty(state: tauri::State<'_, MistyRuntime>) -> Result<NativeSys
     .map_err(|error| format!("Could not sign out of Misty: {error}"))?;
     tx.commit()
         .map_err(|error| format!("Could not finish Misty sign-out: {error}"))?;
-    let _ = state
-        .storage_runtime
-        .call("misty/clear-session-tokens", serde_json::json!({}));
-
     Ok(system_info)
 }
 
@@ -1348,7 +1328,6 @@ mod tests {
         assert_eq!(current_id, previous.id);
     }
 
-    #[test]
     #[cfg(debug_assertions)]
     #[test]
     fn probes_path_presence() {

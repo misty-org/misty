@@ -1,11 +1,9 @@
 import {
-  Button,
-  cn,
-  menuItemClass,
-  menuListClass,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  MenuItem,
+  MenuTrigger,
 } from "@/shared/ui";
 import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -22,26 +20,22 @@ export function AiSelectionMenu({
 }) {
   if (!actions.length) return null;
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        {trigger ?? (
-          <Button size="sm" variant="secondary" className="h-7 gap-1.5 text-xs">
-            <MessageCircle className="size-3.5" /> Ask Misty
-          </Button>
-        )}
-      </PopoverTrigger>
-      <PopoverContent className={cn("w-56", menuListClass)} align="start">
+    <DropdownMenu modal={false}>
+      {trigger ? (
+        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      ) : (
+        <MenuTrigger
+          label="Ask Misty"
+          variant="secondary"
+          icon={<MessageCircle className="size-3.5" />}
+          className="h-7 text-xs"
+        />
+      )}
+      <DropdownMenuContent align="start" width="md">
         {actions.map((action) => (
-          <button
-            type="button"
-            key={action.id}
-            className={menuItemClass}
-            onClick={() => onAction(action)}
-          >
-            {action.label}
-          </button>
+          <MenuItem key={action.id} label={action.label} onSelect={() => onAction(action)} />
         ))}
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

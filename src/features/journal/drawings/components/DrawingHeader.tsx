@@ -10,12 +10,7 @@ export interface DrawingHeaderProps {
   onRename: (title: string) => Promise<void>;
 }
 
-export function DrawingHeader({
-  reportError,
-  drawing,
-  onBack,
-  onRename,
-}: DrawingHeaderProps) {
+export function DrawingHeader({ reportError, drawing, onBack, onRename }: DrawingHeaderProps) {
   const [title, setTitle] = useState(drawing.title);
   const [savedTitle, setSavedTitle] = useState(drawing.title);
   const [inputActive, setInputActive] = useState(false);

@@ -1,135 +1,143 @@
-import { useState } from "react";
-import { MousePointer2, Square } from "lucide-react";
-import { Button } from "@/shared/ui";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import {
+  Button,
+  IconButton,
+  Switch,
+  Slider,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui";
+import { RotateCcw, Square } from "lucide-react";
+import { useState } from "react";
 import "./agentCompanionPanel.css";
+import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+import {
+  companionSizeDefault,
+  companionSizeMin,
+  companionSizeMax,
+  companionSizeStep,
+  normalizeCompanionSize,
+} from "./companionSize";
+
+// Radix Select has no empty value, so the server default gets a stand-in.
+const serverDefaultModel = "__server_default__";
+
 export function AgentCompanionPanel() {
   const { presentation: state, control } = useCompanionState();
   const working = useMistyStore((s) => s.working);
   const [error, setError] = useState("");
   const desktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
+  const size = normalizeCompanionSize(state.size);
   const act = (value: CompanionControl) => {
     setError("");
     void companionControl(value).catch((reason) => setError(String(reason)));
   };
+  const active = working || state.phase !== "idle";
   const status =
-    error || state.error
-      ? "Needs attention"
-      : !state.enabled
-        ? "Starting…"
-        : state.phase === "listening"
-          ? "Listening…"
-          : state.phase === "processing" || working
-            ? "Working…"
-            : state.phase === "responding"
-              ? "Speaking…"
-              : "Ready";
+    state.phase === "listening"
+      ? "Listening…"
+      : state.phase === "responding"
+        ? "Speaking…"
+        : "Working…";
   return (
     <div className="agent-companion-panel" aria-label="Companion">
-      <div className="agent-companion-topline">
-        <img src={sprite} width={32} height={32} alt="" />
-        <div className="agent-companion-title">
-          <h2>Companion</h2>
-          <span role="status">
-            {control
-              ? status
-              : desktop
-                ? "Starting…"
-                : "Desktop voice available in Misty for macOS and Windows"}
-          </span>
-        </div>
-        {desktop && (
+      <div className="agent-companion-preview">
+        <img src={sprite} width={80} height={80} alt="" />
+      </div>
+      {active && (
+        <div className="agent-companion-status">
+          <span role="status">{status}</span>
           <Button
             variant="ghost"
             size="sm"
-            aria-pressed={state.showCompanion ?? true}
             disabled={!control}
-            onClick={() => act({ kind: "visibility", visible: !state.showCompanion })}
+            onClick={() => act({ kind: "stop" })}
           >
-            <MousePointer2 size={14} />
-            {state.showCompanion ? "Cursor on" : "Cursor off"}
-          </Button>
-        )}
-        {(working || state.phase !== "idle") && (
-          <Button variant="ghost" size="sm" onClick={() => act({ kind: "stop" })}>
-            <Square size={13} />
+            <Square size={16} />
             Stop
           </Button>
-        )}
-      </div>
-      <div className="agent-companion-mode-row">
-        <div className="agent-mode-selector" role="radiogroup" aria-label="Companion mode">
-          {(["team", "auto"] as const).map((mode) => (
-            <Button
-              key={mode}
-              variant="ghost"
-              role="radio"
-              className={`agent-mode-pill ${state.mode === mode ? "active" : ""}`}
-              aria-checked={state.mode === mode}
-              data-companion-mode={mode}
-              tabIndex={state.mode === mode ? 0 : -1}
-              onKeyDown={(event) => {
-                if (
-                  !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(
-                    event.key,
-                  )
-                )
-                  return;
-                event.preventDefault();
-                const next =
-                  event.key === "Home"
-                    ? "team"
-                    : event.key === "End"
-                      ? "auto"
-                      : mode === "team"
-                        ? "auto"
-                        : "team";
-                event.currentTarget.parentElement
-                  ?.querySelector<HTMLButtonElement>(`[data-companion-mode="${next}"]`)
-                  ?.focus();
-                act({ kind: "mode", mode: next });
-              }}
-              disabled={!control}
-              onClick={() => act({ kind: "mode", mode })}
-            >
-              {mode === "team" ? "Team" : "Auto"}
-            </Button>
-          ))}
         </div>
-        <p>
-          {state.mode === "team"
-            ? "Ask questions or hand off a step. You stay in control."
-            : "Hand off a task. Misty works through the steps in your tabs."}
+      )}
+      {!control && (
+        <p className="agent-companion-availability" role="status">
+          {desktop ? "Starting…" : "Available in Misty for macOS and Windows."}
         </p>
-      </div>
-      <details className="agent-companion-options">
-        <summary>Voice & model</summary>
-        {desktop && (
-          <p>
-            Hold <kbd>{/Mac/.test(navigator.platform) ? "Control + Option" : "Control + Alt"}</kbd>{" "}
-            to talk. Release to send. Hold again to interrupt.
-          </p>
-        )}
-        <label>
-          Model
-          <select
-            aria-label="Companion model"
-            value={state.model}
+      )}
+      <DesktopSettingsSection title="Behavior">
+        <DesktopSettingsRow label="Show companion">
+          <Switch
+            aria-label="Show companion"
+            checked={state.showCompanion ?? true}
             disabled={!control}
-            onChange={(e) => act({ kind: "model", model: e.target.value })}
+            onCheckedChange={(visible) => act({ kind: "visibility", visible })}
+          />
+        </DesktopSettingsRow>
+        <DesktopSettingsRow label="Ask before taking control">
+          <Switch
+            aria-label="Ask before taking control"
+            checked={state.ask === true}
+            disabled={!control}
+            onCheckedChange={(ask) => act({ kind: "ask", ask })}
+          />
+        </DesktopSettingsRow>
+        <div className="agent-companion-size">
+          <div>
+            <span>Companion size</span>
+            <span>{size}%</span>
+            <IconButton
+              label="Reset size"
+              disabled={!control || size === companionSizeDefault}
+              onClick={() => act({ kind: "size", size: companionSizeDefault })}
+            >
+              <RotateCcw size={16} />
+            </IconButton>
+          </div>
+          <Slider
+            aria-label="Companion size"
+            aria-valuetext={`${size}%`}
+            min={companionSizeMin}
+            max={companionSizeMax}
+            step={companionSizeStep}
+            value={[size]}
+            disabled={!control}
+            onValueChange={([next]) => act({ kind: "size", size: next })}
+          />
+        </div>
+      </DesktopSettingsSection>
+      <DesktopSettingsSection title="Voice">
+        {desktop && (
+          <DesktopSettingsRow label="Talk shortcut">
+            <kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</kbd>
+          </DesktopSettingsRow>
+        )}
+        <DesktopSettingsRow label="Model" last>
+          <Select
+            value={state.model || serverDefaultModel}
+            disabled={!control}
+            onValueChange={(model) =>
+              act({ kind: "model", model: model === serverDefaultModel ? "" : model })
+            }
           >
-            <option value="">OpenAI · server default</option>
-            {state.models?.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </details>
+            <SelectTrigger aria-label="Companion model">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={serverDefaultModel}>Server default</SelectItem>
+              {state.models?.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </DesktopSettingsRow>
+      </DesktopSettingsSection>
       {(error || state.error) && (
         <div className="agent-companion-error" role="alert">
           <p>{error || state.error}</p>

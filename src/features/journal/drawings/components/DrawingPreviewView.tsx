@@ -1,14 +1,16 @@
 import {
   Button,
+  ColorSwatch,
+  CustomColorSwatch,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
   Spinner,
 } from "@/shared/ui";
 import type { ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
-import { ClipboardCopy, ImageDown, Palette } from "lucide-react";
+import { ClipboardCopy, ImageDown } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { readDrawingElements } from "../collaboration/drawingSceneStore";
 import type { useDrawingRoomView, DrawingUser } from "../hooks/useDrawingRoomView";
@@ -210,12 +212,8 @@ export function DrawingPreviewView(props: {
 
   const renderExportChoices = () => (
     <>
-      <DropdownMenuItem disabled={!previewUrl} onSelect={exportPng}>
-        PNG
-      </DropdownMenuItem>
-      <DropdownMenuItem disabled={!exportData} onSelect={() => void exportSvg()}>
-        SVG
-      </DropdownMenuItem>
+      <MenuItem label="PNG" disabled={!previewUrl} onSelect={exportPng} />
+      <MenuItem label="SVG" disabled={!exportData} onSelect={() => void exportSvg()} />
     </>
   );
 
@@ -294,29 +292,21 @@ function BackgroundChoices(props: { value: string; onChange: (value: string) => 
   return (
     <div className="ml-auto flex shrink-0 items-center gap-1 pr-1">
       {previewSurfaceColors.map((color, index) => (
-        <button
+        <ColorSwatch
           key={color}
-          type="button"
-          className={`size-5 shrink-0 rounded-md border border-charcoal-border outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-cream-muted ${props.value === color ? "ring-2 ring-[#a89cf7] ring-offset-1 ring-offset-charcoal-card" : ""}`}
-          style={{ backgroundColor: color }}
-          aria-label={`Preview background ${index + 1}`}
-          aria-pressed={props.value === color}
+          shape="square"
+          color={color}
+          label={`Preview background ${index + 1}`}
+          selected={props.value === color}
           onClick={() => props.onChange(color)}
         />
       ))}
-      <label
-        className="relative ml-0.5 grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-cream-muted outline-none transition-colors hover:bg-charcoal-hover hover:text-cream-bright focus-within:ring-2 focus-within:ring-cream-muted"
+      <CustomColorSwatch
+        value={props.value}
+        label="Custom preview background"
         title="Choose a custom preview background"
-      >
-        <Palette className="pointer-events-none size-3.5" />
-        <input
-          type="color"
-          className="absolute inset-0 size-full cursor-pointer opacity-0"
-          value={props.value}
-          aria-label="Custom preview background"
-          onChange={(event) => props.onChange(event.target.value)}
-        />
-      </label>
+        onChange={props.onChange}
+      />
     </div>
   );
 }

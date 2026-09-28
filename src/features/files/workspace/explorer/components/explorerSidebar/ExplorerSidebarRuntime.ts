@@ -1,8 +1,7 @@
 import type { ComponentProps, ComponentType } from "react";
 import type { ExplorerDropTarget } from "../../drag/ExplorerDropTarget";
 import type { ConnectedDevicesSidebarSection } from "./ConnectedDevicesSidebarSection";
-import type { PreviewErrorComponent } from "../globalPreview/PreviewRuntime";
-import type { SidebarDeviceEntry } from "../ExplorerSidebarSupport";
+import { type PreviewErrorComponent, type SidebarDeviceEntry } from "@/features/file-ui";
 import type { useSidebarPreferences } from "./useSidebarPreferences";
 import type { useSidebarQuickAccess } from "./useSidebarQuickAccess";
 import type { useSidebarSmartFolders } from "./useSidebarSmartFolders";

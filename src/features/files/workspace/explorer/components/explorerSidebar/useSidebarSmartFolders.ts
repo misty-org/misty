@@ -1,9 +1,5 @@
-import {
-  savedSearchesDelete,
-  savedSearchesSave,
-  savedSearchesSnapshot,
-} from "@/features/files/workspace/native";
-import { useSearchStore } from "@/features/files/workspace/search";
+import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "../../../native";
+import { useSearchStore } from "../../../search";
 import { createSidebarSmartFolders } from "./createSidebarSmartFolders";
 export const useSidebarSmartFolders = createSidebarSmartFolders({
   snapshot: savedSearchesSnapshot,

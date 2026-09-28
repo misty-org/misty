@@ -34,11 +34,7 @@ export function SpaceMembers({
       <div className={embedded ? "w-full" : "mx-auto w-full max-w-5xl"}>
         <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div>
-            {!embedded ? (
-              <h2 className="m-0 text-sm font-semibold text-cream">
-                Members
-              </h2>
-            ) : null}
+            {!embedded ? <h2 className="m-0 text-sm font-semibold text-cream">Members</h2> : null}
             <p className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-cream-muted`}>
               {`${members.length} active member${members.length === 1 ? "" : "s"}`}
               {space?.pending_count ? ` · ${space.pending_count} pending` : ""}
@@ -62,14 +58,14 @@ export function SpaceMembers({
           />
         ) : null}
 
-            <MemberList
-              members={members}
-              loading={state.membersLoading}
-              owner={state.canManageMembers}
-              canTransferOwnership={state.canTransferOwnership}
-              currentUserId={user?.id}
-              onAction={dialogs.setMemberAction}
-            />
+        <MemberList
+          members={members}
+          loading={state.membersLoading}
+          owner={state.canManageMembers}
+          canTransferOwnership={state.canTransferOwnership}
+          currentUserId={user?.id}
+          onAction={dialogs.setMemberAction}
+        />
 
         {state.canInvite ? (
           <PendingInvitationsCard
