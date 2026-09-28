@@ -6,7 +6,7 @@ import {
   Pressable,
   toolbarIconProps,
 } from "@/shared/ui";
-import { Check, Laptop, RectangleHorizontal } from "lucide-react";
+import { Check, Laptop, MonitorSmartphone, Smartphone, Tablet } from "lucide-react";
 import type { ComponentType } from "react";
 import type {
   BrowserViewport,
@@ -27,12 +27,22 @@ const viewportOptions: Array<{
   {
     id: "responsive",
     label: "Responsive",
-    icon: RectangleHorizontal,
+    icon: MonitorSmartphone,
   },
   {
     id: "desktop",
     label: "Desktop",
     icon: Laptop,
+  },
+  {
+    id: "tablet",
+    label: "Tablet",
+    icon: Tablet,
+  },
+  {
+    id: "mobile",
+    label: "Mobile",
+    icon: Smartphone,
   },
 ];
 export function BrowserViewportMenuView(props: {

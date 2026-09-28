@@ -24,3 +24,6 @@ export { McpConnectionsView } from "./mcp/McpConnectionsSheet";
 export type { AgentScope } from "./model/interfaces/types";
 
 export type { DisplayCapture } from "./companion/protocol";
+
+export { AgentAvatar } from "./components/AgentAvatar";
+export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";

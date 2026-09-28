@@ -13,17 +13,12 @@ export const toolbarSortOptions: Array<{ column: ExplorerSortColumn; label: stri
 ];
 
 export type ExplorerCommandId =
-  | "app.toggle_transfers"
   | "app.open_settings"
   | "clipboard.publish_shared"
   | "clipboard.apply_shared"
   | "search.toggle"
   | "explorer.new_tab"
   | "explorer.restore_tab"
-  | "explorer.close_pane"
-  | "explorer.restore_pane"
-  | "explorer.split_vertical"
-  | "explorer.split_horizontal"
   | "explorer.refresh"
   | "explorer.rename"
   | "explorer.batch_rename"

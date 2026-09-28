@@ -107,7 +107,7 @@ export function unreadActivityCountForSpaceSection(
 
 export function unreadActivityCountForTool(
   items: ActivityItem[],
-  tool: "files" | "agents" | "marketplace" | "transfers",
+  tool: "files" | "agents" | "marketplace",
 ): number {
   return items.filter(
     (item) => !item.readAt && item.target.kind === "workspace-tool" && item.target.tool === tool,

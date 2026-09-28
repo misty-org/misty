@@ -1,5 +1,12 @@
 import { Pencil, RotateCcw } from "lucide-react";
-import { cloneElement, useEffect, useRef, useState, type ReactElement } from "react";
+import {
+  cloneElement,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   ContextMenu,
   ContextMenuAction,
@@ -25,9 +32,14 @@ export function Renameable({
   onRename,
   resetLabel = "Reset",
   portalEditor = true,
+  menuItems,
+  onMenuCloseAutoFocus,
 }: {
   /** Keep the editor inside a containing menu so its focus trap includes the input. */
   portalEditor?: boolean;
+  menuItems?: ReactNode;
+  /** Hand focus to an editor opened by an extra context-menu action. */
+  onMenuCloseAutoFocus?: (event: Event) => void;
   customName?: string;
   onRename?: (name: string | null) => void;
   resetLabel?: string;
@@ -103,6 +115,8 @@ export function Renameable({
         </ContextMenuTrigger>
         <ContextMenuContent
           onCloseAutoFocus={(event) => {
+            onMenuCloseAutoFocus?.(event);
+            if (event.defaultPrevented) return;
             if (pendingRename.current) {
               event.preventDefault();
               pendingRename.current = false;
@@ -110,6 +124,7 @@ export function Renameable({
             } else if (editing) event.preventDefault();
           }}
         >
+          {menuItems}
           <ContextMenuAction
             icon={<Pencil aria-hidden="true" />}
             label="Rename"

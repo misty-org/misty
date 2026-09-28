@@ -212,7 +212,7 @@ export function BrowserAnnotationLayerView(props: {
       <Toolbar
         variant="floating"
         label="Annotation tools"
-        className="absolute bottom-4 left-1/2 z-20 max-w-[calc(100%-24px)] -translate-x-1/2 shadow-2xl"
+        className="absolute inset-x-0 bottom-4 z-20 mx-auto w-fit max-w-[calc(100%-24px)] shadow-2xl"
       >
         <ToolButton label="Pen" active={tool === "pen"} onClick={() => setTool("pen")}>
           <Pencil />

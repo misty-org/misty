@@ -494,6 +494,18 @@ pub(crate) async fn capture_webview_region(
     width: f64,
     height: f64,
 ) -> Result<serde_json::Value, String> {
+    capture_webview_region_sized(webview, x, y, width, height, 640.0).await
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) async fn capture_webview_region_sized(
+    webview: Webview,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    max_dimension: f64,
+) -> Result<serde_json::Value, String> {
     use base64::Engine;
     use block2::RcBlock;
     use objc2::MainThreadMarker;
@@ -531,16 +543,18 @@ pub(crate) async fn capture_webview_region(
         let view: &WKWebView = &*platform.inner().cast();
         let config = WKSnapshotConfiguration::new(mtm);
         config.setRect(NSRect::new(NSPoint::new(x,y), NSSize::new(width,height)));
-        config.setSnapshotWidth(Some(&NSNumber::new_f64(width * (640.0 / width.max(height)).min(1.0))));
+        // Native screenshots retain text detail; the 640px agent captures keep their old budget.
+        config.setSnapshotWidth(Some(&NSNumber::new_f64(width * (max_dimension / width.max(height)).min(if max_dimension > 640.0 { 2.0 } else { 1.0 }))));
         config.setAfterScreenUpdates(true);
         let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
             let result = (|| -> Result<serde_json::Value, String> {
                 if !error.is_null() || image.is_null() { return Err("WebKit could not capture that region.".into()); }
                 let data = (&*image).TIFFRepresentation().ok_or("Capture returned no image.")?;
                 let bitmap = NSBitmapImageRep::imageRepWithData(&data).ok_or("Capture image is unavailable.")?;
-                let jpeg = bitmap.representationUsingType_properties(NSBitmapImageFileType::JPEG, &NSDictionary::new())
+                let lossless = max_dimension > 640.0;
+                let jpeg = bitmap.representationUsingType_properties(if lossless { NSBitmapImageFileType::PNG } else { NSBitmapImageFileType::JPEG }, &NSDictionary::new())
                     .ok_or("Capture could not be encoded.")?;
-                Ok(serde_json::json!({"dataUrl":format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg.to_vec())),
+                Ok(serde_json::json!({"dataUrl":format!("data:image/{};base64,{}", if lossless { "png" } else { "jpeg" }, base64::engine::general_purpose::STANDARD.encode(jpeg.to_vec())),
                     "width":bitmap.pixelsWide(), "height":bitmap.pixelsHigh()}))
             })();
             if let Some(sender) = sender.lock().ok().and_then(|mut sender| sender.take()) { let _ = sender.send(result); }
@@ -561,9 +575,10 @@ pub async fn host_webview_capture_region(
     y: f64,
     width: f64,
     height: f64,
+    max_dimension: Option<f64>,
 ) -> Result<serde_json::Value, String> {
     if webview.label() != "main" {
         return Err("Only the Host can capture its view.".into());
     }
-    capture_webview_region(webview, x, y, width, height).await
+    capture_webview_region_sized(webview, x, y, width, height, max_dimension.unwrap_or(640.0).clamp(640.0, 3840.0)).await
 }

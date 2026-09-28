@@ -4,8 +4,9 @@ import { useAuth } from "@/features/auth";
 import { cn } from "@/shared/ui";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { preloadSpaceSection } from "../SpaceSectionView";
-import { SpaceSwitcher } from "./SpaceSwitcher";
+import { SpaceChatSidebar } from "../chat/sidebar/SpaceChatSidebar";
 import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
+import { SpaceSidebarHeader } from "./SpaceSidebarHeader";
 import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
 
 export function SpaceWorkspaceRail({
@@ -30,59 +31,58 @@ export function SpaceWorkspaceRail({
     return cancelNavigation;
   }, [location.pathname, user?.id, cancelNavigation]);
 
-  async function openPage(path: string, state?: { spaceSettingsReturnTo: string }) {
+  async function openPage(path: string) {
     const request = ++requestRef.current;
     setError("");
     try {
       await preloadSpaceSection(path.split("/")[3]);
       if (request !== requestRef.current) return;
       // The pane's router updates only its owning tab, including in split layouts.
-      navigate(path, { state });
+      navigate(path);
     } catch {
       if (request === requestRef.current) setError("Could not open this page. Try again.");
     }
   }
 
   if (!user) return null;
+  const chatSection = ["home", "chat", "social"].includes(section);
   return (
     <>
       <aside
         className={cn(
-          "misty-navigation-icons flex h-full w-14 shrink-0 flex-col items-center",
-          "overflow-y-auto border-r border-charcoal-border bg-charcoal-workspace",
-          "pb-2 pt-1.5",
+          "misty-navigation-icons flex h-full w-52 shrink-0 flex-col items-stretch",
+          "overflow-hidden border-r border-charcoal-border bg-charcoal-workspace",
+          "px-2 pb-2 pt-2.5",
         )}
         aria-label="Space navigation"
       >
         {space && (
           <>
-            <SpaceSectionNavigation
-              spaceId={space.id}
-              section={["home", "chat"].includes(section) ? "social" : section}
-              iconOnly
-              onNavigate={(path) => void openPage(path)}
-            />
-            <div className="mt-auto pt-2">
-              <SpaceManagementNavigation key={space.id} space={space} />
+            <SpaceSidebarHeader space={space} />
+            <div className="mb-3 mt-2 shrink-0">
+              <SpaceSectionNavigation
+                strip
+                spaceId={space.id}
+                section={chatSection ? "social" : section}
+                onNavigate={(path) => void openPage(path)}
+              />
+            </div>
+            {/* The rest of the sidebar belongs to the active tool's own list. */}
+            {chatSection ? (
+              <SpaceChatSidebar spaceId={space.id} onNavigate={(path) => void openPage(path)} />
+            ) : (
+              <div className="flex-1" />
+            )}
+            <div className="shrink-0 border-t border-charcoal-border/70 pt-2">
+              <SpaceManagementNavigation key={space.id} space={space} compact={false} />
             </div>
           </>
         )}
-        <div className={cn("flex shrink-0 items-center justify-center pt-1", !space && "mt-auto")}>
-          <SpaceSwitcher
-            iconOnly
-            activeSpace={space}
-            activeSpaceId={activeSpaceId}
-            spaces={spaces}
-            userId={user.id}
-            canAddSpace
-            onNavigate={(path, state) => void openPage(path, state)}
-          />
-        </div>
       </aside>
       {error && (
         <p
           role="alert"
-          className="absolute bottom-3 left-16 right-3 z-10 rounded-md border border-charcoal-border bg-charcoal-card p-3 text-xs text-cream"
+          className="absolute bottom-3 left-3 right-3 z-10 rounded-md border border-charcoal-border bg-charcoal-card p-3 text-xs text-cream"
         >
           {error}
         </p>

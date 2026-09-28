@@ -78,8 +78,8 @@ use super::browser_macos::{
     unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
-    browser_pointer_navigation, browser_status_script, browser_status_update_script,
-    browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
+    browser_pointer_navigation, browser_scrollbar_script, browser_status_script,
+    browser_status_update_script, browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
     BROWSER_COMPATIBILITY_SCRIPT, BROWSER_MEDIA_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 use super::browser_shortcuts::{
@@ -178,6 +178,9 @@ fn popup_download_authority(source: &BrowserSession, popup_id: &str) -> Option<(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewCreateRequest {
+    /// Temporary offscreen Home capture: no media, popups, downloads, or tab events.
+    #[serde(default)]
+    pub preview_only: bool,
     #[serde(default)]
     pub origin_space_id: Option<String>,
     #[serde(default)]
@@ -789,9 +792,9 @@ pub async fn browser_webview_create(
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     let window = caller.window();
-    window
-        .set_theme(browser_theme(&request.theme)?)
-        .map_err(|error| error.to_string())?;
+    if !request.preview_only {
+        window.set_theme(browser_theme(&request.theme)?).map_err(|error| error.to_string())?;
+    }
     // A live webview's cookie store cannot be changed by updating its metadata.
     // Account switches must close/reopen through the owning host view.
     if app.get_webview(&label).is_some() {
@@ -804,7 +807,7 @@ pub async fn browser_webview_create(
     }
     register_session(&state, &request.id, &request.scope_id)?;
     if let Some(session) = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?.get_mut(&request.id) {
-        session.workspace_tab_id = request.workspace_tab_id.clone();
+        session.workspace_tab_id = if request.preview_only { None } else { request.workspace_tab_id.clone() };
         session.origin_space_id = request.origin_space_id.clone();
         session.provider_id = request.provider_id.clone();
         session.private = request.private;
@@ -845,6 +848,7 @@ pub async fn browser_webview_create(
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
     let restoring_tab_session = profile_lease.tab_session.is_some();
+    let preview_only = request.preview_only;
     let initial_url = if restoring_tab_session { "about:blank".parse().map_err(|_| "Invalid bootstrap URL")? } else { external_url(&request.url)? };
     let builder = WebviewBuilder::new(label, WebviewUrl::External(initial_url))
         .background_throttling(BackgroundThrottlingPolicy::Disabled)
@@ -868,8 +872,12 @@ pub async fn browser_webview_create(
     };
     let builder = builder
         .focused(false)
+        .initialization_script(if preview_only {
+            "HTMLMediaElement.prototype.play = function(){ return Promise.resolve(); }; document.addEventListener('play', event => { if (event.target instanceof HTMLMediaElement) { event.target.muted = true; event.target.pause(); } }, true); if (window.AudioContext) window.AudioContext.prototype.resume = function(){ return Promise.resolve(); };"
+        } else { "" })
         .accept_first_mouse(true)
         .background_color(browser_background(&request.theme))
+        .initialization_script_for_all_frames(browser_scrollbar_script())
         .initialization_script(browser_viewport_script(
             &shortcut_token,
             renderer(caller.window().label()).tracking,
@@ -911,6 +919,7 @@ pub async fn browser_webview_create(
             }
         })
         .on_new_window(move |url, features| {
+            if preview_only { return NewWindowResponse::Deny; }
             #[cfg(target_os = "macos")]
             if let Some(response) = provider_popup(&popup_app, &popup_id, &url, features) { return response; }
             if external_url(url.as_str()).is_ok() {
@@ -926,6 +935,7 @@ pub async fn browser_webview_create(
             NewWindowResponse::Deny
         })
         .on_page_load(move |webview, payload| {
+            if preview_only { return; }
             if restoring_tab_session && payload.url().as_str() == "about:blank" { return; }
             #[cfg(any(target_os = "macos", windows))]
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { super::browser_session_storage::clear(&webview); }
@@ -966,6 +976,7 @@ pub async fn browser_webview_create(
             }
         })
         .on_document_title_changed(move |webview, title| {
+            if preview_only { return; }
             let _ = title_app.emit(
                 "misty://browser-title",
                 BrowserTitleEvent {
@@ -977,6 +988,7 @@ pub async fn browser_webview_create(
             request_browser_compatibility(&webview, &title_app, &title_id);
         })
         .on_download(move |_webview, event| {
+            if preview_only { return false; }
             handle_download_event(&download_app, &download_id, event)
         });
     let webview = window
@@ -1445,6 +1457,33 @@ pub fn browser_webview_set_bounds(
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
     set_webview_bounds_if_changed(&app, &webview, position, size)
+}
+
+#[tauri::command]
+pub async fn browser_webview_preview_document(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserWebviewIdRequest,
+) -> Result<Value, String> {
+    if tab_is_private(&state, &request.id) { return Err("Private tabs have no previews.".into()); }
+    let view = app.get_webview(&webview_label(&request.id)?).ok_or("Browser page is unavailable.")?;
+    let source = include_str!("../../../src/features/workspace/pageSnapshot.js").replace("export function snapshotPage", "function snapshotPage");
+    let result = evaluate_browser_async_javascript(view.clone(), format!("{source}\nif (document.readyState !== 'complete') throw new Error('Page is still loading'); return JSON.stringify({{ url: location.href, document: snapshotPage(document.documentElement) }});")).await?;
+    let mut result: Value = serde_json::from_str(&result).map_err(|error| error.to_string())?;
+    let size = view.size().map_err(|e| e.to_string())?.to_logical::<f64>(view.window().scale_factor().map_err(|e| e.to_string())?);
+    #[cfg(target_os = "macos")]
+    let image = super::browser_macos::capture_webview_region_sized(view, 0.0, 0.0, size.width, size.height, 2560.0).await;
+    #[cfg(windows)]
+    let image = super::browser_capture_windows::capture(view).await;
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let image: Result<Value, String> = Err("Native preview images are unavailable.".into());
+    if let Ok(image) = image {
+        result["dataUrl"] = image["dataUrl"].clone();
+        result["width"] = image["width"].clone();
+        result["height"] = image["height"].clone();
+    }
+    if result["document"].is_null() && result["dataUrl"].is_null() { return Err("Preview is unavailable.".into()); }
+    Ok(result)
 }
 
 #[tauri::command]

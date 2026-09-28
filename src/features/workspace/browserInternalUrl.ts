@@ -3,6 +3,7 @@
  * ordinary browser tab but render in the renderer instead of a native page.
  */
 export const browserInternalPages = {
+  scheduled: { url: "misty://scheduled", title: "Scheduled" },
   history: { url: "misty://history", title: "History" },
   downloads: { url: "misty://downloads", title: "Downloads" },
   bookmarks: { url: "misty://bookmarks", title: "Bookmarks" },

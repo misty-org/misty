@@ -1,3 +1,4 @@
+import { useCompanionState, requestsScreenContext } from "@/features/agents/companion";
 import { isAgentModeActive } from "./searchAvailability";
 import {
   MistyApprovalReview,
@@ -80,7 +81,9 @@ export function GlobalMistySurface(props: {
   const execution = useLocalExecution((s) => s.execution);
   const pendingApproval = usePendingMistyApproval();
   const docked = props.controller === "misty";
-  const taskSurface = docked && !!execution;
+  // Finished executions retain browser context for follow-ups, not an overlay lease.
+  const taskSurface =
+    docked && !!execution && execution.state !== "finished" && !execution.desktopControl;
   const useController = props.controller === "misty" ? useMistyStore : useGlobalSearchStore;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [showSetup, setShowSetup] = useState(false);
@@ -292,10 +295,12 @@ export function GlobalMistySurface(props: {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, open, showSetup]);
   useEffect(() => {
-    if (!suspendBrowserWebviews || taskSurface) return;
-    requestEmbeddedBrowserSuspension(open, "global-misty");
-    return () => requestEmbeddedBrowserSuspension(false, "global-misty");
-  }, [open, suspendBrowserWebviews, taskSurface]);
+    if (!suspendBrowserWebviews) return;
+    // Search and the task panel can coexist. Each owns its native stacking lease.
+    const reason = docked ? "global-misty" : "global-search";
+    requestEmbeddedBrowserSuspension(open, reason);
+    return () => requestEmbeddedBrowserSuspension(false, reason);
+  }, [open, suspendBrowserWebviews, docked]);
   useEffect(() => {
     if (wasOpenRef.current && !open) onClosed?.();
     wasOpenRef.current = open;
@@ -304,6 +309,18 @@ export function GlobalMistySurface(props: {
     if (open) onContentVisibilityChange?.(contentVisible);
   }, [contentVisible, onContentVisibilityChange, open]);
   const sendAnswer = async (prompt: string) => {
+    if (
+      !allowCapture &&
+      requestsScreenContext(prompt) &&
+      !registeredAiSelection &&
+      !attachments.length &&
+      !useCompanionState.getState().submit
+    ) {
+      setVoiceError(
+        "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there, or attach an image.",
+      );
+      return;
+    }
     if (taskSurface) {
       if (!prompt.trim() || routingFollowupRef.current) return;
       if (attachments.length) {
@@ -326,7 +343,23 @@ export function GlobalMistySurface(props: {
       }
       return;
     }
-    await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
+    const companionSubmit = useCompanionState.getState().submit;
+    if (companionSubmit && !registeredAiSelection && requestsScreenContext(prompt)) {
+      // Like Clicky's panel dismissal, expose the referenced workspace before capture.
+      useController.getState().closePanel();
+      try {
+        await companionSubmit({
+          prompt,
+          attachments: attachmentState.attachments,
+          conversationId: useController.getState().activeConversationId,
+        });
+      } catch (error) {
+        setVoiceError(error instanceof Error ? error.message : String(error));
+        useController.getState().openPanel();
+      }
+    } else {
+      await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
+    }
     if (!useController.getState().query) attachmentState.consume();
   };
   const activateCandidate = (candidate?: UnifiedMistyCandidate) => {

@@ -162,6 +162,50 @@ function harness(disk: JournalStorage = storage()) {
 }
 
 describe("workspace sync controller recovery", () => {
+  it("publishes a closed recovered tab before remote projection can restore it", async () => {
+    const h = harness();
+    const record = structuredClone(
+      h.current().workspace.records.find((record) => record.kind === "tab")!,
+    ) as SharedRecord<"tab">;
+    record.id = "tab:orphan";
+    record.fields.placement.pane_id = "pane:removed";
+    h.current().workspace.records.push(record);
+    const controller = h.start();
+    try {
+      await settled();
+      const next = structuredClone(h.ports.source.read());
+      expect(next.windows[0].layout.tabs).toHaveLength(2);
+      next.windows[0].layout.tabs = next.windows[0].layout.tabs!.filter(
+        (tab) => tab.id !== "recovery:layout:tab:orphan",
+      );
+      h.ports.publish.mockRejectedValueOnce(new Error("Temporarily offline"));
+      h.ports.source.write({ ...next, groups: [], websites: [], recoveryTabIds: [] });
+      await settled();
+      expect(h.journal.pending[0].changes).toContainEqual({
+        action: "delete",
+        kind: "tab",
+        id: "tab:orphan",
+      });
+      controller.refresh();
+      await settled();
+      expect(h.ports.source.read().windows[0].layout.tabs).toHaveLength(1);
+      // Retry explicitly after connectivity returns, preserving the queued deletion.
+      controller.stop();
+      const resumed = h.start();
+      try {
+        await settled();
+        expect(h.current().workspace.records.some((record) => record.id === "tab:orphan")).toBe(
+          false,
+        );
+        expect(h.ports.source.read().windows[0].layout.tabs).toHaveLength(1);
+      } finally {
+        resumed.stop();
+      }
+    } finally {
+      controller.stop();
+    }
+  });
+
   it("bounds failed edit retries while another profile keeps notifying and preserves the edit", async () => {
     vi.useFakeTimers();
     const h = harness();

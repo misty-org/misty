@@ -17,13 +17,13 @@ export function ActivityMenu(props: { className: string }) {
             : "Activity"
       }
       className={cn(props.className, "relative")}
-      title="Activity"
       aria-haspopup="dialog"
       onClick={() => openActivityPanel()}
     >
       <Bell className="size-4" size={16} strokeWidth={2} aria-hidden="true" />
       {count > 0 ? (
         <span
+          aria-hidden="true"
           className={cn(
             "absolute right-0.5 top-0.5 grid h-3.5 min-w-3.5 place-items-center",
             "rounded-full bg-cream-bright px-1 text-[9px] font-bold leading-none",

@@ -9,7 +9,7 @@ import {
 } from "@/features/workspace";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 import { virtualWindowTransition } from "./useVirtualWindowTransition";
 
@@ -29,7 +29,13 @@ vi.mock("./WorkspaceDockTree", () => ({
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="location">{`${location.pathname}${location.search}`}</output>
+      <button onClick={() => navigate(-1)}>Go back in shell</button>
+    </>
+  );
 }
 
 describe("WorkspaceCanvas virtual window shortcuts", () => {
@@ -78,6 +84,22 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     });
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(firstWindowId);
     expect(animate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["close", "select"])("does not add shell history when tabs %s", (action) => {
+    const store = useWorkspaceStore.getState();
+    store.addSurface(workspaceSurfaceFromRoute("/home")!);
+    const ui = render(
+      <MemoryRouter initialEntries={["/before", "/home"]} initialIndex={1}>
+        <WorkspaceCanvas />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+    if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Home" }));
+    else fireEvent.click(ui.getByRole("tab", { name: "Google" }));
+    expect(ui.getByTestId("location").textContent).toBe("/browser");
+    fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));
+    expect(ui.getByTestId("location").textContent).toBe("/before");
   });
 
   it("opens Google when the final tab closes without a Spaces snapshot", async () => {

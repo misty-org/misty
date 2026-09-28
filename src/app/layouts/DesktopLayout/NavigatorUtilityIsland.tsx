@@ -7,14 +7,11 @@ import {
   cn,
   IconButton,
   navigationMenuLinkClass,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
+  TooltipHint,
 } from "@/shared/ui";
 import { PanelsTopLeft, Search } from "lucide-react";
-const { browser: BrowserIcon, agents: AgentIcon, files: FilesIcon } = appIcons;
-import { Link } from "react-router-dom";
+const { browser: BrowserIcon, agents: AgentIcon, files: FilesIcon, home: HomeIcon } = appIcons;
+import { Link, useNavigate } from "react-router-dom";
 import { navigatorFocusRingClass } from "./styles";
 
 const navigatorHeaderActionClass = `${navigationMenuLinkClass} w-full`;
@@ -28,28 +25,34 @@ function NavigatorPrimaryLink(props: {
   icon: NavigatorIcon;
 }) {
   const Icon = props.icon;
+  const navigate = useNavigate();
   return (
-    <Link
-      to={props.path}
-      className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
-      onClick={(event) => {
-        const surface = workspaceSurfaceFromRoute(props.path);
-        if (surface && useWorkspaceStore.getState().openSurface(surface).route !== surface.route)
+    <TooltipHint content={props.label}>
+      <Link
+        to={props.path}
+        className={cn(navigatorHeaderActionClass, props.active && "text-cream-bright")}
+        onClick={(event) => {
+          const surface = workspaceSurfaceFromRoute(props.path);
+          if (!surface || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
-      }}
-      data-reorder-handle="true"
-      data-reorder-header="true"
-      aria-label={props.label}
-      aria-current={props.active ? "page" : undefined}
-      data-misty-window-drag-block="true"
-    >
-      <Icon
-        className="shrink-0 justify-self-center"
-        strokeWidth={appIconStrokeWidth}
-        aria-hidden="true"
-      />
-      <span>{props.label}</span>
-    </Link>
+          const tab = useWorkspaceStore.getState().openDestination(surface);
+          navigate(tab.route, { replace: true });
+        }}
+        data-reorder-handle="true"
+        data-reorder-header="true"
+        aria-label={props.label}
+        aria-current={props.active ? "page" : undefined}
+        data-navigation-destination="true"
+        data-misty-window-drag-block="true"
+      >
+        <Icon
+          className="shrink-0 justify-self-center"
+          strokeWidth={appIconStrokeWidth}
+          aria-hidden="true"
+        />
+        <span>{props.label}</span>
+      </Link>
+    </TooltipHint>
   );
 }
 
@@ -61,8 +64,24 @@ export function NavigatorHeaderAgentsButton(props: { path: string; active: boole
   return <NavigatorPrimaryLink {...props} label="Agents" icon={AgentIcon} />;
 }
 
+export function NavigatorScheduledLink({ active }: { active: boolean }) {
+  return (
+    <NavigatorPrimaryLink
+      path="/scheduled"
+      active={active}
+      label="Scheduled"
+      icon={appIcons.scheduled}
+    />
+  );
+}
+
 export function NavigatorHeaderFilesButton(props: { path: string; active: boolean }) {
   return <NavigatorPrimaryLink {...props} label="Files" icon={FilesIcon} />;
+}
+
+/** Home opens or selects its workspace tab. */
+export function NavigatorHomeLink(props: { active: boolean }) {
+  return <NavigatorPrimaryLink path="/home" active={props.active} label="Home" icon={HomeIcon} />;
 }
 
 export function NavigatorHeaderSearchButton(props?: { className?: string }) {
@@ -71,40 +90,38 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
   const openSearchPanel = () => useBrowserSearchStore.getState().show();
 
   return (
-    <TooltipProvider delayDuration={450}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <IconButton
-            variant="nav-action"
-            label="Search"
-            tooltip={false}
-            className={cn(navigatorFocusRingClass, props?.className)}
-            onClick={openSearchPanel}
-            data-misty-window-drag-block="true"
-          >
-            <Search
-              className="size-4 shrink-0"
-              size={16}
-              strokeWidth={appIconStrokeWidth}
-              aria-hidden="true"
-            />
-          </IconButton>
-        </TooltipTrigger>
-        <TooltipContent>{searchShortcutTitle}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <IconButton
+      variant="nav-action"
+      label="Search"
+      tooltip={searchShortcutTitle}
+      className={cn(navigatorFocusRingClass, props?.className)}
+      onClick={openSearchPanel}
+      data-misty-window-drag-block="true"
+    >
+      <Search
+        className="size-4 shrink-0"
+        size={16}
+        strokeWidth={appIconStrokeWidth}
+        aria-hidden="true"
+      />
+    </IconButton>
   );
 }
 
 export function NavigatorHeaderSpacesButton({ active }: { active: boolean }) {
+  const navigate = useNavigate();
   return (
     <Link
       to="/spaces"
-      onClick={() => {
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         const surface = workspaceSurfaceFromRoute("/spaces");
-        if (surface) useWorkspaceStore.getState().openSurface(surface);
+        if (!surface) return;
+        event.preventDefault();
+        navigate(useWorkspaceStore.getState().openDestination(surface).route, { replace: true });
       }}
       aria-label="Spaces"
+      data-navigation-destination="true"
       aria-current={active ? "page" : undefined}
       className={cn(navigatorHeaderActionClass, active && "text-cream-bright")}
       data-misty-window-drag-block="true"

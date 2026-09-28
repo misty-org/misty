@@ -33,6 +33,14 @@ export function apiErrorMessage(code: string | undefined, fallback: string): str
     voice_recording_too_large: "That voice recording is too large. Keep it under one minute.",
     voice_duration_invalid: "That voice recording could not be read. Please try again.",
     voice_transcription_failed: "Misty could not transcribe that recording. Please try again.",
+    speech_model_unavailable:
+      "The configured speech model is unavailable on this server. Your answer is saved in the conversation.",
+    speech_generation_failed:
+      "Speech generation failed. Your answer is saved in the conversation. Please try speech again later.",
+    speech_reply_unavailable:
+      "Speech is available only for a completed answer. Review the conversation for the current result.",
+    speech_rate_limited:
+      "Speech is temporarily rate limited. Your answer is saved in the conversation.",
     voice_speech_failed: "Misty could not generate speech for that response.",
   };
   return code && messages[code] ? messages[code] : fallback.trim() || "The Misty request failed.";

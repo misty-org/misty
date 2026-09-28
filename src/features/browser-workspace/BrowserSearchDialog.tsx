@@ -126,7 +126,7 @@ export function BrowserSearchDialog() {
         next ? useBrowserSearchStore.getState().show() : useBrowserSearchStore.getState().close()
       }
     >
-      <DialogContent className="top-[24%] max-w-[620px] gap-3 p-4 pt-3">
+      <DialogContent placement="top" className="max-w-[620px] gap-3 p-4 pt-3">
         <DialogTitle className="pr-8 text-sm">
           {scope === "browser" ? "Search or enter a URL" : `Search ${command.label}`}
         </DialogTitle>

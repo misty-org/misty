@@ -6,8 +6,7 @@ const maximumOpenTabs = 16;
 const maximumTabTitleLength = 60;
 const pendingSpaceId = "__pending__";
 
-export type WorkspaceTabKind =
-  "space" | "file-manager" | "agents" | "developer" | "marketplace" | "transfers";
+export type WorkspaceTabKind = "space" | "file-manager" | "agents" | "developer" | "marketplace";
 
 interface WorkspaceTabBase {
   id: string;
@@ -33,10 +32,6 @@ export interface AgentsWorkspaceTab extends WorkspaceTabBase {
   kind: "agents";
 }
 
-export interface TransfersWorkspaceTab extends WorkspaceTabBase {
-  kind: "transfers";
-}
-
 export interface DeveloperWorkspaceTab extends WorkspaceTabBase {
   kind: "developer";
 }
@@ -46,8 +41,7 @@ export type SpacesTab =
   | FileManagerWorkspaceTab
   | AgentsWorkspaceTab
   | DeveloperWorkspaceTab
-  | MarketplaceWorkspaceTab
-  | TransfersWorkspaceTab;
+  | MarketplaceWorkspaceTab;
 
 export interface SpacesTabsSession {
   tabs: SpacesTab[];
@@ -408,7 +402,6 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
     "agents",
     "developer",
     "marketplace",
-    "transfers",
   ].includes(String(candidate.kind))
     ? (candidate.kind as WorkspaceTabKind)
     : "space";
@@ -435,7 +428,7 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
 function workspaceToolTitle(kind: Exclude<WorkspaceTabKind, "space" | "file-manager">): string {
   if (kind === "agents") return "Agents";
   if (kind === "developer") return "Code";
-  return kind === "marketplace" ? "Discover" : "Transfers";
+  return "Discover";
 }
 
 function migratePersistedTabs(

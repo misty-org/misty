@@ -14,7 +14,7 @@ pub enum Component {
 #[derive(Debug, Args)]
 pub struct Setup {
     #[arg(value_enum, default_value = "all")]
-    component: Component,
+    pub component: Component,
     /// Apply the displayed Cloudflare resource plan.
     #[arg(long)]
     apply: bool,
@@ -46,6 +46,7 @@ pub fn run(workspace: &Workspace, options: Setup) -> Result<()> {
             }
             println!("Next: misty server up; misty doctor server");
             if matches!(options.component, Component::All) {
+                environment::apply(workspace, Target::Dev)?;
                 crate::server::health(workspace)?;
                 desktop(workspace)?;
             }

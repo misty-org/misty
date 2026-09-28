@@ -11,11 +11,15 @@ export interface DisplayFrame {
   scale: number;
 }
 export interface DisplayCapture extends AiCaptureAttachment {
+  capturedAt?: number;
+  source?: "desktop-display";
   screen: string;
   primary: boolean;
   display: DisplayFrame;
 }
 export interface CursorSample {
+  /** Activity sequence only; no key identities or typed text leave the native hook. */
+  keyboardActivity?: number;
   x: number;
   y: number;
   displays: DisplayFrame[];
@@ -29,6 +33,8 @@ export interface Presentation {
   /** Percentage of the default 32px companion. */
   size?: number;
   mode: CompanionMode;
+  /** Require human confirmation before acquiring desktop control. Defaults off. */
+  ask?: boolean;
   model: string;
   models?: {
     id: string;
@@ -45,11 +51,3 @@ export interface Presentation {
 export const cursorEvent = "misty://cursor-sample";
 export const presentationEvent = "misty://cursor-presentation";
 export const controlEvent = "misty://cursor-control";
-/** Only an imperative, complete mode command changes modes. Questions and quoted examples cannot. */
-export function spokenMode(text: string): CompanionMode | undefined {
-  const match =
-    /^(?:misty[, ]+)?(?:please )?(?:switch(?: me)? to|change(?: my)? mode to|enable|enter|use) (team|auto)(?: mode)?[.!]?$/i.exec(
-      text.trim(),
-    );
-  return match?.[1].toLowerCase() as CompanionMode | undefined;
-}

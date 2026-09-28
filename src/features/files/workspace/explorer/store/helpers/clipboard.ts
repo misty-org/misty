@@ -62,7 +62,7 @@ export async function pasteSystemClipboardTextIntoPane(
       destinationDirectory: directory,
       operation: "copy",
     });
-    H.refreshTransferViews();
+    H.refreshFileOperationState();
     H.queuePaneRefresh(paneId, directory);
     return true;
   }
@@ -74,7 +74,7 @@ export async function pasteSystemClipboardTextIntoPane(
       destinationDirectory: directory,
       operation: "copy",
     });
-    H.refreshTransferViews();
+    H.refreshFileOperationState();
     H.queuePaneRefresh(paneId, directory);
     return true;
   }
@@ -86,7 +86,7 @@ export async function pasteSystemClipboardTextIntoPane(
       text: html,
       preferredName: "clipboard.html",
     });
-    H.refreshTransferViews();
+    H.refreshFileOperationState();
     H.queuePaneRefresh(paneId, directory);
     return true;
   }
@@ -100,7 +100,7 @@ export async function pasteSystemClipboardTextIntoPane(
         destinationDirectory: directory,
         operation: "copy",
       });
-      H.refreshTransferViews();
+      H.refreshFileOperationState();
       H.queuePaneRefresh(paneId, directory);
       return true;
     }
@@ -110,7 +110,7 @@ export async function pasteSystemClipboardTextIntoPane(
         text,
         preferredName: "clipboard.txt",
       });
-      H.refreshTransferViews();
+      H.refreshFileOperationState();
       H.queuePaneRefresh(paneId, directory);
       return true;
     }
@@ -192,7 +192,7 @@ export async function pasteSystemClipboardImageIntoPane(
     bytes: [...image.bytes],
     preferredName: "clipboard.png",
   });
-  H.refreshTransferViews();
+  H.refreshFileOperationState();
   H.queuePaneRefresh(paneId, directory);
   return true;
 }

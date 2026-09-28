@@ -135,7 +135,7 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
       <div className="ml-auto flex items-center gap-3">
         {showSearch ? (
           <div className="relative w-44">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+            <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
             <Input
               autoFocus
               className="h-8 pl-8 pr-8 text-xs"
@@ -153,7 +153,7 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
               <IconButton
                 size="xs"
                 label="Clear Library search"
-                className="absolute right-1 top-1/2 -translate-y-1/2"
+                className="absolute inset-y-0 right-1 my-auto"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => props.onSearchInput("")}
               >

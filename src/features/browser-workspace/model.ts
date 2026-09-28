@@ -37,7 +37,7 @@ export interface LayoutFields {
   tree: SplitTree;
 }
 export interface TabFields {
-  surface: "browser" | "files" | "agents" | "space";
+  surface: "browser" | "files" | "agents" | "space" | "home";
   title: string;
   placement: {
     layout_id: string;

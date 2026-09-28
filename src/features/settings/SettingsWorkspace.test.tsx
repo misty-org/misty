@@ -145,20 +145,19 @@ describe("SettingsWorkspace", () => {
     await act(async () => root.unmount());
     container.remove();
   });
-  it("has exactly five groups and no combined page labels or account page", async () => {
+  it("lists flat areas with multi-page areas as disclosures and no combined labels", async () => {
     await render();
-    expect([...container.querySelectorAll("nav h2")].map((e) => e.textContent)).toEqual([
-      "App",
-      "Browser",
-      "Spaces",
-      "Files",
-      "Agents",
-    ]);
+    expect(
+      [...container.querySelectorAll("[data-settings-nav-parent]")].map((e) =>
+        e.getAttribute("data-settings-nav-parent"),
+      ),
+    ).toEqual(["browser", "files", "spaces", "agents", "about"]);
+    expect(container.querySelector('[data-settings-nav-entry="general"]')).not.toBeNull();
     expect(
       settingsRegistry.every((e) => !e.label.includes("&") && !e.label.includes(" and ")),
     ).toBe(true);
-    expect(settingsRegistry.some((e) => e.id === "account")).toBe(false);
-    expect(container.textContent).toContain("Account settings");
+    expect(settingsRegistry.some((e) => e.id === "account" || e.id === "profiles")).toBe(false);
+    expect(container.querySelector('[aria-label^="Account settings"]')).not.toBeNull();
   });
   it.each(SECTIONS)("renders a functional or capability-gated %s page", async (section) => {
     await render(section);
@@ -166,7 +165,7 @@ describe("SettingsWorkspace", () => {
     expect(main.textContent!.length).toBeGreaterThan(30);
     expect(main.textContent).not.toContain("Coming soon");
   });
-  it("opens the selected group and allows independent collapse", async () => {
+  it("opens the active area and allows independent collapse", async () => {
     await render("browser");
     const toggle = container.querySelector<HTMLButtonElement>(
       '[aria-label="Collapse Browser settings"]',
@@ -180,23 +179,16 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector("main")?.textContent).toContain("Available model");
   });
   it("keeps system pages individually addressable", () => {
-    for (const id of [
-      "profiles",
-      "sync",
-      "server",
-      "devices",
-      "privacy",
-      "updates",
-      "about",
-      "diagnostics",
-    ])
-      expect(settingsRegistry.find((e) => e.id === id)?.group).toBe("app");
+    for (const id of ["sync", "server", "devices", "privacy", "about", "updates", "diagnostics"])
+      expect(settingsRegistry.find((e) => e.id === id)).toBeDefined();
+    expect(settingsRegistry.find((e) => e.id === "diagnostics")?.area).toBe("about");
   });
   it("preserves aliases and separates browser handoff from settings sync", () => {
     expect(canonicalSettingsSection("advanced")).toBe("diagnostics");
     expect(canonicalSettingsSection("agents")).toBe("agents-defaults");
-    expect(settingsRegistry.find((e) => e.id === "sync")?.group).toBe("app");
-    expect(settingsRegistry.find((e) => e.id === "browser-handoff")?.group).toBe("browser");
+    expect(canonicalSettingsSection("profiles")).toBe("sync");
+    expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("sync");
+    expect(settingsRegistry.find((e) => e.id === "browser-handoff")?.area).toBe("browser");
   });
   it("searches individual preferences and opens their canonical page", async () => {
     await render();

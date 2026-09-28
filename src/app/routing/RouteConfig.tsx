@@ -68,6 +68,10 @@ export const router = createBrowserRouter([
                 element: <ActivityPage />,
               },
               {
+                path: "scheduled",
+                element: null,
+              },
+              {
                 path: "browser",
                 element: null,
               },

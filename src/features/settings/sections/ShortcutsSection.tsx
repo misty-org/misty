@@ -162,7 +162,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
             <label className="relative min-w-[220px] flex-1">
               <Search
                 size={14}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted"
+                className="pointer-events-none absolute inset-y-0 left-2.5 my-auto text-cream-muted"
               />
               <Input
                 aria-label="Search shortcuts"

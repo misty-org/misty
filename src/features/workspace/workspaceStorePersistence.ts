@@ -1,3 +1,4 @@
+import { initialTabGroups, migrateSavedLinkGroups, savableGroupTabs } from "./tabGroups";
 import {
   initialWebsiteNavigation,
   userWebsiteGroups,
@@ -76,7 +77,13 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
 
   return {
     ...initialWebsiteNavigation(),
+    ...initialTabGroups(),
     ...sanitizeRetiredWorkspaceSurfaces(migrated),
+    ...migrateSavedLinkGroups({
+      ...migrated,
+      websiteGroups: userWebsiteGroups(migrated.websiteGroups ?? [], migrated.savedWebsites ?? []),
+      savedWebsites: migrated.savedWebsites ?? [],
+    }),
     websiteGroups: userWebsiteGroups(migrated.websiteGroups ?? [], migrated.savedWebsites ?? []),
   } as WorkspaceStore;
 }
@@ -170,6 +177,11 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
   ) as WorkspaceStore["closedVirtualWindowsByScope"];
   state = { ...state, ...scrubbed, closedVirtualWindowsByScope };
   return {
+    tabGroups: state.tabGroups.map((g) => ({
+      ...g,
+      savedTabs: g.savedTabs ? savableGroupTabs(g.savedTabs) : undefined,
+    })),
+    migratedTabGroupIds: state.migratedTabGroupIds,
     websiteGroups: state.websiteGroups,
     savedWebsites: state.savedWebsites,
     expandedWebsiteGroups: state.expandedWebsiteGroups,

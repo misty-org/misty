@@ -40,8 +40,10 @@ pub struct CursorCompanionState {
     turn: AtomicU64,
     started: AtomicBool,
     capture: AtomicBool,
+    keyboard_activity: AtomicU64,
 }
 pub enum Shortcut {
+    KeyboardActivity,
     Held(bool),
     Error(String),
 }
@@ -359,11 +361,17 @@ async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, Strin
     if state.capture.swap(true, Ordering::SeqCst) {
         return Err("A display capture is already in progress".into());
     }
+    let capture_guard = CaptureGuard {
+        app: app.clone(),
+        state: state.clone(),
+    };
     let result=async {
         on_main(&app,|app| { for (label,w) in app.webview_windows() { if label.starts_with(PREFIX) { w.hide().map_err(|e|e.to_string())?; } } Ok(()) }).await?;
         tokio::time::sleep(Duration::from_millis(80)).await;
         let state=state.clone();
         tauri::async_runtime::spawn_blocking(move|| {
+            // The blocking acquisition can outlive a canceled async waiter.
+            let _capture_guard = capture_guard;
             platform::screen_access()?;
             if !current(&state,turn) { return Err("Capture interrupted".into()); }
             let cursor=platform::cursor().ok_or("Cursor unavailable")?;
@@ -374,14 +382,16 @@ async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, Strin
             for (index,m) in monitors.iter().enumerate() {
                 if !current(&state,turn) { return Err("Capture interrupted".into()); }
                 let frame=frames.iter().find(|d|Some(d.id)==m.id().ok()).ok_or("Display disconnected")?;
-                let image=image::DynamicImage::ImageRgba8(m.capture_image().map_err(|e|e.to_string())?);
-                let resized=image.resize(1280,1280,image::imageops::FilterType::Lanczos3).to_rgb8();
-                let mut bytes=Vec::new(); image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes,80).encode_image(&resized).map_err(|e|e.to_string())?;
+                let (bytes, width, height) = platform::capture_display(m)?;
+                if width == 0 || height == 0 || bytes.is_empty() { return Err("Screen capture returned no pixels".into()); }
+                let captured_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
                 use sha2::{Digest,Sha256}; let content_hash=format!("{:x}",Sha256::digest(&bytes));
                 let screen=format!("screen{}",index+1);let primary=contains(frame,cursor);
-                result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("{screen}{} ({} × {})",if primary {" — primary (cursor)"}else{""},resized.width(),resized.height()),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":resized.width(),"height":resized.height(),"contentHash":content_hash,"screen":screen,"primary":primary,"display":frame}));
+                result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("{screen}{} ({} × {})",if primary {" — primary (cursor)"}else{""},width,height),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":width,"height":height,"contentHash":content_hash,"capturedAt":captured_at,"source":"desktop-display","screen":screen,"primary":primary,"display":frame}));
             }
-            if !current(&state,turn) { return Err("Capture interrupted".into()); } Ok(result)
+            if !current(&state,turn) { return Err("Capture interrupted".into()); }
+            if result.is_empty() { return Err("No display is available for capture".into()); }
+            Ok(result)
         }).await.map_err(|e|e.to_string())?
     }.await;
 
@@ -431,6 +441,11 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                 continue;
             }
             match event {
+                Shortcut::KeyboardActivity => {
+                    events_state
+                        .keyboard_activity
+                        .fetch_add(1, Ordering::Relaxed);
+                }
                 Shortcut::Held(held) => {
                     if events_state.held.swap(held, Ordering::SeqCst) == held {
                         continue;
@@ -472,6 +487,17 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             {
                 recording = None;
             }
+            if let Some((turn, _, record)) = recording.as_mut() {
+                if let Some((sequence, pcm)) = record.drain() {
+                    if current(&audio_state, *turn) {
+                        let _ = audio_app.emit_to(
+                            "main",
+                            "misty://cursor-audio",
+                            json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
+                        );
+                    }
+                }
+            }
             let event = audio_rx.recv_timeout(Duration::from_millis(25));
             let timed_out = recording
                 .as_ref()
@@ -486,7 +512,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         let _ = audio_app.emit_to(
                             "main",
                             "misty://cursor-recorded",
-                            json!({"turn":turn,"audio":"","durationMs":0}),
+                            json!({"turn":turn,"durationMs":0}),
                         );
                         continue;
                     }
@@ -502,7 +528,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                                 let _ = audio_app.emit_to(
                                     "main",
                                     "misty://cursor-recorded",
-                                    json!({"turn":turn,"audio":"","durationMs":0}),
+                                    json!({"turn":turn,"durationMs":0}),
                                 );
                             }
                         }
@@ -516,17 +542,27 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                 Ok((_, false)) | Err(mpsc::RecvTimeoutError::Timeout)
                     if timed_out || !audio_state.held.load(Ordering::SeqCst) =>
                 {
+                    if timed_out {
+                        audio_state.held.store(false, Ordering::SeqCst);
+                    }
                     if let Some((turn, _, record)) = recording.take() {
-                        let (wav, duration) = record.finish();
+                        let (sequence, pcm, duration) = record.finish();
                         if current(&audio_state, turn) {
-                            let _=audio_app.emit_to("main","misty://cursor-recorded",json!({"turn":turn,"audio":STANDARD.encode(wav),"durationMs":duration}));
+                            if !pcm.is_empty() {
+                                let _ = audio_app.emit_to("main", "misty://cursor-audio", json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}));
+                            }
+                            let _ = audio_app.emit_to(
+                                "main",
+                                "misty://cursor-recorded",
+                                json!({"turn":turn,"durationMs":duration}),
+                            );
                         }
                     } else if let Ok((turn, false)) = event {
                         if current(&audio_state, turn) {
                             let _ = audio_app.emit_to(
                                 "main",
                                 "misty://cursor-recorded",
-                                json!({"turn":turn,"audio":"","durationMs":0}),
+                                json!({"turn":turn,"durationMs":0}),
                             );
                         }
                     }
@@ -542,7 +578,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             if state.enabled.load(Ordering::SeqCst) {
                 if let Some((x, y)) = platform::cursor() {
                     let displays = state.data.lock().unwrap().displays.clone();
-                    let payload = json!({"x":x,"y":y,"displays":displays});
+                    let payload = json!({"x":x,"y":y,"displays":displays,"keyboardActivity":state.keyboard_activity.load(Ordering::Relaxed)});
                     for (label, w) in app.webview_windows() {
                         if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
                             let _ = w.emit("misty://cursor-sample", &payload);

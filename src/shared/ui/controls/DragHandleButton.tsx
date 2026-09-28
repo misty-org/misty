@@ -18,8 +18,8 @@ const DragHandleButton = React.forwardRef<
     title={title ?? label}
     className={cn(
       "grid h-[30px] w-[27px] shrink-0 place-items-center rounded-md border-0 bg-transparent p-0",
-      "text-cream-muted outline-none transition-colors hover:bg-cream/[0.045] hover:text-cream",
-      "focus-visible:ring-2 focus-visible:ring-cream/15 data-[state=open]:bg-cream/[0.06]",
+      "text-cream-muted outline-none transition-colors hover:bg-control-hover hover:text-cream",
+      "focus-visible:ring-2 focus-visible:ring-cream/15 data-[state=open]:bg-control-active",
       "[&_svg]:pointer-events-none [&_svg]:size-4",
       className,
     )}

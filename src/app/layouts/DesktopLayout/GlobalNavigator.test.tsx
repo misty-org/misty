@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useActivityStore } from "@/features/activity";
 import { activeLayoutView, useWorkspaceStore } from "@/features/workspace";
-import { addWebsite, createWebsiteGroup } from "@/features/browser-workspace/navigation";
+import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalNavigator } from "./GlobalNavigator";
 
@@ -34,16 +34,48 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("browser workspace navigator", () => {
-  it("shows global tools above personal website groups", () => {
+  it("shows the primary destinations including Scheduled", () => {
+    const folder = createBookmarkFolder("Reading");
+    saveBookmark({ title: "Example", url: "example.com", folderId: folder });
     renderNavigator();
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["Home", "Agents", "Files", "Spaces"])
+    for (const name of ["Home", "Browser", "Agents", "Scheduled", "Files"])
       expect(within(nav).getByRole("link", { name })).toBeTruthy();
-    expect(within(nav).getByRole("heading", { name: "Groups" })).toBeTruthy();
-    expect(within(nav).getByRole("button", { name: "Configure groups" })).toBeTruthy();
-    expect(workspace().websiteGroups).toEqual([]);
-    expect(within(nav).queryByRole("link", { name: "Discover" })).toBeNull();
-    expect(within(nav).queryByRole("button", { name: /switch space/i })).toBeNull();
+    expect(within(nav).getByRole("button", { name: "Spaces" })).toBeTruthy();
+    expect(within(nav).queryByRole("heading", { name: "Groups" })).toBeNull();
+    expect(within(nav).queryByRole("button", { name: "Configure groups" })).toBeNull();
+    expect(within(nav).queryByText("Reading")).toBeNull();
+    expect(workspace().savedWebsites).toHaveLength(1);
+    const pages = within(nav).getAllByRole("link");
+    expect(pages.slice(0, 5).map((page) => page.getAttribute("aria-label"))).toEqual([
+      "Home",
+      "Browser",
+      "Agents",
+      "Scheduled",
+      "Files",
+    ]);
+    expect(pages[0].closest(".misty-navigator-items")).toBeTruthy();
+    for (const name of ["Home", "Browser", "Agents", "Scheduled", "Files"])
+      expect(
+        within(nav).getByRole("link", { name }).hasAttribute("data-navigation-destination"),
+      ).toBe(true);
+    expect(
+      within(nav)
+        .getByRole("button", { name: "Search" })
+        .hasAttribute("data-navigation-destination"),
+    ).toBe(false);
+  });
+  it("opens Scheduled as its own reusable destination", () => {
+    renderNavigator();
+    fireEvent.click(screen.getByRole("link", { name: "Scheduled" }));
+    const scheduled = activeLayoutView(workspace().layout)!;
+    expect(scheduled).toMatchObject({ surfaceId: "scheduled", route: "/scheduled" });
+    expect(screen.getByRole("link", { name: "Scheduled" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+    fireEvent.click(screen.getByRole("link", { name: "Agents" }));
+    fireEvent.click(screen.getByRole("link", { name: "Scheduled" }));
+    expect(activeLayoutView(workspace().layout)?.id).toBe(scheduled.id);
   });
   it("opens Files directly as a global tool", () => {
     renderNavigator();
@@ -55,73 +87,26 @@ describe("browser workspace navigator", () => {
     });
     expect(screen.getByRole("link", { name: "Files" }).getAttribute("aria-current")).toBe("page");
   });
-  it("expands a user group independently of configuration without navigating", () => {
-    const id = createWebsiteGroup("Reading");
-    addWebsite(id, "Example mail", "https://mail.example");
-    renderNavigator();
-    const before = workspace().layout;
-    const expand = screen.getByRole("button", { name: "Reading" });
-    fireEvent.click(expand);
-    expect(expand.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(screen.getByRole("button", { name: "Configure groups" }));
-    expect(screen.getByRole("dialog", { name: "Groups" })).toBeTruthy();
-    expect(expand.getAttribute("aria-expanded")).toBe("false");
-    expect(workspace().layout).toBe(before);
-  });
-  it("adds an arbitrary website through Configure", () => {
-    const id = createWebsiteGroup("Work");
-    renderNavigator();
-    const before = workspace().layout;
-    fireEvent.click(screen.getByRole("button", { name: "Configure groups" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add site to group" }));
-    fireEvent.change(screen.getByLabelText("Site URL"), {
-      target: { value: "https://drive.google.com/" },
-    });
-    fireEvent.change(screen.getByLabelText("Site name (optional)"), { target: { value: "Drive" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add site" }));
-    expect(workspace().savedWebsites).toContainEqual(
-      expect.objectContaining({
-        fields: expect.objectContaining({
-          title: "Drive",
-          group_id: id,
-          url: "https://drive.google.com/",
-        }),
-      }),
-    );
-    expect(workspace().layout).toBe(before);
-  });
-  it("creates and reorders a custom group without reopening the focused page", () => {
-    createWebsiteGroup("Reading");
-    renderNavigator();
-    fireEvent.click(screen.getByRole("button", { name: "Configure groups" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add group" }));
-    fireEvent.change(screen.getByLabelText("New group name"), { target: { value: "Research" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    const before = workspace().layout;
-    fireEvent.keyDown(screen.getByRole("button", { name: "Research" }), {
-      key: "ArrowUp",
-      altKey: true,
-      shiftKey: true,
-    });
-    expect(workspace().websiteGroups.map((group) => group.fields.label)).toEqual([
-      "Research",
-      "Reading",
-    ]);
-    expect(workspace().layout).toBe(before);
-  });
   it("opens the same global browser search from the navbar button", () => {
     renderNavigator();
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(useBrowserSearchStore.getState().open).toBe(true);
   });
-  it("marks the focused saved website, keeping Home inactive", () => {
-    addWebsite(createWebsiteGroup("Reading"), "Example", "https://example.com");
+  it("keeps Browser active for pages opened from bookmarks", () => {
+    workspace().openBrowserTab({ url: "https://example.com", websiteId: "legacy-bookmark" });
     renderNavigator();
-    fireEvent.click(screen.getByRole("button", { name: "Example" }));
-    expect(screen.getByRole("link", { name: "Home" }).getAttribute("aria-current")).toBeNull();
-    expect(screen.getByRole("button", { name: "Example" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
+    expect(screen.getByRole("link", { name: "Browser" }).getAttribute("aria-current")).toBe("page");
   });
+});
+
+it("reveals a portalled side hint on keyboard focus and dismisses it with Escape", async () => {
+  renderNavigator();
+  const activity = screen.getByRole("button", { name: /^Activity/ });
+  fireEvent.focus(activity);
+  const hint = await screen.findByRole("tooltip");
+  expect(hint.textContent).toContain("Activity");
+  expect(screen.getByRole("navigation").contains(hint)).toBe(false);
+  expect(hint.closest("[data-navigation-tooltip]")?.getAttribute("data-side")).toBe("right");
+  fireEvent.keyDown(activity, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).toBeNull();
 });

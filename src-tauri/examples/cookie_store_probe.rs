@@ -9,6 +9,11 @@ mod browser_cookie_restore;
 #[path = "../src/infra/browser_cookie_store.rs"]
 mod browser_cookie_store;
 #[cfg(target_os = "macos")]
+// This macOS probe only needs WebKit identifiers; folder helpers belong to the host.
+#[expect(
+    dead_code,
+    reason = "the probe includes only part of the host profile module"
+)]
 #[path = "../src/infra/browser_profile.rs"]
 mod browser_profile;
 

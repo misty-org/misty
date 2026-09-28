@@ -212,7 +212,7 @@ export function LibraryMemoryPlayback({
               </IconButton>
             </>
           ) : null}
-          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-charcoal-workspace px-4 py-2 ">
+          <div className="absolute inset-x-0 bottom-5 mx-auto flex w-fit items-center gap-3 rounded-full bg-charcoal-workspace px-4 py-2 ">
             <IconButton label="Previous" onClick={previous}>
               <SkipBack size={17} />
             </IconButton>

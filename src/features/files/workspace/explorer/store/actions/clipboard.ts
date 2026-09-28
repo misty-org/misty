@@ -46,7 +46,7 @@ export function createClipboardActions(set: ExplorerSet, get: ExplorerGet): Part
             destinationDirectory: directory,
             operation: clipboard.operation,
           });
-          H.refreshTransferViews();
+          H.refreshFileOperationState();
           get().pushNotification(
             `Queued move for ${H.itemCountLabel(clipboard.items.length)}`,
             "success",
@@ -66,7 +66,7 @@ export function createClipboardActions(set: ExplorerSet, get: ExplorerGet): Part
           destinationDirectory: directory,
           operation: clipboard.operation,
         });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(
           `Queued copy for ${H.itemCountLabel(clipboard.items.length)}`,
           "success",
@@ -94,7 +94,7 @@ export function createClipboardActions(set: ExplorerSet, get: ExplorerGet): Part
           destinationDirectory: directory,
           operation: "copy",
         });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(`Queued upload for ${H.itemCountLabel(paths.length)}`, "success");
         H.queuePaneRefresh(paneId, directory);
       } catch (error) {
@@ -111,7 +111,7 @@ export function createClipboardActions(set: ExplorerSet, get: ExplorerGet): Part
           destinationDirectory: destination,
           operation,
         });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(
           `Queued ${operation === "move" ? "move" : "copy"} for ${H.itemCountLabel(items.length)}`,
           "success",
@@ -139,7 +139,7 @@ export function createClipboardActions(set: ExplorerSet, get: ExplorerGet): Part
           destinationDirectory: destination,
           operation: "copy",
         });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(`Queued drop for ${H.itemCountLabel(sources.length)}`, "success");
         const current = get().panes[paneId]?.listing?.path;
         if (current) H.queuePaneRefresh(paneId, current);
@@ -193,7 +193,7 @@ export function createClipboardActions(set: ExplorerSet, get: ExplorerGet): Part
           }
         }
       } catch {
-        // Transfer refresh is opportunistic; the Transfers view still owns visible transfer errors.
+        // Directory refresh is best effort; file actions report their own errors.
       }
     },
   };

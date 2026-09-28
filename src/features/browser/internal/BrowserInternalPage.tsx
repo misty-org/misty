@@ -1,3 +1,4 @@
+import { Navigate } from "react-router-dom";
 import type { BrowserInternalPage as InternalPage } from "@/features/workspace";
 import { BookmarksPage } from "./BookmarksPage";
 import { BrowserSettingsPage } from "./BrowserSettingsPage";
@@ -10,6 +11,8 @@ import type { BrowserInternalPageProps } from "./types";
 export function BrowserInternalPage(props: BrowserInternalPageProps & { page: InternalPage }) {
   const { page, ...pageProps } = props;
   switch (page) {
+    case "scheduled":
+      return <Navigate to="/scheduled" replace />;
     case "history":
       return <HistoryPage {...pageProps} />;
     case "downloads":

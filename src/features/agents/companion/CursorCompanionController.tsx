@@ -1,4 +1,3 @@
-import { agentsApi } from "@/api/agents/api";
 import { assistantApi } from "@/api/assistant/api";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -6,19 +5,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
 import { companionReply, resolvePoint } from "./companionReply";
+import { companionStage } from "./companionStage";
+import { CompanionVoice } from "./companionVoice";
 import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
 import {
   initialCompanionPresentation,
   useCompanionState,
   type CompanionControl,
+  type CompanionSubmission,
 } from "./companionState";
-import {
-  controlEvent,
-  spokenMode,
-  type CompanionMode,
-  type DisplayCapture,
-  type Presentation,
-} from "./protocol";
+import { controlEvent, type DisplayCapture, type Presentation } from "./protocol";
 let nativeLifecycle = Promise.resolve<unknown>(undefined);
 const nativeConfiguration = (accountId: string) => {
   const next = nativeLifecycle
@@ -43,18 +39,20 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       voicePending = false;
     let nativeReady = false;
     let barrier = Promise.resolve();
-    let abort: AbortController | undefined,
-      audio: HTMLAudioElement | undefined,
-      audioUrl: string | undefined;
+    let abort: AbortController | undefined;
+    let voice: CompanionVoice | undefined;
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     let pointTimer: ReturnType<typeof setTimeout> | undefined;
+    let speechRetry: string | undefined;
     const preferenceKey = `misty.cursor-companion:${accountId}`;
     let show = true,
+      ask = false,
       model = "",
       size = companionSizeDefault;
     try {
       const saved = JSON.parse(localStorage.getItem(preferenceKey) || "{}");
       show = saved.visible !== false;
+      ask = saved.ask === true;
       size = normalizeCompanionSize(saved.size);
       model = typeof saved.model === "string" ? saved.model : "";
     } catch {
@@ -65,7 +63,8 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       phase: "idle",
       visible: show,
       showCompanion: show,
-      mode: "team",
+      mode: "auto",
+      ask,
       model,
       size,
     };
@@ -110,6 +109,7 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
             visible: show,
             model: state.model,
             size: state.size,
+            ask: state.ask === true,
           }),
         );
       } catch {
@@ -118,6 +118,7 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
     };
     const maybeHide = () => {
       if (
+        state.error ||
         voicePending ||
         pointPending ||
         state.phase === "listening" ||
@@ -127,7 +128,7 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       const expected = turn;
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
-        if (active(expected) && !show)
+        if (active(expected) && !show && !state.error)
           change({
             visible: false,
           });
@@ -136,18 +137,12 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
     const stopAudio = () => {
       abort?.abort();
       abort = undefined;
-      if (audio) {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.pause();
-        audio.removeAttribute("src");
-        audio = undefined;
-      }
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-      audioUrl = undefined;
+      voice?.close();
+      voice = undefined;
       voicePending = false;
     };
     const interrupt = () => {
+      speechRetry = undefined;
       stopAudio();
       clearTimeout(hideTimer);
       clearTimeout(pointTimer);
@@ -204,48 +199,59 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         await useMistyStore.getState().cancelResponse?.();
       return active(next);
     };
-    const switchMode = async (mode: CompanionMode) => {
-      if (state.mode !== mode && (await interruptNative()))
-        change({
-          mode,
-          visible: show,
-        });
+    const speechFailed = (id: string, generation: number, reason: unknown) => {
+      if (!active(generation)) return;
+      stopAudio();
+      speechRetry = id;
+      change({
+        phase: "idle",
+        visible: true,
+        error: `The answer is saved in the conversation. Speech failed: ${reason instanceof Error ? reason.message : String(reason)}`,
+      });
+      // Pointing has independent ownership and can finish even when TTS fails.
     };
-    const speak = async (invocationId: string, generation: number) => {
-      voicePending = true;
-      const controller = new AbortController();
-      abort = controller;
-      try {
-        const blob = await agentsApi.speech(invocationId, controller.signal);
-        if (!active(generation)) return;
-        audioUrl = URL.createObjectURL(blob);
-        audio = new Audio(audioUrl);
-        audio.onended = () => {
-          if (active(generation)) {
+    const startVoice = (generation: number, signal: AbortSignal) =>
+      new CompanionVoice({
+        signal,
+        assertCurrent: () => {
+          if (!active(generation)) throw new Error("Voice turn cancelled.");
+        },
+        onPlaying: () => {
+          if (active(generation)) change({ phase: "responding" });
+        },
+        onError: (reason) => {
+          if (voicePending && invocationId) speechFailed(invocationId, generation, reason);
+          else if (owned && active(generation)) {
             stopAudio();
             change({
-              phase: "idle",
+              error:
+                "Voice disconnected. Your task is still running; its answer will appear in the conversation.",
             });
-            maybeHide();
-          }
-        };
-        audio.onerror = () =>
-          fail(
-            generation,
-            "The answer was saved, but speech could not play. Hold the shortcut to try again.",
-          );
-        await audio.play();
-        if (active(generation))
-          change({
-            phase: "responding",
-          });
+          } else fail(generation, reason);
+        },
+      });
+    const speak = async (id: string, generation: number) => {
+      speechRetry = undefined;
+      voicePending = true;
+      const controller = abort ?? new AbortController();
+      abort = controller;
+      try {
+        change({ phase: "processing" });
+        voice ??= startVoice(generation, controller.signal);
+        await voice.speak(id);
+        if (!active(generation)) return;
+        stopAudio();
+        change({ phase: "idle" });
+        maybeHide();
       } catch (error) {
-        if (!controller.signal.aborted) fail(generation, error);
+        if (!controller.signal.aborted) speechFailed(id, generation, error);
       }
     };
     let captures: DisplayCapture[] = [];
+    let recordedTurn = -1;
     let submittedTurn = 0,
       invocationId: string | undefined;
+    let submittedConversationId: string | undefined;
     const settle = () => {
       if (!owned || !invocationId || !active(submittedTurn)) return;
       const current = useMistyStore.getState();
@@ -258,7 +264,7 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       if (current.working) return;
       owned = false;
       const reply = current.conversations
-        .find((c) => c.id === current.activeConversationId)
+        .find((c) => c.id === submittedConversationId)
         ?.messages.slice()
         .reverse()
         .find((m) => m.role === "assistant");
@@ -291,6 +297,72 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       }
       void speak(invocationId, submittedTurn);
     };
+    const capture = (generation: number, signal: AbortSignal) =>
+      companionStage(
+        invoke<DisplayCapture[]>("cursor_companion_capture", { turn: generation }),
+        signal,
+        "Screen capture",
+        20_000,
+      );
+    const submitCaptured = async (
+      request: CompanionSubmission,
+      generation: number,
+      screens: DisplayCapture[],
+      signal: AbortSignal,
+    ) => {
+      if (!active(generation)) return;
+      captures = screens;
+      submittedTurn = generation;
+      owned = true;
+      await companionStage(
+        useMistyStore.getState().submitAnswer(
+          request.prompt,
+          request.attachments ?? [],
+          undefined,
+          "workspace",
+          [],
+          { conversationId: request.conversationId, context: [] },
+          {
+            turn: generation,
+            executionMode: "agent",
+            interactionMode: state.mode,
+            displayCaptures: screens,
+            model: state.model,
+          },
+        ),
+        signal,
+        "Starting the response",
+        60_000,
+      );
+      if (!active(generation)) return;
+      const current = useMistyStore.getState();
+      invocationId = current.invocationId;
+      submittedConversationId = current.activeConversationId;
+      if (!invocationId) {
+        owned = false;
+        throw new Error(current.error || "The companion could not start. Please try again.");
+      }
+      settle();
+    };
+    const submit = async (request: CompanionSubmission) => {
+      if (!nativeReady) throw new Error("The companion is starting. Try again in a moment.");
+      if (useMistyStore.getState().working)
+        throw new Error("Stop the current response before sending another request.");
+      if (!(await interruptNative())) return;
+      const generation = turn;
+      invocationId = undefined;
+      captures = [];
+      change({ visible: true, phase: "processing", error: undefined });
+      const controller = new AbortController();
+      abort = controller;
+      try {
+        const screens = await capture(generation, controller.signal);
+        await submitCaptured(request, generation, screens, controller.signal);
+      } catch (error) {
+        if (!controller.signal.aborted) fail(generation, error);
+        throw error;
+      }
+    };
     const unsubscribe = useMistyStore.subscribe(settle);
     const removers: Promise<() => void>[] = [];
     const window = getCurrentWindow();
@@ -302,6 +374,14 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       );
     };
     const setup = async () => {
+      listen<{ taskId: string; reason: string }>("misty://desktop-control-stopped", (event) => {
+        const stoppedTurn = turn;
+        void import("../localExecution").then(({ useLocalExecution, pauseLocalExecution }) => {
+          if (useLocalExecution.getState().execution?.taskId !== event.taskId) return;
+          if (!disposed) fail(stoppedTurn, event.reason);
+          void pauseLocalExecution(event.taskId);
+        });
+      });
       useMistyStore.getState().setAccount(accountId);
       listen<{
         turn: number;
@@ -312,7 +392,10 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
           turn = payload.turn;
           captures = [];
           invocationId = undefined;
-          void interrupt().catch((e) => fail(turn, e));
+          void interrupt().catch((e) => fail(payload.turn, e));
+          const controller = new AbortController();
+          abort = controller;
+          voice = startVoice(payload.turn, controller.signal);
           change({
             visible: true,
             phase: "listening",
@@ -369,8 +452,12 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
             size: normalizeCompanionSize(control.size),
           });
           persist();
-        } else if (control.kind === "mode") {
-          await switchMode(control.mode);
+        } else if (control.kind === "ask") {
+          // End existing ownership before changing the next takeover's policy.
+          if (await interruptNative()) {
+            change({ ask: control.ask });
+            persist();
+          }
         } else if (
           control.kind === "model" &&
           (control.model === "" || state.models?.some((m) => m.id === control.model))
@@ -387,6 +474,12 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
               visible: show,
             });
         } else if (control.kind === "retry") {
+          if (speechRetry && nativeReady) {
+            const id = speechRetry;
+            change({ error: undefined, visible: true });
+            await speak(id, turn);
+            return;
+          }
           if (!(await interruptNative())) return;
           turn = await nativeConfiguration(accountId);
           if (disposed) return;
@@ -401,18 +494,26 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         accountId,
         presentation: state,
         control,
+        submit,
       });
       listen<CompanionControl>(controlEvent, (request) => {
         void control(request).catch((e) => fail(turn, e));
       });
+      listen<{ turn: number; sequence: number; audio: string }>(
+        "misty://cursor-audio",
+        (payload) => {
+          if (active(payload.turn)) voice?.append(payload.sequence, payload.audio);
+        },
+      );
       listen<{
         turn: number;
-        audio: string;
         durationMs: number;
       }>("misty://cursor-recorded", (payload) => {
         const generation = payload.turn;
-        if (!active(generation)) return;
+        if (!active(generation) || recordedTurn === generation) return;
+        recordedTurn = generation;
         if (payload.durationMs < 150) {
+          stopAudio();
           change({
             phase: "idle",
           });
@@ -422,36 +523,18 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         change({
           phase: "processing",
         });
-        const controller = new AbortController();
+        const controller = abort ?? new AbortController();
         abort = controller;
         void (async () => {
           await barrier;
           if (!active(generation)) return;
-          const bytes = Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0));
-          const [transcription, screens] = await Promise.all([
-            agentsApi.transcribeVoice(
-              new Blob([bytes], {
-                type: "audio/wav",
-              }),
-              payload.durationMs,
-              controller.signal,
-            ),
-            invoke<DisplayCapture[]>("cursor_companion_capture", {
-              turn: generation,
-            }),
-          ]);
+          if (!voice)
+            throw new Error("The voice session did not start. Hold the shortcut to try again.");
+          const textResult = await voice.commit();
           if (!active(generation)) return;
-          const text = transcription.transcript.trim();
+          const text = textResult.trim();
           if (!text) {
-            change({
-              phase: "idle",
-            });
-            maybeHide();
-            return;
-          }
-          const mode = spokenMode(text);
-          if (mode) {
-            await switchMode(mode);
+            stopAudio();
             change({
               phase: "idle",
             });
@@ -462,38 +545,15 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
             throw new Error(
               "An Agent conversation is already running. Stop it before starting a companion request.",
             );
-          captures = screens;
-          submittedTurn = generation;
-          owned = true;
-          const current = useMistyStore.getState();
-          await current.submitAnswer(
-            text,
-            [],
-            undefined,
-            "workspace",
-            [],
-            {
-              conversationId: current.activeConversationId,
-              context: [],
-            },
-            {
-              turn: generation,
-              executionMode: "agent",
-              interactionMode: state.mode,
-              displayCaptures: screens,
-              model: state.model,
-            },
-          );
+          // Clicky captures only after transcript finalization; no stale pre-transcription frame.
+          const screens = await capture(generation, controller.signal);
           if (!active(generation)) return;
-          invocationId = useMistyStore.getState().invocationId;
-          if (!invocationId) {
-            owned = false;
-            throw new Error(
-              useMistyStore.getState().error ||
-                "The companion could not start. Hold the shortcut to retry.",
-            );
-          }
-          settle();
+          await submitCaptured(
+            { prompt: text, conversationId: useMistyStore.getState().activeConversationId },
+            generation,
+            screens,
+            controller.signal,
+          );
         })().catch((e) => {
           if (!controller.signal.aborted) fail(generation, e);
         });
@@ -511,12 +571,10 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
         .then((catalog) => {
           if (!disposed)
             change({
-              models: catalog.models
-                .filter((m) => m.id.startsWith("openai/"))
-                .map((m) => ({
-                  id: m.id,
-                  name: m.name,
-                })),
+              models: catalog.models.map((m) => ({
+                id: m.id,
+                name: m.name,
+              })),
             });
         })
         .catch(() => {});
@@ -536,6 +594,7 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
           accountId: "",
           presentation: initialCompanionPresentation,
           control: undefined,
+          submit: undefined,
         });
       void nativeConfiguration("");
     };

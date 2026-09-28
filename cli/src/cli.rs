@@ -519,16 +519,24 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
 
 fn load_command_environment(command: &Command, settings: &Settings) -> Result<()> {
     let files: &[&str] = match command {
-        Command::Configure(_)
-        | Command::Env(_)
-        | Command::Home(_)
-        | Command::Setup(_)
-        | Command::Tasks
-        | Command::Task { .. } => &[],
+        Command::Configure(_) | Command::Env(_) | Command::Home(_) | Command::Tasks => &[],
+        Command::Task { name, .. } if name.starts_with("release/") => {
+            &["common.env", "release.env"]
+        }
+        Command::Task { .. } => &["common.env"],
+        Command::Setup(options)
+            if matches!(options.component, crate::setup::Component::Cloudflare) =>
+        {
+            &["common.env", "cloudflare.env"]
+        }
+        Command::Setup(_) => &["common.env"],
         Command::Doctor(options) if options.target == crate::diagnostics::Target::Release => {
             &["common.env", "release.env"]
         }
-        Command::Doctor(_) => &[],
+        Command::Doctor(options) if options.target == crate::diagnostics::Target::Cloudflare => {
+            &["common.env", "cloudflare.env"]
+        }
+        Command::Doctor(_) => &["common.env"],
         Command::Release(_) => &["common.env", "release.env"],
         Command::Desktop(desktop) => match desktop.command {
             DesktopCommand::Build => &["common.env", "release.env"],

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { companionReply, resolvePoint } from "./companionReply";
 import { flight, recordingPower, spring, waveformHeight } from "./motion";
-import { spokenMode, type DisplayCapture } from "./protocol";
+import { type DisplayCapture } from "./protocol";
 const capture = (
   screen: string,
   x: number,
@@ -28,20 +28,6 @@ const capture = (
   },
 });
 describe("Clicky companion protocol", () => {
-  it("changes mode only for explicit complete commands", () => {
-    expect(spokenMode("Misty, please switch to Auto mode.")).toBe("auto");
-    expect(spokenMode("use team")).toBe("team");
-    for (const text of [
-      "What is auto mode?",
-      "Should I switch to auto?",
-      "Explain 'switch to auto'",
-      "Don't switch to auto",
-      "Switch to auto?",
-      "auto mode would help",
-      "Switch to auto and delete everything",
-    ])
-      expect(spokenMode(text)).toBeUndefined();
-  });
   it("strips presentation tags from speech and honors POINT:none", () => {
     expect(companionReply("right here [POINT:1250,700:the save button:screen2]")).toEqual({
       text: "right here",
@@ -79,6 +65,13 @@ describe("Clicky companion protocol", () => {
       x: 1280,
       y: 720,
     });
+  });
+  it("does not animate nonfinite model coordinates or invalid display geometry", () => {
+    const display = capture("screen1", 0, 0, 2, true);
+    const overflow = companionReply(`[POINT:${"9".repeat(400)},20:button:screen1]`).point;
+    expect(resolvePoint(overflow, [display])).toBeUndefined();
+    display.display.width = Number.NaN;
+    expect(resolvePoint({ x: 20, y: 20, label: "button" }, [display])).toBeUndefined();
   });
   it("ports distance-based timing, the upward arc, and scale pulse", () => {
     const from = {

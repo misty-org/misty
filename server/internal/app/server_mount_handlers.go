@@ -2,8 +2,8 @@ package app
 
 import (
 	"context"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	"github.com/kannachi323/misty/server/internal/platform/security"
 	browsersync "github.com/kannachi323/misty/server/internal/sync"
 	"net/http"
 	"time"
@@ -152,6 +152,7 @@ func (s *Server) MountHandlers() error {
 		s.Router.Post(prefix+"/billing/checkout-session", api.CreateCheckoutSession(s.Database))
 		s.Router.Post(prefix+"/billing/portal-session", api.CreatePortalSession(s.Database))
 		s.Router.Get(prefix+"/billing/usage", api.GetBillingUsage(s.Database))
+		s.Router.Get(prefix+"/billing/ai-usage", api.GetAIUsage(s.Database))
 		s.mountAIRoutes(prefix+"/ai", aiService)
 		s.mountMistyRoutes(prefix, aiService)
 		s.mountSmartLibraryRoutes(prefix+"/ai/smart-library", smartLibraryService)

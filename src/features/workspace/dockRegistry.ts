@@ -30,7 +30,7 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
     restore: parseCodeTabState,
   },
   files: descriptor("files", "multiple", "suspend", 360, 240),
-  transfers: descriptor("transfers", "singleton", "suspend", 360, 240),
+  scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
   "official-app": descriptor("official-app", "multiple", "keep-alive", 420, 280),
   extension: descriptor("extension", "multiple", "keep-alive", 420, 280),

@@ -62,7 +62,7 @@ export function workspaceRecords(
       });
       for (const pane of dockLeaves(layout.root))
         pane.tabs.forEach((tab, order) => {
-          if (!["browser", "files", "agents", "space"].includes(tab.surfaceId))
+          if (!["browser", "files", "agents", "space", "home"].includes(tab.surfaceId))
             throw new Error("Retired workspace views must be migrated before enabling sync");
           const browser = tab.surfaceId === "browser" ? parseBrowserTabState(tab.state) : null;
           // Files paths remain device-local until their authorized device/root
@@ -72,12 +72,14 @@ export function workspaceRecords(
               ? tab.route
               : tab.surfaceId === "agents"
                 ? tab.route.replace(/^\/apps\/agents(?=[/?#]|$)/, "/agents")
-                : "/files";
+                : tab.surfaceId === "home"
+                  ? "/home"
+                  : "/files";
           add({
             kind: "tab",
             id: tab.id,
             fields: {
-              surface: tab.surfaceId as "browser" | "files" | "agents" | "space",
+              surface: tab.surfaceId as "browser" | "files" | "agents" | "space" | "home",
               title: tab.title,
               placement: { layout_id: layout.id, pane_id: pane.id, order },
               url: browser?.url ?? null,
