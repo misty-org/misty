@@ -1,7 +1,7 @@
 import type { DesktopNavItem } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { routes } from "@/features/app-shell";
-import { appIcons } from "@/shared/ui/app-icons";
+import { appIcons } from "@/shared/ui";
 
 export const desktopNavItems: DesktopNavItem[] = [
   { id: "home", label: "Home", path: routes.home, icon: appIcons.home, exact: true },
@@ -16,7 +16,6 @@ const deepLinkPrefixes = [
   routes.browser,
   routes.terminal,
   routes.invite,
-  routes.transfers,
   routes.files,
   routes.code,
   routes.providers,
@@ -24,6 +23,7 @@ const deepLinkPrefixes = [
   routes.automations,
   routes.agents,
   routes.activity,
+  routes.scheduled,
   routes.spaces,
   routes.studio,
   routes.account,
@@ -48,7 +48,6 @@ export function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
   if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.automations))
     return "spaces";
-  if (pathname.startsWith(routes.transfers)) return "files";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";
   if (

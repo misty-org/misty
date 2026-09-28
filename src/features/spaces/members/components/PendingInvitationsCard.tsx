@@ -1,6 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
-import { Button, Card } from "@/shared/ui";
+import { Button, Card, IconButton } from "@/shared/ui";
 import { RefreshCcw, XCircle } from "lucide-react";
 import { useState } from "react";
 
@@ -63,12 +63,10 @@ export function PendingInvitationsCard({
             />
             Resend
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            type="button"
+          <IconButton
+            size="md"
+            label={`Revoke invitation for ${invitation.invited_email}`}
             disabled={Boolean(busyAction)}
-            aria-label={`Revoke invitation for ${invitation.invited_email}`}
             onClick={() =>
               run(`revoke:${invitation.id}`, () =>
                 spacesApi
@@ -78,7 +76,7 @@ export function PendingInvitationsCard({
             }
           >
             <XCircle className="size-4" />
-          </Button>
+          </IconButton>
         </div>
       ))}
     </Card>

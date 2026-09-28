@@ -1,4 +1,4 @@
-import type { SmartLibraryImportPreflight } from "@/native/contracts";
+import type { SmartLibraryImportPreflight } from "@/native/ipc";
 import {
   AlertDialog,
   AlertDialogContent,

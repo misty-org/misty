@@ -45,7 +45,7 @@ describe("Agents automation route state", () => {
 
   it("opens the dashboard for old automation links without removing saved workflow data", async () => {
     await act(async () => root.render(agentsSurface("/agents?view=automations&automation=flow-1")));
-    expect(container.querySelector('[data-testid="activity"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-testid="activity"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
       "/agents?view=automations&automation=flow-1",
     );

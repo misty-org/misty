@@ -1,4 +1,4 @@
-import type { MountedDevice, ProviderRemote } from "@/native/contracts";
+import type { MountedDevice } from "@/native/ipc";
 import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 
@@ -12,8 +12,7 @@ import {
   pinnedPathLabel,
   quickAccessPathHidden,
 } from "@/features/file-ui";
-import { providerIconForType } from "@/shared/assets/icons";
-import { AssetIcon, Button, cn } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 
 /**
  * The picker's locations rail: the explorer sidebar reduced to navigation only — no workspace
@@ -75,28 +74,6 @@ export function PickerPlaces(props: PickerPlacesProps) {
         ))}
       </PlacesSection>
 
-      {props.remotes.length > 0 || props.remoteLoading ? (
-        <PlacesSection label="Remotes">
-          {props.remotes.length === 0 ? (
-            <PlacesHint>Loading…</PlacesHint>
-          ) : (
-            props.remotes.map((remote) => {
-              const path = joinPath(props.mountRoot, remote.name);
-              const icon = providerIconForType(remote.type);
-              return (
-                <PlaceRow
-                  key={`${remote.type}:${remote.name}`}
-                  active={props.activePath === path || props.activePath.startsWith(`${path}/`)}
-                  icon={<AssetIcon src={icon.src} color={icon.color} size={16} />}
-                  label={remote.name}
-                  onSelect={() => props.onNavigate(path)}
-                />
-              );
-            })
-          )}
-        </PlacesSection>
-      ) : null}
-
       {devices.length > 0 || props.devicesLoading ? (
         <PlacesSection label="Devices">
           {devices.length === 0 ? (
@@ -143,19 +120,14 @@ function PlaceRow({
   onSelect: () => void;
 }) {
   return (
-    <Button
-      className={cn(
-        "h-8 w-full justify-start gap-2 px-2 font-normal shadow-none",
-        active && "bg-charcoal-hover text-cream",
-      )}
-      variant="ghost"
-      type="button"
+    <Pressable
+      className={cn("h-8 w-full gap-2 px-2", active && "bg-charcoal-hover text-cream")}
       aria-current={active ? "true" : undefined}
       onClick={onSelect}
     >
       <span className="shrink-0 text-cream-muted">{icon}</span>
       <span className="min-w-0 truncate">{label}</span>
-    </Button>
+    </Pressable>
   );
 }
 
@@ -163,8 +135,6 @@ export interface PickerPlacesProps {
   homePath: string;
   activePath: string;
   mountRoot: string;
-  remotes: ProviderRemote[];
-  remoteLoading: boolean;
   devices: MountedDevice[];
   devicesLoading: boolean;
   pinnedPaths: string[];

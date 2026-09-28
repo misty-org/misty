@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
 use url::Url;
 
@@ -9,7 +10,8 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   __MISTY_BACKGROUND_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
 
-  // External pages own their layout, scrollbars, and scrolling behavior.
+  // External pages own their layout and scrolling behavior. Scrollbar paint
+  // is installed separately in every frame using the shell's shared CSS.
   // Page zoom is handled by the native WebView; never emulate it with DOM
   // observers, overflow overrides, or scroll-position corrections here.
 
@@ -184,6 +186,35 @@ pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bo
             "__MISTY_POINTER_TRACKING_PLACEHOLDER__",
             if pointer_tracking { "true" } else { "false" },
         )
+}
+
+static STATUS_BUBBLE_ENABLED: AtomicBool = AtomicBool::new(true);
+
+/// Whether pages show the hovered-link and loading bubble. Misty's settings
+/// push the user's preference; pages created afterwards start with it.
+pub(super) fn set_status_bubble_enabled(enabled: bool) {
+    STATUS_BUBBLE_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+pub(super) fn browser_status_script() -> String {
+    include_str!("browser_status.js").replace(
+        "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
+        if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) { "true" } else { "false" },
+    )
+}
+
+pub(super) const BROWSER_MEDIA_SCRIPT: &str = include_str!("browser_media.js");
+
+pub(super) fn browser_scrollbar_script() -> String {
+    include_str!("browser_scrollbars.js").replace(
+        "__MISTY_SCROLLBAR_CSS_PLACEHOLDER__",
+        &serde_json::to_string(include_str!("../../../src/styles/scrollbars.css"))
+            .expect("scrollbar CSS is a valid JSON string"),
+    )
+}
+
+pub(super) fn browser_status_update_script(state: &serde_json::Value) -> String {
+    format!("window.__MISTY_SET_STATUS__?.({state});")
 }
 
 pub(super) const BROWSER_FAVICON_SCRIPT: &str = r#"

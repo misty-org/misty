@@ -166,15 +166,7 @@ fn granted(
         .collect()
 }
 fn relay() -> Result<Relay, String> {
-    let url = option_env!("MISTY_DEVICE_RELAY_URL").unwrap_or("").trim();
-    if !url.is_empty() {
-        return Ok(Relay::Managed { url: url.into() });
-    }
-    if cfg!(debug_assertions) {
-        Ok(Relay::Default)
-    } else {
-        Err("A managed peer relay is required in production.".into())
-    }
+    Ok(Relay::Disabled)
 }
 #[tauri::command]
 pub async fn space_peer_start(
@@ -785,11 +777,28 @@ mod tests {
         );
         assert!(granted(&HashMap::new(), &permissions, &["chosen".into()]).is_err());
         permissions.decide("connections.read", true).unwrap();
-        assert!(granted(&HashMap::new(), &permissions, &[]).unwrap().is_empty());
-        assert_eq!(granted(&HashMap::new(), &permissions, &["chosen".into()]).unwrap().len(), 1);
-        assert!(granted(&HashMap::new(), &permissions, &[temporary.path().display().to_string()]).is_err());
+        assert!(granted(&HashMap::new(), &permissions, &[])
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            granted(&HashMap::new(), &permissions, &["chosen".into()])
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(granted(
+            &HashMap::new(),
+            &permissions,
+            &[temporary.path().display().to_string()]
+        )
+        .is_err());
         assert!(granted(&HashMap::new(), &permissions, &["another-view".into()]).is_err());
-        assert!(granted(&HashMap::new(), &permissions, &["chosen".into(), "chosen".into()]).is_err());
+        assert!(granted(
+            &HashMap::new(),
+            &permissions,
+            &["chosen".into(), "chosen".into()]
+        )
+        .is_err());
         released.store(true, std::sync::atomic::Ordering::Release);
         assert!(granted(&HashMap::new(), &permissions, &["chosen".into()]).is_err());
     }

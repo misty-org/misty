@@ -6,7 +6,7 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
   semanticQueryMinimumCharacters,
   semanticSearchDebounceMs,
-} from "@/features/files/workspace/explorer/utils/globalSearch";
+} from "@/features/files/workspace";
 import type { SearchScope } from "./searchCommands";
 import {
   fileResults,

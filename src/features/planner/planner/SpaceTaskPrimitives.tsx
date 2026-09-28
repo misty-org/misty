@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui";
-import { Bot, Flag } from "lucide-react";
+import { Flag } from "lucide-react";
 export type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
 
 export const taskStatusOptions: Array<[SpaceTaskStatus, string]> = [

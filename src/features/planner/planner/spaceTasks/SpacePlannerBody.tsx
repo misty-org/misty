@@ -1,10 +1,6 @@
-import type {
-  SpaceMember,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
-import { Button } from "@/shared/ui";
-import { LoaderCircle } from "lucide-react";
+import { Button, Spinner } from "@/shared/ui";
 import { SpaceTaskBoard, SpaceTaskList } from "../SpacePlannerViews";
 import type { ReactNode } from "react";
 import { matchesDueFilter } from "./taskFiltering";
@@ -15,7 +11,7 @@ export interface SpacePlannerBodyProps {
   renderError(message: string): ReactNode;
   view: TaskViewMode;
   members: SpaceMember[];
-  
+
   canManage: boolean;
   assignee: string;
   due: DueFilter;
@@ -29,7 +25,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
   const { view, data, actions, members } = props;
   const visibleTasks = data.tasks.filter(
     (task) =>
-      !(props.assignee === "unassigned" && (task.assignee_user_id)) &&
+      !(props.assignee === "unassigned" && task.assignee_user_id) &&
       matchesDueFilter(task, props.due),
   );
   const isEmptyLoad = data.loading && !data.tasks.length;
@@ -42,13 +38,13 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
       {data.error ? props.renderError(data.error) : null}
       {isEmptyLoad ? (
         <div className="grid h-full min-h-56 place-items-center text-cream-muted">
-          <LoaderCircle className="size-5 animate-spin" aria-label="Loading tasks" />
+          <Spinner size="lg" label="Loading tasks" />
         </div>
       ) : view === "board" ? (
         <SpaceTaskBoard
           tasks={visibleTasks.filter((task) => task.status !== "canceled")}
           members={members}
-          
+
           totals={data.statusTotals}
           busy={actions.busy}
           canManage={props.canManage}
@@ -62,7 +58,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
         <SpaceTaskList
           tasks={visibleTasks}
           members={members}
-          
+
           busy={actions.busy}
           canManage={props.canManage}
           onOpen={actions.openEdit}
@@ -79,7 +75,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
           type="button"
           onClick={() => void data.load(true)}
         >
-          {data.loading ? <LoaderCircle className="size-4 animate-spin" /> : null}Load more
+          {data.loading ? <Spinner label={false} /> : null}Load more
         </Button>
       ) : null}
     </section>

@@ -27,8 +27,8 @@ vi.mock("@/features/planner/roadmap/spaceRoadmap/RoadmapInspector", () => ({
 }));
 
 import { RoadmapEditor } from "./RoadmapEditor";
-import { RoadmapRuntimeProvider } from "./roadmapRuntime";
-import { roadmapTestRuntime } from "./roadmapTestRuntime";
+import { RoadmapRuntimeProvider } from "./RoadmapRuntime";
+import { roadmapTestRuntime } from "./RoadmapTestRuntime";
 
 describe("RoadmapEditor layout", () => {
   let container: HTMLDivElement;

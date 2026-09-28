@@ -10,7 +10,7 @@ import type {
   ExplorerLibraryItem,
   FileEntry,
   TransferRecord,
-} from "@/native/contracts";
+} from "@/native/ipc";
 import { explorerPathKey, normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 
 import type { PaneExplorerState } from "../../model/interfaces/store/types";

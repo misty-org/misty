@@ -1,5 +1,7 @@
 //! Portable cookie fields at the native WebView2/CDP boundary. No renderer IPC.
-//! Partitioned cookies and unknown SameSite policies fail closed.
+//! Partitioned cookies and unknown SameSite policies are skipped and reported,
+//! never broadened or guessed.
+use super::browser_data_coverage::{site, CookieRead, SkipReason};
 use misty_browser_sync::document::credentials::{Cookie, SameSite};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -32,53 +34,59 @@ struct EngineCookie {
     partition_key_opaque: bool,
 }
 
-pub(crate) fn decode(value: Value) -> Result<Vec<Cookie>> {
+pub(crate) fn decode(value: Value) -> Result<CookieRead> {
     let raw = value
         .get("cookies")
         .and_then(Value::as_array)
         .ok_or(CookieStoreError::Invalid)?;
-    if raw.len() > 20_000 {
-        return Err(CookieStoreError::TooLarge);
+    Ok(CookieRead::accept(
+        raw.iter().map(|raw| {
+            let skip = |reason| (site(raw["domain"].as_str().unwrap_or_default()), reason);
+            decode_one(raw).map_err(skip)
+        }),
+        20_000,
+    ))
+}
+
+fn decode_one(raw: &Value) -> std::result::Result<Cookie, SkipReason> {
+    let native: EngineCookie =
+        serde_json::from_value(raw.clone()).map_err(|_| SkipReason::Malformed)?;
+    if native.partition_key.is_some() || native.partition_key_opaque {
+        return Err(SkipReason::Partitioned);
     }
-    raw.iter()
-        .map(|raw| {
-            let native: EngineCookie =
-                serde_json::from_value(raw.clone()).map_err(|_| CookieStoreError::Invalid)?;
-            if native.partition_key.is_some() || native.partition_key_opaque {
-                return Err(CookieStoreError::Unsupported);
-            }
-            let same_site = match native.same_site.as_deref() {
-                Some("Strict") => Some(SameSite::Strict),
-                Some("Lax") => Some(SameSite::Lax),
-                Some("None") => Some(SameSite::None),
-                None => None, // Preserve unspecified; never guess an engine default.
-                _ => return Err(CookieStoreError::Unsupported),
-            };
-            let expires_unix_seconds = if native.session {
-                None
-            } else {
-                let seconds = native.expires.ok_or(CookieStoreError::Unsupported)?;
-                if !seconds.is_finite() || seconds < 0. || seconds >= i64::MAX as f64 {
-                    return Err(CookieStoreError::Unsupported);
-                }
-                Some(seconds.floor() as i64)
-            };
-            let cookie = Cookie {
-                name: native.name,
-                value: native.value,
-                host_only: !native.domain.starts_with('.'),
-                domain: native.domain,
-                path: native.path,
-                secure: native.secure,
-                http_only: native.http_only,
-                same_site,
-                expires_unix_seconds,
-                partition_key: None,
-            };
-            cookie.validate().map_err(|_| CookieStoreError::Invalid)?;
-            Ok(cookie)
-        })
-        .collect()
+    let same_site = match native.same_site.as_deref() {
+        Some("Strict") => Some(SameSite::Strict),
+        Some("Lax") => Some(SameSite::Lax),
+        Some("None") => Some(SameSite::None),
+        None => None, // Preserve unspecified; never guess an engine default.
+        _ => return Err(SkipReason::UnsupportedAttributes),
+    };
+    let expires_unix_seconds = if native.session {
+        None
+    } else {
+        let seconds = native.expires.ok_or(SkipReason::UnsupportedAttributes)?;
+        if !seconds.is_finite() || seconds < 0. || seconds >= i64::MAX as f64 {
+            return Err(SkipReason::UnsupportedAttributes);
+        }
+        Some(seconds.floor() as i64)
+    };
+    Ok(Cookie {
+        name: native.name,
+        value: native.value,
+        host_only: !native.domain.starts_with('.'),
+        domain: native.domain,
+        path: native.path,
+        secure: native.secure,
+        http_only: native.http_only,
+        same_site,
+        expires_unix_seconds,
+        partition_key: None,
+    })
+}
+
+/// Whether Storage.setCookies can store the cookie exactly.
+pub(crate) fn representable(cookie: &Cookie) -> bool {
+    encode(cookie).is_ok()
 }
 
 pub(crate) fn encode(cookie: &Cookie) -> Result<Value> {
@@ -136,7 +144,10 @@ mod tests {
     }
     #[test]
     fn preserves_host_domain_session_expiry_and_same_site_distinctions() {
-        let host = decode(json!({ "cookies": [engine()] })).unwrap().remove(0);
+        let host = decode(json!({ "cookies": [engine()] }))
+            .unwrap()
+            .cookies
+            .remove(0);
         let mut domain = host.clone();
         domain.host_only = false;
         assert_eq!(encode(&host).unwrap()["url"], "https://example.test/");
@@ -150,37 +161,49 @@ mod tests {
         raw["session"] = json!(false);
         raw["expires"] = json!(1_900_000_000.75);
         raw.as_object_mut().unwrap().remove("sameSite");
-        let persistent = decode(json!({ "cookies": [raw] })).unwrap().remove(0);
+        let persistent = decode(json!({ "cookies": [raw] }))
+            .unwrap()
+            .cookies
+            .remove(0);
         assert!(!persistent.host_only);
         assert_eq!(persistent.expires_unix_seconds, Some(1_900_000_000));
         assert!(persistent.same_site.is_none());
         assert!(encode(&persistent).unwrap().get("sameSite").is_none());
     }
     #[test]
-    fn rejects_partitioned_or_incomplete_data_instead_of_reporting_logout() {
+    fn skips_partitioned_or_incomplete_cookies_and_keeps_the_rest() {
         assert!(decode(json!({})).is_err());
-        assert!(decode(json!({ "cookies": [] })).unwrap().is_empty());
-        for (key, value) in [
+        assert!(decode(json!({ "cookies": [] })).unwrap().cookies.is_empty());
+        let mut incomplete = engine();
+        incomplete["session"] = json!(false);
+        incomplete["expires"] = Value::Null;
+        for (key, value, reason) in [
             (
                 "partitionKey",
                 json!({ "topLevelSite": "https://example.test", "hasCrossSiteAncestor": true }),
+                SkipReason::Partitioned,
             ),
-            ("partitionKeyOpaque", json!(true)),
-            ("sameSite", json!("future-policy")),
+            ("partitionKeyOpaque", json!(true), SkipReason::Partitioned),
+            (
+                "sameSite",
+                json!("future-policy"),
+                SkipReason::UnsupportedAttributes,
+            ),
         ] {
             let mut raw = engine();
             raw[key] = value;
+            let mut other = engine();
+            other["name"] = json!("kept");
+            let read = decode(json!({ "cookies": [raw, other, incomplete.clone()] })).unwrap();
+            assert_eq!(read.cookies.len(), 1);
+            assert_eq!(read.cookies[0].name, "kept");
             assert_eq!(
-                decode(json!({ "cookies": [raw] })).err(),
-                Some(CookieStoreError::Unsupported)
+                read.skipped,
+                vec![
+                    ("example.test".into(), reason),
+                    ("example.test".into(), SkipReason::UnsupportedAttributes)
+                ]
             );
         }
-        let mut raw = engine();
-        raw["session"] = json!(false);
-        raw["expires"] = Value::Null;
-        assert_eq!(
-            decode(json!({ "cookies": [raw] })).err(),
-            Some(CookieStoreError::Unsupported)
-        );
     }
 }

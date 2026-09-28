@@ -145,7 +145,8 @@ impl SyncApi {
         }
         match response.status().as_u16() {
             200 | 201 => {}
-            401 | 403 => return Err(Error::Authentication),
+            401 => return Err(Error::Authentication),
+            403 => return Err(Error::DeviceForbidden),
             409 | 426 => return Err(Error::Recovery),
             _ => return Err(Error::Network),
         }
@@ -271,20 +272,22 @@ impl SyncApi {
         Ok(response.devices)
     }
 
+    /// `tree_id` asks an activated device to claim that tree instead of its own.
     pub async fn control_device(
         &self,
         device_id: &str,
         full_sync: Option<bool>,
         activate: bool,
+        tree_id: Option<&str>,
     ) -> Result<String> {
+        let mut body = serde_json::json!({
+            "device_id": device_id, "full_sync": full_sync, "activate": activate,
+        });
+        if let Some(tree) = tree_id {
+            body["tree_id"] = tree.into();
+        }
         let response: serde_json::Value = self
-            .request(
-                reqwest::Method::POST,
-                "control",
-                Some(&serde_json::json!({
-                    "device_id": device_id, "full_sync": full_sync, "activate": activate,
-                })),
-            )
+            .request(reqwest::Method::POST, "control", Some(&body))
             .await?;
         Ok(response["operation_id"]
             .as_str()
@@ -292,16 +295,29 @@ impl SyncApi {
             .to_owned())
     }
 
-    pub async fn advertise_controls(&self, device_id: &str, display_name: &str) -> Result<()> {
+    /// Announces this device's controls and OS. The name is the user's to
+    /// choose (`rename_device`), so it is never overwritten here.
+    pub async fn advertise_controls(&self, device_id: &str, os_version: &str) -> Result<()> {
         let _: serde_json::Value = self
             .request(
                 reqwest::Method::POST,
                 "control",
                 Some(&serde_json::json!({
                     "device_id": device_id, "control_version": 1,
-                    "display_name": display_name,
                     "platform": std::env::consts::OS,
+                    "os_version": os_version.chars().take(64).collect::<String>(),
                 })),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn rename_device(&self, device_id: &str, name: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .request(
+                reqwest::Method::POST,
+                "control",
+                Some(&serde_json::json!({ "device_id": device_id, "display_name": name })),
             )
             .await?;
         Ok(())
@@ -326,7 +342,7 @@ impl SyncApi {
                 Some(&Body {
                     workspace_id: &scope.workspace_id,
                     device_id,
-                    protocol_version: 1,
+                    protocol_version: PROTOCOL_VERSION,
                 }),
             )
             .await?;
@@ -394,7 +410,10 @@ impl SyncSocket {
             "ws"
         };
         endpoint.set_scheme(scheme).map_err(|_| Error::Invalid)?;
-        endpoint.query_pairs_mut().append_pair("ticket", &ticket);
+        endpoint
+            .query_pairs_mut()
+            .append_pair("ticket", &ticket)
+            .append_pair("protocol", &PROTOCOL_VERSION.to_string());
         let connector = if scheme == "wss" {
             Some(tls_connector()?)
         } else {
@@ -422,7 +441,7 @@ impl SyncSocket {
         .map_err(|_| Error::Network)??
         {
             ServerFrame::Challenge {
-                protocol_version: 1,
+                protocol_version: PROTOCOL_VERSION,
                 challenge,
             } => challenge,
             _ => return Err(Error::Invalid),
@@ -496,7 +515,8 @@ async fn send(
     frame: &ClientFrame<'_>,
 ) -> Result<()> {
     let data = serde_json::to_string(frame)?;
-    if data.len() > 1500 << 10 {
+    // A maximal tree op is 1400 KiB of ciphertext, base64 encoded.
+    if data.len() > 2 << 20 {
         return Err(Error::TooLarge);
     }
     let bytes = data.len() as u64;
@@ -559,6 +579,9 @@ mod traffic_tests {
     use super::*;
     #[tokio::test]
     async fn counts_actual_websocket_payloads_and_shares_them_across_reconnect_clients() {
+        // Like the worker tests, install the provider here: it must not depend
+        // on another test having run first.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {

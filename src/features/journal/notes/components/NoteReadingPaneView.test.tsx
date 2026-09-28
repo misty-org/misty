@@ -34,7 +34,7 @@ it("does not seed a title before sync or let a viewer edit it", () => {
     subscribeRename: () => () => {},
     useCollaborationRoom: () => ({ session, error: null, notice: null }),
     backlinks: async () => ({ backlinks: [] }),
-    Editor: () => <div>SDK editor</div>,
+    Editor: () => <div>Note editor</div>,
   };
   const note = {
     id: "note-a",

@@ -1,12 +1,10 @@
-import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
-  cn,
-  menuItemClass,
-  menuLabelClass,
-  menuListClass,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Pressable,
+  toolbarIconProps,
 } from "@/shared/ui";
 import { Check, Laptop, MonitorSmartphone, Smartphone, Tablet } from "lucide-react";
 import type { ComponentType } from "react";
@@ -17,74 +15,68 @@ import type {
 } from "./browserViewport";
 import { BrowserViewportSizeSliders } from "./BrowserViewportSizeSliders";
 import { useBrowserOverlay } from "./useBrowserOverlay";
-
 export * from "./browserViewport";
-
 const viewportOptions: Array<{
   id: BrowserViewport;
   label: string;
-  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: ComponentType<{
+    size?: number;
+    strokeWidth?: number;
+  }>;
 }> = [
-  { id: "responsive", label: "Responsive", icon: MonitorSmartphone },
-  { id: "desktop", label: "Desktop", icon: Laptop },
-  { id: "tablet", label: "Tablet", icon: Tablet },
-  { id: "mobile", label: "Mobile", icon: Smartphone },
+  {
+    id: "responsive",
+    label: "Responsive",
+    icon: MonitorSmartphone,
+  },
+  {
+    id: "desktop",
+    label: "Desktop",
+    icon: Laptop,
+  },
+  {
+    id: "tablet",
+    label: "Tablet",
+    icon: Tablet,
+  },
+  {
+    id: "mobile",
+    label: "Mobile",
+    icon: Smartphone,
+  },
 ];
-
 export function BrowserViewportMenuView(props: {
   value: BrowserViewport;
   onChange: (value: BrowserViewport) => void;
   sizes: Record<BrowserViewportDevice, BrowserViewportSize>;
   onSizeChange: (device: BrowserViewportDevice, size: BrowserViewportSize) => void;
-  iconButtonClass: string;
-  lightChrome: boolean;
   suspensionReason: string;
   setOverlay: (reason: string, active: boolean) => Promise<void>;
 }) {
   const active = viewportOptions.find((option) => option.id === props.value) ?? viewportOptions[0];
   const ActiveIcon = active.icon;
   const overlay = useBrowserOverlay(props.suspensionReason, props.setOverlay);
-
   return (
     <Popover open={overlay.open} onOpenChange={overlay.onOpenChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            props.iconButtonClass,
-            props.value !== "responsive" &&
-              (props.lightChrome
-                ? "bg-black/[0.06] text-[#202020]"
-                : "bg-white/[0.06] text-[#e9e9e9]"),
-          )}
-          aria-label={`Viewport: ${active.label}`}
-          title={`Viewport: ${active.label}`}
+        <IconButton
+          label={`Viewport: ${active.label}`}
+          tooltip={false}
+          data-active={props.value !== "responsive"}
         >
-          <ActiveIcon {...browserToolbarStyles.icon} />
-        </button>
+          <ActiveIcon {...toolbarIconProps} />
+        </IconButton>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={8}
-        className={cn(
-          "w-64 data-[state=closed]:animate-none data-[state=open]:animate-none",
-          menuListClass,
-        )}
-      >
-        <p className={menuLabelClass}>Viewport</p>
+      <PopoverContent align="end" sideOffset={8} className="grid w-64 gap-1 p-1">
+        <p className="m-0 px-2 py-1 text-xs font-medium text-cream-muted">Viewport</p>
         {viewportOptions.map((option) => {
           const Icon = option.icon;
           const selected = option.id === props.value;
           const size = option.id === "responsive" ? null : props.sizes[option.id];
           return (
             <div key={option.id}>
-              <button
-                type="button"
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-sm",
-                  "transition-colors hover:bg-charcoal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active/40",
-                  selected && "bg-charcoal-hover text-cream",
-                )}
+              <Pressable
+                className="flex items-center hover:bg-cream/[0.045] rounded-md w-full gap-2.5 px-2 py-2"
                 aria-pressed={selected}
                 onClick={() => props.onChange(option.id)}
               >
@@ -96,7 +88,7 @@ export function BrowserViewportMenuView(props: {
                   </span>
                 </span>
                 {selected ? <Check size={14} aria-hidden /> : null}
-              </button>
+              </Pressable>
               {selected && size ? (
                 <BrowserViewportSizeSliders
                   device={option.id as BrowserViewportDevice}

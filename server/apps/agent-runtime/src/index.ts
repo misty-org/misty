@@ -1,4 +1,5 @@
 import express, { type Request } from "express";
+import { instanceModelConfig } from "./model-provider.js";
 import { vercelHarness as harness } from "./vercel-harness.js";
 import { MISTY_HARNESS_VERSION } from "./harness.js";
 import { controlPlaneURL } from "./control-plane.js";
@@ -12,6 +13,7 @@ interface RawRequest extends Request {
   rawBody?: Buffer;
 }
 
+instanceModelConfig();
 const app = express();
 app.use(
   express.json({

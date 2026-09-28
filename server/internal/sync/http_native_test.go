@@ -151,3 +151,42 @@ func TestBrowserSyncNativeWorkerAgainstGo(t *testing.T) {
 		t.Fatal("workers did not reconnect with fresh tickets")
 	}
 }
+
+// TestBrowserSyncNativeTreesAgainstGo runs two real native workers through
+// publish, claim, displacement and take-back on the tree protocol.
+func TestBrowserSyncNativeTreesAgainstGo(t *testing.T) {
+	binary := os.Getenv("MISTY_BROWSER_SYNC_TREE_FIXTURE")
+	if binary == "" {
+		t.Skip("requires the built Rust live_tree_fixture example")
+	}
+	database, _ := browserSocketTestDatabase(t)
+	t.Setenv("MISTY_AUTH_SIGNING_KEY", base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{23}, 32)))
+	signer, err := security.SessionSignerFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cookie, err := signer.Mint("owner", "fixture-session", "access", time.Now().Add(5*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewBrowserSyncService(database)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /auth/refresh", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusUnauthorized) })
+	mux.Handle("GET /sync/workspace", service.Workspace())
+	mux.Handle("POST /sync/workspace", service.Workspace())
+	mux.Handle("GET /sync/devices", service.Devices())
+	mux.Handle("POST /sync/devices", service.Devices())
+	mux.Handle("POST /sync/control", service.ControlDevice())
+	mux.Handle("POST /sync/ticket", service.Ticket())
+	mux.Handle("GET /sync/ws", service.Connect())
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, binary)
+	command.Env = append(os.Environ(), "MISTY_SYNC_FIXTURE_BASE="+server.URL, "MISTY_SYNC_FIXTURE_COOKIE="+accounts.SessionCookieName+"="+cookie)
+	output, err := command.CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "native_tree_fixture_ok") {
+		t.Fatalf("native tree fixture: %v\n%s", err, output)
+	}
+}

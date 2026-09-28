@@ -1,4 +1,4 @@
-import type { FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/ipc";
 import type { CSSProperties, MouseEvent } from "react";
 import { memo, useMemo } from "react";
 import { useExplorerDragSource, useExplorerDropZone } from "../../drag/ExplorerDragHooks";
@@ -62,7 +62,13 @@ export const FileGridItem = memo(function FileGridItem(props: {
   return (
     <div
       ref={drop.ref}
-      className={`${fileBrowserStyles.gridItem} ${props.selected ? fileBrowserStyles.gridItemSelected : ""} ${entry.isDeleted ? fileBrowserStyles.gridItemDeleted : ""} ${source.dragging ? fileBrowserStyles.gridItemDragging : ""} ${props.cut ? fileBrowserStyles.gridItemCut : ""}`}
+      className={[
+        fileBrowserStyles.gridItem,
+        props.selected ? fileBrowserStyles.gridItemSelected : "",
+        entry.isDeleted ? fileBrowserStyles.gridItemDeleted : "",
+        source.dragging ? fileBrowserStyles.gridItemDragging : "",
+        props.cut ? fileBrowserStyles.gridItemCut : "",
+      ].join(" ")}
       style={props.style}
       aria-disabled={entry.isDeleted || undefined}
       aria-pressed={props.selected}

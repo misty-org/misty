@@ -2,17 +2,15 @@ import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
 import { useSetupStore } from "@/features/installer";
-import { useDocumentAppAppearance } from "@/features/settings";
+import { SettingsProfilesBridge, useDocumentAppAppearance } from "@/features/settings";
 import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
-
 export function RootLayout(props: {
   isDeepLinkRouteAllowed: (route: string) => boolean;
   resolveAuthDeepLinkRoute: (target: "account" | "providers") => string;
@@ -29,7 +27,6 @@ export function RootLayout(props: {
       loadSystem: state.loadSystem,
     })),
   );
-
   useEffect(
     () =>
       installMistyDeepLinkHandler(
@@ -39,11 +36,6 @@ export function RootLayout(props: {
       ),
     [navigate, props.isDeepLinkRouteAllowed, props.resolveAuthDeepLinkRoute],
   );
-
-  useEffect(() => {
-    document.documentElement.dataset.formFactor = isNativeMobileBuild ? "mobile" : "desktop";
-  }, []);
-
   useEffect(() => {
     if (!hasTauriInternals()) return;
     try {
@@ -52,17 +44,16 @@ export function RootLayout(props: {
       // Platform detection is best-effort; leave the attribute unset.
     }
   }, []);
-
   useEffect(() => {
     if (!hasTauriInternals()) return;
     if (setupLoadStarted.current) return;
     setupLoadStarted.current = true;
     void loadSystem();
   }, [loadSystem]);
-
   return (
     <>
       <AuthProvider>
+        <SettingsProfilesBridge />
         <ShortcutRuntime />
         <RenderErrorBoundary>
           <PointerDragProvider>
@@ -74,16 +65,14 @@ export function RootLayout(props: {
     </>
   );
 }
-
 function AuthenticatedTreeOutlet() {
   const { user } = useAuth();
   return <Outlet key={user?.id ?? "anonymous"} />;
 }
-
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {
   return (
     <div
-      className={`pointer-events-none fixed left-1/2 top-10 z-[2147483000] -translate-x-1/2 rounded-full border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream shadow-xl transition duration-150 ${props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}
+      className={`pointer-events-none fixed inset-x-0 top-10 layer-dialog-backdrop mx-auto w-fit rounded-full border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream shadow-xl transition duration-150 ${props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}
       role="status"
       aria-live="polite"
       aria-hidden={!props.visible}

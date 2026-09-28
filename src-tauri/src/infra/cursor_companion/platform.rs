@@ -2,6 +2,60 @@ use super::Shortcut;
 use std::sync::mpsc::Sender;
 
 #[cfg(target_os = "macos")]
+pub fn capture_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), String> {
+    use base64::Engine;
+    unsafe extern "C" {
+        fn misty_companion_capture_display(display_id: u32) -> *mut std::ffi::c_char;
+    }
+    let raw = unsafe { misty_companion_capture_display(monitor.id().map_err(|e| e.to_string())?) };
+    if raw.is_null() {
+        return Err("Screen capture returned no image".into());
+    }
+    let decoded = unsafe {
+        serde_json::from_slice::<serde_json::Value>(std::ffi::CStr::from_ptr(raw).to_bytes())
+    };
+    unsafe {
+        libc::free(raw.cast());
+    }
+    let value = decoded.map_err(|e| e.to_string())?;
+    if value["legacy_capture"].as_bool() == Some(true) {
+        return capture_legacy_display(monitor);
+    }
+    if let Some(error) = value["error"].as_str() {
+        return Err(error.into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(
+            value["jpeg"]
+                .as_str()
+                .ok_or("Screen capture returned no image")?,
+        )
+        .map_err(|e| e.to_string())?;
+    let width = value["width"].as_u64().ok_or("Invalid capture width")? as u32;
+    let height = value["height"].as_u64().ok_or("Invalid capture height")? as u32;
+    Ok((bytes, width, height))
+}
+
+#[cfg(windows)]
+pub fn capture_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), String> {
+    capture_legacy_display(monitor)
+}
+
+// Windows and macOS 12–13 retain xcap: SCScreenshotManager requires macOS 14.
+fn capture_legacy_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), String> {
+    let image =
+        image::DynamicImage::ImageRgba8(monitor.capture_image().map_err(|e| e.to_string())?);
+    let resized = image
+        .resize(1280, 1280, image::imageops::FilterType::Lanczos3)
+        .to_rgb8();
+    let mut bytes = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 80)
+        .encode_image(&resized)
+        .map_err(|e| e.to_string())?;
+    Ok((bytes, resized.width(), resized.height()))
+}
+
+#[cfg(target_os = "macos")]
 fn overlay_frame(display: &super::Display, main_height: f64) -> objc2_foundation::NSRect {
     use objc2_foundation::{NSPoint, NSRect, NSSize};
     // CG display/cursor coordinates start at the main display's top-left;
@@ -123,8 +177,11 @@ pub fn shortcut(tx: Sender<Shortcut>) {
             CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged],
+            vec![CGEventType::FlagsChanged, CGEventType::KeyDown],
             move |_, kind, event| {
+                if matches!(kind, CGEventType::KeyDown) {
+                    let _ = send.send(Shortcut::KeyboardActivity);
+                }
                 if matches!(kind, CGEventType::FlagsChanged) {
                     let flags = event.get_flags();
                     let next = flags.contains(
@@ -184,6 +241,15 @@ pub fn shortcut(tx: Sender<Shortcut>) {
                             keys[index] =
                                 message as u32 == WM_KEYDOWN || message as u32 == WM_SYSKEYDOWN;
                         }
+                        if index.is_none()
+                            && !matches!(
+                                event.vkCode as u16,
+                                VK_LSHIFT | VK_RSHIFT | VK_LWIN | VK_RWIN
+                            )
+                            && matches!(message as u32, WM_KEYDOWN | WM_SYSKEYDOWN)
+                        {
+                            let _ = tx.send(Shortcut::KeyboardActivity);
+                        }
                         let next = (keys[0] || keys[1]) && (keys[2] || keys[3]);
                         if next != *held {
                             *held = next;
@@ -214,15 +280,17 @@ pub fn shortcut(tx: Sender<Shortcut>) {
 }
 #[cfg(target_os = "macos")]
 pub fn microphone_access() -> Result<(), String> {
-    use cocoa::base::id;
-    use objc::{class, msg_send, sel, sel_impl};
+    use objc2::{msg_send, runtime::AnyClass};
+    use objc2_foundation::NSString;
     #[link(name = "AVFoundation", kind = "framework")]
     extern "C" {
-        static AVMediaTypeAudio: id;
+        static AVMediaTypeAudio: *const NSString;
     }
+    let device_class =
+        AnyClass::get(c"AVCaptureDevice").ok_or("The microphone capture API is unavailable.")?;
     unsafe {
         let status: isize =
-            msg_send![class!(AVCaptureDevice), authorizationStatusForMediaType: AVMediaTypeAudio];
+            msg_send![device_class, authorizationStatusForMediaType: AVMediaTypeAudio];
         if status == 3 {
             return Ok(());
         }
@@ -233,7 +301,7 @@ pub fn microphone_access() -> Result<(), String> {
         let block = block2::RcBlock::new(move |allowed: objc2::runtime::Bool| {
             let _ = tx.send(allowed.as_bool());
         });
-        let _: () = msg_send![class!(AVCaptureDevice), requestAccessForMediaType: AVMediaTypeAudio completionHandler: &*block];
+        let _: () = msg_send![device_class, requestAccessForMediaType: AVMediaTypeAudio, completionHandler: &*block];
         if rx
             .recv_timeout(std::time::Duration::from_secs(60))
             .unwrap_or(false)
@@ -275,12 +343,16 @@ pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     unsafe {
-        use objc::{msg_send, sel, sel_impl};
-        let native = window.ns_window().map_err(|e| e.to_string())? as cocoa::base::id;
-        let _: () = msg_send![native, setLevel: 1000isize];
-        let _: () = msg_send![native, setCollectionBehavior: (1usize | 16 | 256)];
-        let _: () = msg_send![native, setHidesOnDeactivate: false];
-        let _: () = msg_send![native, setHasShadow: false];
+        use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+        let native = &*(window.ns_window().map_err(|e| e.to_string())? as *mut NSWindow);
+        native.setLevel(1000);
+        native.setCollectionBehavior(
+            NSWindowCollectionBehavior::CanJoinAllSpaces
+                | NSWindowCollectionBehavior::Stationary
+                | NSWindowCollectionBehavior::FullScreenAuxiliary,
+        );
+        native.setHidesOnDeactivate(false);
+        native.setHasShadow(false);
     }
     #[cfg(windows)]
     unsafe {

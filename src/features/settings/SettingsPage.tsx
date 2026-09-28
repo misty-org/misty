@@ -1,216 +1,80 @@
+import { openAccountSettingsInBrowser } from "@/features/account";
 import { useAppStore } from "@/features/app-shell";
-import { useSettingsStore } from "./store/useSettingsStore";
-import {
-  Bell,
-  Bot,
-  MonitorCog,
-  SlidersHorizontal,
-  Cpu,
-  DownloadCloud,
-  Eye,
-  LayoutTemplate,
-  Keyboard,
-  Lock,
-  MessageCircle,
-  Rows3,
-  UserRound,
-  Server,
-  Settings2,
-  RefreshCw,
-} from "lucide-react";
-import { memo, type ComponentType } from "react";
-import { ComingSoonSurface } from "@/shared/ui";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, Input } from "@/shared/ui";
+import { CircleUserRound, ExternalLink } from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
-import { AdvancedSection } from "./sections/AdvancedSection";
-import { AccountSection } from "./sections/AccountSection";
-import { LayoutSection } from "./sections/LayoutSection";
-import { AppearanceSection } from "./sections/AppearanceSection";
-import { GeneralSection } from "./sections/GeneralSection";
-import { MistySection } from "./sections/MistySection";
-import { NotificationsSection } from "./sections/NotificationsSection";
-import { PrivacySection } from "./sections/PrivacySection";
-import { ServerSection } from "./sections/ServerSection";
-import { ShortcutsSection } from "./sections/ShortcutsSection";
-import { UpdatesSection } from "./sections/UpdatesSection";
-import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
+import type { DesktopSettingsNavEntry } from "./components/SettingsNavigation";
+import {
+  searchSettings,
+  SettingsSearchResults,
+  type SettingsSearchResult,
+} from "./components/SettingsSearchResults";
+import { SettingsPageScope, SettingsScopePill } from "./profiles/SettingScope";
+import { useSettingsProfiles } from "./profiles/store";
+import { NativeAvailability } from "./sections/FeatureSections";
+import {
+  canonicalSettingsSection,
+  settingsAreas,
+  settingsPageTitle,
+  settingsRegistry,
+} from "./settingsRegistry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
-import type { LucideIcon } from "lucide-react";
-
-/**
- * The one place a section is declared.
- *
- * `group` captions the nav rail. Sixteen entries need the break, and the
- * caption is what tells you whether a section configures preferences, an app,
- * or the underlying system.
- */
-export type SettingsGroup = "preferences" | "agents" | "system";
-
-/** Rail captions, drawn with the global navigator's section-header treatment. */
-const groupLabels: Record<SettingsGroup, string> = {
-  preferences: "Preferences",
-  agents: "Agents",
-  system: "System",
-};
-
-const groupIcons: Record<SettingsGroup, LucideIcon> = {
-  preferences: SlidersHorizontal,
-  agents: Bot,
-  system: MonitorCog,
-};
-
-export interface SettingsRegistryEntry {
-  id: SettingsSection;
-  label: string;
-  icon: LucideIcon;
-  group: SettingsGroup;
-  Component: ComponentType<SettingsContentProps>;
+import { useSettingsStore } from "./store/useSettingsStore";
+export { canonicalSettingsSection, settingsRegistry } from "./settingsRegistry";
+export type { SettingsArea, SettingsRegistryEntry } from "./settingsRegistry";
+const navItems: DesktopSettingsNavEntry<SettingsSection>[] = settingsRegistry.map(
+  (entry, index) => {
+    const area = settingsAreas[entry.area];
+    const multiPage = settingsRegistry.filter((item) => item.area === entry.area).length > 1;
+    const firstOfArea = settingsRegistry[index - 1]?.area !== entry.area;
+    return {
+      id: entry.id,
+      label: multiPage ? entry.label : area.label,
+      icon: area.icon,
+      parent: multiPage ? { id: entry.area, label: area.label, icon: area.icon } : undefined,
+      breakBefore: firstOfArea && area.breakBefore,
+    };
+  },
+);
+/** Scrolls to, focuses, and briefly highlights the row a search result pointed at. */
+function useFocusSettingRow(focus: { label: string; request: number }) {
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focus.label) return;
+    let clearFlash: ReturnType<typeof setTimeout> | undefined;
+    const timer = setTimeout(() => {
+      const find = (selector: string, attribute: string) =>
+        Array.from(content.current?.querySelectorAll<HTMLElement>(selector) ?? []).find(
+          (e) => e.getAttribute(attribute) === focus.label,
+        );
+      const element =
+        find("[data-setting-label]", "data-setting-label") ?? find("[aria-label]", "aria-label");
+      if (!element) return;
+      element.scrollIntoView?.({ block: "center" });
+      (
+        element.querySelector<HTMLElement>(
+          "[data-setting-control] input:not(:disabled),[data-setting-control] button:not(:disabled),[data-setting-control] select:not(:disabled)",
+        ) ?? element
+      ).focus();
+      element.dataset.settingFlash = "true";
+      clearFlash = setTimeout(() => delete element.dataset.settingFlash, 900);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(clearFlash);
+    };
+  }, [focus]);
+  return content;
 }
-
-const ModelsComingSoonSection = () => <SettingsComingSoon feature="Models" />;
-
-function SettingsComingSoon({ feature }: { feature: string }) {
-  return (
-    <ComingSoonSurface
-      feature={feature}
-      className="min-h-[360px] rounded-lg border border-charcoal-border/80 bg-charcoal-card"
-    />
-  );
-}
-
-export const settingsRegistry: readonly SettingsRegistryEntry[] = [
-  {
-    id: "general",
-    label: "General",
-    icon: Rows3,
-    group: "preferences",
-    Component: GeneralSection,
-  },
-  {
-    id: "account",
-    label: "Account",
-    icon: UserRound,
-    group: "preferences",
-    Component: AccountSection,
-  },
-  {
-    id: "appearance",
-    label: "Appearance",
-    icon: Eye,
-    group: "preferences",
-    Component: AppearanceSection,
-  },
-  {
-    id: "layout",
-    label: "Layout",
-    icon: LayoutTemplate,
-    group: "preferences",
-    Component: LayoutSection,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: Bell,
-    group: "preferences",
-    Component: NotificationsSection,
-  },
-  {
-    id: "shortcuts",
-    label: "Shortcuts",
-    icon: Keyboard,
-    group: "preferences",
-    Component: ShortcutsSection,
-  },
-  {
-    id: "models",
-    label: "Models",
-    icon: Cpu,
-    group: "agents",
-    Component: ModelsComingSoonSection,
-  },
-  {
-    id: "misty",
-    label: "Misty",
-    icon: MessageCircle,
-    group: "agents",
-    Component: MistySection,
-  },
-  {
-    id: "sync",
-    label: "Sync",
-    icon: RefreshCw,
-    group: "system",
-    Component: BrowserSyncSettings,
-  },
-  {
-    id: "server",
-    label: "Server",
-    icon: Server,
-    group: "system",
-    Component: ServerSection,
-  },
-  {
-    id: "privacy",
-    label: "Privacy",
-    icon: Lock,
-    group: "system",
-    Component: PrivacySection,
-  },
-  {
-    id: "updates",
-    label: "Updates",
-    icon: DownloadCloud,
-    group: "system",
-    Component: UpdatesSection,
-  },
-  {
-    id: "advanced",
-    label: "Advanced",
-    icon: Settings2,
-    group: "system",
-    Component: AdvancedSection,
-  },
-];
-
-const navItems = settingsRegistry.map(({ id, label, icon, group }) => ({
-  id,
-  label,
-  icon,
-  group,
-  groupLabel: groupLabels[group],
-  groupIcon: groupIcons[group],
-}));
-
-const mobileExcludedSettings = new Set<SettingsSection>([
-  "layout",
-  "shortcuts",
-  "code",
-  "terminal",
-  "transfers",
-  "server",
-  "updates",
-  "advanced",
-]);
-
 export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
-  presentation?: "page" | "overlay" | "mobile";
+  presentation?: "page" | "overlay";
   onClose?: () => void;
 }) {
-  const {
-    activeSection,
-    settings,
-    launchOnLogin,
-    openWithAssociations,
-    shortcuts,
-    working,
-    setActiveSection,
-    updateSetting,
-    load,
-    removeOpenWithAssociation,
-    updateShortcut,
-    reassignShortcut,
-    resetShortcuts,
-  } = useSettingsStore(
+  const store = useSettingsStore(
     useShallow((state) => ({
       activeSection: state.activeSection,
       settings: state.settings,
@@ -218,6 +82,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       openWithAssociations: state.openWithAssociations,
       shortcuts: state.shortcuts,
       working: state.working,
+      error: state.error,
       setActiveSection: state.setActiveSection,
       updateSetting: state.updateSetting,
       load: state.load,
@@ -227,49 +92,138 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       resetShortcuts: state.resetShortcuts,
     })),
   );
+  const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
-  const document = settings?.document ?? {};
-  const mobile = props.presentation === "mobile";
-  const visibleRegistry = mobile
-    ? settingsRegistry.filter((item) => !mobileExcludedSettings.has(item.id))
-    : settingsRegistry;
-  const visibleNavItems = mobile
-    ? navItems.filter((item) => !mobileExcludedSettings.has(item.id))
-    : navItems;
-  const entry = visibleRegistry.find((item) => item.id === activeSection) ?? visibleRegistry[0];
-  const visibleActiveSection = entry.id;
-  const controlProps: SettingsContentProps = {
-    document,
-    launchOnLogin,
-    working,
-    onSettingChange: updateSetting,
-    onLoad: load,
-    onShortcutChange: updateShortcut,
-    onShortcutReassign: reassignShortcut,
-    onResetShortcuts: resetShortcuts,
-    onRemoveOpenWithAssociation: removeOpenWithAssociation,
-    shortcuts,
-    openWithAssociations,
+  const profile = useSettingsProfiles();
+  const [query, setQuery] = useState("");
+  const [linkError, setLinkError] = useState("");
+  const [focus, setFocus] = useState({ label: "", request: 0 });
+  const content = useFocusSettingRow(focus);
+  const { settings, load } = store;
+  const section = canonicalSettingsSection(store.activeSection);
+  const entry = settingsRegistry.find((item) => item.id === section) ?? settingsRegistry[0];
+  const results = useMemo(() => searchSettings(query), [query]);
+  useEffect(() => {
+    if (!settings) void load();
+  }, [settings, load]);
+  const select = (id: SettingsSection, label = "") => {
+    store.setActiveSection(id);
+    setFocus((current) => ({ label, request: current.request + 1 }));
+    setQuery("");
+  };
+  const openResult = (result: SettingsSearchResult) => select(result.page, result.focus);
+  const Active = entry.Component;
+  const controls: SettingsContentProps = {
+    document: store.settings?.document ?? {},
+    launchOnLogin: store.launchOnLogin,
+    working: store.working || !profile.ready,
+    onSettingChange: store.updateSetting,
+    onLoad: store.load,
+    onOpenResource: (path) => {
+      props.onClose?.();
+      navigate(path);
+    },
+    onShortcutChange: store.updateShortcut,
+    onShortcutReassign: store.reassignShortcut,
+    onResetShortcuts: store.resetShortcuts,
+    onRemoveOpenWithAssociation: store.removeOpenWithAssociation,
+    shortcuts: store.shortcuts,
+    openWithAssociations: store.openWithAssociations,
     app,
   };
-
-  const ActiveComponent = entry.Component;
-
   return (
     <DesktopSettingsFrame
-      activeId={visibleActiveSection}
+      activeId={entry.id}
       ariaLabel="Settings"
-      items={visibleNavItems}
+      items={navItems}
       navigationLabel="Settings sections"
       onClose={props.onClose}
-      onSelect={setActiveSection}
+      onSelect={(id) => select(id)}
       presentation={props.presentation}
-      title={entry.label}
+      title={settingsPageTitle(entry)}
+      titleAccessory={<SettingsScopePill owner={entry.owner} />}
+      navigationHeader={
+        <Input
+          aria-label="Search settings"
+          placeholder="Search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && query) {
+              e.stopPropagation();
+              setQuery("");
+            }
+            if (e.key === "Enter" && results[0]) openResult(results[0]);
+          }}
+        />
+      }
+      navigationOverride={
+        query.trim() ? (
+          <SettingsSearchResults query={query} results={results} onSelect={openResult} />
+        ) : undefined
+      }
+      navigationFooter={
+        <div className="mt-2 border-t border-charcoal-border/70 pt-2">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 text-xs text-cream-muted"
+            aria-label="Account settings (opens in your browser)"
+            onClick={() => {
+              setLinkError("");
+              void openAccountSettingsInBrowser().catch((e) => setLinkError(String(e)));
+            }}
+          >
+            <CircleUserRound className="size-4" aria-hidden="true" />
+            Account
+            <ExternalLink className="ml-auto size-3" aria-hidden="true" />
+          </Button>
+          {linkError && (
+            <p role="alert" className="text-xs text-destructive">
+              {linkError}
+            </p>
+          )}
+        </div>
+      }
+      contentHeader={
+        <>
+          {(store.error || profile.error) && (
+            <div role="alert" className="mb-5 text-sm text-destructive">
+              {store.error || profile.error}
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  void (
+                    profile.ready
+                      ? profile.refresh()
+                      : store
+                          .load()
+                          .then(() => window.dispatchEvent(new Event("misty:retry-settings")))
+                  ).catch(() => {})
+                }
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {profile.state?.notice && (
+            <p role="status" className="mb-4 text-sm text-cream-muted">
+              {profile.state.notice}
+            </p>
+          )}
+        </>
+      }
     >
-      <ActiveComponent {...controlProps} />
+      <div ref={content}>
+        <SettingsPageScope.Provider value={{ page: entry.id, owner: entry.owner }}>
+          {entry.native && !hasTauriInternals() ? (
+            <NativeAvailability feature={entry.label} />
+          ) : (
+            <Active {...controls} />
+          )}
+        </SettingsPageScope.Provider>
+      </div>
     </DesktopSettingsFrame>
   );
 });
-
 export default SettingsWorkspace;
-export type { SettingValue, SettingsSection } from "./settingsTypes";
+export type { SettingsSection, SettingValue } from "./settingsTypes";

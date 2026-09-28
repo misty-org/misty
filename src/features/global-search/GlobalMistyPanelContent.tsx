@@ -2,12 +2,16 @@ import { companionReply } from "@/features/agents";
 import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  cn,
+  IconButton,
+  Input,
+  MenuItem,
+  MenuTrigger,
+  Spinner,
 } from "@/shared/ui";
 import {
   Bell,
@@ -21,7 +25,6 @@ import {
   FolderKanban,
   History,
   Library,
-  Loader2,
   Map as MapIcon,
   MessageCircle,
   NotebookPen,
@@ -69,7 +72,7 @@ export function SearchResults(props: {
   return (
     <div className="p-2">
       <div className="flex h-7 items-center px-2 text-[11px] text-cream-muted">
-        {props.searching ? <Loader2 className="mr-1.5 size-3 animate-spin" /> : null}
+        {props.searching ? <Spinner size="sm" label={false} className="size-3 mr-1.5" /> : null}
         Showing {props.results.length} {props.results.length === 1 ? "result" : "results"}
       </div>
       {props.results.map((result) => {
@@ -316,41 +319,40 @@ export function ConversationMenu(props: {
   };
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size={props.compact ? "icon-sm" : "sm"}
-          aria-label={props.compact ? "Conversation history" : undefined}
-          title={props.compact ? "Conversation history" : undefined}
-          className="max-w-48 gap-1.5 text-xs text-cream-muted"
-        >
-          <History className="size-3.5" />
-          {!props.compact && (
-            <>
-              <span className="truncate">
-                {active?.title ?? (props.loading ? "Loading…" : "New conversation")}
-              </span>
-              <ChevronDown className="size-3" />
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72" data-misty-layer-portal>
-        <DropdownMenuItem onSelect={props.onNew}>
-          <Plus className="size-4" /> New conversation
-        </DropdownMenuItem>
+      {props.compact ? (
+        <MenuTrigger
+          iconOnly
+          label="Conversation history"
+          title="Conversation history"
+          icon={<History className="size-3.5" />}
+        />
+      ) : (
+        <MenuTrigger
+          label="Conversation history"
+          value={active?.title ?? (props.loading ? "Loading…" : "New conversation")}
+          icon={<History className="size-3.5" />}
+          className="max-w-48 text-xs text-cream-muted"
+        />
+      )}
+      <DropdownMenuContent align="end" width="xl" data-misty-layer-portal>
+        <MenuItem
+          icon={<Plus className="size-4" />}
+          label="New conversation"
+          onSelect={props.onNew}
+        />
         {props.conversations.length ? (
           <>
             <DropdownMenuSeparator />
             <div className="flex items-center gap-2 px-2 py-1.5">
               <Search className="size-3.5 text-cream-muted" />
-              <input
+              <Input
+                variant="bare"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => event.stopPropagation()}
                 placeholder="Search conversations"
                 aria-label="Search conversations"
-                className="min-w-0 flex-1 bg-transparent text-xs text-cream outline-none placeholder:text-cream-muted"
+                className="h-7 flex-1 text-xs"
               />
             </div>
             <DropdownMenuSeparator />
@@ -367,11 +369,12 @@ export function ConversationMenu(props: {
               }}
             >
               {renaming ? (
-                <input
+                <Input
+                  variant="toolbar"
                   autoFocus
                   value={draftTitle}
                   aria-label={`Rename ${conversation.title}`}
-                  className="h-7 min-w-0 flex-1 rounded-md border border-charcoal-border bg-charcoal-bg px-2 text-xs text-cream outline-none"
+                  className="h-7 min-w-0 flex-1"
                   onChange={(event) => setDraftTitle(event.target.value)}
                   onClick={(event) => {
                     event.preventDefault();
@@ -393,11 +396,9 @@ export function ConversationMenu(props: {
               )}
               {renaming ? (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Save ${conversation.title}`}
+                  <IconButton
+                    label={`Save ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -405,12 +406,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Check className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Cancel renaming ${conversation.title}`}
+                  </IconButton>
+                  <IconButton
+                    label={`Cancel renaming ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -418,15 +417,13 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <X className="size-3.5" />
-                  </Button>
+                  </IconButton>
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-cream"
-                    aria-label={`Rename ${conversation.title}`}
+                  <IconButton
+                    label={`Rename ${conversation.title}`}
+                    className="p-1"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -435,12 +432,10 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Pencil className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="rounded p-1 text-cream-muted hover:text-red-300"
-                    aria-label={`Delete ${conversation.title}`}
+                  </IconButton>
+                  <IconButton
+                    label={`Delete ${conversation.title}`}
+                    className="p-1 hover:text-red-300"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -448,7 +443,7 @@ export function ConversationMenu(props: {
                     }}
                   >
                     <Trash2 className="size-3.5" />
-                  </Button>
+                  </IconButton>
                 </>
               )}
             </DropdownMenuItem>

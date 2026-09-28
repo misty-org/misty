@@ -1,39 +1,25 @@
 import { CheckCircle2 } from "lucide-react";
-import { Button } from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
 
 export function TourCompleteModal(props: { onFinish: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-150"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tour-complete-title"
-    >
-      <div className="misty-popup-surface w-full max-w-[400px] rounded-xl border border-charcoal-border bg-charcoal-card p-7 text-center shadow-2xl ring-1 ring-cream/10">
+    <Dialog open onOpenChange={(open) => !open && props.onFinish()}>
+      <DialogContent className="max-w-[400px] gap-0 p-7 text-center">
         <div className="mx-auto grid size-12 place-items-center rounded-full border border-charcoal-border bg-charcoal-hover text-cream-bright">
           <CheckCircle2 size={24} />
         </div>
-
-        <h2 id="tour-complete-title" className="mt-5 text-base font-semibold text-cream-bright">
+        <DialogTitle className="mt-5 text-base font-semibold text-cream-bright">
           You're all set!
-        </h2>
-
-        <p className="mt-2 text-sm leading-relaxed text-cream-muted">
+        </DialogTitle>
+        <DialogDescription className="mt-2 text-sm leading-relaxed text-cream-muted">
           You can reopen this walkthrough from your profile menu.
-        </p>
-
+        </DialogDescription>
         <div className="mt-7">
-          <Button
-            type="button"
-            variant="default"
-            size="default"
-            className="w-full h-9 font-medium"
-            onClick={props.onFinish}
-          >
+          <Button className="h-9 w-full font-medium" onClick={props.onFinish}>
             Start working
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

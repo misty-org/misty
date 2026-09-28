@@ -1,8 +1,9 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { agentInterventionsApi, type AgentInterventionWait } from "./api";
 import { agentInterventionActivities, useAgentInterventions } from "./store";
+import type * as ApiModule from "./api";
 vi.mock("./api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./api")>()),
+  ...(await importOriginal<typeof ApiModule>()),
   agentInterventionsApi: { list: vi.fn(), decide: vi.fn() },
 }));
 const wait = (): AgentInterventionWait => ({

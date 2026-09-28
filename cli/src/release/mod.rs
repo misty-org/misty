@@ -34,7 +34,7 @@ pub fn start(
     let version = state::normalize_version(raw_version)?;
     let platforms = selected_platforms(no_macos, no_windows)?;
     state::verify_versions(workspace, &version)?;
-    state::require_release_checkout(workspace, dry_run)?;
+    state::require_release_checkout(workspace, !dry_run)?;
     if !dry_run {
         checks::app(workspace)?;
     }

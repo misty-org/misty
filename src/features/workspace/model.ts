@@ -1,3 +1,4 @@
+import type { MistyTabGroup } from "./tabGroups";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -6,6 +7,8 @@ export * from "./browserSearchEngine";
 import { blankBrowserUrl } from "./browserUrl";
 
 export { blankBrowserUrl } from "./browserUrl";
+export * from "./browserInternalUrl";
+import { browserInternalPage, browserInternalPages } from "./browserInternalUrl";
 export {
   browserHomeUrl,
   configureBrowserHomeUrl,
@@ -21,8 +24,8 @@ export type WorkspaceSurfaceId =
   | "terminal"
   | "code"
   | "files"
-  | "transfers"
   | "agents"
+  | "scheduled"
   | "official-app"
   | "extension"
   | "marketplace";
@@ -43,6 +46,8 @@ export interface BrowserTabState {
   profileId?: string;
   /** Saved website used to open this tab, independent of its current URL. */
   websiteId?: string;
+  /** A private tab: throwaway website data, no history, never saved or synced. */
+  private?: true;
 }
 
 export type CodeMultibufferKind =
@@ -226,6 +231,7 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
       /^[A-Za-z0-9:_.-]{1,200}$/.test(candidate.websiteId)
         ? candidate.websiteId
         : undefined,
+    private: candidate.private === true || undefined,
   };
 }
 
@@ -258,6 +264,8 @@ export function sanitizeBrowserTitle(title?: string, url?: string): string {
 
 export function browserTabTitle(url: string): string {
   if (url === blankBrowserUrl) return "New Tab";
+  const internal = browserInternalPage(url);
+  if (internal) return browserInternalPages[internal].title;
   try {
     const parsed = new URL(url);
     const query = parsed.searchParams.get("q");
@@ -302,7 +310,7 @@ export interface DockWidgetDescriptor<TState = unknown> {
 }
 
 export interface WorkspaceTab {
-  /** A newly split pane can be filled by the next app launch. */
+  /** An unused new tab or split can take the next selected destination. */
   placeholder?: boolean;
   /** Stable identity of this pane’s app group, independent of its label. */
   groupInstanceId?: string;
@@ -347,6 +355,8 @@ export interface WorkspaceLayout {
 
 /** A window tab owns a split tree; each leaf contains one app view. */
 export interface WorkspaceLayoutTab {
+  /** Chrome-style grouping of visible layout tabs, independent of pane identities. */
+  tabGroupId?: string;
   id: string;
   /** Legacy native aliases are resolved after account preferences load. */
   legacyNameKeys?: string[];
@@ -365,6 +375,7 @@ export interface WorkspaceVirtualWindow {
 }
 
 export interface WorkspaceSnapshot {
+  tabGroups?: MistyTabGroup[];
   version: 2 | 3;
   accountId: string;
   deviceId: string;

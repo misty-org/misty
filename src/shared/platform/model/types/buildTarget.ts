@@ -1,1 +1,1 @@
-export type MistyBuildTarget = "desktop" | "mobile" | "android";
+export type MistyBuildTarget = "desktop" | "web";

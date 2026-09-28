@@ -1,6 +1,6 @@
 import { MessageSquare, Pause, Play, Square, Check } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "@/shared/ui";
+import { cn, IconButton } from "@/shared/ui";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
   finishLocalExecution,
@@ -10,8 +10,11 @@ import {
 } from "./localExecution";
 import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
 
-export const agentOverlayBarClass =
-  "pointer-events-auto fixed bottom-4 left-1/2 z-[2147482600] flex w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg bg-charcoal-card p-1 text-cream shadow-lg";
+export const agentOverlayBarClass = cn(
+  "pointer-events-auto fixed inset-x-0 bottom-4 layer-workspace-overlay mx-auto flex",
+  "w-max max-w-[calc(100dvw-32px)] items-center rounded-lg",
+  "bg-charcoal-card p-1 text-cream shadow-lg",
+);
 
 export function WorkspaceAutopilotBar({ execution, name }: { execution: Execution; name: string }) {
   const [error, setError] = useState("");
@@ -38,6 +41,7 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
       execution.accountId,
       execution.spaceId,
       stop,
+      execution.desktopControl,
     );
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && event.metaKey && event.shiftKey) {
@@ -50,7 +54,14 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
       unwatch();
       window.removeEventListener("keydown", key, true);
     };
-  }, [execution.taskId, execution.accountId, execution.spaceId, execution.ready, running]);
+  }, [
+    execution.taskId,
+    execution.accountId,
+    execution.spaceId,
+    execution.ready,
+    execution.desktopControl,
+    running,
+  ]);
   useEffect(() => {
     if (error) useMistyStore.setState({ error });
   }, [error]);
@@ -69,63 +80,66 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
       title={
         error ||
         (running
-          ? `${name} is controlling Misty`
+          ? execution.desktopControl
+            ? `${name} is working`
+            : `${name} is controlling Misty`
           : execution.state === "paused"
             ? "Paused"
             : "Task finished")
       }
     >
+      {error && (
+        <p className="max-w-80 px-2 text-xs" role="alert">
+          {error}
+        </p>
+      )}
       <p className="sr-only" role="status">
         {error ||
           (running
             ? execution.ready
-              ? `${name} is controlling Misty. You can watch or stop at any time.`
-              : "Preparing Misty window control…"
+              ? execution.desktopControl
+                ? `${name} is working. Desktop control begins when needed. Stop at any time.`
+                : `${name} is controlling Misty. You can watch or stop at any time.`
+              : "Preparing the task…"
             : execution.state === "finished"
               ? "Task finished — you have control."
               : "Paused — you have control.")}
       </p>
       <div className="flex items-center gap-1" role="group" aria-label="Playback controls">
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Show chat"
-          aria-label="Show chat"
+        <IconButton
+          size="md"
+          label="Show chat"
           onClick={() => useMistyStore.getState().openPanel()}
         >
           <MessageSquare className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Resume"
-          aria-label="Resume"
+        </IconButton>
+        <IconButton
+          size="md"
+          label="Resume"
           disabled={pending || execution.state !== "paused"}
           onClick={() =>
             act(() =>
               steerLocalExecution(
-                "Continue the task. Capture the whole Misty window first and verify prior actions before continuing.",
+                execution.desktopControl
+                  ? "Continue the task. Inspect the current desktop and verify prior actions before continuing."
+                  : "Continue the task. Capture the whole Misty window first and verify prior actions before continuing.",
               ),
             )
           }
         >
           <Play className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Pause"
-          aria-label="Pause"
+        </IconButton>
+        <IconButton
+          size="md"
+          label="Pause"
           disabled={pending || !running}
           onClick={() => act(() => pauseLocalExecution(execution.taskId))}
         >
           <Pause className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={execution.state === "finished" ? "Done" : "Stop task"}
-          aria-label={execution.state === "finished" ? "Done" : "Stop task"}
+        </IconButton>
+        <IconButton
+          size="md"
+          label={execution.state === "finished" ? "Done" : "Stop task"}
           disabled={pending}
           onClick={() => act(finishLocalExecution)}
         >
@@ -134,7 +148,7 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
           ) : (
             <Square className="size-4" />
           )}
-        </Button>
+        </IconButton>
       </div>
     </aside>
   );

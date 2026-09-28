@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  IconButton,
 } from "@/shared/ui";
 import { RotateCcw, ShieldCheck } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -106,16 +107,14 @@ export function MemberPermissionControls({
         <ShieldCheck className="size-3.5" />
         Permissions
       </Button>
-      <Button
+      <IconButton
+        size="md"
+        label={`Manage permissions for ${memberName}`}
         className="sm:hidden"
-        size="icon"
-        variant="ghost"
-        type="button"
         onClick={openPermissions}
-        aria-label={`Manage permissions for ${memberName}`}
       >
         <ShieldCheck className="size-4" />
-      </Button>
+      </IconButton>
 
       <DialogContent className="flex max-h-[min(820px,calc(100vh-32px))] max-w-xl flex-col overflow-hidden p-0">
         <DialogHeader className="border-b border-charcoal-border/60 px-5 py-4 text-left sm:px-6 sm:py-5">

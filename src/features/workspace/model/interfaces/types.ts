@@ -1,17 +1,7 @@
-import type { MultiPanelPaneRestoreMode, SplitOrientation } from "../../useMultiPanelStore";
-
 export interface MultiPanelPane {
   id: string;
   title: string;
   path: string;
-}
-
-export interface MultiPanelClosedPane {
-  pane: MultiPanelPane;
-  tabId: string;
-  restoreMode: MultiPanelPaneRestoreMode;
-  laneIndex: number;
-  rowIndex: number;
 }
 
 export interface MultiPanelTab {
@@ -28,7 +18,8 @@ export interface MultiPanelTab {
 }
 
 export interface MultiPanelLayout {
-  orientation: SplitOrientation;
+  /** Legacy saved layout shape; Files always restores a single pane. */
+  orientation: "vertical" | "horizontal";
   paneIds: string[];
   lanes?: string[][];
   gridSplitRatio?: number;

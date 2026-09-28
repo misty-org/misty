@@ -1,0 +1,66 @@
+{
+  "verified_at": "2026-09-28T07:07:45.894189+00:00",
+  "app": "dev1",
+  "frontend_url": "http://127.0.0.1:5175/agents",
+  "fixture_url": "http://127.0.0.1:8766/companion.html",
+  "request_path": "Agents composer -> shared companion submit -> model -> internal MCP -> native browser",
+  "live_run": {
+    "invocation_id": "invocation_834d580e-36d0-45b0-8d89-8faa55a8eb34",
+    "state": "completed",
+    "created_at": "2026-09-28T07:05:42.640853+00:00",
+    "completed_at": "2026-09-28T07:06:27.589366+00:00",
+    "tools": [
+      {
+        "name": "browser.navigate",
+        "state": "completed",
+        "error_code": null
+      },
+      {
+        "name": "browser.inspect",
+        "state": "completed",
+        "error_code": null
+      },
+      {
+        "name": "browser.interact",
+        "state": "completed",
+        "error_code": null
+      },
+      {
+        "name": "browser.inspect",
+        "state": "completed",
+        "error_code": null
+      },
+      {
+        "name": "browser.click",
+        "state": "completed",
+        "error_code": null
+      },
+      {
+        "name": "browser.visual",
+        "state": "completed",
+        "error_code": null
+      }
+    ]
+  },
+  "observed_page": {
+    "count": 1,
+    "phrase": "Misty browser verified"
+  },
+  "observed_completion": {
+    "saved_answer_confirmed": true,
+    "companion_state": "Ready",
+    "forced_panel_visible": false,
+    "browser_visible": true,
+    "search_opened_and_closed": true
+  },
+  "checks": {
+    "focused_frontend_tests": 19,
+    "typecheck": "passed",
+    "scoped_eslint": "passed"
+  },
+  "limitations": [
+    "External Chrome/Safari/Zen control was not implemented or tested.",
+    "The first fixture attempt navigated and typed, then failed with an unknown click outcome around a development reload. The successful attempt used a fresh page and separate task.",
+    "Voice input was not used for this test; the typed composer uses the shared companion executor."
+  ]
+}

@@ -184,7 +184,7 @@ function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
 }
 
 function isMacNativeRuntime(): boolean {
-  return /Mac|iPhone|iPad/.test(navigator.platform);
+  return /Mac/.test(navigator.platform);
 }
 
 export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {

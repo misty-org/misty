@@ -1,4 +1,4 @@
-import type { GlobalPreviewSource } from "../file-ui/explorer/model/interfaces/components/GlobalPreview";
+import type { GlobalPreviewSource } from "@/features/file-ui";
 import {
   archiveExtensions,
   audioMimeTypes,

@@ -97,6 +97,71 @@ pub(crate) async fn evaluate_browser_async_javascript(
         .map_err(|_| "Browser capture was canceled.".to_owned())?
 }
 
+/// Runs `function_body` in Misty's page-state content world: it shares the
+/// DOM with the page but not its JavaScript, so page scripts cannot observe
+/// or tamper with it. The world is retained so its globals persist per page.
+#[cfg(target_os = "macos")]
+pub(crate) async fn evaluate_isolated_javascript(
+    webview: Webview,
+    function_body: String,
+) -> Result<String, String> {
+    use block2::RcBlock;
+    use objc2::{rc::Retained, runtime::AnyObject, MainThreadMarker};
+    use objc2_foundation::{NSError, NSString};
+    use objc2_web_kit::{WKContentWorld, WKWebView};
+    use std::{cell::OnceCell, sync::Mutex, time::Duration};
+
+    thread_local! {
+        static WORLD: OnceCell<Retained<WKContentWorld>> = const { OnceCell::new() };
+    }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let sender = Mutex::new(Some(sender));
+    let finish = move |result: Result<String, String>| {
+        if let Some(sender) = sender.lock().ok().and_then(|mut s| s.take()) {
+            let _ = sender.send(result);
+        }
+    };
+    let finish = std::sync::Arc::new(finish);
+    let fail = finish.clone();
+    webview
+        .with_webview(move |platform_webview| unsafe {
+            let Some(mtm) = MainThreadMarker::new() else {
+                fail(Err("Page state must run on the main thread.".to_owned()));
+                return;
+            };
+            let view: &WKWebView = &*platform_webview.inner().cast();
+            let world = WORLD.with(|cell| {
+                cell.get_or_init(|| WKContentWorld::worldWithName(&NSString::from_str("misty-page-state"), mtm))
+                    .clone()
+            });
+            let done = finish.clone();
+            let handler = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
+                let result = if !error.is_null() {
+                    Err("The page could not run page-state code.".to_owned())
+                } else if value.is_null() {
+                    Ok("null".to_owned())
+                } else if let Some(value) = (&*value).downcast_ref::<NSString>() {
+                    Ok(value.to_string())
+                } else {
+                    Err("The page returned an invalid page state.".to_owned())
+                };
+                done(result);
+            });
+            view.callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
+                &NSString::from_str(&function_body),
+                None,
+                None,
+                &world,
+                Some(&*handler),
+            );
+        })
+        .map_err(|error| error.to_string())?;
+    tokio::time::timeout(Duration::from_secs(10), receiver)
+        .await
+        .map_err(|_| "Page state timed out.".to_owned())?
+        .map_err(|_| "Page state was canceled.".to_owned())?
+}
+
 #[cfg(target_os = "macos")]
 pub(super) fn native_macos_safari_user_agent() -> Option<String> {
     use objc2_foundation::{NSBundle, NSString};
@@ -182,6 +247,14 @@ pub(super) fn configure_browser_webview(
             }
             if let Some(parent) = view.superview() {
                 parent.setAutoresizesSubviews(true);
+            }
+            // Stop pages at their edges instead of rubber-banding past the
+            // viewport. This is WebKit SPI (_WKRectEdgeNone = 0), so probe for
+            // it; CSS overscroll-behavior on the root blocked wheel scrolling.
+            let rubber_banding = objc2::sel!(_setRubberBandingEnabled:);
+            let supported: bool = objc2::msg_send![view, respondsToSelector: rubber_banding];
+            if supported {
+                let _: () = objc2::msg_send![view, _setRubberBandingEnabled: 0usize];
             }
             if let Some(window) = view.window() {
                 // AppKit normally preserves cached window contents during a
@@ -327,6 +400,83 @@ pub(super) async fn remove_browser_data_store(
         .map_err(|_| "Website account removal timed out. Retry removal.".to_owned())?
         .map_err(|_| "Website account removal was canceled.".to_owned())?
 }
+/// Asks where to save a download with the system save panel. WebKit asks for
+/// the destination on the main thread, so the modal panel can run in place.
+#[cfg(target_os = "macos")]
+pub(super) fn ask_download_destination(suggested: &std::path::Path) -> Option<std::path::PathBuf> {
+    use objc2::runtime::AnyObject;
+    use objc2_foundation::{NSString, NSURL};
+    unsafe {
+        let panel: *mut AnyObject = objc2::msg_send![objc2::class!(NSSavePanel), savePanel];
+        let panel = panel.as_ref()?;
+        if let Some(name) = suggested.file_name().and_then(|name| name.to_str()) {
+            let _: () = objc2::msg_send![panel, setNameFieldStringValue: &*NSString::from_str(name)];
+        }
+        if let Some(directory) = suggested.parent() {
+            let url = NSURL::fileURLWithPath_isDirectory(
+                &NSString::from_str(&directory.to_string_lossy()),
+                true,
+            );
+            let _: () = objc2::msg_send![panel, setDirectoryURL: &*url];
+        }
+        // NSModalResponseOK
+        let response: isize = objc2::msg_send![panel, runModal];
+        if response != 1 {
+            return None;
+        }
+        let url: *mut NSURL = objc2::msg_send![panel, URL];
+        let path = url.as_ref()?.path()?;
+        Some(std::path::PathBuf::from(path.to_string()))
+    }
+}
+
+/// Removes the chosen kinds of website data changed since `since_ms` from one
+/// profile's store, leaving the store itself in place.
+#[cfg(target_os = "macos")]
+pub(super) async fn clear_browser_website_data(
+    app: &tauri::AppHandle,
+    identifier: [u8; 16],
+    data_types: Vec<&'static str>,
+    since_ms: i64,
+) -> Result<(), String> {
+    use block2::RcBlock;
+    use objc2::{runtime::AnyObject, MainThreadMarker};
+    use objc2_foundation::{NSArray, NSDate, NSString, NSUUID};
+    use objc2_web_kit::WKWebsiteDataStore;
+    use std::sync::Mutex;
+    let (sender, receiver) = tokio::sync::oneshot::channel::<()>();
+    app.run_on_main_thread(move || {
+        let Some(mtm) = MainThreadMarker::new() else { return };
+        let sender = Mutex::new(Some(sender));
+        unsafe {
+            let store =
+                WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(identifier), mtm);
+            let names = data_types.iter().map(|name| NSString::from_str(name)).collect::<Vec<_>>();
+            let array = NSArray::from_retained_slice(&names);
+            let types: *mut AnyObject = objc2::msg_send![objc2::class!(NSSet), setWithArray: &*array];
+            let since = NSDate::dateWithTimeIntervalSince1970(since_ms.max(0) as f64 / 1000.0);
+            let retained_store = store.clone();
+            let handler = RcBlock::new(move || {
+                let _keep_alive = &retained_store;
+                if let Some(sender) = sender.lock().ok().and_then(|mut sender| sender.take()) {
+                    let _ = sender.send(());
+                }
+            });
+            let _: () = objc2::msg_send![
+                &*store,
+                removeDataOfTypes: types,
+                modifiedSince: &*since,
+                completionHandler: &*handler
+            ];
+        }
+    })
+    .map_err(|error| error.to_string())?;
+    tokio::time::timeout(std::time::Duration::from_secs(60), receiver)
+        .await
+        .map_err(|_| "Clearing website data timed out.".to_owned())?
+        .map_err(|_| "Clearing website data was cancelled.".to_owned())
+}
+
 #[cfg(not(target_os = "macos"))]
 pub(super) async fn remove_browser_data_store(
     _: &tauri::AppHandle,
@@ -343,6 +493,18 @@ pub(crate) async fn capture_webview_region(
     y: f64,
     width: f64,
     height: f64,
+) -> Result<serde_json::Value, String> {
+    capture_webview_region_sized(webview, x, y, width, height, 640.0).await
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) async fn capture_webview_region_sized(
+    webview: Webview,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    max_dimension: f64,
 ) -> Result<serde_json::Value, String> {
     use base64::Engine;
     use block2::RcBlock;
@@ -381,16 +543,18 @@ pub(crate) async fn capture_webview_region(
         let view: &WKWebView = &*platform.inner().cast();
         let config = WKSnapshotConfiguration::new(mtm);
         config.setRect(NSRect::new(NSPoint::new(x,y), NSSize::new(width,height)));
-        config.setSnapshotWidth(Some(&NSNumber::new_f64(width * (640.0 / width.max(height)).min(1.0))));
+        // Native screenshots retain text detail; the 640px agent captures keep their old budget.
+        config.setSnapshotWidth(Some(&NSNumber::new_f64(width * (max_dimension / width.max(height)).min(if max_dimension > 640.0 { 2.0 } else { 1.0 }))));
         config.setAfterScreenUpdates(true);
         let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
             let result = (|| -> Result<serde_json::Value, String> {
                 if !error.is_null() || image.is_null() { return Err("WebKit could not capture that region.".into()); }
                 let data = (&*image).TIFFRepresentation().ok_or("Capture returned no image.")?;
                 let bitmap = NSBitmapImageRep::imageRepWithData(&data).ok_or("Capture image is unavailable.")?;
-                let jpeg = bitmap.representationUsingType_properties(NSBitmapImageFileType::JPEG, &NSDictionary::new())
+                let lossless = max_dimension > 640.0;
+                let jpeg = bitmap.representationUsingType_properties(if lossless { NSBitmapImageFileType::PNG } else { NSBitmapImageFileType::JPEG }, &NSDictionary::new())
                     .ok_or("Capture could not be encoded.")?;
-                Ok(serde_json::json!({"dataUrl":format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg.to_vec())),
+                Ok(serde_json::json!({"dataUrl":format!("data:image/{};base64,{}", if lossless { "png" } else { "jpeg" }, base64::engine::general_purpose::STANDARD.encode(jpeg.to_vec())),
                     "width":bitmap.pixelsWide(), "height":bitmap.pixelsHigh()}))
             })();
             if let Some(sender) = sender.lock().ok().and_then(|mut sender| sender.take()) { let _ = sender.send(result); }
@@ -411,9 +575,10 @@ pub async fn host_webview_capture_region(
     y: f64,
     width: f64,
     height: f64,
+    max_dimension: Option<f64>,
 ) -> Result<serde_json::Value, String> {
     if webview.label() != "main" {
         return Err("Only the Host can capture its view.".into());
     }
-    capture_webview_region(webview, x, y, width, height).await
+    capture_webview_region_sized(webview, x, y, width, height, max_dimension.unwrap_or(640.0).clamp(640.0, 3840.0)).await
 }

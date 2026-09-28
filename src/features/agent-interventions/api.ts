@@ -30,14 +30,12 @@ export const agentInterventionsApi = {
   },
   async decide(id: string, ready: boolean, signal?: AbortSignal) {
     z.string().uuid().parse(id);
-    return z
-      .object({ queued: z.literal(true) })
-      .parse(
-        await apiRequest<unknown>(`/me/agent-interventions/${encodeURIComponent(id)}`, {
-          method: "POST",
-          body: JSON.stringify({ ready }),
-          signal,
-        }),
-      );
+    return z.object({ queued: z.literal(true) }).parse(
+      await apiRequest<unknown>(`/me/agent-interventions/${encodeURIComponent(id)}`, {
+        method: "POST",
+        body: JSON.stringify({ ready }),
+        signal,
+      }),
+    );
   },
 };

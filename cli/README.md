@@ -42,7 +42,7 @@ removes its encrypted roots while retaining the device key for other accounts.
 If that key is missing or mismatched, Misty preserves the database and fails
 closed rather than generating a replacement. The launcher does not loosen
 Keychain access controls.
-Release signing and mobile builds are unchanged. Direct `npx tauri dev` bypasses
+Release signing is unchanged. Direct `npx tauri dev` bypasses
 the Misty launcher; use the commands above for stable desktop dev signing.
 
 ### Test device sync with two development profiles
@@ -60,6 +60,15 @@ local sync database across restarts; multiple windows within one profile remain
 one device. Do not copy sync databases between profiles or reset IDs to test sync.
 Their Vite dependency caches are separate, and Control lists the profile name
 alongside its host and device ID.
+
+Native Cargo artifacts and intermediate files are isolated per profile under
+`src-tauri/target/dev-profiles/<profile>`; bundled workers also have private build
+directories. This prevents dev1 and dev2 from sharing build locks or overwriting
+compiled profile configuration. Custom `CARGO_TARGET_DIR` (or
+`CARGO_BUILD_TARGET_DIR`) and `CARGO_BUILD_BUILD_DIR` roots receive the same
+`dev-profiles/<profile>` suffix. The first build of each profile creates its own
+cache. Restart existing dev commands to pick up launcher changes; no CLI reinstall
+is needed.
 
 Enable **Full sync** on both devices. Only the **Active** device publishes tab
 and workspace changes. In the other profile, use **Control → Switch to This
@@ -79,33 +88,9 @@ Start the documentation site with:
 misty docs dev
 ```
 
-On macOS, prepare and run the Apple mobile app with:
-
-```sh
-misty mobile doctor
-misty mobile devices
-misty mobile open
-misty mobile setup
-misty mobile dev --open
-```
-
-After Xcode signing is configured, launch a connected device directly by name:
-
-```sh
-misty mobile dev --device "My iPhone"
-```
-
-That command discovers the Mac's LAN address, selects an available development
-port, starts Vite and Tauri, builds and installs Misty, and keeps hot reload
-running. It uses Apple's CoreDevice path automatically for paired wireless
-iPhones and exits immediately with an unlock instruction when the device is
-locked. The mobile command also starts the local server stack, so it is the only
-command needed for an ordinary iPhone development session. Desktop and website
-development servers can remain open.
-
 Built-in tools compile with Misty. Native workers are bundled during the desktop build.
 
-The CLI discovers the current Misty checkout, including when run from a nested directory. Built-in tools and the CLI live in `src/features/` and `cli/`. Optional server and website repositories can live next to the checkout. Configure a fallback location with:
+The CLI discovers the current Misty checkout, including when run from a nested directory. Built-in tools and the CLI live in `src/features/` and `cli/`. The backend lives in `server/`; the website can live in the sibling `misty-website/` checkout. Configure a fallback location with:
 
 ```sh
 misty configure --workspace /path/to/misty-org
@@ -116,8 +101,6 @@ misty configure --workspace /path/to/misty-org
 ```sh
 misty doctor
 misty setup
-misty sdk build
-misty sdk check
 misty check tasks
 misty check app
 misty check server
@@ -144,15 +127,6 @@ misty desktop clean
 misty desktop clean --apply
 misty desktop icons sync
 
-misty mobile doctor
-misty mobile devices
-misty mobile open
-misty mobile setup
-misty mobile dev --open
-misty mobile dev --device "My iPhone"
-misty mobile run --device "My iPhone" --release
-misty mobile build --target simulator --no-sign
-misty mobile build --build-number 42 --export-method app-store-connect
 
 misty docs dev
 misty docs build
@@ -204,8 +178,9 @@ user's home.
 
 The CLI stores its own workspace selection in `~/.misty/cli/config.toml` and
 continues to read older platform-specific config locations during migration.
-Development-only desktop profiles live under `~/.misty/cli/profiles` so they
-cannot be mistaken for production application state.
+Development profiles select distinct Tauri identifiers (`com.misty.desktop.<profile>`)
+and retain their own native application storage. The CLI does not create an unused
+`~/.misty/cli/profiles` directory.
 
 ## Setup and diagnostics
 
@@ -213,7 +188,7 @@ The backend lives in `server/`. Run the CLI from any directory inside this check
 
 | Command | Purpose |
 | --- | --- |
-| `misty setup server` | Create missing environment files and development keys. |
+| `misty setup server` | Create development defaults and required development keys. |
 | `misty setup cloudflare --account ID --zone ID --hostname api.example.com` | Validate access and preview tunnel/DNS setup; add `--apply` to provision. |
 | `misty setup desktop` | Create missing desktop API configuration and install frontend dependencies. |
 | `misty env describe` | List registered variables and their owning files. |
@@ -222,10 +197,35 @@ The backend lives in `server/`. Run the CLI from any directory inside this check
 | `misty doctor desktop` | Check desktop tool availability. |
 | `misty doctor cloudflare` | Check Cloudflare access, the deployed Worker, and public API health. |
 | `misty doctor release` | Run the existing release readiness checks. |
+
 | `misty doctor server --fix` | Create missing local environment files and keys; preserve existing values. |
-| `misty server status` | Show running services and completed setup jobs. |
+| `misty server status` | Show running services and unfinished or failed setup jobs. |
 | `misty server logs api --tail 100 --follow` | Follow bounded, service-specific logs. |
 | `misty server deploy` | Explicitly deploy the development Worker. |
+
+Environment files are optional until they contain configuration. Setup and migration
+do not create empty or comment-only placeholders, including under `cli/.env/`.
+`misty env set` creates a setting's file on demand with private permissions.
+`misty env check` still rejects missing required values, unknown settings, and
+insecure existing files. Use `misty env describe` to find the file for an optional
+integration before enabling it. Normal CLI commands also validate the files they load.
+
+Server commands pass configured values to Compose interpolation through the process
+environment, with shell values taking precedence there. Variables loaded only through
+a service's `env_file` still come from that file; a shell export does not override
+those container values. Compose skips absent optional files and does not implicitly
+load a default `.env`.
+
+Worker secret generation is first-use only. `misty setup server` preserves existing
+development bundles and can restore a missing `.dev.vars` from its matching server
+keys. `misty server worker generate-secrets --target production` creates a missing
+production Journal configuration and room salt; it preserves an existing salt and
+refuses to rotate configured keys. Back up both halves together. Environment migration
+refuses to overwrite an existing scoped configuration file.
+
+See [the complete CLI/environment audit](../server/docs/environment-audit.md) for
+remaining production and release gaps. `misty tasks` lists executable entrypoints;
+helper modules and tests are not commands.
 
 Doctor aggregates findings and exits nonzero if issues remain. `--json` produces structured findings for server, desktop, Cloudflare, and the default combined check. Release diagnostics retain their existing text output. Configuration checks and health checks do not exercise application workflows.
 

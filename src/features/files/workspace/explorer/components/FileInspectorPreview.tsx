@@ -7,15 +7,15 @@ export {
   AudioPreview,
   FolderContentsPreview,
   PreviewImage,
-} from "./fileInspector/previewViews";
+} from "./fileInspector/PreviewViews";
 
 import {
   explorerListDirectory,
   explorerPreviewItem,
   connectedDevicesMediaUrl,
   fileMetadataSnapshot,
-} from "@/features/files/workspace/native";
-import type { DirectoryListing, FileEntry, FileMetadataSnapshot } from "@/native/contracts";
+} from "../../native";
+import type { DirectoryListing, FileEntry, FileMetadataSnapshot } from "@/native/ipc";
 import { errorText } from "@/shared/lib/format";
 import { useEffect, useState } from "react";
 import type { LoadedInspectorPreview } from "../model/interfaces/components/FileInspectorPreview";

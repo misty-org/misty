@@ -60,6 +60,13 @@ impl AgentService {
         .await
     }
 
+    pub async fn revoke_folder_scope(&self, scope_id: String) -> ApiResult<()> {
+        run_db(self.database_path.clone(), move |connection| {
+            connection.execute("DELETE FROM local_agent_scopes WHERE id=?1", [scope_id])?;
+            Ok(())
+        }).await
+    }
+
     pub async fn open_citation(&self, request: OpenAgentCitationRequest) -> ApiResult<()> {
         let citation = request.citation;
         let page = (citation.get("kind").and_then(Value::as_str) == Some("pdf_page"))
@@ -370,11 +377,16 @@ mod tests {
             .is_ok());
         assert!(service
             .scoped_document_path(PrepareScopedAgentDocumentRequest {
-                scope_id,
+                scope_id: scope_id.clone(),
                 relative_path: "../outside.txt".to_owned()
             })
             .await
             .is_err());
+        service.revoke_folder_scope(scope_id.clone()).await.unwrap();
+        assert!(service.scoped_document_path(PrepareScopedAgentDocumentRequest {
+            scope_id, relative_path: "inside.txt".to_owned()
+        }).await.is_err());
+        assert_eq!(fs::read_to_string(folder.join("inside.txt")).unwrap(), "hello");
         let _ = fs::remove_dir_all(root);
     }
 }

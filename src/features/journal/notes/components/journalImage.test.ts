@@ -2,7 +2,7 @@ import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { expect, it, vi } from "vitest";
 import { journalImage } from "./journalImage";
-import type { JournalImageLease } from "@/features/journal/sdkJournalAssets";
+import type { JournalImageLease } from "@/features/journal/journalAssets";
 
 it("keeps the stable shared reference in the document and releases rendered URLs", async () => {
   const release = vi.fn(),

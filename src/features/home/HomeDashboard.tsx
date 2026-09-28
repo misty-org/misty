@@ -1,43 +1,24 @@
-import { homeApi } from "@/api/home/api";
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { useAuth } from "@/features/auth";
 import {
-  SpaceAvatar,
   preferredDefaultSpace,
   rememberedJournalRoute,
   rememberedPlannerRoute,
   socialProviderPath,
+  SpaceAvatar,
   useSpacesStore,
 } from "@/features/spaces";
 import {
+  useRecentToolsStore,
   WORKSPACE_TOOLS_META,
   WorkspaceAppIcon,
-  isWorkspaceToolId,
-  workspaceSurfaceFromRoute,
-  useRecentToolsStore,
-  useWorkspaceStore,
   type WorkspaceToolId,
 } from "@/features/workspace";
 import { Button, cn } from "@/shared/ui";
-import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import { ArrowRight, CalendarDays, Clock3, Flame, UsersRound } from "lucide-react";
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentProps,
-  type MouseEvent,
-  type ReactNode,
-} from "react";
-import { Link } from "react-router-dom";
-import {
-  activityStreak,
-  cacheHomeActivity,
-  contributionDates,
-  dateKey,
-  type HomeActivity,
-} from "./homeActivity";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { activityStreak, contributionDates } from "./homeActivity";
 import {
   firstName,
   formatAgendaTime,
@@ -46,35 +27,33 @@ import {
   formatRelativeDate,
   greetingForDate,
 } from "./homeFormat";
-
+import { contributionDays, OverviewContributions } from "./HomeContributions";
+import { HomeLink } from "./HomeLink";
+import { useHomeActivity } from "./useHomeActivity";
 import { useHomeAgenda, type HomeAgendaEntry } from "./useHomeAgenda";
-
-const contributionWeeks = 40;
-const contributionDays = contributionWeeks * 7;
 const fallbackTools: WorkspaceToolId[] = ["journal", "planner", "social", "inbox", "files"];
-
-type HomeDashboardProps = { global: true; spaceId?: never } | { global?: false; spaceId: string };
-
+type HomeDashboardProps =
+  | {
+      global: true;
+      spaceId?: never;
+    }
+  | {
+      global?: false;
+      spaceId: string;
+    };
 export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
-  const presentation = useSurfacePresentation();
-  const mobile = presentation !== "desktop";
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const spacesLoading = useSpacesStore((state) => state.loading);
   const recentTools = useRecentToolsStore((state) => state.recentTools);
-  const hydrateRecentTools = useRecentToolsStore((state) => state.hydrateRecentTools);
   const [now] = useState(() => new Date());
-  const activityScope = JSON.stringify([user?.id, spaceId]);
-  const [activityResult, setActivityResult] = useState<{
-    scope: string;
-    activity: HomeActivity;
-    state: "ready" | "error";
-  } | null>(null);
-  const [activityAttempt, setActivityAttempt] = useState(0);
-  const activity = activityResult?.scope === activityScope ? activityResult.activity : {};
-  const activityState = activityResult?.scope === activityScope ? activityResult.state : "loading";
   const space = spaces.find((candidate) => candidate.id === spaceId);
   const fallbackSpaceId = global ? preferredDefaultSpace(spaces)?.id : undefined;
+  const {
+    activity,
+    state: activityState,
+    retry: retryActivity,
+  } = useHomeActivity(user?.id, spaceId, fallbackSpaceId);
   const agendaSpaces = useMemo(
     () =>
       (global ? spaces : space ? [space] : []).filter(
@@ -87,48 +66,6 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
   const agendaPath = agendaSpace
     ? `/spaces/${encodeURIComponent(agendaSpace.id)}/planner/agenda/day`
     : undefined;
-
-  useEffect(() => {
-    const todayKey = dateKey(new Date());
-    const sessionKey = `misty:home-activity-session:${user?.id ?? "guest"}:${spaceId ?? "global"}:${todayKey}`;
-    let recordedThisSession = false;
-    try {
-      recordedThisSession = !!window.sessionStorage.getItem(sessionKey);
-    } catch {
-      // The server remains authoritative when session storage is unavailable.
-    }
-    let cancelled = false;
-    setActivityResult(null);
-    const request = recordedThisSession
-      ? homeApi.snapshot(spaceId, fallbackSpaceId)
-      : homeApi.recordVisit(spaceId, todayKey, fallbackSpaceId);
-    void request
-      .then((snapshot) => {
-        if (cancelled) return;
-        setActivityResult({ scope: activityScope, activity: snapshot.activity, state: "ready" });
-        cacheHomeActivity(user?.id ?? "", spaceId ?? "global", snapshot.activity);
-        try {
-          window.sessionStorage.setItem(sessionKey, "1");
-        } catch {
-          // A successful database response does not depend on local storage.
-        }
-        hydrateRecentTools(snapshot.recent_apps.filter(isWorkspaceToolId));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setActivityResult({ scope: activityScope, activity: {}, state: "error" });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activityAttempt, activityScope, fallbackSpaceId, hydrateRecentTools, spaceId, user?.id]);
-
-  useEffect(() => {
-    const refresh = () => setActivityAttempt((value) => value + 1);
-    window.addEventListener("misty:refresh-focused-tool", refresh);
-    return () => window.removeEventListener("misty:refresh-focused-tool", refresh);
-  }, []);
-
   const jumpTools = useMemo(() => {
     const ordered = [...recentTools, ...fallbackTools];
     const seen = new Set<WorkspaceToolId>();
@@ -145,7 +82,6 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
       })
       .slice(0, 4);
   }, [recentTools, space, spaces, global]);
-
   const visibleSpaces = useMemo(
     () =>
       [...spaces]
@@ -153,19 +89,21 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
         .slice(0, 5),
     [spaces],
   );
-
   const streak = activityStreak(activity, now);
   const overviewDates = contributionDates(now, contributionDays);
-  useMobileSurfaceChrome({ title: global ? "Home" : space?.name || "Home", level: "root" });
-
   if (!global && !space) return null;
-
   return (
-    <main className="misty-transient-scrollbar h-full min-h-0 overflow-x-hidden overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25 selection:text-cream-bright">
+    <main
+      className={cn(
+        "misty-transient-scrollbar h-full min-h-0 overflow-x-hidden",
+        "overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25",
+        "selection:text-cream-bright",
+      )}
+    >
       <div
         className={cn(
           "mx-auto w-full max-w-[1240px] [@media(min-width:1024px)_and_(min-height:800px)]:h-full",
-          mobile ? "px-4 py-4" : "px-5 py-6 sm:px-8 lg:px-10",
+          "px-5 py-6 sm:px-8 lg:px-10",
         )}
       >
         <header className="mb-6">
@@ -182,7 +120,7 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
               <div
                 className={cn(
                   "grid gap-2 rounded-2xl border border-charcoal-border bg-charcoal-card/55 p-2",
-                  mobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4",
+                  "sm:grid-cols-2 lg:grid-cols-4",
                 )}
               >
                 {jumpTools.map((toolId) => {
@@ -194,10 +132,14 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                       : null;
                   if (!route) return null;
                   return (
-                    <DashboardLink
+                    <HomeLink
                       key={toolId}
                       to={route}
-                      className="group flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors hover:bg-charcoal-active/65 focus-visible:ring-2 focus-visible:ring-sage-fg/60"
+                      className={cn(
+                        "group flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left",
+                        "outline-none transition-colors hover:bg-charcoal-active/65",
+                        "focus-visible:ring-2 focus-visible:ring-sage-fg/60",
+                      )}
                     >
                       <WorkspaceAppIcon
                         appId={toolId}
@@ -219,11 +161,11 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                       <ArrowRight
                         className={cn(
                           "size-4 shrink-0 text-cream-muted transition-opacity",
-                          mobile ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                          "opacity-0 group-hover:opacity-100",
                         )}
                         aria-hidden="true"
                       />
-                    </DashboardLink>
+                    </HomeLink>
                   );
                 })}
               </div>
@@ -237,9 +179,9 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                 title="Agenda"
                 action={
                   agendaPath ? (
-                    <DashboardLink to={agendaPath} className={sectionLinkClass}>
+                    <HomeLink to={agendaPath} className={sectionLinkClass}>
                       Open agenda
-                    </DashboardLink>
+                    </HomeLink>
                   ) : undefined
                 }
               />
@@ -261,9 +203,9 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                     {spacesLoading ? (
                       <p role="status">Loading your spaces…</p>
                     ) : (
-                      <DashboardLink to="/spaces" className={sectionLinkClass}>
+                      <HomeLink to="/spaces" className={sectionLinkClass}>
                         Create a Space
-                      </DashboardLink>
+                      </HomeLink>
                     )}
                   </div>
                 )}
@@ -293,9 +235,10 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
               </div>
               {activityState === "error" && (
                 <Button
-                  variant="ghost"
-                  className="h-auto p-0 text-xs text-cream-muted hover:bg-transparent hover:text-cream-bright"
-                  onClick={() => setActivityAttempt((value) => value + 1)}
+                  variant="link"
+                  size="none"
+                  className="text-xs text-cream-muted hover:text-cream-bright"
+                  onClick={retryActivity}
                 >
                   Retry activity
                 </Button>
@@ -311,14 +254,12 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
     </main>
   );
 }
-
 function spaceToolIsAvailable(space: Space, toolId: WorkspaceToolId): boolean {
   if (toolId === "social") return space.permissions?.["messages.read"] !== false;
   if (toolId === "planner") return space.permissions?.["tasks.view"] !== false;
   if (toolId === "library") return space.permissions?.["library.view"] !== false;
   return true;
 }
-
 function CurrentDateTime() {
   const [value, setValue] = useState(() => new Date());
   useEffect(() => {
@@ -326,7 +267,6 @@ function CurrentDateTime() {
     const interval = window.setInterval(updateClock, 1_000);
     return () => window.clearInterval(interval);
   }, []);
-
   const date = formatLongDate(value);
   const time = formatClockTime(value);
   return (
@@ -342,11 +282,9 @@ function CurrentDateTime() {
     </time>
   );
 }
-
 function StreakFlame() {
   return <Flame className="size-5 shrink-0 text-cream-bright" aria-hidden="true" />;
 }
-
 function SectionHeading(props: { id: string; title: string; action?: ReactNode }) {
   return (
     <div className="mb-3 flex min-h-7 items-center justify-between gap-4 px-1">
@@ -357,7 +295,6 @@ function SectionHeading(props: { id: string; title: string; action?: ReactNode }
     </div>
   );
 }
-
 function AgendaRows(props: {
   state: "loading" | "ready" | "error";
   entries: HomeAgendaEntry[];
@@ -384,12 +321,7 @@ function AgendaRows(props: {
           </p>
           <p className="mt-1 text-xs text-cream-muted">Check your connection and try again.</p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="rounded-lg bg-charcoal-active px-3 py-2 text-xs font-medium text-cream outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-sage-fg/60"
-          onClick={() => void props.onRetry()}
-        >
+        <Button size="sm" onClick={() => void props.onRetry()}>
           Try again
         </Button>
       </div>
@@ -412,7 +344,7 @@ function AgendaRows(props: {
     <div className="grid gap-1">
       {error}
       {props.entries.map((entry) => (
-        <DashboardLink
+        <HomeLink
           to={`/spaces/${encodeURIComponent(entry.spaceId)}/planner/agenda/day`}
           key={`${entry.spaceId}:${entry.kind}:${entry.id}`}
           className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-charcoal-active/45"
@@ -429,18 +361,21 @@ function AgendaRows(props: {
             <Clock3 size={13} aria-hidden="true" />
             {formatAgendaTime(entry.starts_at, entry.all_day)}
           </span>
-        </DashboardLink>
+        </HomeLink>
       ))}
     </div>
   );
 }
-
 function SpaceRow(props: { space: Space }) {
   const encodedId = encodeURIComponent(props.space.id);
   return (
-    <DashboardLink
+    <HomeLink
       to={`/spaces/${encodedId}/home`}
-      className="group flex min-w-0 items-center gap-3 rounded-xl px-3 py-1 outline-none transition-colors hover:bg-charcoal-active/65 focus-visible:ring-2 focus-visible:ring-sage-fg/60"
+      className={cn(
+        "group flex min-w-0 items-center gap-3 rounded-xl px-3 py-1 outline-none",
+        "transition-colors hover:bg-charcoal-active/65 focus-visible:ring-2",
+        "focus-visible:ring-sage-fg/60",
+      )}
     >
       <SpaceAvatar space={props.space} className="size-9" />
       <span className="min-w-0 flex-1">
@@ -455,75 +390,14 @@ function SpaceRow(props: { space: Space }) {
         </span>
       </span>
       <span className="shrink-0 text-xs text-cream-muted">Open</span>
-    </DashboardLink>
+    </HomeLink>
   );
 }
-
-function OverviewContributions(props: { dates: Date[]; activity: HomeActivity }) {
-  return (
-    <div className="min-w-0 pb-1 [container-type:inline-size]">
-      <div className="min-w-0">
-        <div
-          className="mb-1.5 flex justify-between px-0.5 text-[10px] text-cream-muted"
-          aria-hidden="true"
-        >
-          {monthLabels(props.dates).map((label) => (
-            <span key={label.key}>{label.label}</span>
-          ))}
-        </div>
-        <div
-          className="grid min-w-0 grid-flow-col grid-rows-[repeat(7,auto)] auto-cols-fr place-items-center gap-[clamp(0.125rem,0.25cqw,0.25rem)]"
-          aria-label={`${contributionWeeks} weeks of Home activity`}
-        >
-          {props.dates.map((date) => {
-            const key = dateKey(date);
-            const count = props.activity[key] ?? 0;
-            return (
-              <span
-                key={key}
-                className={cn(
-                  "aspect-square w-full max-w-[clamp(1.125rem,1.4cqw,1.5rem)] rounded-[5px]",
-                  contributionClass(count),
-                )}
-                title={`${count} ${count === 1 ? "visit" : "visits"} on ${date.toLocaleDateString()}`}
-              />
-            );
-          })}
-        </div>
-        <div className="mt-2 flex items-center justify-end gap-1.5 text-[10px] text-cream-muted">
-          <span>Less</span>
-          {[0, 1, 2, 4].map((count) => (
-            <span key={count} className={cn("size-2.5 rounded-[3px]", contributionClass(count))} />
-          ))}
-          <span>More</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DashboardLink(props: ComponentProps<typeof Link>) {
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    props.onClick?.(event);
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    )
-      return;
-    const path = typeof props.to === "string" ? props.to : (props.to.pathname ?? "");
-    const surface = workspaceSurfaceFromRoute(path);
-    if (surface) useWorkspaceStore.getState().openSurface(surface);
-  };
-  return <Link {...props} onClick={handleClick} />;
-}
-
-const sectionLinkClass =
-  "rounded-md px-1.5 py-1 text-xs font-medium text-sage-fg outline-none underline-offset-4 hover:text-cream-bright hover:underline focus-visible:ring-2 focus-visible:ring-sage-fg/60";
-
+const sectionLinkClass = cn(
+  "rounded-md px-1.5 py-1 text-xs font-medium text-sage-fg outline-none",
+  "underline-offset-4 hover:text-cream-bright hover:underline",
+  "focus-visible:ring-2 focus-visible:ring-sage-fg/60",
+);
 function routeForTool(toolId: WorkspaceToolId, space: Space, accountId: string): string | null {
   const encodedId = encodeURIComponent(space.id);
   if (toolId === "journal") return rememberedJournalRoute(accountId, space.id);
@@ -531,16 +405,14 @@ function routeForTool(toolId: WorkspaceToolId, space: Space, accountId: string):
   if (toolId === "social") return socialProviderPath(space.id, "misty");
   if (toolId === "library") return `/spaces/${encodedId}/library`;
   if (toolId === "home") return `/spaces/${encodedId}/home`;
-  if (["inbox", "browser", "code", "files", "terminal", "agents", "transfers"].includes(toolId)) {
+  if (["inbox", "browser", "code", "files", "terminal", "agents"].includes(toolId)) {
     return `/${toolId}`;
   }
   return null;
 }
-
 function isSpaceTool(toolId: WorkspaceToolId): boolean {
   return ["journal", "planner", "social", "library"].includes(toolId);
 }
-
 function toolDescription(toolId: WorkspaceToolId): string {
   const descriptions: Partial<Record<WorkspaceToolId, string>> = {
     journal: "Notes and drawings",
@@ -553,35 +425,13 @@ function toolDescription(toolId: WorkspaceToolId): string {
     code: "Projects and source",
     terminal: "Local command line",
     agents: "AI collaborators",
-    transfers: "Recent transfers",
   };
   return descriptions[toolId] ?? "Open workspace";
 }
-
 function agendaDotClass(kind: SpaceAgendaEntry["kind"]): string {
   if (kind === "event") return "bg-avatar-blue";
   if (kind === "task") return "bg-avatar-green";
   if (kind === "goal") return "bg-agent-violet";
   if (kind === "milestone") return "bg-avatar-orange";
   return "bg-agent-indigo";
-}
-
-function contributionClass(count: number): string {
-  if (count >= 4) return "bg-cream-bright";
-  if (count >= 2) return "bg-cream-bright/70";
-  if (count >= 1) return "bg-cream-bright/40";
-  return "bg-charcoal-active/75";
-}
-
-function monthLabels(dates: Date[]): { key: string; label: string }[] {
-  const labels: { key: string; label: string }[] = [];
-  for (const date of dates) {
-    const key = `${date.getFullYear()}-${date.getMonth()}`;
-    if (labels.some((label) => label.key === key)) continue;
-    labels.push({
-      key,
-      label: new Intl.DateTimeFormat(undefined, { month: "short" }).format(date),
-    });
-  }
-  return labels;
 }

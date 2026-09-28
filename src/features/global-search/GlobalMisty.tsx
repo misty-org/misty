@@ -1,3 +1,4 @@
+import { useCompanionState, requestsScreenContext } from "@/features/agents/companion";
 import { isAgentModeActive } from "./searchAvailability";
 import {
   MistyApprovalReview,
@@ -16,7 +17,7 @@ import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { invokeShortcutCommand } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
-import { ScrollArea, cn } from "@/shared/ui";
+import { cn, ScrollArea, ViewportLayer } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -80,7 +81,9 @@ export function GlobalMistySurface(props: {
   const execution = useLocalExecution((s) => s.execution);
   const pendingApproval = usePendingMistyApproval();
   const docked = props.controller === "misty";
-  const taskSurface = docked && !!execution;
+  // Finished executions retain browser context for follow-ups, not an overlay lease.
+  const taskSurface =
+    docked && !!execution && execution.state !== "finished" && !execution.desktopControl;
   const useController = props.controller === "misty" ? useMistyStore : useGlobalSearchStore;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [showSetup, setShowSetup] = useState(false);
@@ -171,7 +174,7 @@ export function GlobalMistySurface(props: {
         registration.accountId === props.accountId && registration.paneId === aiPaneId,
     ),
   );
-  // An SDK adapter may be denied, revoked or closed while its pane is mounted.
+  // A surface adapter may be denied, revoked or closed while its pane is mounted.
   // Optional context must never throw through the workspace render boundary.
   const surfaceSnapshot = useMemo(
     () => readOptionalSurfaceContext(includeCurrentContext ? aiRegistration?.adapter : undefined),
@@ -292,10 +295,12 @@ export function GlobalMistySurface(props: {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closePanel, open, showSetup]);
   useEffect(() => {
-    if (!suspendBrowserWebviews || taskSurface) return;
-    requestEmbeddedBrowserSuspension(open, "global-misty");
-    return () => requestEmbeddedBrowserSuspension(false, "global-misty");
-  }, [open, suspendBrowserWebviews, taskSurface]);
+    if (!suspendBrowserWebviews) return;
+    // Search and the task panel can coexist. Each owns its native stacking lease.
+    const reason = docked ? "global-misty" : "global-search";
+    requestEmbeddedBrowserSuspension(open, reason);
+    return () => requestEmbeddedBrowserSuspension(false, reason);
+  }, [open, suspendBrowserWebviews, docked]);
   useEffect(() => {
     if (wasOpenRef.current && !open) onClosed?.();
     wasOpenRef.current = open;
@@ -304,6 +309,18 @@ export function GlobalMistySurface(props: {
     if (open) onContentVisibilityChange?.(contentVisible);
   }, [contentVisible, onContentVisibilityChange, open]);
   const sendAnswer = async (prompt: string) => {
+    if (
+      !allowCapture &&
+      requestsScreenContext(prompt) &&
+      !registeredAiSelection &&
+      !attachments.length &&
+      !useCompanionState.getState().submit
+    ) {
+      setVoiceError(
+        "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there, or attach an image.",
+      );
+      return;
+    }
     if (taskSurface) {
       if (!prompt.trim() || routingFollowupRef.current) return;
       if (attachments.length) {
@@ -326,7 +343,23 @@ export function GlobalMistySurface(props: {
       }
       return;
     }
-    await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
+    const companionSubmit = useCompanionState.getState().submit;
+    if (companionSubmit && !registeredAiSelection && requestsScreenContext(prompt)) {
+      // Like Clicky's panel dismissal, expose the referenced workspace before capture.
+      useController.getState().closePanel();
+      try {
+        await companionSubmit({
+          prompt,
+          attachments: attachmentState.attachments,
+          conversationId: useController.getState().activeConversationId,
+        });
+      } catch (error) {
+        setVoiceError(error instanceof Error ? error.message : String(error));
+        useController.getState().openPanel();
+      }
+    } else {
+      await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
+    }
     if (!useController.getState().query) attachmentState.consume();
   };
   const activateCandidate = (candidate?: UnifiedMistyCandidate) => {
@@ -428,6 +461,7 @@ export function GlobalMistySurface(props: {
             state.accountId !== props.accountId
               ? state
               : {
+                  thinkingModeExplicit: true,
                   thinkingMode:
                     state.activeConversationId === activeConversationId
                       ? settings.reasoningEffort === "xhigh"
@@ -445,12 +479,10 @@ export function GlobalMistySurface(props: {
   );
 
   return (
-    <div
-      className={
-        docked
-          ? "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center px-4 pt-10"
-          : "pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
-      }
+    <ViewportLayer
+      layer="chrome"
+      passthrough
+      className={cn("flex flex-col items-center", docked ? "px-4 pt-10" : "pt-[9vh]")}
       data-global-misty-root
     >
       {docked && open && (
@@ -480,7 +512,11 @@ export function GlobalMistySurface(props: {
               className={cn(
                 "pointer-events-none flex flex-col items-center",
                 docked
-                  ? "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden rounded-xl bg-charcoal-card text-cream shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+                  ? [
+                      "relative w-[min(600px,100%)] max-h-[calc(100dvh-140px)] overflow-hidden",
+                      "rounded-xl bg-charcoal-card text-cream",
+                      "shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
+                    ]
                   : "gap-2",
               )}
               data-html2canvas-ignore="true"
@@ -600,7 +636,7 @@ export function GlobalMistySurface(props: {
           />
         </Suspense>
       ) : null}
-    </div>
+    </ViewportLayer>
   );
 }
 

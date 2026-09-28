@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button } from "@/shared/ui";
+import { cn, Button, Pressable } from "@/shared/ui";
 import { capabilityApprovalsApi, type CapabilityApprovalReview } from "./api";
 import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useCapabilityApprovals } from "./store";
@@ -39,10 +39,9 @@ export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boole
         <ul className="m-0 list-none p-0">
           {items.map((item) => (
             <li key={item.id} className="border-t border-charcoal-border/70">
-              <Button
-                variant="ghost"
+              <Pressable
                 aria-expanded={selected === item.id}
-                className="flex min-h-11 w-full items-start justify-between gap-3 rounded-md px-2 py-3 text-start text-sm text-cream hover:bg-charcoal-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cream-muted font-normal h-auto"
+                className="rounded-md flex min-h-11 w-full items-start justify-between gap-3 px-2 py-3 text-sm text-cream hover:bg-charcoal-card"
                 onClick={() =>
                   setParams((current) => {
                     const next = new URLSearchParams(current);
@@ -53,7 +52,7 @@ export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boole
               >
                 <span className="min-w-0 break-words [overflow-wrap:anywhere]">{item.summary}</span>
                 <span className="shrink-0 text-cream-muted">Review</span>
-              </Button>
+              </Pressable>
             </li>
           ))}
         </ul>
@@ -236,7 +235,11 @@ export function CapabilityApprovalDetail({ id, onClose }: { id: string; onClose(
             </p>
             <pre
               dir="auto"
-              className="misty-transient-scrollbar mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md bg-charcoal-card p-3 font-mono text-sm leading-6 text-cream [overflow-wrap:anywhere]"
+              className={cn(
+                "misty-transient-scrollbar mt-2 max-h-80 overflow-auto",
+                "whitespace-pre-wrap break-words rounded-md bg-charcoal-card p-3",
+                "font-mono text-sm leading-6 text-cream [overflow-wrap:anywhere]",
+              )}
               tabIndex={0}
             >
               {typeof details!.input === "string"

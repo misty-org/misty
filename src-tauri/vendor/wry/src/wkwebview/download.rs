@@ -1,6 +1,6 @@
-use std::{env::current_dir, ptr::null_mut};
+use std::{cell::RefCell, collections::HashMap, env::current_dir, ptr::null_mut};
 
-use objc2::{rc::Retained, runtime::ProtocolObject, DeclaredClass};
+use objc2::{rc::Retained, runtime::ProtocolObject, DeclaredClass, Message};
 use objc2_foundation::{NSData, NSError, NSString, NSURLResponse, NSURL};
 use objc2_web_kit::{WKDownload, WKNavigationAction, WKNavigationResponse};
 
@@ -12,6 +12,45 @@ use objc2_web_kit::WKWebView;
 use super::class::{
   wry_download_delegate::WryDownloadDelegate, wry_navigation_delegate::WryNavigationDelegate,
 };
+
+thread_local! {
+  /// Downloads in progress, keyed by their destination path. WebKit objects
+  /// are main-thread only, so the registry lives on the main thread.
+  static ACTIVE_DOWNLOADS: RefCell<HashMap<String, Retained<WKDownload>>> = RefCell::new(HashMap::new());
+}
+
+fn forget_download(download: &WKDownload) {
+  ACTIVE_DOWNLOADS.with(|active| {
+    active
+      .borrow_mut()
+      .retain(|_, item| !std::ptr::eq(Retained::as_ptr(item), download as *const WKDownload));
+  });
+}
+
+/// Bytes received and expected (-1 when unknown) for a download in progress.
+/// Must be called on the main thread.
+pub fn download_progress(destination: &str) -> Option<(i64, i64)> {
+  ACTIVE_DOWNLOADS.with(|active| {
+    let active = active.borrow();
+    let download = active.get(destination)?;
+    unsafe {
+      let progress: *mut objc2::runtime::AnyObject = objc2::msg_send![&**download, progress];
+      let progress = progress.as_ref()?;
+      let completed: i64 = objc2::msg_send![progress, completedUnitCount];
+      let total: i64 = objc2::msg_send![progress, totalUnitCount];
+      Some((completed, total))
+    }
+  })
+}
+
+/// Cancels a download in progress. WebKit then reports it as failed.
+/// Must be called on the main thread.
+pub fn cancel_download(destination: &str) -> bool {
+  let download = ACTIVE_DOWNLOADS.with(|active| active.borrow_mut().remove(destination));
+  let Some(download) = download else { return false };
+  unsafe { download.cancel(None) };
+  true
+}
 
 // Download action handler
 pub(crate) fn navigation_download_action(
@@ -76,6 +115,11 @@ pub(crate) fn download_policy(
       let mut started_fn = started_fn.borrow_mut();
       match started_fn(url.to_string(), &mut download_destination) {
         true => {
+          ACTIVE_DOWNLOADS.with(|active| {
+            active
+              .borrow_mut()
+              .insert(download_destination.display().to_string(), download.retain());
+          });
           let path = NSString::from_str(&download_destination.display().to_string());
           let ns_url = NSURL::fileURLWithPath_isDirectory(&path, false);
           (*completion_handler).call((Retained::as_ptr(&ns_url),))
@@ -91,6 +135,7 @@ pub(crate) fn download_policy(
 }
 
 pub(crate) fn download_did_finish(this: &WryDownloadDelegate, download: &WKDownload) {
+  forget_download(download);
   unsafe {
     let original_request = download.originalRequest().unwrap();
     let url = original_request.URL().unwrap().absoluteString().unwrap();
@@ -106,6 +151,7 @@ pub(crate) fn download_did_fail(
   error: &NSError,
   _resume_data: &NSData,
 ) {
+  forget_download(download);
   unsafe {
     #[cfg(debug_assertions)]
     {

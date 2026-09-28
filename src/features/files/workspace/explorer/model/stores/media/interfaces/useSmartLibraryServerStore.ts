@@ -1,5 +1,5 @@
-import type { AnalysisBatch, AnalysisEstimate, AnalysisResult } from "@/native/contracts";
-import type { SmartLibrarySourceKind } from "@/native/contracts/primitives";
+import type { AnalysisBatch, AnalysisEstimate, AnalysisResult } from "@/native/ipc";
+import type { SmartLibrarySourceKind } from "@/native/ipc/primitives";
 
 export interface RegisterSmartLibraryFolderRequest {
   clientLibraryId: string;

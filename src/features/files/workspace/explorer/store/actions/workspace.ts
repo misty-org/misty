@@ -4,7 +4,7 @@ import {
   explorerLibraryRecordLastOpened,
   explorerLibraryRecordRecent,
   explorerLibrarySnapshot,
-} from "@/features/files/workspace/native";
+} from "../../../native";
 import { errorText } from "@/shared/lib/format";
 import type { ExplorerStore } from "../../model/interfaces/store/types";
 import type { ExplorerGet, ExplorerSet } from "../../model/types/store/types";

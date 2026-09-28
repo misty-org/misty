@@ -1,61 +1,46 @@
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, cn } from "@/shared/ui";
+import { cn, Collapsible, CollapsibleContent, CollapsibleTrigger, Pressable } from "@/shared/ui";
 import { ChevronDown, ChevronRight, Circle, Flag, ListTree, Shapes } from "lucide-react";
 import { useState } from "react";
-
 export function RoadmapOutline({
   snapshot,
   selectedId,
   onSelect,
   onOpenTask,
-  mobile = false,
 }: {
   snapshot: SpaceRoadmapSnapshot;
   selectedId: string;
   onSelect: (id: string) => void;
   onOpenTask: (taskId: string) => void;
-  mobile?: boolean;
 }) {
-  const [open, setOpen] = useState(mobile);
+  const [open, setOpen] = useState(false);
   return (
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className={cn("border-charcoal-border/70 bg-charcoal-bg", mobile ? "h-full" : "border-t")}
+      className={cn("border-charcoal-border/70 bg-charcoal-bg", "border-t")}
     >
-      {!mobile ? (
+      {
         <CollapsibleTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold text-cream-muted"
-          >
+          <Pressable className="flex items-center hover:bg-cream/[0.045] h-9 w-full gap-2 rounded-none px-3 text-[10px] font-semibold text-cream-muted">
             <ListTree className="size-3.5" />
             Accessible outline
             <ChevronDown
               className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")}
             />
-          </Button>
+          </Pressable>
         </CollapsibleTrigger>
-      ) : null}
+      }
       <CollapsibleContent>
-        <nav
-          className={cn(
-            "overflow-auto p-2",
-            mobile ? "h-full pb-[env(safe-area-inset-bottom)]" : "max-h-52 pt-0",
-          )}
-          aria-label="Roadmap outline"
-        >
+        <nav className={cn("overflow-auto p-2", "max-h-52 pt-0")} aria-label="Roadmap outline">
           {snapshot.milestones.map((milestone) => (
             <div key={milestone.id}>
-              <Button
+              <Pressable
                 className={cn(
-                  mobile ? "min-h-12" : "h-8",
-                  "w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
+                  "h-8",
+                  "w-full gap-2 rounded px-2 text-xs hover:bg-charcoal-card",
                   selectedId === milestone.id && "bg-charcoal-card",
                 )}
-                type="button"
-                variant="ghost"
                 onClick={() => onSelect(milestone.id)}
               >
                 <Flag className="size-3.5" />
@@ -63,85 +48,76 @@ export function RoadmapOutline({
                 <span className="ml-auto text-[10px] text-cream-muted">
                   {milestone.goal_done}/{milestone.goal_total}
                 </span>
-              </Button>
+              </Pressable>
               {snapshot.goals
                 .filter((goal) => goal.milestone_id === milestone.id)
                 .map((goal) => (
                   <div key={goal.id}>
-                    <Button
+                    <Pressable
                       className={cn(
                         outlineItemClass,
-                        mobile && "min-h-12",
+                        false,
                         "pl-7 text-xs",
                         selectedId === goal.id && "bg-charcoal-card text-cream",
                       )}
-                      type="button"
-                      variant="ghost"
                       onClick={() => onSelect(goal.id)}
                     >
                       <ChevronRight className="size-3" />
                       <Circle className="size-2.5" />
                       <span className="truncate">{goal.title}</span>
-                    </Button>
+                    </Pressable>
                     {goal.tasks.map((task) => (
-                      <Button
-                        className={cn(outlineItemClass, mobile && "min-h-12", "pl-12 text-[11px]")}
-                        type="button"
-                        variant="ghost"
+                      <Pressable
+                        className={cn(outlineItemClass, false, "pl-12 text-[11px]")}
                         key={task.id}
                         onClick={() => onOpenTask(task.id)}
                       >
                         <Circle className="size-2" />
                         <span className="truncate">{task.title}</span>
-                      </Button>
+                      </Pressable>
                     ))}
                   </div>
                 ))}
               {snapshot.nodes
                 .filter((node) => node.milestone_id === milestone.id)
                 .map((node) => (
-                  <Button
+                  <Pressable
                     className={cn(
                       outlineItemClass,
-                      mobile && "min-h-12",
+                      false,
                       "pl-7 text-xs",
                       selectedId === node.id && "bg-charcoal-card text-cream",
                     )}
-                    type="button"
-                    variant="ghost"
                     key={node.id}
                     onClick={() => onSelect(node.id)}
                   >
                     <Shapes className="size-3" />
                     <span className="truncate">{node.title}</span>
-                  </Button>
+                  </Pressable>
                 ))}
             </div>
           ))}
           {snapshot.nodes
             .filter((node) => !node.milestone_id)
             .map((node) => (
-              <Button
+              <Pressable
                 className={cn(
-                  mobile ? "min-h-12" : "h-8",
-                  "w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
+                  "h-8",
+                  "w-full gap-2 rounded px-2 text-xs hover:bg-charcoal-card",
                   selectedId === node.id && "bg-charcoal-card",
                 )}
-                type="button"
-                variant="ghost"
                 key={node.id}
                 onClick={() => onSelect(node.id)}
               >
                 <Shapes className="size-3.5" />
                 <span className="truncate">{node.title}</span>
-              </Button>
+              </Pressable>
             ))}
         </nav>
       </CollapsibleContent>
     </Collapsible>
   );
 }
-
 const outlineItemClass = [
   "h-7 w-full justify-start gap-2 rounded pr-2 text-left font-normal",
   "text-cream-muted hover:bg-charcoal-card hover:text-cream",

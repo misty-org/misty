@@ -1,93 +1,12 @@
-import {
-  Button,
-  cn,
-  NavigationSectionButton,
-  NavigationTreeItem,
-  navigationMenuGroupClass,
-} from "@/shared/ui";
-import { type LucideIcon, X } from "lucide-react";
-import { createContext, Fragment, type ReactNode, useEffect, useState } from "react";
-
+import { cn, IconButton } from "@/shared/ui";
+import { X } from "lucide-react";
+import { createContext, type ReactNode } from "react";
+import { SettingActionsMenu, SettingScopeBadge } from "../profiles/SettingScope";
+import { type DesktopSettingsNavEntry, SettingsNavigation } from "./SettingsNavigation";
+export type { DesktopSettingsNavEntry } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
-
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
-  const mobile = props.presentation === "mobile";
-  const activeGroup = props.items.find((item) => item.id === props.activeId)?.group;
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
-
-  useEffect(() => {
-    if (!activeGroup) return;
-    setCollapsedGroups((current) => {
-      if (!current.has(activeGroup)) return current;
-      const next = new Set(current);
-      next.delete(activeGroup);
-      return next;
-    });
-  }, [activeGroup]);
-
-  const toggleGroup = (group: string) => {
-    setCollapsedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
-  };
-
-  if (mobile) {
-    return (
-      <div
-        aria-label={props.ariaLabel}
-        className="grid h-full min-h-0 grid-rows-[48px_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg"
-      >
-        <header className="flex items-center gap-3 border-b border-charcoal-border px-3">
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-cream-bright">
-            {props.title}
-          </h1>
-          <Button
-            aria-label={`Close ${props.ariaLabel.toLowerCase()}`}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-            onClick={props.onClose}
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </Button>
-        </header>
-        <nav
-          className="misty-transient-scrollbar flex min-h-14 gap-1 overflow-x-auto border-b border-charcoal-border bg-charcoal-sidebar px-2 py-1.5"
-          aria-label={props.navigationLabel}
-        >
-          {props.items.map((item) => {
-            const Icon = item.icon;
-            const active = item.id === props.activeId;
-            return (
-              <Button
-                variant="ghost"
-                key={item.id}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-normal justify-start",
-                  active
-                    ? "bg-charcoal-active text-cream-bright"
-                    : "text-cream-muted hover:bg-charcoal-hover active:bg-charcoal-hover",
-                )}
-                onClick={() => props.onSelect(item.id)}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-                {item.label}
-              </Button>
-            );
-          })}
-        </nav>
-        <div className="misty-scrollbar min-h-0 overflow-y-auto overscroll-contain p-4">
-          {props.children}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       aria-label={props.ariaLabel}
@@ -98,95 +17,57 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         "max-[680px]:grid-cols-[156px_1px_minmax(0,1fr)]",
       )}
     >
-      <aside
-        className={cn(
-          "misty-scrollbar min-h-0 overflow-y-auto overscroll-contain bg-charcoal-sidebar px-3 py-3.5 text-cream-muted",
-          "[scrollbar-gutter:stable] max-[680px]:px-2",
+      <aside className="flex min-h-0 flex-col overflow-hidden bg-charcoal-sidebar py-3 text-cream-muted">
+        {props.navigationHeader ? (
+          <div className="mb-3 shrink-0 px-3 max-[680px]:px-2">{props.navigationHeader}</div>
+        ) : null}
+        {props.navigationOverride ?? (
+          <SettingsNavigation
+            items={props.items}
+            activeId={props.activeId}
+            label={props.navigationLabel}
+            onSelect={props.onSelect}
+          />
         )}
-      >
-        <nav className="flex min-h-0 flex-col" aria-label={props.navigationLabel}>
-          <div className={navigationMenuGroupClass}>
-            {props.items.map((item, index) => {
-              const Icon = item.icon;
-              const GroupIcon = item.groupIcon;
-              const active = props.activeId === item.id;
-              // Group captions use the global navigator's section-header
-              // treatment so the two rails read as the same component.
-              const startsGroup =
-                item.group !== undefined && item.group !== props.items[index - 1]?.group;
-              const groupCollapsed = item.group ? collapsedGroups.has(item.group) : false;
-              return (
-                <Fragment key={item.id}>
-                  {startsGroup && item.groupLabel ? (
-                    <h2 className={cn("flex h-8 shrink-0 items-center", index > 0 && "mt-1")}>
-                      <NavigationSectionButton
-                        open={!groupCollapsed}
-                        label={item.groupLabel}
-                        icon={
-                          GroupIcon ? (
-                            <GroupIcon aria-hidden="true" data-settings-group-icon="true" />
-                          ) : null
-                        }
-                        aria-label={`${groupCollapsed ? "Expand" : "Collapse"} ${item.groupLabel} settings`}
-                        onClick={() => item.group && toggleGroup(item.group)}
-                      />
-                    </h2>
-                  ) : null}
-                  {!groupCollapsed ? (
-                    <NavigationTreeItem
-                      icon={<Icon aria-hidden="true" />}
-                      label={item.label}
-                      selected={active}
-                      nested={Boolean(item.group)}
-                      settings
-                      data-settings-nav-entry={item.id}
-                      onClick={() => props.onSelect(item.id)}
-                    />
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </div>
-        </nav>
+        {props.navigationFooter ? (
+          <div className="shrink-0 px-3 max-[680px]:px-2">{props.navigationFooter}</div>
+        ) : null}
       </aside>
 
       <div aria-hidden="true" className="bg-charcoal-border" />
 
       <main className="flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
-        <header className="shrink-0 border-b border-charcoal-border/60 bg-charcoal-bg">
+        <header className="shrink-0 border-b border-charcoal-border/60">
           <div className="flex min-h-12 min-w-0 items-center gap-3 px-5 py-2 max-[720px]:px-4">
-            <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-cream">
                 {props.title}
               </h1>
+              {props.titleAccessory}
             </div>
             {overlay ? (
-              <Button
-                aria-label={`Close ${props.ariaLabel.toLowerCase()}`}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-                onClick={props.onClose}
-              >
+              <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
                 <X className="size-4" strokeWidth={1.8} />
-              </Button>
+              </IconButton>
             ) : null}
           </div>
         </header>
-        <div
-          className={cn(
-            "misty-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-5 max-[720px]:p-4",
-            "mx-auto w-full",
-            overlay ? "max-w-[760px]" : "max-w-[860px]",
-          )}
-        >
-          {props.children}
+        {/* The scroller spans the full pane so its scrollbar sits at the panel edge. */}
+        <div className="misty-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+          <div
+            className={cn(
+              "mx-auto w-full p-5 max-[720px]:p-4",
+              overlay ? "max-w-[760px]" : "max-w-[860px]",
+            )}
+          >
+            {props.contentHeader}
+            {props.children}
+          </div>
         </div>
       </main>
     </div>
   );
 }
-
 export function DesktopSettingsSection(props: {
   title: string;
   description?: string;
@@ -194,8 +75,8 @@ export function DesktopSettingsSection(props: {
 }) {
   return (
     <section className="mb-6 min-w-0 last:mb-0">
-      <div className="mb-3 min-w-0">
-        <h2 className="text-sm font-semibold leading-5 text-cream">{props.title}</h2>
+      <div className="mb-2.5 min-w-0">
+        <h2 className="text-[13px] font-medium leading-5 text-cream-muted">{props.title}</h2>
         {props.description ? (
           <p className="mt-1 max-w-2xl text-[13px] leading-[18px] text-cream-muted">
             {props.description}
@@ -208,57 +89,58 @@ export function DesktopSettingsSection(props: {
     </section>
   );
 }
-
 export function DesktopSettingsRow(props: {
   label: string;
   description?: string;
   children: ReactNode;
   last?: boolean;
+  /** Unavailable right now; dims the text only. */
   muted?: boolean;
+  /** Depends on the row above it and is drawn as its indented sub-row. */
+  indent?: boolean;
 }) {
   return (
     <div
+      data-setting-label={props.label}
+      tabIndex={-1}
       aria-disabled={props.muted || undefined}
       className={cn(
-        "grid min-h-16 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5 border-b border-charcoal-border/70 px-5 py-3.5 last:border-b-0",
+        "group/setting-row grid min-h-14 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5",
+        "border-b border-charcoal-border/70 px-5 py-3 last:border-b-0 outline-none",
+        "transition-colors duration-700 data-[setting-flash=true]:bg-charcoal-hover data-[setting-flash=true]:duration-0",
         "max-[760px]:grid-cols-1 max-[760px]:items-start max-[760px]:gap-3",
+        props.indent && "pl-10",
         props.last && "border-b-0",
-        props.muted && "bg-charcoal-bg/70",
       )}
     >
-      <div className="grid min-w-0 gap-1">
-        <strong
-          className={cn(
-            "text-sm font-medium leading-5",
-            props.muted ? "text-cream-muted" : "text-cream",
-          )}
-        >
-          {props.label}
-        </strong>
+      <div className="grid min-w-0 gap-0.5">
+        <span className="flex min-w-0 items-center gap-2">
+          <strong
+            className={cn(
+              "truncate text-sm font-medium leading-5",
+              props.muted ? "text-cream-muted" : "text-cream",
+            )}
+          >
+            {props.label}
+          </strong>
+          <SettingScopeBadge label={props.label} />
+        </span>
         {props.description ? (
           <span className="text-[13px] leading-[18px] text-cream-muted">{props.description}</span>
         ) : null}
       </div>
       <SettingsControlLabelContext.Provider value={props.label}>
-        <div className="flex min-w-0 items-center justify-end max-[760px]:w-full max-[760px]:justify-start">
+        <div
+          data-setting-control
+          className="flex min-w-0 items-center justify-end gap-2 max-[760px]:w-full max-[760px]:justify-start"
+        >
+          <SettingActionsMenu label={props.label} />
           {props.children}
         </div>
       </SettingsControlLabelContext.Provider>
     </div>
   );
 }
-
-export interface DesktopSettingsNavEntry<Id extends string = string> {
-  id: Id;
-  label: string;
-  icon: LucideIcon;
-  /** Adjacent entries sharing a group are drawn together. */
-  group?: string;
-  /** Caption shown above the first entry of a group. Omit for an unlabeled break. */
-  groupLabel?: string;
-  groupIcon?: LucideIcon;
-}
-
 export interface DesktopSettingsFrameProps<Id extends string> {
   activeId: Id;
   ariaLabel: string;
@@ -267,6 +149,13 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   navigationLabel: string;
   onClose?: () => void;
   onSelect: (id: Id) => void;
-  presentation?: "page" | "overlay" | "mobile";
+  presentation?: "page" | "overlay";
   title: ReactNode;
+  /** Sits beside the title, e.g. the page's storage scope. */
+  titleAccessory?: ReactNode;
+  navigationHeader?: ReactNode;
+  /** Replaces the section list, e.g. with search results while the user types. */
+  navigationOverride?: ReactNode;
+  navigationFooter?: ReactNode;
+  contentHeader?: ReactNode;
 }

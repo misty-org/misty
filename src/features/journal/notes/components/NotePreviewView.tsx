@@ -53,7 +53,11 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
       </div>
 
       <div className="misty-scrollbar min-h-0 overflow-auto">
-        {copyFailed ? <p role="alert" className="px-3 text-sm text-cream-muted">Copy failed. Try Copy to clipboard again or select and copy the text.</p> : null}
+        {copyFailed ? (
+          <p role="alert" className="px-3 text-sm text-cream-muted">
+            Copy failed. Try Copy to clipboard again or select and copy the text.
+          </p>
+        ) : null}
         {noteText.trim() ? (
           <Suspense
             fallback={

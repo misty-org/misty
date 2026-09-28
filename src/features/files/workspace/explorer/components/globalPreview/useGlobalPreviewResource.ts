@@ -3,19 +3,18 @@ import {
   connectedDevicesMediaUrl,
   explorerPrepareOpenItem,
   explorerPreviewItem,
-} from "@/features/files/workspace/native";
+} from "../../../native";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
-import type {
-  GlobalPreviewSource,
-  PreviewResource,
-} from "../../model/interfaces/components/GlobalPreview";
-import { sourceExtension } from "./previewFormat";
-import { audioMimeTypes, imageMimeTypes, videoMimeTypes } from "./previewMediaTables";
+import type { GlobalPreviewSource, PreviewResource } from "@/features/file-ui";
 import {
+  sourceExtension,
+  audioMimeTypes,
+  imageMimeTypes,
+  videoMimeTypes,
   globalPreviewKindForSource,
   extractDocumentText as readBuiltinDocument,
-} from "./previewDocument";
-export { extractDocumentText, globalPreviewKindForSource } from "./previewDocument";
+} from "@/features/resource-preview";
+export { extractDocumentText, globalPreviewKindForSource } from "@/features/resource-preview";
 import { usePreviewResource } from "./usePreviewResource";
 export function useGlobalPreviewResource(source: GlobalPreviewSource) {
   const load = useHostDocumentLoader();

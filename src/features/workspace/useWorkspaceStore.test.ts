@@ -57,7 +57,7 @@ describe("desktop dock store", () => {
     ]);
   });
 
-  it("closes non-Home last tab in the last virtual window, remembers it, and leaves Choose app open", () => {
+  it("closes the last tab in the last virtual window, remembers it, and leaves no tabs", () => {
     const store = useWorkspaceStore.getState();
     const browser = store.addSurface(browserRequest);
     const initialHome = dockTabs(store.layout.root).find((t) => t.id !== browser.id)!;
@@ -67,9 +67,13 @@ describe("desktop dock store", () => {
     ]);
 
     expect(store.closeTab(browser.id)).toBe(true);
-    const remaining = dockTabs(useWorkspaceStore.getState().layout.root);
-    expect(remaining).toMatchObject([{ surfaceId: "home", title: "New Tab", placeholder: true }]);
+    expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual([]);
     expect(useWorkspaceStore.getState().closedTabs[0]?.tab.id).toBe(browser.id);
+    // Opening something again replaces the empty workspace with a single tab.
+    const reopened = useWorkspaceStore.getState().openSurface(browserRequest);
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((tab) => tab.id)).toEqual([
+      reopened.id,
+    ]);
   });
 
   it("switches to another panel when closing the last tab of a panel in a multi-panel window", () => {
@@ -262,7 +266,7 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
   });
 
-  it("restores a saved Transfers tab now that the destination is visible", () => {
+  it("migrates a saved Transfers tab to Files", () => {
     const legacyTab = {
       id: "tab:legacy",
       surfaceId: "transfers",
@@ -288,9 +292,9 @@ describe("desktop dock store", () => {
 
     const restored = dockTabs(useWorkspaceStore.getState().layout.root);
     expect(restored).toHaveLength(1);
-    expect(restored[0].surfaceId).toBe("official-app");
-    expect(restored[0].route).toBe("/apps/files?view=transfers");
-    expect(restored[0].groupKey).toBe("app:files");
+    expect(restored[0].surfaceId).toBe("files");
+    expect(restored[0].route).toBe("/files");
+    expect(restored[0].groupKey).toBe("tool:files");
   });
 
   it("restores a legacy Space tab as its concrete tool tab", () => {

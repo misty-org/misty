@@ -1,10 +1,5 @@
 import { SpaceRequestError } from "@/api/spaces/api";
-import type {
-  Space,
-  SpaceMember,
-  SpaceMessage,
-  SpaceStudioResource,
-} from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMember, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildMessageSpans,
@@ -77,19 +72,6 @@ const member: SpaceMember = {
   read_message_seq: 0,
 };
 
-const agent: SpaceStudioResource = {
-  id: "agent-helper",
-  space_id: "space",
-  creator_user_id: "owner",
-  kind: "agent",
-  name: "Helper",
-  enabled: true,
-  version: 1,
-  schedules_enabled: false,
-  created_at: "2026-07-14T00:00:00Z",
-  updated_at: "2026-07-14T00:00:00Z",
-};
-
 describe("buildMessageSpans", () => {
   it("stores human mentions while keeping retired agent names literal", () => {
     expect(buildMessageSpans("Hi @Sam Lee, ask @Helper", [member])).toEqual([
@@ -112,8 +94,6 @@ describe("buildMessageSpans", () => {
       { type: "text", text: "@Nonexistent summarize these files" },
     ]);
   });
-
-
 });
 
 describe("Space loading access boundary", () => {
@@ -305,8 +285,6 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
   });
 
-
-
   it("shows a message immediately and reconciles it after the server confirms", async () => {
     const request = deferred<{ message: SpaceMessage; triggered_runs: never[] }>();
     const optimistic = messageFixture({
@@ -356,8 +334,6 @@ describe("Spaces mutations", () => {
       { ...optimistic, local_delivery_state: "failed" },
     ]);
   });
-
-
 
   // Regression coverage: these actions previously had no error handling at all,
   // so a failed request left `error` untouched and the UI's error banner (which

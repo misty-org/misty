@@ -1,26 +1,13 @@
-import {
-  cn,
-  menuItemClass,
-  menuListClass,
-  navigationMenuLinkClass,
-  navigationMenuPrimaryLayoutClass,
-  popupSurfaceClass,
-} from "@/shared/ui";
 import type { FramePacingState } from "@/app/layouts/model/types";
+import { cn, navigationMenuLinkClass, navigationMenuPrimaryLayoutClass } from "@/shared/ui";
 
 export const desktopFrameClass = [
   "relative isolate grid h-full min-h-0",
   "grid-rows-[36px_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace text-cream",
 ].join(" ");
 
-export const tabletFrameClass = [
-  "relative isolate grid h-full min-h-0",
-  "grid-rows-[minmax(0,1fr)] overflow-hidden bg-charcoal-workspace pb-6 pt-7 text-cream",
-].join(" ");
-
 export const desktopNavbarClass =
   "relative z-10 col-start-1 row-span-2 row-start-1 min-h-0 overflow-hidden";
-export const tabletNavbarClass = "relative z-10 col-start-1 row-start-1 min-h-0 overflow-hidden";
 
 // An auto-hiding navigator floats over the workspace instead of taking a grid
 // column, so revealing it never reflows the surfaces underneath.
@@ -88,28 +75,21 @@ export const navigatorFocusRingClass = [
 
 export const navigatorPrimaryRowLayoutClass = navigationMenuPrimaryLayoutClass;
 
-export const navigatorSubsectionIconClass =
-  "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0 place-items-center text-cream-bright [contain:layout_paint] [&_img]:!size-5 [&_svg]:!size-5";
+export const navigatorSubsectionIconClass = cn(
+  "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0",
+  "place-items-center text-cream-bright [contain:layout_paint]",
+  "[&_img]:!size-5 [&_svg]:!size-5",
+);
 
 export const navigatorIslandActionClass = [
   "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
   "text-cream-muted no-underline outline-none transition-colors",
-  "hover:bg-charcoal-active hover:text-cream-bright",
+  "hover:bg-control-hover hover:text-cream",
+  "aria-pressed:bg-control-active aria-pressed:text-cream data-[state=open]:bg-control-active",
   navigatorFocusRingClass,
 ].join(" ");
 
 export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
-
-export const navigatorIslandIdentityLayoutClass =
-  "box-border flex h-[var(--navigation-row-height,32px)] min-w-0 items-center gap-2.5 px-2.5 py-0";
-
-export const navigatorHierarchyTriggerClass = [
-  navigatorIslandIdentityLayoutClass,
-  "misty-navigator-hierarchy-trigger misty-navigator-row-target rounded-lg border-0 bg-transparent",
-  "text-left text-cream no-underline outline-none transition-colors duration-150 motion-reduce:transition-none",
-  "hover:text-cream-bright focus-visible:text-cream-bright active:text-cream-bright data-[state=open]:text-cream-bright",
-  navigatorFocusRingClass,
-].join(" ");
 
 export const navigatorHierarchyActionClass = navigatorIslandActionClass;
 
@@ -121,23 +101,6 @@ export function navigatorRowClass(active: boolean): string {
     active && "text-cream-bright",
   );
 }
-
-export const profilePopoverClass = [
-  "pointer-events-auto fixed z-[2147482900] max-h-[calc(100dvh-44px)] w-[256px] overflow-y-auto",
-  popupSurfaceClass,
-  menuListClass,
-].join(" ");
-
-export const accountChooserPopoverClass = [
-  "pointer-events-auto fixed z-[2147482910] max-h-[calc(100dvh-44px)] w-[280px] overflow-y-auto",
-  popupSurfaceClass,
-  menuListClass,
-].join(" ");
-
-export const profileMenuItemClass = cn(
-  menuItemClass,
-  "grid h-8 grid-cols-[20px_minmax(0,1fr)_auto] border-0 bg-transparent",
-);
 
 export const workStatusToastDurationMs = 3500;
 
@@ -193,14 +156,6 @@ export const frameOverlayBaseClass = [
   "pointer-events-none fixed right-3 top-10 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto]",
   "gap-x-3 gap-y-[3px] rounded-md border bg-charcoal-card px-2.5 py-2 text-[11px] leading-tight",
   "text-cream shadow-xl",
-].join(" ");
-
-export const settingsOverlayLayerClass =
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace px-8 py-8";
-
-export const settingsOverlayPanelClass = [
-  "h-[min(760px,calc(100dvh-64px))] w-[min(980px,calc(100dvw-144px))]",
-  "min-w-0 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card shadow-2xl",
 ].join(" ");
 
 export const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {

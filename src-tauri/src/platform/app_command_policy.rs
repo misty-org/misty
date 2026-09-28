@@ -6,16 +6,50 @@ pub fn allows(label: &str, command: &str) -> bool {
     }
     match label {
         "main" => true,
+        _ if label
+            .strip_prefix("misty-cursor-")
+            .and_then(|id| id.parse::<u32>().ok())
+            .is_some() =>
+        {
+            command == "cursor_companion_snapshot"
+        }
         _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => {
             true
         }
-        _ => label.starts_with("misty-mini-app-") && command == "mini_app_rpc",
+        _ => false,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cursor_overlays_can_only_read_their_presentation_snapshot() {
+        for label in ["misty-cursor-1", "misty-cursor-4294967295"] {
+            assert!(allows(label, "cursor_companion_snapshot"));
+            for command in [
+                "cursor_companion_configure",
+                "cursor_companion_present",
+                "cursor_companion_capture",
+                "cursor_companion_interrupt",
+                "cursor_companion_bind_task",
+                "ensure_local_access_token",
+                "browser_sync_state",
+                "code_read_text_file",
+            ] {
+                assert!(!allows(label, command), "{label}: {command}");
+            }
+        }
+        for label in [
+            "misty-cursor-controls",
+            "misty-cursor-",
+            "misty-cursor-spoof",
+            "browser-a",
+        ] {
+            assert!(!allows(label, "cursor_companion_snapshot"));
+        }
+    }
 
     #[test]
     fn vault_commands_are_main_workspace_only() {
@@ -30,6 +64,7 @@ mod tests {
             "browser_sync_edit",
             "browser_sync_resume",
             "browser_sync_activate",
+            "browser_sync_claim",
             "browser_sync_lock",
             "browser_sync_forget_key",
             "browser_recovery_open",
@@ -56,8 +91,8 @@ mod tests {
                 "ensure_local_access_token",
                 "code_read_text_file",
                 "terminal_create",
-                "mini_app_open",
-                "mini_app_reply",
+                "builtin_service_open",
+                "mini_app_close",
                 "save_authenticated_user",
                 "auth_cookie_restore",
                 "auth_cookie_capture",
@@ -69,9 +104,9 @@ mod tests {
                 assert!(!allows(label, command), "{label}: {command}");
             }
         }
-        assert!(allows("main", "mini_app_open"));
+        assert!(allows("main", "builtin_service_open"));
         assert!(!allows("misty-bot-pet", "app_snapshot"));
-        assert!(allows("misty-mini-app-a", "mini_app_rpc"));
+        assert!(!allows("misty-mini-app-a", "mini_app_rpc"));
         assert!(!allows("browser-a", "mini_app_rpc"));
     }
 }

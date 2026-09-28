@@ -1,4 +1,4 @@
-import type { SmartLibraryAsset } from "@/native/contracts";
+import type { SmartLibraryAsset } from "@/native/ipc";
 import { useEffect, useMemo, useState } from "react";
 import { aggregateLibraryTags, visibleLibraryTags } from "../../utils/libraryTags";
 

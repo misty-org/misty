@@ -1,16 +1,15 @@
-import { useState } from "react";
-import { Button, Switch } from "@/shared/ui";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, Slider, Switch } from "@/shared/ui";
+import { useState } from "react";
 import {
   companionSizeDefault,
-  companionSizeMin,
   companionSizeMax,
+  companionSizeMin,
   companionSizeStep,
   normalizeCompanionSize,
 } from "./companionSize";
-
+import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
 export function CompanionAppearanceSettings() {
   const { presentation, control } = useCompanionState();
   const [error, setError] = useState("");
@@ -36,7 +35,12 @@ export function CompanionAppearanceSettings() {
           aria-label="Show cursor companion"
           checked={presentation.showCompanion ?? true}
           disabled={!control}
-          onCheckedChange={(visible) => change({ kind: "visibility", visible })}
+          onCheckedChange={(visible) =>
+            change({
+              kind: "visibility",
+              visible,
+            })
+          }
         />
       </div>
       <div className="flex items-center gap-4">
@@ -44,7 +48,10 @@ export function CompanionAppearanceSettings() {
           <img
             src={sprite}
             alt=""
-            style={{ width: (32 * size) / 100, height: (32 * size) / 100 }}
+            style={{
+              width: (32 * size) / 100,
+              height: (32 * size) / 100,
+            }}
           />
         </div>
         <label className="min-w-0 flex-1 text-xs text-cream">
@@ -52,24 +59,27 @@ export function CompanionAppearanceSettings() {
             <span>Companion size</span>
             <span>{size}%</span>
           </span>
-          <input
-            type="range"
+          <Slider
             aria-label="Companion size"
             aria-valuetext={`${size}%`}
             min={companionSizeMin}
             max={companionSizeMax}
             step={companionSizeStep}
-            value={size}
+            value={[size]}
             disabled={!control}
-            className="w-full accent-cream"
-            onChange={(event) => change({ kind: "size", size: Number(event.target.value) })}
+            onValueChange={([next]) => change({ kind: "size", size: next })}
           />
         </label>
         <Button
           variant="ghost"
           size="sm"
           disabled={!control || size === companionSizeDefault}
-          onClick={() => change({ kind: "size", size: companionSizeDefault })}
+          onClick={() =>
+            change({
+              kind: "size",
+              size: companionSizeDefault,
+            })
+          }
         >
           Reset size
         </Button>

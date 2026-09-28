@@ -1,17 +1,14 @@
 import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/model/types";
+import { reportSystemError } from "@/features/activity";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
-import { reportSystemError } from "@/features/activity";
-import { useProvidersStore } from "@/features/providers";
 import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
-import { Notification } from "@/shared/ui/notification";
+import { Notification } from "@/shared/ui";
 import { memo, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
-  const providerError = useProvidersStore((state) => state.error);
-  const providerMessage = useProvidersStore((state) => state.message);
   const settingsError = useSettingsStore((state) => state.error);
   const settingsMessage = useSettingsStore((state) => state.message);
   const notificationPreferences = useSettingsStore(
@@ -19,7 +16,6 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
   );
   const notice = noticeForRoute(props.routeId, {
     app: { error: appError, message: appMessage },
-    providers: { error: providerError, message: providerMessage },
     settings: { error: settingsError, message: settingsMessage },
   });
   const showMessage =
@@ -27,7 +23,6 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
 
   const dismissNotice = () => {
     useAppStore.getState().clearNotice();
-    useProvidersStore.setState({ error: null, message: null });
     useSettingsStore.setState({ error: null, message: null });
   };
 
@@ -50,8 +45,6 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
 export const AppNoticePublisher = memo(function AppNoticePublisher() {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
-  const providerError = useProvidersStore((state) => state.error);
-  const providerMessage = useProvidersStore((state) => state.message);
   const settingsError = useSettingsStore((state) => state.error);
   const settingsMessage = useSettingsStore((state) => state.message);
   const lastPublished = useRef<Record<string, string>>({});
@@ -60,8 +53,6 @@ export const AppNoticePublisher = memo(function AppNoticePublisher() {
     const entries = [
       ["app", "error", appError],
       ["app", "message", appMessage],
-      ["providers", "error", providerError],
-      ["providers", "message", providerMessage],
       ["settings", "error", settingsError],
       ["settings", "message", settingsMessage],
     ] satisfies AppNoticeEntry[];
@@ -85,19 +76,16 @@ export const AppNoticePublisher = memo(function AppNoticePublisher() {
         continue;
       }
     }
-  }, [appError, appMessage, providerError, providerMessage, settingsError, settingsMessage]);
+  }, [appError, appMessage, settingsError, settingsMessage]);
 
   return null;
 });
 
 function noticeForRoute(
   route: AppTab,
-  notices: Record<
-    "app" | "providers" | "settings",
-    { error: string | null; message: string | null }
-  >,
+  notices: Record<"app" | "settings", { error: string | null; message: string | null }>,
 ) {
-  const scoped = route === "providers" || route === "settings" ? notices[route] : notices.app;
+  const scoped = route === "settings" ? notices[route] : notices.app;
   return {
     error: scoped.error ?? notices.app.error,
     message: scoped.message ?? notices.app.message,
@@ -106,8 +94,6 @@ function noticeForRoute(
 
 function appNoticeSourceLabel(source: AppNoticeSource): string {
   switch (source) {
-    case "providers":
-      return "Remotes";
     case "settings":
       return "Settings";
     case "app":

@@ -1,24 +1,20 @@
-import {
-  savedSearchesDelete,
-  savedSearchesSave,
-  savedSearchesSnapshot,
-} from "@/features/files/workspace/native";
-import type { SavedSearch, SearchResult } from "@/native/contracts";
+import { savedSearchesDelete, savedSearchesSave, savedSearchesSnapshot } from "../../../native";
+import type { SavedSearch, SearchResult } from "@/native/ipc";
 import { useEffect, useState } from "react";
-import type { SmartFolderDraft } from "../../model/interfaces/components/ExplorerSidebarSupport";
-import type { SmartFolderDialogState } from "../../model/types/components/ExplorerSidebarSupport";
 import {
-  mergeHybridSearchResults,
-  queryIndexedExplorerSearch,
-  querySemanticExplorerSearch,
-} from "../../utils/globalSearch";
-import {
+  type SmartFolderDraft,
+  type SmartFolderDialogState,
   smartFolderId,
   smartFolderMatchMode,
   smartFolderQueryFromRules,
   smartFolderRulesWithMode,
   sortSavedSearches,
-} from "../ExplorerSidebarSupport";
+} from "@/features/file-ui";
+import {
+  mergeHybridSearchResults,
+  queryIndexedExplorerSearch,
+  querySemanticExplorerSearch,
+} from "../../utils/globalSearch";
 import { matchesRules, searchableRuleText, semanticRuleText } from "./savedSearchRules";
 
 const FOLDER_RESULT_LIMIT = 200;

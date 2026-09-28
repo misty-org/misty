@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   ExplorerCommandQueryMode,
   ExplorerSortColumn,
@@ -15,6 +16,7 @@ export interface ExplorerLocationResult {
 }
 
 export interface ExplorerToolbarProps {
+  trailingActions?: ReactNode;
   /** Display labels may differ from the owning runtime's internal path identifiers. */
   breadcrumbs?: Array<{ label: string; path: string }>;
   displayPath?: string;
@@ -26,7 +28,6 @@ export interface ExplorerToolbarProps {
   canDelete?: boolean;
   canRestore?: boolean;
   onRestore?: () => void;
-  onOpenTransfers?: () => void;
   paneId: string;
   path: string;
   commandQuery: string;

@@ -1,5 +1,5 @@
 import { useFileBrowserRuntime } from "./FileBrowserRuntime";
-import type { DirectoryListing, FileEntry } from "@/native/contracts";
+import type { DirectoryListing, FileEntry } from "@/native/ipc";
 import type { CSSProperties, MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileBrowserProps } from "../../model/interfaces/components/FileBrowser";
@@ -7,7 +7,7 @@ import { dragItemsForEntry } from "../FileBrowserDrag";
 import { GenericFileIcon } from "../FileBrowserIcons";
 import { InlineNameEditor } from "../FileBrowserInline";
 import { fileBrowserStyles } from "../FileBrowserStyles";
-import { passiveRenameDraftsFor } from "./entryPresentation";
+import { passiveRenameDraftsFor } from "./EntryPresentation";
 import { FileGridItem } from "./FileGridItem";
 import {
   GRID_GAP,

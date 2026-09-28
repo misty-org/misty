@@ -1,13 +1,10 @@
 import { activityApi } from "@/api/activity/api";
-import { buildMessageSpans, mergeSpaceMessages } from "../chat/store/useSpaceMessageSpansStore";
 import { resolveSpacesApiBase, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { queueMobileChatSubmission } from "@/features/chat-composer/mobileChatQueue";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { buildMessageSpans, mergeSpaceMessages } from "../chat/store/useSpaceMessageSpansStore";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
 export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
-
 type SpacesSet = (
   partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),
 ) => void;
@@ -58,37 +55,10 @@ export function createSpaceContentActions(
             }
           : state.messagesBySpace,
       }));
-      if (isNativeMobileBuild && !navigator.onLine && optimisticMessage?.client_nonce) {
-        const spans =
-          optimisticMessage.content ??
-          (trimmed
-            ? buildMessageSpans(
-                trimmed,
-                get().membersBySpace[spaceId] ?? [],
-              )
-            : []);
-        await queueMobileChatSubmission({
-          clientNonce: optimisticMessage.client_nonce,
-          spaceId,
-          conversationId: "",
-          content: spans,
-          fileNodeIds,
-          attachmentIds,
-          libraryItemIds,
-          replyToMessageId,
-        });
-        set({ sending: false });
-        return;
-      }
       try {
         const spans =
           optimisticMessage?.content ??
-          (trimmed
-            ? buildMessageSpans(
-                trimmed,
-                get().membersBySpace[spaceId] ?? [],
-              )
-            : []);
+          (trimmed ? buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? []) : []);
         const response = await spacesApi.sendMessage(
           spaceId,
           spans,
@@ -119,7 +89,10 @@ export function createSpaceContentActions(
                 [spaceId]: (state.messagesBySpace[spaceId] ?? []).map((message) =>
                   message.client_nonce === optimisticMessage.client_nonce &&
                   message.local_delivery_state === "sending"
-                    ? { ...message, local_delivery_state: "failed" as const }
+                    ? {
+                        ...message,
+                        local_delivery_state: "failed" as const,
+                      }
                     : message,
                 ),
               }
@@ -128,14 +101,12 @@ export function createSpaceContentActions(
         throw error;
       }
     },
-
     updateMessage: async (spaceId, messageId, text, fileNodeIds = []) => {
-      set({ error: null });
+      set({
+        error: null,
+      });
       try {
-        const spans = buildMessageSpans(
-          text.trim(),
-          get().membersBySpace[spaceId] ?? [],
-        );
+        const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? []);
         const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
         set((state) => ({
           messagesBySpace: {
@@ -144,13 +115,16 @@ export function createSpaceContentActions(
           },
         }));
       } catch (error) {
-        set({ error: errorText(error) });
+        set({
+          error: errorText(error),
+        });
         throw error;
       }
     },
-
     deleteMessage: async (spaceId, messageId) => {
-      set({ error: null });
+      set({
+        error: null,
+      });
       try {
         await spacesApi.deleteMessage(spaceId, messageId);
         set((state) => ({
@@ -162,13 +136,16 @@ export function createSpaceContentActions(
           },
         }));
       } catch (error) {
-        set({ error: errorText(error) });
+        set({
+          error: errorText(error),
+        });
         throw error;
       }
     },
-
     toggleMessageReaction: async (spaceId, messageId, emoji, reacted) => {
-      set({ error: null });
+      set({
+        error: null,
+      });
       try {
         const saved = reacted
           ? await spacesApi.removeMessageReaction(spaceId, messageId, emoji)
@@ -180,16 +157,16 @@ export function createSpaceContentActions(
           },
         }));
       } catch (error) {
-        set({ error: errorText(error) });
+        set({
+          error: errorText(error),
+        });
         throw error;
       }
     },
-
     markRead: async (spaceId, seq) => {
       await spacesApi.markRead(spaceId, seq);
       await get().loadInbox();
     },
-
     openNode: async (spaceId, nodeId, disposition = "open") => {
       const [ticket, base] = await Promise.all([
         spacesApi.resolve(spaceId, nodeId, disposition),
@@ -197,39 +174,45 @@ export function createSpaceContentActions(
       ]);
       await openExternalLink(`${base}${ticket.url}`);
     },
-
     saveStudio: async (spaceId, kind, item) => {
-      set({ error: null });
+      set({
+        error: null,
+      });
       try {
         const saved = await spacesApi.saveStudio(spaceId, kind, item);
         await get().loadStudio(spaceId, kind);
         return saved;
       } catch (error) {
-        set({ error: errorText(error) });
+        set({
+          error: errorText(error),
+        });
         throw error;
       }
     },
-
     deleteStudio: async (spaceId, kind, id) => {
-      set({ error: null });
+      set({
+        error: null,
+      });
       try {
         await spacesApi.deleteStudio(spaceId, kind, id);
         await get().loadStudio(spaceId, kind);
       } catch (error) {
-        set({ error: errorText(error) });
+        set({
+          error: errorText(error),
+        });
         throw error;
       }
     },
-
     runStudio: async (spaceId, kind, id, prompt = "", capabilityId = "") => {
       try {
         return await spacesApi.runStudio(spaceId, kind, id, prompt, capabilityId);
       } catch (error) {
-        set({ error: errorText(error) });
+        set({
+          error: errorText(error),
+        });
         throw error;
       }
     },
-
     markInboxSeen: async () => {
       await activityApi.markSeen();
       set((state) => ({
@@ -245,10 +228,14 @@ export function createSpaceContentActions(
         },
       }));
     },
-
     clearInbox: async (tab) => {
       await activityApi.clearInbox(tab);
-      set((state) => ({ inbox: { ...state.inbox, [tab]: [] } }));
+      set((state) => ({
+        inbox: {
+          ...state.inbox,
+          [tab]: [],
+        },
+      }));
     },
   };
 }

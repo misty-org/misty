@@ -14,7 +14,7 @@ import {
   ManagedAiRequestError,
   signedAgentDeviceRequest,
 } from "@/features/agents";
-import type { ConnectedDevicesSnapshot } from "@/native/contracts";
+import type { ConnectedDevicesSnapshot } from "@/native/ipc";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -373,6 +373,11 @@ export function connectedDevicesErrorMessage(cause: unknown): string {
   if (cause instanceof ManagedAiRequestError) {
     if (cause.status === 404) return "Connected Devices isn’t enabled on this Misty server.";
     if (cause.status === 503) return "Connected Devices is temporarily unavailable.";
+    // Cloudflare edge failures (e.g. 1033: tunnel offline) arrive as a bare
+    // "error code: NNNN" body. That means the server is unreachable, not broken.
+    if (cause.status === 530 || /^error code: \d+$/i.test(cause.message.trim())) {
+      return "Can’t reach the Misty server right now. Misty will keep retrying.";
+    }
   }
   return cause instanceof Error ? cause.message : "Connected Devices is unavailable.";
 }
@@ -382,15 +387,11 @@ export function peerIsOnline(peer: ServerConnectedPeer): boolean {
   return heartbeat > Date.now() - 90_000;
 }
 
-function connectedDevicePlatform(): "ios" | "macos" | "windows" | "unknown" {
+function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unknown" {
   const value = navigator.userAgent.toLowerCase();
-  if (
-    /iphone|ipad|ipod/.test(value) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  )
-    return "ios";
   if (value.includes("mac")) return "macos";
   if (value.includes("win")) return "windows";
+  if (value.includes("linux")) return "linux";
   return "unknown";
 }
 

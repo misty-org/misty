@@ -49,14 +49,9 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
         .arg(config_path.as_os_str())
         .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
     if let Some(profile) = profile {
-        let profile_root = crate::home::default_root()?
-            .join("cli/profiles")
-            .join(profile);
-        fs::create_dir_all(&profile_root)?;
         command = command
             .env("MISTY_PROFILE", profile)
-            .env("MISTY_DESKTOP_PROFILE", profile)
-            .env("MISTY_PROFILE_DIR", profile_root.as_os_str());
+            .env("MISTY_DESKTOP_PROFILE", profile);
     }
     command.run(&workspace.misty)
 }
@@ -78,22 +73,11 @@ pub fn clean(workspace: &Workspace, apply: bool) -> Result<()> {
         "design-qa-output",
         "artifacts/design-qa",
         "src-tauri/target",
-        "src-tauri/gen/apple/build",
-        "src-tauri/gen/apple/DerivedData",
-        "src-tauri/gen/apple/Externals",
-        "src-tauri/gen/apple/Pods",
-        "src-tauri/gen/android/.gradle",
     ]
     .into_iter()
     .map(|path| root.join(path))
     .collect::<Vec<_>>();
     collect_named(root, ".DS_Store", false, &mut candidates);
-    collect_named(
-        &root.join("src-tauri/gen/android"),
-        "build",
-        true,
-        &mut candidates,
-    );
     candidates.sort();
     candidates.dedup();
 

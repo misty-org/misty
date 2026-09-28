@@ -17,7 +17,7 @@ import type { BulkLibraryItemAction } from "@/api/spaces/dto/types/types";
 import { libraryPreviewPath, libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { LibraryUploadOptions } from "./library-upload";
 export type LibraryTransfers = Pick<
-  typeof import("./library-upload"),
+  typeof LibraryUploadModule,
   | "downloadProtectedFile"
   | "fetchProtectedBlob"
   | "replaceLibraryItemContent"
@@ -25,6 +25,7 @@ export type LibraryTransfers = Pick<
   | "uploadLibraryPath"
 >;
 import type { SpaceRequest } from "./types";
+import type * as LibraryUploadModule from "./library-upload";
 export function createSpaceLibraryItemsApi(
   spaceRequest: SpaceRequest,
   transfers: LibraryTransfers,
@@ -158,8 +159,8 @@ export function createSpaceLibraryItemsApi(
       ),
     libraryUsage: (spaceId: string) =>
       spaceRequest<SpaceStorageUsage>(`/spaces/${encodeURIComponent(spaceId)}/library/usage`),
-    /** Personal and per-Space quota usage, with legacy fields retained by the server. */
-    agentUsage: () => spaceRequest<BillingUsage>("/billing/usage", { cache: "no-store" }),
+    /** Account-wide AI usage; Space storage is fetched separately. */
+    agentUsage: () => spaceRequest<BillingUsage>("/billing/ai-usage", { cache: "no-store" }),
     libraryAssetStacks: (spaceId: string) =>
       spaceRequest<{ stacks: LibraryAssetStack[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks`,

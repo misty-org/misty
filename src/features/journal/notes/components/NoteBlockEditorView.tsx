@@ -1,16 +1,3 @@
-import "./noteTiptapEditor.css";
-
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  Input,
-  Separator,
-  cn,
-} from "@/shared/ui";
 import type {
   AiArtifact,
   AiContextReference,
@@ -18,14 +5,28 @@ import type {
   AiSuggestedAction,
   AiSurfaceAdapter,
 } from "@/features/ai-surface/types";
+import type { JournalImageLease } from "@/features/journal/journalAssets";
+import {
+  Button,
+  cn,
+  DragHandleButton,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+  Input,
+  MenuItem,
+  Separator,
+  SuggestionItem,
+  SuggestionList,
+} from "@/shared/ui";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import { FindAndReplace } from "@tiptap/extension-find-and-replace";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Image } from "@tiptap/extension-image";
-import { journalImage } from "./journalImage";
-import type { JournalImageLease } from "@/features/journal/sdkJournalAssets";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
@@ -35,7 +36,6 @@ import { UniqueID } from "@tiptap/extension-unique-id";
 import { Markdown } from "@tiptap/markdown";
 import type { Editor, JSONContent } from "@tiptap/react";
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react";
-import type { Text as YText } from "yjs";
 import { StarterKit } from "@tiptap/starter-kit";
 import {
   AlignCenter,
@@ -61,15 +61,18 @@ import {
   Superscript as SuperscriptIcon,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Text as YText } from "yjs";
 import type { NoteBodyFormat } from "../model/types/types";
 import type { UploadNoteAssetInput } from "../noteAssets";
 import type { NoteCollaborationSession } from "../noteCollaboration";
+import { journalImage } from "./journalImage";
 import {
   NoteToolbarInlineControls,
   NoteToolbarStructureControls,
+  ToolButton,
 } from "./NoteEditorToolbarControls";
-
+import "./noteTiptapEditor.css";
 export type NoteEditorSession = Pick<
   NoteCollaborationSession,
   "key" | "doc" | "fragment" | "title" | "markdown" | "metadata"
@@ -81,7 +84,11 @@ export interface NoteEditorRuntime {
   useCollaborationRoom(
     spaceId: string,
     noteId: string,
-  ): { session: NoteEditorSession | null; error: string | null; notice: string | null };
+  ): {
+    session: NoteEditorSession | null;
+    error: string | null;
+    notice: string | null;
+  };
   uploadAsset(input: UploadNoteAssetInput): Promise<string>;
   resolveAsset?(reference: string): Promise<JournalImageLease>;
   renderImagePicker(input: { onCancel(): void; onSelect(file: File): void }): ReactNode;
@@ -91,7 +98,6 @@ export interface NoteEditorRuntime {
   reportError(error: unknown): void;
   openCitation(citation: Parameters<NonNullable<AiSurfaceAdapter["openCitation"]>>[0]): void;
 }
-
 export interface NoteBlockEditorProps {
   runtime: NoteEditorRuntime;
   editable: boolean;
@@ -103,7 +109,10 @@ export interface NoteBlockEditorProps {
   bodyFormat: NoteBodyFormat;
   bodyMarkdown?: string;
   autoFocus?: boolean;
-  linkableNotes?: Array<{ id: string; title: string }>;
+  linkableNotes?: Array<{
+    id: string;
+    title: string;
+  }>;
   onOpenNote?: (noteId: string) => void;
   aiContext?: AiContextReference;
   onContentChange?: (content: {
@@ -124,8 +133,11 @@ export function NoteBlockEditorView(props: NoteBlockEditorProps) {
   }
   return <MistyTipTapEditor {...props} />;
 }
-
-function CollaborativeNoteEditor(props: NoteBlockEditorProps & { spaceId: string }) {
+function CollaborativeNoteEditor(
+  props: NoteBlockEditorProps & {
+    spaceId: string;
+  },
+) {
   const { session, error, notice } = props.runtime.useCollaborationRoom(
     props.spaceId,
     props.noteId,
@@ -157,8 +169,11 @@ function CollaborativeNoteEditor(props: NoteBlockEditorProps & { spaceId: string
     </div>
   );
 }
-
-function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorSession }) {
+function MistyTipTapEditor(
+  props: NoteBlockEditorProps & {
+    session?: NoteEditorSession;
+  },
+) {
   const { body, bodyFormat, bodyMarkdown, session } = props;
   const loadingRef = useRef(true);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
@@ -166,30 +181,42 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [replace, setReplace] = useState("");
-  const [block, setBlock] = useState<{ pos: number; node: JSONContent } | null>(null);
+  const [block, setBlock] = useState<{
+    pos: number;
+    node: JSONContent;
+  } | null>(null);
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const [aiSelection, setAiSelection] = useState<NoteAiSelection | null>(null);
-
   useEffect(() => {
     onContentChangeRef.current = props.onContentChange;
   }, [props.onContentChange]);
-
   const extensions = useMemo(
     () => [
       StarterKit.configure({
         undoRedo: props.session ? false : undefined,
-        link: { openOnClick: false, enableClickSelection: true },
+        link: {
+          openOnClick: false,
+          enableClickSelection: true,
+        },
       }),
       TaskList,
-      TaskItem.configure({ nested: true }),
-      Highlight.configure({ multicolor: true }),
+      TaskItem.configure({
+        nested: true,
+      }),
+      Highlight.configure({
+        multicolor: true,
+      }),
       props.runtime.resolveAsset
         ? journalImage(props.runtime.resolveAsset)
-        : Image.configure({ allowBase64: false }),
+        : Image.configure({
+            allowBase64: false,
+          }),
       Typography,
       Superscript,
       Subscript,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
       UniqueID.configure({
         types: [
           "paragraph",
@@ -202,11 +229,20 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
           "image",
         ],
       }),
-      FindAndReplace.configure({ searchDebounceMs: 250, injectCSS: false }),
-      Markdown.configure({ markedOptions: { gfm: true } }),
+      FindAndReplace.configure({
+        searchDebounceMs: 250,
+        injectCSS: false,
+      }),
+      Markdown.configure({
+        markedOptions: {
+          gfm: true,
+        },
+      }),
       ...(props.session
         ? [
-            Collaboration.configure({ fragment: props.session.fragment }),
+            Collaboration.configure({
+              fragment: props.session.fragment,
+            }),
             CollaborationCaret.configure({
               provider: props.session.provider as never,
               user: collaborationUser(props.accountId),
@@ -216,7 +252,6 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
     ],
     [props.accountId, props.session, props.runtime],
   );
-
   const editor = useEditor({
     immediatelyRender: false,
     editable: props.editable,
@@ -258,21 +293,31 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
         props.session.metadata.set("schema", "tiptap-v1");
         props.session.metadata.set("outgoing_note_ids", collectNoteLinks(updated));
       }
-      onContentChangeRef.current?.({ body, bodyFormat: "tiptap-json", bodyMarkdown: markdown });
+      onContentChangeRef.current?.({
+        body,
+        bodyFormat: "tiptap-json",
+        bodyMarkdown: markdown,
+      });
     },
     onSelectionUpdate: ({ editor: updated }) => {
       updateSuggestion(updated, setSuggestion);
       updateAiSelection(updated, props.aiContext, setAiSelection);
     },
   });
-
   useEffect(() => editor?.setEditable(props.editable), [editor, props.editable]);
   useEffect(() => {
     if (!editor || session || loadingRef.current) return;
-    editor.commands.setContent(initialContent({ body, bodyFormat, bodyMarkdown }), {
-      contentType: bodyFormat === "tiptap-json" ? "json" : "markdown",
-      emitUpdate: false,
-    });
+    editor.commands.setContent(
+      initialContent({
+        body,
+        bodyFormat,
+        bodyMarkdown,
+      }),
+      {
+        contentType: bodyFormat === "tiptap-json" ? "json" : "markdown",
+        emitUpdate: false,
+      },
+    );
   }, [body, bodyFormat, bodyMarkdown, editor, session]);
   useEffect(() => {
     if (!editor || !props.editable || !props.autoFocus) return;
@@ -301,11 +346,8 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
     editor.view.dom.addEventListener("keydown", onKeyDown);
     return () => editor.view.dom.removeEventListener("keydown", onKeyDown);
   }, [editor]);
-
   if (!editor) return <div className="px-2 py-3 text-sm text-cream-muted">Opening editor…</div>;
-
   const aiAdapter = createNoteAiAdapter(editor, props, aiSelection);
-
   const uploadImage = async (file?: File) => {
     if (!file) return;
     const src = await props.runtime.uploadAsset({
@@ -314,11 +356,21 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
       noteId: props.noteId,
       file,
     });
-    editor.chain().focus().setImage({ src, alt: file.name }).run();
+    editor
+      .chain()
+      .focus()
+      .setImage({
+        src,
+        alt: file.name,
+      })
+      .run();
   };
-
   return (
-    <EditorContext.Provider value={{ editor }}>
+    <EditorContext.Provider
+      value={{
+        editor,
+      }}
+    >
       <div className={cn("misty-tiptap-editor", !props.editable && "is-readonly")}>
         {props.runtime.renderAiRegistration(aiAdapter)}
         {props.editable ? (
@@ -352,9 +404,19 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
             <DragHandle
               editor={editor}
               nested
-              computePositionConfig={{ placement: "left-start", strategy: "fixed" }}
+              computePositionConfig={{
+                placement: "left-start",
+                strategy: "fixed",
+              }}
               onNodeChange={({ node, pos }) =>
-                setBlock(node && typeof pos === "number" ? { pos, node: node.toJSON() } : null)
+                setBlock(
+                  node && typeof pos === "number"
+                    ? {
+                        pos,
+                        node: node.toJSON(),
+                      }
+                    : null,
+                )
               }
             >
               <BlockHandle editor={editor} block={block} noteId={props.noteId} />
@@ -384,7 +446,6 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteEditorS
     </EditorContext.Provider>
   );
 }
-
 export type NoteAiSelection = {
   snapshot: AiSelectionSnapshot;
   from: number;
@@ -392,7 +453,6 @@ export type NoteAiSelection = {
   x: number;
   y: number;
 };
-
 export interface NotesInlineProposal {
   selection: AiSelectionSnapshot;
   replacement: string;
@@ -400,7 +460,6 @@ export interface NotesInlineProposal {
   invocationId?: string;
   status: "proposed" | "stale" | "applying" | "applied" | "discarded" | "failed";
 }
-
 export const noteSelectionActions: AiSuggestedAction[] = [
   {
     id: "notes.improve",
@@ -437,7 +496,6 @@ export const noteSelectionActions: AiSuggestedAction[] = [
     requestedArtifactKind: "task_set",
   },
 ];
-
 const notePageActions: AiSuggestedAction[] = [
   {
     id: "notes.summarize",
@@ -465,10 +523,11 @@ const notePageActions: AiSuggestedAction[] = [
     requestedArtifactKind: "task_set",
   },
 ];
-
 function createNoteAiAdapter(
   editor: Editor,
-  props: NoteBlockEditorProps & { session?: NoteEditorSession },
+  props: NoteBlockEditorProps & {
+    session?: NoteEditorSession;
+  },
   selection: NoteAiSelection | null,
 ): AiSurfaceAdapter | null {
   const context = props.aiContext;
@@ -493,7 +552,6 @@ function createNoteAiAdapter(
     },
   };
 }
-
 function updateAiSelection(
   editor: Editor,
   context: AiContextReference | undefined,
@@ -520,12 +578,15 @@ function updateAiSelection(
         spaceId: context.spaceId,
         revision: context.revision,
       },
-      anchors: { from, to, editor: "tiptap-prosemirror-v1" },
+      anchors: {
+        from,
+        to,
+        editor: "tiptap-prosemirror-v1",
+      },
       contentHash: noteSelectionHash(content),
     },
   });
 }
-
 function canApplyNoteArtifact(editor: Editor, props: NoteBlockEditorProps, artifact: AiArtifact) {
   if (!props.editable || artifact.kind !== "text_patch" || !props.aiContext) return false;
   if (artifact.target?.id !== props.aiContext.id) return false;
@@ -540,7 +601,6 @@ function canApplyNoteArtifact(editor: Editor, props: NoteBlockEditorProps, artif
   if (!selection) return false;
   return noteSelectionAt(editor, selection) === selection.content;
 }
-
 async function applyNoteArtifact(
   editor: Editor,
   props: NoteBlockEditorProps,
@@ -560,7 +620,6 @@ async function applyNoteArtifact(
   editor.view.dispatch(editor.state.tr.insertText(replacement, from, to));
   editor.commands.focus(Math.min(from + replacement.length, editor.state.doc.content.size));
 }
-
 function artifactSelection(artifact: AiArtifact): AiSelectionSnapshot | null {
   const value = (artifact.operations as Record<string, unknown>)?.selection;
   if (!value || typeof value !== "object") return null;
@@ -571,7 +630,6 @@ function artifactSelection(artifact: AiArtifact): AiSelectionSnapshot | null {
     ? selection
     : null;
 }
-
 function noteSelectionAt(editor: Editor, selection: AiSelectionSnapshot) {
   const from = Number(selection.anchors?.from);
   const to = Number(selection.anchors?.to);
@@ -579,7 +637,6 @@ function noteSelectionAt(editor: Editor, selection: AiSelectionSnapshot) {
   const current = editor.state.doc.textBetween(from, to, "\n", "\n");
   return noteSelectionHash(current) === selection.contentHash ? current : null;
 }
-
 function noteSelectionHash(value: string) {
   let hash = 0x811c9dc5;
   for (let index = 0; index < value.length; index += 1) {
@@ -588,7 +645,6 @@ function noteSelectionHash(value: string) {
   }
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
-
 function SimpleEditorToolbar(props: {
   editor: Editor;
   searchOpen: boolean;
@@ -622,36 +678,39 @@ function SimpleEditorToolbar(props: {
         <ToolButton
           label="Align left"
           Icon={AlignLeft}
-          active={editor.isActive({ textAlign: "left" })}
+          active={editor.isActive({
+            textAlign: "left",
+          })}
           onClick={() => editor.chain().focus().setTextAlign("left").run()}
         />
         <ToolButton
           label="Align center"
           Icon={AlignCenter}
-          active={editor.isActive({ textAlign: "center" })}
+          active={editor.isActive({
+            textAlign: "center",
+          })}
           onClick={() => editor.chain().focus().setTextAlign("center").run()}
         />
         <ToolButton
           label="Align right"
           Icon={AlignRight}
-          active={editor.isActive({ textAlign: "right" })}
+          active={editor.isActive({
+            textAlign: "right",
+          })}
           onClick={() => editor.chain().focus().setTextAlign("right").run()}
         />
         <ToolButton
           label="Justify"
           Icon={AlignJustify}
-          active={editor.isActive({ textAlign: "justify" })}
+          active={editor.isActive({
+            textAlign: "justify",
+          })}
           onClick={() => editor.chain().focus().setTextAlign("justify").run()}
         />
       </ToolbarGroup>
       <ToolbarRule />
       <ToolbarGroup>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="misty-tiptap-tool gap-1.5 px-2"
-          onClick={props.onAddImage}
-        >
+        <Button variant="toolbar" size="sm" className="gap-1.5 px-2" onClick={props.onAddImage}>
           <ImagePlus size={17} />
           Add
         </Button>
@@ -668,35 +727,12 @@ function SimpleEditorToolbar(props: {
     </div>
   );
 }
-
 function ToolbarGroup({ children }: { children: ReactNode }) {
   return <div className="flex shrink-0 items-center gap-0.5">{children}</div>;
 }
 function ToolbarRule() {
   return <Separator orientation="vertical" className="mx-1.5 h-6 shrink-0" />;
 }
-function ToolButton(props: {
-  label: string;
-  Icon: ComponentType<{ size?: number }>;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.active}
-      className={cn("misty-tiptap-tool", props.active && "is-active")}
-      onClick={props.onClick}
-    >
-      <props.Icon size={17} />
-    </Button>
-  );
-}
-
 function SearchReplacePanel(props: {
   editor: Editor;
   open: boolean;
@@ -735,50 +771,73 @@ function SearchReplacePanel(props: {
       <Button size="sm" variant="ghost" onClick={() => commands.replaceAll()}>
         All
       </Button>
-      <Button size="icon" variant="ghost" aria-label="Close search" onClick={props.onClose}>
+      <IconButton size="md" label="Close search" onClick={props.onClose}>
         <Minus size={16} />
-      </Button>
+      </IconButton>
     </div>
   );
 }
-
 function BlockHandle(props: {
   editor: Editor;
-  block: { pos: number; node: JSONContent } | null;
+  block: {
+    pos: number;
+    node: JSONContent;
+  } | null;
   noteId: string;
 }) {
   const { editor, block } = props;
   const pos = block?.pos ?? Math.max(0, editor.state.selection.$from.before(1));
   const node = editor.state.doc.nodeAt(pos);
-  const range = node ? { from: pos, to: pos + node.nodeSize } : null;
+  const range = node
+    ? {
+        from: pos,
+        to: pos + node.nodeSize,
+      }
+    : null;
   return (
     <div className="misty-tiptap-block-handle" data-misty-window-drag-block="true">
-      <button
-        type="button"
-        aria-label="Add block"
-        title="Add block"
-        onClick={() => editor.chain().focus().insertContentAt(pos, { type: "paragraph" }).run()}
+      <DragHandleButton
+        label="Add block"
+        onClick={() =>
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(pos, {
+              type: "paragraph",
+            })
+            .run()
+        }
       >
-        <Plus size={16} />
-      </button>
+        <Plus />
+      </DragHandleButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Block actions" title="Drag or open block actions">
-            <GripVertical size={16} />
-          </button>
+          <DragHandleButton label="Block actions" title="Drag or open block actions">
+            <GripVertical />
+          </DragHandleButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="left" className="w-52">
-          <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
-            <Pilcrow />
-            Turn into text
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          >
-            <Heading />
-            Turn into heading
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Pilcrow />}
+            label="Turn into text"
+            onSelect={() => editor.chain().focus().setParagraph().run()}
+          />
+          <MenuItem
+            icon={<Heading />}
+            label="Turn into heading"
+            onSelect={() =>
+              editor
+                .chain()
+                .focus()
+                .toggleHeading({
+                  level: 2,
+                })
+                .run()
+            }
+          />
+          <MenuItem
+            icon={<Highlighter />}
+            label="Highlight block"
             disabled={!range}
             onSelect={() =>
               range &&
@@ -786,15 +845,16 @@ function BlockHandle(props: {
                 .chain()
                 .focus()
                 .setTextSelection(range)
-                .toggleHighlight({ color: "#7255d9" })
+                .toggleHighlight({
+                  color: "#7255d9",
+                })
                 .run()
             }
-          >
-            <Highlighter />
-            Highlight block
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Copy />}
+            label="Duplicate block"
             disabled={!node}
             onSelect={() =>
               node &&
@@ -804,42 +864,35 @@ function BlockHandle(props: {
                 .insertContentAt(pos + node.nodeSize, node.toJSON())
                 .run()
             }
-          >
-            <Copy />
-            Duplicate block
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Copy />}
+            label="Copy to clipboard"
             disabled={!node}
             onSelect={() => node && void navigator.clipboard.writeText(node.textContent)}
-          >
-            <Copy />
-            Copy to clipboard
-          </DropdownMenuItem>
-          <DropdownMenuItem
+          />
+          <MenuItem
+            icon={<Link2 />}
+            label="Copy anchor link"
             onSelect={() =>
               void navigator.clipboard.writeText(
                 `misty://notes/${props.noteId}#${String(node?.attrs.id || `block-${pos}`)}`,
               )
             }
-          >
-            <Link2 />
-            Copy anchor link
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          <MenuItem
+            icon={<Trash2 />}
+            label="Delete"
             disabled={!range}
-            variant="destructive"
+            destructive
             onSelect={() => range && editor.chain().focus().deleteRange(range).run()}
-          >
-            <Trash2 />
-            Delete
-          </DropdownMenuItem>
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
 }
-
 type SuggestionState = {
   type: "slash" | "wiki";
   query: string;
@@ -866,24 +919,44 @@ function updateSuggestion(editor: Editor, set: (value: SuggestionState | null) =
     y: coords.bottom + 8,
   });
 }
-
 function SuggestionMenu(props: {
   editor: Editor;
   suggestion: SuggestionState;
-  notes: Array<{ id: string; title: string }>;
+  notes: Array<{
+    id: string;
+    title: string;
+  }>;
   onClose: () => void;
 }) {
   const slashItems = [
-    { label: "Text", icon: Pilcrow, run: () => props.editor.chain().focus().setParagraph().run() },
+    {
+      label: "Text",
+      icon: Pilcrow,
+      run: () => props.editor.chain().focus().setParagraph().run(),
+    },
     {
       label: "Heading 1",
       icon: Heading,
-      run: () => props.editor.chain().focus().toggleHeading({ level: 1 }).run(),
+      run: () =>
+        props.editor
+          .chain()
+          .focus()
+          .toggleHeading({
+            level: 1,
+          })
+          .run(),
     },
     {
       label: "Heading 2",
       icon: Heading,
-      run: () => props.editor.chain().focus().toggleHeading({ level: 2 }).run(),
+      run: () =>
+        props.editor
+          .chain()
+          .focus()
+          .toggleHeading({
+            level: 2,
+          })
+          .run(),
     },
     {
       label: "Bullet list",
@@ -915,60 +988,76 @@ function SuggestionMenu(props: {
     .filter((note) => note.title.toLowerCase().includes(props.suggestion.query.toLowerCase()))
     .slice(0, 8);
   return (
-    <div
-      className="misty-tiptap-suggestion"
-      style={{ left: props.suggestion.x, top: props.suggestion.y }}
-      role="listbox"
+    <SuggestionList
+      className="fixed layer-menu max-h-[360px] min-w-[250px] overflow-auto"
+      style={{
+        left: props.suggestion.x,
+        top: props.suggestion.y,
+      }}
     >
-      <p>{props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}</p>
+      <p className="mx-2 mb-1.5 mt-1 text-[11px] font-semibold text-cream-muted">
+        {props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}
+      </p>
       {props.suggestion.type === "slash"
         ? slashItems.map((item) => (
-            <button
+            <SuggestionItem
               key={item.label}
-              type="button"
+              selected={false}
               onClick={() => {
                 props.editor
                   .chain()
                   .focus()
-                  .deleteRange({ from: props.suggestion.from, to: props.suggestion.to })
+                  .deleteRange({
+                    from: props.suggestion.from,
+                    to: props.suggestion.to,
+                  })
                   .run();
                 item.run();
                 props.onClose();
               }}
             >
-              <item.icon size={16} />
+              <item.icon />
               {item.label}
-            </button>
+            </SuggestionItem>
           ))
         : notes.map((note) => (
-            <button
+            <SuggestionItem
               key={note.id}
-              type="button"
+              selected={false}
               onClick={() => {
                 props.editor
                   .chain()
                   .focus()
-                  .deleteRange({ from: props.suggestion.from, to: props.suggestion.to })
+                  .deleteRange({
+                    from: props.suggestion.from,
+                    to: props.suggestion.to,
+                  })
                   .insertContent({
                     type: "text",
                     text: note.title,
-                    marks: [{ type: "link", attrs: { href: `misty-note://${note.id}` } }],
+                    marks: [
+                      {
+                        type: "link",
+                        attrs: {
+                          href: `misty-note://${note.id}`,
+                        },
+                      },
+                    ],
                   })
                   .run();
                 props.onClose();
               }}
             >
-              <Link2 size={16} />
+              <Link2 />
               {note.title}
-            </button>
+            </SuggestionItem>
           ))}
       {props.suggestion.type === "wiki" && notes.length === 0 ? (
-        <span>No matching notes</span>
+        <span className="p-2 text-xs text-cream-muted">No matching notes</span>
       ) : null}
-    </div>
+    </SuggestionList>
   );
 }
-
 type FindCommands = {
   setSearchTerm: (value: string) => boolean;
   setReplaceTerm: (value: string) => boolean;
@@ -987,12 +1076,18 @@ function initialContent(
     try {
       return JSON.parse(props.body) as JSONContent;
     } catch {
-      return { type: "doc", content: [{ type: "paragraph" }] };
+      return {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+          },
+        ],
+      };
     }
   }
   return props.bodyMarkdown ?? props.body ?? "";
 }
-
 function replaceYText(text: YText, value: string) {
   if (text.toString() === value) return;
   text.doc?.transact(() => {
@@ -1009,7 +1104,9 @@ function applyPendingMarkdown(editor: Editor, session?: NoteEditorSession) {
   const applied = Number(session.metadata.get("applied_version") ?? 0);
   const markdown = String(session.metadata.get("pending_markdown") ?? "");
   if (!pending || pending <= applied) return;
-  editor.commands.setContent(markdown, { contentType: "markdown" });
+  editor.commands.setContent(markdown, {
+    contentType: "markdown",
+  });
   session.metadata.set("applied_version", pending);
 }
 function collectNoteLinks(editor: Editor): string[] {
@@ -1031,7 +1128,9 @@ function collaborationUser(accountId?: string) {
   let hash = 0;
   for (const character of seed) hash = (hash * 31 + character.charCodeAt(0)) | 0;
   const colors = ["#8b7cf6", "#48a889", "#d09a55", "#cf6f79", "#5b91d5"];
-  return { name: "Misty collaborator", color: colors[Math.abs(hash) % colors.length] };
+  return {
+    name: "Misty collaborator",
+    color: colors[Math.abs(hash) % colors.length],
+  };
 }
-
 export default NoteBlockEditorView;

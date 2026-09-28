@@ -426,3 +426,40 @@ fn group_icons_accept_small_pngs_and_reject_other_payloads() {
         png
     );
 }
+
+#[test]
+fn home_tabs_survive_native_sync_and_can_be_deleted() {
+    let fields = json!({
+        "surface":"home", "title":"Home",
+        "placement":{"layout_id":"layout:home","pane_id":"pane:home","order":0},
+        "url":null, "profile_id":null, "website_id":null,
+        "tool_route":"/home", "agent_owned":false
+    });
+    let initial = apply(
+        &Document::default(),
+        changes(json!([{
+            "action":"create", "kind":"tab", "id":"tab:home", "fields":fields
+        }])),
+        MAC,
+    );
+    let restored: Document = serde_json::from_slice(&initial.encode().unwrap()).unwrap();
+    assert_eq!(
+        restored.live(Kind::Tab, "tab:home").unwrap().values()["tool_route"],
+        "/home"
+    );
+    let closed = apply(
+        &restored,
+        changes(json!([{
+            "action":"delete", "kind":"tab", "id":"tab:home"
+        }])),
+        MAC,
+    );
+    assert!(closed.live(Kind::Tab, "tab:home").is_none());
+    let mut invalid = fields;
+    invalid["tool_route"] = json!("/agents");
+    assert!(misty_browser_sync::document::entities::validate(
+        Kind::Tab,
+        &serde_json::from_value(invalid).unwrap()
+    )
+    .is_err());
+}

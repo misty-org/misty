@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
 import { observeAccountChanges } from "@/api/accountEvents";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
@@ -9,13 +9,7 @@ import {
 import { finishLocalExecution, useLocalExecution } from "@/features/agents/localExecution";
 import { betaExecutionMode } from "@/features/agents/betaModes";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/shared/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
 
 export function MistyAgentPicker({ accountId }: { accountId: string }) {
   const agents = usePersonalAgentsStore((state) => state.agents);
@@ -67,23 +61,17 @@ export function MistyAgentPicker({ accountId }: { accountId: string }) {
   };
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="min-w-0 gap-2 px-0 text-sm font-semibold"
-          aria-label={`Agent: ${current?.name ?? "Misty"}`}
-          title="Switch agent"
-          disabled={
-            working || switching || execution?.state === "running" || execution?.state === "paused"
-          }
-        >
-          {current && <AgentAvatar agent={current} />}
-          <span className="max-w-36 truncate">{current?.name ?? "Misty"}</span>
-          <ChevronDown className="size-3 text-cream-muted" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56" data-misty-layer-portal>
+      <MenuTrigger
+        label={`Agent: ${current?.name ?? "Misty"}`}
+        value={current?.name ?? "Misty"}
+        title="Switch agent"
+        icon={current ? <AgentAvatar agent={current} /> : undefined}
+        className="min-w-0 gap-2 px-0 text-sm font-semibold [&>span]:max-w-36"
+        disabled={
+          working || switching || execution?.state === "running" || execution?.state === "paused"
+        }
+      />
+      <DropdownMenuContent align="start" width="md" data-misty-layer-portal>
         {agents
           .filter((agent) => agent.enabled)
           .map((agent) => (

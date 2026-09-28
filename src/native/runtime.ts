@@ -9,8 +9,7 @@ import type {
   NoteAssetStoreRequest,
   NoteAssetStoreResult,
   PasteItem,
-  StorageSnapshot,
-} from "@/native/contracts";
+} from "@/native/ipc";
 
 import { invoke } from "./invoke";
 export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<void> {
@@ -65,12 +64,6 @@ export function appConfigureServer(
     deploymentId: deploymentId ?? null,
     name: name ?? null,
   });
-}
-
-
-
-export function storageSnapshot(): Promise<StorageSnapshot> {
-  return invoke("storage_snapshot");
 }
 
 export function claudeStatus(): Promise<ClaudeStatus> {

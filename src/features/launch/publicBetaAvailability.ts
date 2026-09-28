@@ -11,7 +11,6 @@ export const publicBetaAvailability = {
   mcpConnections: true,
   recurringBriefings: false,
   smartLibraryAnalysis: false,
-  transfers: false,
 } as const;
 
 export type PublicBetaFeature = keyof typeof publicBetaAvailability;

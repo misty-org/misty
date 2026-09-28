@@ -15,6 +15,10 @@ impl BrowserProfile {
             storage: WebsiteStorage::new(view, physical),
         }
     }
+    pub fn with_held(mut self, held: super::browser_data_budget::Held) -> Self {
+        self.storage = self.storage.with_held(held);
+        self
+    }
 }
 fn cookies(target: &[CredentialRecord]) -> Vec<CredentialRecord> {
     target

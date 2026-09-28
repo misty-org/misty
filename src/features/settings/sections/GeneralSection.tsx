@@ -1,23 +1,21 @@
+import { workspaceDefaultTabOptions } from "@/features/workspace/workspaceDefaultTab";
 import { startupViewOptions } from "@/features/app-shell";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, numberSetting, SelectControl, SwitchControl } from "../settingsControls";
+import { booleanSetting, numberSetting, SelectControl, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-
 export function GeneralSection(props: SettingsContentProps) {
   const launchOnLoginUnsupported = props.launchOnLogin?.supported === false;
   const launchOnLoginEnabled = props.launchOnLogin
     ? props.launchOnLogin.enabled
     : booleanSetting(props.document, "general", "launch_on_login", false);
   const reopenLastSession = booleanSetting(props.document, "general", "reopen_last_session", true);
-
   return (
     <>
       <SettingsSectionBlock title="Startup">
-        {!isNativeMobileBuild ? (
+        {
           <SettingsRow
             label="Launch on login"
             muted={launchOnLoginUnsupported}
@@ -33,7 +31,7 @@ export function GeneralSection(props: SettingsContentProps) {
               onChange={(value) => props.onSettingChange("general", "launch_on_login", value)}
             />
           </SettingsRow>
-        ) : null}
+        }
         <SettingsRow
           label="Reopen last session"
           description="Return to whichever view you were last in instead of a fixed one."
@@ -45,9 +43,10 @@ export function GeneralSection(props: SettingsContentProps) {
           />
         </SettingsRow>
         <SettingsRow
-          label="Open on launch"
+          label="Otherwise open"
           description="The view Misty starts on when it is not reopening your last session."
           muted={reopenLastSession}
+          indent
         >
           <SelectControl
             value={numberSetting(props.document, "general", "startup_view_index", 0)}
@@ -56,18 +55,22 @@ export function GeneralSection(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("general", "startup_view_index", value)}
           />
         </SettingsRow>
-        {!isNativeMobileBuild ? (
-          <SettingsRow
-            label="New tabs and windows"
-            description="Open Google to search or enter a web address."
-            last
-          >
-            <span className="text-sm text-cream-muted">Google</span>
-          </SettingsRow>
-        ) : null}
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Behavior">
+        <SettingsRow
+          label="New tabs and splits"
+          description="Choose the starting page. Selecting a navbar destination fills an unused tab or pane."
+        >
+          <SelectControl
+            value={numberSetting(props.document, "general", "workspace_default_tab_index", 0)}
+            options={[...workspaceDefaultTabOptions]}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("general", "workspace_default_tab_index", value)
+            }
+          />
+        </SettingsRow>
         <SettingsRow
           label="Confirm destructive actions"
           description="Ask before delete, empty trash, and other irreversible actions."

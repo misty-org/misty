@@ -1,0 +1,40 @@
+:root {
+  /* Fixed logical pixels keep the same thickness at every viewport size. */
+  --misty-scrollbar-size: 5px;
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--misty-theme-active, #737373) var(--misty-theme-bg, transparent);
+  }
+
+  /* WebKit/Blink standard scrollbar properties override custom sizing.
+     Use their pixel-sized track; other engines retain the thin fallback.
+     Base-layer defaults let deliberately hidden scrollbars stay hidden. */
+  @supports selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: var(--misty-scrollbar-size);
+    height: var(--misty-scrollbar-size);
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: var(--misty-theme-bg, transparent);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--misty-theme-active, #737373);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--misty-theme-text-muted, #999);
+  }
+}

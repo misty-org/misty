@@ -39,7 +39,7 @@ const sortOptions: Option[] = [
 
 export interface TaskFiltersProps {
   members: SpaceMember[];
-  
+
   status: string;
   assignee: string;
   priority: string;

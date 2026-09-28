@@ -1,5 +1,5 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { Button, cn } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { Gauge, Settings2, UsersRound } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { SpaceMembersPopover } from "../members";
@@ -26,40 +26,24 @@ export function SpaceRowActions({
       <SpaceUsagePopover
         space={space}
         trigger={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className={cn(spaceRowActionClass, actionClassName)}
-            aria-label={`${space.name} usage`}
-            title="Usage"
-          >
+          <IconButton label={`${space.name} usage`} className={actionClassName} title="Usage">
             <Gauge size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Button>
+          </IconButton>
         }
       />
       <SpaceMembersPopover
         space={space}
         trigger={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className={cn(spaceRowActionClass, actionClassName)}
-            aria-label={`${space.name} members`}
-            title="Members"
-          >
+          <IconButton label={`${space.name} members`} className={actionClassName} title="Members">
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Button>
+          </IconButton>
         }
       />
-      <Button
+      <IconButton
         asChild
-        variant="ghost"
-        size="icon-sm"
-        className={cn(spaceRowActionClass, actionClassName)}
-        aria-label={`${space.name} settings`}
-        title="Settings"
+        label={`${space.name} settings`}
+        tooltip="Settings"
+        className={actionClassName}
       >
         <Link
           to={`/spaces/${encodedSpaceId}/settings/general`}
@@ -68,13 +52,7 @@ export function SpaceRowActions({
         >
           <Settings2 size={16} strokeWidth={1.75} aria-hidden="true" />
         </Link>
-      </Button>
+      </IconButton>
     </div>
   );
 }
-
-const spaceRowActionClass = [
-  "size-7 rounded-md p-0 text-cream-muted",
-  "hover:bg-charcoal-hover hover:text-cream-bright",
-  "focus-visible:ring-2 focus-visible:ring-charcoal-active",
-].join(" ");

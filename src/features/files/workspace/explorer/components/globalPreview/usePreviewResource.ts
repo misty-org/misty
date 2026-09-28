@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { errorText } from "@/shared/lib/format";
-import type {
-  GlobalPreviewSource,
-  PreviewResource,
-} from "../../model/interfaces/components/GlobalPreview";
-import type { PreviewRuntime } from "./PreviewRuntime";
+import {
+  type GlobalPreviewSource,
+  type PreviewResource,
+  type PreviewRuntime,
+} from "@/features/file-ui";
 export function usePreviewResource(source: GlobalPreviewSource, load: PreviewRuntime["load"]) {
   const [resource, setResource] = useState<PreviewResource | null>(null);
   const [loading, setLoading] = useState(true);

@@ -1,20 +1,21 @@
-import { companionFollowPoint, normalizeCompanionSize } from "./companionSize";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { emitTo } from "@tauri-apps/api/event";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import { cursorEvent, presentationEvent, type CursorSample, type Presentation } from "./protocol";
+import { invoke } from "@tauri-apps/api/core";
+import { emitTo } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { CompanionActivity } from "./companionActivity";
+import { companionFollowPoint, normalizeCompanionSize } from "./companionSize";
+import "./cursorCompanion.css";
 import {
+  BUBBLE_FADE_MS,
   flight,
   POINT_HOLD_MS,
-  BUBBLE_FADE_MS,
-  spring,
   recordingPower,
+  spring,
   waveformHeight,
   type Point,
 } from "./motion";
-import "./cursorCompanion.css";
+import { cursorEvent, presentationEvent, type CursorSample, type Presentation } from "./protocol";
 const initial: Presentation = {
   generation: 0,
   phase: "idle",
@@ -29,13 +30,22 @@ function usePresentation() {
   const [state, setState] = useState(initial);
   useEffect(() => {
     let active = true;
+    let receivedPresentation = false;
     const remove = getCurrentWindow().listen<Presentation>(presentationEvent, ({ payload }) => {
+      receivedPresentation = true;
       if (active) setState(payload);
     });
     void remove
       .then(() => invoke<Presentation | null>("cursor_companion_snapshot"))
       .then((snapshot) => {
-        if (active && snapshot) setState(snapshot);
+        if (active && !receivedPresentation && snapshot) setState(snapshot);
+      })
+      .catch(() => {
+        if (active)
+          void emitTo("main", "misty://cursor-renderer-error", {
+            error:
+              "The cursor could not restore its display state. Restart Misty after updating the desktop app.",
+          });
       });
     return () => {
       active = false;
@@ -56,12 +66,25 @@ function CursorOverlay() {
     let power = 0,
       meterTurn = -1,
       lastMeterFrame = 0;
-    const bubbleScale = { x: 0.5, y: 0 },
-      bubbleVelocity = { x: 0, y: 0 };
+    const bubbleScale = {
+        x: 0.5,
+        y: 0,
+      },
+      bubbleVelocity = {
+        x: 0,
+        y: 0,
+      };
+    const activity = new CompanionActivity();
     let sample: CursorSample | undefined;
     let position: Point | undefined;
-    const velocity = { x: 0, y: 0 };
-    let flightStart: Point = { x: 0, y: 0 },
+    const velocity = {
+      x: 0,
+      y: 0,
+    };
+    let flightStart: Point = {
+        x: 0,
+        y: 0,
+      },
       target = flightStart,
       returnMouse = flightStart;
     let navigation: "follow" | "out" | "hold" | "return" = "follow";
@@ -76,17 +99,24 @@ function CursorOverlay() {
     const removers = [
       getCurrentWindow().listen<CursorSample>(cursorEvent, ({ payload }) => {
         sample = payload;
+        const display = payload.displays.find((display) => display.id === id);
+        const scale = /Mac/.test(navigator.platform) ? 1 : (display?.scale ?? 1);
+        activity.sample(
+          { x: payload.x / scale, y: payload.y / scale },
+          payload.keyboardActivity,
+          performance.now(),
+        );
       }),
-      getCurrentWindow().listen<{ turn: number; power: number }>(
-        "misty://cursor-meter",
-        ({ payload }) => {
-          if (payload.turn === latest.current.generation) {
-            if (meterTurn !== payload.turn) power = 0;
-            meterTurn = payload.turn;
-            power = recordingPower(payload.power, power);
-          }
-        },
-      ),
+      getCurrentWindow().listen<{
+        turn: number;
+        power: number;
+      }>("misty://cursor-meter", ({ payload }) => {
+        if (payload.turn === latest.current.generation) {
+          if (meterTurn !== payload.turn) power = 0;
+          meterTurn = payload.turn;
+          power = recordingPower(payload.power, power);
+        }
+      }),
     ];
     const finish = () => {
       navigation = "follow";
@@ -112,14 +142,19 @@ function CursorOverlay() {
       const factor = /Mac/.test(navigator.platform) ? 1 : d.scale;
       const width = d.width / factor,
         height = d.height / factor;
-      const mouse = { x: (sample.x - d.x) / factor, y: (sample.y - d.y) / factor };
+      const mouse = {
+        x: (sample.x - d.x) / factor,
+        y: (sample.y - d.y) / factor,
+      };
       const follow = companionFollowPoint(
         mouse,
         width,
         height,
         normalizeCompanionSize(latest.current.size),
       );
-      position ??= { ...follow };
+      position ??= {
+        ...follow,
+      };
       const state = latest.current;
       const key = `${state.generation}:${JSON.stringify(state.point)}`;
       if (key !== seen) {
@@ -132,7 +167,9 @@ function CursorOverlay() {
             x: Math.max(20, Math.min(width - 20, (state.point.x - d.x) / factor + 8)),
             y: Math.max(20, Math.min(height - 20, (state.point.y - d.y) / factor + 12)),
           };
-          flightStart = { ...position };
+          flightStart = {
+            ...position,
+          };
           started = now;
           navigation = "out";
           const phrases = [
@@ -160,7 +197,10 @@ function CursorOverlay() {
           finish();
         else {
           const f = flight(flightStart, target, now - started);
-          position = { x: f.x, y: f.y };
+          position = {
+            x: f.x,
+            y: f.y,
+          };
           scale = f.scale;
           rotation = f.rotation;
           if (f.done) {
@@ -176,15 +216,33 @@ function CursorOverlay() {
         if (now > holdUntil + BUBBLE_FADE_MS) {
           navigation = "return";
           started = now;
-          flightStart = { ...position };
+          flightStart = {
+            ...position,
+          };
           target = follow;
           returnMouse = mouse;
         }
       } else spring(position, velocity, follow, dt);
       const onScreen = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
-      const visible = state.visible && (navigation !== "follow" || (!state.point && onScreen));
+      const presence = activity.presentation(
+        now,
+        state.phase !== "idle" ||
+          navigation !== "follow" ||
+          Boolean(state.point) ||
+          Boolean(state.error),
+      );
+      const visible =
+        state.visible &&
+        presence.visible &&
+        (navigation !== "follow" || (!state.point && onScreen));
+      group.current.style.transitionDuration = `${presence.fadeMs}ms`;
       group.current.style.opacity = visible ? "1" : "0";
       group.current.style.transform = `translate(${position.x}px, ${position.y}px)`;
+      const errorBubble = group.current.querySelector<HTMLElement>(".cursor-error-bubble");
+      if (errorBubble) {
+        errorBubble.style.left = `${Math.max(8 - position.x, Math.min(10, width - position.x - errorBubble.offsetWidth - 8))}px`;
+        errorBubble.style.top = `${Math.max(8 - position.y, Math.min(26, height - position.y - errorBubble.offsetHeight - 8))}px`;
+      }
       const image = group.current.querySelector<HTMLImageElement>(".cursor-sprite");
       if (image)
         image.style.transform = `translate(-50%,-50%) rotate(${rotation}deg) scale(${scale})`;
@@ -196,7 +254,16 @@ function CursorOverlay() {
         }
         bubble.current.textContent = label.slice(0, typed);
         bubble.current.style.opacity = navigation === "hold" && now <= holdUntil ? "1" : "0";
-        spring(bubbleScale, bubbleVelocity, { x: navigation === "hold" ? 1 : 0.5, y: 0 }, dt, 0.4);
+        spring(
+          bubbleScale,
+          bubbleVelocity,
+          {
+            x: navigation === "hold" ? 1 : 0.5,
+            y: 0,
+          },
+          dt,
+          0.4,
+        );
         bubble.current.style.transform = `translateY(-50%) scale(${bubbleScale.x})`;
         const glow = Math.max(0, 6 + (1 - bubbleScale.x) * 16);
         const alpha = Math.max(0, Math.min(1, 0.5 + (1 - bubbleScale.x)));
@@ -217,7 +284,9 @@ function CursorOverlay() {
         className="cursor-group"
         data-phase={presentation.phase}
         style={
-          { "--companion-scale": normalizeCompanionSize(presentation.size) / 100 } as CSSProperties
+          {
+            "--companion-scale": normalizeCompanionSize(presentation.size) / 100,
+          } as CSSProperties
         }
       >
         <img className="cursor-sprite" src={sprite} alt="" />
@@ -255,6 +324,15 @@ function CursorOverlay() {
           </foreignObject>
         </svg>
         <div ref={bubble} className="cursor-point-bubble" />
+        {presentation.error && !presentation.point && (
+          <div className="cursor-error-bubble">
+            {presentation.error.includes("Speech failed:")
+              ? "Speech unavailable"
+              : "Companion needs attention"}
+            <br />
+            Open Agents to retry.
+          </div>
+        )}
       </div>
     </div>
   );

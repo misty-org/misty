@@ -1,64 +1,47 @@
-import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
-import { useCompanionState } from "../companion/companionState";
-import { Button } from "@/shared/ui";
-import { useEffect, useRef, useState } from "react";
-import { Loader2, Mic, Square, X } from "lucide-react";
-import type { AgentProfile } from "@misty/contracts";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { MistyComposer } from "@/features/global-search/MistyComposer";
-import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
-import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
+import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
+import { MistyComposer } from "@/features/global-search/MistyComposer";
+import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, IconButton, Spinner } from "@/shared/ui";
+import { Mic, Square, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCompanionState } from "../companion/companionState";
 import { AgentConversationView } from "./AgentConversationView";
-
-const suggestions = [
-  [
-    "Catch me up on my projects",
-    "Help me catch up on my current projects and identify what needs attention.",
-  ],
-  ["Plan my next steps", "Help me make a practical plan for what I’m working on."],
-  [
-    "Turn an idea into a draft",
-    "Help me turn an idea into a clear first draft. Ask me what I have in mind.",
-  ],
-  [
-    "Think through a decision",
-    "Help me think through a decision. Ask me about the options and what matters most.",
-  ],
-];
-
 export function AgentWorkspaceConversation({
   agent,
+  conversationId,
+  emptyContent,
   spaceId: _legacySpaceId,
   accountId,
   onCreate,
-  userName,
   onDraftStateChange,
 }: {
   agent?: AgentProfile;
+  conversationId?: string;
+  emptyContent?: ReactNode;
   spaceId: string;
   accountId: string;
   onCreate: () => void;
-  userName?: string;
   onDraftStateChange?: (status: { dirty: boolean; busy: boolean }) => void;
 }) {
   const spaceId = "";
   const state = useMistyStore();
   const [draft, setDraft] = useState("");
-
-  const [showSuggestions, setShowSuggestions] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scoped = state.conversations.filter(
     (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
-  const conversation = scoped.find((c) => c.id === state.activeConversationId);
-
-  const reportError = (error: string) => useMistyStore.setState({ error: error || null });
+  const conversation = scoped.find((c) => c.id === (conversationId ?? state.activeConversationId));
+  const reportError = (error: string) =>
+    useMistyStore.setState({
+      error: error || null,
+    });
   const companion = useCompanionState((s) => s.presentation);
   const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
-
   const voice = useAiVoiceRecorder({
     onTranscript: (text) => {
       setDraft((previous) => (previous ? `${previous} ${text}` : text));
@@ -66,8 +49,6 @@ export function AgentWorkspaceConversation({
     },
     onError: reportError,
   });
-  const [openedAt] = useState(() => new Date());
-
   useEffect(() => {
     const store = useMistyStore.getState();
     store.setAccount(accountId);
@@ -76,7 +57,11 @@ export function AgentWorkspaceConversation({
   }, [accountId]);
   useEffect(() => {
     const view = scrollRef.current;
-    if (view && view.scrollHeight - view.scrollTop - view.clientHeight < 220)
+    if (
+      conversation?.messages.length &&
+      view &&
+      view.scrollHeight - view.scrollTop - view.clientHeight < 220
+    )
       view.scrollTop = view.scrollHeight;
   }, [conversation?.messages, state.working]);
   const prepare = () =>
@@ -105,8 +90,15 @@ export function AgentWorkspaceConversation({
     voice.transcribing ||
     attachments.attachments.some((a) => a.state === "uploading");
   useEffect(() => {
-    onDraftStateChange?.({ dirty: hasDraft, busy: composingBusy });
-    return () => onDraftStateChange?.({ dirty: false, busy: false });
+    onDraftStateChange?.({
+      dirty: hasDraft,
+      busy: composingBusy,
+    });
+    return () =>
+      onDraftStateChange?.({
+        dirty: false,
+        busy: false,
+      });
   }, [hasDraft, composingBusy, onDraftStateChange]);
   const send = async (prompt = draft) => {
     if (
@@ -117,22 +109,32 @@ export function AgentWorkspaceConversation({
     )
       return;
     prepare();
-    await useMistyStore.getState().submitAnswer(
-      prompt,
-      attachments.attachments,
-      undefined,
-      "workspace",
-      [],
-      {
-        conversationId: conversation?.id ?? "",
-        context: [],
-      },
-      {
-        executionMode: isDesktop ? "agent" : "user",
-        interactionMode: companion.mode,
-        model: companion.model,
-      },
-    );
+    try {
+      if (isDesktop) {
+        const submit = useCompanionState.getState().submit;
+        if (!submit) throw new Error("The companion is starting. Try again in a moment.");
+        await submit({
+          prompt,
+          attachments: attachments.attachments,
+          conversationId: conversation?.id ?? "",
+        });
+      } else {
+        await useMistyStore
+          .getState()
+          .submitAnswer(
+            prompt,
+            attachments.attachments,
+            undefined,
+            "workspace",
+            [],
+            { conversationId: conversation?.id ?? "", context: [] },
+            { executionMode: "user", interactionMode: companion.mode, model: companion.model },
+          );
+      }
+    } catch (error) {
+      reportError(error instanceof Error ? error.message : String(error));
+      return;
+    }
     if (!useMistyStore.getState().error) {
       setDraft("");
       attachments.consume();
@@ -140,7 +142,6 @@ export function AgentWorkspaceConversation({
   };
   return (
     <section className="agent-conversation" aria-label={`${agent?.name || "Misty"} conversation`}>
-      <AgentCompanionPanel />
       <div className="agent-conversation-scroll" ref={scrollRef}>
         {conversation?.messages.length ? (
           <AgentConversationView
@@ -151,90 +152,23 @@ export function AgentWorkspaceConversation({
             onCancel={(id) => void state.cancelAgentTask(id)}
             onRetry={(prompt) => void send(prompt)}
           />
-        ) : (
-          <div className="agent-welcome">
-            <time className="agent-conversation-date" dateTime={openedAt.toISOString()}>
-              Today {openedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
-            </time>
-            <p className="agent-greeting">
-              Hi{userName ? ` ${userName.split(" ")[0]}` : " there"}!
-            </p>
-            <p className="agent-introduction">
-              {agent?.system_managed
-                ? "Ask me about what you’re working on, or hand off a step. Use Team to work together, or Auto to let me carry a task through your tabs."
-                : agent
-                  ? `I’m ${agent.name}. Tell me what you’d like help with, and we’ll take it from there.`
-                  : "Create an agent to start a conversation."}
-            </p>
-            {showSuggestions && agent && (
-              <div className="agent-starters">
-                <div className="agent-starters-heading">
-                  <h3>What can I take off your plate?</h3>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="agent-icon-button"
-                    aria-label="Dismiss suggestions"
-                    onClick={() => setShowSuggestions(false)}
-                  >
-                    <X size={16} />
-                  </Button>
-                </div>
-                <div className="agent-starter-options">
-                  {suggestions.map(([label, prompt], index) => (
-                    <Button
-                      variant="ghost"
-                      key={label}
-                      disabled={!agent.enabled || state.working}
-                      onClick={() => {
-                        setDraft(prompt);
-                        textareaRef.current?.focus();
-                      }}
-                    >
-                      <span className="agent-option-letter" aria-hidden>
-                        {String.fromCharCode(65 + index)}
-                      </span>
-                      <span>{label}</span>
-                    </Button>
-                  ))}
-                </div>
-                <input
-                  className="agent-custom-answer"
-                  aria-label="Custom answer"
-                  placeholder="Type your own answer"
-                  value={draft}
-                  disabled={!agent.enabled || state.working}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-                      event.preventDefault();
-                      void send();
-                    }
-                  }}
-                />
-              </div>
-            )}
-            {!agent && (
-              <Button variant="ghost" className="agent-create-action" onClick={onCreate}>
-                Create an agent
-              </Button>
-            )}
+        ) : emptyContent ? (
+          emptyContent
+        ) : !agent && !state.conversationsLoading ? (
+          <div className="agent-empty-state">
+            <Button variant="secondary" onClick={onCreate}>
+              Create an agent
+            </Button>
           </div>
-        )}
+        ) : null}
       </div>
       <div className="agent-compose-area">
         {state.error && (
           <div role="alert" className="agent-compose-error">
             <p>{state.error}</p>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="agent-icon-button"
-              aria-label="Dismiss error"
-              onClick={() => reportError("")}
-            >
+            <IconButton label="Dismiss error" onClick={() => reportError("")}>
               <X size={16} />
-            </Button>
+            </IconButton>
           </div>
         )}
         {agent && !agent.enabled && (
@@ -243,7 +177,7 @@ export function AgentWorkspaceConversation({
           </p>
         )}
         <MistyComposer
-          className="agent-workspace-composer"
+          layout="conversation"
           value={draft}
           onChange={setDraft}
           mode="ask"
@@ -264,30 +198,30 @@ export function AgentWorkspaceConversation({
           disabled={!agent?.enabled || !accountId}
           busy={state.working}
           voiceControl={
-            <Button
-              variant="ghost"
-              className="agent-voice-button"
-              aria-label={voice.recording ? "Stop recording" : "Start voice input"}
-              title={voice.recording ? "Stop recording" : "Voice input"}
-              disabled={!agent?.enabled || state.working || voice.requesting || voice.transcribing}
+            <IconButton
+              label={voice.recording ? "Stop recording" : "Start voice input"}
+              disabled={
+                !agent?.enabled ||
+                !accountId ||
+                state.working ||
+                voice.requesting ||
+                voice.transcribing
+              }
               onClick={() => (voice.recording ? voice.stop() : void voice.start())}
             >
               {voice.requesting || voice.transcribing ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Spinner size="lg" label={false} />
               ) : voice.recording ? (
                 <Square size={16} />
               ) : (
                 <Mic size={18} />
               )}
-            </Button>
+            </IconButton>
           }
           trailingControl={
             state.working ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="agent-icon-button"
-                aria-label="Stop response"
+              <IconButton
+                label="Stop response"
                 onClick={() => {
                   if (state.invocationId)
                     void aiSurfaceApi
@@ -296,7 +230,7 @@ export function AgentWorkspaceConversation({
                 }}
               >
                 <Square size={16} />
-              </Button>
+              </IconButton>
             ) : undefined
           }
         />

@@ -35,141 +35,6 @@ async fn soft_delete_uses_unique_trash_name() {
 }
 
 #[test]
-fn remote_conflict_lookup_accepts_relative_and_full_list_paths() {
-    let parent = RemoteBrowseTarget {
-        provider_type: "drive".into(),
-        remote_name: "work".into(),
-        remote_path: "/Documents".into(),
-    };
-    let items = vec![
-        RemoteListItem {
-            name: "report.pdf".into(),
-            path: "report.pdf".into(),
-            is_dir: false,
-            ..remote_list_item_default()
-        },
-        RemoteListItem {
-            name: "Archive".into(),
-            path: "/Documents/Archive".into(),
-            is_dir: true,
-            ..remote_list_item_default()
-        },
-    ];
-
-    assert_eq!(
-        remote_item_is_directory(&parent, "/Documents/report.pdf", &items).unwrap(),
-        Some(false)
-    );
-    assert_eq!(
-        remote_item_is_directory(&parent, "/Documents/Archive", &items).unwrap(),
-        Some(true)
-    );
-    assert_eq!(
-        remote_item_is_directory(&parent, "/Documents/missing.txt", &items).unwrap(),
-        None
-    );
-}
-
-#[test]
-fn remote_preview_metadata_rejects_directories_without_size_cap() {
-    let parent = RemoteBrowseTarget {
-        provider_type: "drive".into(),
-        remote_name: "work".into(),
-        remote_path: "/Documents".into(),
-    };
-    let items = vec![
-        RemoteListItem {
-            name: "notes.txt".into(),
-            path: "notes.txt".into(),
-            size: 128,
-            mod_time: "2026-06-21T00:00:00Z".into(),
-            ..remote_list_item_default()
-        },
-        RemoteListItem {
-            name: "Archive".into(),
-            path: "Archive".into(),
-            is_dir: true,
-            ..remote_list_item_default()
-        },
-        RemoteListItem {
-            name: "large.pdf".into(),
-            path: "large.pdf".into(),
-            size: 512 * 1024 * 1024,
-            ..remote_list_item_default()
-        },
-    ];
-
-    assert_eq!(
-        remote_preview_metadata_from_items(&parent, "/Documents/notes.txt", &items).unwrap(),
-        Some((128, "2026-06-21T00:00:00Z".into()))
-    );
-    assert!(remote_preview_metadata_from_items(&parent, "/Documents/Archive", &items).is_err());
-    assert_eq!(
-        remote_preview_metadata_from_items(&parent, "/Documents/large.pdf", &items).unwrap(),
-        Some((512 * 1024 * 1024, "".into()))
-    );
-    assert_eq!(
-        remote_preview_metadata_from_items(&parent, "/Documents/missing.txt", &items).unwrap(),
-        None
-    );
-}
-
-#[test]
-fn remote_list_items_are_deduped_by_resolved_path() {
-    let parent = RemoteBrowseTarget {
-        provider_type: "drive".into(),
-        remote_name: "work".into(),
-        remote_path: "/Documents".into(),
-    };
-    let items = vec![
-        RemoteListItem {
-            name: "fig2_topo.pdf".into(),
-            path: "fig2_topo.pdf".into(),
-            size: 1024,
-            ..remote_list_item_default()
-        },
-        RemoteListItem {
-            name: "fig2_topo.pdf".into(),
-            path: "/Documents/fig2_topo.pdf".into(),
-            size: 1024,
-            ..remote_list_item_default()
-        },
-        RemoteListItem {
-            name: "Misty_Terms_of_Service.docx".into(),
-            path: "Misty_Terms_of_Service.docx".into(),
-            size: 2048,
-            ..remote_list_item_default()
-        },
-        remote_list_item_default(),
-    ];
-
-    let deduped = dedupe_remote_list_items(&parent, items).unwrap();
-
-    assert_eq!(deduped.len(), 2);
-    assert_eq!(deduped[0].name, "fig2_topo.pdf");
-    assert_eq!(deduped[1].name, "Misty_Terms_of_Service.docx");
-}
-
-#[test]
-fn remote_item_paths_prefer_the_fetched_name_over_a_stale_path_field() {
-    let parent = RemoteBrowseTarget {
-        provider_type: "drive".into(),
-        remote_name: "work".into(),
-        remote_path: "/Documents".into(),
-    };
-    let item = RemoteListItem {
-        name: "current-name.pdf".into(),
-        path: "/Documents/old-name.pdf".into(),
-        ..remote_list_item_default()
-    };
-
-    assert_eq!(
-        remote_item_path(&parent, &item).unwrap(),
-        "/Documents/current-name.pdf"
-    );
-}
-
-#[test]
 fn trash_virtual_entries_are_marked_deleted() {
     let root = unique_test_dir("trash-virtual");
     let trashed = root.join("deleted.txt");
@@ -346,4 +211,32 @@ async fn generated_image_thumbnail_writes_small_images_to_cache() {
     assert!(Path::new(&thumbnail.path).starts_with(&service.image_thumbnail_cache_dir));
 
     let _ = tokio::fs::remove_dir_all(&root).await;
+}
+
+#[tokio::test]
+async fn lists_local_files_and_rejects_retired_cloud_locations() {
+    let root = unique_test_dir("local-only-listing");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("notes.txt"), b"local").unwrap();
+    let service = test_explorer_service_for_home(root.clone());
+    let request = |path: String| ListDirectoryRequest {
+        path: Some(path),
+        show_hidden: Some(false),
+        force_remote_refresh: None,
+    };
+    let listing = service
+        .list_directory(request(display_path(&root)))
+        .await
+        .unwrap();
+    assert!(listing
+        .entries
+        .iter()
+        .any(|entry| entry.name == "notes.txt"));
+    for path in [
+        "misty://drive/notes.txt".to_owned(),
+        display_path(&service.mount_root.join("drive")),
+    ] {
+        assert!(service.list_directory(request(path)).await.is_err());
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }

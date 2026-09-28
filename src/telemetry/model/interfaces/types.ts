@@ -13,7 +13,7 @@ export interface CommonClientProperties {
   architecture?: string;
   release_channel: ReleaseChannel;
   distribution_channel: DistributionChannel;
-  device_class?: "desktop" | "phone" | "tablet" | "chromeos" | "unknown";
+  device_class?: "desktop" | "unknown";
   environment: Environment;
 }
 
@@ -23,7 +23,7 @@ export interface CommonServerProperties {
 }
 
 export interface SubscriptionProperties extends CommonServerProperties {
-  provider: "stripe" | "apple_app_store" | "google_play" | "revenuecat" | "other";
+  provider: "stripe" | "other";
   plan_id: string;
   billing_interval?: "monthly" | "yearly" | "lifetime" | "other";
   currency?: string;

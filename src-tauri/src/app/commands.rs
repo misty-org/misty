@@ -10,11 +10,6 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
-#[cfg(target_os = "android")]
-use sha2::{Digest, Sha256};
-#[cfg(target_os = "android")]
-use tauri_plugin_document_tree::{DocumentTreeExt, PickTreeRequest};
-
 use crate::app::runtime::MistyRuntime;
 use crate::domain::clipboard::{
     ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
@@ -66,12 +61,6 @@ use crate::infra::power_pack::{
     FileToolsReadonlyRequest, FileToolsSymlinkRequest, FileToolsSymlinkTargetRequest,
     FileToolsSymlinkTargetResult, SavedSearch, SavedSearchesSnapshot,
 };
-use crate::infra::providers::{
-    BackendAction, BackendActionResult, BackendRunRequest, CloudConfigPaths, ConfigSecurityStatus,
-    ProviderConfigRequest, ProviderConfigStep, ProviderJobStart, ProviderJobStatus,
-    ProvidersSnapshot, RemoteEditDraft, RemoteTestResult, SaveRemoteRequest, VerifyResult,
-    VerifyStartRequest,
-};
 use crate::infra::search::{SearchQueryRequest, SearchResult, SearchScanRequest, SearchStatus};
 use crate::infra::settings::{OpenWithAssociation, SaveSettingsRequest, SettingsSnapshot};
 use crate::infra::smart_library::{
@@ -81,8 +70,6 @@ use crate::infra::smart_library::{
     SmartLibraryImportPreflight, SmartLibraryImportResult, SmartLibraryScanRequest,
     SmartLibrarySearchRequest, SmartLibrarySnapshot,
 };
-use crate::infra::storage::StorageSnapshot;
-use crate::infra::storage_runtime::StorageRuntimeSnapshot;
 use crate::infra::transfers::{TransferFilter, TransferPage};
 
 #[derive(Debug, Serialize)]
@@ -91,7 +78,6 @@ pub struct AppSnapshot {
     app_name: &'static str,
     version: &'static str,
     migration_stage: &'static str,
-    storage_runtime: StorageRuntimeSnapshot,
     environment: AppEnvironmentSnapshot,
 }
 
@@ -136,7 +122,6 @@ pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapsh
         app_name: "Misty",
         version: env!("CARGO_PKG_VERSION"),
         migration_stage: "Tauri migration shell",
-        storage_runtime: state.storage_runtime.snapshot(),
         environment: state.environment.snapshot(),
     })
 }
@@ -188,47 +173,6 @@ pub async fn mail_cache_remove(
 }
 
 #[tauri::command]
-pub fn mobile_cache_read(
-    account_id: String,
-    record_key: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Option<String>> {
-    crate::infra::mobile_cache::read(&state.environment.cache_dir(), &account_id, &record_key)
-}
-
-#[tauri::command]
-pub fn mobile_cache_write(
-    account_id: String,
-    record_key: String,
-    value: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mobile_cache::write(
-        &state.environment.cache_dir(),
-        &account_id,
-        &record_key,
-        &value,
-    )
-}
-
-#[tauri::command]
-pub fn mobile_cache_remove(
-    account_id: String,
-    record_key: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mobile_cache::remove(&state.environment.cache_dir(), &account_id, &record_key)
-}
-
-#[tauri::command]
-pub fn mobile_cache_purge_account(
-    account_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mobile_cache::purge_account(&state.environment.cache_dir(), &account_id)
-}
-
-#[tauri::command]
 pub async fn agents_device_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {
@@ -241,6 +185,14 @@ pub async fn agents_register_folder_scope(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {
     state.agents.register_folder_scope(request).await
+}
+
+#[tauri::command]
+pub async fn agents_revoke_folder_scope(
+    scope_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.agents.revoke_folder_scope(scope_id).await
 }
 
 #[tauri::command]
@@ -345,11 +297,6 @@ pub fn claude_drain_events(state: State<'_, MistyRuntime>) -> Vec<ClaudeStreamEv
 #[tauri::command]
 pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
     state.claude.abort()
-}
-
-#[tauri::command]
-pub async fn storage_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<StorageSnapshot> {
-    Ok(state.storage.snapshot().await)
 }
 
 #[tauri::command]
@@ -726,97 +673,8 @@ pub async fn explorer_list_directory(
             created_ms: None,
         });
     }
-    #[cfg(target_os = "android")]
-    if state
-        .explorer
-        .is_android_local_virtual_path(request.path.as_deref())
-    {
-        return state
-            .explorer
-            .list_android_local_directory(&app, request)
-            .await;
-    }
+
     state.explorer.list_directory(request).await
-}
-
-#[cfg(target_os = "android")]
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AndroidGrantedFolder {
-    pub uri: String,
-    pub name: String,
-    pub document_id: String,
-    pub can_write: bool,
-    pub path: String,
-}
-
-#[cfg(target_os = "android")]
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AndroidAllFilesAccessStatus {
-    pub granted: bool,
-    pub can_request: bool,
-    pub storage_root: Option<String>,
-}
-
-#[cfg(target_os = "android")]
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AndroidGrantLocalFolderRequest {
-    pub initial_directory: Option<String>,
-}
-
-#[cfg(target_os = "android")]
-#[tauri::command]
-pub fn android_grant_local_folder(
-    app: AppHandle,
-    request: Option<AndroidGrantLocalFolderRequest>,
-) -> ApiResult<AndroidGrantedFolder> {
-    let folder = app
-        .document_tree()
-        .pick_tree(PickTreeRequest {
-            initial_directory: request.and_then(|value| value.initial_directory),
-        })
-        .map_err(|error| ApiError::Message(error.to_string()))?;
-    let digest = Sha256::digest(folder.uri.as_bytes());
-    let location_id = hex::encode(&digest[..8]);
-    Ok(AndroidGrantedFolder {
-        uri: folder.uri,
-        name: folder.name,
-        document_id: folder.document_id,
-        can_write: folder.can_write,
-        path: format!("misty://local/{location_id}"),
-    })
-}
-
-#[cfg(target_os = "android")]
-#[tauri::command]
-pub fn android_all_files_access_status(app: AppHandle) -> ApiResult<AndroidAllFilesAccessStatus> {
-    let status = app
-        .document_tree()
-        .all_files_access_status()
-        .map_err(|error| ApiError::Message(error.to_string()))?;
-    Ok(AndroidAllFilesAccessStatus {
-        granted: status.granted,
-        can_request: status.can_request,
-        storage_root: status.storage_root,
-    })
-}
-
-#[cfg(target_os = "android")]
-#[tauri::command]
-pub fn android_open_all_files_access_settings(
-    app: AppHandle,
-) -> ApiResult<AndroidAllFilesAccessStatus> {
-    let status = app
-        .document_tree()
-        .open_all_files_access_settings()
-        .map_err(|error| ApiError::Message(error.to_string()))?;
-    Ok(AndroidAllFilesAccessStatus {
-        granted: status.granted,
-        can_request: status.can_request,
-        storage_root: status.storage_root,
-    })
 }
 
 #[tauri::command]
@@ -1780,7 +1638,6 @@ pub fn coding_ai_clear_api_key(provider_id: String) -> ApiResult<()> {
     crate::infra::credentials::clear_coding_ai_key(&provider_id)
 }
 
-
 #[tauri::command]
 pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<DeviceSnapshot> {
     let devices = state.devices.clone();
@@ -1854,7 +1711,7 @@ pub async fn connected_devices_initialize(
     Ok(snapshot)
 }
 
-#[cfg(all(any(desktop, target_os = "ios"), not(target_os = "macos")))]
+#[cfg(all(desktop, not(target_os = "macos")))]
 #[tauri::command]
 pub async fn connected_devices_initialize(
     request: InitializeConnectedDevicesRequest,
@@ -1873,7 +1730,7 @@ pub async fn connected_devices_initialize(
     Ok(snapshot)
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_snapshot(
     state: State<'_, MistyRuntime>,
@@ -1881,7 +1738,7 @@ pub async fn connected_devices_snapshot(
     state.connected_devices.snapshot()
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_subscribe_directory(
     path: String,
@@ -1896,7 +1753,7 @@ pub async fn connected_devices_subscribe_directory(
     )
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_connect(
     request: ConnectPeerRequest,
@@ -1905,7 +1762,7 @@ pub async fn connected_devices_connect(
     state.connected_devices.connect(request).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_open_workspace_route(
     device_id: String,
@@ -1918,7 +1775,7 @@ pub async fn connected_devices_open_workspace_route(
         .await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_roots(
     device_id: String,
@@ -1927,7 +1784,7 @@ pub async fn connected_devices_roots(
     state.connected_devices.roots(&device_id).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_list_directory(
     request: PeerPathRequest,
@@ -1936,7 +1793,7 @@ pub async fn connected_devices_list_directory(
     state.connected_devices.list_directory(request).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_read_file(
     request: PeerReadRequest,
@@ -1945,7 +1802,7 @@ pub async fn connected_devices_read_file(
     state.connected_devices.read_file(request).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_media_url(
     path: String,
@@ -1954,7 +1811,7 @@ pub async fn connected_devices_media_url(
     state.connected_devices.media_url(&path).await
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn connected_devices_prepare_clipboard_files(
     device_id: String,
@@ -1987,198 +1844,6 @@ pub async fn connected_devices_prepare_clipboard_files(
         ));
     }
     crate::infra::native_clipboard::write_native_clipboard_file_refs(&prepared)
-}
-
-#[tauri::command]
-pub async fn providers_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ProvidersSnapshot> {
-    state.providers.snapshot().await
-}
-
-#[tauri::command]
-pub async fn providers_refresh(state: State<'_, MistyRuntime>) -> ApiResult<ProvidersSnapshot> {
-    state.providers.refresh().await
-}
-
-#[tauri::command]
-pub async fn providers_import_cloud_connection(
-    name: String,
-    provider_type: String,
-    connection_id: String,
-    connection_source: Option<String>,
-    connected_account_id: Option<String>,
-    handoff: String,
-    redeem_url: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProvidersSnapshot> {
-    let name = name.trim();
-    let provider_type = provider_type.trim();
-    let connection_id = connection_id.trim();
-    let handoff = handoff.trim();
-    if name.is_empty() || connection_id.is_empty() || handoff.is_empty() {
-        return Err(ApiError::Message(
-            "Cloud connection name and credential handoff are required.".to_owned(),
-        ));
-    }
-    if !matches!(provider_type, "drive" | "dropbox" | "onedrive") {
-        return Err(ApiError::Message(
-            "That cloud provider is not supported.".to_owned(),
-        ));
-    }
-    let connection_source = connection_source.as_deref().unwrap_or("legacy_cloud");
-    if !matches!(connection_source, "connected_account" | "legacy_cloud")
-        || (connection_source == "connected_account"
-            && connected_account_id
-                .as_deref()
-                .is_none_or(|value| value.trim().is_empty()))
-    {
-        return Err(ApiError::Message(
-            "Cloud connection provenance was invalid.".to_owned(),
-        ));
-    }
-    let credential = crate::infra::cloud_handoff::redeem_cloud_credential(handoff, &redeem_url)
-        .await
-        .map_err(ApiError::Message)?;
-    if credential.connection_id != connection_id
-        || credential.provider != provider_type
-        || credential.access_token.trim().is_empty()
-    {
-        return Err(ApiError::Message(
-            "Cloud credential handoff did not match the selected connection.".to_owned(),
-        ));
-    }
-    state
-        .storage_runtime
-        .call(
-            "config/create",
-            serde_json::json!({
-                "name": name,
-                "type": provider_type,
-                "parameters": {
-                    "access_token": credential.access_token,
-                    "misty_connection_id": connection_id,
-                    "misty_connection_source": connection_source,
-                    "misty_connected_account_id": connected_account_id.as_deref().unwrap_or(""),
-                },
-                "opt": { "nonInteractive": true }
-            }),
-        )
-        .map_err(ApiError::Message)?;
-    state.providers.refresh().await
-}
-
-#[tauri::command]
-pub async fn providers_select_remote(
-    name: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RemoteEditDraft> {
-    state.providers.select_remote(name).await
-}
-
-#[tauri::command]
-pub async fn providers_save_remote(
-    request: SaveRemoteRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RemoteEditDraft> {
-    state.providers.save_remote(request).await
-}
-
-#[tauri::command]
-pub async fn providers_test_remote(
-    name: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<RemoteTestResult> {
-    state.providers.test_remote(name).await
-}
-
-#[tauri::command]
-pub async fn providers_config_paths(state: State<'_, MistyRuntime>) -> ApiResult<CloudConfigPaths> {
-    state.providers.config_paths().await
-}
-
-#[tauri::command]
-pub async fn providers_configure_remote(
-    request: ProviderConfigRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProviderConfigStep> {
-    state.providers.configure_remote(request).await
-}
-
-#[tauri::command]
-pub async fn providers_verify_start(
-    request: VerifyStartRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProviderJobStart> {
-    state.providers.start_verify(request).await
-}
-
-#[tauri::command]
-pub async fn providers_job_status(
-    job_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProviderJobStatus> {
-    state.providers.job_status(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_job_cancel(
-    job_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.providers.cancel_job(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_verify_result(
-    job_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<VerifyResult> {
-    state.providers.verify_result(job_id).await
-}
-
-#[tauri::command]
-pub async fn providers_backend_actions(
-    remote: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Vec<BackendAction>> {
-    state.providers.backend_actions(remote).await
-}
-
-#[tauri::command]
-pub async fn providers_run_backend_action(
-    request: BackendRunRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<BackendActionResult> {
-    state.providers.run_backend_action(request).await
-}
-
-#[tauri::command]
-pub async fn providers_config_security(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConfigSecurityStatus> {
-    state.providers.config_security().await
-}
-
-#[tauri::command]
-pub async fn providers_harden_config(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConfigSecurityStatus> {
-    state.providers.harden_config().await
-}
-
-#[tauri::command]
-pub async fn providers_repair_config_security(
-    password: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConfigSecurityStatus> {
-    state.providers.repair_config_security(password).await
-}
-
-#[tauri::command]
-pub async fn providers_disconnect_remote(
-    name: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ProvidersSnapshot> {
-    state.providers.disconnect_remote(name).await
 }
 
 #[tauri::command]
@@ -2237,14 +1902,8 @@ fn open_path_default(file_path: &str) -> ApiResult<()> {
         .args(["/C", "start", "", file_path])
         .spawn();
 
-    #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     let spawn_result = Command::new("xdg-open").arg(file_path).spawn();
-
-    #[cfg(any(target_os = "ios", target_os = "android"))]
-    let spawn_result: Result<std::process::Child, std::io::Error> = Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "opening local files with the default app is not supported on this platform",
-    ));
 
     spawn_result
         .map(|_| ())
@@ -2304,10 +1963,7 @@ fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
         }
     }
 
-    #[cfg(all(
-        unix,
-        not(any(target_os = "macos", target_os = "ios", target_os = "android"))
-    ))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     {
         let mut candidates = Vec::<String>::new();
         match preferred {
@@ -2343,13 +1999,6 @@ fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
             "Failed to open a terminal for {trimmed}. Tried: {}",
             errors.join("; ")
         )));
-    }
-
-    #[cfg(any(target_os = "ios", target_os = "android"))]
-    {
-        Err(ApiError::Message(
-            "Opening a terminal is not supported on this platform.".to_owned(),
-        ))
     }
 }
 
@@ -2569,17 +2218,6 @@ pub async fn duplicates_cancel(scan_id: String, state: State<'_, MistyRuntime>) 
 }
 
 #[tauri::command]
-pub async fn duplicates_hash_remote_candidates(
-    scan_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<DuplicateScanResult> {
-    state
-        .power_pack
-        .duplicates_hash_remote_candidates(scan_id)
-        .await
-}
-
-#[tauri::command]
 pub async fn saved_searches_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<SavedSearchesSnapshot> {
@@ -2697,4 +2335,37 @@ pub async fn navigation_names_update(
         return Err("Only the trusted Misty shell can rename navigation.".into());
     }
     state.navigation_names.update(account, key, name).await
+}
+
+#[tauri::command]
+pub async fn settings_profile_state(
+    webview: tauri::Webview,
+    scope: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
+    if webview.label() != "main" {
+        return Err(ApiError::Unavailable(
+            "Only the trusted Misty shell can read settings profiles.".into(),
+        ));
+    }
+    state.settings.profile_state(scope, None).await
+}
+
+#[tauri::command]
+pub async fn settings_profile_commit(
+    webview: tauri::Webview,
+    scope: String,
+    revision: i64,
+    document: serde_json::Value,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
+    if webview.label() != "main" {
+        return Err(ApiError::Unavailable(
+            "Only the trusted Misty shell can save settings profiles.".into(),
+        ));
+    }
+    state
+        .settings
+        .profile_state(scope, Some((revision, document)))
+        .await
 }

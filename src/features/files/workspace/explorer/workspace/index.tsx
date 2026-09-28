@@ -1,6 +1,5 @@
-import { createFilesAiAdapter } from "../../createFilesAiAdapter";
+import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { routes, useAppStore } from "@/features/app-shell";
-import { ProvidersWorkspacePanel, useProvidersStore } from "@/features/providers";
 import {
   selectAdvancedPreferences,
   selectFilePreferences,
@@ -8,62 +7,48 @@ import {
   useSettingsStore,
 } from "@/features/settings";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useTransientScrollbars } from "@/shared/hooks/useTransientScrollbars";
-import { isAndroidBuild } from "@/shared/platform/buildTarget";
+import { ComingSoonSurface } from "@/shared/ui";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { ChromeTabShell } from "./ChromeTabShell";
+import { createFilesAiAdapter } from "../../createFilesAiAdapter";
 import { ExplorerLoadingShell } from "../components/ExplorerLoadingShell";
 import { ExplorerPane } from "../components/ExplorerPane";
 import { ExplorerSidebar } from "../components/ExplorerSidebar";
 import { libraryWorkspacePath } from "../components/LibraryWorkspace";
-import { ComingSoonSurface } from "@/shared/ui";
 import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
-import { selectedPathsForPane, useExplorerStore } from "../store";
+import { useExplorerStore } from "../store";
 import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
+import { FileOperationConflictDialog } from "./FileOperationConflictDialog";
 import { ExplorerDialog } from "./ExplorerBatchRenameDialog";
+import { executableShortcutCommands } from "./ExplorerCommands";
 import { CompareDialog } from "./ExplorerCompareDialog";
 import { ExplorerContextMenu } from "./ExplorerContextMenu";
-import {
-  canCloseExplorerTab,
-  canOpenTerminalPath,
-  ensureFilesBrowseTab,
-  ExplorerTray,
-  isChromeTabPath,
-  isRemotesTabPath,
-} from "./ExplorerDesktopPlugins";
+import { canCloseExplorerTab, canOpenTerminalPath, ExplorerTray } from "./ExplorerDesktopPlugins";
 import { cx } from "./ExplorerDesktopShared";
 import { ExplorerNotifications, ExplorerRenameStatus } from "./ExplorerDesktopStatus";
 import { DuplicateFinderDialog } from "./ExplorerDuplicateFinderDialog";
-import { createExplorerAddTabControl } from "./ExplorerNewTabControl";
 import { ExplorerMultiPanelWorkspace } from "./ExplorerMultiPanelWorkspace";
+import { createExplorerAddTabControl } from "./ExplorerNewTabControl";
 import { explorerShellStyles } from "./ExplorerShellStyles";
-import {
-  ConnectedExplorerToolbar,
-  ConnectedFileInspector,
-  ExplorerPaneHeaderActions,
-} from "./ExplorerToolbarConnections";
-import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
-import { useFilesDockWorkspace } from "./explorerWorkspace/useFilesDockWorkspace";
+import { ConnectedExplorerToolbar, ConnectedFileInspector } from "./ExplorerToolbarConnections";
 import { filesMultiPanelStore } from "./explorerWorkspace/filesDockStores";
 import { useConnectedDeviceDirectoryInvalidation } from "./explorerWorkspace/useConnectedDeviceDirectoryInvalidation";
+import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
 import {
-  useAndroidLocalFolderGrant,
   useExplorerKeyboardShortcuts,
   useLegacyPluginTabMigration,
   useOperationErrorNotification,
 } from "./explorerWorkspace/useExplorerWorkspaceEvents";
+import { useFilesDockWorkspace } from "./explorerWorkspace/useFilesDockWorkspace";
 import { usePanelResize } from "./explorerWorkspace/usePanelResize";
-import { executableShortcutCommands } from "./ExplorerCommands";
 import {
   useScopedExplorerWorkspace,
   type ExplorerWorkspaceProps,
 } from "./explorerWorkspace/useScopedExplorerWorkspace";
 import { useTransferRefreshPolling } from "./explorerWorkspace/useTransferRefreshPolling";
 import { resolveExplorerBottomBarRenderer } from "./ExplorerWorkspaceChrome";
-import { emptyProviderRemotes } from "./ExplorerWorkspaceConstants";
 import {
   buildExplorerLocationResults,
   resolveMountRoot,
@@ -113,12 +98,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       dismissNotification: state.dismissNotification,
     })),
   );
-  const { providersLoading, sidebarRemotes } = useProvidersStore(
-    useShallow((state) => ({
-      providersLoading: state.loading,
-      sidebarRemotes: state.providers?.remotes ?? emptyProviderRemotes,
-    })),
-  );
   const {
     activePaneId,
     activeTabPath,
@@ -155,7 +134,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const filePreferences = useSettingsStore(
     useShallow((state) => selectFilePreferences(state.settings?.document)),
   );
-
   useEffect(() => {
     // Seeds the store-wide defaults a freshly opened pane inherits. Per-pane
     // overrides from the toolbar live in `paneViewModes`/`paneShowHidden` and
@@ -171,16 +149,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     preferredWorkspaceRoot,
     environmentHomePath,
   );
-  const homePath = isAndroidBuild ? "misty://local" : storageHomePath;
-  const {
-    androidAllFilesAccess,
-    androidGrantedFolders,
-    devicesLoading,
-    mountedDevices,
-    refreshAndroidAllFilesAccess,
-    refreshAndroidGrantedFolders,
-    refreshDevices,
-  } = useExplorerDevices(homePath);
+  const homePath = storageHomePath;
+  const { devicesLoading, mountedDevices, refreshDevices } = useExplorerDevices();
   const mountRoot = resolveMountRoot(
     storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
@@ -188,12 +158,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const activePath = useExplorerStore(
     (state) => state.panes[activePaneId]?.listing?.path ?? homePath,
   );
-  const activePane = useExplorerStore((state) => state.panes[activePaneId]);
   const aiAdapter = useMemo(
     () =>
       createFilesAiAdapter({
         viewId: `${props.workspaceId ?? "files"}:${activePaneId}`,
-        canMutate: !isAndroidBuild,
+        canMutate: true,
         selected: () => {
           const pane = useExplorerStore.getState().panes[activePaneId];
           const ids = new Set(pane?.selectedIds ?? []);
@@ -202,7 +171,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         rename: (_entry, name) => useExplorerStore.getState().renameSelected(activePaneId, name),
         trash: () => useExplorerStore.getState().deleteSelected(activePaneId, "trash"),
       }),
-    [activePane, activePaneId, props.workspaceId],
+    [activePaneId, props.workspaceId],
   );
   useAiSurfaceAdapter(aiAdapter);
   const explorerInitialized = useExplorerStore((state) => state.initialized);
@@ -245,33 +214,17 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     [workspacePathSignature],
   );
   const locationResults = useMemo(
-    () =>
-      buildExplorerLocationResults(
-        homePath,
-        mountRoot,
-        pinnedPaths,
-        sidebarRemotes,
-        library,
-        workspacePaths,
-        isAndroidBuild,
-      ),
-    [homePath, library, mountRoot, pinnedPaths, sidebarRemotes, workspacePaths],
+    () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, library, workspacePaths),
+    [homePath, library, mountRoot, pinnedPaths, workspacePaths],
   );
-  const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
-  const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
-  const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
-  useEffect(() => {
-    ensureFilesBrowseTab(homePath, multiPanelStore);
-  }, [homePath, multiPanelStore, workspacePathSignature]);
+  const sidebarVisible = activeTabSidebarVisible;
+  const previewVisible = activeTabPreviewVisible;
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
     activePathRef.current = activePath;
   }, [activePaneId, activePath]);
-
   useScopedExplorerWorkspace(props, homePath, settingsLoaded);
-
   useOperationErrorNotification(operationError, pushNotification);
-
   useExplorerKeyboardShortcuts({
     active: props.active,
     navigate,
@@ -279,7 +232,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     multiPanelStore,
     workspaceId: props.workspaceId,
   });
-
   const navigateSidebar = useCallback(
     (path: string) => {
       const paneId = multiPanelStore.getState().activePaneId;
@@ -287,10 +239,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     },
     [multiPanelStore],
   );
-
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
-      if (isChromeTabPath(path) || path === libraryWorkspacePath) return null;
+      if (path === libraryWorkspacePath) return null;
       return (
         <ConnectedExplorerToolbar
           paneId={paneId}
@@ -304,34 +255,12 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
-      // The dock supplies the tab strip, not the pane's own controls, so these
-      // belong to the embedded view just as much as the standalone route.
-      const paneActions =
-        activePaneId === paneId ? (
-          <div className="flex items-center gap-1">
-            <ExplorerPaneHeaderActions paneId={paneId} multiPanelStore={multiPanelStore} />
-          </div>
-        ) : undefined;
-      if (isRemotesTabPath(path)) {
-        return (
-          <ChromeTabShell embedded={props.embedded} label="Remotes" homePath={homePath}>
-            <ProvidersWorkspacePanel workspaceId={paneId} />
-          </ChromeTabShell>
-        );
-      }
       if (path === libraryWorkspacePath) {
         return <ComingSoonSurface feature="Smart Library" />;
       }
-      return (
-        <ExplorerPane
-          paneId={paneId}
-          path={path}
-          isActive={activePaneId === paneId}
-          paneActions={paneActions}
-        />
-      );
+      return <ExplorerPane paneId={paneId} path={path} isActive={activePaneId === paneId} />;
     },
-    [activePaneId, homePath, multiPanelStore, props.embedded],
+    [activePaneId],
   );
   const { inspector } = useExplorerAgentDock({
     activePaneId,
@@ -340,22 +269,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       <ConnectedFileInspector paneId={activePaneId} />
     ) : undefined,
   });
-  // Remotes is presented as an overlay. Navigating to /providers is the shared
-  // entry point: DesktopLayout turns it into "open the overlay and restore the
-  // previous route", the same way /settings and /account behave.
-  const handleManageRemotes = useCallback(() => {
-    navigate(routes.providers);
-  }, [navigate]);
-  const handleAddRemote = useCallback(() => {
-    navigate(routes.providers);
-    void useProvidersStore.getState().openAddRemote();
-  }, [navigate]);
-  const handleGrantLocalFolder = useAndroidLocalFolderGrant({
-    homePath,
-    multiPanelStore,
-    refreshAndroidAllFilesAccess,
-    refreshAndroidGrantedFolders,
-  });
   const explorerSidebar = useMemo(
     () =>
       sidebarVisible ? (
@@ -363,8 +276,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           homePath={homePath}
           activePath={activePath}
           mountRoot={mountRoot}
-          remotes={sidebarRemotes}
-          remoteLoading={providersLoading}
           library={library}
           devices={mountedDevices}
           devicesLoading={devicesLoading}
@@ -372,23 +283,12 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           onNavigate={navigateSidebar}
           onRefreshDevices={refreshDevices}
           onOpenInNewTab={openSidebarPathInNewTab}
-          onManageRemotes={handleManageRemotes}
-          onAddRemote={handleAddRemote}
-          androidLocal={isAndroidBuild}
-          androidAllFilesAccess={androidAllFilesAccess}
-          androidGrantedFolders={androidGrantedFolders}
-          onGrantLocalFolder={handleGrantLocalFolder}
           onUnpinPinnedPath={useExplorerStore.getState().togglePinnedPath}
         />
       ) : undefined,
     [
       activePath,
-      androidAllFilesAccess,
-      androidGrantedFolders,
       devicesLoading,
-      handleAddRemote,
-      handleGrantLocalFolder,
-      handleManageRemotes,
       homePath,
       library,
       mountRoot,
@@ -396,9 +296,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       navigateSidebar,
       openSidebarPathInNewTab,
       pinnedPaths,
-      providersLoading,
       refreshDevices,
-      sidebarRemotes,
       sidebarVisible,
     ],
   );
@@ -407,15 +305,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       props.workspaceId ? null : (
         <ExplorerTray
           onToggleFileManagerMode={() => navigate(routes.browser)}
-          terminalEnabled={
-            activeTabSupportsSidePanels &&
-            canOpenTerminalPath(activeTabPath) &&
-            canOpenTerminalPath(activePath)
-          }
+          terminalEnabled={canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
           terminalPath={activePath}
         />
       ),
-    [activePath, activeTabPath, activeTabSupportsSidePanels, navigate, props.workspaceId],
+    [activePath, activeTabPath, navigate, props.workspaceId],
   );
   const renderAddTabControl = useMemo(() => createExplorerAddTabControl(homePath), [homePath]);
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
@@ -438,7 +332,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             renderTabActions={renderTabActions}
             renderToolbar={renderToolbar}
             showTabStrip={!props.embedded}
-            showDefaultPaneControls={false}
             renderNavigationAside={explorerSidebar}
             navigationAsideWidth={sidebarWidth}
             onNavigationAsideResizeStart={startSidebarResize}
@@ -452,6 +345,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             renderPane={renderPane}
           />
         </main>
+        {workspaceFocused ? <FileOperationConflictDialog /> : null}
         {inlineEdit && ownsPane(inlineEdit.paneId) ? (
           <ExplorerRenameStatus edit={inlineEdit} />
         ) : null}
@@ -476,5 +370,4 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     </ExplorerDragProvider>
   );
 });
-
 export default ExplorerWorkspace;

@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 const loads = vi.hoisted(() => ({ host: vi.fn(), cursor: vi.fn() }));
-vi.mock("./hostMain", () => {
+vi.mock("./HostMain", () => {
   loads.host();
   return { startup: Promise.resolve() };
 });

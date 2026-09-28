@@ -1,7 +1,7 @@
 import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
-import type { SearchResult } from "@/native/contracts";
+import type { SearchResult } from "@/native/ipc";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 

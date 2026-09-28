@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import type {
-  DeviceCustomizationState,
-  SidebarCollapsedState,
-} from "../../model/interfaces/components/ExplorerSidebarSupport";
 import {
+  type DeviceCustomizationState,
+  type SidebarCollapsedState,
   loadDeviceCustomization,
   loadHiddenQuickAccessPaths,
   loadSidebarCollapsedState,
   saveDeviceCustomization,
   saveHiddenQuickAccessPaths,
   saveSidebarCollapsedState,
-} from "../ExplorerSidebarSupport";
+} from "@/features/file-ui";
 
 /**
  * Everything the sidebar remembers between sessions.

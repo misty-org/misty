@@ -1,4 +1,4 @@
-import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import type { DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import { TableCell, TableRow } from "@/shared/ui";
 import type { MouseEvent } from "react";
 import { memo, useMemo } from "react";
@@ -15,7 +15,7 @@ import { transferDropAcceptance } from "../FileBrowserDrag";
 import { FileIcon } from "../FileBrowserIcons";
 import { InlineNameEditor, PassiveRenameDraftView } from "../FileBrowserInline";
 import { fileBrowserStyles } from "../FileBrowserStyles";
-import { formatEntrySize } from "./entryPresentation";
+import { formatEntrySize } from "./EntryPresentation";
 
 export const FileTableRow = memo(function FileTableRow(props: {
   entry: FileEntry;
@@ -68,7 +68,13 @@ export const FileTableRow = memo(function FileTableRow(props: {
   return (
     <TableRow
       ref={drop.ref}
-      className={`${fileBrowserStyles.tableRow} ${props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : ""} ${entry.isDeleted ? fileBrowserStyles.tableRowDeleted : ""} ${source.dragging ? fileBrowserStyles.tableRowDragging : ""} ${props.cut ? fileBrowserStyles.tableRowCut : ""}`}
+      className={[
+        fileBrowserStyles.tableRow,
+        props.inlineEdit ? fileBrowserStyles.tableRowInlineEditing : "",
+        entry.isDeleted ? fileBrowserStyles.tableRowDeleted : "",
+        source.dragging ? fileBrowserStyles.tableRowDragging : "",
+        props.cut ? fileBrowserStyles.tableRowCut : "",
+      ].join(" ")}
       style={{ height: props.rowHeight }}
       aria-disabled={entry.isDeleted || undefined}
       aria-selected={props.selected}

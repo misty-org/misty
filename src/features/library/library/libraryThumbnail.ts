@@ -24,7 +24,6 @@ const documentThumbnailExtensions = new Set([
   "numbers",
   "key",
 ]);
-
 export function libraryItemThumbnailEligible(mimeType: string, fileName: string): boolean {
   if (mimeType.startsWith("image/") || mimeType.startsWith("video/")) return true;
   const extension = fileName.toLowerCase().split(".").pop() ?? "";

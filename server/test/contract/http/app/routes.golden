@@ -799,6 +799,7 @@ POST /api/spaces/{spaceID}/tasks/{taskID}/move
 POST /api/spaces/{spaceID}/transfer
 POST /api/sync/control
 POST /api/sync/devices
+POST /api/sync/restore/step
 POST /api/sync/ticket
 POST /api/sync/workspace
 POST /api/webhooks/social/instagram
@@ -933,6 +934,7 @@ POST /spaces/{spaceID}/tasks/{taskID}/move
 POST /spaces/{spaceID}/transfer
 POST /sync/control
 POST /sync/devices
+POST /sync/restore/step
 POST /sync/ticket
 POST /sync/workspace
 POST /v1/account/deletion/status
@@ -1088,6 +1090,7 @@ POST /v1/spaces/{spaceID}/tasks/{taskID}/move
 POST /v1/spaces/{spaceID}/transfer
 POST /v1/sync/control
 POST /v1/sync/devices
+POST /v1/sync/restore/step
 POST /v1/sync/ticket
 POST /v1/sync/workspace
 POST /v1/webhooks/social/instagram

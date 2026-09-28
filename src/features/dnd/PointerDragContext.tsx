@@ -186,7 +186,7 @@ function PointerDragPreview({ state }: { state: PointerDragState }) {
 
   return (
     <div
-      className="pointer-events-none fixed z-[2147483100] max-w-[320px] opacity-90 shadow-2xl"
+      className="pointer-events-none fixed layer-dialog max-w-[320px] opacity-90 shadow-2xl"
       style={{ left: state.pointer.x + 12, top: state.pointer.y + 12 }}
       aria-hidden="true"
     >

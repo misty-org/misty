@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { usePreviewResource } from "./usePreviewResource";
-import type { PreviewResource } from "../../model/interfaces/components/GlobalPreview";
+import type { PreviewResource } from "@/features/file-ui";
 
 it("releases a late preview URL after switching files and the visible URL on close", async () => {
   const revoke = vi.fn();

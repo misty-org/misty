@@ -33,7 +33,8 @@ describe("DrawingPreviewHeader", () => {
     const onOpen = vi.fn();
     await act(async () => {
       root.render(
-        <DrawingPreviewHeader reportError={reportSystemError}
+        <DrawingPreviewHeader
+          reportError={reportSystemError}
           drawing={drawingFixture()}
           onRename={onRename}
           onDelete={onDelete}

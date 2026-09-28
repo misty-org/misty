@@ -324,7 +324,6 @@ pub fn setup(
         ("CLOUDFLARE_ZONE_ID", zone),
         ("CLOUDFLARE_API_TOKEN", token),
         ("CLOUDFLARE_TUNNEL_TOKEN", tunnel_token),
-        ("MISTY_CLOUDFLARE_TUNNEL_ID", tunnel),
         ("MISTY_CLOUDFLARE_TUNNEL_NAME", name),
         ("MISTY_DEV_API_TUNNEL_HOSTNAME", host),
         ("MISTY_DEV_API_ORIGIN", origin.clone()),
