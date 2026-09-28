@@ -19,12 +19,15 @@ export function SpaceSectionNavigation({
   section,
   horizontal,
   iconOnly = false,
+  strip = false,
   onNavigate,
 }: {
   spaceId: string;
   section: string;
   horizontal?: boolean;
   iconOnly?: boolean;
+  /** Equal-width icon cells on one track, above the active tool's own list. */
+  strip?: boolean;
   onNavigate?: (path: string) => void;
 }) {
   const { user } = useAuth();
@@ -41,7 +44,11 @@ export function SpaceSectionNavigation({
     <TooltipProvider delayDuration={350}>
       <nav
         className={
-          horizontal ? "flex min-w-0 items-center gap-1 overflow-x-auto" : "grid min-w-0 gap-1"
+          strip
+            ? "grid min-w-0 auto-cols-fr grid-flow-col gap-0.5 rounded-lg bg-charcoal-card p-0.5"
+            : horizontal
+              ? "flex min-w-0 items-center gap-1 overflow-x-auto"
+              : "grid min-w-0 gap-1"
         }
         aria-label="Space sections"
       >
@@ -50,6 +57,7 @@ export function SpaceSectionNavigation({
             key={id}
             horizontal={horizontal}
             iconOnly={iconOnly}
+            strip={strip}
             active={
               id === "journal" ? section === "notes" || section === "drawings" : section === id
             }

@@ -8,7 +8,6 @@ import {
   AgendaDestinationIcon,
   RoadmapsDestinationIcon,
   ExplorerDestinationIcon,
-  TransfersDestinationIcon,
   AllItemsDestinationIcon,
   FavoritesDestinationIcon,
   CollectionsDestinationIcon,
@@ -38,7 +37,6 @@ export function DestinationIcon({
 }) {
   if (appId === "files") {
     if (item.id === "explorer") return <ExplorerDestinationIcon aria-hidden />;
-    if (item.id === "transfers") return <TransfersDestinationIcon aria-hidden />;
   }
   if (isPinnedDestination(item)) return <Link2 aria-hidden />;
   if (item.id === "misty") return <MistyBrandIcon size={18} />;

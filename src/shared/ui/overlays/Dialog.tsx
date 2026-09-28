@@ -95,8 +95,10 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     container?: HTMLElement | null;
+    /** `top` sits the panel in the upper part of the window, for search-style dialogs. */
+    placement?: "center" | "top";
   }
->(({ className, children, container, ...props }, ref) => {
+>(({ className, children, container, placement = "center", ...props }, ref) => {
   React.useEffect(() => {
     return () => {
       cleanupPointerEvents();
@@ -109,38 +111,47 @@ const DialogContent = React.forwardRef<
   return (
     <DialogPortal container={container}>
       <DialogOverlay className={container ? "absolute inset-0" : undefined} />
-      <DialogPrimitive.Content
-        ref={ref}
-        data-slot="dialog-content"
+      {/* Flex layout centers the panel on whole pixels; a 50% translate would land odd
+          sizes on a half pixel and blur their text on 1x displays. */}
+      <div
+        data-slot="dialog-positioner"
         className={cn(
-          container
-            ? "absolute left-1/2 top-1/2 layer-dialog grid -translate-x-1/2 -translate-y-1/2"
-            : "fixed left-1/2 top-1/2 layer-dialog grid -translate-x-1/2 -translate-y-1/2",
-          "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
-          "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-          "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-          "data-[state=closed]:pointer-events-none",
-          className,
+          container ? "absolute" : "fixed",
+          "inset-0 layer-dialog pointer-events-none flex justify-center",
+          placement === "top" ? "items-start pt-[12vh]" : "items-center",
         )}
-        {...props}
       >
-        {children}
-        <DialogPrimitive.Close
-          data-slot="dialog-close"
+        <DialogPrimitive.Content
+          ref={ref}
+          data-slot="dialog-content"
           className={cn(
-            "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
-            "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
-            "hover:text-cream focus-visible:ring-[3px]",
-            "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
+            "pointer-events-auto relative grid",
+            "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
+            "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
+            "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "data-[state=closed]:pointer-events-none",
+            className,
           )}
+          {...props}
         >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
+          {children}
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            className={cn(
+              "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
+              "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
+              "hover:text-cream focus-visible:ring-[3px]",
+              "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
+            )}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </div>
     </DialogPortal>
   );
 });

@@ -28,7 +28,7 @@ export function InternalPageFrame(props: {
           <label className="relative w-full max-w-sm sm:w-72">
             <span className="sr-only">{props.search.placeholder}</span>
             <Search
-              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-cream-muted"
+              className="pointer-events-none absolute inset-y-0 left-2.5 my-auto size-4 text-cream-muted"
               aria-hidden="true"
             />
             <Input

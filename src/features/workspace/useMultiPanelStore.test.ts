@@ -6,17 +6,35 @@ import {
 } from "./useMultiPanelStore";
 
 describe("multi-panel workspace state", () => {
-  it("preserves every valid pane when hydrating a split layout", () => {
+  it("restores the focused folder from a legacy split layout", () => {
     const source = createMultiPanelStore({ idPrefix: "source" });
     source.getState().initialize("/Users/demo", "demo");
-    source.getState().splitPane(source.getState().activePaneId, "vertical");
+    const tab = source.getState().tabs[0];
+    const focused = { id: "legacy-second", path: "/Users/demo/Documents", title: "Documents" };
+    source.setState({
+      tabs: [
+        {
+          ...tab,
+          panes: [...tab.panes, focused],
+          activePaneId: focused.id,
+          layout: {
+            orientation: "vertical",
+            paneIds: [tab.activePaneId, focused.id],
+            lanes: [[tab.activePaneId], [focused.id]],
+          },
+        },
+      ],
+      activePaneId: focused.id,
+    });
     const snapshot = source.getState();
     const restored = createMultiPanelStore({ idPrefix: "restored" });
 
     expect(restored.getState().hydrate(snapshot)).toBe(true);
-    expect(restored.getState().tabs[0]?.panes).toHaveLength(2);
-    expect(restored.getState().tabs[0]?.layout.lanes).toHaveLength(2);
+    expect(restored.getState().tabs[0]?.panes).toHaveLength(1);
+    expect(restored.getState().tabs[0]?.layout.lanes).toHaveLength(1);
 
+    expect(restored.getState().tabs[0]?.path).toBe("/Users/demo/Documents");
+    expect(restored.getState().activePaneId).toBe("legacy-second");
     destroyMultiPanelStore(source);
     destroyMultiPanelStore(restored);
   });

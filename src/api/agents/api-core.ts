@@ -5,6 +5,12 @@ export function createAgentsApi(
   },
 ) {
   return {
+    realtimeVoiceTicket: (deviceId: string, signal?: AbortSignal) =>
+      apiRequest<{ ticket: string; expires_in: number; webrtc?: boolean }>("/agent-voice/realtime/ticket", {
+        method: "POST",
+        signal,
+        body: JSON.stringify({ device_id: deviceId }),
+      }),
     run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
     cancelRun: <T>(runId: string) =>
       apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),

@@ -34,21 +34,26 @@ const AlertDialogContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPortal>
     <AlertDialogOverlay />
-    <AlertDialogPrimitive.Content
-      ref={ref}
-      data-slot="alert-dialog-content"
-      className={cn(
-        "fixed left-1/2 top-1/2 layer-blocking-popup grid",
-        "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
-        "-translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-        "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        className,
-      )}
-      {...props}
-    />
+    <div
+      data-slot="alert-dialog-positioner"
+      className="pointer-events-none fixed inset-0 layer-blocking-popup flex items-center justify-center"
+    >
+      <AlertDialogPrimitive.Content
+        ref={ref}
+        data-slot="alert-dialog-content"
+        className={cn(
+          "pointer-events-auto relative grid",
+          "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
+          "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
+          "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          className,
+        )}
+        {...props}
+      />
+    </div>
   </AlertDialogPortal>
 ));
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;

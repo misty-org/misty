@@ -1,3 +1,4 @@
+import { migrateSavedLinkGroups } from "@/features/workspace/tabGroups";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { layoutTabs, mapLayoutViews } from "@/features/workspace/layoutTabs";
 import { scrubPrivateTab } from "@/features/workspace/privateBrowsing";
@@ -63,7 +64,13 @@ export const workspaceSource: WorkspaceSource = {
     const active = windows.find((window) => window.id === projected.activeWindowId) ?? windows[0];
     // Do not call the legacy normalizer: it creates random Google tabs for empty
     // remote panes, which would be mistaken for local edits and sent back.
+    const groupMigration = migrateSavedLinkGroups({
+      ...state,
+      websiteGroups: projected.groups.filter((g) => g.fields.icon !== "folder"),
+      savedWebsites: projected.websites,
+    });
     useWorkspaceStore.setState({
+      ...groupMigration,
       websiteGroups: projected.groups,
       savedWebsites: projected.websites,
       activeScopeKey: "global",

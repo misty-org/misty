@@ -7,7 +7,6 @@
   "src/features/files/workspace/explorer/workspace/index.tsx": 611,
   "src/features/shortcuts/registry.ts": 667,
   "src/features/planner/roadmap/SpaceRoadmapWorkspace.tsx": 630,
-  "src/features/transfers/TransferWorkspacePane.tsx": 636,
   "src/features/workspace/useWorkspaceStore.ts": 710,
   "src-tauri/src/app/commands.rs": 2397,
   "src-tauri/src/domain/clipboard/cache.rs": 1102,

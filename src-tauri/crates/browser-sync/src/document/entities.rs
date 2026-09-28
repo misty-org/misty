@@ -172,6 +172,7 @@ pub struct Layout {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Surface {
+    Home,
     Browser,
     Files,
     Agents,
@@ -287,7 +288,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                         return Err(Error::Invalid);
                     }
                 }
-                Surface::Files | Surface::Agents | Surface::Space => {
+                Surface::Home | Surface::Files | Surface::Agents | Surface::Space => {
                     if v.url.is_some() || v.profile_id.is_some() || v.website_id.is_some() {
                         return Err(Error::Invalid);
                     }
@@ -295,6 +296,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                     text(route, 4096, false)?;
                     let path = route.split(['?', '#']).next().unwrap_or_default();
                     let prefix = match v.surface {
+                        Surface::Home => "/home",
                         Surface::Files => "/files",
                         Surface::Space => "/spaces",
                         _ => "/agents",

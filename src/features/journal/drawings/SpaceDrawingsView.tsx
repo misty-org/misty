@@ -238,7 +238,7 @@ export function SpaceDrawingsView(props: {
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
                   <div className="shrink-0 border-b border-charcoal-border p-3">
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+                      <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
                       <Input
                         className="h-8 bg-charcoal-bg pl-8 text-xs"
                         aria-label="Search drawings"
@@ -624,7 +624,7 @@ function DrawingWorkspace(props: {
         {room.notice ? (
           <div
             className={[
-              "absolute left-1/2 top-3 z-30 max-w-xl -translate-x-1/2 rounded-md border",
+              "absolute inset-x-0 top-3 z-30 mx-auto w-fit max-w-xl rounded-md border",
               "border-sage-fg/30 bg-charcoal-bg px-3 py-2 text-sm shadow-md",
             ].join(" ")}
           >

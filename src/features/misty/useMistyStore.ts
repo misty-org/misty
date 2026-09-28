@@ -5,7 +5,7 @@ import {
   visualSearchAgents as executeGlobalVisualSearch,
   subscribeAgentsInvocation as subscribeToAiInvocation,
 } from "@/features/agents/AgentsRuntime";
-import { betaExecutionMode } from "@/features/agents/betaModes";
+import { betaExecutionMode, visibleAutopilotAvailable } from "@/features/agents/betaModes";
 import {
   finishLocalExecution,
   isAgentWorkerWindow,
@@ -439,16 +439,18 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           get().selectedAgentId!,
           spaceId,
           executionMode === "team" ? "team" : "agent",
-          companion
-            ? {
-                normalTabs: true,
-                openWhenMissing:
-                  companion.interactionMode === "auto" ||
-                  /^(?:(?:please|misty)[, ]+)*(?:(?:can|could|would|will) you (?:please )?)?(?:open|navigate|go to|search|find|book|buy|download|upload|fill|click|do this|do that|take over)\b/i.test(
-                    normalized,
-                  ),
-              }
-            : undefined,
+          visibleAutopilotAvailable() && !isAgentWorkerWindow()
+            ? { normalTabs: false, desktopControl: true }
+            : companion
+              ? {
+                  normalTabs: true,
+                  openWhenMissing:
+                    companion.interactionMode === "auto" ||
+                    /^(?:(?:please|misty)[, ]+)*(?:(?:can|could|would|will) you (?:please )?)?(?:open|navigate|go to|search|find|book|buy|download|upload|fill|click|do this|do that|take over)\b/i.test(
+                      normalized,
+                    ),
+                }
+              : undefined,
         );
         executionTaskId = execution.taskId;
         if (companion?.turn !== undefined) {
@@ -634,7 +636,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             )
               return;
             patchConversationMessage(set, get, conversationId, assistantMessage.id, {
-              content: "Misty lost the response stream. You can retry without affecting search.",
+              content:
+                get()
+                  .conversations.find((conversation) => conversation.id === conversationId)
+                  ?.messages.find((message) => message.id === assistantMessage.id)?.content ||
+                "Misty lost the response stream. Review the task before retrying.",
               state: "failed",
               retryable: true,
               activity: undefined,

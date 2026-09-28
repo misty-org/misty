@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { CompanionActivity } from "./companionActivity";
 import { companionFollowPoint, normalizeCompanionSize } from "./companionSize";
 import "./cursorCompanion.css";
 import {
@@ -29,13 +30,22 @@ function usePresentation() {
   const [state, setState] = useState(initial);
   useEffect(() => {
     let active = true;
+    let receivedPresentation = false;
     const remove = getCurrentWindow().listen<Presentation>(presentationEvent, ({ payload }) => {
+      receivedPresentation = true;
       if (active) setState(payload);
     });
     void remove
       .then(() => invoke<Presentation | null>("cursor_companion_snapshot"))
       .then((snapshot) => {
-        if (active && snapshot) setState(snapshot);
+        if (active && !receivedPresentation && snapshot) setState(snapshot);
+      })
+      .catch(() => {
+        if (active)
+          void emitTo("main", "misty://cursor-renderer-error", {
+            error:
+              "The cursor could not restore its display state. Restart Misty after updating the desktop app.",
+          });
       });
     return () => {
       active = false;
@@ -64,6 +74,7 @@ function CursorOverlay() {
         x: 0,
         y: 0,
       };
+    const activity = new CompanionActivity();
     let sample: CursorSample | undefined;
     let position: Point | undefined;
     const velocity = {
@@ -88,6 +99,13 @@ function CursorOverlay() {
     const removers = [
       getCurrentWindow().listen<CursorSample>(cursorEvent, ({ payload }) => {
         sample = payload;
+        const display = payload.displays.find((display) => display.id === id);
+        const scale = /Mac/.test(navigator.platform) ? 1 : (display?.scale ?? 1);
+        activity.sample(
+          { x: payload.x / scale, y: payload.y / scale },
+          payload.keyboardActivity,
+          performance.now(),
+        );
       }),
       getCurrentWindow().listen<{
         turn: number;
@@ -206,9 +224,25 @@ function CursorOverlay() {
         }
       } else spring(position, velocity, follow, dt);
       const onScreen = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
-      const visible = state.visible && (navigation !== "follow" || (!state.point && onScreen));
+      const presence = activity.presentation(
+        now,
+        state.phase !== "idle" ||
+          navigation !== "follow" ||
+          Boolean(state.point) ||
+          Boolean(state.error),
+      );
+      const visible =
+        state.visible &&
+        presence.visible &&
+        (navigation !== "follow" || (!state.point && onScreen));
+      group.current.style.transitionDuration = `${presence.fadeMs}ms`;
       group.current.style.opacity = visible ? "1" : "0";
       group.current.style.transform = `translate(${position.x}px, ${position.y}px)`;
+      const errorBubble = group.current.querySelector<HTMLElement>(".cursor-error-bubble");
+      if (errorBubble) {
+        errorBubble.style.left = `${Math.max(8 - position.x, Math.min(10, width - position.x - errorBubble.offsetWidth - 8))}px`;
+        errorBubble.style.top = `${Math.max(8 - position.y, Math.min(26, height - position.y - errorBubble.offsetHeight - 8))}px`;
+      }
       const image = group.current.querySelector<HTMLImageElement>(".cursor-sprite");
       if (image)
         image.style.transform = `translate(-50%,-50%) rotate(${rotation}deg) scale(${scale})`;
@@ -290,6 +324,15 @@ function CursorOverlay() {
           </foreignObject>
         </svg>
         <div ref={bubble} className="cursor-point-bubble" />
+        {presentation.error && !presentation.point && (
+          <div className="cursor-error-bubble">
+            {presentation.error.includes("Speech failed:")
+              ? "Speech unavailable"
+              : "Companion needs attention"}
+            <br />
+            Open Agents to retry.
+          </div>
+        )}
       </div>
     </div>
   );

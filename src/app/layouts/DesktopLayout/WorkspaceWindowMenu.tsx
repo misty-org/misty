@@ -35,8 +35,10 @@ export function WorkspaceWindowMenu(props: {
 
   return (
     <DropdownMenu>
+      <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-charcoal-border" />
       <MenuTrigger
         iconOnly
+        showChevron
         size="xs"
         label="Manage virtual windows"
         title="Manage virtual windows"

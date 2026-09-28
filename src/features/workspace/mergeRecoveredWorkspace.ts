@@ -34,6 +34,18 @@ export function mergeRecoveredWorkspace(
       ...recovered.activeVirtualWindowIdByScope,
       ...live.activeVirtualWindowIdByScope,
     },
+    tabGroups: records(
+      recovered.tabGroups ?? [],
+      current.tabGroups,
+      baseline.tabGroups ?? [],
+    ).filter(
+      (group) =>
+        !baseline.tabGroups?.some((old) => old.id === group.id) ||
+        current.tabGroups.some((live) => live.id === group.id),
+    ),
+    migratedTabGroupIds: [
+      ...new Set([...(recovered.migratedTabGroupIds ?? []), ...current.migratedTabGroupIds]),
+    ],
     websiteGroups: records(
       recovered.websiteGroups ?? [],
       current.websiteGroups,

@@ -119,7 +119,7 @@ export function BrowserOmniboxView(props: {
           type="button"
           variant="ghost"
           size="sm"
-          className="w-full justify-center overflow-hidden text-xs text-cream-muted"
+          className="w-full justify-center overflow-hidden text-[13px] text-cream-muted"
           aria-label="Show current address"
           title="Show current address"
           onClick={() => {

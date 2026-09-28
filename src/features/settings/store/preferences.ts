@@ -15,7 +15,6 @@ export function selectAppearancePreferences(
     ),
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     navigatorAutoHide: settingsBoolean(source, "appearance", "navigator_auto_hide", false),
-    navigatorWidthIndex: settingsNumber(source, "appearance", "navigator_width_index", 0),
     panelOpacity: clampSettingsNumber(
       settingsNumber(source, "appearance", "panel_opacity", 0.82),
       0.4,
@@ -124,12 +123,6 @@ export function selectGeneralPreferences(
       true,
     ),
     defaultFileActionIndex: settingsNumber(source, "general", "default_file_action_index", 0),
-    defaultTransferBehaviorIndex: settingsNumber(
-      source,
-      "general",
-      "default_transfer_behavior_index",
-      0,
-    ),
     openLinksExternally: settingsBoolean(source, "general", "open_links_externally", false),
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
@@ -215,7 +208,6 @@ export interface AppearancePreferences {
   appZoom: number;
   compactModeEnabled: boolean;
   navigatorAutoHide: boolean;
-  navigatorWidthIndex: number;
   panelOpacity: number;
   thumbnailPreviewsEnabled: boolean;
   wallpaperPath: string;
@@ -253,7 +245,6 @@ export interface NotificationPreferences {
 export interface GeneralPreferences {
   confirmDestructiveActions: boolean;
   defaultFileActionIndex: number;
-  defaultTransferBehaviorIndex: number;
   openLinksExternally: boolean;
   preferredWorkspaceRoot: string;
   reopenLastSession: boolean;

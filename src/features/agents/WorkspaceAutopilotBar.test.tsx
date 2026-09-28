@@ -44,7 +44,13 @@ it("does not watch or revoke authority while startup is still preparing", () => 
   expect(mocks.watch).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
   rerender(<WorkspaceAutopilotBar execution={{ ...execution, ready: true }} name="Misty" />);
-  expect(mocks.watch).toHaveBeenCalledWith("task", "account", "space", expect.any(Function));
+  expect(mocks.watch).toHaveBeenCalledWith(
+    "task",
+    "account",
+    "space",
+    expect.any(Function),
+    undefined,
+  );
 });
 it("Pause revokes the current task and a late error cannot replace another task's status", async () => {
   render(<WorkspaceAutopilotBar execution={{ ...execution, ready: true }} name="Misty" />);
@@ -69,4 +75,20 @@ it("stops the task from the control center", async () => {
   render(<WorkspaceAutopilotBar execution={execution} name="Misty" />);
   fireEvent.click(screen.getByRole("button", { name: "Stop task" }));
   await waitFor(() => expect(mocks.finish).toHaveBeenCalledOnce());
+});
+
+it("shows the exact desktop blocker without relying on a tooltip", async () => {
+  render(
+    <WorkspaceAutopilotBar
+      execution={{ ...execution, ready: true, desktopControl: true }}
+      name="Misty"
+    />,
+  );
+  fireEvent(
+    window,
+    new CustomEvent("misty:autopilot-error", {
+      detail: { taskId: "task", message: "Allow dev1 in Accessibility" },
+    }),
+  );
+  expect(screen.getByRole("alert").textContent).toBe("Allow dev1 in Accessibility");
 });

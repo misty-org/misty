@@ -37,7 +37,7 @@ export function SettingsProfilesBridge() {
             ...document,
             appearance: {
               ...((document.appearance as Record<string, unknown>) ?? {}),
-              navigator_auto_hide: readNavigatorLayout().visibility === "hidden",
+              navigator_auto_hide: readNavigatorLayout().autoHide,
             },
           };
         },

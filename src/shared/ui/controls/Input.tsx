@@ -14,8 +14,8 @@ const inputVariants = {
   ],
   // The browser address bar: a quiet field that lifts on hover and focus.
   toolbar: [
-    "h-[30px] w-full min-w-0 rounded-md border border-cream/[0.07] bg-transparent px-2",
-    "text-xs text-cream outline-none transition-colors placeholder:text-cream-muted",
+    "h-8 w-full min-w-0 rounded-md border border-cream/[0.07] bg-transparent px-2",
+    "text-[13px] text-cream outline-none transition-colors placeholder:text-cream-muted",
     "hover:bg-cream/[0.025] focus:border-cream/[0.12] focus:bg-cream/[0.04]",
     "disabled:pointer-events-none disabled:opacity-50",
   ],

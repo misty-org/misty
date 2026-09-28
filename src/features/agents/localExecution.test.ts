@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   sessionGeneration: 0,
   transitioning: false,
   startAutopilot: vi.fn(),
+  focus: vi.fn(),
   request: vi.fn(),
   cancel: vi.fn(),
   stream: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock("./betaModes", () => ({ visibleAutopilotAvailable: () => mocks.autopilot
 vi.mock("./workspaceAutopilot", () => ({ startWorkspaceAutopilot: mocks.startAutopilot }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ label: "main", setFocus: async () => {} }),
+  getCurrentWindow: () => ({ label: "main", setFocus: mocks.focus }),
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/features/auth/core", () => ({
@@ -62,6 +63,7 @@ import {
   finishLocalExecution,
   useLocalExecution,
 } from "./localExecution";
+import { useCompanionState } from "./companion/companionState";
 beforeEach(async () => {
   await finishLocalExecution();
   vi.clearAllMocks();
@@ -77,6 +79,7 @@ beforeEach(async () => {
   mocks.state.invocationId = undefined;
   mocks.state.accountId = "owner";
   mocks.state.submitAnswer.mockResolvedValue(undefined);
+  useCompanionState.setState({ accountId: "", submit: undefined });
 });
 describe("native task authority", () => {
   it("uses an ordinary companion tab without a worker view or closing the user's tab", async () => {
@@ -315,6 +318,33 @@ describe("native task authority", () => {
 });
 
 describe("model-led follow-ups", () => {
+  it("routes a screen follow-up through fresh companion capture after pausing", async () => {
+    await startLocalExecution("owner", "agent", "", "agent");
+    const submit = vi.fn(async () => {
+      expect(useLocalExecution.getState().execution?.state).toBe("paused");
+    });
+    useCompanionState.setState({ accountId: "owner", submit });
+    mocks.request.mockImplementation(async (path: string) =>
+      path === "/misty/agent-followup" ? { route: "steer" } : undefined,
+    );
+    await routeLocalFollowup("Explain this problem on my screen");
+    expect(submit).toHaveBeenCalledWith({
+      prompt: "Explain this problem on my screen",
+      conversationId: "conversation",
+    });
+    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+  });
+  it("explains missing desktop context in a worker without guessing or continuing", async () => {
+    await startLocalExecution("owner", "agent", "", "agent");
+    mocks.request.mockImplementation(async (path: string) =>
+      path === "/misty/agent-followup" ? { route: "steer" } : undefined,
+    );
+    await expect(routeLocalFollowup("What is on my screen?")).rejects.toThrow(
+      "Fresh desktop context is unavailable",
+    );
+    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+  });
   it("quiesces execution before interpreting a correction", async () => {
     await startLocalExecution("owner", "agent", "", "agent");
     mocks.request.mockImplementation(async (path: string) => {
@@ -377,18 +407,53 @@ describe("model-led follow-ups", () => {
   });
 });
 
-it("visible control grants only whole-window tools and rejects Team startup", async () => {
+it("legacy modes share the same visible control behavior", async () => {
   mocks.autopilot = true;
   const execution = await startLocalExecution("owner", "agent", "", "agent");
   expect(execution.autopilot).toBe(true);
-  expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "");
+  expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "", undefined);
   expect(execution.deviceContexts[0].capabilities).toEqual([
     "browser.workspace.visual",
     "browser.workspace.interact",
   ]);
   expect(execution.deviceContexts[0].metadata?.workspace_control).toBe(true);
   await finishLocalExecution();
-  await expect(startLocalExecution("owner", "agent", "space", "team")).rejects.toThrow(
-    "Only Agent mode",
-  );
+  const legacy = await startLocalExecution("owner", "agent", "space", "team");
+  expect(legacy.mode).toBe("agent");
+  expect(legacy.autopilot).toBe(true);
+});
+
+it("binds desktop control without moving focus or substituting an ordinary browser tab", async () => {
+  mocks.autopilot = true;
+  const execution = await startLocalExecution("owner", "agent", "", "agent", {
+    normalTabs: false,
+    desktopControl: true,
+  });
+  expect(mocks.focus).not.toHaveBeenCalled();
+  expect(mocks.normalContext).not.toHaveBeenCalled();
+  expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "", true);
+  expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_create", {
+    request: expect.objectContaining({ url: "about:blank" }),
+  });
+  expect(execution.deviceContexts[0]).toMatchObject({
+    capabilities: ["browser.workspace.visual", "browser.workspace.interact"],
+    metadata: { desktop_control: true },
+  });
+  await settleLocalExecution("finished", execution.taskId);
+  expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", {
+    taskId: execution.taskId,
+  });
+});
+
+it("does not cancel a successor invocation while an older pause is awaiting modules", async () => {
+  const old = await startLocalExecution("owner", "agent", "", "agent");
+  const pending = pauseLocalExecution(old.taskId);
+  useLocalExecution.setState({ execution: { ...old, taskId: "successor", state: "running" } });
+  mocks.state.invocationId = "new-invocation";
+  mocks.state.working = true;
+  await pending;
+  expect(mocks.state.invocationId).toBe("new-invocation");
+  expect(mocks.state.working).toBe(true);
+  expect(mocks.cancel).not.toHaveBeenCalled();
+  expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", { taskId: old.taskId });
 });

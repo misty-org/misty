@@ -11,15 +11,7 @@ vi.mock("../mcp/McpConnectionsSheet", () => ({
 }));
 
 vi.mock("../components/MistyDashboard", () => ({
-  MistyDashboard: ({ onManageConnections }: { onManageConnections: () => void }) => (
-    <section aria-label="Misty workspace">
-      Misty
-      <p>Activity</p>
-      <button type="button" onClick={onManageConnections}>
-        Tool connections
-      </button>
-    </section>
-  ),
+  MistyDashboard: () => <section aria-label="Agent work">Independent task activity</section>,
 }));
 
 describe("Agents conversation page", () => {
@@ -62,37 +54,26 @@ describe("Agents conversation page", () => {
     );
 
     expect(container.querySelector('[aria-label="Automations workspace"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Misty workspace"]')).not.toBeNull();
+    expect(document.body.querySelector('[aria-label="Agent work"]')).not.toBeNull();
     expect(container.querySelector('[role="tablist"]')).toBeNull();
 
     await act(async () => root.unmount());
   });
 
-  it("keeps connection management available in activity", async () => {
+  it("omits connection management from the agent navigation", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
     await act(async () =>
       root.render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={["/agents?view=activity"]}>
           <DesktopAgentsPage />
         </MemoryRouter>,
       ),
     );
-
-    await act(async () =>
-      (container.querySelector('[aria-label="Agent details"]') as HTMLButtonElement)?.click(),
-    );
-    const activityButton = container.querySelector(
-      '[aria-label="View agent activity"]',
-    ) as HTMLButtonElement;
-    await act(async () => activityButton?.click());
-    const connectionButton = [...container.querySelectorAll("button")].find((button) =>
-      button.textContent?.includes("Tool connections"),
-    );
-    await act(async () => connectionButton?.click());
-    expect(document.body.querySelector('[aria-label="Tool connections sheet"]')).not.toBeNull();
-
+    expect(document.body.querySelector('[aria-label="Agent work"]')).not.toBeNull();
+    expect(document.body.textContent).not.toContain("Connect apps");
+    expect(document.body.querySelector('[aria-label="Tool connections sheet"]')).toBeNull();
     await act(async () => root.unmount());
   });
 });

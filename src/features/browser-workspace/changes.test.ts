@@ -134,3 +134,51 @@ describe("workspace edit field diff", () => {
     ]);
   });
 });
+
+it("round-trips Home and records its deletion alongside browser tabs", () => {
+  const before = fixture();
+  const home = structuredClone(before[0].layout.tabs![0]);
+  home.id = "layout:home";
+  home.root.id = "pane:home";
+  home.focusedPaneId = "pane:home";
+  const pane = dockLeaves(home.root)[0];
+  pane.tabs[0] = {
+    ...pane.tabs[0],
+    id: "tab:home",
+    surfaceId: "home",
+    groupKey: "tool:home",
+    route: "/home",
+    title: "Home",
+    state: {},
+  };
+  pane.activeTabId = "tab:home";
+  before[0].layout.tabs!.push(home);
+  const encoded = workspaceChanges([], before, profile).changes;
+  const records = encoded.flatMap((change) =>
+    change.action === "create" ? [{ kind: change.kind, id: change.id, fields: change.fields }] : [],
+  );
+  const projected = projectWorkspace(
+    {
+      version: 1,
+      sequence: 1,
+      records,
+      resumes: {},
+      orphaned_tab_ids: [],
+      orphaned_website_ids: [],
+    } as WorkspaceView,
+    { activeLayoutByWindow: {}, activeTabByPane: {}, focusedPaneByLayout: {} },
+  );
+  expect(
+    projected.windows[0].layout.tabs!.flatMap((tab) =>
+      dockLeaves(tab.root).flatMap((pane) => pane.tabs),
+    ),
+  ).toContainEqual(expect.objectContaining({ surfaceId: "home", route: "/home", id: "tab:home" }));
+  const after = structuredClone(before);
+  after[0].layout.tabs = after[0].layout.tabs!.filter((tab) => tab.id !== "layout:home");
+  expect(workspaceChanges(before, after, profile).changes).toEqual(
+    expect.arrayContaining([
+      { action: "delete", kind: "tab", id: "tab:home" },
+      { action: "delete", kind: "layout", id: "layout:home" },
+    ]),
+  );
+});

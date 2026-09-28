@@ -16,7 +16,6 @@ const deepLinkPrefixes = [
   routes.browser,
   routes.terminal,
   routes.invite,
-  routes.transfers,
   routes.files,
   routes.code,
   routes.providers,
@@ -24,6 +23,7 @@ const deepLinkPrefixes = [
   routes.automations,
   routes.agents,
   routes.activity,
+  routes.scheduled,
   routes.spaces,
   routes.studio,
   routes.account,
@@ -48,7 +48,6 @@ export function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
   if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.automations))
     return "spaces";
-  if (pathname.startsWith(routes.transfers)) return "files";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";
   if (

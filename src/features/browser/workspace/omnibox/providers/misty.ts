@@ -6,6 +6,7 @@ const MIN_QUERY_LENGTH = 2;
 
 /** Extra words that name each of Misty's own browser pages. */
 const keywords: Record<keyof typeof browserInternalPages, string[]> = {
+  scheduled: ["scheduled", "schedule", "tasks", "reminders"],
   history: ["history", "recent", "visited"],
   downloads: ["downloads", "files"],
   bookmarks: ["bookmarks", "saved", "favorites"],

@@ -35,43 +35,6 @@
   border: 0;
 }
 
-.app-pages-root ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-.app-pages-root ::-webkit-scrollbar-track {
-  background: #131313;
-}
-
-.app-pages-root ::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: #3e3e3e;
-}
-
-.app-pages-root ::-webkit-scrollbar-thumb:hover {
-  background: #8c8c8c;
-}
-
-.app-pages-root .misty-scrollbar,
-.app-pages-root .misty-transient-scrollbar,
-.app-pages-root .misty-transient-scrollbar-active {
-  scrollbar-color: #3e3e3e #131313;
-  scrollbar-width: thin;
-}
-
-/* Modern WebKit/Blink let scrollbar-width/color override pseudo-element
-   sizing. Keep the explicit 4px desktop track; retain thin as the fallback. */
-@supports selector(::-webkit-scrollbar) {
-  .app-pages-root .misty-scrollbar,
-  .app-pages-root .misty-transient-scrollbar,
-  .app-pages-root .misty-transient-scrollbar-active,
-  .app-pages-root [data-navigator-section-scroll] {
-    scrollbar-width: auto;
-    scrollbar-color: auto;
-  }
-}
-
 .app-pages-root .misty-file-browser-scrollbar {
   scrollbar-gutter: stable;
 }
@@ -87,16 +50,30 @@
 }
 
 /* One glyph size for every navbar icon: primary rows, utility actions, the
-   Misty logo, the profile avatar, and the Space rail. Portaled menus retain
-   their own sizing. */
+   Misty logo, and the Space rail. Avatars are identity tiles, sized a touch
+   larger so a filled square reads at the same weight as a stroked glyph.
+   Portaled menus retain their own sizing. */
 .misty-navigation-icons {
   --misty-navigation-icon-size: 16px;
+  --misty-navigation-avatar-size: 20px;
   --navigation-primary-icon-size: var(--misty-navigation-icon-size);
 }
 
-.misty-navigation-icons :is(svg, img, [data-slot="avatar"]) {
+/* The global rail uses square 36px tiles around 18px glyphs. */
+.misty-global-navigator {
+  --misty-navigation-icon-size: 18px;
+  --misty-navigation-tile-size: 36px;
+}
+
+.misty-navigation-icons :is(svg, img:not([data-slot="avatar-image"])) {
   width: var(--misty-navigation-icon-size) !important;
   height: var(--misty-navigation-icon-size) !important;
+  flex-shrink: 0;
+}
+
+.misty-navigation-icons [data-slot="avatar"] {
+  width: var(--misty-navigation-avatar-size) !important;
+  height: var(--misty-navigation-avatar-size) !important;
   flex-shrink: 0;
 }
 
@@ -136,19 +113,24 @@
   --navigation-primary-icon-slot: var(--misty-navigation-icon-size);
 }
 
-/* The Space avatar is identity, not a glyph: it fills most of its tile. */
+/* Space and profile avatars share the same identity footprint within their tiles. */
 .misty-navigation-icons
-  .misty-space-rail-avatar
+  :is(.misty-space-rail-avatar, [data-navigator-profile-bar])
   :is([data-slot="avatar"], [data-slot="avatar"] img) {
   width: 28px !important;
   height: 28px !important;
 }
 
-.misty-global-navigator .misty-navigator-icon-target,
 .misty-space-rail-control {
   width: 32px !important;
   height: 32px !important;
   min-width: 32px;
+}
+
+.misty-global-navigator .misty-navigator-icon-target {
+  width: var(--misty-navigation-tile-size) !important;
+  height: var(--misty-navigation-tile-size) !important;
+  min-width: var(--misty-navigation-tile-size);
 }
 
 /* Navigation feedback fills the row or action behind the brightened label

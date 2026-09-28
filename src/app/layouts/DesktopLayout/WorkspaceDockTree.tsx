@@ -1,4 +1,5 @@
 import { StablePaneLayout } from "@/features/workspace/StablePaneLayout";
+import { useWorkspacePagePreview } from "@/features/workspace/useWorkspacePagePreview";
 import { panePlacement } from "@/features/workspace/panePlacement";
 import { WorkspacePaneControls } from "./WorkspacePaneControls";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
@@ -49,8 +50,9 @@ const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   terminal: "Terminal",
   code: "Code",
   files: "Files",
-  transfers: "Transfers",
+
   agents: "Agents",
+  scheduled: "Scheduled",
   "official-app": "App",
   extension: "App",
   marketplace: "Discover",
@@ -93,7 +95,7 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
             code: "Code",
             terminal: "Terminal",
             agents: "Agents",
-            transfers: "Transfers",
+            scheduled: "Scheduled",
           } as Record<string, string>
         )[id] ?? "Tool";
       contextLabel = label;
@@ -256,8 +258,8 @@ function DockSplitView(
           "hover:bg-charcoal-active focus-visible:outline-none focus-visible:ring-2",
           "focus-visible:ring-cream-muted/60 data-[resize-handle-active]:bg-charcoal-active",
           props.node.direction === "horizontal"
-            ? "w-px cursor-col-resize before:inset-y-0 before:left-1/2 before:w-3 before:-translate-x-1/2"
-            : "h-px cursor-row-resize before:inset-x-0 before:top-1/2 before:h-3 before:-translate-y-1/2",
+            ? "w-px cursor-col-resize before:inset-y-0 before:-inset-x-[5px]"
+            : "h-px cursor-row-resize before:inset-x-0 before:-inset-y-[5px]",
         )}
       />
       <Panel
@@ -284,6 +286,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const [dropZone, setDropZone] = useState<DockDropZone | null>(null);
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane.tabs[0];
+  useWorkspacePagePreview(activeTab, sectionRef, props.workspaceActive !== false);
   const focused = props.workspaceActive !== false && pane.id === props.focusedPaneId;
   // Open tabs own live UI state and subscriptions. Hiding an inactive surface
   // must not unmount it, otherwise collaborative tools reconnect and reload on
@@ -545,9 +548,7 @@ function aiContextForTab(tab: WorkspaceTab): AiContextReference {
   const privacy =
     tab.surfaceId === "inbox"
       ? "provider"
-      : (["browser", "terminal", "code", "files", "transfers"] as WorkspaceSurfaceId[]).includes(
-            tab.surfaceId,
-          )
+      : (["browser", "terminal", "code", "files"] as WorkspaceSurfaceId[]).includes(tab.surfaceId)
         ? "device"
         : "private";
   return {
@@ -649,13 +650,6 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
       "files.organize",
       "Suggest cleanup",
       "Suggest a reversible cleanup plan for the selected files.",
-    ),
-  ],
-  transfers: [
-    action(
-      "transfers.diagnose",
-      "Diagnose",
-      "Diagnose the visible transfer state and suggest recovery steps.",
     ),
   ],
   drawings: [

@@ -17,6 +17,7 @@ vi.mock("./globalMistyApi", async (importOriginal) => {
   };
 });
 
+import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import * as localExecution from "@/features/agents/localExecution";
 import { GlobalMisty } from "./GlobalMisty";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -227,6 +228,52 @@ describe("GlobalMisty", () => {
     });
 
     expect(useMistyStore.getState().panel).toBe("answer");
+  });
+  it("keeps task controls above native pages when Search closes", async () => {
+    const reasons = new Set<string>();
+    const unsubscribe = subscribeEmbeddedBrowserSuspension((active, reason) => {
+      if (active) reasons.add(reason);
+      else reasons.delete(reason);
+    });
+    try {
+      await act(async () => {
+        useMistyStore.setState({ accountId: "account-1", panel: "closed", working: true });
+        localExecution.useLocalExecution.setState({
+          execution: {
+            accountId: "account-1",
+            spaceId: "",
+            agentId: "agent-1",
+            taskId: "task-1",
+            mode: "agent",
+            state: "running",
+            normalTabs: true,
+            ready: true,
+            views: [],
+            context: [],
+            deviceContexts: [],
+          },
+        });
+        root.render(
+          <MemoryRouter>
+            <GlobalMisty
+              accountId="account-1"
+              currentPath="/browser"
+              activePaneId=""
+              activePanePath=""
+            />
+          </MemoryRouter>,
+        );
+      });
+      expect(reasons.has("global-misty")).toBe(true);
+      await act(async () => useGlobalSearchStore.setState({ panel: "results" }));
+      await act(async () => useGlobalSearchStore.getState().closePanel());
+      expect(reasons.has("global-search")).toBe(false);
+      expect(reasons.has("global-misty")).toBe(true);
+      await act(async () => localExecution.useLocalExecution.setState({ execution: null }));
+      expect(reasons.has("global-misty")).toBe(false);
+    } finally {
+      unsubscribe();
+    }
   });
   it("keeps both control bars available when task chat closes and accepts messages while working", async () => {
     const followup = vi

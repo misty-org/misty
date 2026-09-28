@@ -1,6 +1,5 @@
+import { useOperationQueueStore } from "../useOperationQueueStore";
 import { useAppStore } from "@/features/app-shell";
-import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
-import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import type { FileEntry, PasteItem } from "@/native/ipc";
 import type { CreateItemKind } from "@/native/ipc/primitives";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -93,12 +92,6 @@ export function defaultDownloadsDirectory(): string {
 
 export async function downloadDestinationDirectory(): Promise<string | null> {
   const defaultDirectory = H.defaultDownloadsDirectory();
-  const transferBehaviorIndex = selectGeneralPreferences(
-    useSettingsStore.getState().settings?.document,
-  ).defaultTransferBehaviorIndex;
-  if (transferBehaviorIndex === 1) {
-    return defaultDirectory;
-  }
   if (!hasTauriInternals()) {
     return defaultDirectory;
   }
@@ -248,8 +241,7 @@ export function refreshAndClearRenamePanes(items: ExplorerBatchRenameItem[]): vo
   }
 }
 
-export function refreshTransferViews(): void {
-  void useTransfersStore.getState().load(undefined, { silent: true });
+export function refreshFileOperationState(): void {
   void useOperationQueueStore.getState().load({ silent: true });
 }
 

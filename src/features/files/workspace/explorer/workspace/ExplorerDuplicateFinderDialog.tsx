@@ -1,3 +1,4 @@
+import { useOperationQueueStore } from "../store/useOperationQueueStore";
 import { SystemErrorActivity } from "@/features/activity";
 import {
   duplicatesCancel,
@@ -5,7 +6,6 @@ import {
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
 } from "../../native";
-import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import { useMemo } from "react";
 import { useExplorerStore } from "../store";
 import {
@@ -47,7 +47,6 @@ export function DuplicateFinderDialog(props: {
                 operation: "move",
               });
         } else await explorerQueueDeleteItems({ paths, permanent: false });
-        void useTransfersStore.getState().load(undefined, { silent: true });
         void useOperationQueueStore.getState().load({ silent: true });
         useExplorerStore
           .getState()
