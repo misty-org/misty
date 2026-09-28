@@ -1,5 +1,6 @@
 import { CursorCompanionController } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
+import { RecallRecorderMount } from "@/features/recall";
 import { type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
@@ -300,6 +301,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 <CursorCompanionController key={user.id} accountId={user.id} />
                 <DictationController key={`dictation-${user.id}`} />
                 <CapturePanel key={`capture-${user.id}`} />
+                <RecallRecorderMount key={`recall-${user.id}`} />
               </>
             ) : null}
           </>

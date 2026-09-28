@@ -39,6 +39,7 @@ const (
 	GrantProjectEdit    GrantAction = "project.edit"
 	GrantProjectInstall GrantAction = "project.install"
 	GrantGitPush        GrantAction = "git.push"
+	GrantRecallRead     GrantAction = "recall.read"
 
 	// Actions that pause but can never be remembered.
 	ActionToolWrite      GrantAction = "tool.write"      // any other change Misty makes in Ask
@@ -46,7 +47,11 @@ const (
 	ActionScreenControl  GrantAction = "screen.control"  // a consequential action on the whole screen
 	ActionAccountSetting GrantAction = "account.setting" // account and security settings
 	ActionOutsideProject GrantAction = "project.outside" // a path outside the attached project
+	ActionRecallForget   GrantAction = "recall.forget"   // deleting what Memory kept
 )
+
+// RecallScopeID is the scope id of a Memory grant: Memory is per person.
+const RecallScopeID = "memory"
 
 // ScopeKind names what a grant is limited to.
 type ScopeKind string
@@ -59,6 +64,8 @@ const (
 	ScopeProject          ScopeKind = "project"
 	ScopeRepo             ScopeKind = "repo"
 	ScopeSchedule         ScopeKind = "schedule"
+	// ScopeRecall is the person's own Memory; its one id is RecallScopeID.
+	ScopeRecall ScopeKind = "recall"
 )
 
 // ActionClass is how an action behaves in Ask and Auto.
@@ -101,11 +108,13 @@ var grantActions = map[GrantAction]struct {
 	GrantProjectEdit:     {ClassScopeImplied, []ScopeKind{ScopeProject}},
 	GrantProjectInstall:  {ClassPermission, []ScopeKind{ScopeProject}},
 	GrantGitPush:         {ClassPermission, []ScopeKind{ScopeRepo}},
+	GrantRecallRead:      {ClassPermission, []ScopeKind{ScopeRecall}},
 	ActionToolWrite:      {ClassScopeImplied, nil},
 	ActionBrowserStep:    {ClassScopeImplied, nil},
 	ActionScreenControl:  {ClassNeverRemember, nil},
 	ActionAccountSetting: {ClassNeverRemember, nil},
 	ActionOutsideProject: {ClassNeverRemember, nil},
+	ActionRecallForget:   {ClassNeverRemember, nil},
 }
 
 // ClassOf is the action's class. Unknown actions need the person every time.

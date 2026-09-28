@@ -137,13 +137,14 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     try {
       const device = await voiceDeviceId();
       const ticket = await voiceApi.liveTicket({ device_id: device, channels, language });
-      const hearsOther = source.kind === "system" || source.kind === "app";
+      const hearsOther =
+        source.kind === "system" || source.kind === "app" || source.kind === "recording";
       if (source.mic || source.kind === "mic" || hearsOther) {
         current.native = true;
         const session = await invoke<number>("voice_capture_start", {
           request: {
             mic: source.mic || source.kind === "mic",
-            system: source.kind === "system",
+            system: source.kind === "system" || source.kind === "recording",
             pids: source.pids ?? [],
           },
         });

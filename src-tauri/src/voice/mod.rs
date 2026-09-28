@@ -1,9 +1,10 @@
-//! Voice: dictation into any app, and (later) captures and recordings.
+//! Voice: dictation into any app, captures, and screen recordings.
 //! Docs: docs/design/voice-memory/BRIEF.md.
 #[cfg(any(target_os = "macos", windows))]
 mod capture;
 pub mod dictation;
 pub mod insert;
+pub mod recording;
 pub mod tab_tap;
 #[cfg(any(target_os = "macos", windows))]
 mod pill;

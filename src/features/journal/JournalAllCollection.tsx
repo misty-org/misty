@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, PencilRuler, Plus } from "lucide-react";
 import { useAuth } from "@/features/auth";
+import { publicBetaFeatureEnabled } from "@/features/launch";
 import { CaptureMenu } from "@/features/voice";
 import { useSpacesStore } from "@/features/spaces/core";
 import { useSpaceOverview } from "@/features/spaces/useSpaceOverview";
@@ -25,6 +26,8 @@ export const journalSections = [
   { value: "notes", label: "Notes" },
   { value: "drawings", label: "Drawings" },
   { value: "pinned", label: "Pinned" },
+  // A day of Memory: what you read, said and recorded.
+  ...(publicBetaFeatureEnabled("recall") ? [{ value: "day", label: "Day" }] : []),
 ];
 
 export function JournalAllCollection(props: {

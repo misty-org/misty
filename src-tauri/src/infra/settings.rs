@@ -299,6 +299,17 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("keep_recordings", json!(false)),
         ],
     );
+    // Memory: off until the person turns it on; a pause is a time in ms.
+    changed |= ensure_section_defaults(
+        root,
+        "recall",
+        &[
+            ("enabled", json!(false)),
+            ("paused_until", json!(0)),
+            ("excluded_sites", json!("")),
+            ("remember_dictation", json!(true)),
+        ],
+    );
     changed |= ensure_section_defaults(
         root,
         "advanced",

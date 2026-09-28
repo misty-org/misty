@@ -265,6 +265,8 @@ variables and deliberate compatibility aliases are called out separately below.
 | `VISION_PROCESSOR_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` |
 | `VISION_PROCESSOR_TOKEN` | `integrations/ai.env` | `server/internal/app/server_core.go` |
 | `MISTY_COMPANION_TEACH_REASONING` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_cursor_companion.go` |
+| `MISTY_RECALL` | `integrations/ai.env` | `server/internal/platform/httpapi/memory_api.go` |
+| `MISTY_RECALL_BACKLOG_CAP` | `integrations/ai.env` | `server/internal/platform/httpapi/memory_api.go` |
 | `MISTY_VOICE_LIVE` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_ticket.go` |
 | `MISTY_VOICE_LIVE_URL` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_ticket.go` |
 | `MISTY_VOICE_LIVE_TICKET_MINUTES` | `integrations/ai.env` | `server/internal/platform/httpapi/voice_live_ticket.go` |

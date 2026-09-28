@@ -77,6 +77,21 @@ func (db *Database) CompleteAIEmbeddingChunk(ctx context.Context, chunk AIEmbedd
 	})
 }
 
+// Memory documents are the person's own browsing and listening. They are
+// searched only through SearchMemoryRetrieval, which recall tools gate.
+const (
+	retrievalWithoutMemory = `AND d.source_kind NOT LIKE 'memory\_%'`
+	retrievalOnlyMemory    = `AND d.source_kind LIKE 'memory\_%' AND d.privacy_class='private'`
+)
+
+// SearchMemoryRetrieval searches only the person's Memory documents.
+func (db *Database) SearchMemoryRetrieval(ctx context.Context, userID, query string, embedding []float64, limit int, embeddingModel string) ([]AIRetrievalHit, error) {
+	if embeddingModel == "" {
+		embeddingModel = "google/gemini-embedding-2"
+	}
+	return db.searchAIRetrieval(ctx, userID, query, embedding, limit, "", embeddingModel, retrievalOnlyMemory)
+}
+
 func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string, embedding []float64, limit int, spaceIDs ...string) ([]AIRetrievalHit, error) {
 	spaceID := ""
 	if len(spaceIDs) > 0 {
@@ -86,6 +101,10 @@ func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string,
 	if len(spaceIDs) > 1 {
 		embeddingModel = spaceIDs[1]
 	}
+	return db.searchAIRetrieval(ctx, userID, query, embedding, limit, spaceID, embeddingModel, retrievalWithoutMemory)
+}
+
+func (db *Database) searchAIRetrieval(ctx context.Context, userID, query string, embedding []float64, limit int, spaceID, embeddingModel, kinds string) ([]AIRetrievalHit, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return []AIRetrievalHit{}, nil
@@ -105,7 +124,7 @@ func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string,
 					ts_rank_cd(c.lexical,q.value) lexical_score,
 					CASE WHEN c.embedding IS NULL OR c.embedding_model<>$6 THEN 0 ELSE (1-(c.embedding <=> $2::vector)) END semantic_score
 				FROM ai_retrieval_documents d JOIN ai_retrieval_chunks c ON c.document_id=d.id CROSS JOIN lexical_query q
-				WHERE d.lifecycle_state='active' AND ($5='' OR d.space_id=$5)
+				WHERE d.lifecycle_state='active' `+kinds+` AND ($5='' OR d.space_id=$5)
 				  AND (
 				    (d.privacy_class='private' AND d.owner_user_id=$4) OR
 				    (d.privacy_class IN ('shared','provider')
@@ -124,7 +143,7 @@ func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string,
 				SELECT d.id,d.source_kind,d.source_id,COALESCE(d.space_id,''),d.source_revision,d.title,d.href,c.content,
 					ts_rank_cd(c.lexical,q.value) score,ts_rank_cd(c.lexical,q.value) lexical_score,0::float8 semantic_score
 				FROM ai_retrieval_documents d JOIN ai_retrieval_chunks c ON c.document_id=d.id CROSS JOIN lexical_query q
-				WHERE d.lifecycle_state='active' AND ($4='' OR d.space_id=$4)
+				WHERE d.lifecycle_state='active' `+kinds+` AND ($4='' OR d.space_id=$4)
 				  AND (
 				    (d.privacy_class='private' AND d.owner_user_id=$3) OR
 				    (d.privacy_class IN ('shared','provider')

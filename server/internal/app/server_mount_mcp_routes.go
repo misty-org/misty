@@ -36,6 +36,12 @@ func (s *Server) mountMCPRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.Delete(prefix+"/me/voice/transcripts/{transcriptID}", spaces.VoiceTranscript())
 	s.Router.Post(prefix+"/me/voice/transcripts/{transcriptID}/notes", spaces.VoiceTranscriptNotes())
 	s.Router.Post(prefix+"/me/voice/transcribe", spaces.VoiceTranscribeLibraryItem())
+	s.Router.Get(prefix+"/me/memory/events", spaces.MemoryEvents())
+	s.Router.Post(prefix+"/me/memory/events", spaces.MemoryEvents())
+	s.Router.Post(prefix+"/me/memory/forget", spaces.MemoryForget())
+	s.Router.Get(prefix+"/me/memory/status", spaces.MemoryStatus())
+	s.Router.Get(prefix+"/me/memory/export", spaces.MemoryExport())
+	s.Router.Post(prefix+"/me/memory/day-summary", spaces.MemoryDaySummary())
 	// Collaboration: Plan/Act mode, agent questions, plans and goals.
 	s.Router.Get(prefix+"/me/conversations/{conversationID}/collaboration", spaces.ConversationCollaboration())
 	s.Router.Put(prefix+"/me/conversations/{conversationID}/mode", spaces.ConversationModeControl())

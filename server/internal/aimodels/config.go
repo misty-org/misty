@@ -43,6 +43,7 @@ var Roles = []Role{
 	{"dictation-cleanup", false},
 	// Notes, summaries, action items and chapters from a transcript.
 	{"voice-notes", false},
+	{"day-summary", false},
 }
 
 // Sense is a user-facing model choice. Kind says which Gateway models fit it.
