@@ -1,35 +1,43 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { dockTabs } from "./dockTree";
-import { defaultBrowserHomeUrl } from "./model";
-import { initialWorkspaceLayout } from "./virtualWindows";
-import { configureWorkspaceDefaultTab, createDefaultWorkspaceTab } from "./workspaceDefaultTab";
-
-describe("workspace default tab", () => {
-  afterEach(() => configureWorkspaceDefaultTab(0));
-
-  it("opens Google without depending on a Space or installed app", () => {
-    expect(createDefaultWorkspaceTab("global")).toMatchObject({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Google",
-      route: "/browser",
-      state: { url: defaultBrowserHomeUrl },
-    });
-    expect(createDefaultWorkspaceTab("global").placeholder).toBeUndefined();
+import { afterEach, expect, it } from "vitest";
+import {
+  configureWorkspaceDefaultTab,
+  createDefaultWorkspaceTab,
+  createHomeWorkspaceTab,
+} from "./workspaceDefaultTab";
+afterEach(() => configureWorkspaceDefaultTab(0));
+it("starts on replaceable Home by default, with a distinct established Home factory", () => {
+  expect(createDefaultWorkspaceTab("global")).toMatchObject({
+    surfaceId: "home",
+    route: "/home",
+    placeholder: true,
   });
+  expect(createHomeWorkspaceTab("global")).toMatchObject({ surfaceId: "home", placeholder: false });
+});
+it.each([
+  [0, "home"],
+  [1, "browser"],
+  [2, "files"],
+  [3, "agents"],
+])("uses configured starting page %s", (index, surfaceId) => {
+  configureWorkspaceDefaultTab(Number(index));
+  expect(createDefaultWorkspaceTab("global")).toMatchObject({ surfaceId, placeholder: true });
+});
+it("falls back to Home for invalid preferences and allocates independent identities", () => {
+  configureWorkspaceDefaultTab(999);
+  const first = createDefaultWorkspaceTab("global"),
+    second = createDefaultWorkspaceTab("global");
+  expect(first.surfaceId).toBe("home");
+  expect(first.id).not.toBe(second.id);
+  expect(first.instanceKey).not.toBe(second.instanceKey);
+});
 
-  it("ignores retired default-app preferences when restoring a layout", () => {
-    configureWorkspaceDefaultTab(999);
-    expect(dockTabs(initialWorkspaceLayout("space:family").root)).toMatchObject([
-      { surfaceId: "browser", route: "/browser", state: { url: defaultBrowserHomeUrl } },
-    ]);
+it("round-trips the configurable starting page through portable settings", async () => {
+  const { portableValues, projectPreferences } =
+    await import("@/features/settings/profiles/registry");
+  expect(portableValues({ general: { workspace_default_tab_index: 2 } })).toEqual({
+    "app.tabs.startPage": "files",
   });
-
-  it("allocates independent browser runtime identities for every new tab", () => {
-    const first = createDefaultWorkspaceTab("global");
-    const second = createDefaultWorkspaceTab("global");
-    expect(first.id).not.toBe(second.id);
-    expect(first.instanceKey).toBe(first.id);
-    expect(second.instanceKey).toBe(second.id);
+  expect(projectPreferences({}, { "app.tabs.startPage": "agents" })).toMatchObject({
+    general: { workspace_default_tab_index: 3 },
   });
 });

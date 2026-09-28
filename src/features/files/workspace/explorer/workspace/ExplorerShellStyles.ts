@@ -12,4 +12,7 @@ export const explorerShellStyles = {
   bottomBarGroup: "grid grid-flow-col auto-cols-max items-center gap-1",
   paneHeaderActions: "flex h-full flex-none items-center gap-5",
   paneHeaderActionSection: "flex flex-none items-center gap-1 overflow-visible",
+  bottomButton:
+    "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
+  bottomButtonSelected: "bg-charcoal-hover text-cream",
 } as const;

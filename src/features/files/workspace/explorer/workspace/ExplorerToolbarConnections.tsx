@@ -1,13 +1,7 @@
-import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
-import {
-  maxMultiPanelPanes,
-  useMultiPanelStore,
-  type MultiPanelStoreHook,
-} from "@/features/workspace";
+import { useOperationQueueStore } from "../store/useOperationQueueStore";
+import { useMultiPanelStore } from "@/features/workspace";
 import type { FileEntry } from "@/native/ipc";
-import { IconButton } from "@/shared/ui";
-import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo } from "react";
+import { memo, useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { ExplorerLocationResult } from "../components/ExplorerToolbar";
 import { ExplorerPaneToolbarActions, ExplorerToolbar } from "../components/ExplorerToolbar";
@@ -17,13 +11,11 @@ import type { ExplorerSortColumn } from "../store";
 import { selectedEntriesForPane, selectedEntryForPane, useExplorerStore } from "../store";
 import { revealSearchResultInPane } from "../utils/searchNavigation";
 import {
-  newestUndoableTransfer,
   redoLatestTransferOperation,
   runExplorerCommand,
   transferTypeLabel,
   undoLatestTransferOperation,
 } from "./ExplorerCommands";
-import { explorerShellStyles } from "./ExplorerShellStyles";
 
 export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   paneId: string;
@@ -62,13 +54,10 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
     useShallow((queue) => ({
       snapshot: queue.snapshot,
       working: queue.working,
+      latestUndoable: queue.latestUndoable,
     })),
   );
-  const transfers = useTransfersStore((transferState) => transferState.transfers);
-  const latestUndoable = useMemo(
-    () => newestUndoableTransfer(transfers?.rows ?? []),
-    [transfers?.rows],
-  );
+  const latestUndoable = operationQueue.latestUndoable;
   const canUndo = Boolean(latestUndoable) && !operationQueue.working;
   const canRedo = Boolean(operationQueue.snapshot?.redoAvailable) && !operationQueue.working;
   const undoTitle = latestUndoable
@@ -77,7 +66,6 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
 
   useEffect(() => {
     const refreshHistory = () => {
-      void useTransfersStore.getState().load(undefined, { silent: true });
       void useOperationQueueStore.getState().load({ silent: true });
     };
     refreshHistory();
@@ -195,7 +183,7 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
       {...state}
       paneId={props.paneId}
       locationResults={props.locationResults}
-      onOpenTransfers={() => props.onNavigateRoute("/apps/files?view=transfers")}
+      trailingActions={<ConnectedExplorerToolbarActions paneId={props.paneId} />}
       onNavigate={onNavigate}
       onNavigateLocation={onNavigateLocation}
       onNavigateSearchResult={onNavigateSearchResult}
@@ -230,147 +218,82 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
   );
 });
 
-export const ExplorerPaneHeaderActions = memo(function ExplorerPaneHeaderActions(props: {
+const ConnectedExplorerToolbarActions = memo(function ConnectedExplorerToolbarActions(props: {
   paneId: string;
-  multiPanelStore?: MultiPanelStoreHook;
 }) {
-  return (
-    <div className={explorerShellStyles.paneHeaderActions}>
-      <div className={explorerShellStyles.paneHeaderActionSection}>
-        <ExplorerPaneControls paneId={props.paneId} multiPanelStore={props.multiPanelStore} />
-      </div>
-      <ConnectedExplorerPaneToolbarActions paneId={props.paneId} />
-    </div>
+  const state = useExplorerStore(
+    useShallow((explorer) => {
+      const pane = explorer.panes[props.paneId];
+      const selectedEntries = selectedEntriesForPane(pane).filter((entry) => !entry.isDeleted);
+      const selectedEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
+      return {
+        path: pane?.listing?.path ?? "",
+        viewMode: explorer.paneViewModes[props.paneId] ?? explorer.viewMode,
+        itemScale: explorer.paneFileItemScales[props.paneId] ?? explorer.fileItemScale,
+        sort: explorer.paneSorts[props.paneId] ?? explorer.sort,
+        showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
+        selectedCount: selectedEntries.length,
+        selectedEntryPath: selectedEntry?.path ?? null,
+        hasRemoteSelection: selectedEntries.some((entry) => entry.location.kind === "peer_device"),
+        canOpenWithSelected: Boolean(
+          selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink",
+        ),
+        canCalculateDirectorySizes: Boolean(pane?.hasFolderEntries),
+      };
+    }),
   );
-});
-
-const ConnectedExplorerPaneToolbarActions = memo(
-  function ConnectedExplorerPaneToolbarActions(props: { paneId: string }) {
-    const state = useExplorerStore(
-      useShallow((explorer) => {
-        const pane = explorer.panes[props.paneId];
-        const selectedEntries = selectedEntriesForPane(pane).filter((entry) => !entry.isDeleted);
-        const selectedEntry = selectedEntries.length === 1 ? selectedEntries[0] : null;
-        return {
-          path: pane?.listing?.path ?? "",
-          viewMode: explorer.paneViewModes[props.paneId] ?? explorer.viewMode,
-          itemScale: explorer.paneFileItemScales[props.paneId] ?? explorer.fileItemScale,
-          sort: explorer.paneSorts[props.paneId] ?? explorer.sort,
-          showHidden: explorer.paneShowHidden[props.paneId] ?? explorer.showHidden,
-          selectedCount: selectedEntries.length,
-          selectedEntryPath: selectedEntry?.path ?? null,
-          hasRemoteSelection: selectedEntries.some(
-            (entry) => entry.location.kind === "peer_device",
-          ),
-          canOpenWithSelected: Boolean(
-            selectedEntry && selectedEntry.kind !== "folder" && selectedEntry.kind !== "symlink",
-          ),
-          canCalculateDirectorySizes: Boolean(pane?.hasFolderEntries),
-        };
-      }),
-    );
-    const onViewMode = useCallback(
-      (mode: "grid" | "list") => {
-        useExplorerStore.getState().setViewMode(mode, props.paneId);
-      },
-      [props.paneId],
-    );
-    const onItemScale = useCallback(
-      (scale: number) => {
-        useExplorerStore.getState().setFileItemScale(scale, props.paneId);
-      },
-      [props.paneId],
-    );
-    const onSort = useCallback(
-      (column: ExplorerSortColumn) => {
-        useExplorerStore.getState().setSort(column, props.paneId);
-      },
-      [props.paneId],
-    );
-    const onToggleHidden = useCallback(() => {
-      void useExplorerStore.getState().toggleHidden(props.paneId);
-    }, [props.paneId]);
-    const onRefresh = useCallback(() => {
-      void useExplorerStore.getState().refreshPane(props.paneId);
-    }, [props.paneId]);
-    const onCalculateDirectorySizes = useCallback(() => {
-      void useExplorerStore
-        .getState()
-        .calculatePaneDirectorySizes(props.paneId, { force: true, notify: true });
-    }, [props.paneId]);
-    const onDownload = useCallback(() => {
-      void useExplorerStore.getState().downloadSelected(props.paneId);
-    }, [props.paneId]);
-    const onOpenWith = useCallback(() => {
-      void useExplorerStore.getState().openWithSelected(props.paneId);
-    }, [props.paneId]);
-    const onCopyPath = useCallback((path: string) => {
-      void useExplorerStore.getState().copyPath(path);
-    }, []);
-
-    return (
-      <ExplorerPaneToolbarActions
-        {...state}
-        onViewMode={onViewMode}
-        onItemScale={onItemScale}
-        onSort={onSort}
-        onToggleHidden={onToggleHidden}
-        onRefresh={onRefresh}
-        onCalculateDirectorySizes={onCalculateDirectorySizes}
-        onDownload={onDownload}
-        onOpenWith={onOpenWith}
-        onCopyPath={onCopyPath}
-      />
-    );
-  },
-);
-
-const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
-  paneId: string;
-  multiPanelStore?: MultiPanelStoreHook;
-}) {
-  const store = props.multiPanelStore ?? useMultiPanelStore;
-  const { tabs, activeTabId, splitPane, closePane } = store(
-    useShallow((state) => ({
-      tabs: state.tabs,
-      activeTabId: state.activeTabId,
-      splitPane: state.splitPane,
-      closePane: state.closePane,
-    })),
+  const onViewMode = useCallback(
+    (mode: "grid" | "list") => {
+      useExplorerStore.getState().setViewMode(mode, props.paneId);
+    },
+    [props.paneId],
   );
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
-  const paneCount = activeTab?.panes.length ?? 0;
-  const paneIsInActiveTab = Boolean(activeTab?.panes.some((pane) => pane.id === props.paneId));
-  const canSplit = paneIsInActiveTab && paneCount < maxMultiPanelPanes();
-  const canClose = paneIsInActiveTab && paneCount > 1;
+  const onItemScale = useCallback(
+    (scale: number) => {
+      useExplorerStore.getState().setFileItemScale(scale, props.paneId);
+    },
+    [props.paneId],
+  );
+  const onSort = useCallback(
+    (column: ExplorerSortColumn) => {
+      useExplorerStore.getState().setSort(column, props.paneId);
+    },
+    [props.paneId],
+  );
+  const onToggleHidden = useCallback(() => {
+    void useExplorerStore.getState().toggleHidden(props.paneId);
+  }, [props.paneId]);
+  const onRefresh = useCallback(() => {
+    void useExplorerStore.getState().refreshPane(props.paneId);
+  }, [props.paneId]);
+  const onCalculateDirectorySizes = useCallback(() => {
+    void useExplorerStore
+      .getState()
+      .calculatePaneDirectorySizes(props.paneId, { force: true, notify: true });
+  }, [props.paneId]);
+  const onDownload = useCallback(() => {
+    void useExplorerStore.getState().downloadSelected(props.paneId);
+  }, [props.paneId]);
+  const onOpenWith = useCallback(() => {
+    void useExplorerStore.getState().openWithSelected(props.paneId);
+  }, [props.paneId]);
+  const onCopyPath = useCallback((path: string) => {
+    void useExplorerStore.getState().copyPath(path);
+  }, []);
 
   return (
-    <>
-      <IconButton
-        label="Split file pane vertically"
-        title="Split vertically"
-        onClick={() => splitPane(props.paneId, "vertical")}
-        disabled={!canSplit}
-      >
-        <Columns2 size={15} />
-      </IconButton>
-      <IconButton
-        label="Split file pane horizontally"
-        title="Split horizontally"
-        onClick={() => splitPane(props.paneId, "horizontal")}
-        disabled={!canSplit}
-      >
-        <Rows2 size={15} />
-      </IconButton>
-      <IconButton
-        label="Close file pane"
-        title="Close pane"
-        onClick={() => closePane(props.paneId)}
-        disabled={!canClose}
-      >
-        <PanelTopClose size={15} />
-      </IconButton>
-    </>
+    <ExplorerPaneToolbarActions
+      {...state}
+      onViewMode={onViewMode}
+      onItemScale={onItemScale}
+      onSort={onSort}
+      onToggleHidden={onToggleHidden}
+      onRefresh={onRefresh}
+      onCalculateDirectorySizes={onCalculateDirectorySizes}
+      onDownload={onDownload}
+      onOpenWith={onOpenWith}
+      onCopyPath={onCopyPath}
+    />
   );
 });
 

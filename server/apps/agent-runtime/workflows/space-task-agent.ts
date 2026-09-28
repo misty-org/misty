@@ -1,4 +1,6 @@
 import { modelTurnLimit } from "../src/model-budget.js";
+import { InstanceModel } from "../src/instance-model.js";
+import { companionImageParts } from "../src/companion-images.js";
 import { requiresBrowserReinspection } from "../src/browser-reinspection.js";
 import { MISTY_HARNESS_VERSION, type HarnessCheckpoint, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
 import { executePinnedCapability } from "../src/pinned-capability.js";
@@ -780,7 +782,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   );
   let browserInspectionRequired = false;
   const reinspectionFailures = new Set<string>();
-  const activeToolKeys = () => browserInspectionRequired
+  const activeToolKeys = () => context.companion_explanation ? [] : browserInspectionRequired
     ? [keyForName.get("browser.inspect")!].filter(Boolean) as Array<keyof typeof tools>
     :
     [
@@ -809,9 +811,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   let modelTurn = 0;
   const agent = new WorkflowAgent({
     id: "misty-space-task-agent",
-    model: context.model_id,
-    instructions: `${context.system}\n\n${proactiveExecutionInstructions}\nUse misty_discover_capabilities when the current working set lacks an action you need. Discovery results identify capabilities available on the next turn.`,
-    tools,
+    model: new InstanceModel(context.model_id),
+    instructions: context.companion_explanation ? context.system : `${context.system}\n\n${proactiveExecutionInstructions}\nUse misty_discover_capabilities when the current working set lacks an action you need. Discovery results identify capabilities available on the next turn.`,
+    tools: context.companion_explanation ? {} : tools,
     prepareStep: () => ({ activeTools: activeToolKeys() }),
     // One model call per stream lets the coordinator refresh the active-time
     // deadline after durable tool waits. The aggregate loop below owns the cap.
@@ -939,15 +941,15 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     };
     const images = [
       ...(context.attachments ?? []),
-      ...(context.display_captures ?? []),
       ...(context.capture ? [context.capture] : []),
     ];
-    let messages: ModelMessage[] = images.length
+    let messages: ModelMessage[] = images.length || context.display_captures?.length
       ? [
             {
               role: "user",
               content: [
                 { type: "text", text: context.prompt + "\nSupplied task files (use these IDs for upload):\n" + (context.attachments ?? []).map(file => JSON.stringify({attachmentId:file.id,name:file.name,mimeType:file.mime_type})).join("\n") },
+                ...companionImageParts(context.display_captures),
                 ...images.flatMap<TextPart | ImagePart | FilePart>(
                   (image) =>
                     image.mime_type === "text/plain"

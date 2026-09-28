@@ -236,7 +236,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("wallpaper_path", json!("")),
             ("panel_opacity", json!(0.82)),
             ("app_zoom", json!(1.0)),
-            ("navigator_width_index", json!(0)),
             ("navigator_auto_hide", json!(false)),
         ],
     );

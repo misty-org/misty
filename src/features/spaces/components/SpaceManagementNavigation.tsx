@@ -1,25 +1,53 @@
 import { SpaceMembersPopover } from "@/features/spaces/members";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { IconButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
+import {
+  Button,
+  IconButton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui";
 import { Gauge, UsersRound } from "lucide-react";
 import { SpaceUsagePopover } from "./SpaceUsagePopover";
 
 /** Members and usage for the current Space, stacked at the foot of the Space rail. */
-export function SpaceManagementNavigation({ space }: { space: Space | undefined }) {
+export function SpaceManagementNavigation({
+  space,
+  compact = true,
+}: {
+  space: Space | undefined;
+  compact?: boolean;
+}) {
   if (!space) return null;
 
   return (
     <TooltipProvider delayDuration={400}>
-      <nav className="flex shrink-0 flex-col items-center gap-1" aria-label="Space management">
+      <nav
+        className={compact ? "flex shrink-0 flex-col items-center gap-1" : "grid gap-1"}
+        aria-label="Space management"
+      >
         <Tooltip>
           <SpaceMembersPopover
             space={space}
             side="right"
             trigger={
               <TooltipTrigger asChild>
-                <IconButton size="lg" label="Members" tooltip={false} className={railControlClass}>
-                  <UsersRound aria-hidden="true" />
-                </IconButton>
+                {compact ? (
+                  <IconButton
+                    size="lg"
+                    label="Members"
+                    tooltip={false}
+                    className={railControlClass}
+                  >
+                    <UsersRound aria-hidden="true" />
+                  </IconButton>
+                ) : (
+                  <Button variant="ghost" justify="start" className="w-full">
+                    <UsersRound size={16} aria-hidden="true" />
+                    Members
+                  </Button>
+                )}
               </TooltipTrigger>
             }
           />
@@ -31,9 +59,16 @@ export function SpaceManagementNavigation({ space }: { space: Space | undefined 
             side="right"
             trigger={
               <TooltipTrigger asChild>
-                <IconButton size="lg" label="Usage" tooltip={false} className={railControlClass}>
-                  <Gauge aria-hidden="true" />
-                </IconButton>
+                {compact ? (
+                  <IconButton size="lg" label="Usage" tooltip={false} className={railControlClass}>
+                    <Gauge aria-hidden="true" />
+                  </IconButton>
+                ) : (
+                  <Button variant="ghost" justify="start" className="w-full">
+                    <Gauge size={16} aria-hidden="true" />
+                    Usage
+                  </Button>
+                )}
               </TooltipTrigger>
             }
           />

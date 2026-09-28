@@ -57,6 +57,7 @@ export function AppearanceSection(props: SettingsContentProps) {
           label="Panel opacity"
           description="How much of the wallpaper shows through Misty's surfaces."
           muted={!wallpaperPath}
+          indent
           last
         >
           <SliderControl
@@ -117,8 +118,8 @@ export function AppearanceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
         <SettingsRow
-          label="Hide sidebar"
-          description="Slide the rail away until you hover the edge of the window."
+          label="Auto-hide navigation"
+          description="Reveal the icon rail when you move to the window edge."
           last
         >
           <SwitchControl

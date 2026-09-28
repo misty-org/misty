@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SettingsControlsModule from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { AppearanceSection } from "./AppearanceSection";
@@ -17,11 +17,6 @@ vi.mock("@/shared/hooks/useAppZoom", () => ({
   appZoomStep: 0.1,
   setAppZoom: zoomMocks.setAppZoom,
   useAppZoomValue: () => zoomMocks.current,
-}));
-
-vi.mock("@/features/app-shell", () => ({
-  publishNavigatorLayout: vi.fn(),
-  useNavigatorLayoutValue: () => ({ visibility: "sticky" }),
 }));
 
 vi.mock("../SettingsControls", async () => {
@@ -52,6 +47,7 @@ vi.mock("../SettingsControls", async () => {
 });
 
 describe("AppearanceSection app zoom", () => {
+  afterEach(cleanup);
   const onSettingChange = vi.fn();
   const props: SettingsContentProps = {
     document: {},
@@ -95,5 +91,16 @@ describe("AppearanceSection app zoom", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(zoomMocks.setAppZoom).toHaveBeenCalledWith(1);
     expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.1);
+  });
+
+  it("offers auto-hide without restoring the retired wide layout preference", () => {
+    render(
+      <AppearanceSection {...props} document={{ appearance: { navigator_compact: false } }} />,
+    );
+    expect(screen.queryByRole("switch", { name: "Compact navigation" })).toBeNull();
+    const autoHide = screen.getByRole("switch", { name: "Auto-hide navigation" });
+    expect(autoHide.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(autoHide);
+    expect(onSettingChange).toHaveBeenCalledWith("appearance", "navigator_auto_hide", true);
   });
 });

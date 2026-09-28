@@ -138,6 +138,8 @@ export interface GlobalAiMessage {
   attachments?: MistyImageAttachment[];
   citations?: GlobalAiCitation[];
   action?: GlobalAiActionProposal;
+  /** Set on turns Misty started itself rather than the person typing them. */
+  source?: "scheduled_task";
 }
 
 export interface MistyImageAttachment {

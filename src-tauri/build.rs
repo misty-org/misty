@@ -24,17 +24,24 @@ fn main() {
         println!("cargo:rustc-link-search=native={}", runtime_dir.trim());
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
         println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyCompanionCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAutopilot.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyDesktopControl.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
         println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
+            .file("native/macos/MistyCompanionCapture.m")
             .file("native/macos/MistyAutopilot.m")
+            .file("native/macos/MistyDesktopControl.m")
+            .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyFolderBookmarks.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("misty_context");
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
-        for framework in ["AppKit", "Carbon", "CoreGraphics", "Security"] {
+        for framework in ["AppKit", "Carbon", "CoreGraphics", "Security", "ApplicationServices", "CoreImage", "CoreMedia", "CoreVideo"] {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
     }

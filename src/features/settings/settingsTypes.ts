@@ -40,7 +40,6 @@ export type SettingsSection =
   | "journal"
   | "files"
   | "search"
-  | "transfers"
   | "planner"
   | "library"
   | "browser"

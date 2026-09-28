@@ -49,14 +49,9 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
         .arg(config_path.as_os_str())
         .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
     if let Some(profile) = profile {
-        let profile_root = crate::home::default_root()?
-            .join("cli/profiles")
-            .join(profile);
-        fs::create_dir_all(&profile_root)?;
         command = command
             .env("MISTY_PROFILE", profile)
-            .env("MISTY_DESKTOP_PROFILE", profile)
-            .env("MISTY_PROFILE_DIR", profile_root.as_os_str());
+            .env("MISTY_DESKTOP_PROFILE", profile);
     }
     command.run(&workspace.misty)
 }

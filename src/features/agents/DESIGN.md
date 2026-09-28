@@ -1,304 +1,245 @@
 ---
-name: "Misty Agents \u2014 Operate"
-description: "Grok Bot structure with Misty identity: single-line roster, conversational start, bottom pill and full-height details."
+name: "Misty Agents"
+description: "The approved quiet conversation layout, with a toggled navigation island and Misty shared controls."
 colors:
-  canvas: "#080808"
-  sidebar: "#111111"
-  bubble: "#262626"
-  field: "#303030"
-  text: "#eeeeee"
-  muted: "#a0a0a0"
-  divider: "#202020"
-  search: "#242424"
-  search-border: "#2d2d2d"
-  search-hover: "#292929"
-  selected-row: "#323232"
-  avatar: "#3c3c3c"
-  account-avatar: "#383838"
-  option-border: "#404040"
-  option-hover: "#393939"
-  option-letter: "#494949"
-  option-text: "#ddd"
-  composer-border: "#474747"
-  attachment-border: "#4a4a4a"
-  voice-text: "#bdbdbd"
-  voice-hover: "#505050"
-  send: "#f4f4f4"
-  send-disabled: "#4b4b4b"
-  send-disabled-text: "#b7b7b7"
-  selection: "#555"
-  selection-text: "#fff"
-  preview: "#1a1a1a"
-  preview-border: "#282828"
-  preview-hover: "#232323"
-  recipient-hover: "#454545"
-  dialog: "#191919"
-  dialog-selected: "#343434"
-  dialog-muted: "#aaa"
-  light-canvas: "#fff"
-  light-sidebar: "#f5f5f5"
-  light-bubble: "#eee"
-  light-field: "#e5e5e5"
-  light-line: "#d4d4d4"
-  light-text: "#161616"
-  light-muted: "#606060"
+  workspace: "var(--color-charcoal-workspace)"
+  background: "var(--color-charcoal-bg)"
+  sidebar: "var(--color-charcoal-sidebar)"
+  card: "var(--color-charcoal-card)"
+  border: "var(--color-charcoal-border)"
+  hover: "var(--color-charcoal-hover)"
+  active: "var(--color-charcoal-active)"
+  text: "var(--color-cream)"
+  bright: "var(--color-cream-bright)"
+  muted: "var(--color-cream-muted)"
 typography:
   body:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     fontSize: "14px"
     fontWeight: 400
-    lineHeight: 1.45
-  metadata:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "12px"
-    fontWeight: 400
-  account-initials:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "11px"
-    fontWeight: 400
-  avatar:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "18px"
-    fontWeight: 500
-  avatar-large:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "28px"
-    fontWeight: 500
-  avatar-header:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "12px"
-    fontWeight: 500
-  avatar-recipient:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    lineHeight: 1.5
+  message:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     fontSize: "14px"
-    fontWeight: 500
-  avatar-search:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "15px"
-    fontWeight: 500
+    fontWeight: 400
+    lineHeight: 1.6
   composer:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     fontSize: "14px"
     fontWeight: 400
     lineHeight: "22px"
-  compact-field:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "16px"
+  metadata:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontSize: "13px"
     fontWeight: 400
+  control:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontSize: "14px"
+    fontWeight: 500
+  compact-metadata:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontSize: "12px"
+    fontWeight: 400
+  shortcut:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontSize: "16px"
+  avatar-emoji:
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontSize: "18px"
+    fontWeight: 500
 rounded:
-  badge: "4px"
-  bubble-join: "6px"
-  icon: "7px"
-  field: "8px"
-  options: "9px"
-  roster: "11px"
-  recipient: "12px"
-  dialog: "13px"
-  transcript: "17px"
-  bubble: "18px"
-  composer: "26px"
-  circle: "50%"
+  md: "var(--radius-md)"
+  lg: "var(--radius-lg)"
+  xl: "var(--radius-xl)"
 spacing:
-  "3": "3px"
-  "4": "4px"
-  "5": "5px"
-  "6": "6px"
-  "7": "7px"
-  "8": "8px"
-  "9": "9px"
-  "10": "10px"
-  "12": "12px"
-  "13": "13px"
-  "14": "14px"
-  "16": "16px"
-  "17": "17px"
-  "18": "18px"
-  "20": "20px"
-  "21": "21px"
-  "22": "22px"
-  "24": "24px"
+  xs: "4px"
+  sm: "8px"
+  md: "12px"
+  lg: "16px"
+  xl: "24px"
+  roomy: "32px"
 components:
-  icon-button:
+  toolbar-button:
     backgroundColor: "transparent"
     textColor: "{colors.muted}"
-    rounded: "{rounded.icon}"
-    size: "32px"
-  icon-button-hover:
-    backgroundColor: "{colors.bubble}"
+    rounded: "{rounded.md}"
+    size: "30px"
+  primary-button:
+    backgroundColor: "{colors.bright}"
+    textColor: "{colors.background}"
+    rounded: "{rounded.md}"
+    size: "30px"
+  outline-button:
+    backgroundColor: "transparent"
     textColor: "{colors.text}"
-    rounded: "{rounded.icon}"
-    size: "32px"
-  search-trigger:
-    backgroundColor: "{colors.search}"
-    textColor: "{colors.muted}"
-    rounded: "{rounded.field}"
-    height: "32px"
-    padding: "0 9px"
-  roster-selected:
-    backgroundColor: "{colors.selected-row}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.roster}"
-    height: "68px"
-    padding: "10px"
-  starter-group:
-    backgroundColor: "{colors.bubble}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.bubble}"
-    padding: "12px"
-    width: "80%"
-  starter-option:
-    backgroundColor: "{colors.field}"
-    textColor: "{colors.text}"
-    padding: "8px 9px"
-  custom-answer:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.field}"
+    typography: "{typography.control}"
+    rounded: "{rounded.md}"
     height: "32px"
     padding: "0 10px"
+  roster-row:
+    backgroundColor: "transparent"
+    textColor: "{colors.text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    height: "64px"
+    padding: "8px 10px"
+  field:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.md}"
+    height: "36px"
+    padding: "4px 10px"
+  message-bubble:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.text}"
+    typography: "{typography.message}"
+    rounded: "{rounded.xl}"
+    padding: "10px 14px"
   conversation-composer:
-    backgroundColor: "{colors.field}"
+    backgroundColor: "color-mix(in srgb, var(--color-charcoal-card) 95%, transparent)"
     textColor: "{colors.text}"
-    rounded: "{rounded.composer}"
-    padding: "5px"
-  send-button:
-    backgroundColor: "{colors.send}"
-    textColor: "{colors.sidebar}"
-    rounded: "{rounded.circle}"
-    size: "30px"
-  send-button-disabled:
-    backgroundColor: "{colors.send-disabled}"
-    textColor: "{colors.send-disabled-text}"
-    rounded: "{rounded.circle}"
-    size: "30px"
-  details-panel:
-    backgroundColor: "{colors.canvas}"
+    typography: "{typography.composer}"
+    rounded: "{rounded.xl}"
+    padding: "6px"
+  recipient-list:
+    backgroundColor: "{colors.card}"
     textColor: "{colors.text}"
-    width: "298px"
-  activity-tile:
-    backgroundColor: "{colors.preview}"
-    textColor: "{colors.muted}"
-    rounded: "{rounded.icon}"
-  search-dialog:
-    backgroundColor: "{colors.dialog}"
+    rounded: "{rounded.lg}"
+    padding: "4px"
+    width: "min(320px, calc(100% - 40px))"
+  navigation-island:
+    backgroundColor: "{colors.card}"
     textColor: "{colors.text}"
-    rounded: "{rounded.dialog}"
-    width: "min(520px, calc(100vw - 32px))"
+    rounded: "{rounded.lg}"
+    padding: "3px"
+  navigation-dropdown:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.lg}"
+    padding: "12px"
+    width: "432px"
+  companion-setting-row:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.text}"
+    typography: "{typography.body}"
+    padding: "16px"
+  settings-panel:
+    backgroundColor: "{colors.sidebar}"
+    textColor: "{colors.text}"
+    width: "420px"
 ---
 
-# Design System: Misty Agents — Operate
+# Design System: Misty Agents
 
 ## Overview
 
-**Creative North Star: "Operate"**
+**Creative North Star: "Grok Bot layout, Misty controls"**
 
-The user-pinned Grok Bot layout is the structural authority for this scoped Agents surface: a quiet, dense roster and an open conversation, with details revealed alongside. Misty's identity, truthful capability language, and PRODUCT.md remain normative. This record replaces the rejected Agents design; it does not redefine other Misty surfaces or the root design record.
+The Agents workspace follows the user-approved quiet Grok-like chat composition using Misty's shared theme, controls, and restrained corners. A flat roster, larger cloud avatars, centered agent identity, quiet transcript, and single bottom composer make conversation the default surface. The identity toggles a text-only navigation island immediately below it; Conversations, Activity, and Profile each open their own shared popover. Companion controls stay in a separate shared sheet.
 
-The composition begins with conversational greeting bubbles and four lettered choices, followed by a custom-answer field. A single bottom composer anchors the canvas. There is no centered hero, runtime exposition, or Marketplace entry. Inline Companion controls now precede the conversation: persistent Team/Auto choices, Cursor on/off, status, conditional Stop, and expandable Voice & model options. This replaces the earlier prohibition on persistent mode controls; detailed companion tokens and behavior live in `companion/DESIGN.md`. Misty uses the current desktop mark. Personal agents use the same mark in Sky, Lavender, Mint, or Peach unless a custom emoji is configured.
+This record refreshes the approved Agents implementation and applies only to this feature. The surface brief at `.impeccable/surfaces/src-features-agents-agentspage-tsx.md` holds the task context. Source authority is `AgentsPage.tsx`, `agentsWorkspace.css`, `components/AgentNavigationIsland.tsx`, the roster, editor, activity, and sheet components, and `companion/AgentCompanionPanel.tsx`, together with shared UI, `MistyComposer`, and `src/styles/styles.css`. There is no root `PRODUCT.md` or `DESIGN.md`; this record makes no new product-wide strategy claims.
 
-Source authority is AgentsPage.tsx, agentsWorkspace.css, components/AgentWorkspaceConversation.tsx, AgentSearchDialog.tsx, AgentAvatar.tsx, and AgentConversationView.tsx. WorkspaceCanvas.tsx supplies the conditional host-chrome treatment. Evidence is the real React component rendered with synthetic data: repository-root .impeccable/review/agents/grok-desktop.png (1045 × 768), grok-user-1111.png (1111 × 823), grok-mobile.png (390 × 844), grok-details.png, grok-settings.png, and grok-search.png; grok-reference-native.png is the actual Grok reference. The reviewer found desktop structural fidelity met and requested documentation replacement and larger mobile targets. The final verdict pass scored both the documentation and mobile-target corrections resolved (ship at that scope). These captures do not verify native Misty chrome, voice recording, live account integration, or AI backend execution. That earlier review did not observe native Misty. The later companion update has renderer captures at `.impeccable/review/cursor-agents/team.png`, `auto.png`, and `narrow.png`, plus the actual packaged macOS capture `packaged-macos-auto.png`. Packaged macOS observation confirms rendered original sprites and Team-to-Auto switching through the native controller, without establishing voice, multimonitor behavior, or Windows parity.
+The current approved references are repository-root `.impeccable/mocks/agents-persistent-island`, with the user's text-only/no-chevron triggers and identity-toggle qualifications. Actual production components rendered with illustrative fixture data are recorded in `.impeccable/review/agents-island-final/{desktop,conversations,profile,activity,island-hidden,companion,mobile,split-pane,light}.png`; the README and detector report share that directory, and `.impeccable/review/hero-repro.png` records the hero view. These supersede the earlier `grok-direct` layout references. The finish review accepted the visual fidelity and identified stale documentation as its only required fix; this refresh records that implementation.
 
 **Key Characteristics:**
 
-- Single-line roster, compact header, and top-aligned conversational content.
-- Near-black grayscale surfaces with small tonal steps and native system type.
-- A single pill composer and full-height details, settings, or history panel.
-- Container-responsive navigation with larger compact-screen controls.
+- A quiet conversation canvas with one composer and a flat searchable roster.
+- A centered identity toggle and three text-only popover triggers.
+- Theme-bound neutral surfaces and reused cloud identity assets at clear contextual sizes.
+- Independent task activity and on-demand companion settings.
+- Container-responsive views that preserve draft, profile, conversation scope, and focus behavior.
 
 ## Colors
 
+The palette is Misty's global semantic charcoal/cream system, which resolves through the active theme. Token names describe roles even when a light theme reverses their visual tone. Preserve the CSS variable bindings in the frontmatter; do not introduce an Agents-only dark or light palette.
+
 ### Primary
 
-Text and the enabled send button provide the brightest emphasis. There is no decorative brand accent in the workspace chrome. Cloud avatars provide the only decorative color accents; inherited action statuses may use semantic functional color.
+The bright text token supplies the filled send action, paired with the background token for its glyph. Existing shared semantic treatments continue to represent errors, progress, and other message states where required.
 
 ### Neutral
 
-Canvas, Sidebar, Bubble, and Field define the main tonal layers. Muted supports dates, placeholders, secondary controls, and activity labels. Selected Row distinguishes the active agent without adding a subtitle. The recorded border, hover, avatar, option-letter, dialog, and disabled-send variants are intentional values present in the implementation, not palette drift.
+Workspace is the open conversation canvas. Sidebar separates the roster and companion/create sheet; card supports the navigation island, popovers, settings groups, message bubbles, fields, composer, and recipient results. Border supplies hairline boundaries. Text is ordinary content, muted is secondary metadata and inactive toolbar labels, and hover/active support shared control states.
 
-The workspace defines local `--agent-*` variables. The light theme overrides the seven core surface/text variables using the recorded light variants; fixed grayscale details and the search dialog retain their literal source colors. The captures establish the dark appearance only. Shared transcript action components retain their existing global semantic tokens.
-
-**The Structural Fidelity Rule.** Preserve the reference's tonal hierarchy and layout while retaining truthful Misty content and capabilities.
+**The Shared Theme Rule.** Agents uses the same semantic color variables and control states as the rest of Misty.
 
 ## Typography
 
-Use the native system stack and a compact body role throughout the roster, greeting, introductory copy, header, and choice labels. Header text inherits body sizing and weight; there is no display headline. Dates, choice letters, status lines, and history metadata use the metadata role. Names truncate to one line. Message content and settings copy wrap normally.
+Use the inherited system UI stack. Main body, conversation prose, composer input, roster names, identity, island controls, profile fields, history previews, and activity content use the body/control scale. History dates, task status, avatar expression captions, and companion section labels use the metadata scale. Existing roster previews, search result copy, notices, and helper text keep the smaller compact-metadata scale. The companion shortcut has its own larger role; emoji sizes belong to avatar rendering, not prose hierarchy.
 
-Avatar typography is context-specific: roster, header, search, recipient results, and large settings identity each have the source-derived role recorded above. Compact fields use the larger field role at the narrow container breakpoint. The composer declares its own body-sized text and line height; its specific selector remains authoritative over the general compact-field rule.
+There is no display type or Agents page heading. Names and roster previews truncate on one line; messages, task results, errors, and form content wrap. Message content is bounded by the narrower of the available message percentage and a readable text measure (72ch). Shared form labels and controls retain their shared type styling.
 
 ## Layout
 
-The workspace fills its available pane and queries its own inline size. The roster has a fixed width (270px), inset horizontal padding (6px), a top row (44px), a search trigger (32px), scrolling single-line agent rows (68px), and a bottom account menu. The center flexes to remaining width. Its header is compact (44px) with identity at the left and actions at the right.
+The desktop React/Tauri surface uses the web token system and responds to its workspace container. A fixed roster (244px) has a search field and New chat action in a compact header (54px), then scrolling agent rows (64px). Rows can include the latest conversation title beneath the name; history does not expand into a nested tree. Search matches agent names and saved chat titles. There is no Agents heading, bottom account area, or Connect apps action. The main header is also (54px), with centered identity and a companion pointer action.
 
-The dated welcome begins near the top. Greeting and introduction bubbles have a maximum width (80%); the choice group shares that width. There is no fixed centered content column. Conversation content scrolls independently above the composer, whose outer padding is (10px 16px 14px). Assistant transcript bubbles have a maximum width (80%); the shared user message renderer retains its own width (82%).
+The island sits immediately below the identity, centered in the conversation with a small internal gap (2px), compact inset, and bottom separation (4px). Its maximum width leaves a workspace inset (24px). It is initially visible for a selected agent; clicking the identity hides or reveals it. The identity button has a compact horizontal inset (4px) and a reserved chevron slot that appears on hover, keyboard focus, or while the island is open; it points up when open. The three island triggers remain text only. New chat shows the recipient chooser instead of the island. Each section opens a shared popover below its own trigger with an offset (10px), collision padding (12px), and the workspace element as its collision boundary. Dropdowns use the documented width, capped by the viewport and Radix's available width, and a maximum height of the lesser of (580px) and available height. Their content scrolls independently; opening one does not resize the conversation.
 
-Details, settings, and history share one full-height right panel (298px) with a header (44px). At container widths up to (860px), an open panel replaces the conversation within the main region and takes the remaining width; greeting and choice widths expand to (94%). At widths up to (600px), the roster and active surface alternate. Header rows grow to (48px), the choice group and introduction can occupy full width, and composer padding includes the bottom safe area. Icon actions, including suggestion dismissal, become (44px × 44px); composer attachment, voice, send, and stop targets also become (44px × 44px). Other workspace buttons have a minimum height (44px).
+The transcript and composer share a maximum region (836px). The transcript scrolls above the composer with message separation (18px); bubbles are bounded by `min(82%, 72ch)`. The composer has outer padding (12px 24px 16px), one row of controls, and an attachment row when needed. Its textarea grows from (38px) to (160px). The roster New chat action places a To field in the header and a compact recipient list below it; the composer stays disabled until a recipient is selected. Conversations' New chat action starts a conversation with the current agent.
 
-The command search dialog is viewport-bounded (520px maximum with 32px total horizontal allowance), with a scrollable results area bounded by (380px or 60vh). Its CSS is separate from the workspace container.
-
-The host suppresses the redundant official-app topbar only for a lone Agents surface. Multipane, tab, window, and Windows control requirements preserve host chrome. Component screenshots alone do not establish the native result of this condition.
+Companion and Create new agent use an in-place right sheet with a header (54px) and independently scrolling content. On wide panes the main region reserves the documented sheet width. At container widths up to (960px), the sheet replaces the main conversation region while retaining the roster. At (720px), the roster narrows to (220px), transcript/composer insets tighten, and the sheet uses the remaining width. At (600px), roster and conversation alternate as full-width views and the sheet uses the full available width. Popovers remain bounded to their workspace in both compact and full-width views.
 
 ## Elevation & Depth
 
-The workspace uses flat tonal surfaces and hairline boundaries. The composer and search dialog explicitly have no shadow. Shared transcript components retain their own inherited details, including the user bubble's small shadow and semantic action styling; do not generalize the chrome rule into an unsupported claim about every child component. There is no dedicated panel entrance animation in the workspace stylesheet. Working and transcription indicators reuse existing spinner behavior.
+Tonal surfaces and hairline boundaries separate persistent workspace chrome. The conversation composer, message bubbles, and companion/create sheet have no decorative shadow; the sheet has no entrance animation. The navigation dropdowns use shared `Popover` surface, border, radius, shadow, and motion. Shared fields and controls retain their component styling. Shared color transitions use the incumbent duration and easing, while working states reuse existing indicators.
 
-**The Flat Chrome Rule.** Separate roster, conversation, and panels through tone and boundaries rather than decorative depth.
+**The Quiet Chrome Rule.** Keep persistent workspace chrome flat and reveal secondary controls when requested.
 
 ## Shapes
 
-The main signature is the broad composer pill, paired with softly joined greeting and introduction bubbles and a rounded choice group. The two greeting bubbles have small joining corners on the left. Choice rows live inside one bordered group with internal dividers; the letter markers are small rounded rectangles. Roster selection, search, fields, menus, and the activity tile use their recorded restrained radii.
+Use the shared radius scale: medium for buttons and fields, large for the island, dropdowns, settings groups, and recipient list, and extra-large for message bubbles and the conversation composer. The shared defaults resolve to restrained corners (6px, 8px, and 12px respectively). Icon controls remain square with medium corners; shared switches retain their native pill shape.
 
-Avatars are clipped circular identities: roster (48px square), header (21px square), search (29px square), recipient results (25px square), and large settings identity (64px square). Attachment, voice, and send controls are circular. Keep the actual roster proportions rather than normalizing every avatar to a new size.
+Cloud assets keep their own silhouette. Roster avatars are (40px); centered header, transcript, and recipient avatars are (32px); the profile avatar is (64px); the companion settings preview is (80px). The preview's display size is distinct from the saved desktop companion scale. Reuse the existing assets rather than adding a second identity treatment.
 
 ## Components
 
-### Roster and account menu
+### Shared controls and navigation
 
-Show one 48px avatar and one 16px agent name per 68px row, separated by a 12px gap, with `aria-pressed` selection and a tonal hover. Search opens command search rather than filtering this list in place. New chat opens recipient selection with a create-agent action. The account menu exposes Activity, Connections, Agent settings, and Create agent.
+Use shared `Button`, `IconButton`, `Input`, `Textarea`, `Toggle`, `Pressable`, `Popover`, `Sheet`, `Switch`, `Slider`, and `Select`. The standard icon action is (30px) with an accessible label. Island triggers use small toolbar buttons with only Conversations, Activity, and Profile text; they have no chevrons or icons. The identity communicates island visibility with `aria-expanded` and `aria-controls`. Only one section popover is open at a time. Roster rows use shared ghost styling and `aria-pressed`; history also identifies the current conversation.
 
-### Cloud avatars
+Preserve disabled states, keyboard operation, popover dismissal, and focus restoration through the shared primitives and page guards. The shared controls declare focus treatments, while global CSS currently suppresses focus halos. That global behavior is not an Agents design rule or a claim of visible-focus coverage.
 
-Agent identities use the original animated WebP cloud sprites: Sky (Original), Lavender (Wink), Mint (Focused), and Peach (Joyful). Assets are bundled inline for packaged reliability, with static WebP posters selected for reduced-motion preferences. The cursor companion and its size preview use the original Sky expression cycle.
+### Conversations and composer
 
-The identity picker previews immediately and persists through Save changes as `avatar.cloudVariant`. Existing custom `avatar.emoji` values remain authoritative until a cloud is selected. New agents start with Lavender; older personal agents without a saved choice receive a stable ID-based variant. Other avatar metadata is preserved.
+Conversations contains a search field, New chat action, and saved conversation rows with a title, date, and latest message preview. It remains separate from task activity. Reopening a historical conversation preserves its saved scope; new conversations remain personal.
 
-### Inline companion controls
+Use `MistyComposer` with `layout="conversation"`. This layout has restrained corners, no shadow, a growing textarea, and the shared square send control; other composer consumers retain their default layout. Attachment, microphone, send, and stop controls remain shared actions. Recording, transcription, working, errors, and disabled-agent feedback appear only when state requires them. Enter submits and Shift+Enter inserts a line break; composition events avoid premature submission. Keep the existing renderer's attachments, citations, approvals, cancellation, retry, and copy behavior. A fresh enabled conversation stays quiet; the absent-agent state retains a direct creation action.
 
-The Companion section sits above the conversation scroll region and shares its controller and Team/Auto mode with native voice and the typed composer. Team/Auto is a radio group with roving Tab focus, arrow-key selection, and Home/End selection. Cursor visibility, working status, Stop, expandable voice/model options, and retryable errors stay in this section. Original WebP bytes are imported inline for packaged asset reliability. `companion/DESIGN.md` and its sidecar own the scoped control and overlay values; retain the rest of this Agents system.
+### Activity
 
-### Greeting and choices
+Activity lists independent task executions with title, status, and update time. Expanding a task reveals its instruction, result, tool events, pending approvals, and cancellation when applicable; delegated tasks can name their parent. Task rows may use a disclosure chevron, while island triggers remain text only. Activity has no conversation links. Loading, empty, error/retry, and busy action states remain visible. Scheduled navigates to scheduled work through the existing route.
 
-A centered date precedes two left-aligned conversational bubbles. The four A–D options populate the editable composer; the custom answer shares the draft and can submit with Enter. Dismiss removes the suggestion group. The absent-agent state offers creation; disabled agents expose a clear settings instruction.
+### Profile
 
-### Composer and transcript
+Profile shows the larger avatar and Change avatar control, name and description fields, and a collapsed instructions/memory disclosure. Existing avatar editing, memory actions, save/delete behavior, and conversation model selection remain available. Save changes appears for a dirty profile; Create agent appears in the creation sheet. Profile edits use the shared unsaved-change dialog before section changes, island dismissal, or navigation. Keep editing restores focus inside the existing dropdown. Discard and switch continues the requested action; when the roster New chat action opens the recipient chooser, focus lands in Search or create agents.
 
-The bottom pill contains attachment, editable message, voice, and send/stop controls in one row. Attachment previews can add a row above. The textarea grows within its implemented limit (140px). Voice recording, transcription, working, errors, and disabled state have concrete UI; integration success has not been established by the captures. Enter sends, Shift+Enter creates a line break, and composition events avoid premature submission.
+### Companion and creation sheet
 
-Conversation selection is scoped to the selected agent within the account-loaded history, without filtering to the current Space. New work is personal; historical conversations retain their saved scope when reopened. Existing message rendering preserves attachments, citations, approval actions, retry, cancellation, and copy behavior. The workspace restyles assistant messages as bubbles. Drafts, uploads, recording, and unsaved editor changes participate in navigation guards.
+The pointer action opens Companion in a shared nonmodal `Sheet`; agent creation uses the same sheet host. The sheet has no portal or backdrop, moves initial focus to Close, and restores its trigger when possible. It keeps the explicit unsaved-form guard and busy restrictions.
 
-### Details, settings, and history
+Companion uses `DesktopSettingsSection` and `DesktopSettingsRow`, with a centered existing sprite preview. Behavior contains one Show companion switch, an Ask before taking control switch, and a full-width size slider with percentage and Reset size action. Rows have a minimum height (64px) and a two-column label/control layout. Voice contains the native talk shortcut and a shared model select. The model trigger is (160px) capped by its available width. Active status and Stop appear when work is active; unavailable, error, and Retry companion states retain their existing command/state bindings. Companion is not a persistent strip in the conversation. See `companion/DESIGN.md` for the native overlay's separate behavior.
 
-Details contains a monitor-icon activity tile and truthful links to ongoing work, scheduled tasks, and approvals. It is an activity destination, not a computer preview. Settings retain identity, description, model and advanced agent configuration, personal app assignments, and remembered preferences. Conversation context and existing-conversation model choice remain in settings. Shared Team/Auto mode and companion voice/model options now live in the inline Companion section above the conversation. The previous User/Agent/Team work-mode selector is removed. History shows the account-loaded conversations for the selected agent, without a current-Space filter. Close/back controls stay in the panel header.
+### Identity assets and verification
 
-### Command search
+Reuse the existing cloud variants and their reduced-motion posters: Sky, Lavender, Mint, and Peach. Custom emoji remains supported. Avatar edits preview locally and persist through the existing save action. Preserve the raster provenance sidecars; this implementation introduces no new shipped raster asset.
 
-Search includes agents, account-loaded conversations, and actions for Agent settings, Activity, Connections, and Create agent. The dialog supplies arrow-key/Enter guidance and a no-results state. Its selected result uses the dialog-selection tone. It is not a product-wide launcher or a Marketplace search.
-
-### Fields and state feedback
-
-Workspace form controls declare a visible two-pixel muted focus outline with a three-pixel offset. Disabled controls use the muted text role; send has explicit disabled fill and text variants. Settings fields use the canvas, structural line, and field radius. Shared menu, editor, and transcript components retain their existing semantics. These source declarations and component captures are not comprehensive keyboard, native touch, large-text, or assistive-technology certification.
+The isolated production-component fixture verifies the approved desktop layout, all three dropdowns, hidden island, companion sheet, light theme, and workspace widths (390px and 690px). Browser interactions verify toggling, dropdowns, dirty-profile guards, and recipient-input focus after discard. The focused suite passed (28 tests across 6 suites), targeted ESLint passed, and whitespace checks passed. Full typecheck remains blocked by existing concurrent errors in `SettingsNavigation.tsx` (`.at`) and `SettingScope.tsx` (`unknown`) outside this scope. Native voice, cursor control, account integration, and live backend task execution were not exercised by the fixture; existing handlers remain connected, and mocked API tests establish delegation rather than end-to-end execution.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- Do preserve the user-pinned Grok structure and Misty identity together.
-- Do use the scoped grayscale tokens and existing semantic status treatments where the shared conversation renderer requires them.
-- Do retain visible focus, personal new-work scope, saved historical conversation scope, and explicit settings labels.
-- Do describe activity, permissions, working states, and failures truthfully.
+- Do preserve the approved quiet chat composition using Misty's shared theme and controls.
+- Do keep the identity toggle immediately above the text-only Conversations, Activity, and Profile island.
+- Do keep each section in its own workspace-bounded shared popover, and Companion in its shared sheet.
+- Do keep task execution, status, results, approvals, and cancellation in Activity.
+- Do preserve accessible labels, keyboard behavior, focus restoration, draft guards, and saved conversation scope.
+- Do reuse the existing cloud assets and their provenance records.
 
 ### Don't:
 
-- Don’t restore a centered hero, roster responsibility subtitles, runtime marketing text, or the replaced User/Agent/Team work-mode selector. Keep the authorized Team/Auto companion controls inline in Agents.
-- Don’t add Marketplace to this Agents surface or infer a product-wide removal.
-- Don’t turn the activity tile into a simulated live computer stream.
-- Don’t treat synthetic component captures as native-shell, voice, backend, or permission-enforcement verification.
+- Don't restore the Agents heading, bottom account area, Connect apps action, nested chat tree, persistent Companion band, welcome suggestions, or keyboard hint footer on this surface.
+- Don't add chevrons or icons to the three island triggers or conversation links to Activity.
+- Don't introduce an Agents-only palette or replace shared controls with a separate visual language.
+- Don't turn fixture screenshots or mocked API tests into claims of native voice, cursor control, account, or backend verification.
+- Don't promote this feature's composition or avatar sizing into product-wide rules.

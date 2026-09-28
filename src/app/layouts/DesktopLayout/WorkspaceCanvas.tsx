@@ -109,7 +109,8 @@ export function WorkspaceCanvas(props: {
       findDockLeaf(state.layout.root, state.layout.focusedPaneId) ??
       dockLeaves(state.layout.root)[0];
     const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
-    if (tab && `${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
+    if (tab && `${location.pathname}${location.search}` !== tab.route)
+      navigate(tab.route, { replace: true });
   }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
@@ -163,7 +164,8 @@ export function WorkspaceCanvas(props: {
       if (!tab.placeholder) {
         useRecentToolsStore.getState().recordToolUsage(toolIdFromTab(tab));
       }
-      if (`${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
+      if (`${location.pathname}${location.search}` !== tab.route)
+        navigate(tab.route, { replace: true });
     },
     [focusTab, location.pathname, location.search, navigate],
   );
@@ -178,7 +180,7 @@ export function WorkspaceCanvas(props: {
       const nextActive =
         focusedPane?.tabs.find((t) => t.id === focusedPane.activeTabId) ?? focusedPane?.tabs[0];
       if (nextActive && `${location.pathname}${location.search}` !== nextActive.route) {
-        navigate(nextActive.route);
+        navigate(nextActive.route, { replace: true });
       }
     },
     [closeTab, location.pathname, location.search, navigate],
@@ -204,7 +206,8 @@ export function WorkspaceCanvas(props: {
 
   const openSelectedTab = useCallback(
     (tab: WorkspaceTab | null) => {
-      if (tab && `${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
+      if (tab && `${location.pathname}${location.search}` !== tab.route)
+        navigate(tab.route, { replace: true });
     },
     [location.pathname, location.search, navigate],
   );

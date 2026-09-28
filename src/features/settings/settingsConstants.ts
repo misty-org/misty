@@ -1,5 +1,4 @@
 export const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
-export const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
 export const fileViewModeOptions = ["List", "Grid"];
 // The store already consumes and clamps this to 5-240; these are the values the
 // UI offers.

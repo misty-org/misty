@@ -32,6 +32,8 @@ import {
 import { openBrowserPopup } from "./openBrowserPopup";
 import { providerWebsiteFromRoute } from "./providers";
 const browserBlockingOverlaySelector = [
+  // Rail hints extend over native pages, above the renderer's own DOM layers.
+  '[data-navigation-tooltip="true"]:not([data-state="closed"])',
   '[data-misty-notification="true"]',
   '[data-slot="dropdown-menu-content"][data-state="open"]',
   '[data-slot="dropdown-menu-sub-content"][data-state="open"]',

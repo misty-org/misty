@@ -50,9 +50,9 @@ export function createOperationActivityObserver() {
         lifecycle: failed ? "request" : "update",
         title: `${label} ${failed ? "needs attention" : complete ? "completed" : canceled ? "canceled" : "in progress"}`,
         body: failed
-          ? "Open Transfers to resolve the conflict or retry the job."
+          ? "Open Files to check the destination and resolve any file conflicts."
           : `${jobs.length} ${jobs.length === 1 ? "operation" : "operations"}`,
-        target: { kind: "route", href: "/apps/files?view=transfers" },
+        target: { kind: "route", href: "/files" },
         notify: baselined,
       });
     }

@@ -12,6 +12,7 @@ import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?in
 import { Button, cn, Spinner } from "@/shared/ui";
 import {
   AlertCircle,
+  CalendarClock,
   Check,
   CheckCircle2,
   Clipboard,
@@ -106,7 +107,13 @@ function AgentMessage(props: {
     return null;
   if (message.role === "user") {
     return (
-      <div className="flex justify-end">
+      <div className="agent-message-user flex flex-col items-end gap-1.5">
+        {message.source === "scheduled_task" ? (
+          <span className="flex items-center gap-1.5 text-xs text-cream-muted">
+            <CalendarClock size={13} aria-hidden="true" />
+            Sent by scheduled task
+          </span>
+        ) : null}
         <div
           className={cn(
             "max-w-[82%] rounded-2xl rounded-br-md border border-white/5 bg-charcoal-card",

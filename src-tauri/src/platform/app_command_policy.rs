@@ -6,6 +6,13 @@ pub fn allows(label: &str, command: &str) -> bool {
     }
     match label {
         "main" => true,
+        _ if label
+            .strip_prefix("misty-cursor-")
+            .and_then(|id| id.parse::<u32>().ok())
+            .is_some() =>
+        {
+            command == "cursor_companion_snapshot"
+        }
         _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => {
             true
         }
@@ -16,6 +23,33 @@ pub fn allows(label: &str, command: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cursor_overlays_can_only_read_their_presentation_snapshot() {
+        for label in ["misty-cursor-1", "misty-cursor-4294967295"] {
+            assert!(allows(label, "cursor_companion_snapshot"));
+            for command in [
+                "cursor_companion_configure",
+                "cursor_companion_present",
+                "cursor_companion_capture",
+                "cursor_companion_interrupt",
+                "cursor_companion_bind_task",
+                "ensure_local_access_token",
+                "browser_sync_state",
+                "code_read_text_file",
+            ] {
+                assert!(!allows(label, command), "{label}: {command}");
+            }
+        }
+        for label in [
+            "misty-cursor-controls",
+            "misty-cursor-",
+            "misty-cursor-spoof",
+            "browser-a",
+        ] {
+            assert!(!allows(label, "cursor_companion_snapshot"));
+        }
+    }
 
     #[test]
     fn vault_commands_are_main_workspace_only() {

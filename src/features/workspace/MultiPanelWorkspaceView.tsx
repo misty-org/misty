@@ -1,7 +1,5 @@
-import { StablePaneLayout } from "./StablePaneLayout";
-import { IconButton } from "@/shared/ui";
-import { Columns2, GripVertical, PanelTopClose, Rows2 } from "lucide-react";
-import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
+import { GripVertical } from "lucide-react";
+import type { KeyboardEvent, PointerEvent } from "react";
 import {
   createContext,
   memo,
@@ -17,7 +15,7 @@ import type { ComponentType } from "react";
 import type { ChromeTabStripProps } from "./model/interfaces";
 import type { MultiPanelTab, MultiPanelWorkspaceProps } from "./model/interfaces";
 import { sidePanelGridStyle } from "./sidePanelGridStyle";
-import { activeMultiPanelTab, maxMultiPanelPanes, useMultiPanelStore } from "./useMultiPanelStore";
+import { activeMultiPanelTab, useMultiPanelStore } from "./useMultiPanelStore";
 import type { MultiPanelStoreHook } from "./model/types/useMultiPanelStore";
 export type { MultiPanelWorkspaceProps } from "./model/interfaces";
 
@@ -30,8 +28,8 @@ export function useMultiPanelStoreContext(): MultiPanelStoreHook | null {
 // Shared pane edges are owned here so adjacent panels never draw duplicate borders.
 const paneResizeDividerClass = [
   "group/resize relative z-[5] min-h-0 min-w-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0",
-  "before:left-1/2 before:w-[9px] before:-translate-x-1/2 before:content-[''] after:pointer-events-none after:absolute",
-  "after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-charcoal-border",
+  "before:inset-x-0 before:mx-auto before:w-[9px] before:content-[''] after:pointer-events-none after:absolute",
+  "after:inset-0 after:mx-auto after:w-px after:bg-charcoal-border",
   "after:content-[''] hover:after:bg-charcoal-active focus-visible:outline-none focus-visible:after:bg-cream-muted",
 ].join(" ");
 const paneResizeDividerActiveClass = "after:!bg-charcoal-active [&>div]:!opacity-100";
@@ -56,24 +54,13 @@ const multiPanelStyles = {
     "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden",
     "bg-charcoal-bg [contain:layout_paint]",
   ].join(" "),
-  lane: "relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden",
-  splitter: [
-    "absolute z-[6] bg-transparent after:absolute after:bg-charcoal-border",
-    "after:content-[''] hover:after:bg-charcoal-active focus-visible:outline-none",
-    "focus-visible:after:bg-cream-muted",
-  ].join(" "),
-  splitterActive: "after:!bg-charcoal-active",
-  splitterVertical:
-    "bottom-0 top-0 w-[11px] -translate-x-[5px] cursor-col-resize after:bottom-0 after:left-[5px] after:top-0 after:w-px",
-  splitterHorizontal:
-    "left-0 right-0 h-[11px] -translate-y-[5px] cursor-row-resize after:left-0 after:right-0 after:top-[5px] after:h-px",
   aside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar",
   asideResizer: paneResizeDividerClass,
   asideResizerActive: paneResizeDividerActiveClass,
   navigationAside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar",
   navigationAsideResizer: paneResizeDividerClass,
   asideResizerGrip: [
-    "pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2",
+    "pointer-events-none absolute inset-0 z-[1] m-auto grid size-5",
     "place-items-center rounded-md bg-charcoal-card text-cream-muted",
     "opacity-0 transition-opacity group-hover/resize:opacity-60",
   ].join(" "),
@@ -85,8 +72,6 @@ const multiPanelStyles = {
   ].join(" "),
   paneActive: "",
   paneContent: "min-h-0 min-w-0 overflow-hidden",
-  paneActions:
-    "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
 } as const;
 
 export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
@@ -94,7 +79,6 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
 ) {
   const {
     TabStrip: ChromeTabStrip,
-    canClosePane,
     canCloseTab,
     className,
     asideResizing = false,
@@ -103,7 +87,6 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
     onAsideResizeBy,
     onNavigationAsideResizeStart,
     onNavigationAsideResizeBy,
-    onDidClosePane,
     onDidCloseTab,
     renderAddTabControl,
     renderAside,
@@ -117,7 +100,6 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
     renderTabActions,
     renderToolbar,
     showTabStrip = true,
-    showDefaultPaneControls = true,
     store: providedStore,
   } = props;
   const store = providedStore ?? useMultiPanelStore;
@@ -128,11 +110,8 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
     addTab,
     closeTab,
     selectTab,
-    splitPane,
-    closePane,
     reorderTabs,
     setActivePane,
-    setSplitRatio,
   } = store(
     useShallow((state) => ({
       tabs: state.tabs,
@@ -141,23 +120,13 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
       addTab: state.addTab,
       closeTab: state.closeTab,
       selectTab: state.selectTab,
-      splitPane: state.splitPane,
-      closePane: state.closePane,
       reorderTabs: state.reorderTabs,
       setActivePane: state.setActivePane,
-      setSplitRatio: state.setSplitRatio,
     })),
   );
-  const panelRef = useRef<HTMLDivElement | null>(null);
   const workspaceElementRef = useRef<HTMLElement | null>(null);
-  const [draggingSplitter, setDraggingSplitter] = useState<"grid" | "lane0" | "lane1" | null>(null);
   const [compactSidePanels, setCompactSidePanels] = useState(false);
   const activeTab = activeMultiPanelTab({ tabs, activeTabId });
-  const canSplit = Boolean(activeTab && activeTab.panes.length < maxMultiPanelPanes());
-  const lanes = activeTab ? normalizedLanes(activeTab) : [];
-  const gridSplitRatio = clampRatio(activeTab?.layout.gridSplitRatio ?? 0.5);
-  const laneSplitRatios = activeTab?.layout.laneSplitRatios ?? [0.5, 0.5];
-  const panelStyle = splitPanelStyle(lanes, gridSplitRatio);
   useLayoutEffect(() => {
     const element = workspaceElementRef.current;
     if (!element || typeof ResizeObserver === "undefined") return;
@@ -205,55 +174,6 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
     },
     [canCloseTab, closeTab, onDidCloseTab],
   );
-  const handleClosePane = useCallback(
-    (paneId: string) => {
-      if (!activeTab) return;
-      if (canClosePane && !canClosePane(paneId, activeTab)) return;
-      closePane(paneId);
-      onDidClosePane?.(paneId, activeTab);
-    },
-    [activeTab, canClosePane, closePane, onDidClosePane],
-  );
-  const beginSplitterDrag = useCallback(
-    (ratioKind: "grid" | "lane0" | "lane1", event: PointerEvent<HTMLDivElement>) => {
-      if (!activeTab) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const container = ratioKind === "grid" ? panelRef.current : event.currentTarget.parentElement;
-      if (!container) return;
-      setDraggingSplitter(ratioKind);
-      const previousCursor = document.body.style.cursor;
-      const previousUserSelect = document.body.style.userSelect;
-      document.body.style.cursor = ratioKind === "grid" ? "col-resize" : "row-resize";
-      document.body.style.userSelect = "none";
-      let frame: number | null = null;
-      let pendingRatio = ratioFromPointer(container, ratioKind, event.clientX, event.clientY);
-      const apply = () => {
-        frame = null;
-        setSplitRatio(activeTab.id, ratioKind, pendingRatio);
-      };
-      const onPointerMove = (moveEvent: globalThis.PointerEvent) => {
-        pendingRatio = ratioFromPointer(container, ratioKind, moveEvent.clientX, moveEvent.clientY);
-        if (frame === null) frame = window.requestAnimationFrame(apply);
-      };
-      const finish = () => {
-        if (frame !== null) {
-          window.cancelAnimationFrame(frame);
-          frame = null;
-        }
-        setSplitRatio(activeTab.id, ratioKind, pendingRatio);
-        setDraggingSplitter(null);
-        document.body.style.cursor = previousCursor;
-        document.body.style.userSelect = previousUserSelect;
-        window.removeEventListener("pointermove", onPointerMove);
-        window.removeEventListener("pointerup", finish);
-      };
-      window.addEventListener("pointermove", onPointerMove);
-      window.addEventListener("pointerup", finish, { once: true });
-    },
-    [activeTab, setSplitRatio],
-  );
-
   if (!activeTab) return null;
   // A split pane can be narrow even when the application window is wide.
   // Adapt side panels to this workspace's real container, not the viewport.
@@ -289,43 +209,12 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
       : hasBottomBar
         ? multiPanelStyles.workspaceRowsWithBottomWithoutTabs
         : multiPanelStyles.workspaceRowsWithoutTabs;
-  const tabStripActions =
-    renderTabActions || showDefaultPaneControls ? (
-      <div className={multiPanelStyles.paneActions}>
-        {renderTabActions ? <MultiPanelTabActionsSlot renderTabActions={renderTabActions} /> : null}
-        {showDefaultPaneControls ? (
-          <>
-            <IconButton
-              title="Split vertically"
-              label="Split file pane vertically"
-              onClick={() => splitPane(activePaneId, "vertical")}
-              disabled={!canSplit}
-            >
-              <Columns2 size={16} />
-            </IconButton>
-            <IconButton
-              title="Split horizontally"
-              label="Split file pane horizontally"
-              onClick={() => splitPane(activePaneId, "horizontal")}
-              disabled={!canSplit}
-            >
-              <Rows2 size={16} />
-            </IconButton>
-            <IconButton
-              title="Close pane"
-              label="Close file pane"
-              onClick={() => handleClosePane(activePaneId)}
-              disabled={activeTab.panes.length <= 1}
-            >
-              <PanelTopClose size={16} />
-            </IconButton>
-          </>
-        ) : null}
-      </div>
-    ) : null;
+  const tabStripActions = renderTabActions ? (
+    <MultiPanelTabActionsSlot renderTabActions={renderTabActions} />
+  ) : null;
   const addTabControl = renderAddTabControl?.(activeTab, addTab);
   const livePanes = activeTab.panes
-    .filter((pane) => lanes.some((lane) => lane.includes(pane.id)))
+    .filter((pane) => pane.id === activeTab.activePaneId)
     .map((pane) => ({
       id: pane.id,
       content: (
@@ -417,82 +306,13 @@ export const MultiPanelWorkspaceView = memo(function MultiPanelWorkspaceView(
               </div>
             </>
           ) : null}
-          <StablePaneLayout panes={livePanes}>
-            <div ref={panelRef} className={`${multiPanelStyles.panel} h-full`} style={panelStyle}>
-              {lanes.map((lane, laneIndex) => {
-                const laneRatio = clampRatio(laneSplitRatios[laneIndex] ?? 0.5);
-                return (
-                  <div
-                    key={`lane-${lane.join(":")}`}
-                    className={multiPanelStyles.lane}
-                    style={laneStyle(lane, laneRatio)}
-                  >
-                    {lane.map((paneId) => {
-                      const pane = activeTab.panes.find((candidate) => candidate.id === paneId);
-                      if (!pane) return null;
-                      return (
-                        <div
-                          key={pane.id}
-                          data-pane-layout-slot={pane.id}
-                          className="min-h-0 min-w-0"
-                        />
-                      );
-                    })}
-                    {lane.length > 1 ? (
-                      <div
-                        className={cx(
-                          multiPanelStyles.splitter,
-                          multiPanelStyles.splitterHorizontal,
-                          draggingSplitter === `lane${laneIndex}` &&
-                            multiPanelStyles.splitterActive,
-                        )}
-                        style={{ top: `${laneRatio * 100}%` }}
-                        onPointerDown={(event) =>
-                          beginSplitterDrag(laneIndex === 0 ? "lane0" : "lane1", event)
-                        }
-                        role="separator"
-                        data-pane-layout-resizer
-                        aria-orientation="horizontal"
-                        aria-label="Resize stacked file panes"
-                        aria-valuemin={10}
-                        aria-valuemax={90}
-                        aria-valuenow={Math.round(laneRatio * 100)}
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          const next = ratioFromSeparatorKey(event, "horizontal", laneRatio);
-                          if (next !== null)
-                            setSplitRatio(activeTab.id, laneIndex === 0 ? "lane0" : "lane1", next);
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                );
-              })}
-              {lanes.length > 1 ? (
-                <div
-                  className={cx(
-                    multiPanelStyles.splitter,
-                    multiPanelStyles.splitterVertical,
-                    draggingSplitter === "grid" && multiPanelStyles.splitterActive,
-                  )}
-                  style={{ left: `${gridSplitRatio * 100}%` }}
-                  onPointerDown={(event) => beginSplitterDrag("grid", event)}
-                  role="separator"
-                  data-pane-layout-resizer
-                  aria-orientation="vertical"
-                  aria-label="Resize side-by-side file panes"
-                  aria-valuemin={10}
-                  aria-valuemax={90}
-                  aria-valuenow={Math.round(gridSplitRatio * 100)}
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    const next = ratioFromSeparatorKey(event, "vertical", gridSplitRatio);
-                    if (next !== null) setSplitRatio(activeTab.id, "grid", next);
-                  }}
-                />
-              ) : null}
-            </div>
-          </StablePaneLayout>
+          <div className={multiPanelStyles.panel}>
+            {livePanes.map((pane) => (
+              <div key={pane.id} className="min-h-0 min-w-0">
+                {pane.content}
+              </div>
+            ))}
+          </div>
           {hasAside ? (
             <>
               <div
@@ -539,65 +359,6 @@ function MultiPanelPaneSlot(props: {
   return <>{props.renderPane(props.paneId, props.path)}</>;
 }
 
-function splitPanelStyle(lanes: string[][], gridRatio: number): CSSProperties {
-  if (lanes.length <= 1) return {};
-  return {
-    gridTemplateColumns: `${gridRatio}fr ${1 - gridRatio}fr`,
-    gridTemplateRows: "minmax(0, 1fr)",
-  };
-}
-
-function laneStyle(lane: string[], rowRatio: number): CSSProperties {
-  if (lane.length <= 1) return {};
-  return {
-    gridTemplateRows: `${rowRatio}fr ${1 - rowRatio}fr`,
-  };
-}
-
-function normalizedLanes(tab: MultiPanelTab): string[][] {
-  if (tab.layout.lanes?.length)
-    return tab.layout.lanes
-      .map((lane) => lane.slice(0, 2))
-      .filter((lane) => lane.length > 0)
-      .slice(0, 2);
-  const ids = tab.layout.paneIds.slice(0, maxMultiPanelPanes());
-  if (ids.length <= 1) return ids.length ? [[ids[0]]] : [];
-  if (tab.layout.orientation === "horizontal") return [ids.slice(0, 2)];
-  if (ids.length === 2) return [[ids[0]], [ids[1]]];
-  return [ids.slice(0, 2), ids.slice(2, 4)];
-}
-
-function ratioFromPointer(
-  panel: HTMLElement,
-  ratioKind: "grid" | "lane0" | "lane1",
-  clientX: number,
-  clientY: number,
-): number {
-  const rect = panel.getBoundingClientRect();
-  const raw =
-    ratioKind === "grid"
-      ? (clientX - rect.left) / Math.max(1, rect.width)
-      : (clientY - rect.top) / Math.max(1, rect.height);
-  return clampRatio(raw);
-}
-
-function ratioFromSeparatorKey(
-  event: KeyboardEvent<HTMLElement>,
-  orientation: "horizontal" | "vertical",
-  current: number,
-): number | null {
-  let next: number | null = null;
-  if (event.key === "Home") next = 0.1;
-  else if (event.key === "End") next = 0.9;
-  else if (orientation === "vertical" && event.key === "ArrowLeft") next = current - 0.05;
-  else if (orientation === "vertical" && event.key === "ArrowRight") next = current + 0.05;
-  else if (orientation === "horizontal" && event.key === "ArrowUp") next = current - 0.05;
-  else if (orientation === "horizontal" && event.key === "ArrowDown") next = current + 0.05;
-  if (next === null) return null;
-  event.preventDefault();
-  return clampRatio(next);
-}
-
 function resizeSidePanelFromKeyboard(
   event: KeyboardEvent<HTMLElement>,
   resize: ((delta: number) => void) | undefined,
@@ -605,13 +366,4 @@ function resizeSidePanelFromKeyboard(
   if (!resize || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
   event.preventDefault();
   resize(event.key === "ArrowLeft" ? -16 : 16);
-}
-
-function clampRatio(value: number): number {
-  if (!Number.isFinite(value)) return 0.5;
-  return Math.min(0.9, Math.max(0.1, value));
-}
-
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(" ");
 }

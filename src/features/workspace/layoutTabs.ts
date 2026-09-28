@@ -100,3 +100,38 @@ export function layoutTabLabel(tab: WorkspaceLayoutTab): string {
   if (view?.placeholder) return tab.title && tab.title !== "New pane" ? tab.title : "New Tab";
   return tab.title || paneViewLabel(view);
 }
+
+/** Recover views hidden by the former cross-destination Back stack as visible tabs. */
+export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayout {
+  const tabs = layoutTabs(layout);
+  const visible = new Set(allLayoutViews(layout).map((view) => view.id));
+  const recovered = new Map<string, WorkspaceTab>();
+  let changed = false;
+  const visit = (node: WorkspaceDockNode): WorkspaceDockNode => {
+    if (node.type === "split")
+      return { ...node, first: visit(node.first), second: visit(node.second) };
+    const active = node.tabs[0];
+    if (!active || !node.history?.entries.some((entry) => entry.id !== active.id)) return node;
+    changed = true;
+    for (const entry of node.history.entries) {
+      if (!entry.placeholder && !visible.has(entry.id)) recovered.set(entry.id, entry);
+    }
+    const entries = node.history.entries.filter((entry) => entry.id === active.id);
+    const index = Math.max(
+      0,
+      node.history.entries
+        .slice(0, node.history.index + 1)
+        .filter((entry) => entry.id === active.id).length - 1,
+    );
+    return { ...node, history: entries.length ? { entries, index } : undefined };
+  };
+  const updated = tabs.map((tab) => ({
+    ...tab,
+    root: visit(tab.id === layout.activeLayoutTabId ? layout.root : tab.root),
+  }));
+  if (!changed) return layout;
+  return selectLayoutTab(
+    { ...layout, tabs: [...updated, ...Array.from(recovered.values(), singleViewLayoutTab)] },
+    layout.activeLayoutTabId ?? tabs[0].id,
+  );
+}

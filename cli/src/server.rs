@@ -66,10 +66,7 @@ pub fn up(workspace: &Workspace, detach: bool, build: bool, verbose: bool) -> Re
         thread::sleep(Duration::from_secs(2));
     }
     status(workspace)?;
-    println!(
-        "API: http://127.0.0.1:{}/v1",
-        env::var("MISTY_HOST_PORT").unwrap_or_else(|_| "8081".into())
-    );
+    println!("API: {}", development_api_url());
     println!("Worker deployment: misty server deploy");
     Ok(())
 }
@@ -310,7 +307,12 @@ pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
     let worker_path = workspace.server.join("apps/journal-collab/.dev.vars");
     require_private_file(&server_path)?;
     require_private_file(&worker_path)?;
-    let server = read_environment(&server_path)?;
+    let mut server = read_environment(&server_path)?;
+    for name in [TICKET_PRIVATE_KEY, CONTROL_SECRET, PROJECTION_SECRET] {
+        if let Some(value) = values.get(name).filter(|value| !value.is_empty()) {
+            server.insert(name.into(), value.clone());
+        }
+    }
     let worker = read_environment(&worker_path)?;
     let signing = SigningKey::from_pkcs8_der(
         &STANDARD.decode(required_map_value(&server, TICKET_PRIVATE_KEY)?)?,
@@ -333,7 +335,7 @@ pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
 }
 
 pub fn ports(workspace: &Workspace) -> Result<()> {
-    let values = environment::read(workspace, Target::Dev)?;
+    let values = environment::effective(workspace, Target::Dev)?;
     let rows = container_status(workspace).unwrap_or_default();
     for (key, fallback, service) in [
         ("MISTY_HOST_PORT", "8081", "misty-api"),
@@ -374,7 +376,7 @@ pub fn health(workspace: &Workspace) -> Result<()> {
     validate_health(&rows)
 }
 fn validate_health(rows: &[serde_json::Value]) -> Result<()> {
-    for service in ["postgres", "misty-api", "tunnel"] {
+    for service in ["postgres", "agent-runtime", "misty-api", "tunnel"] {
         let row = rows
             .iter()
             .find(|row| row["Service"] == service)
@@ -397,7 +399,7 @@ fn validate_health(rows: &[serde_json::Value]) -> Result<()> {
     Ok(())
 }
 fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
-    let mut secrets: Vec<String> = environment::read(workspace, Target::Dev)?
+    let mut secrets: Vec<String> = environment::effective(workspace, Target::Dev)?
         .into_iter()
         .filter(|(name, _)| {
             ["TOKEN", "SECRET", "KEY", "PASSWORD", "PEPPER", "SALT"]
@@ -431,19 +433,21 @@ pub fn deploy_development(workspace: &Workspace) -> Result<()> {
 }
 
 fn development_compose() -> CommandSpec {
-    compose(Target::Dev, "compose.dev.yml")
+    compose("compose.dev.yml")
 }
 
-fn compose(target: Target, file: &str) -> CommandSpec {
-    let mut command = CommandSpec::new("docker").arg("compose");
-    for path in environment::relative_paths(target) {
-        command = command.arg("--env-file").arg(path);
-    }
-    command.args(["--file", file])
+fn compose(file: &str) -> CommandSpec {
+    // load_command_environment already applied the configured files with shell
+    // overrides preserved. Do not require placeholders or let Compose load an
+    // unrelated default .env file (our .env path is a directory).
+    CommandSpec::new("docker")
+        .env("COMPOSE_DISABLE_ENV_FILE", "1")
+        .env_remove("COMPOSE_ENV_FILES")
+        .args(["compose", "--file", file])
 }
 
 fn production_compose() -> CommandSpec {
-    compose(Target::Prod, "compose.prod.yml")
+    compose("compose.prod.yml")
 }
 
 pub fn production_check(workspace: &Workspace) -> Result<()> {
@@ -563,6 +567,11 @@ pub fn build_image(workspace: &Workspace, tag: &str) -> Result<()> {
 
 pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
     let worker = workspace.server.join("apps/journal-collab");
+    for path in [worker.join(".secrets/server.env"), worker.join(".dev.vars")] {
+        if path.exists() {
+            bail!("Worker keys already exist at {}; use misty setup server to validate or restore the bundle without rotating keys", path.display());
+        }
+    }
     let development_environment =
         environment::root(workspace, Target::Dev).join("crypto/journal.env");
     let mut random = OsRng;
@@ -615,17 +624,33 @@ pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
     let worker_environment = workspace
         .server
         .join("apps/journal-collab/.secrets/worker.prod.env");
-    let existing = fs::read_to_string(&production_environment)
-        .with_context(|| format!("could not read {}", production_environment.display()))?;
-    validate_room_salt(&existing, &production_environment)?;
-
+    let mut existing = match fs::read_to_string(&production_environment) {
+        Ok(contents) => {
+            require_private_file(&production_environment)?;
+            contents
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(error.into()),
+    };
+    if worker_environment.exists() {
+        bail!("production Worker keys already exist; restore the matching API bundle instead of rotating keys");
+    }
     let mut random = OsRng;
     let secrets = JournalSecrets::generate(&mut random)?;
-    let updated =
+    for name in [TICKET_PRIVATE_KEY, CONTROL_SECRET, PROJECTION_SECRET] {
+        if environment_values(&existing, name).is_empty() {
+            existing.push_str(&format!("\n{name}=<generated>\n"));
+        }
+    }
+    let mut updated =
         replace_production_secret_placeholders(&existing, &production_environment, &secrets)?;
+    if environment_values(&updated, ROOM_SALT).is_empty() {
+        updated.push_str(&format!("\n{ROOM_SALT}={}\n", random_secret(&mut random)));
+    }
+    validate_room_salt(&updated, &production_environment)?;
 
-    // Write the Worker half first. If the server environment write fails, the
-    // production placeholders remain and a retry can safely replace this file.
+    // Preserve the Worker half if the server write fails. A subsequent attempt
+    // refuses to overwrite it; restore/reconcile the partial bundle explicitly.
     write_private(&worker_environment, secrets.worker_environment().as_bytes())?;
     write_private(&production_environment, updated.as_bytes())?;
 
@@ -633,7 +658,7 @@ pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
     println!("  server: {}", production_environment.display());
     println!("  Worker: {}", worker_environment.display());
     println!("The private signing key was not printed or sent to Cloudflare.");
-    println!("The production room salt was preserved.");
+    println!("Existing production room salt was preserved; a missing salt was generated.");
     println!(
         "Deploy the Worker values with Wrangler only after reviewing the production configuration."
     );
@@ -809,7 +834,8 @@ fn read_environment(path: &Path) -> Result<BTreeMap<String, String>> {
         fs::read_to_string(path).with_context(|| format!("could not read {}", path.display()))?;
     let mut values = BTreeMap::new();
     for item in dotenvy::from_read_iter(contents.as_bytes()) {
-        let (name, value) = item.with_context(|| format!("could not parse {}", path.display()))?;
+        let (name, value) = item
+            .map_err(|_| anyhow::anyhow!("could not parse {} (values omitted)", path.display()))?;
         if values.insert(name.clone(), value).is_some() {
             bail!("{name} is defined more than once in {}", path.display());
         }
@@ -1177,8 +1203,10 @@ mod tests {
             json!({"Service":"misty-api","State":"running","Health":"healthy"}),
             json!({"Service":"tunnel","State":"running","Health":"healthy"}),
             json!({"Service":"setup","State":"exited","ExitCode":0}),
+            json!({"Service":"agent-runtime","State":"running","Health":"healthy"}),
         ];
         assert!(validate_health(&rows).is_ok());
+        assert!(validate_health(&rows[..4]).is_err());
         rows[3]["ExitCode"] = json!(1);
         assert!(validate_health(&rows).is_err());
         rows[3]["ExitCode"] = json!(0);
@@ -1190,8 +1218,7 @@ mod tests {
     #[test]
     fn development_commands_select_the_explicit_compose_file() {
         let up = development_up_command(true, true).display();
-        assert!(up.contains("--env-file .env/dev/runtime.env"));
-        assert!(up.contains("--env-file .env/dev/integrations/discord.env"));
+        assert!(!up.contains("--env-file"));
         assert!(up.ends_with("--file compose.dev.yml up --build --remove-orphans --detach"));
         let up_without_build = development_up_command(true, false).display();
         assert!(up_without_build.ends_with("--file compose.dev.yml up --remove-orphans --detach"));
@@ -1326,7 +1353,7 @@ mod tests {
         let room_salt = STANDARD.encode([9_u8; 32]);
         let production_path = server.join(".env/prod/crypto/journal.env");
         fs::create_dir_all(production_path.parent().unwrap()).unwrap();
-        fs::write(
+        write_private(
             &production_path,
             format!(
                 "MISTY_ENVIRONMENT=production\n\
@@ -1334,7 +1361,8 @@ mod tests {
                  {TICKET_PRIVATE_KEY}=<replace-private>\n\
                  {CONTROL_SECRET}=replace-with-control\n\
                  {PROJECTION_SECRET}=replace-with-projection\n"
-            ),
+            )
+            .as_bytes(),
         )
         .unwrap();
         let workspace = Workspace {

@@ -9,6 +9,7 @@ import { browserTabTitle } from "./model";
 
 describe("browser internal pages", () => {
   it("recognizes Misty's own pages regardless of case or a trailing slash", () => {
+    expect(browserInternalPage("misty://scheduled")).toBe("scheduled");
     expect(browserInternalPage("misty://history")).toBe("history");
     expect(browserInternalPage("MISTY://Downloads/")).toBe("downloads");
     expect(browserInternalPage("misty://constructor")).toBeNull();
@@ -17,11 +18,13 @@ describe("browser internal pages", () => {
   });
 
   it("opens internal pages from the address bar instead of searching for them", () => {
+    expect(normalizeBrowserAddress("misty://scheduled")).toBe(browserInternalUrl("scheduled"));
     expect(normalizeBrowserAddress("misty://bookmarks/")).toBe(browserInternalUrl("bookmarks"));
     expect(normalizeBrowserAddress("misty://nope")).toContain("nope");
   });
 
   it("titles internal tabs by page name", () => {
+    expect(browserTabTitle("misty://scheduled")).toBe("Scheduled");
     expect(browserTabTitle("misty://extensions")).toBe("Extensions");
   });
 });

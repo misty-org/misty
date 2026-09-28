@@ -82,3 +82,48 @@ describe("MistyComposer", () => {
     expect(capture).toHaveBeenCalledOnce();
   });
 });
+
+it("replaces the send action with stop while a conversation is working", () => {
+  const stop = vi.fn();
+  render(
+    <MistyComposer
+      layout="conversation"
+      value=""
+      onChange={vi.fn()}
+      mode="ask"
+      attachments={[]}
+      maxAttachments={4}
+      onAddFiles={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSubmit={vi.fn()}
+      busy
+      trailingControl={<button onClick={stop}>Stop response</button>}
+    />,
+  );
+  expect(screen.queryByRole("button", { name: "Send to Misty" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Stop response" }));
+  expect(stop).toHaveBeenCalledOnce();
+});
+
+it("disables the message field and ignores pasted files when unavailable", () => {
+  const addFiles = vi.fn();
+  render(
+    <MistyComposer
+      layout="conversation"
+      value=""
+      onChange={vi.fn()}
+      mode="ask"
+      attachments={[]}
+      maxAttachments={4}
+      onAddFiles={addFiles}
+      onRemoveAttachment={vi.fn()}
+      onSubmit={vi.fn()}
+      disabled
+    />,
+  );
+  expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).disabled).toBe(true);
+  fireEvent.paste(document.querySelector("[data-misty-universal-composer]")!, {
+    clipboardData: { files: [new File(["image"], "image.png", { type: "image/png" })] },
+  });
+  expect(addFiles).not.toHaveBeenCalled();
+});

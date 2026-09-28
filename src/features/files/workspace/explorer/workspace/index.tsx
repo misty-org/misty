@@ -20,28 +20,19 @@ import { libraryWorkspacePath } from "../components/LibraryWorkspace";
 import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
 import { useExplorerStore } from "../store";
 import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
+import { FileOperationConflictDialog } from "./FileOperationConflictDialog";
 import { ExplorerDialog } from "./ExplorerBatchRenameDialog";
 import { executableShortcutCommands } from "./ExplorerCommands";
 import { CompareDialog } from "./ExplorerCompareDialog";
 import { ExplorerContextMenu } from "./ExplorerContextMenu";
-import {
-  canCloseExplorerTab,
-  canOpenTerminalPath,
-  ensureFilesBrowseTab,
-  ExplorerTray,
-  isChromeTabPath,
-} from "./ExplorerDesktopPlugins";
+import { canCloseExplorerTab, canOpenTerminalPath, ExplorerTray } from "./ExplorerDesktopPlugins";
 import { cx } from "./ExplorerDesktopShared";
 import { ExplorerNotifications, ExplorerRenameStatus } from "./ExplorerDesktopStatus";
 import { DuplicateFinderDialog } from "./ExplorerDuplicateFinderDialog";
 import { ExplorerMultiPanelWorkspace } from "./ExplorerMultiPanelWorkspace";
 import { createExplorerAddTabControl } from "./ExplorerNewTabControl";
 import { explorerShellStyles } from "./ExplorerShellStyles";
-import {
-  ConnectedExplorerToolbar,
-  ConnectedFileInspector,
-  ExplorerPaneHeaderActions,
-} from "./ExplorerToolbarConnections";
+import { ConnectedExplorerToolbar, ConnectedFileInspector } from "./ExplorerToolbarConnections";
 import { filesMultiPanelStore } from "./explorerWorkspace/filesDockStores";
 import { useConnectedDeviceDirectoryInvalidation } from "./explorerWorkspace/useConnectedDeviceDirectoryInvalidation";
 import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
@@ -226,12 +217,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, library, workspacePaths),
     [homePath, library, mountRoot, pinnedPaths, workspacePaths],
   );
-  const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
-  const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
-  const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
-  useEffect(() => {
-    ensureFilesBrowseTab(homePath, multiPanelStore);
-  }, [homePath, multiPanelStore, workspacePathSignature]);
+  const sidebarVisible = activeTabSidebarVisible;
+  const previewVisible = activeTabPreviewVisible;
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
     activePathRef.current = activePath;
@@ -254,7 +241,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
-      if (isChromeTabPath(path) || path === libraryWorkspacePath) return null;
+      if (path === libraryWorkspacePath) return null;
       return (
         <ConnectedExplorerToolbar
           paneId={paneId}
@@ -268,27 +255,12 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
-      // The dock supplies the tab strip, not the pane's own controls, so these
-      // belong to the embedded view just as much as the standalone route.
-      const paneActions =
-        activePaneId === paneId ? (
-          <div className="flex items-center gap-1">
-            <ExplorerPaneHeaderActions paneId={paneId} multiPanelStore={multiPanelStore} />
-          </div>
-        ) : undefined;
       if (path === libraryWorkspacePath) {
         return <ComingSoonSurface feature="Smart Library" />;
       }
-      return (
-        <ExplorerPane
-          paneId={paneId}
-          path={path}
-          isActive={activePaneId === paneId}
-          paneActions={paneActions}
-        />
-      );
+      return <ExplorerPane paneId={paneId} path={path} isActive={activePaneId === paneId} />;
     },
-    [activePaneId, multiPanelStore],
+    [activePaneId],
   );
   const { inspector } = useExplorerAgentDock({
     activePaneId,
@@ -333,15 +305,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       props.workspaceId ? null : (
         <ExplorerTray
           onToggleFileManagerMode={() => navigate(routes.browser)}
-          terminalEnabled={
-            activeTabSupportsSidePanels &&
-            canOpenTerminalPath(activeTabPath) &&
-            canOpenTerminalPath(activePath)
-          }
+          terminalEnabled={canOpenTerminalPath(activeTabPath) && canOpenTerminalPath(activePath)}
           terminalPath={activePath}
         />
       ),
-    [activePath, activeTabPath, activeTabSupportsSidePanels, navigate, props.workspaceId],
+    [activePath, activeTabPath, navigate, props.workspaceId],
   );
   const renderAddTabControl = useMemo(() => createExplorerAddTabControl(homePath), [homePath]);
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
@@ -364,7 +332,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             renderTabActions={renderTabActions}
             renderToolbar={renderToolbar}
             showTabStrip={!props.embedded}
-            showDefaultPaneControls={false}
             renderNavigationAside={explorerSidebar}
             navigationAsideWidth={sidebarWidth}
             onNavigationAsideResizeStart={startSidebarResize}
@@ -378,6 +345,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             renderPane={renderPane}
           />
         </main>
+        {workspaceFocused ? <FileOperationConflictDialog /> : null}
         {inlineEdit && ownsPane(inlineEdit.paneId) ? (
           <ExplorerRenameStatus edit={inlineEdit} />
         ) : null}

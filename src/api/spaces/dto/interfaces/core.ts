@@ -288,7 +288,6 @@ export interface SpacesSnapshot {
     personal_storage_limit_bytes?: number;
     space_storage_limit_bytes?: number;
     personal_ai_limit?: number;
-    space_ai_limit?: number;
     unlimited_spaces: boolean;
     unlimited_collaborators: boolean;
   };

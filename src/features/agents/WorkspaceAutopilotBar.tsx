@@ -11,8 +11,8 @@ import {
 import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
 
 export const agentOverlayBarClass = cn(
-  "pointer-events-auto fixed bottom-4 left-1/2 layer-workspace-overlay flex",
-  "w-max max-w-[calc(100dvw-32px)] -translate-x-1/2 items-center rounded-lg",
+  "pointer-events-auto fixed inset-x-0 bottom-4 layer-workspace-overlay mx-auto flex",
+  "w-max max-w-[calc(100dvw-32px)] items-center rounded-lg",
   "bg-charcoal-card p-1 text-cream shadow-lg",
 );
 
@@ -41,6 +41,7 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
       execution.accountId,
       execution.spaceId,
       stop,
+      execution.desktopControl,
     );
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && event.metaKey && event.shiftKey) {
@@ -53,7 +54,14 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
       unwatch();
       window.removeEventListener("keydown", key, true);
     };
-  }, [execution.taskId, execution.accountId, execution.spaceId, execution.ready, running]);
+  }, [
+    execution.taskId,
+    execution.accountId,
+    execution.spaceId,
+    execution.ready,
+    execution.desktopControl,
+    running,
+  ]);
   useEffect(() => {
     if (error) useMistyStore.setState({ error });
   }, [error]);
@@ -72,18 +80,27 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
       title={
         error ||
         (running
-          ? `${name} is controlling Misty`
+          ? execution.desktopControl
+            ? `${name} is working`
+            : `${name} is controlling Misty`
           : execution.state === "paused"
             ? "Paused"
             : "Task finished")
       }
     >
+      {error && (
+        <p className="max-w-80 px-2 text-xs" role="alert">
+          {error}
+        </p>
+      )}
       <p className="sr-only" role="status">
         {error ||
           (running
             ? execution.ready
-              ? `${name} is controlling Misty. You can watch or stop at any time.`
-              : "Preparing Misty window control…"
+              ? execution.desktopControl
+                ? `${name} is working. Desktop control begins when needed. Stop at any time.`
+                : `${name} is controlling Misty. You can watch or stop at any time.`
+              : "Preparing the task…"
             : execution.state === "finished"
               ? "Task finished — you have control."
               : "Paused — you have control.")}
@@ -103,7 +120,9 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
           onClick={() =>
             act(() =>
               steerLocalExecution(
-                "Continue the task. Capture the whole Misty window first and verify prior actions before continuing.",
+                execution.desktopControl
+                  ? "Continue the task. Inspect the current desktop and verify prior actions before continuing."
+                  : "Continue the task. Capture the whole Misty window first and verify prior actions before continuing.",
               ),
             )
           }

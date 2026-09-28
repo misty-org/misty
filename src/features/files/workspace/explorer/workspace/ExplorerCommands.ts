@@ -1,5 +1,5 @@
+import { useOperationQueueStore } from "../store/useOperationQueueStore";
 export { newestUndoableTransfer, transferTypeLabel } from "./explorerCommands/transferLabels";
-import { useOperationQueueStore, useTransfersStore } from "@/features/transfers";
 import { dockLeaves, multiPanelStoreForPane, useWorkspaceStore } from "@/features/workspace";
 import { operationQueueRedo, operationQueueUndo, transfersSnapshot } from "../../native";
 import { errorText } from "@/shared/lib/format";
@@ -7,7 +7,7 @@ import { selectedPathsForPane, useExplorerStore } from "../store";
 import { openCompareWith } from "./ExplorerContextMenu";
 import { useSearchStore } from "../../search";
 import { invokeShortcutCommand } from "@/features/shortcuts";
-import { openTransfersTab, toggleActiveTabPanelVisibility } from "./ExplorerDesktopPlugins";
+import { toggleActiveTabPanelVisibility } from "./ExplorerDesktopPlugins";
 import { applySharedClipboardToSystem } from "./explorerCommands/clipboardPayloads";
 import {
   newestUndoableTransfer,
@@ -55,7 +55,7 @@ export function runExplorerCommand(
   const dockTab = dockPane?.tabs.find(
     (tab) => tab.id === dockPane.activeTabId && tab.surfaceId === "files",
   );
-  const openDockedFiles = (zone?: "right" | "down") => {
+  const openDockedFiles = () => {
     const path = activeTab?.path ?? explorer.panes[paneId]?.listing?.path ?? "/";
     const tab = workspace.openSurface({
       surfaceId: "files",
@@ -67,16 +67,10 @@ export function runExplorerCommand(
       paneId: dockPane?.id,
       state: { version: 1, path },
     });
-    if (zone && dockPane) workspace.dockTab(tab.id, dockPane.id, zone);
     workspace.focusTab(tab.id);
     navigateRoute(tab.route);
   };
   switch (commandId) {
-    case "app.toggle_transfers":
-      // Transfers is its own tool now, so this opens a dock tab rather than a
-      // panel inside the file manager.
-      navigateRoute(openTransfersTab().route);
-      break;
     case "app.open_settings":
       window.dispatchEvent(
         new CustomEvent("misty:open-settings", { detail: { section: "files" } }),
@@ -100,19 +94,6 @@ export function runExplorerCommand(
     case "explorer.restore_tab":
       if (dockTab) invokeShortcutCommand("workspace.reopen_tab");
       else multi.restoreTab();
-      break;
-    case "explorer.close_pane":
-      if (activeTab && activeTab.panes.length > 1) multi.closePane(paneId);
-      else if (dockTab) invokeShortcutCommand("workspace.close_tab");
-      break;
-    case "explorer.restore_pane":
-      multi.restorePane();
-      break;
-    case "explorer.split_vertical":
-      multi.splitPane(paneId, "vertical");
-      break;
-    case "explorer.split_horizontal":
-      multi.splitPane(paneId, "horizontal");
       break;
     case "explorer.refresh":
       void explorer.refreshPane(paneId);
@@ -228,8 +209,7 @@ function openDeepSearch(paneId: string): void {
 export async function undoLatestTransferOperation(): Promise<void> {
   const explorer = useExplorerStore.getState();
   try {
-    const loadedRows = useTransfersStore.getState().transfers?.rows;
-    const rows = loadedRows ?? (await transfersSnapshot({ limit: 500 })).rows;
+    const rows = (await transfersSnapshot({ limit: 500 })).rows;
     const latest = newestUndoableTransfer(rows);
     if (!latest) {
       explorer.pushNotification("No completed rename or move is available to undo.", "info", 3500);
@@ -238,7 +218,7 @@ export async function undoLatestTransferOperation(): Promise<void> {
 
     const snapshot = await operationQueueUndo(latest.undoTokenId);
     useOperationQueueStore.setState({ snapshot, error: null });
-    await useTransfersStore.getState().load(undefined, { silent: true });
+    await useOperationQueueStore.getState().load({ silent: true });
     explorer.pushNotification(
       `Undo queued for ${latest.fileName || transferTypeLabel(latest.transferType)}.`,
       "success",
@@ -254,7 +234,7 @@ export async function redoLatestTransferOperation(): Promise<void> {
   try {
     const snapshot = await operationQueueRedo();
     useOperationQueueStore.setState({ snapshot, error: null });
-    await useTransfersStore.getState().load(undefined, { silent: true });
+    await useOperationQueueStore.getState().load({ silent: true });
     explorer.pushNotification("Redo queued.", "success", 3500);
   } catch (error) {
     explorer.pushNotification(`Redo failed: ${errorText(error)}`, "error", 4500);
