@@ -9,7 +9,7 @@ const ListRow = React.forwardRef<HTMLLIElement, React.ComponentPropsWithoutRef<"
       data-slot="list-row"
       className={cn(
         "group/row flex min-h-11 items-center gap-3 rounded-md px-2 py-1.5",
-        "hover:bg-cream/[0.045] focus-within:bg-cream/[0.045]",
+        "hover:bg-control-hover focus-within:bg-control-hover",
         className,
       )}
       {...props}

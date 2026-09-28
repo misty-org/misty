@@ -55,14 +55,20 @@ const FILES: &[FileSpec] = &[
             "MISTY_ENVIRONMENT",
             "MISTY_HOST_PORT",
             "MISTY_INSTANCE_NAME",
-            "MISTY_OPERATOR_USER_ID",
             "MISTY_PUBLIC_API_URL",
             "MISTY_SDK_EXECUTION_ENABLED",
+            "MISTY_DEVICE_JOBS_ENABLED",
             "MISTY_WEBSITE_URL",
             "PASSWORD_RESET_START_URL",
             "PASSWORD_RESET_URL",
             "PORT",
             "TRUST_PROXY_HEADERS",
+            "TRUSTED_PROXY_CIDRS",
+            "MISTY_INVITATION_URL_BASE",
+            "MISTY_AGENT_DOCUMENTS_ENABLED",
+            "MISTY_SOCIAL_AUTOMATION_DISABLED",
+            "MISTY_SOCIAL_DISCORD_DISABLED",
+            "MISTY_SOCIAL_SEND_DISABLED",
         ],
     },
     FileSpec {
@@ -76,6 +82,10 @@ const FILES: &[FileSpec] = &[
             "DB_PASSWORD",
             "DB_PORT",
             "DB_SSLMODE",
+            "DB_MAX_OPEN_CONNS",
+            "DB_MAX_IDLE_CONNS",
+            "DB_CONN_MAX_LIFETIME",
+            "DB_CONN_MAX_IDLE_TIME",
             "DB_USER",
         ],
     },
@@ -94,16 +104,57 @@ const FILES: &[FileSpec] = &[
             "R2_BUCKET",
             "R2_ENDPOINT",
             "R2_SECRET_KEY",
+            "MISTY_R2_ALLOWED_ORIGINS",
         ],
     },
     FileSpec {
         path: "observability.env",
-        names: &["MISTY_METRICS_TOKEN", "POSTHOG_PROJECT_TOKEN"],
+        names: &[
+            "MISTY_METRICS_TOKEN",
+            "POSTHOG_PROJECT_TOKEN",
+            "POSTHOG_HOST",
+            "MISTY_RELEASE_CHANNEL",
+            "MISTY_SERVER_VERSION",
+        ],
     },
     FileSpec {
         path: "integrations/ai.env",
         names: &[
             "AI_GATEWAY_API_KEY",
+            "MISTY_REALTIME_API_KEY",
+            "AI_GATEWAY_BASE_URL",
+            "AI_GATEWAY_EMBEDDING_BASE_URL",
+            "AGENT_TRANSCRIPTION_MODEL",
+            "MEDIA_SEARCH_EMERGENCY_DISABLE",
+            "MEDIA_SEARCH_TRANSCRIPTION_MODEL",
+            "MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL",
+            "SMART_LIBRARY_EMBEDDING_MODEL",
+            "SMART_LIBRARY_PRIMARY_MODEL",
+            "SMART_LIBRARY_FALLBACK_MODEL",
+            "SMART_LIBRARY_EMERGENCY_DISABLE",
+            "SMART_LIBRARY_SEARCH_EMERGENCY_DISABLE",
+            "SMART_LIBRARY_SEARCH_DAILY_LIMIT",
+            "MISTY_AI_PROVIDER",
+            "MISTY_AI_MODEL",
+            "MISTY_AI_LOW_MODEL",
+            "MISTY_AI_MED_MODEL",
+            "MISTY_AI_HIGH_MODEL",
+            "MISTY_AI_MODEL_CATALOG_JSON",
+            "OPENAI_BASE_URL",
+            "GEMINI_AUTH_MODE",
+            "GEMINI_BASE_URL",
+            "GEMINI_OAUTH_SCOPE",
+            "GEMINI_VERTEX_PROJECT",
+            "GEMINI_VERTEX_LOCATION",
+            "GOOGLE_CLOUD_PROJECT",
+            "GOOGLE_CLOUD_LOCATION",
+            "GOOGLE_CLOUD_REGION",
+            "VISION_PROCESSOR_URL",
+            "VISION_PROCESSOR_TOKEN",
+            "MISTY_AGENT_MODEL_PROVIDER",
+            "MISTY_AGENT_MODEL",
+            "MISTY_AGENT_MODEL_API_KEY",
+            "MISTY_AGENT_MODEL_BASE_URL",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
             "MISTY_AI_MAX_TOKENS_PER_DAY",
@@ -117,7 +168,6 @@ const FILES: &[FileSpec] = &[
         names: &[
             "CLOUDFLARE_ACCOUNT_ID",
             "CLOUDFLARE_ZONE_ID",
-            "MISTY_CLOUDFLARE_TUNNEL_ID",
             "MISTY_CLOUDFLARE_TUNNEL_NAME",
             "CLOUDFLARE_API_TOKEN",
             "CLOUDFLARE_TUNNEL_TOKEN",
@@ -127,7 +177,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_DEV_API_ORIGIN",
             "MISTY_DEV_API_TUNNEL_HOSTNAME",
             "MISTY_DEV_TUNNEL_HOSTNAME",
-            "MISTY_LOCAL_WEBSITE_ORIGIN",
             "PARTYKIT_HOST",
         ],
     },
@@ -143,6 +192,7 @@ const FILES: &[FileSpec] = &[
         path: "integrations/discord.env",
         names: &[
             "DISCORD_BOT_TOKEN",
+            "DISCORD_GATEWAY_URL",
             "DISCORD_CLIENT_ID",
             "DISCORD_CLIENT_SECRET",
         ],
@@ -155,6 +205,7 @@ const FILES: &[FileSpec] = &[
         path: "integrations/email.env",
         names: &[
             "MAILJET_API_KEY",
+            "MAILJET_API_BASE_URL",
             "MAILJET_FROM_EMAIL",
             "MAILJET_FROM_NAME",
             "MAILJET_SECRET_KEY",
@@ -162,12 +213,17 @@ const FILES: &[FileSpec] = &[
     },
     FileSpec {
         path: "integrations/figma.env",
-        names: &["FIGMA_CLIENT_ID", "FIGMA_CLIENT_SECRET"],
+        names: &[
+            "FIGMA_CLIENT_ID",
+            "FIGMA_CLIENT_SECRET",
+            "FIGMA_API_BASE_URL",
+        ],
     },
     FileSpec {
         path: "integrations/github.env",
         names: &[
             "GITHUB_APP_ID",
+            "GITHUB_API_BASE_URL",
             "GITHUB_APP_PRIVATE_KEY",
             "GITHUB_APP_SLUG",
             "GITHUB_WEBHOOK_SECRET",
@@ -202,29 +258,8 @@ const FILES: &[FileSpec] = &[
         ],
     },
     FileSpec {
-        path: "integrations/notion.env",
-        names: &[
-            "NOTION_CLIENT_ID",
-            "NOTION_CLIENT_SECRET",
-            "NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN",
-            "NOTION_WEBHOOK_VERIFICATION_TOKEN",
-        ],
-    },
-    FileSpec {
-        path: "integrations/slack.env",
-        names: &[
-            "SLACK_CLIENT_ID",
-            "SLACK_CLIENT_SECRET",
-            "SLACK_SIGNING_SECRET",
-        ],
-    },
-    FileSpec {
         path: "crypto/documents.env",
-        names: &[
-            "DOCUMENT_KEY_ID",
-            "DOCUMENT_PRIVATE_KEY_B64",
-            "DOCUMENT_SIGNING_KEY",
-        ],
+        names: &["DOCUMENT_SIGNING_KEY"],
     },
     FileSpec {
         path: "crypto/journal.env",
@@ -265,9 +300,28 @@ const FILES: &[FileSpec] = &[
 // Accepted only when reading older environments; retired switches and settings
 // must not block startup or become active configuration again.
 const DEPRECATED_NAMES: &[&str] = &[
+    "MISTY_LOCAL_WEBSITE_ORIGIN",
+    "MISTY_CLOUDFLARE_TUNNEL_ID",
     "MISTY_CONNECTED_DEVICES_ENABLED",
     "MISTY_SDK_PROVIDERS_ENABLED",
     "WAITLIST_NOTIFY_EMAIL",
+    "MISTY_OPERATOR_USER_ID",
+    "DOCUMENT_KEY_ID",
+    "DOCUMENT_PRIVATE_KEY_B64",
+    "NOTION_CLIENT_ID",
+    "NOTION_CLIENT_SECRET",
+    "NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN",
+    "NOTION_WEBHOOK_VERIFICATION_TOKEN",
+    "SLACK_CLIENT_ID",
+    "SLACK_CLIENT_SECRET",
+    "SLACK_SIGNING_SECRET",
+];
+
+const DEPRECATED_CLI_NAMES: &[&str] = &[
+    "MISTY_SOURCE_DIR",
+    "MISTY_PROXY_SOURCE_DIR",
+    "MISTY_HUB_SOURCE_DIR",
+    "MISTY_RCLONE_SOURCE",
 ];
 
 const PROD_REQUIRED: &[&str] = &[
@@ -282,7 +336,6 @@ const PROD_REQUIRED: &[&str] = &[
     "MISTY_DEVICE_PAIRING_PEPPER",
     "MISTY_DEVICE_TICKET_PRIVATE_KEY",
     "MISTY_ENVIRONMENT",
-    "MISTY_OPERATOR_USER_ID",
     "MISTY_PUBLIC_API_URL",
     "R2_ACCESS_KEY",
     "R2_BUCKET",
@@ -304,13 +357,6 @@ pub fn root(workspace: &Workspace, target: Target) -> PathBuf {
     workspace.server.join(".env").join(target.label())
 }
 
-pub fn relative_paths(target: Target) -> Vec<String> {
-    FILES
-        .iter()
-        .map(|spec| format!(".env/{}/{}", target.label(), spec.path))
-        .collect()
-}
-
 pub fn init(workspace: &Workspace, target: Target) -> Result<()> {
     let mut created = 0;
     for spec in FILES {
@@ -319,9 +365,14 @@ pub fn init(workspace: &Workspace, target: Target) -> Result<()> {
             require_private_file(&path)?;
             continue;
         }
-        write_private(&path, initial_file_contents(*spec, target).as_bytes())?;
+        let contents = initial_file_contents(*spec, target);
+        if contents.is_empty() {
+            continue;
+        }
+        write_private(&path, contents.as_bytes())?;
         created += 1;
     }
+    fs::create_dir_all(root(workspace, target))?;
     secure_directories(&root(workspace, target))?;
     secure_directories(&workspace.server.join(".env"))?;
     init_cli_files(workspace)?;
@@ -342,13 +393,7 @@ fn initial_file_contents(spec: FileSpec, target: Target) -> String {
             _ => {}
         }
     }
-    format!(
-        "# Managed by misty env. Configure only the features you use.\n{}",
-        spec.names
-            .iter()
-            .map(|name| format!("# {name}=\n"))
-            .collect::<String>()
-    )
+    String::new()
 }
 
 fn random_hex(byte_count: usize) -> String {
@@ -368,7 +413,7 @@ pub fn migrate(workspace: &Workspace) -> Result<()> {
 
 pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
     read_cli_files(workspace)?;
-    let values = read(workspace, target)?;
+    let values = effective(workspace, target)?;
     let missing = required(target)
         .iter()
         .filter(|name| {
@@ -406,7 +451,7 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
             .context("MISTY_BILLING_URL is required")?;
         let url = url::Url::parse(raw).context("Invalid MISTY_BILLING_URL")?;
         let local = target == Target::Dev
-            && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"));
+            && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]" | "host.docker.internal"));
         if (url.scheme() != "https" && !(url.scheme() == "http" && local))
             || url.host_str().is_none()
             || !url.username().is_empty()
@@ -414,7 +459,7 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
             || url.query().is_some()
             || url.fragment().is_some()
         {
-            bail!("Billing URL requires HTTPS, except for development loopback");
+            bail!("Billing URL requires HTTPS, except for the local development host");
         }
         if values
             .get("MISTY_BILLING_SECRET")
@@ -514,6 +559,11 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
         .iter()
         .map(|spec| base.join(spec.path))
         .collect::<BTreeSet<_>>();
+    // Retired integration files may remain on upgraded installations. They are never loaded.
+    let retired_files = [
+        base.join("integrations/notion.env"),
+        base.join("integrations/slack.env"),
+    ];
     if base.exists() {
         for entry in WalkDir::new(&base).follow_links(false) {
             let entry = entry?;
@@ -523,6 +573,7 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
                     .extension()
                     .is_some_and(|extension| extension == "env")
                 && !known_files.contains(entry.path())
+                && !retired_files.iter().any(|path| path == entry.path())
             {
                 bail!("unknown environment file: {}", entry.path().display());
             }
@@ -533,15 +584,16 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
     let mut values = BTreeMap::new();
     for spec in FILES {
         let path = base.join(spec.path);
-        if !path.is_file() {
-            bail!("missing environment file: {}", path.display());
+        if !path.exists() {
+            continue;
         }
         require_private_file(&path)?;
         let contents = fs::read_to_string(&path)
             .with_context(|| format!("could not read {}", path.display()))?;
         for item in dotenvy::from_read_iter(contents.as_bytes()) {
-            let (name, value) =
-                item.with_context(|| format!("could not parse {}", path.display()))?;
+            let (name, value) = item.map_err(|_| {
+                anyhow::anyhow!("could not parse {} (values omitted)", path.display())
+            })?;
             if DEPRECATED_NAMES.contains(&name.as_str()) {
                 continue;
             }
@@ -560,6 +612,17 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
                     target.label()
                 );
             }
+        }
+    }
+    Ok(values)
+}
+
+/// Values used by CLI validation and Compose interpolation; shell overrides files.
+pub fn effective(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, String>> {
+    let mut values = read(workspace, target)?;
+    for name in ownership()?.keys() {
+        if let Ok(value) = env::var(name) {
+            values.insert((*name).to_owned(), value);
         }
     }
     Ok(values)
@@ -615,16 +678,26 @@ fn migrate_server_file(workspace: &Workspace, target: Target) -> Result<()> {
         grouped.entry(owner(name)?).or_default().push(line);
     }
 
+    for &relative in grouped.keys() {
+        let path = root(workspace, target).join(relative);
+        if path.exists() {
+            bail!(
+                "migration would overwrite {}; merge it with {} before retrying",
+                path.display(),
+                legacy.display()
+            );
+        }
+    }
     for spec in FILES {
         let path = root(workspace, target).join(spec.path);
         let lines = grouped.remove(spec.path).unwrap_or_default();
-        let contents = if lines.is_empty() {
-            String::new()
-        } else {
-            format!("{}\n", lines.join("\n"))
-        };
+        if lines.is_empty() {
+            continue;
+        }
+        let contents = format!("{}\n", lines.join("\n"));
         write_private(&path, contents.as_bytes())?;
     }
+    fs::create_dir_all(root(workspace, target))?;
     secure_directories(&root(workspace, target))?;
     secure_directories(&workspace.server.join(".env"))?;
     read(workspace, target)?;
@@ -652,7 +725,6 @@ fn migrate_cli_file(workspace: &Workspace) -> Result<()> {
             next.display()
         );
     }
-    fs::create_dir_all(&next)?;
     let mut grouped = BTreeMap::<&str, Vec<&str>>::new();
     let mut seen = BTreeSet::new();
     for line in contents.lines() {
@@ -670,15 +742,18 @@ fn migrate_cli_file(workspace: &Workspace) -> Result<()> {
         if !seen.insert(name.to_owned()) {
             bail!("{name} is defined more than once in {}", legacy.display());
         }
+        if DEPRECATED_CLI_NAMES.contains(&name) {
+            continue;
+        }
         grouped.entry(cli_owner(name)?).or_default().push(line);
     }
+    fs::create_dir_all(&next)?;
     for name in ["common.env", "release.env", "cloudflare.env"] {
         let lines = grouped.remove(name).unwrap_or_default();
-        let body = if lines.is_empty() {
-            String::new()
-        } else {
-            format!("{}\n", lines.join("\n"))
-        };
+        if lines.is_empty() {
+            continue;
+        }
+        let body = format!("{}\n", lines.join("\n"));
         write_private(&next.join(name), body.as_bytes())?;
     }
     secure_directories(&next)?;
@@ -698,29 +773,58 @@ fn init_cli_files(workspace: &Workspace) -> Result<()> {
     }
     for name in ["common.env", "release.env", "cloudflare.env"] {
         let path = root.join(name);
-        if !path.exists() {
-            write_private(&path, b"")?;
-        } else {
+        if path.exists() {
             require_private_file(&path)?;
         }
     }
-    secure_directories(&root)
+    if root.exists() {
+        secure_directories(&root)?;
+    }
+    Ok(())
 }
 
 fn read_cli_files(workspace: &Workspace) -> Result<BTreeMap<String, String>> {
+    read_selected_cli_files(workspace, &["common.env", "release.env", "cloudflare.env"])
+}
+
+pub fn read_selected_cli_files(
+    workspace: &Workspace,
+    files: &[&str],
+) -> Result<BTreeMap<String, String>> {
     let root = workspace.cli.join(".env");
+    if root.is_file() {
+        bail!(
+            "legacy CLI environment must be migrated first: {}",
+            root.display()
+        );
+    }
+    if root.is_dir() {
+        for entry in fs::read_dir(&root)? {
+            let entry = entry?;
+            if entry.path().extension().is_some_and(|ext| ext == "env")
+                && !["common.env", "release.env", "cloudflare.env"]
+                    .contains(&entry.file_name().to_string_lossy().as_ref())
+            {
+                bail!("unknown CLI environment file: {}", entry.path().display());
+            }
+        }
+    }
     let mut values = BTreeMap::new();
-    for file in ["common.env", "release.env", "cloudflare.env"] {
+    for &file in files {
         let path = root.join(file);
-        if !path.is_file() {
-            bail!("missing CLI environment file: {}", path.display());
+        if !path.exists() {
+            continue;
         }
         require_private_file(&path)?;
         let contents = fs::read_to_string(&path)
             .with_context(|| format!("could not read {}", path.display()))?;
         for item in dotenvy::from_read_iter(contents.as_bytes()) {
-            let (name, value) =
-                item.with_context(|| format!("could not parse {}", path.display()))?;
+            let (name, value) = item.map_err(|_| {
+                anyhow::anyhow!("could not parse {} (values omitted)", path.display())
+            })?;
+            if DEPRECATED_CLI_NAMES.contains(&name.as_str()) {
+                continue;
+            }
             let expected = cli_owner(&name)?;
             if expected != file {
                 bail!("{name} belongs in misty/cli/.env/{expected}, not misty/cli/.env/{file}");
@@ -753,10 +857,7 @@ fn cli_owner(name: &str) -> Result<&'static str> {
         name,
         "MISTY_ROOT"
             | "MISTY_ORG_ROOT"
-            | "MISTY_SOURCE_DIR"
-            | "MISTY_PROXY_SOURCE_DIR"
-            | "MISTY_HUB_SOURCE_DIR"
-            | "MISTY_RCLONE_SOURCE"
+            | "MISTY_DEV_SIGNING_IDENTITY"
             | "MISTY_DESKTOP_DEV_PORT"
             | "MISTY_DESKTOP_INITIAL_ROUTE"
     ) {
@@ -834,12 +935,24 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
     let owners = ownership()?;
     let relative = owners.get(name).context("unknown environment setting")?;
     let path = root(workspace, target).join(relative);
-    let contents = fs::read_to_string(&path)?;
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => {
+            require_private_file(&path)?;
+            contents
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(error.into()),
+    };
     let mut lines: Vec<String> = contents
         .lines()
         .filter(|line| {
-            line.split_once('=')
-                .is_none_or(|(key, _)| key.trim() != name)
+            line.split_once('=').is_none_or(|(key, _)| {
+                key.trim()
+                    .strip_prefix("export ")
+                    .unwrap_or(key.trim())
+                    .trim()
+                    != name
+            })
         })
         .map(str::to_owned)
         .collect();
@@ -848,6 +961,8 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
         bail!("environment values cannot contain a single quote");
     }
     lines.push(format!("{name}='{value}'"));
+    fs::create_dir_all(path.parent().context("environment path has no parent")?)?;
+    secure_directories(&workspace.server.join(".env"))?;
     use std::io::Write;
     let mut temporary =
         tempfile::NamedTempFile::new_in(path.parent().context("environment path has no parent")?)?;
@@ -879,6 +994,130 @@ pub fn describe() -> Result<()> {
 mod tests {
     use super::*;
 
+    fn fixture_workspace(path: &Path) -> Workspace {
+        Workspace {
+            root: path.into(),
+            misty: path.into(),
+            server: path.join("server"),
+            cli: path.join("cli"),
+            website: path.join("website"),
+            features: path.join("src/features"),
+        }
+    }
+
+    #[test]
+    fn cli_loader_enforces_ownership_and_ignores_retired_settings() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        let path = workspace.cli.join(".env/common.env");
+        write_private(
+            &path,
+            b"MISTY_SOURCE_DIR=retired\nMISTY_DEV_SIGNING_IDENTITY=fixture\n",
+        )
+        .unwrap();
+        let values = read_selected_cli_files(&workspace, &["common.env"]).unwrap();
+        assert!(!values.contains_key("MISTY_SOURCE_DIR"));
+        assert_eq!(values["MISTY_DEV_SIGNING_IDENTITY"], "fixture");
+        write_private(&path, b"APPLE_SIGNING_IDENTITY=fixture\n").unwrap();
+        assert!(read_selected_cli_files(&workspace, &["common.env"]).is_err());
+        write_private(&path, b"MISTY_UNKNOWN_SETTING=fixture\n").unwrap();
+        assert!(read_selected_cli_files(&workspace, &["common.env"]).is_err());
+        write_private(
+            &path,
+            b"MISTY_DEV_SIGNING_IDENTITY=one\nMISTY_DEV_SIGNING_IDENTITY=two\n",
+        )
+        .unwrap();
+        assert!(read_selected_cli_files(&workspace, &["common.env"]).is_err());
+    }
+
+    #[test]
+    fn invalid_private_values_do_not_appear_in_errors() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        for (path, cli) in [
+            (
+                root(&workspace, Target::Dev).join("integrations/ai.env"),
+                false,
+            ),
+            (workspace.cli.join(".env/common.env"), true),
+        ] {
+            write_private(&path, b"INVALID KEY=private-fixture-token\n").unwrap();
+            let result = if cli {
+                read_cli_files(&workspace)
+            } else {
+                read(&workspace, Target::Dev)
+            };
+            let error = format!("{:#}", result.unwrap_err());
+            assert!(!error.contains("private-fixture-token"));
+        }
+    }
+
+    #[test]
+    fn migration_never_overwrites_scoped_configuration() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        let scoped = root(&workspace, Target::Dev).join("crypto/services.env");
+        write_private(&scoped, b"MISTY_AUTH_SIGNING_KEY=current\n").unwrap();
+        let legacy = legacy_path(&workspace, Target::Dev);
+        write_private(&legacy, b"MISTY_AUTH_SIGNING_KEY=old\nDB_NAME=legacy\n").unwrap();
+        assert!(migrate_server_file(&workspace, Target::Dev).is_err());
+        assert_eq!(
+            fs::read_to_string(scoped).unwrap(),
+            "MISTY_AUTH_SIGNING_KEY=current\n"
+        );
+        assert!(legacy.is_file());
+        assert!(!root(&workspace, Target::Dev).join("database.env").exists());
+    }
+
+    #[test]
+    fn set_replaces_export_assignments_without_creating_duplicates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        let path = root(&workspace, Target::Dev).join("integrations/ai.env");
+        write_private(&path, b"export OPENAI_API_KEY=old\n").unwrap();
+        set(&workspace, Target::Dev, "OPENAI_API_KEY", "new-$literal").unwrap();
+        assert_eq!(
+            read(&workspace, Target::Dev).unwrap()["OPENAI_API_KEY"],
+            "new-$literal"
+        );
+    }
+
+    #[test]
+    fn fresh_production_keys_need_no_placeholder_files_and_are_preserved() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        init(&workspace, Target::Prod).unwrap();
+        crate::server::generate_production_worker_secrets(&workspace).unwrap();
+        let first = read(&workspace, Target::Prod).unwrap();
+        assert!(first.contains_key("JOURNAL_COLLAB_ROOM_SALT"));
+        assert!(first.contains_key("JOURNAL_COLLAB_TICKET_PRIVATE_KEY"));
+        assert!(crate::server::generate_production_worker_secrets(&workspace).is_err());
+        assert_eq!(first, read(&workspace, Target::Prod).unwrap());
+    }
+
+    #[test]
+    fn development_generation_preserves_keys_and_detects_api_overrides() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        init(&workspace, Target::Dev).unwrap();
+        crate::server::initialize_development_secrets(&workspace).unwrap();
+        let path = workspace
+            .server
+            .join("apps/journal-collab/.secrets/server.env");
+        let original = fs::read(&path).unwrap();
+        assert!(crate::server::generate_worker_secrets(&workspace).is_err());
+        assert_eq!(fs::read(path).unwrap(), original);
+        crate::server::validate_development_secrets(&workspace).unwrap();
+        set(
+            &workspace,
+            Target::Dev,
+            "JOURNAL_COLLAB_CONTROL_SECRET",
+            "different",
+        )
+        .unwrap();
+        assert!(crate::server::validate_development_secrets(&workspace).is_err());
+    }
+
     #[test]
     fn every_name_has_one_owner() {
         let owners = ownership().unwrap();
@@ -895,9 +1134,36 @@ mod tests {
     }
 
     #[test]
-    fn paths_use_short_target_names() {
-        assert!(relative_paths(Target::Dev)[0].starts_with(".env/dev/"));
-        assert!(relative_paths(Target::Prod)[0].starts_with(".env/prod/"));
+    fn optional_files_are_created_only_when_configured() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = Workspace {
+            root: tmp.path().to_path_buf(),
+            misty: tmp.path().to_path_buf(),
+            server: tmp.path().join("server"),
+            cli: tmp.path().join("cli"),
+            website: tmp.path().join("website"),
+            features: tmp.path().join("src/features"),
+        };
+        init(&workspace, Target::Dev).unwrap();
+        assert!(!workspace.cli.join(".env").exists());
+        assert!(read_cli_files(&workspace).unwrap().is_empty());
+        let integration = root(&workspace, Target::Dev).join("integrations/figma.env");
+        assert!(!integration.exists());
+        let before = read(&workspace, Target::Dev).unwrap();
+        assert!(!before.contains_key("FIGMA_CLIENT_ID"));
+        set(&workspace, Target::Dev, "FIGMA_CLIENT_ID", "fixture").unwrap();
+        assert_eq!(
+            read(&workspace, Target::Dev).unwrap()["FIGMA_CLIENT_ID"],
+            "fixture"
+        );
+        fs::remove_file(integration).unwrap();
+        init(&workspace, Target::Dev).unwrap();
+        assert_eq!(read(&workspace, Target::Dev).unwrap(), before);
+        let error = validate(&workspace, Target::Dev).unwrap_err().to_string();
+        assert!(error.contains("missing required values"));
+        assert!(error.contains("CLOUDFLARE_API_TOKEN"));
+        init(&workspace, Target::Prod).unwrap();
+        assert!(read(&workspace, Target::Prod).unwrap().is_empty());
     }
 
     #[test]
@@ -916,15 +1182,29 @@ mod tests {
             let base = root(&workspace, target);
             assert!(!base.join("integrations/stripe.env").exists());
             assert!(!base.join("integrations/activepieces.env").exists());
+            assert!(!base.join("integrations/notion.env").exists());
+            assert!(!base.join("integrations/slack.env").exists());
+            write_private(
+                &base.join("integrations/notion.env"),
+                b"NOTION_CLIENT_SECRET=retired\n",
+            )
+            .unwrap();
+            write_private(
+                &base.join("integrations/slack.env"),
+                b"SLACK_SIGNING_SECRET=retired\n",
+            )
+            .unwrap();
             for (file, entry) in [
                 ("runtime.env", "MISTY_SDK_PROVIDERS_ENABLED=true"),
+                ("runtime.env", "MISTY_OPERATOR_USER_ID=retired"),
+                ("crypto/documents.env", "DOCUMENT_PRIVATE_KEY_B64=retired"),
                 (
                     "integrations/email.env",
                     "WAITLIST_NOTIFY_EMAIL=fixture@example.invalid",
                 ),
             ] {
                 let path = base.join(file);
-                let contents = fs::read_to_string(&path).unwrap();
+                let contents = fs::read_to_string(&path).unwrap_or_default();
                 write_private(&path, format!("{contents}\n{entry}\n").as_bytes()).unwrap();
             }
             let values = read(&workspace, target).unwrap();

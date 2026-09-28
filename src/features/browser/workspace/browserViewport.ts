@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-export type BrowserViewport = "responsive" | "desktop";
+export type BrowserViewport = "responsive" | "desktop" | "tablet" | "mobile";
 export type BrowserViewportDevice = Exclude<BrowserViewport, "responsive">;
 export type BrowserViewportSize = {
   width: number;
@@ -10,6 +10,14 @@ export const browserViewportDefaults: Record<BrowserViewportDevice, BrowserViewp
   desktop: {
     width: 1920,
     height: 1080,
+  },
+  tablet: {
+    width: 820,
+    height: 1180,
+  },
+  mobile: {
+    width: 390,
+    height: 844,
   },
 };
 export const browserViewportRanges: Record<
@@ -30,6 +38,26 @@ export const browserViewportRanges: Record<
     height: {
       min: 600,
       max: 1600,
+    },
+  },
+  tablet: {
+    width: {
+      min: 600,
+      max: 1366,
+    },
+    height: {
+      min: 600,
+      max: 1366,
+    },
+  },
+  mobile: {
+    width: {
+      min: 320,
+      max: 480,
+    },
+    height: {
+      min: 568,
+      max: 1000,
     },
   },
 };

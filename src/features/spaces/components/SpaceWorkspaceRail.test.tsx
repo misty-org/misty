@@ -15,8 +15,10 @@ import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 const { preload } = vi.hoisted(() => ({ preload: vi.fn(async () => {}) }));
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "one" } }) }));
 vi.mock("../SpaceSectionView", () => ({ preloadSpaceSection: preload }));
-vi.mock("./spacePanel/useAgentUsage", () => ({ useBillingUsage: () => undefined }));
 vi.mock("./spacePanel/useSpaceLibraryUsage", () => ({ useSpaceLibraryUsage: () => undefined }));
+vi.mock("../chat/sidebar/useSpaceConversations", () => ({
+  useSpaceConversations: () => ({ conversations: [], loading: false, upsert: vi.fn(), remove: vi.fn() }),
+}));
 
 const space = (id: string, name: string): Space => ({
   id,
@@ -57,12 +59,6 @@ function mount() {
       <Harness />
     </MemoryRouter>,
   );
-}
-function openMenu() {
-  fireEvent.pointerDown(screen.getByRole("button", { name: /Switch Space/ }), {
-    button: 0,
-    ctrlKey: false,
-  });
 }
 beforeEach(() => {
   useWorkspaceStore.getState().reset();
@@ -113,26 +109,24 @@ it("follows the focused Space and hides pages the user cannot access", () => {
   });
   mount();
   act(() => open("/spaces/work/social"));
-  expect(screen.getByRole("button", { name: /current Space: Work/ })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Channels" })).toBeTruthy();
   const nav = screen.getByRole("navigation", { name: "Space sections" });
   expect(within(nav).queryByRole("link", { name: "Planner" })).toBeNull();
   expect(within(nav).queryByRole("link", { name: "Library" })).toBeNull();
   expect(within(nav).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
 });
 
-it("exposes management directly and keeps Space switching separate", async () => {
+it("names the Space without a switcher and exposes management directly", async () => {
   mount();
-  openMenu();
-  for (const name of ["Family", "Work", "New Space"])
-    expect(screen.getByRole("menuitem", { name })).toBeTruthy();
-  expect(screen.queryByRole("menuitem", { name: "Members" })).toBeNull();
-  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+  expect(screen.getByRole("heading", { name: "Family" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Switch Space/ })).toBeNull();
   const management = screen.getByRole("navigation", { name: "Space management" });
   expect(within(management).getByRole("button", { name: "Members" })).toBeTruthy();
   expect(within(management).getByRole("link", { name: "Settings" })).toBeTruthy();
   fireEvent.click(within(management).getByRole("button", { name: "Usage" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
-  expect(screen.getByText("Your personal allowance")).toBeTruthy();
+  expect(screen.getByText("Storage")).toBeTruthy();
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   fireEvent.click(within(management).getByRole("button", { name: "Members" }));
@@ -149,11 +143,8 @@ it("exposes management directly and keeps Space switching separate", async () =>
     ),
   );
   expect(screen.getByTestId("settings-return").textContent).toBe("/spaces/family/notes");
-  openMenu();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Work" }));
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: /current Space: Work/ })).toBeTruthy(),
-  );
+  act(() => open("/spaces/work/social"));
+  await waitFor(() => expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy());
 });
 
 it("keeps the current page on load failure and ignores loads after the pane route changes", async () => {

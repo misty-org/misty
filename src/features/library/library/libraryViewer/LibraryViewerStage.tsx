@@ -81,7 +81,7 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
             shape="round"
             size="lg"
             label="Previous item"
-            className="absolute left-4 top-1/2 z-20 -translate-y-1/2 disabled:opacity-20"
+            className="absolute inset-y-0 left-4 z-20 my-auto disabled:opacity-20"
             disabled={index <= 0}
             onClick={props.onPrevious}
           >
@@ -92,7 +92,7 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
             shape="round"
             size="lg"
             label="Next item"
-            className="absolute right-4 top-1/2 z-20 -translate-y-1/2 disabled:opacity-20"
+            className="absolute inset-y-0 right-4 z-20 my-auto disabled:opacity-20"
             disabled={index < 0 || index >= itemCount - 1}
             onClick={props.onNext}
           >

@@ -28,10 +28,10 @@ export const routes = {
   studioAgents: "/studio/agents",
   studioWorkflows: "/studio/workflows",
   providers: "/providers",
+  scheduled: "/scheduled",
   profile: "/profile",
   register: "/register",
   settings: "/settings",
   signIn: "/signin",
-  transfers: "/transfers",
   terminal: "/terminal",
 } as const;

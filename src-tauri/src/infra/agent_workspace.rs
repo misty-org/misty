@@ -217,7 +217,11 @@ pub fn agent_workspace_acquire(
     request: LeaseRequest,
 ) -> Result<LeaseResult, String> {
     let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
-    acquire_lease(&mut inner, webview.window().label(), request)
+    let task = request.task_id.clone();
+    let result = acquire_lease(&mut inner, webview.window().label(), request)?;
+    drop(inner);
+    super::workspace_autopilot::renew(&task);
+    Ok(result)
 }
 
 fn acquire_lease(

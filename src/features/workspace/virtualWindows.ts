@@ -1,4 +1,10 @@
-import { layoutTabs, mapLayoutViews, migrateLayoutTabs, selectLayoutTab } from "./layoutTabs";
+import {
+  recoverPaneHistoryViews,
+  layoutTabs,
+  mapLayoutViews,
+  migrateLayoutTabs,
+  selectLayoutTab,
+} from "./layoutTabs";
 import { reconcileGroupIdentities } from "./groupIdentity";
 import {
   capDockLeaves,
@@ -38,7 +44,7 @@ export function normalizeWorkspaceLayout(
   layout: WorkspaceLayout,
   scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceLayout {
-  const migrated = migrateLayoutTabs(layout);
+  const migrated = recoverPaneHistoryViews(migrateLayoutTabs(layout));
   const activeId = migrated.activeLayoutTabId ?? layoutTabs(migrated)[0].id;
   const tabs = layoutTabs(migrated).map((tab) => {
     const source = tab.id === activeId ? migrated : tab;

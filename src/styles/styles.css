@@ -2,6 +2,7 @@
 @import "tailwindcss" source("../../");
 @import "tw-animate-css";
 @import "./overflow-fade.css";
+@import "./scrollbars.css";
 
 /* Semantic charcoal/cream palette. Utilities resolve through these variables
    so the Themes extension can preview and persist one coherent app palette. */
@@ -75,6 +76,9 @@
     var(--misty-theme-bg)
   );
   --color-cream-muted: var(--misty-theme-text-muted);
+  /* Shared interaction fills stay visible on both dark and light themes. */
+  --color-control-hover: color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
+  --color-control-active: color-mix(in srgb, var(--misty-theme-text) 16%, transparent);
   --color-notification-red: var(--misty-theme-danger);
 
   --color-sage-fg: var(--misty-theme-sage);

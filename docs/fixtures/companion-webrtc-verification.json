@@ -1,0 +1,37 @@
+{
+  "verified_at": "2026-09-27T18:30:12.403471+00:00",
+  "live_webrtc_verified": false,
+  "live_webrtc_blocker": "MISTY_REALTIME_API_KEY is not configured",
+  "active_provider_transport": "gateway_websocket",
+  "frontend_tests": {
+    "passed": 38,
+    "typecheck": "passed"
+  },
+  "go_checks": {
+    "relevant_units_with_race": "passed",
+    "vet": "passed",
+    "isolated_http_mcp_contracts_with_race": "passed",
+    "sdk_browser_planner_scenarios": 21,
+    "isolated_database_removed": true
+  },
+  "cli_environment_tests": {
+    "passed": 10
+  },
+  "services": [
+    {
+      "service": "misty-api",
+      "health": "healthy",
+      "started_at": "2026-09-27T18:29:07.929839923Z",
+      "image": "sha256:64b948733442acd15b1da950a5e77a9439edfe4e5a8deb3946a66ebda2e51bba",
+      "realtime_credential_present": false
+    },
+    {
+      "service": "misty-server-agent-runtime-1",
+      "health": "healthy",
+      "started_at": "2026-09-27T17:29:41.1213788Z",
+      "image": "sha256:ba0f8c166feb89d0a67162ca6239ab1a5c6c5d2a3195076a78251a16b19ba97d",
+      "realtime_credential_present": false
+    }
+  ],
+  "remaining": "Live desktop mic/speaker, interruption, capture and pointing checks; existing workflow test counter race and repository size cleanup remain tracked in the ledger."
+}

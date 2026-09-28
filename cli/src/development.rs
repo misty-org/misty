@@ -22,6 +22,22 @@ pub fn setup(workspace: &Workspace) -> Result<()> {
     CommandSpec::new(npm()).args(["ci"]).run(&workspace.misty)
 }
 
+// Executable tasks only; imported helpers and test fixtures are not commands.
+const TASKS: &[&str] = &[
+    "build-native-services",
+    "run-signed-desktop",
+    "run-tool",
+    "tauri",
+    "workspace-pane-lifecycle",
+    "release/beta",
+    "release/collect-macos",
+    "release/finalize-draft",
+    "release/prepare-manifest",
+    "release/promote-beta",
+    "release/setup-keys",
+    "release/sign-dmg",
+];
+
 /// Tooling that uses Vite/Node APIs stays in TypeScript under cli/tasks.
 /// Only repository-owned tasks may be selected; arguments remain separate OS arguments.
 pub fn task(workspace: &Workspace, name: &str, arguments: &[String]) -> Result<()> {
@@ -35,7 +51,8 @@ pub fn task(workspace: &Workspace, name: &str, arguments: &[String]) -> Result<(
 }
 
 fn task_path(root: &std::path::Path, name: &str) -> Result<PathBuf> {
-    if name.is_empty()
+    if !TASKS.contains(&name)
+        || name.is_empty()
         || name.starts_with('/')
         || name.contains('\\')
         || name
@@ -53,17 +70,7 @@ fn task_path(root: &std::path::Path, name: &str) -> Result<PathBuf> {
 
 pub fn tasks(workspace: &Workspace) -> Result<()> {
     workspace.validate()?;
-    let root = workspace.cli.join("tasks");
-    let mut names = Vec::new();
-    for entry in walkdir::WalkDir::new(&root) {
-        let entry = entry?;
-        if entry.file_type().is_file() && entry.path().extension().is_some_and(|e| e == "ts") {
-            let relative = entry.path().strip_prefix(&root)?.with_extension("");
-            names.push(relative.display().to_string());
-        }
-    }
-    names.sort();
-    for name in names {
+    for name in TASKS {
         println!("{name}");
     }
     Ok(())
@@ -76,9 +83,18 @@ mod tests {
     fn only_repo_tasks_can_run() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
-        std::fs::write(root.join("hello.ts"), "").unwrap();
-        assert_eq!(task_path(&root, "hello").unwrap(), root.join("hello.ts"));
-        for name in ["../hello", "/hello", "a/../../hello", "a\\hello", ""] {
+        std::fs::write(root.join("tauri.ts"), "").unwrap();
+        assert_eq!(task_path(&root, "tauri").unwrap(), root.join("tauri.ts"));
+        for name in [
+            "../hello",
+            "/hello",
+            "a/../../hello",
+            "a\\hello",
+            "",
+            "app-env",
+            "tooling",
+            "dev-build.test",
+        ] {
             assert!(task_path(&root, name).is_err());
         }
     }

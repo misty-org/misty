@@ -7,14 +7,22 @@ const Avatar = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root> & {
     size?: "default" | "sm" | "lg";
+    /**
+     * `tile` sits in an icon slot like a glyph: a square with soft corners and no ring,
+     * so any uploaded picture crops to the same footprint as the icons around it.
+     */
+    shape?: "circle" | "tile";
   }
->(({ className, size = "default", ...props }, ref) => (
+>(({ className, size = "default", shape = "circle", ...props }, ref) => (
   <AvatarPrimitive.Root
     ref={ref}
     data-slot="avatar"
     data-size={size}
+    data-shape={shape}
     className={cn(
       "group/avatar relative flex size-8 shrink-0 overflow-hidden rounded-full border border-charcoal-border bg-charcoal-card text-cream-bright select-none data-[size=lg]:size-10 data-[size=sm]:size-6",
+      "data-[shape=tile]:rounded-[28%] data-[shape=tile]:border-0 data-[shape=tile]:bg-transparent",
+      "data-[shape=tile]:[container-type:size]",
       className,
     )}
     {...props}
@@ -29,7 +37,10 @@ const AvatarImage = React.forwardRef<
   <AvatarPrimitive.Image
     ref={ref}
     data-slot="avatar-image"
-    className={cn("aspect-square size-full rounded-full object-cover", className)}
+    className={cn(
+      "aspect-square size-full rounded-full object-cover group-data-[shape=tile]/avatar:rounded-[inherit]",
+      className,
+    )}
     {...props}
   />
 ));
@@ -44,6 +55,8 @@ const AvatarFallback = React.forwardRef<
     data-slot="avatar-fallback"
     className={cn(
       "flex size-full items-center justify-center rounded-full bg-charcoal-card text-sm font-medium text-cream-bright group-data-[size=sm]/avatar:text-xs",
+      // Tile initials scale with the tile instead of a fixed text size.
+      "group-data-[shape=tile]/avatar:rounded-[inherit] group-data-[shape=tile]/avatar:text-[length:42cqi] group-data-[shape=tile]/avatar:font-semibold",
       className,
     )}
     {...props}

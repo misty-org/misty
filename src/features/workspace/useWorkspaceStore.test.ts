@@ -262,7 +262,7 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
   });
 
-  it("restores a saved Transfers tab now that the destination is visible", () => {
+  it("migrates a saved Transfers tab to Files", () => {
     const legacyTab = {
       id: "tab:legacy",
       surfaceId: "transfers",
@@ -288,9 +288,9 @@ describe("desktop dock store", () => {
 
     const restored = dockTabs(useWorkspaceStore.getState().layout.root);
     expect(restored).toHaveLength(1);
-    expect(restored[0].surfaceId).toBe("official-app");
-    expect(restored[0].route).toBe("/apps/files?view=transfers");
-    expect(restored[0].groupKey).toBe("app:files");
+    expect(restored[0].surfaceId).toBe("files");
+    expect(restored[0].route).toBe("/files");
+    expect(restored[0].groupKey).toBe("tool:files");
   });
 
   it("restores a legacy Space tab as its concrete tool tab", () => {

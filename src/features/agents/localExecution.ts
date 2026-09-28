@@ -11,6 +11,7 @@ import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import type { AiInvocationDeviceContext } from "@/features/ai-surface";
 import type { GlobalAiContextRef } from "@/features/global-search/types";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
+import { requestsScreenContext } from "./companion/companionIntent";
 
 export const agentWorkerParameters = new URLSearchParams(
   typeof location === "undefined" ? "" : location.search,
@@ -26,6 +27,7 @@ export interface Execution {
   state: "running" | "paused" | "finished";
   views: string[];
   autopilot?: boolean;
+  desktopControl?: boolean;
   normalTabs?: boolean;
   ready?: boolean;
   context: GlobalAiContextRef[];
@@ -66,11 +68,11 @@ export async function startLocalExecution(
   agentId: string,
   _legacySpaceId: string,
   mode: "agent" | "team",
-  options?: { normalTabs: boolean; openWhenMissing?: boolean },
+  options?: { normalTabs: boolean; openWhenMissing?: boolean; desktopControl?: boolean },
 ) {
   const spaceId = "";
-  if (!options?.normalTabs && visibleAutopilotAvailable() && mode !== "agent")
-    throw new Error("Only Agent mode is available in this beta.");
+  // Preserve legacy wire values without letting them choose different behavior.
+  if (!options?.normalTabs && visibleAutopilotAvailable()) mode = "agent";
   if (!hasTauriInternals() || !/Mac|Win/.test(navigator.platform))
     throw new Error("Agent execution requires Misty on macOS or Windows.");
   const accountGeneration = readApiSessionGeneration();
@@ -89,7 +91,8 @@ export async function startLocalExecution(
     (previous.agentId !== agentId ||
       previous.spaceId !== spaceId ||
       previous.mode !== mode ||
-      previous.normalTabs !== options?.normalTabs)
+      previous.normalTabs !== options?.normalTabs ||
+      previous.desktopControl !== options?.desktopControl)
   ) {
     await finishLocalExecution();
     previous = null;
@@ -100,11 +103,10 @@ export async function startLocalExecution(
       previous.agentId !== agentId ||
       previous.spaceId !== spaceId ||
       previous.mode !== mode ||
-      previous.normalTabs !== options?.normalTabs)
+      previous.normalTabs !== options?.normalTabs ||
+      previous.desktopControl !== options?.desktopControl)
   )
-    throw new Error(
-      "Stop the current task before changing its agent, mode, or conversation scope.",
-    );
+    throw new Error("Stop the current task before changing its agent or conversation scope.");
   if (previous?.state === "running")
     throw new Error("Pause the active task before starting another request.");
   const epoch = ++generation;
@@ -115,6 +117,7 @@ export async function startLocalExecution(
     spaceId,
     mode,
     normalTabs: options?.normalTabs,
+    desktopControl: options?.desktopControl,
     autopilot:
       !options?.normalTabs &&
       mode === "agent" &&
@@ -150,10 +153,10 @@ export async function startLocalExecution(
     await invoke("agent_workspace_acquire", { request: lease(execution) });
     assertCurrent();
     if (execution.autopilot) {
-      await getCurrentWindow().setFocus();
+      if (!execution.desktopControl) await getCurrentWindow().setFocus();
       await (
         await import("./workspaceAutopilot")
-      ).startWorkspaceAutopilot(execution.taskId, accountId, spaceId);
+      ).startWorkspaceAutopilot(execution.taskId, accountId, spaceId, execution.desktopControl);
     }
     assertCurrent();
     clearInterval(heartbeat);
@@ -238,7 +241,9 @@ export async function startLocalExecution(
         request: {
           id,
           scopeId,
-          url: browserHomeUrl(),
+          // Desktop control uses this inert view only as the existing device
+          // operation/grant carrier. It never navigates a hidden task browser.
+          url: execution.desktopControl ? "about:blank" : browserHomeUrl(),
           originSpaceId: spaceId,
           x: 0,
           y: 64,
@@ -264,7 +269,7 @@ export async function startLocalExecution(
       execution.context.push({
         kind: "browser-tab",
         id: "browser:workspace",
-        title: "Browser",
+        title: execution.desktopControl ? "Desktop" : "Browser",
         source: "current",
         privacy: "device",
         spaceId,
@@ -276,7 +281,7 @@ export async function startLocalExecution(
         deviceId: device.id,
         kind: "browser_tab",
         opaqueRef: scopeId,
-        displayName: "Browser workspace",
+        displayName: execution.desktopControl ? "Desktop screen control" : "Browser workspace",
         capabilities: execution.autopilot
           ? ["browser.workspace.visual", "browser.workspace.interact"]
           : [
@@ -290,13 +295,14 @@ export async function startLocalExecution(
             ],
         metadata: {
           ...(execution.autopilot ? { workspace_control: true } : {}),
+          ...(execution.desktopControl ? { desktop_control: true } : {}),
           app_id: "browser",
           window_label: getCurrentWindow().label,
         },
       });
     }
     assertCurrent();
-    if (execution.autopilot) await getCurrentWindow().setFocus();
+    if (execution.autopilot && !execution.desktopControl) await getCurrentWindow().setFocus();
     assertCurrent();
     execution.ready = true;
     useLocalExecution.setState({ execution: { ...execution } });
@@ -321,16 +327,20 @@ export async function startLocalExecution(
 export async function pauseLocalExecution(expectedTaskId?: string) {
   const execution = useLocalExecution.getState().execution;
   if (!execution || (expectedTaskId && execution.taskId !== expectedTaskId)) return;
-  ++generation;
+  const epoch = ++generation;
   clearInterval(heartbeat);
   heartbeat = undefined;
   useLocalExecution.setState({ execution: { ...execution, state: "paused" } });
   const { useMistyStore } = await import("@/features/misty/useMistyStore");
   const { replaceActiveGlobalInvocationStream } =
     await import("@/features/global-search/globalSearchStoreHelpers");
-  const invocationId = useMistyStore.getState().invocationId;
-  replaceActiveGlobalInvocationStream();
-  useMistyStore.setState({ working: false, invocationId: undefined });
+  const stillCurrent =
+    generation === epoch && useLocalExecution.getState().execution?.taskId === execution.taskId;
+  const invocationId = stillCurrent ? useMistyStore.getState().invocationId : undefined;
+  if (stillCurrent) {
+    replaceActiveGlobalInvocationStream();
+    useMistyStore.setState({ working: false, invocationId: undefined });
+  }
   await releaseLease(execution);
   if (invocationId) {
     const { aiSurfaceApi } = await import("@/features/ai-surface/api");
@@ -373,7 +383,18 @@ export async function steerLocalExecution(prompt: string) {
     working: false,
     selectedSpaceId: useLocalExecution.getState().execution?.spaceId ?? before.selectedSpaceId,
   });
-  if (useLocalExecution.getState().execution?.autopilot) {
+  if (
+    useLocalExecution.getState().execution?.normalTabs ||
+    useLocalExecution.getState().execution?.desktopControl ||
+    requestsScreenContext(prompt)
+  ) {
+    const companion = (await import("./companion/companionState")).useCompanionState.getState();
+    if (!companion.submit || companion.accountId !== before.accountId)
+      throw new Error(
+        "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there. The task remains paused.",
+      );
+    await companion.submit({ prompt, conversationId: before.activeConversationId });
+  } else if (useLocalExecution.getState().execution?.autopilot) {
     await useMistyStore.getState().submitAnswer(prompt, undefined, undefined, "workspace");
   } else {
     await useMistyStore.getState().submitAnswer(prompt);

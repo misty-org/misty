@@ -16,10 +16,10 @@ export type AiSurfaceId =
   | "files"
   | "code"
   | "terminal"
-  | "transfers"
   | "marketplace"
   | "extension"
   | "photo-editor"
+  | "scheduled"
   | "agents"
   | "settings";
 export type AiInvocationMode = "quick" | "drawer" | "companion";

@@ -12,8 +12,10 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "val
   icon?: React.ReactNode;
   /** Current selection shown in place of the label, e.g. a picked model. */
   value?: React.ReactNode;
-  /** Icon-only triggers are toolbar icon buttons and never show a chevron. */
+  /** Icon-only triggers use toolbar geometry. */
   iconOnly?: boolean;
+  /** Show dropdown affordance beside a toolbar icon. */
+  showChevron?: boolean;
   tooltip?: string | false;
   /** Opens a DropdownMenu by default; "popover" for a Popover with rich content. */
   kind?: "menu" | "popover";
@@ -23,7 +25,7 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "val
 
 /**
  * The button that opens a DropdownMenu, or a Popover with kind="popover". Labeled triggers
- * always end in a chevron that flips while open; icon-only triggers never have one.
+ * always end in a chevron; toolbar triggers opt in with showChevron.
  * Features never draw their own.
  */
 const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
@@ -33,6 +35,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
       icon,
       value,
       iconOnly = false,
+      showChevron = false,
       tooltip,
       variant,
       className,
@@ -52,10 +55,16 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
             size={size}
             tooltip={tooltip ?? false}
             variant={variant ?? "toolbar"}
-            className={className}
+            className={cn(showChevron && "w-auto gap-0.5 px-1", className)}
             {...props}
           >
             {icon}
+            {showChevron && (
+              <ChevronDown
+                aria-hidden
+                className="size-4 shrink-0 transition-transform duration-150 group-data-[state=open]/button:rotate-180"
+              />
+            )}
           </IconButton>
         </Trigger>
       );

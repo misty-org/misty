@@ -150,7 +150,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
 
               <div className="relative">
                 <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cream-muted"
+                  className="pointer-events-none absolute inset-y-0 left-3 my-auto size-4 text-cream-muted"
                   aria-hidden="true"
                 />
                 <Input

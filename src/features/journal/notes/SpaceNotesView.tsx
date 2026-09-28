@@ -254,7 +254,7 @@ export function SpaceNotesView(
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
                   <div className="shrink-0 border-b border-charcoal-border p-3">
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+                      <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
                       <Input
                         className={cn("bg-charcoal-bg pl-9", "h-8 text-xs")}
                         aria-label="Search notes"

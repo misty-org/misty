@@ -11,7 +11,7 @@ import {
 } from "@/shared/ui";
 import { ArrowUp, Camera, ImagePlus, Plus, Search, X } from "lucide-react";
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { SearchAskToggle } from "./GlobalMistySupport";
 import { validateMistyImage } from "./mistyImageValues";
 import type { GlobalAiMode, MistyImageAttachment } from "./types";
@@ -37,12 +37,38 @@ export function MistyComposer(props: {
   placeholder?: string;
   compact?: boolean;
   inputFirst?: boolean;
+  layout?: "default" | "conversation";
   className?: string;
   onError?: (message: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const textareaRef = props.textareaRef ?? localTextareaRef;
   const [dragging, setDragging] = useState(false);
+  useLayoutEffect(() => {
+    if (props.layout !== "conversation") return;
+    const input = textareaRef.current;
+    if (!input) return;
+    const resize = () => {
+      input.style.height = "0px";
+      input.style.height = `${Math.min(160, Math.max(38, input.scrollHeight))}px`;
+    };
+    resize();
+    // Wrapping changes when the workspace pane is resized, even without typing.
+    let width = input.clientWidth;
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(() => {
+            if (input.clientWidth === width) return;
+            width = input.clientWidth;
+            resize();
+          });
+    observer?.observe(input);
+    return () => observer?.disconnect();
+  }, [props.layout, props.value, textareaRef]);
   const accept = (files: File[]) => {
+    if (props.disabled) return;
     try {
       const room = props.maxAttachments - props.attachments.length;
       if (room <= 0)
@@ -72,6 +98,7 @@ export function MistyComposer(props: {
     <div
       className={cn(
         "relative flex flex-col rounded-2xl border border-charcoal-border bg-charcoal-card/95 shadow-lg shadow-black/15 transition",
+        props.layout === "conversation" && "rounded-xl shadow-none",
         dragging && "border-blue-400 bg-blue-500/[0.06]",
         props.className,
       )}
@@ -89,10 +116,12 @@ export function MistyComposer(props: {
         if (files.length) accept(files);
       }}
       data-misty-universal-composer
+      data-composer-layout={props.layout ?? "default"}
+      data-dragging={dragging}
       data-misty-composer={props.compact ? "follow-up" : "launcher"}
     >
       {props.attachments.length ? (
-        <div className="flex gap-2 overflow-x-auto px-3 pt-3">
+        <div className="misty-composer-attachments flex gap-2 overflow-x-auto px-3 pt-3">
           {props.attachments.map((attachment) => (
             <div
               key={attachment.id}
@@ -144,100 +173,112 @@ export function MistyComposer(props: {
           ))}
         </div>
       ) : null}
-      <Textarea
-        variant="composer"
-        ref={props.textareaRef}
-        data-global-misty-launcher-input
-        value={props.value}
-        onChange={(event) => props.onChange(event.target.value)}
-        onKeyDown={props.onKeyDown}
-        rows={1}
-        aria-label={props.mode === "search" ? "Search Misty" : "Message Misty"}
-        placeholder={
-          props.placeholder ??
-          (props.mode === "search"
-            ? "Search files, notes, and connected apps…"
-            : "Ask Misty anything…")
-        }
-        className={cn(
-          "max-h-40 min-h-12 px-4 pb-2.5 pt-3 text-[15px] leading-6",
-          props.compact && "min-h-11 px-3.5 pb-2 pt-2.5 text-sm leading-5",
-          props.inputFirst && "min-h-20 px-4 pb-3 pt-3 text-base leading-6",
-        )}
-      />
-      <div
-        className={cn(
-          "flex min-h-10 items-center gap-1 px-3 pb-3",
-          !props.inputFirst && "border-t border-charcoal-border pt-1.5",
-        )}
-      >
-        <FileInput
-          ref={fileRef}
-          accept={
-            props.mode === "search"
-              ? "image/jpeg,image/png,image/webp"
-              : "image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"
+      <div className="misty-composer-body contents">
+        <Textarea
+          variant="composer"
+          ref={textareaRef}
+          data-global-misty-launcher-input
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+          onKeyDown={props.onKeyDown}
+          rows={1}
+          disabled={props.disabled}
+          aria-label={props.mode === "search" ? "Search Misty" : "Message Misty"}
+          placeholder={
+            props.placeholder ??
+            (props.mode === "search"
+              ? "Search files, notes, and connected apps…"
+              : "Ask Misty anything…")
           }
-          multiple={props.maxAttachments > 1}
-          onChange={(event) => {
-            accept(Array.from(event.target.files ?? []));
-            event.target.value = "";
-          }}
+          className={cn(
+            "max-h-40 min-h-12 px-4 pb-2.5 pt-3 text-[15px] leading-6",
+            props.compact && "min-h-11 px-3.5 pb-2 pt-2.5 text-sm leading-5",
+            props.inputFirst && "min-h-20 px-4 pb-3 pt-3 text-base leading-6",
+          )}
         />
-        {props.onCapture ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <IconButton label="Add attachments" tooltip={false} disabled={props.disabled}>
-                <Plus className="size-4" />
-              </IconButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" data-misty-layer-portal>
-              <MenuItem
-                icon={<ImagePlus className="size-4" />}
-                label="Attach files"
-                onSelect={() => fileRef.current?.click()}
-              />
-              <MenuItem
-                icon={<Camera className="size-4" />}
-                label="Capture part of the screen"
-                onSelect={props.onCapture}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <IconButton
-            label="Attach files"
-            disabled={props.disabled}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Plus className="size-4" />
-          </IconButton>
-        )}
-        {props.onModeChange ? (
-          <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
-        ) : props.mode === "search" ? (
-          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
-            <Search className="size-3.5" />
-            Search
-          </span>
-        ) : (
-          props.modelControl
-        )}
-        <div className="min-w-0 flex-1" />
-        {props.voiceControl}
-        <IconButton
-          label={props.mode === "search" ? "Search" : "Send to Misty"}
-          disabled={
-            props.disabled ||
-            props.busy ||
-            !canSend ||
-            props.attachments.some((item) => item.state !== "ready")
-          }
-          onClick={props.onSubmit}
+        <div
+          className={cn(
+            "flex min-h-10 items-center gap-1 px-3 pb-3",
+            "misty-composer-controls",
+            !props.inputFirst && "border-t border-charcoal-border pt-1.5",
+          )}
         >
-          {props.busy ? <Spinner label={false} /> : <ArrowUp className="size-4" />}
-        </IconButton>
-        {props.trailingControl}
+          <FileInput
+            ref={fileRef}
+            accept={
+              props.mode === "search"
+                ? "image/jpeg,image/png,image/webp"
+                : "image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"
+            }
+            multiple={props.maxAttachments > 1}
+            onChange={(event) => {
+              accept(Array.from(event.target.files ?? []));
+              event.target.value = "";
+            }}
+          />
+          {props.onCapture ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton label="Add attachments" tooltip={false} disabled={props.disabled}>
+                  <Plus className="size-4" />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" data-misty-layer-portal>
+                <MenuItem
+                  icon={<ImagePlus className="size-4" />}
+                  label="Attach files"
+                  onSelect={() => fileRef.current?.click()}
+                />
+                <MenuItem
+                  icon={<Camera className="size-4" />}
+                  label="Capture part of the screen"
+                  onSelect={props.onCapture}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <IconButton
+              label="Attach files"
+              disabled={props.disabled}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Plus className="size-4" />
+            </IconButton>
+          )}
+          {props.onModeChange ? (
+            <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
+          ) : props.mode === "search" ? (
+            <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
+              <Search className="size-3.5" />
+              Search
+            </span>
+          ) : (
+            props.modelControl
+          )}
+          <div className="misty-composer-spacer min-w-0 flex-1" />
+          {props.voiceControl && (
+            <div className="misty-composer-voice contents">{props.voiceControl}</div>
+          )}
+          {!(props.layout === "conversation" && props.busy && props.trailingControl) && (
+            <IconButton
+              className="misty-composer-send"
+              variant={props.layout === "conversation" ? "primary" : "toolbar"}
+              label={props.mode === "search" ? "Search" : "Send to Misty"}
+              disabled={
+                props.disabled ||
+                props.busy ||
+                !canSend ||
+                props.attachments.some((item) => item.state !== "ready")
+              }
+              onClick={props.onSubmit}
+            >
+              {props.busy ? <Spinner label={false} /> : <ArrowUp className="size-4" />}
+            </IconButton>
+          )}
+          {props.trailingControl && (
+            <div className="misty-composer-trailing contents">{props.trailingControl}</div>
+          )}
+        </div>
       </div>
     </div>
   );

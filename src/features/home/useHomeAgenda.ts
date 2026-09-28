@@ -5,7 +5,7 @@ import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpans
 
 export type HomeAgendaEntry = SpaceAgendaEntry & { spaceId: string; spaceName: string };
 
-export function useHomeAgenda(accountId: string, spaces: Space[], loading: boolean) {
+export function useHomeAgenda(accountId: string, spaces: Space[], loading: boolean, limit = 4) {
   const scope = JSON.stringify([accountId, spaces.map((space) => space.id)]);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{
@@ -37,7 +37,7 @@ export function useHomeAgenda(accountId: string, spaces: Space[], loading: boole
         .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
         .filter((entry) => entry.status !== "completed")
         .sort((left, right) => Date.parse(left.starts_at) - Date.parse(right.starts_at))
-        .slice(0, 4);
+        .slice(0, limit);
       setResult({
         scope,
         entries,
@@ -47,7 +47,7 @@ export function useHomeAgenda(accountId: string, spaces: Space[], loading: boole
     return () => {
       cancelled = true;
     };
-  }, [scope, spaces, loading, attempt]);
+  }, [scope, spaces, loading, attempt, limit]);
 
   useEffect(() => {
     const refresh = () => setAttempt((value) => value + 1);

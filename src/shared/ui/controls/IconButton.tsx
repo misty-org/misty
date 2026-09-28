@@ -7,16 +7,16 @@ const iconButtonSizes = {
   // Inline closers inside tabs and menu rows.
   "2xs": "size-5 [&_svg:not([class*='size-'])]:size-3",
   xs: "size-6 [&_svg:not([class*='size-'])]:size-3.5",
-  sm: "size-[30px]",
+  sm: "size-8",
   md: "size-9",
   lg: "size-10",
 } as const;
 
 /** Glyph geometry for icons inside toolbar-sized icon buttons. */
-export const toolbarIconProps = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
+export const toolbarIconProps = { size: 18, strokeWidth: 1.75, "aria-hidden": true } as const;
 
 /**
- * The one icon-only button. Defaults to the browser chrome's toolbar look at 30px;
+ * The one icon-only button. Defaults to the browser chrome's toolbar look at 32px;
  * `label` is required and doubles as the tooltip unless `tooltip={false}`. With `asChild` it
  * styles its child, such as a router Link. `shape="round"` is for tab closers and media controls.
  */

@@ -15,17 +15,11 @@ export function SpaceAvatar({
 
   return (
     <Avatar
-      className={cn("shrink-0 rounded-[25%]", className)}
+      shape="tile"
+      className={cn("shrink-0", className)}
       aria-label={`${space.name} default profile picture`}
     >
-      <AvatarFallback
-        className={cn(
-          "rounded-[inherit] text-[10px] font-bold",
-          avatarColorClass(space.id),
-          avatarInkClass,
-          fallbackClassName,
-        )}
-      >
+      <AvatarFallback className={cn(avatarColorClass(space.id), avatarInkClass, fallbackClassName)}>
         {initials}
       </AvatarFallback>
     </Avatar>

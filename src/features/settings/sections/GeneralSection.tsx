@@ -1,3 +1,4 @@
+import { workspaceDefaultTabOptions } from "@/features/workspace/workspaceDefaultTab";
 import { startupViewOptions } from "@/features/app-shell";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -42,9 +43,10 @@ export function GeneralSection(props: SettingsContentProps) {
           />
         </SettingsRow>
         <SettingsRow
-          label="Open on launch"
+          label="Otherwise open"
           description="The view Misty starts on when it is not reopening your last session."
           muted={reopenLastSession}
+          indent
         >
           <SelectControl
             value={numberSetting(props.document, "general", "startup_view_index", 0)}
@@ -56,6 +58,19 @@ export function GeneralSection(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Behavior">
+        <SettingsRow
+          label="New tabs and splits"
+          description="Choose the starting page. Selecting a navbar destination fills an unused tab or pane."
+        >
+          <SelectControl
+            value={numberSetting(props.document, "general", "workspace_default_tab_index", 0)}
+            options={[...workspaceDefaultTabOptions]}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("general", "workspace_default_tab_index", value)
+            }
+          />
+        </SettingsRow>
         <SettingsRow
           label="Confirm destructive actions"
           description="Ask before delete, empty trash, and other irreversible actions."

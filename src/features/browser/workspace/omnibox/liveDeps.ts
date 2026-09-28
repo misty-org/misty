@@ -1,3 +1,4 @@
+import { bookmarks } from "@/features/bookmarks/library";
 import { invoke } from "@tauri-apps/api/core";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { searchLocalMistyContent } from "@/features/global-search/localContentSearch";
@@ -26,9 +27,7 @@ export const liveOmniboxDeps: OmniboxDeps = {
   historySuggestions: (request) =>
     hasTauriInternals() ? browserLibrary.historySuggestions(request) : Promise.resolve([]),
   bookmarks: () =>
-    useWorkspaceStore
-      .getState()
-      .savedWebsites.map((website) => ({ url: website.fields.url, title: website.fields.title })),
+    bookmarks(useWorkspaceStore.getState().savedWebsites).map(({ url, title }) => ({ url, title })),
   mistyContent: (text, limit) =>
     searchLocalMistyContent(text, limit).map((result) => ({
       id: result.canonicalId ?? `${result.kind}:${result.id}`,

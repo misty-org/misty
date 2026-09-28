@@ -14,6 +14,7 @@ export function SpaceSidebarLink({
   active,
   horizontal = false,
   iconOnly = false,
+  strip = false,
   badgeCount = 0,
   icon: Icon,
   label,
@@ -23,6 +24,8 @@ export function SpaceSidebarLink({
   active: boolean;
   horizontal?: boolean;
   iconOnly?: boolean;
+  /** One equal-width icon cell of the Space sidebar's tool strip. */
+  strip?: boolean;
   badgeCount?: number;
   icon: LucideIcon;
   label: string;
@@ -33,7 +36,9 @@ export function SpaceSidebarLink({
     <Link
       className={cn(
         navigationMenuLinkClass,
-        iconOnly
+        strip
+          ? "relative h-8 w-full grid-cols-1 place-items-center gap-0 !px-0"
+          : iconOnly
           ? "misty-space-rail-control relative size-10 grid-cols-1 place-items-center gap-0 p-0 [@media(pointer:coarse)]:size-11"
           : horizontal
             ? "w-auto shrink-0"
@@ -41,7 +46,7 @@ export function SpaceSidebarLink({
         active && "text-cream-bright",
       )}
       to={to}
-      aria-label={iconOnly ? label : undefined}
+      aria-label={iconOnly || strip ? label : undefined}
       aria-current={active ? "page" : undefined}
       onClick={(event) => {
         if (
@@ -60,7 +65,7 @@ export function SpaceSidebarLink({
       <span className={navigationMenuPrimaryIconClass}>
         <Icon size={18} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
       </span>
-      <span className={iconOnly ? "sr-only" : "flex min-w-0 items-center gap-2"}>
+      <span className={iconOnly || strip ? "sr-only" : "flex min-w-0 items-center gap-2"}>
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {badgeCount > 0 ? (
           <span
@@ -74,7 +79,7 @@ export function SpaceSidebarLink({
           </span>
         ) : null}
       </span>
-      {iconOnly && badgeCount > 0 && (
+      {(iconOnly || strip) && badgeCount > 0 && (
         <span
           aria-hidden="true"
           className="absolute right-1 top-1 size-2 rounded-full bg-notification-red"
@@ -82,10 +87,10 @@ export function SpaceSidebarLink({
       )}
     </Link>
   );
-  return iconOnly ? (
+  return iconOnly || strip ? (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">
+      <TooltipContent side={strip ? "bottom" : "right"}>
         {label}
         {badgeCount > 0 ? ` · ${badgeCount} new` : ""}
       </TooltipContent>

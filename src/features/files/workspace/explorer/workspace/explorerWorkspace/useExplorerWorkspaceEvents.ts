@@ -20,7 +20,9 @@ export function useLegacyPluginTabMigration(options: {
   useEffect(() => {
     if (!homePath) return;
     const multi = (options.multiPanelStore ?? useMultiPanelStore).getState();
-    const legacyTabs = multi.tabs.filter((tab) => parsePluginTabPath(tab.path));
+    const legacyTabs = multi.tabs.filter(
+      (tab) => parsePluginTabPath(tab.path) || tab.path.startsWith("misty-transfers://"),
+    );
     for (const tab of legacyTabs) {
       multi.updateActiveTabPath(tab.activePaneId, homePath, "Files");
       multi.setTabPanelVisibility(tab.id, {

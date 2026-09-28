@@ -4,36 +4,39 @@ import { describe, expect, it } from "vitest";
 import { useLegacyPluginTabMigration } from "./useExplorerWorkspaceEvents";
 
 describe("retired extension tab recovery", () => {
-  it("restores legacy tabs to Files without changing ordinary tabs or focus", () => {
-    const store = createMultiPanelStore({ idPrefix: "retired-extension" });
-    store.getState().initialize("/Users/test/Documents", "Documents");
-    const browseId = store.getState().activeTabId;
-    store.getState().addTab("misty-plugin://panel?plugin=themes&panel=main", "Themes");
-    const legacy = store.getState().tabs.find((tab) => tab.id !== browseId)!;
-    store
-      .getState()
-      .setTabPanelVisibility(legacy.id, { sidebarVisible: false, previewVisible: false });
-    store.getState().selectTab(browseId);
+  it.each(["misty-plugin://panel?plugin=themes&panel=main", "misty-transfers://history"])(
+    "restores %s to Files without changing ordinary tabs or focus",
+    (legacyPath) => {
+      const store = createMultiPanelStore({ idPrefix: "retired-extension" });
+      store.getState().initialize("/Users/test/Documents", "Documents");
+      const browseId = store.getState().activeTabId;
+      store.getState().addTab(legacyPath, "Legacy");
+      const legacy = store.getState().tabs.find((tab) => tab.id !== browseId)!;
+      store
+        .getState()
+        .setTabPanelVisibility(legacy.id, { sidebarVisible: false, previewVisible: false });
+      store.getState().selectTab(browseId);
 
-    renderHook(() =>
-      useLegacyPluginTabMigration({
-        homePath: "/Users/test",
-        workspacePathSignature: "saved-tabs",
-        multiPanelStore: store,
-      }),
-    );
+      renderHook(() =>
+        useLegacyPluginTabMigration({
+          homePath: "/Users/test",
+          workspacePathSignature: "saved-tabs",
+          multiPanelStore: store,
+        }),
+      );
 
-    expect(store.getState().activeTabId).toBe(browseId);
-    expect(store.getState().tabs.find((tab) => tab.id === browseId)?.path).toBe(
-      "/Users/test/Documents",
-    );
-    expect(store.getState().tabs.find((tab) => tab.id === legacy.id)).toMatchObject({
-      path: "/Users/test",
-      title: "Files",
-      sidebarVisible: true,
-      previewVisible: true,
-    });
-  });
+      expect(store.getState().activeTabId).toBe(browseId);
+      expect(store.getState().tabs.find((tab) => tab.id === browseId)?.path).toBe(
+        "/Users/test/Documents",
+      );
+      expect(store.getState().tabs.find((tab) => tab.id === legacy.id)).toMatchObject({
+        path: "/Users/test",
+        title: "Files",
+        sidebarVisible: true,
+        previewVisible: true,
+      });
+    },
+  );
 
   it("waits until the home folder is available", () => {
     const store = createMultiPanelStore({ idPrefix: "retired-extension-wait" });

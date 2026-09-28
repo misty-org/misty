@@ -268,13 +268,13 @@ async function streamAiInvocation(
   const headers = new Headers({ Accept: "text/event-stream" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
   await readInvocationStream(
-    (lastEventId) => {
+    (lastEventId, connectionSignal) => {
       if (lastEventId) headers.set("Last-Event-ID", lastEventId);
       return httpRequest(`${base}${eventsUrl}`, {
         method: "GET",
         credentials: apiRequestCredentials(),
         headers,
-        signal,
+        signal: connectionSignal,
       });
     },
     signal,
@@ -302,6 +302,9 @@ function toServerInvocation(input: AiInvocationRequest) {
       content_hash: c.contentHash,
       screen: c.screen,
       primary: c.primary,
+      captured_at: c.capturedAt,
+      display_id: c.display.id,
+      source: c.source,
     })),
     capture: input.capture
       ? {

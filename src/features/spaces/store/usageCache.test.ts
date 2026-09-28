@@ -76,7 +76,7 @@ describe("usageCache", () => {
       expect(spy).toHaveBeenCalledTimes(2);
     });
 
-    it("prefers the new personal AI meter and retains per-Space usage", async () => {
+    it("prefers the account AI meter and retains per-Space storage", async () => {
       const response = {
         personal: {
           ai: {
@@ -95,14 +95,14 @@ describe("usageCache", () => {
             name: "Studio",
             role: "member",
             owner_user_id: "owner",
-            ai: {
-              used: 50,
-              reserved: 0,
-              limit: 100,
-              remaining: 50,
-              used_ratio: 0.5,
-              available: true,
-              paused: false,
+            storage: {
+              space_id: "space-1",
+              space: {
+                used_bytes: 50,
+                reserved_bytes: 0,
+                limit_bytes: 100,
+                remaining_bytes: 50,
+              },
             },
           },
         ],
@@ -113,7 +113,7 @@ describe("usageCache", () => {
       await fetchBillingUsage();
 
       expect(getCachedAgentUsage()?.percentage_used).toBe(25);
-      expect(getCachedBillingUsage()?.spaces?.[0]?.ai?.used_ratio).toBe(0.5);
+      expect(getCachedBillingUsage()?.spaces?.[0]?.storage?.space?.used_bytes).toBe(50);
     });
   });
 

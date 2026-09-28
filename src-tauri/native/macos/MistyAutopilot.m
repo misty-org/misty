@@ -77,9 +77,9 @@ char *misty_autopilot_action(const char *json) {
       [(id<NSTextInputClient>)responder insertText:text replacementRange:NSMakeRange(NSNotFound,0)];
     } else if ([kind isEqual:@"key"]) {
       NSString *key=action[@"key"];
-      NSDictionary *keys=@{@"Enter":@[@(kVK_Return),@"\r"],@"Escape":@[@(kVK_Escape),@"\033"],@"Tab":@[@(kVK_Tab),@"\t"],@"Backspace":@[@(kVK_Delete),@"\177"],@"ArrowLeft":@[@(kVK_LeftArrow),@"\uF702"],@"ArrowRight":@[@(kVK_RightArrow),@"\uF703"],@"ArrowUp":@[@(kVK_UpArrow),@"\uF700"],@"ArrowDown":@[@(kVK_DownArrow),@"\uF701"],@"SelectAll":@[@(kVK_ANSI_A),@"a"],@"Undo":@[@(kVK_ANSI_Z),@"z"]};
+      NSDictionary *keys=@{@"Enter":@[@(kVK_Return),@"\r"],@"Escape":@[@(kVK_Escape),@"\033"],@"Tab":@[@(kVK_Tab),@"\t"],@"Backspace":@[@(kVK_Delete),@"\177"],@"ArrowLeft":@[@(kVK_LeftArrow),@"\uF702"],@"ArrowRight":@[@(kVK_RightArrow),@"\uF703"],@"ArrowUp":@[@(kVK_UpArrow),@"\uF700"],@"ArrowDown":@[@(kVK_DownArrow),@"\uF701"],@"SelectAll":@[@(kVK_ANSI_A),@"a"],@"Undo":@[@(kVK_ANSI_Z),@"z"],@"AddressBar":@[@(kVK_ANSI_L),@"l"],@"NewTab":@[@(kVK_ANSI_T),@"t"],@"Find":@[@(kVK_ANSI_F),@"f"]};
       NSArray *spec=keys[key]; if (!spec) return AutopilotJSON(@{@"error":@"Unsupported workspace key"});
-      NSEventModifierFlags flags=([key isEqual:@"SelectAll"]||[key isEqual:@"Undo"])?NSEventModifierFlagCommand:0;
+      NSEventModifierFlags flags=([@[@"SelectAll", @"Undo", @"AddressBar", @"NewTab", @"Find"] containsObject:key])?NSEventModifierFlagCommand:0;
       for (NSNumber *type in @[@(NSEventTypeKeyDown),@(NSEventTypeKeyUp)]) {
         NSEvent *event=[NSEvent keyEventWithType:type.unsignedIntegerValue location:NSZeroPoint modifierFlags:flags timestamp:time windowNumber:window.windowNumber context:nil characters:spec[1] charactersIgnoringModifiers:spec[1] isARepeat:NO keyCode:[spec[0] unsignedShortValue]];
         [NSApp sendEvent:event];

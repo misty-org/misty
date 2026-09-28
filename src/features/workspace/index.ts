@@ -3,7 +3,7 @@ export * from "./dockTree";
 export * from "./layoutTabs";
 export * from "./MistyBrandIcon";
 export * from "./model";
-export type { MultiPanelClosedPane, MultiPanelPane, MultiPanelTab } from "./model/interfaces/types";
+export type { MultiPanelPane, MultiPanelTab } from "./model/interfaces/types";
 export * from "./navigatorApps";
 export * from "./paneNavigation";
 export * from "./privateBrowsing";
@@ -12,7 +12,6 @@ export {
   activeMultiPanelTab,
   createMultiPanelStore,
   destroyMultiPanelStore,
-  maxMultiPanelPanes,
   multiPanelStoreForPane,
   useMultiPanelStore,
 } from "./useMultiPanelStore";

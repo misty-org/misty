@@ -48,9 +48,11 @@
 .misty-region-capture-hint {
   position: fixed;
   top: 18px;
-  left: 50%;
+  right: 0;
+  left: 0;
   z-index: 2;
-  transform: translateX(-50%);
+  width: fit-content;
+  margin-inline: auto;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 999px;
   background: rgb(18 21 25 / 94%);

@@ -12,6 +12,7 @@ import {
   type Navigator,
   type To,
 } from "react-router-dom";
+import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { dockLeaves } from "./dockTree";
 import type { WorkspaceTab } from "./model";
 import { useWorkspaceStore } from "./useWorkspaceStore";
@@ -132,7 +133,20 @@ export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: Rea
     };
     const commit = (to: To, state: unknown, options: NavigateOptions | undefined) => {
       const resolved = resolvePath(to, location.pathname);
-      apply(createPath(resolved), state, options, true);
+      const nextRoute = createPath(resolved);
+      const destination = workspaceSurfaceFromRoute(nextRoute);
+      const sameDestination =
+        destination &&
+        destination.surfaceId === props.tab.surfaceId &&
+        (destination.surfaceId === "space"
+          ? destination.groupKey.split(":")[1] === props.tab.groupKey.split(":")[1]
+          : destination.groupKey === props.tab.groupKey);
+      if (destination && !sameDestination) {
+        const opened = useWorkspaceStore.getState().openSurface(destination);
+        outerNavigate(opened.route, { ...options, state, replace: true });
+        return;
+      }
+      apply(nextRoute, state, options, true);
     };
     return {
       createHref: (to) => createPath(resolvePath(to, location.pathname)),
@@ -154,7 +168,7 @@ export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: Rea
       push: (to, state, options) => commit(to, state, options),
       replace: (to, state, options) => commit(to, state, { ...options, replace: true }),
     };
-  }, [location.pathname, outerNavigate, props.tab.id]);
+  }, [location.pathname, outerNavigate, props.tab.id, props.tab.groupKey, props.tab.surfaceId]);
 
   const navigationContext = useMemo(
     () => ({ basename: "/", navigator, static: false, useTransitions: false, future: {} }),

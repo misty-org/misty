@@ -141,21 +141,12 @@ export const ProfileNavButton = memo(
         {...buttonProps}
       >
         {account ? (
-          <Avatar
-            className={cn(
-              "size-9 shrink-0 rounded-full transition duration-150",
-              props.open
-                ? "ring-2 ring-cream/70"
-                : "ring-1 ring-charcoal-border/55 group-hover/profile:ring-charcoal-border",
-              props.avatarClassName,
-            )}
-          >
+          <Avatar shape="tile" className={cn("shrink-0", props.avatarClassName)}>
             {avatarUrl ? (
               <AvatarImage src={avatarUrl} alt={`${displayName} profile picture`} />
             ) : null}
             <AvatarFallback
               className={cn(
-                "rounded-full text-[10px] font-bold",
                 account?.id
                   ? cn(avatarColorClass(account.id), avatarInkClass)
                   : "bg-charcoal-bg text-cream",

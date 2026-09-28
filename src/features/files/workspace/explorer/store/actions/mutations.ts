@@ -47,7 +47,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
       try {
         set({ operationError: null });
         await explorerQueueCreateItem({ directory, name: requestedName, kind });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(
           `Queued ${kind === "folder" ? "folder" : "file"} creation`,
           "success",
@@ -96,7 +96,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
           newName: requestedName,
           sourceIsDirectory: entry.kind === "folder",
         });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(`Queued rename to ${requestedName}`, "success");
         get().clearSelection(paneId);
         H.queuePaneRefresh(paneId, pane?.listing?.path ?? entry.path);
@@ -134,7 +134,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
           set({ operationError: null });
           const directory = pane?.listing?.path;
           await explorerQueueDeleteItems({ paths, permanent });
-          H.refreshTransferViews();
+          H.refreshFileOperationState();
           get().pushNotification(H.deleteQueuedMessage(paths.length, permanent), "success");
           get().clearSelection(paneId);
           if (directory) H.queuePaneRefresh(paneId, directory);
@@ -159,7 +159,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
           destinationDirectory: downloadsDirectory,
           operation: "copy",
         });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(`Queued download for ${H.itemCountLabel(items.length)}`, "success");
         if (pane?.listing && H.samePath(pane.listing.path, downloadsDirectory)) {
           H.queuePaneRefresh(paneId, downloadsDirectory);
@@ -178,7 +178,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
           set({ operationError: null });
           const directory = get().panes[dialog.paneId]?.listing?.path;
           await explorerQueueDeleteItems({ paths: dialog.paths, permanent: dialog.permanent });
-          H.refreshTransferViews();
+          H.refreshFileOperationState();
           get().pushNotification(
             H.deleteQueuedMessage(dialog.paths.length, dialog.permanent),
             "success",
@@ -212,7 +212,7 @@ export function createMutationsActions(set: ExplorerSet, get: ExplorerGet): Part
       try {
         set({ operationError: null });
         await explorerQueueRenameItems({ items });
-        H.refreshTransferViews();
+        H.refreshFileOperationState();
         get().pushNotification(`Queued rename for ${H.itemCountLabel(items.length)}`, "success");
         H.refreshAndClearRenamePanes(validatedItems);
       } catch (error) {

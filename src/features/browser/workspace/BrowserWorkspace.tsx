@@ -59,8 +59,10 @@ import {
 import type { BrowserTheme } from "./types";
 import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
+import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
 import { useBrowserPageCommands } from "./useBrowserPageCommands";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
+import { useBrowserPagePreview } from "./useBrowserPagePreview";
 export { normalizeBrowserAddress } from "./browserAddress";
 export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
 function browserThemeFromDocument(): BrowserTheme {
@@ -111,6 +113,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
   const pageLoading = useBrowserRuntimeStore((runtime) => runtime.loading[tab.id] ?? false);
   const internalPage = browserInternalPage(state.url);
+  useBrowserPagePreview(tab, pageHostRef, nativeRuntime && active && !pageLoading && !runtimeError);
   const downloadNotice = useBrowserRuntimeStore((runtime) => runtime.notices[tab.id] ?? null);
   const compatibilityIssue = useBrowserRuntimeStore(
     (runtime) => runtime.compatibilityIssues[tab.id] ?? null,
@@ -363,6 +366,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     return () => setBrowserWebviewsSuspended(false, annotationSuspensionReason);
   }, [annotationSuspensionReason, annotationsActive]);
   const navigateActiveTab = (rawAddress: string) => {
+    useWorkspaceStore.getState().commitPlaceholder(tab.id);
     const url = normalizeBrowserAddress(rawAddress);
     useWorkspaceStore.getState().updateBrowserTab(tab.id, {
       ...createBrowserTabState(url),
@@ -511,6 +515,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       },
     }).catch((error: unknown) => setBrowserError(tab.id, error));
   };
+  useBrowserMenuCommands({
+    tab,
+    commands: page.commands,
+    travel,
+    reload,
+    annotate: () => setAnnotationsActive(true),
+  });
   const showStop = pageLoading && !internalPage && Boolean(page.commands.stop);
   return (
     <section

@@ -1,0 +1,22 @@
+{
+  "expected_input": true,
+  "expected_reply": true,
+  "input_bytes": 67920,
+  "manual_turn_control": true,
+  "model": "openai/gpt-realtime-2.1",
+  "no_speech_before_confirmed_reply": true,
+  "output_bytes": 60000,
+  "output_sha256": "1ceb9b389e368cadc2679c200052348ad5d51eca249c26caf1c593b2a4f6271a",
+  "scope": "synthetic-go-provider-adapter-only",
+  "usage": {
+    "cached_input_audio_tokens": 0,
+    "cached_input_text_tokens": 0,
+    "input_audio_tokens": 14,
+    "input_text_tokens": 52,
+    "output_audio_tokens": 25,
+    "output_text_tokens": 23,
+    "transcription_input_tokens": 14,
+    "transcription_output_tokens": 10
+  },
+  "verified_at": "2026-09-27T17:17:56Z"
+}

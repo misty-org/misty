@@ -6,6 +6,8 @@ pub struct Recording {
     _stream: cpal::Stream,
     samples: Arc<Mutex<Vec<i16>>>,
     rate: u32,
+    delivered: usize,
+    sequence: usize,
 }
 impl Recording {
     pub fn start(app: AppHandle, turn: u64) -> Result<Self, String> {
@@ -16,6 +18,9 @@ impl Recording {
         let config = device.default_input_config().map_err(|e| e.to_string())?;
         let rate = config.sample_rate().0;
         let channels = config.channels() as usize;
+        if rate == 0 || channels == 0 {
+            return Err("The microphone's audio format is invalid.".into());
+        }
         let samples = Arc::new(Mutex::new(Vec::new()));
         let error_app = app.clone();
         let error = move |e| {
@@ -69,33 +74,40 @@ impl Recording {
             _stream: stream,
             samples,
             rate,
+            delivered: 0,
+            sequence: 0,
         })
     }
-    pub fn finish(self) -> (Vec<u8>, u64) {
+    pub fn drain(&mut self) -> Option<(usize, Vec<u8>)> {
+        let samples = self.samples.lock().ok()?;
+        let (pcm, delivered) = pcm_since(&samples, self.rate, self.delivered);
+        self.delivered = delivered;
+        if pcm.is_empty() {
+            return None;
+        }
+        let sequence = self.sequence;
+        self.sequence += 1;
+        Some((sequence, pcm))
+    }
+    pub fn finish(self) -> (usize, Vec<u8>, u64) {
         drop(self._stream);
         let samples = self.samples.lock().unwrap();
-        encode_wav(&samples, self.rate)
+        let (pcm, _) = pcm_since(&samples, self.rate, self.delivered);
+        (
+            self.sequence,
+            pcm,
+            samples.len() as u64 * 1000 / self.rate as u64,
+        )
     }
 }
-// Bound upload size even with 96/192 kHz devices; speech is sent as 24 kHz mono PCM.
-fn encode_wav(samples: &[i16], source_rate: u32) -> (Vec<u8>, u64) {
-    let rate = source_rate.min(24_000);
+// Absolute frame indices preserve phase across chunks. Average source buckets
+// when downsampling; duplicate the source sample when upsampling. Exactly 24 kHz
+// mono signed PCM reaches the provider, including devices below 24 kHz.
+fn pcm_since(samples: &[i16], source_rate: u32, delivered: usize) -> (Vec<u8>, usize) {
+    let rate = 24_000;
     let frames = samples.len() * rate as usize / source_rate as usize;
-    let size = (frames * 2) as u32;
-    let mut wav = Vec::with_capacity(44 + size as usize);
-    wav.extend(b"RIFF");
-    wav.extend((size + 36).to_le_bytes());
-    wav.extend(b"WAVEfmt ");
-    wav.extend(16u32.to_le_bytes());
-    wav.extend(1u16.to_le_bytes());
-    wav.extend(1u16.to_le_bytes());
-    wav.extend(rate.to_le_bytes());
-    wav.extend((rate * 2).to_le_bytes());
-    wav.extend(2u16.to_le_bytes());
-    wav.extend(16u16.to_le_bytes());
-    wav.extend(b"data");
-    wav.extend(size.to_le_bytes());
-    for i in 0..frames {
+    let mut pcm = Vec::with_capacity(frames.saturating_sub(delivered) * 2);
+    for i in delivered..frames {
         let start = i * source_rate as usize / rate as usize;
         let end = ((i + 1) * source_rate as usize / rate as usize)
             .min(samples.len())
@@ -105,9 +117,9 @@ fn encode_wav(samples: &[i16], source_rate: u32) -> (Vec<u8>, u64) {
             .map(|sample| *sample as i64)
             .sum::<i64>()
             / (end - start) as i64;
-        wav.extend((value as i16).to_le_bytes());
+        pcm.extend((value as i16).to_le_bytes());
     }
-    (wav, samples.len() as u64 * 1000 / source_rate as u64)
+    (pcm, frames)
 }
 fn append<T: Copy>(
     input: &[T],
@@ -141,21 +153,30 @@ fn append<T: Copy>(
 mod tests {
     use super::*;
     #[test]
-    fn high_sample_rate_recordings_fit_the_proxy_limit() {
-        let (wav, duration) = encode_wav(&vec![1200; 192_000 * 60], 192_000);
-        assert_eq!(duration, 60_000);
-        assert_eq!(&wav[..4], b"RIFF");
-        assert_eq!(u32::from_le_bytes(wav[24..28].try_into().unwrap()), 24_000);
-        assert_eq!(wav.len(), 44 + 24_000 * 60 * 2);
-        assert_eq!(i16::from_le_bytes(wav[44..46].try_into().unwrap()), 1200);
+    fn all_device_rates_produce_exactly_24khz_pcm() {
+        for rate in [8000, 16000, 24000, 44100, 48000, 96000, 192000] {
+            let (pcm, frames) = pcm_since(&vec![1200; rate as usize], rate, 0);
+            assert_eq!(frames, 24000);
+            assert_eq!(pcm.len(), 48000);
+            assert!(pcm
+                .chunks_exact(2)
+                .all(|v| i16::from_le_bytes([v[0], v[1]]) == 1200));
+        }
     }
     #[test]
-    fn empty_and_rapid_recordings_have_consistent_headers() {
-        let (empty, duration) = encode_wav(&[], 48_000);
-        assert_eq!(empty.len(), 44);
-        assert_eq!(duration, 0);
-        let (short, duration) = encode_wav(&vec![0; 480], 48_000);
-        assert_eq!(short.len(), 524);
-        assert_eq!(duration, 10);
+    fn streaming_chunks_equal_a_single_conversion() {
+        let samples: Vec<i16> = (0..44100).map(|i| (i % 16000) as i16).collect();
+        let mut delivered = 0;
+        let mut streamed = Vec::new();
+        for end in (1..samples.len())
+            .step_by(173)
+            .chain(std::iter::once(samples.len()))
+        {
+            let (chunk, next) = pcm_since(&samples[..end], 44100, delivered);
+            streamed.extend(chunk);
+            delivered = next;
+        }
+        assert_eq!(streamed, pcm_since(&samples, 44100, 0).0);
+        assert_eq!(pcm_since(&[], 48000, 0), (Vec::new(), 0));
     }
 }
