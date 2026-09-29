@@ -15,6 +15,7 @@ import {
 import { SettingsNote } from "@/features/settings/SettingsControls";
 import {
   generateSyncSecret,
+  lockNativeSync,
   unlockNativeSync,
   vaultAvailability,
   type NativeSyncView,
@@ -68,6 +69,7 @@ export function BrowserSyncSettings() {
   const connecting = useBrowserSyncStore((state) => state.connecting);
   const session = useBrowserSyncStore((state) => state.session);
   const issue = useBrowserSyncStore((state) => state.issue);
+  const reenroll = useBrowserSyncStore((state) => !!accountId && state.reenroll === accountId);
   const [available, setAvailable] = useState<{
     account: SyncAccount;
     generation: number;
@@ -83,7 +85,15 @@ export function BrowserSyncSettings() {
     const generation = readApiSessionGeneration();
     const valid = () =>
       active && !isApiSessionTransitioning() && generation === readApiSessionGeneration();
-    setAvailable(null);
+    setAvailable((previous) =>
+      native &&
+      !transitioning &&
+      previous &&
+      previous.account.accountId === accountId &&
+      previous.generation === generation
+        ? previous
+        : null,
+    );
     setError(null);
     let timer: ReturnType<typeof setTimeout> | undefined;
     let checking = false;
@@ -92,9 +102,19 @@ export function BrowserSyncSettings() {
       checking = true;
       clearTimeout(timer);
       try {
-        await readApiAuthToken();
-        if (!valid()) return;
         const account = { apiBase: await resolveApiBase(), accountId };
+        if (!valid()) return;
+        // Unlocking must remain reachable even if restoring account credentials
+        // or checking the server fails. Only offer creation after the server
+        // confirms there is no existing vault.
+        setAvailable((previous) =>
+          previous?.account.accountId === accountId &&
+          previous.account.apiBase === account.apiBase &&
+          previous.generation === generation
+            ? previous
+            : { account, generation, local: false, remote: null },
+        );
+        await readApiAuthToken();
         if (!valid()) return;
         const found = await vaultAvailability(account);
         if (valid()) {
@@ -127,6 +147,16 @@ export function BrowserSyncSettings() {
     setReconnecting(true);
     setError(null);
     try {
+      if (session && (issue ?? session.status.issue) === "sync_device_forbidden") {
+        // The saved key opens the rejected identity, so reopening with it only
+        // reconnects into the same rejection. Drop it and ask for the password,
+        // which lets native register this device again.
+        await lockNativeSync(session.session_id, true);
+        if (valid())
+          useBrowserSyncStore.setState({ session: null, issue: null, reenroll: accountId });
+        setAttempt((value) => value + 1);
+        return;
+      }
       await readApiAuthToken();
       const account = { apiBase: await resolveApiBase(), accountId };
       if (!valid()) return;
@@ -209,10 +239,12 @@ export function BrowserSyncSettings() {
             )}
           </>
         ) : null}
-        {(error || issue) && session?.account_id !== accountId && (
+        {/* While re-enrolling, background retries fail on the dropped key; the
+            unlock form explains the next step instead. */}
+        {(error || (issue && !reenroll)) && session?.account_id !== accountId && (
           <div className="px-5 pb-4">
             <p role="alert" className="mb-3 text-sm text-destructive">
-              {error ?? issue}
+              {syncIssueMessage(error ?? issue)}
             </p>
             <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>
               Try again
@@ -237,23 +269,30 @@ export function BrowserSyncSettings() {
         !transitioning &&
         session?.account_id !== accountId && (
           <SyncVaultForm
-            key={`${available.account.apiBase}:${accountId}`}
+            key={`${available.account.apiBase}:${accountId}:${available.generation}`}
             local={available.local}
-            create={!available.local && available.remote === false}
+            reenroll={reenroll}
+            create={!reenroll && !available.local && available.remote === false}
             onGenerateSecret={generateSyncSecret}
             onUnlock={async ({ password, syncSecret, remember }) => {
               const generation = available.generation;
-              if (isApiSessionTransitioning() || readApiSessionGeneration() !== generation)
-                throw new Error("Your account changed. Reopen sync settings.");
+              const valid = () =>
+                !isApiSessionTransitioning() && readApiSessionGeneration() === generation;
+              if (!valid()) throw new Error("Your account changed. Reopen sync settings.");
+              await readApiAuthToken();
+              if (!valid()) throw new Error("Your account changed. Reopen sync settings.");
               const opened = await unlockNativeSync(
                 available.account,
                 password,
                 syncSecret,
                 remember,
-                !available.local && available.remote === false,
+                !reenroll && !available.local && available.remote === false,
+                reenroll,
               );
-              if (!isApiSessionTransitioning() && generation === readApiSessionGeneration())
-                useBrowserSyncStore.setState({ session: opened, issue: null });
+              if (valid()) {
+                setError(null);
+                useBrowserSyncStore.setState({ session: opened, issue: null, reenroll: null });
+              }
             }}
           />
         )}

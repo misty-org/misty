@@ -128,7 +128,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     (p) => <PrivacySection {...p} page="browser" />,
     "device",
   ),
-  page("browser", "browser-handoff", "Device handoff", BrowserSyncSettings, "resource"),
+  page("browser", "browser-handoff", "Sync", BrowserSyncSettings, "resource"),
   page("files", "files", "Browsing", FilesSection),
   page(
     "files",
@@ -153,7 +153,13 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("agents", "agents-defaults", "Defaults", AgentDefaultsSection),
   page("agents", "models", "Models", ModelsSection, "account"),
   page("agents", "misty", "Misty", MistySection, "account"),
-  page("agents", "agents-memory", "Memory", (p) => <MistySection {...p} page="memory" />, "account"),
+  page(
+    "agents",
+    "agents-memory",
+    "Memory",
+    (p) => <MistySection {...p} page="memory" />,
+    "account",
+  ),
   page("agents", "agents-connections", "Connections", AgentConnectionsSection, "resource"),
   page("agents", "agents-permissions", "Permissions", AgentPermissionsSection, "resource"),
   page("agents", "agents-companion", "Companion", CompanionSection, "device"),

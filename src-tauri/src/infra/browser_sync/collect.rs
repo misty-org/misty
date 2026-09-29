@@ -16,6 +16,12 @@ use std::collections::BTreeSet;
 /// The engine store itself could not be read (not a single bad cookie).
 pub(super) const COOKIES_UNREADABLE: &str = "Native cookie observation failed";
 
+/// Keeps which step failed. The kind is a fieldless enum, so no cookie or
+/// platform error text can reach the renderer through it.
+fn cookies_unreadable(error: browser_cookie_store::CookieStoreError) -> String {
+    format!("{COOKIES_UNREADABLE}: {error:?}")
+}
+
 pub(super) struct Collected {
     pub observations: Vec<BrowserObservation>,
     pub held: Held,
@@ -33,7 +39,7 @@ pub(super) async fn collect(
     let mut coverage = Coverage::default();
     let mut cookies = browser_cookie_store::read(view, physical)
         .await
-        .map_err(|_| COOKIES_UNREADABLE)?;
+        .map_err(cookies_unreadable)?;
     let baseline: Vec<Cookie> = previous
         .iter()
         .filter(|record| matches!(record.area, Area::Cookies))

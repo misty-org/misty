@@ -84,6 +84,15 @@ beforeEach(() => {
   useBrowserSyncStore.setState({ session: session(), issue: null, connecting: false });
 });
 afterEach(cleanup);
+it("offers a direct unlock action when sync cannot connect", () => {
+  useBrowserSyncStore.setState({ session: null, issue: "Could not reach the sync server." });
+  const settings = vi.fn();
+  render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
+  fireEvent.click(screen.getByRole("button", { name: "Unlock sync" }));
+  expect(settings).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
 it("shows green for confirmed healthy sync and live work, with no warning outside the popover", () => {
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
   expect(

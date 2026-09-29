@@ -221,6 +221,25 @@ impl TreeSync {
         Ok(())
     }
 
+    /// Drops this session's copy of a tree so the next watch fetches the
+    /// server's copy from scratch. A driven tree is read-only until it has.
+    pub fn forget(&mut self, store: &mut Store, tree: &str) -> Result<()> {
+        self.states.remove(tree);
+        self.current.remove(tree);
+        if self
+            .local
+            .ready
+            .as_ref()
+            .is_some_and(|(ready, _)| ready == tree)
+        {
+            let mut next = self.local.clone();
+            next.ready = None;
+            store.set_tree_local(&next)?;
+            self.local = next;
+        }
+        Ok(())
+    }
+
     fn follow(&mut self, store: &mut Store, tree: Option<String>) -> Result<()> {
         if self.local.following == tree {
             return Ok(());
@@ -609,12 +628,13 @@ impl TreeSync {
             (_, "sync_unavailable") => Err(Error::Network),
             (_, "sync_device_forbidden") => Err(Error::DeviceForbidden),
             // A structurally rejected op can never succeed; drop it and the
-            // edit that produced it rather than retrying forever.
+            // edit that produced it rather than retrying forever. The tree
+            // itself is still the server's, so sync carries on from there.
             (Some(tree), _) => {
                 let (_, op, _, _) = self.inflight.remove(&tree).expect("present");
                 store.finish_tree_op(&tree, &op.operation_id)?;
                 store.clear_tree_desired(&tree)?;
-                Err(Error::Recovery)
+                Ok(())
             }
             (None, _) => Ok(()),
         }

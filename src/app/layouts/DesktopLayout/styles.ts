@@ -144,12 +144,13 @@ export const navigatorTitlebarStripClass =
 export const desktopWallpaperLayerClass = "hidden";
 
 export const windowsTitlebarControlsClass =
-  "pointer-events-auto absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
+  "pointer-events-auto absolute right-0 top-0 z-[3] flex h-full w-max flex-nowrap items-center";
 
-export const windowsWorkspaceControlsClass = "ml-auto flex h-7 shrink-0 items-center gap-1";
+export const windowsWorkspaceControlsClass =
+  "mx-2 flex h-7 shrink-0 flex-nowrap items-center gap-1 empty:hidden";
 
 export const windowsTitlebarControlButtonClass =
-  "grid h-full w-[46px] place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
+  "grid h-full w-[46px] shrink-0 place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
 export const windowsTitlebarCloseButtonClass = `${windowsTitlebarControlButtonClass} hover:bg-charcoal-active hover:text-cream-bright`;
 
 export const frameOverlayBaseClass = [
