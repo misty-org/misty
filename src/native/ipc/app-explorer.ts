@@ -253,6 +253,8 @@ export interface SearchStatus {
   lastScanUpdatedItemCount: number;
   lastScanRemovedItemCount: number;
   lastScanUnchangedItemCount: number;
+  /** When the last scan began, in any Misty window sharing this index. */
+  lastScanStartedMs?: number | null;
 }
 export interface SearchScanRequest {
   roots?: string[];

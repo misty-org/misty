@@ -467,11 +467,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
             );
           })
         ) : (
-          <EmptyWorkspacePane
-            onOpen={() =>
-              props.onOpen(useWorkspaceStore.getState().openBrowserTab({ paneId: pane.id }))
-            }
-          />
+          <EmptyWorkspacePane />
         )}
       </div>
       {dim > 0 ? (

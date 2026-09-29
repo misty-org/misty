@@ -1,0 +1,71 @@
+//! One native snapshot of a browser profile's website data: cookies plus every
+//! origin's storage. Items that cannot sync are skipped and reported, while
+//! items synced by devices that can hold them are carried, never deleted.
+use super::super::browser_data_budget::{fit, Held, Limit};
+use super::super::browser_data_coverage::{identity, Coverage};
+use super::super::{browser_cookie_store, browser_website_capture};
+use misty_browser_sync::{
+    document::{
+        credentials::{Area, Cookie},
+        CredentialRecord,
+    },
+    store::BrowserObservation,
+};
+use std::collections::BTreeSet;
+
+/// The engine store itself could not be read (not a single bad cookie).
+pub(super) const COOKIES_UNREADABLE: &str = "Native cookie observation failed";
+
+pub(super) struct Collected {
+    pub observations: Vec<BrowserObservation>,
+    pub held: Held,
+    pub coverage: Coverage,
+}
+
+pub(super) async fn collect(
+    app: &tauri::AppHandle,
+    view: &tauri::Webview,
+    physical: &str,
+    previous: &[CredentialRecord],
+    extra: Option<(tauri::Webview, Vec<String>)>,
+    limit: Limit,
+) -> Result<Collected, String> {
+    let mut coverage = Coverage::default();
+    let mut cookies = browser_cookie_store::read(view, physical)
+        .await
+        .map_err(|_| COOKIES_UNREADABLE)?;
+    let baseline: Vec<Cookie> = previous
+        .iter()
+        .filter(|record| matches!(record.area, Area::Cookies))
+        .filter_map(|record| serde_json::from_value::<Vec<Cookie>>(record.payload.clone()).ok())
+        .flatten()
+        .collect();
+    cookies.align_same_site(
+        &baseline,
+        browser_cookie_store::SAME_SITE_NONE_IS_UNSPECIFIED,
+    );
+    let local: BTreeSet<_> = cookies.cookies.iter().map(identity).collect();
+    cookies.carry(&baseline, browser_cookie_store::representable);
+    let carried = cookies
+        .cookies
+        .iter()
+        .map(identity)
+        .filter(|cookie| !local.contains(cookie))
+        .collect();
+    cookies.record(&mut coverage);
+    let storage =
+        browser_website_capture::capture(app, physical, previous, extra, &mut coverage).await?;
+    let mut fitted = fit(
+        cookies.cookies,
+        &carried,
+        storage.candidates,
+        &mut coverage,
+        limit,
+    )?;
+    fitted.held.databases = storage.held_databases;
+    Ok(Collected {
+        observations: fitted.observations,
+        held: fitted.held,
+        coverage,
+    })
+}

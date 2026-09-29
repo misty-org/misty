@@ -37,8 +37,20 @@ export function selectLayoutTab(layout: WorkspaceLayout, id: string): WorkspaceL
     : layout;
 }
 
+/** A window with no tabs is a valid workspace: one layout tab whose pane is empty. */
+export function isEmptyLayoutTab(tab: WorkspaceLayoutTab): boolean {
+  return dockTabs(tab.root).length === 0;
+}
+
+export function emptyLayoutTab(): WorkspaceLayoutTab {
+  const pane = createDockLeaf();
+  return { id: `layout:${pane.id}`, root: pane, focusedPaneId: pane.id };
+}
+
 export function appendLayoutTab(layout: WorkspaceLayout, tab: WorkspaceLayoutTab): WorkspaceLayout {
-  return selectLayoutTab({ ...layout, tabs: [...layoutTabs(layout), tab] }, tab.id);
+  // The empty placeholder never lingers beside real tabs.
+  const kept = isEmptyLayoutTab(tab) ? [] : layoutTabs(layout).filter((t) => !isEmptyLayoutTab(t));
+  return selectLayoutTab({ ...layout, tabs: [...kept, tab] }, tab.id);
 }
 
 export function singleViewLayoutTab(view: WorkspaceTab): WorkspaceLayoutTab {
