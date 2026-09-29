@@ -6,7 +6,10 @@ use uuid::Uuid;
 use super::{
     merkle::{self, Leaf},
     model::{self, NodeBody},
-    protocol::{content_hash, NodeWrite, SlotMeta, SlotWrite, TreeChange, TreeDelta, TreeNode, TreeOp, TreeSnapshot},
+    protocol::{
+        content_hash, NodeWrite, SlotMeta, SlotWrite, TreeChange, TreeDelta, TreeNode, TreeOp,
+        TreeSnapshot,
+    },
     seal::{self, Position},
 };
 use crate::{
@@ -44,7 +47,11 @@ pub struct TreeState {
     pub last_change: Option<TreeChange>,
 }
 
-fn leaves(tree_id: &str, nodes: &BTreeMap<String, StoredNode>, slots: &BTreeMap<(String, i16), SlotMeta>) -> Result<Vec<Leaf>> {
+fn leaves(
+    tree_id: &str,
+    nodes: &BTreeMap<String, StoredNode>,
+    slots: &BTreeMap<(String, i16), SlotMeta>,
+) -> Result<Vec<Leaf>> {
     let mut out = Vec::with_capacity(nodes.len() + slots.len());
     for (id, n) in nodes {
         if id == tree_id {
@@ -62,7 +69,11 @@ fn leaves(tree_id: &str, nodes: &BTreeMap<String, StoredNode>, slots: &BTreeMap<
             tab_node_id: tab.clone(),
             slot: *slot,
             version: meta.version,
-            hash: meta.content_hash.as_slice().try_into().map_err(|_| Error::Invalid)?,
+            hash: meta
+                .content_hash
+                .as_slice()
+                .try_into()
+                .map_err(|_| Error::Invalid)?,
         });
     }
     Ok(out)
@@ -70,14 +81,24 @@ fn leaves(tree_id: &str, nodes: &BTreeMap<String, StoredNode>, slots: &BTreeMap<
 
 impl TreeState {
     pub fn empty(tree_id: &str) -> Self {
-        Self { tree_id: tree_id.into(), ..Default::default() }
+        Self {
+            tree_id: tree_id.into(),
+            ..Default::default()
+        }
     }
 
     fn open(&self, v: &Verifier<'_>, id: &str, n: &StoredNode) -> Result<NodeBody> {
         let plain = seal::open(
             v.root,
             v.scope,
-            Position { tree_id: &self.tree_id, node_id: id, parent_id: n.parent_id.as_deref(), slot: 0, version: n.version, key_epoch: n.key_epoch },
+            Position {
+                tree_id: &self.tree_id,
+                node_id: id,
+                parent_id: n.parent_id.as_deref(),
+                slot: 0,
+                version: n.version,
+                key_epoch: n.key_epoch,
+            },
             &n.ciphertext,
         )?;
         Ok(serde_json::from_slice(&plain)?)
@@ -106,25 +127,52 @@ impl TreeState {
             return Err(Error::Identity);
         }
         let root = self.nodes.get(&self.tree_id).ok_or(Error::Identity)?;
-        let root_hash = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, content_hash(&root.ciphertext));
-        if root.version != self.version || !last.manifest.upserts.iter().any(|u| u[0] == self.tree_id && u[2] == root_hash) {
+        let root_hash = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            content_hash(&root.ciphertext),
+        );
+        if root.version != self.version
+            || !last
+                .manifest
+                .upserts
+                .iter()
+                .any(|u| u[0] == self.tree_id && u[2] == root_hash)
+        {
             return Err(Error::Identity);
         }
         let mut records = Vec::new();
         let mut resume = None;
         for (id, n) in &self.nodes {
             match (self.open(v, id, n)?, id == &self.tree_id) {
-                (NodeBody::Root { tree_version, merkle_root, resume: r }, true) => {
+                (
+                    NodeBody::Root {
+                        tree_version,
+                        merkle_root,
+                        resume: r,
+                    },
+                    true,
+                ) => {
                     if tree_version != self.version || merkle_root != computed {
                         return Err(Error::Identity);
                     }
                     resume = r;
                 }
-                (NodeBody::Record { kind, id: record_id, fields }, false) => {
+                (
+                    NodeBody::Record {
+                        kind,
+                        id: record_id,
+                        fields,
+                    },
+                    false,
+                ) => {
                     if model::node_id(&self.tree_id, kind, &record_id) != *id {
                         return Err(Error::Identity);
                     }
-                    records.push(ViewRecord { kind, id: record_id, fields });
+                    records.push(ViewRecord {
+                        kind,
+                        id: record_id,
+                        fields,
+                    });
                 }
                 _ => return Err(Error::Identity),
             }
@@ -144,7 +192,13 @@ impl TreeState {
             nodes: self
                 .nodes
                 .iter()
-                .map(|(id, n)| TreeNode { node_id: id.clone(), parent_id: n.parent_id.clone(), version: n.version, key_epoch: n.key_epoch, ciphertext: n.ciphertext.clone() })
+                .map(|(id, n)| TreeNode {
+                    node_id: id.clone(),
+                    parent_id: n.parent_id.clone(),
+                    version: n.version,
+                    key_epoch: n.key_epoch,
+                    ciphertext: n.ciphertext.clone(),
+                })
                 .collect(),
             slots: self.slots.values().cloned().collect(),
             last_change: self.last_change.clone(),
@@ -155,7 +209,15 @@ impl TreeState {
         let mut state = Self::empty(&snapshot.tree_id);
         state.version = snapshot.version;
         for n in snapshot.nodes {
-            state.nodes.insert(n.node_id, StoredNode { parent_id: n.parent_id, version: n.version, key_epoch: n.key_epoch, ciphertext: n.ciphertext });
+            state.nodes.insert(
+                n.node_id,
+                StoredNode {
+                    parent_id: n.parent_id,
+                    version: n.version,
+                    key_epoch: n.key_epoch,
+                    ciphertext: n.ciphertext,
+                },
+            );
         }
         for s in snapshot.slots {
             state.slots.insert((s.tab_node_id.clone(), s.slot), s);
@@ -193,7 +255,15 @@ impl TreeState {
             next.slots.retain(|(tab, _), _| tab != id);
         }
         for n in delta.nodes {
-            next.nodes.insert(n.node_id, StoredNode { parent_id: n.parent_id, version: n.version, key_epoch: n.key_epoch, ciphertext: n.ciphertext });
+            next.nodes.insert(
+                n.node_id,
+                StoredNode {
+                    parent_id: n.parent_id,
+                    version: n.version,
+                    key_epoch: n.key_epoch,
+                    ciphertext: n.ciphertext,
+                },
+            );
         }
         // Touched slot keys absent from the delta no longer exist.
         for change in &delta.changes {
@@ -229,22 +299,60 @@ impl TreeState {
         let version = self.version + 1;
         let key_epoch = grant.key_epoch;
         let placed = model::place(&self.tree_id, records);
-        let current: BTreeMap<(crate::document::entities::Kind, &str), &ViewRecord> =
-            self.records.iter().map(|r| ((r.kind, r.id.as_str()), r)).collect();
+        let current: BTreeMap<(crate::document::entities::Kind, &str), &ViewRecord> = self
+            .records
+            .iter()
+            .map(|r| ((r.kind, r.id.as_str()), r))
+            .collect();
         let mut nodes = self.nodes.clone();
         let mut upserts = Vec::new();
         for (id, (parent, record)) in &placed {
-            let unchanged = current.get(&(record.kind, record.id.as_str())).is_some_and(|c| c.fields == record.fields)
+            let unchanged = current
+                .get(&(record.kind, record.id.as_str()))
+                .is_some_and(|c| c.fields == record.fields)
                 && nodes.get(id).is_some_and(|n| n.parent_id == *parent);
             if unchanged {
                 continue;
             }
-            let body = serde_json::to_vec(&NodeBody::Record { kind: record.kind, id: record.id.clone(), fields: record.fields.clone() })?;
-            let ciphertext = seal::seal(root, scope, Position { tree_id: &self.tree_id, node_id: id, parent_id: parent.as_deref(), slot: 0, version, key_epoch }, &body)?;
-            nodes.insert(id.clone(), StoredNode { parent_id: parent.clone(), version, key_epoch, ciphertext: ciphertext.clone() });
-            upserts.push(NodeWrite { node_id: id.clone(), parent_id: parent.clone(), ciphertext });
+            let body = serde_json::to_vec(&NodeBody::Record {
+                kind: record.kind,
+                id: record.id.clone(),
+                fields: record.fields.clone(),
+            })?;
+            let ciphertext = seal::seal(
+                root,
+                scope,
+                Position {
+                    tree_id: &self.tree_id,
+                    node_id: id,
+                    parent_id: parent.as_deref(),
+                    slot: 0,
+                    version,
+                    key_epoch,
+                },
+                &body,
+            )?;
+            nodes.insert(
+                id.clone(),
+                StoredNode {
+                    parent_id: parent.clone(),
+                    version,
+                    key_epoch,
+                    ciphertext: ciphertext.clone(),
+                },
+            );
+            upserts.push(NodeWrite {
+                node_id: id.clone(),
+                parent_id: parent.clone(),
+                ciphertext,
+            });
         }
-        let deletes: Vec<String> = self.nodes.keys().filter(|id| **id != self.tree_id && !placed.contains_key(*id)).cloned().collect();
+        let deletes: Vec<String> = self
+            .nodes
+            .keys()
+            .filter(|id| **id != self.tree_id && !placed.contains_key(*id))
+            .cloned()
+            .collect();
         let mut next_slots = self.slots.clone();
         for id in &deletes {
             nodes.remove(id);
@@ -252,30 +360,91 @@ impl TreeState {
         }
         let mut slot_writes = Vec::new();
         for (tab, slot, plaintext) in slots {
-            if !placed.contains_key(&tab) {
+            // Tab slots hang off tab records; sign-in slots off the root node,
+            // which every op rewrites and therefore always exists.
+            if !(placed.contains_key(&tab)
+                || (tab == self.tree_id && super::signin::is_signin_slot(slot)))
+            {
                 return Err(Error::Invalid);
             }
             match plaintext {
                 Some(plain) => {
-                    let ciphertext = seal::seal(root, scope, Position { tree_id: &self.tree_id, node_id: &tab, parent_id: None, slot, version, key_epoch }, &plain)?;
-                    next_slots.insert((tab.clone(), slot), SlotMeta { tab_node_id: tab.clone(), slot, version, content_hash: content_hash(&ciphertext).to_vec() });
-                    slot_writes.push(SlotWrite { tab_node_id: tab, slot, ciphertext: Some(ciphertext) });
+                    let ciphertext = seal::seal(
+                        root,
+                        scope,
+                        Position {
+                            tree_id: &self.tree_id,
+                            node_id: &tab,
+                            parent_id: None,
+                            slot,
+                            version,
+                            key_epoch,
+                        },
+                        &plain,
+                    )?;
+                    next_slots.insert(
+                        (tab.clone(), slot),
+                        SlotMeta {
+                            tab_node_id: tab.clone(),
+                            slot,
+                            version,
+                            content_hash: content_hash(&ciphertext).to_vec(),
+                        },
+                    );
+                    slot_writes.push(SlotWrite {
+                        tab_node_id: tab,
+                        slot,
+                        ciphertext: Some(ciphertext),
+                    });
                 }
                 None => {
                     if next_slots.remove(&(tab.clone(), slot)).is_some() {
-                        slot_writes.push(SlotWrite { tab_node_id: tab, slot, ciphertext: None });
+                        slot_writes.push(SlotWrite {
+                            tab_node_id: tab,
+                            slot,
+                            ciphertext: None,
+                        });
                     }
                 }
             }
         }
-        let same_resume = serde_json::to_value(resume)? == serde_json::to_value(self.resume.as_ref())?;
-        if upserts.is_empty() && deletes.is_empty() && slot_writes.is_empty() && same_resume && self.version > 0 {
+        let same_resume =
+            serde_json::to_value(resume)? == serde_json::to_value(self.resume.as_ref())?;
+        if upserts.is_empty()
+            && deletes.is_empty()
+            && slot_writes.is_empty()
+            && same_resume
+            && self.version > 0
+        {
             return Ok(None);
         }
         let merkle_root = merkle::root(leaves(&self.tree_id, &nodes, &next_slots)?).to_vec();
-        let body = serde_json::to_vec(&NodeBody::Root { tree_version: version, merkle_root: merkle_root.clone(), resume: resume.cloned() })?;
-        let ciphertext = seal::seal(root, scope, Position { tree_id: &self.tree_id, node_id: &self.tree_id, parent_id: None, slot: 0, version, key_epoch }, &body)?;
-        upserts.insert(0, NodeWrite { node_id: self.tree_id.clone(), parent_id: None, ciphertext });
+        let body = serde_json::to_vec(&NodeBody::Root {
+            tree_version: version,
+            merkle_root: merkle_root.clone(),
+            resume: resume.cloned(),
+        })?;
+        let ciphertext = seal::seal(
+            root,
+            scope,
+            Position {
+                tree_id: &self.tree_id,
+                node_id: &self.tree_id,
+                parent_id: None,
+                slot: 0,
+                version,
+                key_epoch,
+            },
+            &body,
+        )?;
+        upserts.insert(
+            0,
+            NodeWrite {
+                node_id: self.tree_id.clone(),
+                parent_id: None,
+                ciphertext,
+            },
+        );
         let mut op = TreeOp {
             workspace_id: scope.workspace_id.clone(),
             tree_id: self.tree_id.clone(),
@@ -316,13 +485,24 @@ impl TreeState {
             nodes: op
                 .upserts
                 .iter()
-                .map(|n| TreeNode { node_id: n.node_id.clone(), parent_id: n.parent_id.clone(), version: op.tree_version(), key_epoch: op.key_epoch, ciphertext: n.ciphertext.clone() })
+                .map(|n| TreeNode {
+                    node_id: n.node_id.clone(),
+                    parent_id: n.parent_id.clone(),
+                    version: op.tree_version(),
+                    key_epoch: op.key_epoch,
+                    ciphertext: n.ciphertext.clone(),
+                })
                 .collect(),
             slots: op
                 .slots
                 .iter()
                 .filter_map(|s| {
-                    s.ciphertext.as_ref().map(|c| SlotMeta { tab_node_id: s.tab_node_id.clone(), slot: s.slot, version: op.tree_version(), content_hash: content_hash(c).to_vec() })
+                    s.ciphertext.as_ref().map(|c| SlotMeta {
+                        tab_node_id: s.tab_node_id.clone(),
+                        slot: s.slot,
+                        version: op.tree_version(),
+                        content_hash: content_hash(c).to_vec(),
+                    })
                 })
                 .collect(),
             deleted: op.deletes.clone(),
@@ -330,7 +510,24 @@ impl TreeState {
         self.apply_delta(v, delta)
     }
 
+    /// Verified content hashes of this device's sign-in slots, by kind.
+    pub fn signin_hashes(&self) -> BTreeMap<i16, [u8; 32]> {
+        self.slots
+            .iter()
+            .filter(|((node, kind), _)| {
+                *node == self.tree_id && super::signin::is_signin_slot(*kind)
+            })
+            .filter_map(|((_, kind), meta)| {
+                Some((*kind, meta.content_hash.as_slice().try_into().ok()?))
+            })
+            .collect()
+    }
+
     pub fn tab_node(&self, record_id: &str) -> String {
-        model::node_id(&self.tree_id, crate::document::entities::Kind::Tab, record_id)
+        model::node_id(
+            &self.tree_id,
+            crate::document::entities::Kind::Tab,
+            record_id,
+        )
     }
 }

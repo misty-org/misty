@@ -23,7 +23,18 @@ pub use browser_capture::{BrowserCaptureState, BrowserObservation};
 pub(crate) mod browser_import;
 pub use browser_import::{BrowserImportJournal, BrowserImportReceipt};
 mod trees;
-pub use trees::Desired;
+pub use trees::{Desired, TreeLocal};
+mod device_signin;
+pub use device_signin::{hex as signin_digest_hex, DeviceSignin};
+
+/// Whether two sets of credential records hold the same data, ignoring engine
+/// enumeration order, a cookie domain's leading dot, and expired cookies.
+pub fn credentials_equivalent(
+    a: &[crate::document::CredentialRecord],
+    b: &[crate::document::CredentialRecord],
+) -> Result<bool> {
+    browser_import::equivalent(a, b)
+}
 
 const MAX_PENDING_COUNT: u64 = 10_000;
 const MAX_PENDING_BYTES: u64 = 32 << 20;
@@ -118,6 +129,16 @@ fn connect(path: &Path) -> Result<Connection> {
         INSERT OR IGNORE INTO sync_tree_counter VALUES(1,1);
         CREATE TABLE IF NOT EXISTS sync_tree_roster (
             singleton INTEGER PRIMARY KEY CHECK(singleton=1), roster TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sync_tree_local (
+            singleton INTEGER PRIMARY KEY CHECK(singleton=1), state TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sync_tree_retired (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, tree_id TEXT NOT NULL,
+            retired_at INTEGER NOT NULL, desired TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sync_device_signin (
+            tree_id TEXT PRIMARY KEY, binding TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS sync_vault (
             singleton INTEGER PRIMARY KEY CHECK(singleton=1),

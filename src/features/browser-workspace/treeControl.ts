@@ -17,6 +17,12 @@ export interface TreeRow {
 
 const osNames: Record<string, string> = { macos: "macOS", windows: "Windows", linux: "Linux" };
 
+/** A device with no presence entry is treated as live; one reported offline is not. */
+export function deviceIsLive(session: NativeSyncView, deviceId: string) {
+  if (deviceId === session.device_id) return true;
+  return session.presence.find((item) => item.device_id === deviceId)?.online ?? true;
+}
+
 export function osLabel(platform: string, version?: string) {
   const name = osNames[platform] ?? platform;
   return [name, version].filter(Boolean).join(" ");
@@ -31,7 +37,13 @@ export function treeRows(
   const nameOf = (id: string) => rows.find((row) => row.device_id === id)?.name ?? "another device";
   return rows.map((row) => {
     const driver = trees.trees.find((tree) => tree.tree_id === row.device_id)?.driver_device_id;
-    const seat: TreeSeat = !driver ? "free" : driver === session.device_id ? "you" : "other";
+    // A seat held by a device that is no longer connected is free, not "in use".
+    const seat: TreeSeat =
+      !driver || !deviceIsLive(session, driver)
+        ? "free"
+        : driver === session.device_id
+          ? "you"
+          : "other";
     return {
       deviceId: row.device_id,
       name: row.name,
@@ -49,7 +61,7 @@ export function treeRows(
 export function seatText(row: TreeRow) {
   if (row.seat === "you") return row.local ? "In use here" : "Open on this device";
   if (row.seat === "other") return row.seatName ? `In use on ${row.seatName}` : "In use";
-  return "Not in use";
+  return row.connection === "Offline" ? "Offline" : "Not in use";
 }
 
 /** Name of the other device whose workspace this device is showing, if any. */
@@ -60,6 +72,13 @@ export function viewingName(session: NativeSyncView, ownerName?: string | null):
     treeRows(session, trees, ownerName).find((row) => row.deviceId === trees.driving_tree)?.name ??
     null
   );
+}
+
+/** This device remembers a seat the server has not confirmed on the current
+ * connection, so another device may be writing to that workspace too. */
+export function seatUnconfirmed(session: NativeSyncView) {
+  const trees = session.trees;
+  return Boolean(trees?.trees.length && trees.driving_tree && trees.seat_confirmed === false);
 }
 
 /** Whether this device must pick a workspace before continuing. */

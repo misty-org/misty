@@ -1,7 +1,8 @@
 //! WebView2 cookie transport. CDP is invoked in the native process, never exposed
 //! as renderer IPC. Every call validates the real user-data folder and profile.
 use super::browser_cookie_cdp as codec;
-pub(crate) use codec::CookieStoreError;
+use super::browser_data_coverage::CookieRead;
+pub(crate) use codec::{representable, CookieStoreError};
 use misty_browser_sync::document::credentials::Cookie;
 use serde_json::{json, Value};
 use std::{
@@ -21,6 +22,8 @@ use windows::Win32::System::Com::CoTaskMemFree;
 use zeroize::Zeroizing;
 
 type Result<T> = std::result::Result<T, CookieStoreError>;
+/// CDP reports unspecified and explicit SameSite=None separately.
+pub(crate) const SAME_SITE_NONE_IS_UNSPECIFIED: bool = false;
 
 // Frees native strings even if the platform returns a failed HRESULT after
 // allocating them. Never format native errors (which may include payload data).
@@ -148,7 +151,7 @@ async fn call(
         .map_err(|_| CookieStoreError::Unavailable)?
 }
 
-pub(crate) async fn read(view: &Webview, profile: &str) -> Result<Vec<Cookie>> {
+pub(crate) async fn read(view: &Webview, profile: &str) -> Result<CookieRead> {
     codec::decode(call(view, profile, "Storage.getCookies", json!({})).await?)
 }
 pub(crate) async fn preflight(view: &Webview, profile: &str, target: Vec<Cookie>) -> Result<()> {
@@ -178,10 +181,19 @@ pub(crate) async fn write(
 }
 
 /// Only fixed native website-storage code uses this method; it is not an IPC command.
-pub(super) async fn evaluate_storage(view: &Webview, profile: &str, body: String) -> Result<String> {
+pub(super) async fn evaluate_storage(
+    view: &Webview,
+    profile: &str,
+    body: String,
+) -> Result<String> {
     let result = call(view, profile, "Runtime.evaluate", json!({
         "expression": format!("(async()=>{{{body}}})()"), "awaitPromise": true, "returnByValue": true,
     })).await?;
-    if result.get("exceptionDetails").is_some() { return Err(CookieStoreError::Unsupported); }
-    result["result"]["value"].as_str().map(str::to_owned).ok_or(CookieStoreError::Invalid)
+    if result.get("exceptionDetails").is_some() {
+        return Err(CookieStoreError::Unsupported);
+    }
+    result["result"]["value"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or(CookieStoreError::Invalid)
 }

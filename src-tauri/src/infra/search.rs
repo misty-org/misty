@@ -34,10 +34,7 @@ use crate::{
         listing_cache::ListingCache,
     },
     error::{ApiError, ApiResult},
-    infra::{
-        environment::AppEnvironmentService,
-        macos_privacy::is_background_scan_excluded as privacy_excluded,
-    },
+    infra::environment::AppEnvironmentService,
 };
 
 const SEARCH_SCHEMA_VERSION: u32 = 1;
@@ -47,6 +44,13 @@ const DEFAULT_MAX_DEPTH: usize = 18;
 const DEFAULT_REMOTE_MAX_DEPTH: usize = 12;
 const REMOTE_DIRECTORY_LIMIT: usize = 20_000;
 const SEARCH_MANIFEST_FILE: &str = "manifest.sqlite3";
+const SCAN_LOCK_FILE: &str = ".scan.lock";
+/// A scan that another process finished this recently is not repeated.
+const MIN_SCAN_SPACING_MS: u64 = 60_000;
+/// Scans run in bursts of this long, then yield for half as long, so a
+/// full walk uses at most about two thirds of one core.
+const SCAN_BURST: Duration = Duration::from_millis(40);
+const SCAN_PAUSE: Duration = Duration::from_millis(20);
 
 #[derive(Clone)]
 pub struct SearchService {
@@ -72,6 +76,9 @@ struct SearchState {
     index: Option<Index>,
     reader: Option<IndexReader>,
     fields: Option<SearchIndexFields>,
+    /// Commit stamp of the live index the reader was opened on. Reopening is
+    /// skipped while it is unchanged; another process may publish a new one.
+    opened: Option<SystemTime>,
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -231,6 +238,8 @@ pub struct SearchStatus {
     pub last_scan_updated_item_count: u64,
     pub last_scan_removed_item_count: u64,
     pub last_scan_unchanged_item_count: u64,
+    /// When the last scan (from any Misty process sharing this index) began.
+    pub last_scan_started_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -255,6 +264,8 @@ struct SearchMeta {
     last_scan_removed_item_count: u64,
     #[serde(default)]
     last_scan_unchanged_item_count: u64,
+    #[serde(default)]
+    last_scan_started_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -282,29 +293,10 @@ struct SearchScanChanges {
     unchanged: u64,
 }
 
-struct SearchScanContext<'a> {
-    fields: &'a SearchIndexFields,
-    writer: &'a IndexWriter,
-    manifest: &'a Mutex<Connection>,
-    generation: u64,
-    changes: &'a mut SearchScanChanges,
-}
-
-struct ManifestCleanup<'a> {
-    manifest: &'a Mutex<Connection>,
-    writer: &'a IndexWriter,
-    fields: &'a SearchIndexFields,
-    request: &'a SearchScanRequest,
-    generation: u64,
-    indexed_local_roots: &'a [String],
-    indexed_remote_names: &'a [String],
-    changes: &'a mut SearchScanChanges,
-}
-
 struct CompletedSearchScan {
-    index: Index,
-    reader: IndexReader,
-    fields: SearchIndexFields,
+    /// The newly published index, or `None` when nothing changed and the
+    /// live index was left untouched.
+    published: Option<(Index, IndexReader, SearchIndexFields)>,
     count: u64,
     local_count: u64,
     remote_count: u64,
@@ -341,6 +333,7 @@ impl SearchService {
             last_scan_updated_item_count: 0,
             last_scan_removed_item_count: 0,
             last_scan_unchanged_item_count: 0,
+            last_scan_started_ms: None,
         };
         Self {
             #[cfg(target_os = "macos")]
@@ -358,6 +351,7 @@ impl SearchService {
                     index: None,
                     reader: None,
                     fields: None,
+                    opened: None,
                 }),
                 cancel_flag: Arc::new(AtomicBool::new(false)),
             }),
@@ -390,6 +384,7 @@ impl SearchService {
                         index: None,
                         reader: None,
                         fields: None,
+                        opened: None,
                     }),
                     cancel_flag: Arc::new(AtomicBool::new(false)),
                 })
@@ -447,29 +442,52 @@ impl SearchService {
                     self.inner.index_root.display()
                 ))
             })?;
-        if self
+        let first = self
             .inner
             .state
             .read()
             .map_err(|e| ApiError::Message(e.to_string()))?
             .index
-            .is_none()
-        {
-            cleanup_staging_dirs(&self.inner.index_root);
+            .is_none();
+        if first {
+            // Staging copies belong to whichever process holds the scan lock.
+            // Only recover or clean up while no scan can be running.
+            if let Some(_lock) = ScanLock::try_acquire(&self.inner.index_root)? {
+                recover_interrupted_publish(&self.inner.live_index_dir);
+                cleanup_staging_dirs(&self.inner.index_root);
+            }
         }
-        let (index, reader, fields) = self.open_index(&self.inner.live_index_dir)?;
+        let stamp = index_stamp(&self.inner.live_index_dir);
+        let reopen = {
+            let state = self
+                .inner
+                .state
+                .read()
+                .map_err(|e| ApiError::Message(e.to_string()))?;
+            state.index.is_none() || stamp.is_none() || state.opened != stamp
+        };
+        if reopen {
+            let (index, reader, fields) = self.open_index(&self.inner.live_index_dir)?;
+            let indexed_item_count = reader.searcher().num_docs();
+            let mut state = self
+                .inner
+                .state
+                .write()
+                .map_err(|error| ApiError::Message(error.to_string()))?;
+            state.index = Some(index);
+            state.reader = Some(reader);
+            state.fields = Some(fields);
+            state.opened = index_stamp(&self.inner.live_index_dir);
+            state.status.indexed_item_count = indexed_item_count;
+            state.status.index_size_bytes = dir_size(&self.inner.live_index_dir);
+        }
+        // Another process sharing this index may have finished a scan.
         let meta = read_meta(&self.inner.index_root);
-        let indexed_item_count = reader.searcher().num_docs();
         let mut state = self
             .inner
             .state
             .write()
             .map_err(|error| ApiError::Message(error.to_string()))?;
-        state.index = Some(index);
-        state.reader = Some(reader);
-        state.fields = Some(fields);
-        state.status.indexed_item_count = indexed_item_count;
-        state.status.index_size_bytes = dir_size(&self.inner.live_index_dir);
         if let Some(meta) = meta.filter(|meta| meta.schema_version == SEARCH_SCHEMA_VERSION) {
             state.status.last_scan_time_ms = meta.last_scan_time_ms;
             state.status.last_scan_outcome = meta.last_scan_outcome;
@@ -482,6 +500,7 @@ impl SearchService {
             state.status.last_scan_updated_item_count = meta.last_scan_updated_item_count;
             state.status.last_scan_removed_item_count = meta.last_scan_removed_item_count;
             state.status.last_scan_unchanged_item_count = meta.last_scan_unchanged_item_count;
+            state.status.last_scan_started_ms = meta.last_scan_started_ms;
         }
         Ok(state.status.clone())
     }
@@ -498,6 +517,32 @@ impl SearchService {
 
     pub async fn start_scan(&self, request: SearchScanRequest) -> ApiResult<SearchStatus> {
         self.init().await?;
+        if self
+            .inner
+            .state
+            .read()
+            .map_err(|error| ApiError::Message(error.to_string()))?
+            .status
+            .scan_in_progress
+        {
+            return self.status().await;
+        }
+        // Every Misty process for this account shares the index directory.
+        // Only one of them scans; the others pick up its result from disk.
+        let Some(lock) = ScanLock::try_acquire(&self.inner.index_root)? else {
+            return self.status().await;
+        };
+        // Another process may have finished a scan since this one checked.
+        let meta = read_meta(&self.inner.index_root);
+        if request.incremental
+            && meta
+                .as_ref()
+                .and_then(|meta| meta.last_scan_time_ms)
+                .is_some_and(|finished| now_ms().saturating_sub(finished) < MIN_SCAN_SPACING_MS)
+        {
+            drop(lock);
+            return self.init().await;
+        }
         {
             let mut state = self
                 .inner
@@ -515,12 +560,16 @@ impl SearchService {
             state.status.current_path = None;
             state.status.scan_errors.clear();
             state.status.last_scan_error = None;
+            state.status.last_scan_started_ms = Some(now_ms());
+            let _ = write_meta(&self.inner.index_root, &meta_from_status(&state.status));
         }
 
         let service = self.clone();
         // Scanning and the confined worker protocol use blocking filesystem I/O.
         // Keep runtime threads available for permission revocation and provider I/O.
         tokio::task::spawn_blocking(move || {
+            let _lock = lock;
+            let _background = BackgroundPriority::enter();
             tauri::async_runtime::block_on(service.run_scan(request));
         });
         self.status().await
@@ -623,9 +672,9 @@ impl SearchService {
                 .index_root
                 .join(format!(".staging.{}.{}", started, std::process::id()));
         let result = self.run_scan_inner(&request, &staging_dir).await;
-        if result.is_err() {
-            let _ = fs::remove_dir_all(&staging_dir);
-        }
+        // The live index is only ever replaced by a completed scan, so a
+        // canceled or failed one leaves the last valid index in place.
+        let _ = fs::remove_dir_all(&staging_dir);
         let finished = now_ms();
         let mut state = match self.inner.state.write() {
             Ok(state) => state,
@@ -646,14 +695,17 @@ impl SearchService {
         });
         state.status.last_scan_error = result.as_ref().err().map(ToString::to_string);
         if let Ok(completed) = result {
-            state.index = Some(completed.index);
-            state.reader = Some(completed.reader);
-            state.fields = Some(completed.fields);
+            if let Some((index, reader, fields)) = completed.published {
+                state.index = Some(index);
+                state.reader = Some(reader);
+                state.fields = Some(fields);
+                state.opened = index_stamp(&self.inner.live_index_dir);
+                state.status.index_size_bytes = dir_size(&self.inner.live_index_dir);
+            }
             state.status.last_scan_time_ms = Some(finished);
             state.status.indexed_item_count = completed.count;
             state.status.indexed_local_item_count = completed.local_count;
             state.status.indexed_remote_item_count = completed.remote_count;
-            state.status.index_size_bytes = dir_size(&self.inner.live_index_dir);
             state.status.indexed_local_roots = completed.local_roots;
             state.status.indexed_remote_names = completed.remote_names;
             state.status.last_scan_added_item_count = completed.changes.added;
@@ -661,31 +713,40 @@ impl SearchService {
             state.status.last_scan_removed_item_count = completed.changes.removed;
             state.status.last_scan_unchanged_item_count = completed.changes.unchanged;
         }
-        let _ = write_meta(
-            &self.inner.index_root,
-            &SearchMeta {
-                schema_version: SEARCH_SCHEMA_VERSION,
-                indexed_item_count: state.status.indexed_item_count,
-                indexed_local_item_count: state.status.indexed_local_item_count,
-                indexed_remote_item_count: state.status.indexed_remote_item_count,
-                last_scan_time_ms: state.status.last_scan_time_ms,
-                last_scan_outcome: state.status.last_scan_outcome.clone(),
-                last_scan_error: state.status.last_scan_error.clone(),
-                indexed_local_roots: state.status.indexed_local_roots.clone(),
-                indexed_remote_names: state.status.indexed_remote_names.clone(),
-                last_scan_added_item_count: state.status.last_scan_added_item_count,
-                last_scan_updated_item_count: state.status.last_scan_updated_item_count,
-                last_scan_removed_item_count: state.status.last_scan_removed_item_count,
-                last_scan_unchanged_item_count: state.status.last_scan_unchanged_item_count,
-            },
-        );
+        let _ = write_meta(&self.inner.index_root, &meta_from_status(&state.status));
     }
 
+    /// Walks the requested roots against the live catalog without writing
+    /// anything. Only the first actual change copies the live index to a
+    /// staging directory, which is published atomically when the scan
+    /// completes; an unchanged tree costs reads only.
     async fn run_scan_inner(
         &self,
         request: &SearchScanRequest,
         staging_dir: &Path,
     ) -> ApiResult<CompletedSearchScan> {
+        if let Some(completed) = self.run_scan_pass(request, staging_dir).await? {
+            return Ok(completed);
+        }
+        // Most of the catalog is gone (for example, areas newly excluded from
+        // scanning). Building it afresh costs far less than deleting entry by
+        // entry, and leaves a compact catalog.
+        let _ = fs::remove_dir_all(staging_dir);
+        let rebuild = SearchScanRequest {
+            incremental: false,
+            ..request.clone()
+        };
+        self.run_scan_pass(&rebuild, staging_dir)
+            .await?
+            .ok_or_else(|| ApiError::Message("Search catalog rebuild did not complete.".into()))
+    }
+
+    /// One walk. `None` asks for a full rebuild instead of this update.
+    async fn run_scan_pass(
+        &self,
+        request: &SearchScanRequest,
+        staging_dir: &Path,
+    ) -> ApiResult<Option<CompletedSearchScan>> {
         let reuse_existing =
             request.incremental && self.inner.live_index_dir.join("meta.json").exists();
         let manifest_exists = self
@@ -693,79 +754,86 @@ impl SearchService {
             .live_index_dir
             .join(SEARCH_MANIFEST_FILE)
             .exists();
-        let (index, fields, existing_reader) = if reuse_existing {
-            copy_index(&self.inner.live_index_dir, staging_dir)?;
-            let (index, reader, fields) = self.open_index(staging_dir)?;
-            (index, fields, Some(reader))
+        let mut sink = if reuse_existing && manifest_exists {
+            ScanSink::probe(self, &self.inner.live_index_dir, staging_dir)?
         } else {
-            let (index, fields) = self.fresh_index(staging_dir)?;
-            (index, fields, None)
+            // Full rebuilds and catalogs that predate the manifest are staged
+            // up front, as before.
+            let (index, fields, existing_reader) = if reuse_existing {
+                copy_index(&self.inner.live_index_dir, staging_dir)?;
+                let (index, reader, fields) = self.open_index(staging_dir)?;
+                (index, fields, Some(reader))
+            } else {
+                let (index, fields) = self.fresh_index(staging_dir)?;
+                (index, fields, None)
+            };
+            let manifest = Mutex::new(open_search_manifest(staging_dir)?);
+            begin_manifest_update(&manifest)?;
+            if let Some(reader) = existing_reader.as_ref() {
+                seed_search_manifest(&manifest, reader, fields)?;
+            }
+            drop(existing_reader);
+            ScanSink::staged(self, staging_dir, index, fields, manifest)?
         };
-        let manifest = Mutex::new(open_search_manifest(staging_dir)?);
-        begin_manifest_update(&manifest)?;
-        if reuse_existing && !manifest_exists {
-            seed_search_manifest(
-                &manifest,
-                existing_reader.as_ref().ok_or_else(|| {
-                    ApiError::Message("Existing search catalog reader is unavailable.".to_owned())
-                })?,
-                fields,
-            )?;
-        }
-        drop(existing_reader);
-        let generation = now_ms().max(1);
-        let mut writer = index
-            .writer_with_num_threads(1, INDEX_MEMORY_BUDGET_BYTES)
-            .map_err(|error| ApiError::Message(error.to_string()))?;
         let ignored = ignored_paths(&request.ignored_paths, &self.inner.excluded_index_root);
+        let privacy =
+            crate::infra::macos_privacy::BackgroundScanExclusions::new(&self.inner.home_dir);
         let mut count = 0u64;
-        let mut local_count = 0u64;
-        let remote_count = 0u64;
-        let mut indexed_local_roots = Vec::new();
-        let indexed_remote_names = Vec::new();
-        let mut changes = SearchScanChanges::default();
+        let mut local_roots_scanned = Vec::new();
+        let indexed_remote_names: Vec<String> = Vec::new();
+        let mut pacer = ScanPacer::default();
 
         if request.include_local {
             let roots = local_roots(request, &self.inner.home_dir);
             for root in roots {
-                if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
+                if self.scan_canceled() {
                     return Err(ApiError::Message("Search scan canceled.".to_string()));
                 }
                 self.set_scan_progress(Some("Local".to_string()), Some(display_path(&root)));
-                match self.scan_local_root(
+                let filter = ScanFilter::new(
                     &root,
-                    request.max_depth,
+                    &self.inner.home_dir,
+                    &self.inner.mount_root,
                     &ignored,
-                    SearchScanContext {
-                        fields: &fields,
-                        writer: &writer,
-                        manifest: &manifest,
-                        generation,
-                        changes: &mut changes,
-                    },
-                ) {
+                    &privacy,
+                );
+                match self.scan_local_root(&root, request.max_depth, &filter, &mut sink, &mut pacer)
+                {
                     Ok(indexed) => {
                         count += indexed;
-                        local_count += indexed;
-                        indexed_local_roots.push(display_path(&root));
+                        local_roots_scanned.push(display_path(&root));
                         self.set_indexed_count(count);
                     }
+                    Err(error) if self.scan_canceled() => return Err(error),
                     Err(error) => self.push_scan_error(display_path(&root), error.to_string()),
                 }
             }
         }
 
-        remove_missing_manifest_docs(ManifestCleanup {
-            manifest: &manifest,
-            writer: &writer,
-            fields: &fields,
-            request,
-            generation,
-            indexed_local_roots: &indexed_local_roots,
-            indexed_remote_names: &indexed_remote_names,
-            changes: &mut changes,
-        })?;
-
+        if !sink.remove_missing(request, &local_roots_scanned)? {
+            return Ok(None);
+        }
+        if self.scan_canceled() {
+            return Err(ApiError::Message("Search scan canceled.".into()));
+        }
+        let changes = sink.changes;
+        let Some(staged) = sink.finish()? else {
+            // Nothing changed: the live index already is the result.
+            let state = self
+                .inner
+                .state
+                .read()
+                .map_err(|error| ApiError::Message(error.to_string()))?;
+            return Ok(Some(CompletedSearchScan {
+                published: None,
+                count: state.status.indexed_item_count,
+                local_count: state.status.indexed_local_item_count,
+                remote_count: state.status.indexed_remote_item_count,
+                local_roots: local_roots_scanned,
+                remote_names: indexed_remote_names,
+                changes,
+            }));
+        };
         {
             let mut state = self
                 .inner
@@ -774,6 +842,12 @@ impl SearchService {
                 .map_err(|error| ApiError::Message(error.to_string()))?;
             state.status.scan_phase = SearchScanPhase::Committing;
         }
+        let StagedIndex {
+            index,
+            mut writer,
+            manifest,
+            ..
+        } = staged;
         writer
             .commit()
             .map_err(|error| ApiError::Message(error.to_string()))?;
@@ -781,40 +855,37 @@ impl SearchService {
         drop(writer);
         drop(index);
         let (local_count, remote_count) = manifest_source_counts(&manifest)?;
+        compact_manifest(&manifest)?;
         drop(manifest);
-        if self.access_cancelled() || self.inner.cancel_flag.load(Ordering::SeqCst) {
+        if self.scan_canceled() {
             return Err(ApiError::Message("Search scan canceled.".into()));
         }
         replace_index(staging_dir, &self.inner.live_index_dir)?;
         let (index, reader, fields) = self.open_index(&self.inner.live_index_dir)?;
         let count = reader.searcher().num_docs();
-        Ok(CompletedSearchScan {
-            index,
-            reader,
-            fields,
+        Ok(Some(CompletedSearchScan {
+            published: Some((index, reader, fields)),
             count,
             local_count,
             remote_count,
-            local_roots: indexed_local_roots,
+            local_roots: local_roots_scanned,
             remote_names: indexed_remote_names,
             changes,
-        })
+        }))
+    }
+
+    fn scan_canceled(&self) -> bool {
+        self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled()
     }
 
     fn scan_local_root(
         &self,
         root: &Path,
         max_depth: Option<usize>,
-        ignored: &[PathBuf],
-        context: SearchScanContext<'_>,
+        filter: &ScanFilter,
+        sink: &mut ScanSink<'_>,
+        pacer: &mut ScanPacer,
     ) -> ApiResult<u64> {
-        let SearchScanContext {
-            fields,
-            writer,
-            manifest,
-            generation,
-            changes,
-        } = context;
         if !root.exists() || !root.is_dir() {
             return Ok(0);
         }
@@ -823,14 +894,12 @@ impl SearchService {
             .follow_links(false)
             .max_depth(max_depth.unwrap_or(DEFAULT_MAX_DEPTH).max(1))
             .into_iter()
-            .filter_entry(|entry| {
-                !is_ignored(entry.path(), ignored)
-                    && !privacy_excluded(entry.path(), &self.inner.home_dir)
-            })
+            .filter_entry(|entry| entry.depth() == 0 || !filter.excludes(entry.path()))
         {
-            if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
+            if self.scan_canceled() {
                 return Err(ApiError::Message("Search scan canceled.".to_string()));
             }
+            pacer.pace();
             let Ok(entry) = entry else {
                 continue;
             };
@@ -838,16 +907,15 @@ impl SearchService {
                 continue;
             }
             let path = entry.path();
-            self.set_current_path_throttled(display_path(path), count);
-            if is_ignored(path, ignored) {
+            self.set_current_path_throttled(path, count);
+            // Directory entries already carry the file type; only files and
+            // directories need their size and modification time.
+            if entry.file_type().is_symlink() {
                 continue;
             }
-            let Ok(metadata) = fs::symlink_metadata(path) else {
+            let Ok(metadata) = entry.metadata() else {
                 continue;
             };
-            if metadata.file_type().is_symlink() {
-                continue;
-            }
             let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
                 continue;
             };
@@ -874,7 +942,7 @@ impl SearchService {
                 modified_ms: metadata_modified_ms(&metadata),
                 hidden: name.starts_with('.'),
             };
-            upsert_search_doc(writer, fields, manifest, &doc, generation, changes)?;
+            sink.accept(doc)?;
             count += 1;
         }
         Ok(count)
@@ -887,12 +955,12 @@ impl SearchService {
         }
     }
 
-    fn set_current_path_throttled(&self, path: String, count: u64) {
+    fn set_current_path_throttled(&self, path: &Path, count: u64) {
         if count % 250 != 0 {
             return;
         }
         if let Ok(mut state) = self.inner.state.write() {
-            state.status.current_path = Some(path);
+            state.status.current_path = Some(display_path(path));
         }
     }
 
@@ -909,6 +977,567 @@ impl SearchService {
                 .scan_errors
                 .push(SearchScanError { source, message });
         }
+    }
+}
+
+/// Cross-process scan ownership. Every Misty process for an account shares the
+/// index directory; the OS releases the lock if its holder exits or crashes.
+struct ScanLock(fs::File);
+
+impl ScanLock {
+    fn try_acquire(index_root: &Path) -> ApiResult<Option<Self>> {
+        fs::create_dir_all(index_root).map_err(|error| ApiError::Message(error.to_string()))?;
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(index_root.join(SCAN_LOCK_FILE))
+            .map_err(|error| ApiError::Message(format!("Search scan lock failed: {error}")))?;
+        match file.try_lock() {
+            Ok(()) => Ok(Some(Self(file))),
+            Err(fs::TryLockError::WouldBlock) => Ok(None),
+            Err(fs::TryLockError::Error(error)) => Err(ApiError::Message(format!(
+                "Search scan lock failed: {error}"
+            ))),
+        }
+    }
+}
+
+impl Drop for ScanLock {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
+}
+
+/// Runs the scanning thread at background priority (CPU and disk) for as long
+/// as it lives; the pooled thread gets its normal priority back afterwards.
+struct BackgroundPriority;
+
+impl BackgroundPriority {
+    fn enter() -> Self {
+        #[cfg(target_os = "macos")]
+        unsafe {
+            libc::setpriority(libc::PRIO_DARWIN_THREAD, 0, libc::PRIO_DARWIN_BG);
+        }
+        Self
+    }
+}
+
+impl Drop for BackgroundPriority {
+    fn drop(&mut self) {
+        #[cfg(target_os = "macos")]
+        unsafe {
+            libc::setpriority(libc::PRIO_DARWIN_THREAD, 0, 0);
+        }
+    }
+}
+
+/// Duty cycle for the filesystem walk.
+struct ScanPacer {
+    burst_started: std::time::Instant,
+    entries: u32,
+}
+
+impl Default for ScanPacer {
+    fn default() -> Self {
+        Self {
+            burst_started: std::time::Instant::now(),
+            entries: 0,
+        }
+    }
+}
+
+impl ScanPacer {
+    fn pace(&mut self) {
+        self.entries = self.entries.wrapping_add(1);
+        if self.entries % 256 != 0 || self.burst_started.elapsed() < SCAN_BURST {
+            return;
+        }
+        std::thread::sleep(SCAN_PAUSE);
+        self.burst_started = std::time::Instant::now();
+    }
+}
+
+/// What one root's walk skips. Caches, toolchains, build output and app data
+/// are regenerated by their owners and never searched for by name; they were
+/// most of a home directory's entries. A root the user chose explicitly is
+/// always walked, even when it lies inside one of those areas.
+struct ScanFilter {
+    names: HashSet<std::ffi::OsString>,
+    absolute: Vec<PathBuf>,
+    home: Option<PathBuf>,
+}
+
+/// Directory names skipped wherever they appear: build output, dependency
+/// stores and caches.
+const GENERATED_DIR_NAMES: &[&str] = &[
+    ".git",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    ".next",
+    ".cache",
+    ".nuxt",
+    ".svelte-kit",
+    ".turbo",
+    ".parcel-cache",
+    ".gradle",
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tox",
+    "DerivedData",
+    "Pods",
+    "bower_components",
+    ".terraform",
+];
+
+/// Home-relative areas that hold application data rather than documents.
+const GENERATED_HOME_DIRS: &[&str] = &[
+    ".Trash",
+    ".cache",
+    ".npm",
+    ".pnpm-store",
+    ".yarn",
+    ".bun",
+    ".deno",
+    ".cargo",
+    ".rustup",
+    ".gradle",
+    ".m2",
+    ".ivy2",
+    ".nvm",
+    ".pyenv",
+    ".rbenv",
+    ".gem",
+    ".cocoapods",
+    ".android",
+    ".docker",
+    ".vscode",
+    ".cursor",
+    ".local",
+    ".colima",
+    ".orbstack",
+    "AppData",
+];
+
+/// Inside ~/Library only these hold user documents (iCloud Drive and
+/// third-party cloud drives).
+const LIBRARY_DOCUMENT_DIRS: &[&str] = &["Mobile Documents", "CloudStorage"];
+
+impl ScanFilter {
+    fn new(
+        root: &Path,
+        home: &Path,
+        mount_root: &Path,
+        ignored: &[PathBuf],
+        privacy: &crate::infra::macos_privacy::BackgroundScanExclusions,
+    ) -> Self {
+        let mut names: HashSet<std::ffi::OsString> =
+            GENERATED_DIR_NAMES.iter().map(Into::into).collect();
+        // Misty's own caches and the remote mount (remotes are indexed
+        // separately); notes and config under ~/.misty stay searchable.
+        let mut absolute = vec![
+            mount_root.to_path_buf(),
+            home.join(".misty").join(".cache"),
+            home.join(".misty").join("tmp"),
+        ];
+        absolute.extend(privacy.roots().iter().cloned());
+        for path in ignored {
+            if path.is_absolute() {
+                absolute.push(path.clone());
+            } else {
+                names.insert(path.as_os_str().to_owned());
+            }
+        }
+        // Explicitly requested roots inside an excluded area are still walked.
+        absolute.retain(|excluded| !root.starts_with(excluded));
+        let home = (!generated_home_area(root, home)).then(|| home.to_path_buf());
+        Self {
+            names,
+            absolute,
+            home,
+        }
+    }
+
+    fn excludes(&self, path: &Path) -> bool {
+        if path
+            .file_name()
+            .is_some_and(|name| self.names.contains(name))
+        {
+            return true;
+        }
+        if self.absolute.iter().any(|root| path.starts_with(root)) {
+            return true;
+        }
+        if path.extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("photoslibrary")
+                || extension.eq_ignore_ascii_case("photolibrary")
+        }) {
+            return true;
+        }
+        self.home
+            .as_deref()
+            .is_some_and(|home| generated_home_area(path, home))
+    }
+}
+
+fn generated_home_area(path: &Path, home: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(home) else {
+        return false;
+    };
+    let mut components = relative.components().map(|part| part.as_os_str());
+    let Some(first) = components.next() else {
+        return false;
+    };
+    if first == "Library" && cfg!(target_os = "macos") {
+        return components
+            .next()
+            .is_some_and(|second| !LIBRARY_DOCUMENT_DIRS.iter().any(|keep| second == *keep));
+    }
+    GENERATED_HOME_DIRS.iter().any(|name| first == *name)
+}
+
+/// The fields a local entry's scan can change; everything else is derived
+/// from its path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DocSignature {
+    is_file: bool,
+    is_dir: bool,
+    size: u64,
+    modified_ms: u64,
+    hidden: bool,
+}
+
+impl From<&SearchDoc> for DocSignature {
+    fn from(doc: &SearchDoc) -> Self {
+        Self {
+            is_file: doc.is_file,
+            is_dir: doc.is_dir,
+            size: doc.size,
+            modified_ms: doc.modified_ms,
+            hidden: doc.hidden,
+        }
+    }
+}
+
+fn lookup_signature(connection: &Connection, key: &str) -> ApiResult<Option<DocSignature>> {
+    let mut statement = connection
+        .prepare_cached(
+            "SELECT is_file,is_dir,size,modified_ms,hidden FROM search_docs WHERE doc_key=?1",
+        )
+        .map_err(search_manifest_error)?;
+    statement
+        .query_row(params![key], |row| {
+            Ok(DocSignature {
+                is_file: row.get::<_, i64>(0)? != 0,
+                is_dir: row.get::<_, i64>(1)? != 0,
+                size: row.get(2)?,
+                modified_ms: row.get(3)?,
+                hidden: row.get::<_, i64>(4)? != 0,
+            })
+        })
+        .optional()
+        .map_err(search_manifest_error)
+}
+
+fn key_hash(key: &str) -> u64 {
+    use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
+    BuildHasherDefault::<DefaultHasher>::default().hash_one(key)
+}
+
+/// Manifest key range holding every local entry below `root`.
+fn local_key_range(root: &str) -> (String, String) {
+    let prefix = if root.ends_with('/') || root.ends_with('\\') {
+        root.to_owned()
+    } else if cfg!(windows) {
+        format!("{root}\\")
+    } else {
+        format!("{root}/")
+    };
+    let lower = format!("local\u{0}{prefix}");
+    let mut upper = lower.clone();
+    let last = upper.pop().expect("separator");
+    upper.push(char::from_u32(last as u32 + 1).expect("next character"));
+    (lower, upper)
+}
+
+/// Entries the manifest holds below the scanned roots that the walk did not
+/// see. Counting first avoids reading every key when nothing was removed.
+/// Both queries read only the `(source_kind, remote_name)` index, which
+/// carries the key, never the much larger rows.
+fn missing_local_keys(
+    connection: &Connection,
+    roots: &[String],
+    seen: &HashSet<u64>,
+    seen_existing: u64,
+) -> ApiResult<(u64, Vec<String>)> {
+    let mut roots: Vec<&String> = roots.iter().collect();
+    roots.sort();
+    roots.dedup();
+    let mut total = 0u64;
+    for root in &roots {
+        let (lower, upper) = local_key_range(root);
+        total += connection
+            .query_row(
+                "SELECT COUNT(*) FROM search_docs WHERE source_kind='local' AND remote_name='' AND doc_key>?1 AND doc_key<?2",
+                params![lower, upper],
+                |row| row.get::<_, u64>(0),
+            )
+            .map_err(search_manifest_error)?;
+    }
+    if total == seen_existing {
+        return Ok((total, Vec::new()));
+    }
+    let mut missing = Vec::new();
+    let mut statement = connection
+        .prepare("SELECT doc_key FROM search_docs WHERE source_kind='local' AND remote_name='' AND doc_key>?1 AND doc_key<?2")
+        .map_err(search_manifest_error)?;
+    for root in roots {
+        let (lower, upper) = local_key_range(root);
+        let keys = statement
+            .query_map(params![lower, upper], |row| row.get::<_, String>(0))
+            .map_err(search_manifest_error)?;
+        for key in keys {
+            let key = key.map_err(search_manifest_error)?;
+            if !seen.contains(&key_hash(&key)) {
+                missing.push(key);
+            }
+        }
+    }
+    Ok((total, missing))
+}
+
+fn lock_manifest(manifest: &Mutex<Connection>) -> ApiResult<std::sync::MutexGuard<'_, Connection>> {
+    manifest
+        .lock()
+        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))
+}
+
+struct StagedIndex {
+    index: Index,
+    writer: IndexWriter,
+    fields: SearchIndexFields,
+    manifest: Mutex<Connection>,
+}
+
+/// Receives walked entries. It compares them with the live manifest read-only
+/// and stages a copy of the index only when the first change appears.
+struct ScanSink<'a> {
+    service: &'a SearchService,
+    staging_dir: &'a Path,
+    live_dir: Option<&'a Path>,
+    probe: Option<Connection>,
+    staged: Option<StagedIndex>,
+    generation: u64,
+    seen: HashSet<u64>,
+    changes: SearchScanChanges,
+}
+
+impl<'a> ScanSink<'a> {
+    fn probe(
+        service: &'a SearchService,
+        live_dir: &'a Path,
+        staging_dir: &'a Path,
+    ) -> ApiResult<Self> {
+        let probe = Connection::open_with_flags(
+            live_dir.join(SEARCH_MANIFEST_FILE),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(search_manifest_error)?;
+        // One point lookup per walked entry: map the file instead of reading
+        // it page by page through SQLite's small default cache.
+        probe
+            .execute_batch("PRAGMA mmap_size=1073741824; PRAGMA cache_size=-65536;")
+            .map_err(search_manifest_error)?;
+        Ok(Self {
+            service,
+            staging_dir,
+            live_dir: Some(live_dir),
+            probe: Some(probe),
+            staged: None,
+            generation: now_ms().max(1),
+            seen: HashSet::new(),
+            changes: SearchScanChanges::default(),
+        })
+    }
+
+    fn staged(
+        service: &'a SearchService,
+        staging_dir: &'a Path,
+        index: Index,
+        fields: SearchIndexFields,
+        manifest: Mutex<Connection>,
+    ) -> ApiResult<Self> {
+        let writer = index
+            .writer_with_num_threads(1, INDEX_MEMORY_BUDGET_BYTES)
+            .map_err(|error| ApiError::Message(error.to_string()))?;
+        Ok(Self {
+            service,
+            staging_dir,
+            live_dir: None,
+            probe: None,
+            staged: Some(StagedIndex {
+                index,
+                writer,
+                fields,
+                manifest,
+            }),
+            generation: now_ms().max(1),
+            seen: HashSet::new(),
+            changes: SearchScanChanges::default(),
+        })
+    }
+
+    fn stage(&mut self) -> ApiResult<&StagedIndex> {
+        if self.staged.is_none() {
+            self.probe = None;
+            let live = self.live_dir.ok_or_else(|| {
+                ApiError::Message("Search catalog staging is unavailable.".to_owned())
+            })?;
+            copy_index(live, self.staging_dir)?;
+            let (index, _reader, fields) = self.service.open_index(self.staging_dir)?;
+            let manifest = Mutex::new(open_search_manifest(self.staging_dir)?);
+            begin_manifest_update(&manifest)?;
+            let writer = index
+                .writer_with_num_threads(1, INDEX_MEMORY_BUDGET_BYTES)
+                .map_err(|error| ApiError::Message(error.to_string()))?;
+            self.staged = Some(StagedIndex {
+                index,
+                writer,
+                fields,
+                manifest,
+            });
+        }
+        Ok(self.staged.as_ref().expect("staged"))
+    }
+
+    fn lookup(&self, key: &str) -> ApiResult<Option<DocSignature>> {
+        match (&self.staged, &self.probe) {
+            (Some(staged), _) => lookup_signature(&*lock_manifest(&staged.manifest)?, key),
+            (None, Some(probe)) => lookup_signature(probe, key),
+            (None, None) => Ok(None),
+        }
+    }
+
+    fn accept(&mut self, doc: SearchDoc) -> ApiResult<()> {
+        let key = search_doc_key(&doc);
+        self.seen.insert(key_hash(&key));
+        let existing = self.lookup(&key)?;
+        if existing == Some(DocSignature::from(&doc)) {
+            self.changes.unchanged += 1;
+            return Ok(());
+        }
+        let generation = self.generation;
+        let staged = self.stage()?;
+        if existing.is_some() {
+            delete_doc(&staged.writer, &staged.fields, &doc.path)?;
+        }
+        add_doc(&staged.writer, &staged.fields, &doc)?;
+        persist_manifest_doc(&*lock_manifest(&staged.manifest)?, &doc, generation)?;
+        if existing.is_some() {
+            self.changes.updated += 1;
+        } else {
+            self.changes.added += 1;
+        }
+        Ok(())
+    }
+
+    /// Removes entries below the fully walked roots that no longer exist.
+    /// Returns `false`, without changing anything, when an incremental update
+    /// would remove most of the catalog; a rebuild is cheaper then.
+    fn remove_missing(&mut self, request: &SearchScanRequest, roots: &[String]) -> ApiResult<bool> {
+        if !request.include_local || roots.is_empty() {
+            return Ok(true);
+        }
+        let seen_existing = self.changes.unchanged + self.changes.updated;
+        let (total, missing) = match (&self.staged, &self.probe) {
+            (Some(staged), _) => missing_local_keys(
+                &*lock_manifest(&staged.manifest)?,
+                roots,
+                &self.seen,
+                seen_existing,
+            )?,
+            (None, Some(probe)) => missing_local_keys(probe, roots, &self.seen, seen_existing)?,
+            (None, None) => (0, Vec::new()),
+        };
+        if missing.is_empty() {
+            return Ok(true);
+        }
+        if request.incremental && missing.len() as u64 * 2 > total {
+            return Ok(false);
+        }
+        let staged = self.stage()?;
+        let manifest = lock_manifest(&staged.manifest)?;
+        let mut delete = manifest
+            .prepare_cached("DELETE FROM search_docs WHERE doc_key=?1")
+            .map_err(search_manifest_error)?;
+        for key in &missing {
+            let Some(path) = key.strip_prefix("local\u{0}") else {
+                continue;
+            };
+            delete_doc(&staged.writer, &staged.fields, path)?;
+            delete
+                .execute(params![key])
+                .map_err(search_manifest_error)?;
+        }
+        drop(delete);
+        drop(manifest);
+        self.changes.removed += missing.len() as u64;
+        Ok(true)
+    }
+
+    fn finish(self) -> ApiResult<Option<StagedIndex>> {
+        Ok(self.staged)
+    }
+}
+
+/// A crash between the two renames of `replace_index` leaves only the
+/// backup; put it back so the last valid index is not lost.
+fn recover_interrupted_publish(live: &Path) {
+    if live.exists() {
+        return;
+    }
+    let (Some(parent), Some(name)) = (live.parent(), live.file_name()) else {
+        return;
+    };
+    let prefix = format!("{}.backup.", name.to_string_lossy());
+    let newest = fs::read_dir(parent)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with(&prefix))
+        .max_by_key(|entry| entry.file_name());
+    if let Some(backup) = newest {
+        let _ = fs::rename(backup.path(), live);
+    }
+}
+
+/// Changes whenever a new index is published (by any process).
+fn index_stamp(live: &Path) -> Option<SystemTime> {
+    fs::metadata(live.join("meta.json"))
+        .and_then(|metadata| metadata.modified())
+        .ok()
+}
+
+fn meta_from_status(status: &SearchStatus) -> SearchMeta {
+    SearchMeta {
+        schema_version: SEARCH_SCHEMA_VERSION,
+        indexed_item_count: status.indexed_item_count,
+        indexed_local_item_count: status.indexed_local_item_count,
+        indexed_remote_item_count: status.indexed_remote_item_count,
+        last_scan_time_ms: status.last_scan_time_ms,
+        last_scan_outcome: status.last_scan_outcome.clone(),
+        last_scan_error: status.last_scan_error.clone(),
+        indexed_local_roots: status.indexed_local_roots.clone(),
+        indexed_remote_names: status.indexed_remote_names.clone(),
+        last_scan_added_item_count: status.last_scan_added_item_count,
+        last_scan_updated_item_count: status.last_scan_updated_item_count,
+        last_scan_removed_item_count: status.last_scan_removed_item_count,
+        last_scan_unchanged_item_count: status.last_scan_unchanged_item_count,
+        last_scan_started_ms: status.last_scan_started_ms,
     }
 }
 
@@ -1027,13 +1656,16 @@ fn copy_directory(source: &Path, destination: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Opens a staged catalog. It is written only inside a staging copy that is
+/// discarded if the scan does not complete, so it keeps no rollback journal.
 fn open_search_manifest(index_dir: &Path) -> ApiResult<Connection> {
     let connection =
         Connection::open(index_dir.join(SEARCH_MANIFEST_FILE)).map_err(search_manifest_error)?;
     connection
         .execute_batch(
-            "PRAGMA journal_mode=DELETE;
+            "PRAGMA journal_mode=OFF;
              PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=-65536;
              CREATE TABLE IF NOT EXISTS search_docs (
                doc_key TEXT PRIMARY KEY,
                path TEXT NOT NULL,
@@ -1108,33 +1740,6 @@ fn search_doc_key(doc: &SearchDoc) -> String {
     }
 }
 
-fn load_manifest_doc(connection: &Connection, key: &str) -> ApiResult<Option<SearchDoc>> {
-    connection
-        .query_row(
-            "SELECT path,name,extension,source_kind,provider_type,remote_name,remote_path,mime_type,is_file,is_dir,size,modified_ms,hidden FROM search_docs WHERE doc_key=?1",
-            params![key],
-            |row| {
-                Ok(SearchDoc {
-                    path: row.get(0)?,
-                    name: row.get(1)?,
-                    extension: row.get(2)?,
-                    source_kind: if row.get::<_, String>(3)? == "remote" { SearchSourceKind::Remote } else { SearchSourceKind::Local },
-                    provider_type: row.get(4)?,
-                    remote_name: row.get(5)?,
-                    remote_path: row.get(6)?,
-                    mime_type: row.get(7)?,
-                    is_file: row.get::<_, i64>(8)? != 0,
-                    is_dir: row.get::<_, i64>(9)? != 0,
-                    size: row.get(10)?,
-                    modified_ms: row.get(11)?,
-                    hidden: row.get::<_, i64>(12)? != 0,
-                })
-            },
-        )
-        .optional()
-        .map_err(search_manifest_error)
-}
-
 fn persist_manifest_doc(
     connection: &Connection,
     doc: &SearchDoc,
@@ -1167,91 +1772,22 @@ fn persist_manifest_doc(
     Ok(())
 }
 
-fn upsert_search_doc(
-    writer: &IndexWriter,
-    fields: &SearchIndexFields,
-    manifest: &Mutex<Connection>,
-    doc: &SearchDoc,
-    generation: u64,
-    changes: &mut SearchScanChanges,
-) -> ApiResult<()> {
-    let manifest = manifest
-        .lock()
-        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?;
-    let key = search_doc_key(doc);
-    match load_manifest_doc(&manifest, &key)? {
-        Some(existing) if existing == *doc => {
-            manifest
-                .execute(
-                    "UPDATE search_docs SET last_seen_generation=?1 WHERE doc_key=?2",
-                    params![generation, key],
-                )
-                .map_err(search_manifest_error)?;
-            changes.unchanged += 1;
-        }
-        Some(existing) => {
-            delete_doc(writer, fields, &existing.path)?;
-            add_doc(writer, fields, doc)?;
-            persist_manifest_doc(&manifest, doc, generation)?;
-            changes.updated += 1;
-        }
-        None => {
-            add_doc(writer, fields, doc)?;
-            persist_manifest_doc(&manifest, doc, generation)?;
-            changes.added += 1;
-        }
-    }
-    Ok(())
-}
-
-fn remove_missing_manifest_docs(context: ManifestCleanup<'_>) -> ApiResult<()> {
-    let ManifestCleanup {
-        manifest,
-        writer,
-        fields,
-        request,
-        generation,
-        indexed_local_roots,
-        indexed_remote_names,
-        changes,
-    } = context;
-    let manifest = manifest
-        .lock()
-        .map_err(|error| ApiError::Message(format!("Search catalog lock failed: {error}")))?;
-    let mut statement = manifest
-        .prepare("SELECT doc_key FROM search_docs WHERE last_seen_generation<>?1")
+/// Removals leave free pages behind; SQLite never shrinks the file on its
+/// own. Once most of the staged catalog is free space, rewrite it compactly
+/// before it is published.
+fn compact_manifest(manifest: &Mutex<Connection>) -> ApiResult<()> {
+    let manifest = lock_manifest(manifest)?;
+    let (pages, free): (u64, u64) = manifest
+        .query_row(
+            "SELECT (SELECT page_count FROM pragma_page_count()), (SELECT freelist_count FROM pragma_freelist_count())",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
         .map_err(search_manifest_error)?;
-    let keys = statement
-        .query_map(params![generation], |row| row.get::<_, String>(0))
-        .map_err(search_manifest_error)?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(search_manifest_error)?;
-    drop(statement);
-    let local_roots: Vec<PathBuf> = indexed_local_roots.iter().map(PathBuf::from).collect();
-    let remote_names: HashSet<&str> = indexed_remote_names.iter().map(String::as_str).collect();
-    for key in keys {
-        let Some(doc) = load_manifest_doc(&manifest, &key)? else {
-            continue;
-        };
-        let covered = match doc.source_kind {
-            SearchSourceKind::Local => {
-                request.include_local
-                    && local_roots
-                        .iter()
-                        .any(|root| Path::new(&doc.path).starts_with(root))
-            }
-            SearchSourceKind::Remote => {
-                request.include_remotes && remote_names.contains(doc.remote_name.as_str())
-            }
-        };
-        if !covered {
-            continue;
-        }
-        delete_doc(writer, fields, &doc.path)?;
+    if pages > 0 && free * 2 > pages {
         manifest
-            .execute("DELETE FROM search_docs WHERE doc_key=?1", params![key])
+            .execute_batch("VACUUM")
             .map_err(search_manifest_error)?;
-        changes.removed += 1;
     }
     Ok(())
 }
@@ -1797,115 +2333,178 @@ mod rule_tests {
 mod incremental_tests {
     use super::*;
 
-    fn fixture(root: &Path) -> SearchDoc {
+    fn temp(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "misty-search-{name}-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&root).expect("temp dir");
+        root
+    }
+
+    fn doc(path: &Path, size: u64) -> SearchDoc {
         SearchDoc {
-            path: root.join("Pikachu.png").display().to_string(),
-            name: "Pikachu.png".to_owned(),
+            path: display_path(path),
+            name: path.file_name().unwrap().to_string_lossy().into_owned(),
             extension: "png".to_owned(),
             source_kind: SearchSourceKind::Local,
             provider_type: String::new(),
             remote_name: String::new(),
             remote_path: String::new(),
-            mime_type: "image/png".to_owned(),
+            mime_type: String::new(),
             is_file: true,
             is_dir: false,
-            size: 42,
+            size,
             modified_ms: 100,
             hidden: false,
         }
     }
-    #[cfg(not(target_os = "macos"))]
+
     #[test]
-    fn manifest_refresh_reuses_unchanged_docs_and_removes_missing_docs() {
-        let root = std::env::temp_dir().join(format!(
-            "misty-search-incremental-{}",
-            uuid::Uuid::new_v4().simple()
-        ));
-        let (index, fields) = create_fresh_index(&root).expect("fresh index");
-        let manifest = Mutex::new(open_search_manifest(&root).expect("manifest"));
-        let mut writer = index.writer(15_000_000).expect("writer");
-        let mut changes = SearchScanChanges::default();
-        let document = fixture(&root);
-
-        upsert_search_doc(&writer, &fields, &manifest, &document, 1, &mut changes)
-            .expect("initial insert");
-        assert_eq!(changes.added, 1);
-        upsert_search_doc(&writer, &fields, &manifest, &document, 2, &mut changes)
-            .expect("unchanged refresh");
-        assert_eq!(changes.unchanged, 1);
-
-        let mut updated = document.clone();
-        updated.size = 84;
-        upsert_search_doc(&writer, &fields, &manifest, &updated, 3, &mut changes)
-            .expect("metadata update");
-        assert_eq!(changes.updated, 1);
-
-        let request = SearchScanRequest {
-            roots: vec![root.display().to_string()],
-            include_local: true,
-            include_remotes: false,
-            remote_names: Vec::new(),
-            max_depth: None,
-            ignored_paths: Vec::new(),
-            incremental: true,
-        };
-        let indexed_local_roots = vec![root.display().to_string()];
-        remove_missing_manifest_docs(ManifestCleanup {
-            manifest: &manifest,
-            writer: &writer,
-            fields: &fields,
-            request: &request,
-            generation: 4,
-            indexed_local_roots: &indexed_local_roots,
-            indexed_remote_names: &[],
-            changes: &mut changes,
-        })
-        .expect("remove missing");
-        assert_eq!(changes.removed, 1);
-        assert_eq!(manifest_source_counts(&manifest).expect("counts"), (0, 0));
-        writer.commit().expect("commit");
-        drop(writer);
-        drop(manifest);
-        drop(index);
+    fn only_one_process_may_scan_a_shared_index_at_a_time() {
+        let root = temp("lock");
+        let first = ScanLock::try_acquire(&root)
+            .expect("lock")
+            .expect("first scan");
+        // A second holder (another Misty process, or a racing request in
+        // this one) is refused instead of starting a duplicate walk.
+        assert!(ScanLock::try_acquire(&root).expect("lock").is_none());
+        drop(first);
+        assert!(ScanLock::try_acquire(&root).expect("lock").is_some());
         let _ = fs::remove_dir_all(root);
     }
-    #[cfg(not(target_os = "macos"))]
-    #[test]
-    fn existing_pre_manifest_catalog_is_reused_on_the_first_incremental_refresh() {
-        let root = std::env::temp_dir().join(format!(
-            "misty-search-seed-{}",
-            uuid::Uuid::new_v4().simple()
-        ));
-        let (index, fields) = create_fresh_index(&root).expect("fresh index");
-        let mut writer = index.writer(15_000_000).expect("writer");
-        let document = fixture(&root);
-        add_doc(&writer, &fields, &document).expect("legacy document");
-        writer.commit().expect("commit legacy index");
-        drop(writer);
-        let reader = index.reader().expect("reader");
-        let manifest = Mutex::new(open_search_manifest(&root).expect("manifest"));
-        begin_manifest_update(&manifest).expect("begin seed");
-        seed_search_manifest(&manifest, &reader, fields).expect("seed manifest");
-        commit_manifest_update(&manifest).expect("commit seed");
-        assert_eq!(manifest_source_counts(&manifest).expect("counts"), (1, 0));
 
-        let mut changes = SearchScanChanges::default();
-        let mut writer = index.writer(15_000_000).expect("incremental writer");
-        upsert_search_doc(&writer, &fields, &manifest, &document, 10, &mut changes)
-            .expect("reuse seeded document");
-        assert_eq!(changes.unchanged, 1);
-        assert_eq!(changes.added, 0);
-        writer.commit().expect("commit incremental index");
-        drop(writer);
-        assert!(root.join(SEARCH_MANIFEST_FILE).exists());
-        assert_eq!(
-            manifest_source_counts(&manifest).expect("post-commit counts"),
-            (1, 0)
+    #[test]
+    fn staging_of_a_running_scan_survives_another_process_starting_up() {
+        let index_root = temp("staging");
+        let live = index_root.join("index");
+        fs::create_dir_all(&live).unwrap();
+        let staging = index_root.join(".staging.1.2");
+        fs::create_dir_all(&staging).unwrap();
+        let held = ScanLock::try_acquire(&index_root).unwrap().unwrap();
+        // What init does on first open: housekeeping only under the lock.
+        if let Some(_lock) = ScanLock::try_acquire(&index_root).unwrap() {
+            cleanup_staging_dirs(&index_root);
+        }
+        assert!(
+            staging.exists(),
+            "a running scan's staging must not be deleted"
         );
+        drop(held);
+        if let Some(_lock) = ScanLock::try_acquire(&index_root).unwrap() {
+            cleanup_staging_dirs(&index_root);
+        }
+        assert!(!staging.exists(), "an abandoned staging copy is reclaimed");
+        let _ = fs::remove_dir_all(index_root);
+    }
+
+    #[test]
+    fn a_publish_interrupted_between_renames_restores_the_last_index() {
+        let index_root = temp("recover");
+        let live = index_root.join("index");
+        let backup = index_root.join("index.backup.123");
+        fs::create_dir_all(&backup).unwrap();
+        fs::write(backup.join("meta.json"), b"{}").unwrap();
+        recover_interrupted_publish(&live);
+        assert!(live.join("meta.json").exists());
+        assert!(!backup.exists());
+        // A present live index is never replaced by a backup.
+        fs::create_dir_all(index_root.join("index.backup.999")).unwrap();
+        recover_interrupted_publish(&live);
+        assert!(live.join("meta.json").exists());
+        let _ = fs::remove_dir_all(index_root);
+    }
+
+    #[test]
+    fn an_unchanged_tree_is_detected_without_any_catalog_writes() {
+        let root = temp("probe");
+        let home = root.join("home");
+        let manifest = open_search_manifest(&root).expect("manifest");
+        let docs: Vec<_> = (0..3)
+            .map(|i| doc(&home.join(format!("{i}.png")), 10))
+            .collect();
+        for item in &docs {
+            persist_manifest_doc(&manifest, item, 1).unwrap();
+        }
+        // A read-only walk: every entry matches its signature.
+        let mut seen = HashSet::new();
+        for item in &docs {
+            let key = search_doc_key(item);
+            seen.insert(key_hash(&key));
+            assert_eq!(
+                lookup_signature(&manifest, &key).unwrap(),
+                Some(DocSignature::from(item))
+            );
+        }
+        let roots = vec![display_path(&home)];
+        assert!(missing_local_keys(&manifest, &roots, &seen, 3)
+            .unwrap()
+            .1
+            .is_empty());
+        // A changed size is an update; a vanished file is found by key.
+        let mut grown = docs[0].clone();
+        grown.size = 11;
+        assert_ne!(
+            lookup_signature(&manifest, &search_doc_key(&grown)).unwrap(),
+            Some(DocSignature::from(&grown))
+        );
+        let mut partial = HashSet::new();
+        partial.insert(key_hash(&search_doc_key(&docs[0])));
+        partial.insert(key_hash(&search_doc_key(&docs[1])));
+        assert_eq!(
+            missing_local_keys(&manifest, &roots, &partial, 2).unwrap(),
+            (3, vec![search_doc_key(&docs[2])])
+        );
+        // Entries outside the walked roots are left alone.
+        persist_manifest_doc(&manifest, &doc(&root.join("elsewhere.png"), 1), 1).unwrap();
+        assert!(missing_local_keys(&manifest, &roots, &seen, 3)
+            .unwrap()
+            .1
+            .is_empty());
         drop(manifest);
-        drop(reader);
-        drop(index);
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn caches_and_app_data_are_skipped_but_documents_and_chosen_roots_are_not() {
+        let home = Path::new("/Users/example");
+        let privacy = crate::infra::macos_privacy::BackgroundScanExclusions::new(home);
+        let mount = home.join(".misty/mnt");
+        let filter = ScanFilter::new(home, home, &mount, &[], &privacy);
+        assert!(filter.excludes(&home.join("project/node_modules")));
+        assert!(filter.excludes(&home.join(".cargo")));
+        assert!(filter.excludes(&home.join(".misty/.cache/search")));
+        assert!(!filter.excludes(&home.join(".misty/notes")));
+        assert!(filter.excludes(&mount.join("remote")));
+        assert!(!filter.excludes(&home.join("Documents/report.pdf")));
+        assert!(!filter.excludes(&home.join(".config")));
+        if cfg!(target_os = "macos") {
+            assert!(filter.excludes(&home.join("Library/Caches")));
+            assert!(filter.excludes(&home.join("Library/Developer")));
+            assert!(filter.excludes(&home.join("Library/Application Support")));
+            assert!(!filter.excludes(&home.join("Library")));
+            assert!(!filter.excludes(&home.join("Library/Mobile Documents/com~apple~CloudDocs")));
+            assert!(!filter.excludes(&home.join("Library/CloudStorage/Dropbox")));
+            // A root the user chose explicitly is walked in full.
+            let chosen = home.join("Library/Application Support/Notes Export");
+            let filter = ScanFilter::new(&chosen, home, &mount, &[], &privacy);
+            assert!(!filter.excludes(&chosen.join("notes.txt")));
+            assert!(filter.excludes(&chosen.join("node_modules")));
+        }
+        // Settings' ignored paths still apply.
+        let ignored = vec![home.join("Archive"), PathBuf::from("Scratch")];
+        let filter = ScanFilter::new(home, home, &mount, &ignored, &privacy);
+        assert!(filter.excludes(&home.join("Archive/old.txt")));
+        assert!(filter.excludes(&home.join("Documents/Scratch")));
+    }
+
+    #[test]
+    fn key_ranges_cover_exactly_the_entries_below_a_root() {
+        let (lower, upper) = local_key_range("/Users/a");
+        let inside = format!("local\u{0}/Users/a/b");
+        let sibling = format!("local\u{0}/Users/ab");
+        assert!(inside > lower && inside < upper);
+        assert!(!(sibling > lower && sibling < upper));
     }
 }
 

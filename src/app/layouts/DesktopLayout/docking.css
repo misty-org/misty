@@ -238,8 +238,8 @@
     box-shadow: inset 0 0 0 1px var(--misty-theme-active);
   }
   .misty-navigator-logo img {
-    width: 22px !important;
-    height: 22px !important;
+    width: 25px !important;
+    height: 25px !important;
   }
   [data-navigator-header] {
     padding: 4px 6px;
@@ -316,7 +316,8 @@
 }
 .misty-global-navigator:is([data-dock-position="top"], [data-dock-position="bottom"]) {
   .misty-navigator-items :is(a, [data-spaces-toggle]) {
-    width: 36px;
+    width: var(--misty-navigation-tile-size);
+    height: var(--misty-navigation-tile-size);
     padding-inline: 0;
     justify-content: center;
   }

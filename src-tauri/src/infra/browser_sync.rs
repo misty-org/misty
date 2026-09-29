@@ -1,6 +1,7 @@
 //! Main-window IPC boundary for the native sync worker. Website views and agent
 //! windows cannot unlock the vault or publish arbitrary credential payloads.
 use std::{
+    borrow::Cow,
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -28,7 +29,12 @@ use zeroize::Zeroizing;
 
 #[cfg(any(target_os = "macos", windows))]
 mod capture;
+#[cfg(any(target_os = "macos", windows))]
+mod collect;
 mod control_advertisement;
+mod device_data;
+#[cfg(any(target_os = "macos", windows))]
+mod device_signin;
 pub mod handoff;
 mod trees;
 
@@ -45,7 +51,16 @@ struct Session {
     task: JoinHandle<misty_browser_sync::Result<()>>,
     notifications: JoinHandle<()>,
     credential_task: Option<JoinHandle<()>>,
-    credential_issue: Option<&'static str>,
+    /// Authored diagnostics only; never platform errors or website data.
+    credential_issue: Option<Cow<'static, str>>,
+    /// Per device (tree): what its website data synced and skipped.
+    website_data: std::collections::BTreeMap<String, device_data::DeviceWebsiteData>,
+    /// The native store holding the sign-in data of the device this session writes.
+    device_browser: Option<device_data::DeviceBrowser>,
+    /// Per device: its sign-in data as last published or restored here.
+    baselines: std::collections::HashMap<String, device_data::Baseline>,
+    /// Local data that could not sync; restores must not roll it back.
+    held: super::browser_data_budget::Held,
     #[cfg(any(target_os = "macos", windows))]
     capture_view: Option<capture::CaptureView>,
 }
@@ -127,7 +142,9 @@ pub(super) async fn browser_profile_lease(
         return Err("The browser account changed before this page could open.".into());
     }
     let mut current = session().lock().await;
-    let previous_issue = current.as_ref().and_then(|active| active.credential_issue);
+    let previous_issue = current
+        .as_ref()
+        .and_then(|active| active.credential_issue.clone());
     let previous = selected_profile()
         .lock()
         .map_err(|_| "Browser profile state is unavailable")?
@@ -136,7 +153,11 @@ pub(super) async fn browser_profile_lease(
     if let Some(active) = current.as_mut() {
         let logical = default_profile_id(&active.scope)?;
         if requested.is_none() || requested == Some(logical.as_str()) {
-            selected = resolve_local_profile(active, &logical, previous.as_ref()).await?;
+            selected = if trees::tree_mode(&active.handle.trees.borrow()) {
+                resolve_device_profile(active, &logical, previous.as_ref()).await?
+            } else {
+                resolve_local_profile(active, &logical, previous.as_ref()).await?
+            };
             // The authenticated binding selects local storage, not sync readiness.
             // Live cookies/storage can legitimately differ from an import receipt.
             // Background capture reports those failures through credential_issue;
@@ -198,7 +219,7 @@ async fn resolve_local_profile(
         Err(error) => {
             if let Some(previous) = previous.filter(|previous| previous.logical == logical) {
                 active.credential_issue = Some(
-                    "Website sign-in sync is unavailable. You can keep browsing with this device's existing data.",
+                    "Website sign-in sync is unavailable. You can keep browsing with this device's existing data.".into(),
                 );
                 Ok(Some(previous.clone()))
             } else {
@@ -208,11 +229,44 @@ async fn resolve_local_profile(
     }
 }
 
+/// Device trees: pages open in the store of the device this session drives.
+/// Stores never switch under open pages; the capture loop closes them first.
+async fn resolve_device_profile(
+    active: &mut Session,
+    logical: &str,
+    previous: Option<&SelectedProfile>,
+) -> Result<Option<SelectedProfile>, String> {
+    match device_data::device_store(active, logical).await {
+        Ok(selected) => {
+            if previous.is_some_and(|previous| *previous != selected) {
+                return Err("The browser profile changed. Its existing views must close before switching stores.".into());
+            }
+            Ok(Some(selected))
+        }
+        // A stopped worker cannot answer; keep using the store already open.
+        Err(error) => match previous.filter(|previous| previous.logical == logical) {
+            Some(previous)
+                if active.handle.status.borrow().phase == Phase::Attention
+                    || active.handle.status.borrow().phase == Phase::Stopped =>
+            {
+                active.credential_issue = Some(
+                    "Website sign-in sync is unavailable. You can keep browsing with this device's existing data.".into(),
+                );
+                Ok(Some(previous.clone()))
+            }
+            _ => Err(error),
+        },
+    }
+}
+
 async fn local_tab_session(
     active: &mut Session,
     logical: &str,
     area: &document::credentials::Area,
 ) -> Option<serde_json::Value> {
+    if trees::tree_mode(&active.handle.trees.borrow()) {
+        return device_data::tab_session(active, area);
+    }
     let result = async {
         let document: Document =
             serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
@@ -231,7 +285,7 @@ async fn local_tab_session(
             // Session restoration is optional; a failed sync read must not
             // prevent a new local browsing session or clear persistent storage.
             active.credential_issue = Some(
-                "Synced tab sessions could not be restored. You can keep browsing with this device's existing data.",
+                "Synced tab sessions could not be restored. You can keep browsing with this device's existing data.".into(),
             );
             None
         }
@@ -262,6 +316,7 @@ fn issue(error: misty_browser_sync::Error) -> String {
         Error::Unlock => "Could not unlock sync. Check the password and sync secret.",
         Error::Identity => "Sync identity did not match. Local data has been preserved.",
         Error::Authentication => "Sign in again to reconnect sync.",
+        Error::DeviceForbidden => "This device does not have permission to sync this workspace. Check its sync access, then retry.",
         Error::Network => "Could not reach the sync server.",
         Error::SecureStorage => "The operating system could not store the sync key.",
         Error::Recovery => "Sync needs a recovery step. Local data has been preserved.",
@@ -420,7 +475,8 @@ pub struct SyncView {
     profile_id: String,
     supports_cookie_handoff: bool,
     browser_profile_ready: bool,
-    browser_profile_issue: Option<&'static str>,
+    browser_profile_issue: Option<Cow<'static, str>>,
+    website_data: Vec<device_data::DeviceWebsiteData>,
     status: Status,
     presence: Vec<Presence>,
     devices: Vec<misty_browser_sync::protocol::Device>,
@@ -464,28 +520,40 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
     let tree_view = active.handle.trees.borrow().clone();
     let tree_mode = trees::tree_mode(&tree_view);
     if tree_mode {
-        active.cached_workspace = trees::synthesize(&mut active.tree_projection, &active.device_id, &tree_view);
+        active.cached_workspace =
+            trees::synthesize(&mut active.tree_projection, &active.device_id, &tree_view);
         active.cached_pending = Vec::new();
     }
     // A local website-storage failure does not stop workspace transport.
     let status = active.handle.status.borrow().clone();
     let profile = default_profile_id(&active.scope)?;
+    let driving = tree_mode
+        .then(|| active.handle.trees.borrow().driving_tree.clone())
+        .flatten();
     let browser_profile_ready = active.credential_issue.is_none()
-        && match active.handle.browser_profile_binding(profile.clone()).await {
-            Ok(binding) => match active.handle.browser_import_journal(profile).await {
-                Ok(journal) => {
-                    binding.active.is_some()
-                        && binding.staged.is_none()
-                        && journal.pending.is_none()
-                        && !journal.quarantined
-                }
+        && if tree_mode {
+            active
+                .device_browser
+                .as_ref()
+                .is_some_and(|browser| Some(&browser.tree) == driving.as_ref())
+        } else {
+            match active.handle.browser_profile_binding(profile.clone()).await {
+                Ok(binding) => match active.handle.browser_import_journal(profile).await {
+                    Ok(journal) => {
+                        binding.active.is_some()
+                            && binding.staged.is_none()
+                            && journal.pending.is_none()
+                            && !journal.quarantined
+                    }
+                    Err(_) => false,
+                },
                 Err(_) => false,
-            },
-            Err(_) => false,
+            }
         };
     Ok(SyncView {
         browser_profile_ready,
-        browser_profile_issue: active.credential_issue,
+        browser_profile_issue: active.credential_issue.clone(),
+        website_data: active.website_data.values().cloned().collect(),
         session_id: active.id.clone(),
         deployment: active.scope.deployment.clone(),
         account_id: active.scope.account_id.clone(),
@@ -809,7 +877,9 @@ async fn open_vault(
     .map_err(issue)?;
     let advertise_api = api.clone();
     let advertise_device = device_id.clone();
-    let advertise_os = tokio::task::spawn_blocking(os_version).await.unwrap_or_default();
+    let advertise_os = tokio::task::spawn_blocking(os_version)
+        .await
+        .unwrap_or_default();
     let advertise_status = handle.status.clone();
     let task = tokio::spawn(worker.run());
     let mut status = handle.status.clone();
@@ -859,6 +929,10 @@ async fn open_vault(
         notifications,
         credential_task,
         credential_issue: None,
+        website_data: Default::default(),
+        device_browser: None,
+        baselines: Default::default(),
+        held: Default::default(),
         #[cfg(any(target_os = "macos", windows))]
         capture_view: None,
     });
@@ -885,7 +959,13 @@ pub async fn browser_sync_edit(
     active_epoch: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
-    if let Some(result) = tree_edit(&session_id, &active_epoch, TreeEdit::Changes(changes.clone())).await {
+    if let Some(result) = tree_edit(
+        &session_id,
+        &active_epoch,
+        TreeEdit::Changes(changes.clone()),
+    )
+    .await
+    {
         return result.map(|()| operation_id);
     }
     enqueue(
@@ -923,7 +1003,7 @@ async fn tree_edit(session_id: &str, epoch: &str, edit: TreeEdit) -> Option<Resu
         if !full_sync_enabled(active) {
             return Err("Full sync is off for this device.".to_string());
         }
-        if trees::driver_epoch(&view) != Some(epoch) {
+        if trees::writer_epoch(&view) != Some(epoch) {
             return Err("Another device is using this workspace now.".to_string());
         }
         match edit {
@@ -971,7 +1051,9 @@ pub async fn browser_sync_resume(
     active_epoch: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
-    if let Some(result) = tree_edit(&session_id, &active_epoch, TreeEdit::Resume(resume.clone())).await {
+    if let Some(result) =
+        tree_edit(&session_id, &active_epoch, TreeEdit::Resume(resume.clone())).await
+    {
         return result.map(|()| operation_id);
     }
     enqueue(
@@ -1036,7 +1118,13 @@ pub async fn browser_sync_rename_device(
         let current = session().lock().await;
         let active = current.as_ref().ok_or("Connect device sync first.")?;
         require_session(active, &session_id)?;
-        if !active.handle.devices.borrow().iter().any(|d| d.grant.device_id == device_id && d.revoked_at.is_none()) {
+        if !active
+            .handle
+            .devices
+            .borrow()
+            .iter()
+            .any(|d| d.grant.device_id == device_id && d.revoked_at.is_none())
+        {
             return Err("That device is not on this account.".into());
         }
         active.api.clone()
@@ -1053,7 +1141,13 @@ fn os_version() -> String {
         let name = b"kern.osproductversion\0";
         // SAFETY: the name is NUL-terminated and size bounds the buffer.
         let ok = unsafe {
-            libc::sysctlbyname(name.as_ptr().cast(), buffer.as_mut_ptr().cast(), &mut size, std::ptr::null_mut(), 0)
+            libc::sysctlbyname(
+                name.as_ptr().cast(),
+                buffer.as_mut_ptr().cast(),
+                &mut size,
+                std::ptr::null_mut(),
+                0,
+            )
         } == 0;
         if ok {
             let end = buffer[..size].iter().position(|b| *b == 0).unwrap_or(size);
@@ -1082,13 +1176,18 @@ fn os_version() -> String {
             .args(["/C", "ver"])
             .creation_flags(CREATE_NO_WINDOW)
             .output();
-        let text = output.map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+        let text = output
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or_default();
         let version = text
             .split("Version")
             .nth(1)
             .map(|rest| rest.trim_matches(|c: char| c == ' ' || c == ']' || c == '\r' || c == '\n'))
             .unwrap_or("");
-        let build = version.split('.').nth(2).and_then(|b| b.parse::<u32>().ok());
+        let build = version
+            .split('.')
+            .nth(2)
+            .and_then(|b| b.parse::<u32>().ok());
         match build {
             Some(build) if build >= 22000 => format!("11 ({version})"),
             Some(_) => format!("10 ({version})"),
@@ -1125,11 +1224,13 @@ pub(crate) async fn page_state_reader() -> Result<(WorkerHandle, String), String
 }
 
 /// Which device captures website sign-ins. Legacy: the single active device.
-/// Tree mode: any device currently driving a tree; incoming changes from
-/// other drivers are restored first by the capture loop.
+/// Tree mode: a device whose seat the server confirmed on this connection. A
+/// seat remembered from before a disconnect may already belong to another
+/// device, and two writers must never publish at once.
 fn may_capture(document: &Document, active: &Session) -> bool {
     if document.tree_mode {
-        active.handle.trees.borrow().driving_tree.is_some()
+        let trees = active.handle.trees.borrow();
+        trees.seat_confirmed && trees.driving_tree.is_some()
     } else {
         document.is_active(&active.device_id)
     }
@@ -1313,8 +1414,14 @@ mod tests {
         });
         // A failed incoming staging attempt must not block the authenticated
         // active local store or select the incomplete incoming generation.
-        assert_eq!(select_bound_profile(&logical, &binding, Some(&selected)).unwrap(), Some(selected.clone()));
-        assert_eq!(select_bound_profile(&logical, &binding, None).unwrap(), Some(selected));
+        assert_eq!(
+            select_bound_profile(&logical, &binding, Some(&selected)).unwrap(),
+            Some(selected.clone())
+        );
+        assert_eq!(
+            select_bound_profile(&logical, &binding, None).unwrap(),
+            Some(selected)
+        );
     }
 
     #[tokio::test]
@@ -1406,7 +1513,11 @@ mod tests {
             task: tokio::spawn(worker.run()),
             notifications: tokio::spawn(std::future::pending()),
             credential_task: None,
-            credential_issue: Some("Website storage unavailable"),
+            credential_issue: Some("Website storage unavailable".into()),
+            website_data: Default::default(),
+            device_browser: None,
+            baselines: Default::default(),
+            held: Default::default(),
             #[cfg(any(target_os = "macos", windows))]
             capture_view: None,
         };
@@ -1430,7 +1541,7 @@ mod tests {
         let status = view(&mut active).await.unwrap();
         assert!(!status.browser_profile_ready);
         assert_eq!(
-            status.browser_profile_issue,
+            status.browser_profile_issue.as_deref(),
             Some("Website storage unavailable")
         );
 
@@ -1534,6 +1645,10 @@ mod tests {
             notifications: tokio::spawn(std::future::pending()),
             credential_task: None,
             credential_issue: None,
+            website_data: Default::default(),
+            device_browser: None,
+            baselines: Default::default(),
+            held: Default::default(),
             #[cfg(any(target_os = "macos", windows))]
             capture_view: None,
         };

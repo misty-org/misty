@@ -38,6 +38,7 @@ import { Renameable } from "@/features/navigation-names/Renameable";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import {
   activeLayoutView,
+  isEmptyLayoutTab,
   layoutTabs,
   layoutTabLabel,
   paneViewLabel,
@@ -60,7 +61,8 @@ export function WorkspaceLayoutTabs(
   const position = props.position ?? "top";
   const vertical = isSideDock(position);
   const layout = useWorkspaceStore((state) => state.layout);
-  const allTabs = layoutTabs(layout);
+  // A workspace with no tabs keeps one empty layout tab that is never shown.
+  const allTabs = layoutTabs(layout).filter((tab) => !isEmptyLayoutTab(tab));
   const groups = useWorkspaceStore((state) => state.tabGroups);
   const pendingGroupEditor = useRef<string | null>(null);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);

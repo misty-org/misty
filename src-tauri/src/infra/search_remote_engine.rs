@@ -57,8 +57,11 @@ impl IndexWriter {
             .mutations
             .lock()
             .map_err(|e| ApiError::Message(e.to_string()))?;
-        serde_json::to_writer(file.as_file_mut(), &value)?;
-        file.write_all(b"\n")
+        // One write per mutation; serializing straight into the file issued a
+        // syscall per JSON token.
+        let mut line = serde_json::to_vec(&value)?;
+        line.push(b'\n');
+        file.write_all(&line)
             .map_err(|e| ApiError::Message(e.to_string()))
     }
     pub(super) fn commit(&mut self) -> ApiResult<()> {

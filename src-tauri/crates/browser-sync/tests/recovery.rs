@@ -73,3 +73,31 @@ fn ciphertext_cannot_be_moved_between_records_or_revisions_and_archives_are_immu
     .unwrap();
     assert!(store.read("workspace").is_err());
 }
+
+#[test]
+fn old_archives_are_retired_so_saving_never_stops_at_the_record_cap() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("recovery.sqlite");
+    let mut store = RecoveryStore::open(&path, scope(), VaultRoot::generate()).unwrap();
+    store.write("workspace", 0, "first").unwrap();
+    for n in 0..300 {
+        store
+            .write(&format!("archive:{n:04}"), 0, &format!("original {n}"))
+            .unwrap();
+    }
+    // The newest originals survive; the oldest were retired to make room.
+    assert!(store.read("archive:0299").unwrap().is_some());
+    assert!(store.read("archive:0000").unwrap().is_none());
+    // Live records keep saving and a new live key still fits.
+    assert_eq!(store.write("workspace", 1, "second").unwrap().revision, 2);
+    assert_eq!(store.write("before-sync", 0, "kept").unwrap().revision, 1);
+    let db = rusqlite::Connection::open(&path).unwrap();
+    let archives: u64 = db
+        .query_row(
+            "SELECT count(*) FROM recovery_records WHERE record_key LIKE 'archive:%'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(archives <= 32);
+}

@@ -79,7 +79,10 @@ export function WorkspaceSpaceNavigation({
     onOpen?.();
   };
   return (
-    <div data-spaces-tray="true" className="grid min-w-0 rounded-lg bg-charcoal-card">
+    <div
+      data-spaces-tray="true"
+      className={cn("grid min-w-0 rounded-lg", activeSpaceId && "bg-charcoal-card")}
+    >
       <TooltipHint content={open ? "Hide Spaces" : "Show Spaces"}>
         <Pressable
           className={cn(navigationMenuLinkClass, "w-full", activeSpaceId && "text-cream-bright")}

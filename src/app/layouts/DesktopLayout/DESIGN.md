@@ -38,7 +38,7 @@ components:
     padding: "3px 8px"
   global-icon-rail:
     backgroundColor: "{colors.workspace}"
-    width: "56px"
+    width: "64px"
 ---
 
 # Design System: Tab groups and global navigation
@@ -63,7 +63,7 @@ Inherit application typography without a new display face. Global navigation use
 
 ## Layout
 
-The global navigator is always a 56px icon rail. Its only modes are always visible and auto-hide: the latter reserves no workspace width and reveals the same rail when hovering the window edge (left by default). Hover reveal overlays the workspace without reflow, then hides after the pointer leaves; keyboard focus and open rail menus keep it available. The titlebar toggle, keyboard shortcut, and Appearance setting share the auto-hide preference. There is no wide or resizable navbar, and retired width preferences cannot restore one. Every rail item, from the Misty menu to Profile, is one square tile (36×36px) around an 18px glyph. Avatars use the shared `tile` shape: a square with soft corners (28% radius), no ring or border, sized to 28px for both Space and Profile identities; uploaded pictures of any aspect ratio crop to that square. Space navigation keeps its labeled rows and 16px glyphs. Preserve accessible names on every tile.
+The global navigator is always a 64px icon rail. Its only modes are always visible and auto-hide: the latter reserves no workspace width and reveals the same rail when hovering the window edge (left by default). Hover reveal overlays the workspace without reflow, then hides after the pointer leaves; keyboard focus and open rail menus keep it available. The titlebar toggle, keyboard shortcut, and Appearance setting share the auto-hide preference. There is no wide or resizable navbar, and retired width preferences cannot restore one. Every rail item, from the Misty menu to Profile, is one square tile (40×40px) around a 23px glyph. Avatars use the shared `tile` shape: a square with soft corners (28% radius), no ring or border, sized to 30px for both Space and Profile identities; uploaded pictures of any aspect ratio crop to that square. Space navigation keeps its labeled rows and 16px glyphs. Preserve accessible names on every tile.
 
 Search, Activity, and Sync sit in the fixed footer, in that order directly above Settings and Profile. The Misty menu stays at the top, and destinations scroll independently between the header and footer.
 

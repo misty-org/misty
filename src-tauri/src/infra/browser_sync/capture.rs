@@ -1,13 +1,11 @@
 //! Native-only cookie observations. The read lease spans the engine callback and
 //! durable acceptance, so an account switch cannot publish into its successor.
+use super::super::browser_data_budget::Limit;
 use super::*;
-use misty_browser_sync::{
-    document::credentials::Area,
-    store::{BrowserCaptureState, BrowserObservation},
-};
+use misty_browser_sync::store::BrowserCaptureState;
 
 pub(super) struct CaptureView {
-    physical: String,
+    pub(super) physical: String,
     pub(super) view: tauri::Webview,
 }
 impl Drop for CaptureView {
@@ -63,37 +61,94 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
             if !retry.ready(std::time::Instant::now()) {
                 continue;
             }
-            let _lifecycle = browser_lifecycle().write().await;
+            // The read side keeps the account from changing under the pass
+            // while pages still open; only loading or switching the store
+            // (which closes pages) takes the write side.
+            let lifecycle = browser_lifecycle().read().await;
+            let pass = {
+                let mut current = session().lock().await;
+                let Some(active) = current.as_mut().filter(|active| active.id == expected) else {
+                    break;
+                };
+                if matches!(
+                    active.handle.status.borrow().phase,
+                    misty_browser_sync::worker::Phase::Stopped
+                        | misty_browser_sync::worker::Phase::Attention
+                ) {
+                    continue;
+                }
+                // Device trees keep sign-in data per device; legacy workspaces
+                // keep one set for the whole workspace.
+                if trees::tree_mode(&active.handle.trees.borrow()) {
+                    device_signin::prepare(&app, active).await
+                } else {
+                    Ok(device_signin::Pass::Exclusive)
+                }
+            };
+            let result = match pass {
+                Ok(device_signin::Pass::Done(issue)) => Ok(issue),
+                Err(error) => Err(error),
+                Ok(device_signin::Pass::Capture(plan)) => {
+                    // Website storage is read with the session unlocked.
+                    let collected = plan.collect(&app).await;
+                    let mut current = session().lock().await;
+                    let Some(active) = current.as_mut().filter(|active| active.id == expected)
+                    else {
+                        break;
+                    };
+                    let result = device_signin::finish(active, plan, collected).await;
+                    report(&app, active, &mut retry, result).await;
+                    continue;
+                }
+                Ok(device_signin::Pass::Exclusive) => {
+                    drop(lifecycle);
+                    let _lifecycle = browser_lifecycle().write().await;
+                    let mut current = session().lock().await;
+                    let Some(active) = current.as_mut().filter(|active| active.id == expected)
+                    else {
+                        break;
+                    };
+                    let result = if trees::tree_mode(&active.handle.trees.borrow()) {
+                        device_signin::reconcile(&app, active).await
+                    } else {
+                        reconcile(&app, active).await
+                    };
+                    report(&app, active, &mut retry, result).await;
+                    continue;
+                }
+            };
             let mut current = session().lock().await;
             let Some(active) = current.as_mut().filter(|active| active.id == expected) else {
                 break;
             };
-            if matches!(
-                active.handle.status.borrow().phase,
-                misty_browser_sync::worker::Phase::Stopped
-                    | misty_browser_sync::worker::Phase::Attention
-            ) {
-                continue;
-            }
-            let result = reconcile(&app, active).await;
-            retry.finished(result.is_ok(), std::time::Instant::now());
-            let issue = match result {
-                Ok(issue) => issue,
-                Err(error) => {
-                    let _ = active.handle.invalidate_browser_readiness().await;
-                    Some(capture_issue(&error))
-                }
-            };
-            if issue != active.credential_issue {
-                active.credential_issue = issue;
-                let _ = app.emit_to(
-                    "main",
-                    "misty:browser-sync-changed",
-                    &active.scope.workspace_id,
-                );
-            }
+            report(&app, active, &mut retry, result).await;
         }
     })
+}
+
+/// Records a pass's outcome and tells the renderer when its issue changed.
+async fn report(
+    app: &tauri::AppHandle,
+    active: &mut Session,
+    retry: &mut CaptureRetry,
+    result: Result<Option<&'static str>, String>,
+) {
+    retry.finished(result.is_ok(), std::time::Instant::now());
+    let issue = match result {
+        Ok(issue) => issue.map(Cow::Borrowed),
+        Err(error) => {
+            let _ = active.handle.invalidate_browser_readiness().await;
+            Some(capture_issue(error))
+        }
+    };
+    if issue != active.credential_issue {
+        active.credential_issue = issue;
+        let _ = app.emit_to(
+            "main",
+            "misty:browser-sync-changed",
+            &active.scope.workspace_id,
+        );
+    }
 }
 
 // Recovery runs quietly at a bounded rate. It cannot replace open pages.
@@ -137,19 +192,21 @@ mod retry_tests {
         assert!(retry.ready(now + std::time::Duration::from_secs(30)));
     }
 }
-// Only known, static diagnostics cross into the renderer. Platform errors and
-// website storage/cookie values must never be included in status messages.
-fn capture_issue(error: &str) -> &'static str {
-    match error {
+// Only authored diagnostics cross into the renderer: every error on these
+// paths is fixed text or a sanitized `issue()`. Platform errors and website
+// storage/cookie values must never be included in status messages.
+fn capture_issue(error: String) -> Cow<'static, str> {
+    Cow::Borrowed(match error.as_str() {
         handoff::RESTORE_DEFERRED => handoff::RESTORE_DEFERRED,
         "Website profile could not be verified" => "Website storage could not verify this browser profile. Retrying automatically.",
         "Website navigated during sync" | "Website changed origin during sync" => "A website navigated during capture. Retrying automatically.",
         "This website's storage could not be transferred" => "A website's storage could not be read. Retrying automatically.",
         "Website storage connection timed out" | "Website storage preparation timed out" => "Website storage preparation timed out. Retrying automatically.",
         "Unsupported website storage" | "Website storage exceeds the sync limit" => "A website's storage is unsupported or exceeds the sync limit. Existing data has been preserved.",
-        "Could not capture this browser's cookie attributes without losing information." | "Native cookie observation failed" => "Website cookies could not be captured without losing their attributes. Existing data has been preserved.",
-        _ => "Browser sign-in changes could not be captured. Existing data has been preserved.",
-    }
+        collect::COOKIES_UNREADABLE => "Website cookies could not be read from this browser profile. Retrying automatically; existing data has been preserved.",
+        // Say what actually failed rather than a generic catch-all.
+        _ => return Cow::Owned(error),
+    })
 }
 
 async fn reconcile(
@@ -284,9 +341,6 @@ async fn observe(
         .capture_view
         .as_ref()
         .ok_or("Native cookie observer is unavailable")?;
-    let observed = super::super::browser_cookie_store::read(&view.view, &generation.physical_id)
-        .await
-        .map_err(|_| "Native cookie observation failed")?;
     let journal = active
         .handle
         .browser_import_journal(logical.clone())
@@ -297,20 +351,27 @@ async fn observe(
         .as_ref()
         .map(|receipt| receipt.credentials.as_slice())
         .unwrap_or(&[]);
-    let mut observations = super::super::browser_website_storage::capture(
+    let collected = collect::collect(
         app,
+        &view.view,
         &generation.physical_id,
         previous,
         None,
+        Limit::SingleEvent,
     )
     .await?;
-    observations.push(BrowserObservation {
-        area: Area::Cookies,
-        payload: serde_json::to_value(observed).map_err(|_| "Could not encode native cookies")?,
-    });
+    active.website_data.insert(
+        active.device_id.clone(),
+        device_data::DeviceWebsiteData::new(
+            &active.device_id,
+            device_data::DeviceDataState::Synced,
+            collected.coverage.report(),
+        ),
+    );
+    active.held = collected.held;
     let state = active
         .handle
-        .observe_browser_profile(logical.clone(), generation.id, observations)
+        .observe_browser_profile(logical.clone(), generation.id, collected.observations)
         .await
         .map_err(issue)?;
     match state {

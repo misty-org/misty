@@ -61,44 +61,56 @@ const writeEntries = (storage, values) => {
   for (const key of Object.keys(storage)) if (!Object.hasOwn(values, key)) storage.removeItem(key);
   for (const [key, value] of Object.entries(values)) if (storage.getItem(key) !== value) storage.setItem(key, value);
 };
-const exportDatabases = async () => {
+// Why a database or area was skipped. Only these fixed reasons leave the page.
+const reasonOf = (error) => ({ unsupported_storage_value: 'unsupported_values', cyclic_storage_value: 'unsupported_values', storage_too_large: 'too_large' })[error?.message] ?? 'unreadable';
+// A database that cannot be exported is skipped whole (its rows depend on each
+// other), recorded in `skipped`, and never deleted by a later import.
+const exportDatabases = async (skipped = []) => {
   if (!indexedDB.databases) throw new Error('database_enumeration_unavailable');
   const databases = [];
   const names = (await indexedDB.databases()).filter(v => typeof v.name === 'string').sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-  if (names.length > 256) throw new Error('too_many_databases');
-  for (const info of names) {
-    const db = await operation(indexedDB.open(info.name));
-    try {
-      const storeNames = Array.from(db.objectStoreNames).sort();
-      const stores = [];
-      if (storeNames.length) {
-        const transaction = db.transaction(storeNames, 'readonly');
-        const done = completed(transaction);
-        const reads = storeNames.map(name => {
-          const store = transaction.objectStore(name);
-          const schema = { name, keyPath: store.keyPath, autoIncrement: store.autoIncrement,
-            indexes: Array.from(store.indexNames).sort().map(name => { const index = store.index(name); return { name, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry }; }) };
-          const rows = [];
-          const cursor = store.openCursor();
-          cursor.onsuccess = () => { const next = cursor.result; if (next) { budget(64); rows.push([next.key, next.value]); next.continue(); } };
-          return { schema, rows };
-        });
-        await done;
-        for (const { schema, rows } of reads) stores.push({ ...schema, records: await Promise.all(rows.map(async ([key, value]) => ({ key: await encode(key), value: await encode(value) }))) });
-      }
-      databases.push({ name: db.name, version: db.version, stores });
-    } finally { db.close(); }
+  for (const info of names.slice(256)) skipped.push({ name: info.name, reason: 'sync_limit' });
+  for (const info of names.slice(0, 256)) {
+    const before = total;
+    try { databases.push(await exportDatabase(info.name)); }
+    catch (error) { total = before; skipped.push({ name: info.name, reason: reasonOf(error) }); }
   }
   return { codec_version: 1, databases };
 };
+const exportDatabase = async (name) => {
+  const db = await operation(indexedDB.open(name));
+  try {
+    const storeNames = Array.from(db.objectStoreNames).sort();
+    const stores = [];
+    if (storeNames.length) {
+      const transaction = db.transaction(storeNames, 'readonly');
+      const done = completed(transaction);
+      const reads = storeNames.map(name => {
+        const store = transaction.objectStore(name);
+        const schema = { name, keyPath: store.keyPath, autoIncrement: store.autoIncrement,
+          indexes: Array.from(store.indexNames).sort().map(name => { const index = store.index(name); return { name, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry }; }) };
+        const rows = [];
+        const cursor = store.openCursor();
+        cursor.onsuccess = () => { const next = cursor.result; if (next) { budget(64); rows.push([next.key, next.value]); next.continue(); } };
+        return { schema, rows };
+      });
+      await done;
+      for (const { schema, rows } of reads) stores.push({ ...schema, records: await Promise.all(rows.map(async ([key, value]) => ({ key: await encode(key), value: await encode(value) }))) });
+    }
+    return { name: db.name, version: db.version, stores };
+  } finally { db.close(); }
+};
 const stable = value => JSON.stringify(value, (_, entry) => entry && typeof entry === 'object' && !Array.isArray(entry) ? Object.fromEntries(Object.keys(entry).sort().map(key => [key, entry[key]])) : entry);
-const importDatabases = async (target) => {
+// `hold` names local databases that could not sync; their synced copies are
+// stand-ins and must not overwrite them.
+const importDatabases = async (target, hold) => {
   if (target.codec_version !== 1) throw new Error('unsupported_database_codec');
   const current = await exportDatabases();
   if (stable(current) === stable(target)) return;
   const desired = new Map(target.databases.map(db => [db.name, db]));
   for (const old of current.databases) if (!desired.has(old.name)) await operation(indexedDB.deleteDatabase(old.name));
   for (const spec of target.databases) {
+    if (hold.has(spec.name)) continue;
     if (stable(current.databases.find(db => db.name === spec.name)) === stable(spec)) continue;
     // Decode before removing the previous database. Native keeps the encrypted
     // previous profile snapshot until the complete import has been verified.
@@ -128,9 +140,70 @@ const importDatabases = async (target) => {
 if (request.write) {
   if (request.write.local !== undefined) writeEntries(localStorage, request.write.local);
   if (request.write.session !== undefined) writeEntries(sessionStorage, request.write.session);
-  if (request.write.indexed !== undefined) await importDatabases(request.write.indexed);
+  if (request.write.indexed !== undefined) await importDatabases(request.write.indexed, new Set(request.write.hold ?? []));
 }
-const result = { origin: location.origin, local: entries(localStorage), session: entries(sessionStorage), indexed: await exportDatabases() };
+// Periodic capture names the areas it needs (a second tab of an origin needs
+// only its own session storage) and the stamps of what it already holds. An
+// area whose stamp still matches is reported unchanged instead of re-exported.
+const read = request.read ?? { local: true, session: true, indexed: true };
+const known = request.known ?? {};
+const digest = (text) => {
+  let h1 = 0xdeadbeef ^ text.length, h2 = 0x41c6ce57 ^ text.length;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `${text.length}:${(h2 >>> 0).toString(16)}${(h1 >>> 0).toString(16)}`;
+};
+// IndexedDB has no change notification. Its database list and the origin's
+// storage usage change with most writes; native re-exports on a bounded
+// schedule for writes that change neither.
+const indexedStamp = async () => {
+  if (!indexedDB.databases || !navigator.storage?.estimate) return null;
+  const [list, estimate] = await Promise.all([indexedDB.databases(), navigator.storage.estimate()]);
+  const usage = estimate.usageDetails?.indexedDB ?? estimate.usage;
+  if (typeof usage !== 'number') return null;
+  return JSON.stringify([list.map(db => [String(db.name), db.version ?? null]).sort(), usage]);
+};
+// Anything that cannot be exported is skipped and reported by kind and reason;
+// native keeps its last synced copy instead of treating it as deleted.
+const skipped = [];
+const skippedDatabases = [];
+const result = { origin: location.origin, local: null, session: null, indexed: null, skipped, skipped_databases: [], unchanged: [], stamps: {} };
+for (const [field, storage] of [['local', localStorage], ['session', sessionStorage]]) {
+  if (!read[field]) continue;
+  const values = entries(storage);
+  const stamp = digest(JSON.stringify(values));
+  result.stamps[field] = stamp;
+  if (known[field] === stamp) result.unchanged.push(field);
+  else result[field] = values;
+}
+if (read.indexed) {
+  let stamp = null;
+  try { stamp = await indexedStamp(); } catch { stamp = null; }
+  result.stamps.indexed = stamp;
+  if (stamp !== null && known.indexed === stamp) result.unchanged.push('indexed');
+  else {
+    try {
+      result.indexed = await exportDatabases(skippedDatabases);
+      for (const { reason } of skippedDatabases) skipped.push({ kind: 'indexed_db', reason, count: 1 });
+      result.skipped_databases = skippedDatabases.map(db => db.name);
+    } catch (error) {
+      skipped.push({ kind: 'indexed_db', reason: reasonOf(error), count: 1 });
+    }
+  }
+}
+for (const [field, kind] of [['indexed', 'indexed_db'], ['local', 'local_storage'], ['session', 'session_storage']]) {
+  if (JSON.stringify(result).length <= limit) break;
+  if (result[field] === null) continue;
+  const count = field === 'indexed' ? result.indexed.databases.length : Object.keys(result[field]).length;
+  result[field] = null;
+  if (field === 'indexed') result.skipped_databases = [];
+  skipped.push({ kind, reason: 'too_large', count });
+}
 if (result.origin !== request.origin) throw new Error('origin_changed');
 const serialized = JSON.stringify(result);
 if (serialized.length > limit) throw new Error('storage_too_large');

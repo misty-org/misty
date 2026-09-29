@@ -64,7 +64,10 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
           const search = useSearchIndexStore.getState();
           await search.initialize();
           const status = useSearchIndexStore.getState().status;
-          const stale = !status?.lastScanTimeMs || Date.now() - status.lastScanTimeMs >= intervalMs;
+          // A scan that failed or was canceled still counts as an attempt, so
+          // it is not retried on every focus change until the next interval.
+          const lastAttempt = Math.max(status?.lastScanTimeMs ?? 0, status?.lastScanStartedMs ?? 0);
+          const stale = !lastAttempt || Date.now() - lastAttempt >= intervalMs;
           if (!status?.scanInProgress && stale) {
             await useSearchIndexStore.getState().startScan(app?.environment.homeDir || "");
           }

@@ -1,4 +1,5 @@
 import type { NativeSyncView } from "./native";
+import { syncIssueMessage } from "./syncIssueMessage";
 
 export interface SyncBadgeStatus {
   tone: "green" | "red" | "neutral";
@@ -40,7 +41,9 @@ export function syncBadgeStatus(input: {
       title: "Local saving needs attention",
       detail: "You can keep browsing while we retry. New changes may be lost if you close Misty.",
     };
-  const issue = input.issue ?? session?.status.issue ?? session?.browser_profile_issue;
+  const issue = syncIssueMessage(
+    input.issue ?? session?.status.issue ?? session?.browser_profile_issue,
+  );
   if (issue) return { ...base, tone: "red", title: "Sync needs attention", detail: issue };
   if (!saved)
     return {

@@ -3,8 +3,8 @@
 pub mod crypto;
 pub mod document;
 pub mod protocol;
-pub mod restore;
 pub mod recovery;
+pub mod restore;
 pub mod secure_store;
 pub mod store;
 pub mod transport;
@@ -31,6 +31,8 @@ pub enum Error {
     Network,
     #[error("Sign in again to reconnect sync")]
     Authentication,
+    #[error("This device does not have permission to sync this workspace")]
+    DeviceForbidden,
     #[error("Sync requires a newer client or a vault recovery step")]
     Recovery,
     #[error("Local sync storage is unavailable")]

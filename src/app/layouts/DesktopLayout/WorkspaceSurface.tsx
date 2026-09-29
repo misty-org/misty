@@ -6,8 +6,6 @@ import { HomePage } from "@/features/home";
 import { AgentsPage } from "@/features/agents";
 import { WorkspaceTabRouteScope, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
 import { migrateRetiredWorkspaceTab } from "@/features/workspace/workspaceMigrations";
-import { Button } from "@/shared/ui";
-import { Plus } from "lucide-react";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 
 export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; active?: boolean }) {
@@ -44,12 +42,10 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; ac
   );
 }
 
-export function EmptyWorkspacePane({ onOpen }: { onOpen: () => void }) {
+export function EmptyWorkspacePane() {
   return (
-    <div className="grid h-full place-items-center bg-charcoal-bg text-cream-muted">
-      <Button variant="outline" onClick={onOpen}>
-        <Plus size={16} /> Open a browser tab
-      </Button>
+    <div className="grid h-full place-items-center bg-charcoal-bg px-6 text-center">
+      <p className="m-0 text-base font-medium text-cream">A little quiet here...</p>
     </div>
   );
 }
