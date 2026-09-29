@@ -252,9 +252,15 @@ Still open:
 
 ## 4. Voice, notes and memory
 Approved 2026-10-14. The design is
-[docs/design/voice-memory/BRIEF.md](../design/voice-memory/BRIEF.md) (revision 1,
+[docs/design/voice-memory/BRIEF.md](../design/voice-memory/BRIEF.md) (revision 2,
 with mockups). The work happens on `voice-memory/audeeo-soniox`, which builds on
 the agent permissions branch (`agents/permissions-coding-clis`).
+
+Status (2026-10-15): phases 0–6 are on the branch, behind the `voiceDictation`,
+`voiceNotes`, `recall` and `captureSessions` flags plus the server switches
+`MISTY_VOICE_LIVE` and `MISTY_RECALL`. They are not yet run on a real Mac or
+Windows machine. The brief's "as built" notes list what changed from the plan
+and what is left.
 
 - **On demand only.** Nothing records the whole computer. The microphone is open
   only while you hold the dictation key, run a capture you started, or talk to

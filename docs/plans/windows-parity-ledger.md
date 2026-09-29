@@ -260,6 +260,23 @@ React UI need no Windows-specific code:
 | A-21 | Microphone denied message | ✓ | Plain message with the Settings path. |
 | A-22 | Companion hold, hooks, overlay, keep awake | ✓ | Already worked. |
 
+## Voice and Memory
+
+From docs/design/voice-memory/BRIEF.md. "Built" means it is written and cross-checked with
+`cargo check --target x86_64-pc-windows-msvc` in a scratch crate, but not yet run on a Windows
+machine. ◐ stays until someone runs it there.
+
+| ID | Capability | State | What was done |
+| --- | --- | --- | --- |
+| V-1 | Audio capture (mic, system without Misty, process loopback) | ◐ | `audeeo-core` WASAPI backend. It is built, and Audeeo's Windows CI runs its tests, but it has not been run on a device. |
+| V-2 | Global hold-to-talk hotkey | ◐ | `global_hotkey/windows.rs`, one `WH_KEYBOARD_LL` hook. It drops the fake LCtrl that AltGr sends, and injected keys. Built. |
+| V-3 | Dictation insertion | ◐ | `insert_windows.rs`. It snapshots every clipboard format, pastes with `SendInput`, uses Ctrl+Shift+V in terminals, and restores the clipboard only if it is unchanged. Built. |
+| V-4 | Dictation pill | ◐ | A shared Tauri window (`misty-dictation-pill`). The no-activate and topmost behavior needs a Windows pass. |
+| V-5 | Transcribe a tab | ◐ | The Kiri media tap in WebView2. Whether WebView2 allows `createMediaElementSource` on every site still needs checking. |
+| V-6 | Screen recording | ◐ | `voice/recording_windows.rs`: Windows.Graphics.Capture into a Media Foundation H.264 sink writer, with system audio and mic as AAC tracks. Built. Needs a run for the capture border, A/V sync and file playback. |
+| V-7 | Memory page recorder | ✓ | Shared TypeScript. It reads the reader article through the same command on both platforms. |
+| V-8 | Memory at the cursor | ✓ | The server-side prompt and tools, the same on both platforms. |
+
 ## Files and the document worker
 
 Third-party app hosting and its host services were removed from Misty on every platform, so the app-facing rows of

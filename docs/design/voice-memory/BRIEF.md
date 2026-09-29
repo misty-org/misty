@@ -1,6 +1,6 @@
 # Misty Voice, Notes and Memory — approved direction
 
-Revision 1. The owner approved the plan on October 14, 2026. This brief records the
+Revision 2 (as built, 2026-10-15). The owner approved the plan on October 14, 2026. This brief records the
 direction, the surfaces and the choices made on the plan's open questions. It builds on
 the [agents-at-cursor brief](../agents-at-cursor/BRIEF.md) (revision 3): the island,
 the mist and push-to-talk come from it. It also builds on the agent permissions work on
@@ -351,3 +351,43 @@ Each phase ships off by default:
   - the backlog cap notice
 - **Desktop:** the clipboard-restore race, vocative matching, and releasing modifiers
   before paste.
+
+## Phase 6 as built, and what changed from the plan
+
+The plan assumed the cursor agent worked like this:
+- it transcribes speech into a text request
+- it sends that request
+- it speaks the reply through a separate text-to-speech call
+
+It doesn't. The companion runs OpenAI realtime speech-to-speech over one socket
+(`/agent-voice/realtime`):
+- Speech is committed as an audio turn. The model's own tools (`show_on_screen`,
+  `start_task`) start the work.
+- Replies, including task results read back with `task.read`, are spoken as streamed
+  realtime audio.
+- The screen is captured only when the model asks. Tests assert that holding the key
+  captures nothing.
+
+So the upgrades land like this:
+- **Memory at the cursor (built).** Cursor runs already get `recall.*` whenever Memory is
+  on. The companion prompt now tells the model to call `recall_search` when the person
+  refers to something they read, heard or said. It still asks for `recall.read` like any
+  other run.
+- **Sentence-pipelined speech (not needed).** Realtime audio already starts speaking
+  before the reply ends. `[POINT]` and `[GUIDE]` tags are stripped on the server before
+  speech (`agentSpeechText`).
+- **Partials (not built).** The provider sends no partial transcript of the person's
+  speech. Showing partials means running the Soniox relay alongside the realtime
+  socket during the hold: a second microphone stream, and a second charge per hold.
+  That is a product decision.
+- **Speculative send (not built).** A realtime turn is committed audio, so there is no
+  text request to send early. The equivalent is enabling the provider's server-side
+  turn detection, which changes how hold-to-talk feels. That is also a product
+  decision.
+- **Key-down look with an 8 s reuse window (not built).** It would reverse the current
+  rule that holding the key never captures the screen. The rule is deliberate and
+  tested. Reuse would also hand the model a stale screen right after it acted on the
+  desktop.
+- **screen.look continuing the run (unchanged).** It still ends the run, and the desktop
+  continues it with the screen attached. Continuing in place needs a desktop round-trip
+  inside a server run.
