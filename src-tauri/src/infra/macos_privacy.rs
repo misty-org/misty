@@ -28,6 +28,28 @@ pub fn is_background_scan_excluded(path: &Path, home_dir: &Path) -> bool {
     }
 }
 
+/// The protected roots of `is_background_scan_excluded`, computed once per
+/// walk instead of once per visited entry.
+pub struct BackgroundScanExclusions(Vec<PathBuf>);
+
+impl BackgroundScanExclusions {
+    pub fn new(home_dir: &Path) -> Self {
+        #[cfg(target_os = "macos")]
+        {
+            Self(protected_app_data_roots(home_dir))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = home_dir;
+            Self(Vec::new())
+        }
+    }
+
+    pub fn roots(&self) -> &[PathBuf] {
+        &self.0
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn protected_app_data_roots(home_dir: &Path) -> Vec<PathBuf> {
     let library = home_dir.join("Library");

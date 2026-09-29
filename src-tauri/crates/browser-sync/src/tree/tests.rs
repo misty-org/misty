@@ -25,27 +25,54 @@ struct Fixture {
 
 fn fixture() -> Fixture {
     let root = VaultRoot::generate();
-    let scope = VaultScope { deployment: "https://sync.example.test".into(), account_id: "account".into(), workspace_id: WORKSPACE.into() };
+    let scope = VaultScope {
+        deployment: "https://sync.example.test".into(),
+        account_id: "account".into(),
+        workspace_id: WORKSPACE.into(),
+    };
     let key = DeviceKey::generate();
     let grant = root.grant(&scope, DEVICE, 1, &key).unwrap();
     let grants = HashMap::from([(DEVICE.to_string(), grant.clone())]);
-    Fixture { root, scope, key, grant, grants }
+    Fixture {
+        root,
+        scope,
+        key,
+        grant,
+        grants,
+    }
 }
 
 fn record(kind: Kind, id: &str, fields: serde_json::Value) -> ViewRecord {
-    ViewRecord { kind, id: id.into(), fields: serde_json::from_value(fields).unwrap() }
+    ViewRecord {
+        kind,
+        id: id.into(),
+        fields: serde_json::from_value(fields).unwrap(),
+    }
 }
 
 fn workspace() -> Vec<ViewRecord> {
     vec![
         record(Kind::Window, "w1", json!({"title": "Main", "order": 0})),
-        record(Kind::Layout, "l1", json!({"window_id": "w1", "title": "", "order": 0, "tree": {"type": "leaf", "id": "p1"}})),
-        record(Kind::Tab, "t1", json!({"surface": "browser", "title": "Docs", "placement": {"layout_id": "l1", "pane_id": "p1", "order": 0}, "url": "https://example.com/", "profile_id": null, "website_id": null, "tool_route": null, "agent_owned": false})),
+        record(
+            Kind::Layout,
+            "l1",
+            json!({"window_id": "w1", "title": "", "order": 0, "tree": {"type": "leaf", "id": "p1"}}),
+        ),
+        record(
+            Kind::Tab,
+            "t1",
+            json!({"surface": "browser", "title": "Docs", "placement": {"layout_id": "l1", "pane_id": "p1", "order": 0}, "url": "https://example.com/", "profile_id": null, "website_id": null, "tool_route": null, "agent_owned": false}),
+        ),
     ]
 }
 
 fn resume() -> Resume {
-    Resume { active_window_id: "w1".into(), active_layout_id: "l1".into(), focused_pane_id: "p1".into(), active_tab_by_pane: BTreeMap::from([("p1".into(), "t1".into())]) }
+    Resume {
+        active_window_id: "w1".into(),
+        active_layout_id: "l1".into(),
+        focused_pane_id: "p1".into(),
+        active_tab_by_pane: BTreeMap::from([("p1".into(), "t1".into())]),
+    }
 }
 
 fn snapshot_of(state: &TreeState, last: TreeChange) -> TreeSnapshot {
@@ -55,7 +82,13 @@ fn snapshot_of(state: &TreeState, last: TreeChange) -> TreeSnapshot {
         nodes: state
             .nodes
             .iter()
-            .map(|(id, n)| TreeNode { node_id: id.clone(), parent_id: n.parent_id.clone(), version: n.version, key_epoch: n.key_epoch, ciphertext: n.ciphertext.clone() })
+            .map(|(id, n)| TreeNode {
+                node_id: id.clone(),
+                parent_id: n.parent_id.clone(),
+                version: n.version,
+                key_epoch: n.key_epoch,
+                ciphertext: n.ciphertext.clone(),
+            })
             .collect(),
         slots: state.slots.values().cloned().collect(),
         last_change: Some(last),
@@ -79,11 +112,29 @@ fn change_of(op: &super::protocol::TreeOp) -> TreeChange {
 #[test]
 fn builds_verifies_and_restores_a_tree() {
     let f = fixture();
-    let v = Verifier { root: &f.root, scope: &f.scope, grants: &f.grants };
+    let v = Verifier {
+        root: &f.root,
+        scope: &f.scope,
+        grants: &f.grants,
+    };
     let mut state = TreeState::empty(DEVICE);
     let tab = state.tab_node("t1");
     let op = state
-        .build_op(&f.root, &f.scope, &f.grant, &f.key, 1, &workspace(), Some(&resume()), vec![(tab.clone(), SLOT_PAGE_STATE, Some(b"{\"scroll\":10}".to_vec()))], vec![])
+        .build_op(
+            &f.root,
+            &f.scope,
+            &f.grant,
+            &f.key,
+            1,
+            &workspace(),
+            Some(&resume()),
+            vec![(
+                tab.clone(),
+                SLOT_PAGE_STATE,
+                Some(b"{\"scroll\":10}".to_vec()),
+            )],
+            vec![],
+        )
         .unwrap()
         .expect("initial op");
     assert_eq!(op.upserts[0].node_id, DEVICE, "root node first");
@@ -96,27 +147,86 @@ fn builds_verifies_and_restores_a_tree() {
     assert_eq!(restored.records.len(), 3);
     assert_eq!(restored.slots.len(), 1);
     // No change, no op.
-    assert!(state.build_op(&f.root, &f.scope, &f.grant, &f.key, 2, &workspace(), Some(&resume()), vec![], vec![]).unwrap().is_none());
+    assert!(state
+        .build_op(
+            &f.root,
+            &f.scope,
+            &f.grant,
+            &f.key,
+            2,
+            &workspace(),
+            Some(&resume()),
+            vec![],
+            vec![]
+        )
+        .unwrap()
+        .is_none());
     // Closing the tab deletes its node and slot.
     let mut fewer = workspace();
     fewer.pop();
-    let close = state.build_op(&f.root, &f.scope, &f.grant, &f.key, 2, &fewer, Some(&resume()), vec![], vec![]).unwrap().unwrap();
+    let close = state
+        .build_op(
+            &f.root,
+            &f.scope,
+            &f.grant,
+            &f.key,
+            2,
+            &fewer,
+            Some(&resume()),
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .unwrap();
     assert_eq!(close.deletes, vec![tab]);
     state.apply_own(&v, &close).unwrap();
-    assert_eq!((state.records.len(), state.slots.len(), state.version), (2, 0, 2));
+    assert_eq!(
+        (state.records.len(), state.slots.len(), state.version),
+        (2, 0, 2)
+    );
 }
 
 #[test]
 fn detects_hidden_nodes_rollbacks_and_forged_changes() {
     let f = fixture();
-    let v = Verifier { root: &f.root, scope: &f.scope, grants: &f.grants };
+    let v = Verifier {
+        root: &f.root,
+        scope: &f.scope,
+        grants: &f.grants,
+    };
     let mut state = TreeState::empty(DEVICE);
-    let first = state.build_op(&f.root, &f.scope, &f.grant, &f.key, 1, &workspace(), Some(&resume()), vec![], vec![]).unwrap().unwrap();
+    let first = state
+        .build_op(
+            &f.root,
+            &f.scope,
+            &f.grant,
+            &f.key,
+            1,
+            &workspace(),
+            Some(&resume()),
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .unwrap();
     state.apply_own(&v, &first).unwrap();
     let v1 = state.clone();
     let mut renamed = workspace();
     renamed[0].fields.insert("title".into(), json!("Renamed"));
-    let second = state.build_op(&f.root, &f.scope, &f.grant, &f.key, 2, &renamed, Some(&resume()), vec![], vec![]).unwrap().unwrap();
+    let second = state
+        .build_op(
+            &f.root,
+            &f.scope,
+            &f.grant,
+            &f.key,
+            2,
+            &renamed,
+            Some(&resume()),
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .unwrap();
     state.apply_own(&v, &second).unwrap();
 
     // Hiding a node breaks the Merkle root.
@@ -138,7 +248,20 @@ fn detects_hidden_nodes_rollbacks_and_forged_changes() {
     assert!(TreeState::from_snapshot(&v, stale).is_err());
     // A change signed by a key without a vault grant is rejected.
     let intruder = DeviceKey::generate();
-    let forged = state.build_op(&f.root, &f.scope, &f.grant, &intruder, 3, &workspace(), None, vec![], vec![]).unwrap().unwrap();
+    let forged = state
+        .build_op(
+            &f.root,
+            &f.scope,
+            &f.grant,
+            &intruder,
+            3,
+            &workspace(),
+            None,
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .unwrap();
     assert!(state.clone().apply_own(&v, &forged).is_err());
 }
 
@@ -150,8 +273,22 @@ fn signing_bytes_match_the_shared_fixture() {
     let fixture: serde_json::Value = serde_json::from_str(raw).unwrap();
     let merkle = vec![7u8; 32];
     let manifest: Manifest = serde_json::from_value(fixture["manifest"].clone()).unwrap();
-    let op_bytes = super::protocol::signing_bytes(WORKSPACE, DEVICE, "01951d32-40ac-7000-8000-000000000003", DEVICE, 5, 1, 9, &merkle, &manifest).unwrap();
-    assert_eq!(String::from_utf8(op_bytes).unwrap(), fixture["op_signing_bytes"].as_str().unwrap());
+    let op_bytes = super::protocol::signing_bytes(
+        WORKSPACE,
+        DEVICE,
+        "01951d32-40ac-7000-8000-000000000003",
+        DEVICE,
+        5,
+        1,
+        9,
+        &merkle,
+        &manifest,
+    )
+    .unwrap();
+    assert_eq!(
+        String::from_utf8(op_bytes).unwrap(),
+        fixture["op_signing_bytes"].as_str().unwrap()
+    );
     let claim = TreeClaim {
         workspace_id: WORKSPACE.into(),
         tree_id: DEVICE.into(),
@@ -161,5 +298,45 @@ fn signing_bytes_match_the_shared_fixture() {
         key_epoch: 1,
         signature: vec![],
     };
-    assert_eq!(String::from_utf8(claim.signing_bytes().unwrap()).unwrap(), fixture["claim_signing_bytes"].as_str().unwrap());
+    assert_eq!(
+        String::from_utf8(claim.signing_bytes().unwrap()).unwrap(),
+        fixture["claim_signing_bytes"].as_str().unwrap()
+    );
+}
+
+#[test]
+fn a_remembered_seat_is_unconfirmed_until_the_roster_arrives_on_this_connection() {
+    let f = fixture();
+    let directory = tempfile::tempdir().unwrap();
+    let mut store = crate::store::Store::initialize_vault(
+        &directory.path().join("workspace.sqlite"),
+        f.scope.clone(),
+        f.grant.clone(),
+        &f.root,
+        &f.key,
+        &crate::document::Document::default().encode().unwrap(),
+        None,
+    )
+    .unwrap();
+    let mut sync = super::sync::TreeSync::new(&f.scope, &f.grant);
+    let roster = vec![super::protocol::Tree {
+        tree_id: DEVICE.into(),
+        shared: false,
+        driver_device_id: Some(DEVICE.into()),
+        driver_epoch: Some("epoch".into()),
+        driver_seen_at: None,
+        version: 0,
+    }];
+    // A seat loaded from the cache or kept across a disconnect is not proof.
+    assert!(!sync.view(&store).unwrap().seat_confirmed);
+    sync.on_roster(&mut store, &f.root, roster.clone()).unwrap();
+    assert!(sync.view(&store).unwrap().seat_confirmed);
+    sync.on_disconnect();
+    let view = sync.view(&store).unwrap();
+    assert_eq!(view.driving_tree.as_deref(), Some(DEVICE));
+    assert!(!view.seat_confirmed);
+    sync.on_connect();
+    assert!(!sync.view(&store).unwrap().seat_confirmed);
+    sync.on_roster(&mut store, &f.root, roster).unwrap();
+    assert!(sync.view(&store).unwrap().seat_confirmed);
 }

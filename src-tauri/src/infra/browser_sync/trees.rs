@@ -26,17 +26,38 @@ pub(super) fn tree_mode(view: &TreeView) -> bool {
 
 pub(super) fn driver_epoch(view: &TreeView) -> Option<&str> {
     let tree = view.driving_tree.as_deref()?;
-    view.trees.iter().find(|t| t.tree_id == tree)?.driver_epoch.as_deref()
+    view.trees
+        .iter()
+        .find(|t| t.tree_id == tree)?
+        .driver_epoch
+        .as_deref()
+}
+
+/// The seat's epoch once edits may be written: this session's copy of the
+/// driven tree has caught up with the server. Before that the renderer sees
+/// no active device, so it neither captures nor publishes anything.
+pub(super) fn writer_epoch(view: &TreeView) -> Option<&str> {
+    driver_epoch(view).filter(|_| view.writable)
 }
 
 fn orphans(records: &[ViewRecord]) -> (Vec<String>, Vec<String>) {
-    let ids = |kind: Kind| -> BTreeSet<&str> { records.iter().filter(|r| r.kind == kind).map(|r| r.id.as_str()).collect() };
+    let ids = |kind: Kind| -> BTreeSet<&str> {
+        records
+            .iter()
+            .filter(|r| r.kind == kind)
+            .map(|r| r.id.as_str())
+            .collect()
+    };
     let (layouts, groups) = (ids(Kind::Layout), ids(Kind::Group));
     let tabs = records
         .iter()
         .filter(|r| r.kind == Kind::Tab)
         .filter(|r| {
-            let layout = r.fields.get("placement").and_then(|p| p.get("layout_id")).and_then(|v| v.as_str());
+            let layout = r
+                .fields
+                .get("placement")
+                .and_then(|p| p.get("layout_id"))
+                .and_then(|v| v.as_str());
             !layout.is_some_and(|l| layouts.contains(l))
         })
         .map(|r| r.id.clone())
@@ -44,16 +65,44 @@ fn orphans(records: &[ViewRecord]) -> (Vec<String>, Vec<String>) {
     let websites = records
         .iter()
         .filter(|r| r.kind == Kind::Website)
-        .filter(|r| !r.fields.get("group_id").and_then(|v| v.as_str()).is_some_and(|g| groups.contains(g)))
+        .filter(|r| {
+            !r.fields
+                .get("group_id")
+                .and_then(|v| v.as_str())
+                .is_some_and(|g| groups.contains(g))
+        })
         .map(|r| r.id.clone())
         .collect();
     (tabs, websites)
 }
 
-pub(super) fn synthesize(projection: &mut TreeProjection, device_id: &str, view: &TreeView) -> WorkspaceView {
-    let driven = view.driving_tree.as_deref().and_then(|t| view.workspaces.get(t));
+pub(super) fn synthesize(
+    projection: &mut TreeProjection,
+    device_id: &str,
+    view: &TreeView,
+) -> WorkspaceView {
+    let driven = view
+        .driving_tree
+        .as_deref()
+        .and_then(|t| view.workspaces.get(t));
+    // Without a seat: the tree this session drove last, kept current by the
+    // server while another session holds it.
+    let followed = view
+        .driving_tree
+        .is_none()
+        .then(|| {
+            view.following
+                .as_deref()
+                .and_then(|t| view.workspaces.get(t))
+        })
+        .flatten();
+    let driven = driven.or(followed);
     // Offline start: the cached own tree, read-only until the seat is known.
-    let cached = view.trees.is_empty().then(|| view.workspaces.get(device_id)).flatten();
+    let cached = view
+        .trees
+        .is_empty()
+        .then(|| view.workspaces.get(device_id))
+        .flatten();
     let own_records = match driven.or(cached) {
         Some(tree) => {
             projection.held = tree.records.clone();
@@ -67,9 +116,20 @@ pub(super) fn synthesize(projection: &mut TreeProjection, device_id: &str, view:
     }
     // Keyed by the tree's last author: the renderer ignores its own resume
     // and follows another author's once, right after switching to their tree.
-    let resume: Option<(String, Resume)> = driven.and_then(|t| Some((t.author.clone().unwrap_or_else(|| device_id.to_owned()), t.resume.clone()?)));
-    let epoch = driver_epoch(view).map(str::to_owned);
-    let content = serde_json::json!([&records, resume.as_ref().map(|(a, r)| (a, serde_json::to_value(r).ok())), &epoch]);
+    let resume: Option<(String, Resume)> = driven.and_then(|t| {
+        Some((
+            t.author.clone().unwrap_or_else(|| device_id.to_owned()),
+            t.resume.clone()?,
+        ))
+    });
+    let epoch = writer_epoch(view).map(str::to_owned);
+    let content = serde_json::json!([
+        &records,
+        resume
+            .as_ref()
+            .map(|(a, r)| (a, serde_json::to_value(r).ok())),
+        &epoch
+    ]);
     if projection.last.as_ref() != Some(&content) {
         projection.sequence += 1;
         projection.last = Some(content);
@@ -82,7 +142,14 @@ pub(super) fn synthesize(projection: &mut TreeProjection, device_id: &str, view:
         records,
         orphaned_tab_ids,
         orphaned_website_ids,
-        resumes: resume.into_iter().map(|(author, resume)| (author, ResumeRecord { sequence, resume })).collect::<BTreeMap<_, _>>(),
-        active_device: epoch.map(|epoch| ActiveDevice { device_id: Some(device_id.to_owned()), epoch, sequence }),
+        resumes: resume
+            .into_iter()
+            .map(|(author, resume)| (author, ResumeRecord { sequence, resume }))
+            .collect::<BTreeMap<_, _>>(),
+        active_device: epoch.map(|epoch| ActiveDevice {
+            device_id: Some(device_id.to_owned()),
+            epoch,
+            sequence,
+        }),
     }
 }

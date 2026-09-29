@@ -1,8 +1,8 @@
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { mapAllVirtualWorkspaceLayouts } from "@/features/workspace/virtualWindows";
 import { allLayoutViews, layoutTabs, layoutTabLabel } from "@/features/workspace/layoutTabs";
+import { routes } from "@/features/app-shell";
 import { WorkspaceLayoutTabs } from "./WorkspaceLayoutTabs";
 import { openMisty } from "@/features/misty/handoff";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
@@ -11,7 +11,6 @@ import {
   canCloseWorkspaceWindow,
   canFitDockSplit,
   dockLeaves,
-  dockTabs,
   dockWidgetRegistry,
   findDockLeaf,
   maxWorkspacePanels,
@@ -73,7 +72,6 @@ export function WorkspaceCanvas(props: {
   const closePane = useWorkspaceStore((state) => state.closePane);
   const updateSplitRatio = useWorkspaceStore((state) => state.updateSplitRatio);
   const leaves = useMemo(() => dockLeaves(layout.root), [layout.root]);
-  const tabCount = useMemo(() => dockTabs(layout.root).length, [layout.root]);
 
   useEffect(() => {
     let knownTabs = workspaceTabsById(useWorkspaceStore.getState());
@@ -86,31 +84,17 @@ export function WorkspaceCanvas(props: {
     });
   }, []);
 
-  useEffect(() => {
-    if (tabCount > 0 || useBrowserSyncStore.getState().session) return;
-
-    // Let route synchronization open the requested surface before creating a Google tab.
-    const timer = window.setTimeout(() => {
-      const workspace = useWorkspaceStore.getState();
-      if (dockTabs(workspace.layout.root).length > 0 || useBrowserSyncStore.getState().session)
-        return;
-      const fallbackTab = workspace.newLayoutTab();
-      if (`${location.pathname}${location.search}` !== fallbackTab.route) {
-        navigate(fallbackTab.route, { replace: true });
-      }
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [activeScopeKey, location.pathname, location.search, navigate, tabCount]);
-
   const navigateToActiveLayoutTab = useCallback(() => {
     const state = useWorkspaceStore.getState();
     const pane =
       findDockLeaf(state.layout.root, state.layout.focusedPaneId) ??
       dockLeaves(state.layout.root)[0];
     const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
-    if (tab && `${location.pathname}${location.search}` !== tab.route)
-      navigate(tab.route, { replace: true });
+    // With no tabs left, leave the address bar on a route that maps to no tab so
+    // the closed one is not reopened from the URL.
+    const route = tab?.route ?? (allLayoutViews(state.layout).length ? null : routes.newTab);
+    if (route && `${location.pathname}${location.search}` !== route)
+      navigate(route, { replace: true });
   }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
@@ -172,18 +156,9 @@ export function WorkspaceCanvas(props: {
 
   const closeWorkspaceTab = useCallback(
     (tab: WorkspaceTab) => {
-      if (!closeTab(tab.id)) return;
-      const state = useWorkspaceStore.getState();
-      const leaves = dockLeaves(state.layout.root);
-      const focusedPane =
-        leaves.find((pane) => pane.id === state.layout.focusedPaneId) ?? leaves[0];
-      const nextActive =
-        focusedPane?.tabs.find((t) => t.id === focusedPane.activeTabId) ?? focusedPane?.tabs[0];
-      if (nextActive && `${location.pathname}${location.search}` !== nextActive.route) {
-        navigate(nextActive.route, { replace: true });
-      }
+      if (closeTab(tab.id)) navigateToActiveLayoutTab();
     },
-    [closeTab, location.pathname, location.search, navigate],
+    [closeTab, navigateToActiveLayoutTab],
   );
 
   const closeActiveTab = useCallback(() => {

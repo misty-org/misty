@@ -3,6 +3,7 @@
 //! physical store and explicit reload coordination before using this adapter.
 #![allow(dead_code)] // Host profile migration must acquire quiescence first.
 use super::browser_cookie_store::{self as cookies, CookieStoreError};
+use super::browser_data_coverage::{align_same_site, partition_restorable};
 use misty_browser_sync::{
     document::{
         credentials::{Area, Cookie},
@@ -35,6 +36,25 @@ impl StagedCookieProfile {
             logical_profile_id,
             physical_profile_id,
         }
+    }
+
+    /// Live target cookies this engine can store, and those it must leave to
+    /// the devices that can (reported unchanged on readback, never written).
+    fn restorable(
+        &self,
+        target: &[CredentialRecord],
+    ) -> Result<(Vec<Cookie>, Vec<Cookie>), EngineError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| EngineError::Invalid)?
+            .as_secs() as i64;
+        // Expired server cookies are tombstoned by time, not native writes.
+        let live = self
+            .target(target)?
+            .into_iter()
+            .filter(|cookie| live(cookie, now))
+            .collect();
+        Ok(partition_restorable(live, cookies::representable))
     }
 
     fn target(&self, target: &[CredentialRecord]) -> Result<Vec<Cookie>, EngineError> {
@@ -86,16 +106,7 @@ fn live(cookie: &Cookie, now: i64) -> bool {
 
 impl QuiescentProfile for StagedCookieProfile {
     async fn preflight(&mut self, target: &[CredentialRecord]) -> Result<(), EngineError> {
-        let target = self.target(target)?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| EngineError::Invalid)?
-            .as_secs() as i64;
-        // Expired server cookies are tombstoned by time, not native writes.
-        let target = target
-            .into_iter()
-            .filter(|cookie| live(cookie, now))
-            .collect();
+        let (target, _) = self.restorable(target)?;
         cookies::preflight(&self.view, &self.physical_profile_id, target)
             .await
             .map_err(issue)?;
@@ -108,19 +119,12 @@ impl QuiescentProfile for StagedCookieProfile {
         cookies::preflight(&self.view, &self.physical_profile_id, vec![])
             .await
             .map_err(issue)?;
-        let target = self.target(target)?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| EngineError::Invalid)?
-            .as_secs() as i64;
-        let target: Vec<_> = target
-            .into_iter()
-            .filter(|cookie| live(cookie, now))
-            .collect();
+        let (target, _) = self.restorable(target)?;
         let current: std::collections::BTreeMap<_, _> =
             cookies::read(&self.view, &self.physical_profile_id)
                 .await
                 .map_err(issue)?
+                .cookies
                 .into_iter()
                 .map(|cookie| (identity(&cookie), cookie))
                 .collect();
@@ -153,13 +157,22 @@ impl QuiescentProfile for StagedCookieProfile {
         &mut self,
         target: &[CredentialRecord],
     ) -> Result<Vec<CredentialRecord>, EngineError> {
-        self.target(target)?;
+        let (stored, kept) = self.restorable(target)?;
         cookies::preflight(&self.view, &self.physical_profile_id, vec![])
             .await
             .map_err(issue)?;
-        let observed = cookies::read(&self.view, &self.physical_profile_id)
+        let mut observed = cookies::read(&self.view, &self.physical_profile_id)
             .await
-            .map_err(issue)?;
+            .map_err(issue)?
+            .cookies;
+        if cookies::SAME_SITE_NONE_IS_UNSPECIFIED {
+            align_same_site(&mut observed, &stored);
+        }
+        let present: std::collections::BTreeSet<_> = observed.iter().map(identity).collect();
+        observed.extend(
+            kept.into_iter()
+                .filter(|cookie| !present.contains(&identity(cookie))),
+        );
         let mut record = target[0].clone();
         record.payload = serde_json::to_value(observed).map_err(|_| EngineError::Invalid)?;
         Ok(vec![record])

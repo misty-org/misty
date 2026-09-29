@@ -3,6 +3,7 @@
 //! lease until completion. Never call this on Misty's own authentication webview.
 #![allow(dead_code)] // Coordinator integration follows the adapter verification.
 
+use super::browser_data_coverage::{site, CookieRead, SkipReason};
 use block2::RcBlock;
 use misty_browser_sync::document::credentials::{Cookie, SameSite};
 use objc2::{rc::Retained, runtime::AnyObject};
@@ -17,6 +18,9 @@ use std::{sync::Mutex, time::Duration};
 use tauri::Webview;
 
 const COOKIE_LIMIT: usize = 20_000;
+/// Foundation drops an explicit SameSite=None and reports nil, which WebKit
+/// enforces as None. The two are indistinguishable in this engine.
+pub(crate) const SAME_SITE_NONE_IS_UNSPECIFIED: bool = true;
 const TIMEOUT: Duration = Duration::from_secs(15);
 
 // Do not include platform errors or cookie values in diagnostics.
@@ -61,25 +65,29 @@ unsafe fn cookie_store(
     Ok(store.httpCookieStore())
 }
 
-fn export_cookie(native: &NSHTTPCookie) -> Result<Cookie> {
-    // WebKit's Cocoa bridge may include partition metadata in the public
-    // properties dictionary even though no portable partition API is exposed.
-    // Refuse such a cookie; never silently broaden it to an unpartitioned one.
-    // Absence is not proof of complete partition coverage on every OS release.
-    if native.properties().is_some_and(|properties| {
+// WebKit's Cocoa bridge may include partition metadata in the public
+// properties dictionary even though no portable partition API is exposed.
+// Absence is not proof of complete partition coverage on every OS release.
+fn partitioned(native: &NSHTTPCookie) -> bool {
+    native.properties().is_some_and(|properties| {
         properties
             .objectForKey(ns_string!("StoragePartition"))
             .is_some()
-    }) || native.portList().is_some_and(|ports| !ports.is_empty())
-    {
+    })
+}
+
+fn export_cookie(native: &NSHTTPCookie) -> Result<Cookie> {
+    // Refuse a partitioned cookie; never silently broaden it to an
+    // unpartitioned one. Ports have no portable representation either.
+    if partitioned(native) || native.portList().is_some_and(|ports| !ports.is_empty()) {
         return Err(CookieStoreError::Unsupported);
     }
     let domain = native.domain().to_string();
     let same_site = match native.sameSitePolicy().map(|value| value.to_string()) {
-        // WebKit's Cocoa conversion treats nil as effective SameSite=None on
-        // older systems. Newer systems expose the explicit "none" string.
-        // This captures effective engine policy, not original Set-Cookie syntax.
-        None => Some(SameSite::None),
+        // nil is a cookie set without a SameSite attribute (Foundation reports
+        // nil even for insecure cookies). Keep it unspecified, as WebView2
+        // does, so the engine applies its own default after a restore.
+        None => None,
         Some(value) if value.eq_ignore_ascii_case("lax") => Some(SameSite::Lax),
         Some(value) if value.eq_ignore_ascii_case("strict") => Some(SameSite::Strict),
         Some(value) if value.eq_ignore_ascii_case("none") => Some(SameSite::None),
@@ -112,7 +120,7 @@ fn export_cookie(native: &NSHTTPCookie) -> Result<Cookie> {
 
 fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
     cookie.validate().map_err(|_| CookieStoreError::Invalid)?;
-    if cookie.partition_key.is_some() || cookie.same_site.is_none() {
+    if cookie.partition_key.is_some() {
         return Err(CookieStoreError::Unsupported);
     }
     // The engine domain representation carries host-only semantics. It must not
@@ -161,7 +169,10 @@ fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
         let native =
             NSHTTPCookie::cookieWithProperties(&properties).ok_or(CookieStoreError::Invalid)?;
         // Reject a lossy platform conversion before touching the live store.
-        let exported = export_cookie(&native)?;
+        let mut exported = export_cookie(&native)?;
+        if matches!(cookie.same_site, Some(SameSite::None)) && exported.same_site.is_none() {
+            exported.same_site = Some(SameSite::None);
+        }
         if !equal(cookie, &exported)? {
             return Err(CookieStoreError::Unsupported);
         }
@@ -178,9 +189,27 @@ fn equal(a: &Cookie, b: &Cookie) -> Result<bool> {
     Ok(normalized(a)? == normalized(b)?)
 }
 
+/// Whether this engine stores the cookie exactly as given (no clamped expiry,
+/// dropped partition or changed policy). Other cookies are left untouched.
+pub(crate) fn representable(cookie: &Cookie) -> bool {
+    objc2::rc::autoreleasepool(|_| import_cookie(cookie).is_ok())
+}
+
+fn skip(native: &NSHTTPCookie, error: CookieStoreError) -> (String, SkipReason) {
+    let reason = if partitioned(native) {
+        SkipReason::Partitioned
+    } else if error == CookieStoreError::Invalid {
+        SkipReason::Malformed
+    } else {
+        SkipReason::UnsupportedAttributes
+    };
+    (site(&native.domain().to_string()), reason)
+}
+
 /// Reads raw engine cookies without leaking them into JS, events, or logs.
-/// `partition_key` coverage is intentionally not claimed by this adapter.
-pub(crate) async fn read(webview: &Webview, profile_id: &str) -> Result<Vec<Cookie>> {
+/// A cookie that cannot be represented exactly is skipped and reported, never
+/// broadened; `partition_key` coverage is not claimed by this adapter.
+pub(crate) async fn read(webview: &Webview, profile_id: &str) -> Result<CookieRead> {
     let expected = expected_profile(webview.label(), profile_id)?;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     let sender = Mutex::new(Some(sender));
@@ -201,14 +230,12 @@ pub(crate) async fn read(webview: &Webview, profile_id: &str) -> Result<Vec<Cook
             let handler = RcBlock::new(
                 move |cookies: std::ptr::NonNull<objc2_foundation::NSArray<NSHTTPCookie>>| {
                     let cookies = cookies.as_ref();
-                    let result = if cookies.len() > COOKIE_LIMIT {
-                        Err(CookieStoreError::TooLarge)
-                    } else {
-                        cookies
-                            .iter()
-                            .map(|cookie| export_cookie(&cookie))
-                            .collect()
-                    };
+                    let result = Ok(CookieRead::accept(
+                        cookies.iter().map(|cookie| {
+                            export_cookie(&cookie).map_err(|error| skip(&cookie, error))
+                        }),
+                        COOKIE_LIMIT,
+                    ));
                     if let Ok(mut sender) = sender.lock() {
                         if let Some(sender) = sender.take() {
                             let _ = sender.send(result);
@@ -388,9 +415,14 @@ mod tests {
         objc2::rc::autoreleasepool(|_| {
             for domain in ["example.test", ".example.test"] {
                 for expires in [None, Some(tomorrow())] {
-                    for policy in [SameSite::Lax, SameSite::Strict, SameSite::None] {
+                    for policy in [
+                        Some(SameSite::Lax),
+                        Some(SameSite::Strict),
+                        Some(SameSite::None),
+                        None,
+                    ] {
                         for secure in [true, false] {
-                            if !secure && matches!(policy, SameSite::None) {
+                            if !secure && matches!(policy, Some(SameSite::None)) {
                                 continue;
                             }
                             for http_only in [true, false] {
@@ -398,12 +430,18 @@ mod tests {
                                 cookie.domain = domain.into();
                                 cookie.host_only = !domain.starts_with('.');
                                 cookie.expires_unix_seconds = expires;
-                                cookie.same_site = Some(policy.clone());
+                                cookie.same_site = policy.clone();
                                 cookie.secure = secure;
                                 cookie.http_only = http_only;
                                 let native =
                                     import_cookie(&cookie).expect("lossless cookie import");
-                                assert!(equal(&cookie, &export_cookie(&native).unwrap()).unwrap());
+                                let mut exported = export_cookie(&native).unwrap();
+                                if matches!(policy, Some(SameSite::None)) {
+                                    // Reported as nil; callers align it with the synced copy.
+                                    assert!(exported.same_site.is_none());
+                                    exported.same_site = policy.clone();
+                                }
+                                assert!(equal(&cookie, &exported).unwrap());
                             }
                         }
                     }
@@ -413,19 +451,26 @@ mod tests {
     }
 
     #[test]
-    fn rejects_silent_expiry_shortening_and_unknown_same_site_semantics() {
+    fn rejects_silent_expiry_shortening() {
         let mut cookie = fixture();
         cookie.expires_unix_seconds = Some(tomorrow() + 10 * 365 * 86_400);
         assert!(matches!(
             import_cookie(&cookie),
             Err(CookieStoreError::Unsupported)
         ));
-        cookie.expires_unix_seconds = None;
+        assert!(!representable(&cookie));
+    }
+
+    #[test]
+    fn cookies_without_same_site_or_secure_are_captured_as_unspecified() {
+        // `document.cookie = "a=1"`: Foundation reports no SameSite policy.
+        let mut cookie = fixture();
+        cookie.secure = false;
         cookie.same_site = None;
-        assert!(matches!(
-            import_cookie(&cookie),
-            Err(CookieStoreError::Unsupported)
-        ));
+        let native = import_cookie(&cookie).expect("unspecified SameSite imports");
+        let exported = export_cookie(&native).unwrap();
+        assert!(exported.same_site.is_none());
+        assert!(equal(&cookie, &exported).unwrap());
     }
 
     #[test]

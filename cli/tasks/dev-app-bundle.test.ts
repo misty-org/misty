@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -40,6 +40,11 @@ test(
       assert.equal(readFileSync(second.executable, "utf8"), "first build");
       const normal = prepareDevelopmentBundle(binary);
       assert.equal(normal.bundle, join(root, "misty-dev-apps/Misty.app"));
+      // A partial copy left by an interrupted run must not reach codesign.
+      const stale = `${first.executable}.99999.tmp`;
+      writeFileSync(stale, "partial");
+      prepareDevelopmentBundle(binary, "device-1");
+      assert.deepEqual(readdirSync(join(first.bundle, "Contents/MacOS")), ["misty-desktop"]);
       assert.throws(() => prepareDevelopmentBundle(binary, "../outside"));
       assert.throws(() => prepareDevelopmentBundle(binary, ""));
     } finally {
