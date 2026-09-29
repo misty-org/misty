@@ -6,7 +6,7 @@ export interface NavigatorLayout {
 }
 
 export const navigatorLayoutStorageKey = "misty:global-navigator-layout:v6";
-export const navigatorRailWidth = 64;
+export const navigatorRailWidth = 66;
 
 export function readNavigatorLayout(
   storage: Pick<Storage, "getItem"> = window.localStorage,

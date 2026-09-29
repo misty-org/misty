@@ -238,8 +238,8 @@
     box-shadow: inset 0 0 0 1px var(--misty-theme-active);
   }
   .misty-navigator-logo img {
-    width: 25px !important;
-    height: 25px !important;
+    width: 24px !important;
+    height: 24px !important;
   }
   [data-navigator-header] {
     padding: 4px 6px;
@@ -268,18 +268,28 @@
     overflow: hidden;
     clip-path: inset(50%);
   }
-  .misty-navigator-items :is(a[aria-current="page"], [data-spaces-toggle][data-active="true"]) {
+  .misty-navigator-items a[aria-current="page"] {
     background: var(--misty-theme-card);
   }
-  /* A centered tray gives Space identities the same axis as the app tiles. */
+  /* The tray is lit whenever it is open, so its toggle steps one shade brighter. */
+  .misty-navigator-items
+    [data-spaces-toggle]:is([data-active="true"], [aria-expanded="true"]) {
+    background: var(--misty-theme-active);
+  }
+  /* A centered tray gives Space identities the same axis as the app tiles.
+     Its inset keeps every tile off the lit edge, and the radius stays
+     concentric with the 8px tiles inside it. */
   [data-spaces-tray] {
+    --misty-spaces-tray-inset: 4px;
     justify-self: center;
-    width: var(--misty-navigation-tile-size);
+    width: calc(var(--misty-navigation-tile-size) + 2 * var(--misty-spaces-tray-inset));
+    padding: var(--misty-spaces-tray-inset);
+    border-radius: calc(8px + var(--misty-spaces-tray-inset));
   }
   [data-spaces-stack] > [role="group"] {
     flex-direction: column;
     width: 100%;
-    padding-block: 4px;
+    padding-top: 4px;
   }
   [data-spaces-stack][data-open="false"] > [role="group"] {
     padding-block: 0;
@@ -328,6 +338,18 @@
     overflow: hidden;
     clip-path: inset(50%);
   }
+}
+
+/* Space tiles sit on the lit tray, so their feedback steps one shade brighter. */
+[data-spaces-tray]
+  .misty-space-rail-control:is(
+    :hover,
+    :focus-visible,
+    [aria-current="page"],
+    [data-state="open"],
+    :active
+  ) {
+  background-color: var(--misty-theme-active);
 }
 
 /* Markers are portalled out of the rail: the edge belongs to the window. */

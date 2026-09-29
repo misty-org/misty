@@ -81,11 +81,15 @@ export function WorkspaceSpaceNavigation({
   return (
     <div
       data-spaces-tray="true"
-      className={cn("grid min-w-0 rounded-lg", activeSpaceId && "bg-charcoal-card")}
+      className={cn("grid min-w-0 rounded-lg", (open || activeSpaceId) && "bg-charcoal-hover")}
     >
       <TooltipHint content={open ? "Hide Spaces" : "Show Spaces"}>
         <Pressable
-          className={cn(navigationMenuLinkClass, "w-full", activeSpaceId && "text-cream-bright")}
+          className={cn(
+            navigationMenuLinkClass,
+            "w-full",
+            (open || activeSpaceId) && "text-cream-bright",
+          )}
           aria-label="Spaces"
           aria-expanded={open}
           aria-controls="navigator-spaces"
@@ -107,9 +111,11 @@ export function WorkspaceSpaceNavigation({
         data-spaces-stack="true"
         data-open={open ? "true" : "false"}
         inert={!open}
+        // Height only: the clipped row already hides a closed stack, and fading
+        // it makes WebKit composite the rail and re-rasterize its glyphs.
         className={cn(
-          "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
-          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
       >
         <TooltipProvider delayDuration={350}>
