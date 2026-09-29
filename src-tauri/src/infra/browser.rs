@@ -1825,30 +1825,11 @@ pub fn browser_webviews_hide_all(caller:Webview, app: AppHandle) -> Result<(), S
 
 #[tauri::command]
 pub fn browser_webviews_park_all(caller:Webview, app: AppHandle) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        remember_main_macos_webview(&app,caller.window().label())?;
-        let mut errors = Vec::new();
-        for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-") && webview.window().label()==caller.window().label() {
-                // Keep the live page composited directly beneath the app
-                // renderer while another workspace tab is active. Returning
-                // to Browser can then reveal it without a hide/show gap.
-                if let Err(error) = position_windows_webview(&webview, true, true) {
-                    errors.push(error);
-                }
-            }
-        }
-        return if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors.join("; "))
-        };
-    }
-    #[cfg(not(windows))]
-    {
-        browser_webviews_hide_all(caller,app)
-    }
+    // Inactive pages must be hidden, not merely stacked below the renderer.
+    // Closing an overlay restacks browser children above it, which otherwise
+    // exposes parked WebView2 pages over Home or Agents. Hiding retains the
+    // native page and its session for the next explicit reconciliation.
+    browser_webviews_hide_all(caller, app)
 }
 
 /// Caller holds the browser lifecycle write lease. Enumerate real native views

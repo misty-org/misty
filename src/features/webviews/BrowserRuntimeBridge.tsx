@@ -148,9 +148,9 @@ export function BrowserRuntimeBridge() {
   );
   useLayoutEffect(() => {
     if (browserSurfaceActive) return;
-    // Commit the opaque workspace surface first. On the next frame Windows
-    // can keep each live browser child parked beneath it, ready for an
-    // immediate reveal when the user returns.
+    // Commit the replacement workspace surface, then hide its native browser
+    // siblings. Their pages stay loaded without participating in overlay
+    // stacking until Browser becomes active again.
     const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
     return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);

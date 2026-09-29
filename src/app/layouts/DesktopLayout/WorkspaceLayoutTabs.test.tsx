@@ -8,9 +8,6 @@ vi.mock("./WorkspaceDockTree", () => ({
   minimumForWorkspaceTabs: () => ({ width: 280, height: 180 }),
 }));
 vi.mock("./WorkspaceWindowMenu", () => ({ WorkspaceWindowMenu: () => null }));
-vi.mock("./WindowsWorkspaceTitlebarControls", () => ({
-  WindowsWorkspaceTitlebarControls: () => null,
-}));
 beforeEach(() => {
   useWorkspaceStore.getState().reset();
   vi.stubGlobal("CSS", { escape: (value: string) => value });
@@ -19,11 +16,15 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-function mount(position: "top" | "bottom" | "left" | "right" = "top") {
+function mount(
+  position: "top" | "bottom" | "left" | "right" = "top",
+  windowsTitlebarControls = false,
+) {
   const state = useWorkspaceStore.getState();
   return render(
     <WorkspaceLayoutTabs
       position={position}
+      windowsTitlebarControls={windowsTitlebarControls}
       focusedPaneId={state.layout.focusedPaneId}
       lastUsedTabByGroup={{}}
       onOpen={vi.fn()}
@@ -45,6 +46,27 @@ function mount(position: "top" | "bottom" | "left" | "right" = "top") {
     />,
   );
 }
+it.each(["top", "bottom", "left", "right"] as const)(
+  "keeps Windows pane controls together outside the %s tab strip",
+  (position) => {
+    const slot = document.createElement("div");
+    slot.id = "misty-windows-workspace-controls";
+    document.body.append(slot);
+    try {
+      mount(position, true);
+      expect(screen.getByRole("tablist", { name: "Window tabs" })).toBeTruthy();
+      const controls = ["Create split right", "Create split down", "Close pane"].map((name) =>
+        screen.getByRole("button", { name }),
+      );
+      expect(Array.from(slot.querySelectorAll("button"))).toEqual(controls);
+      expect(controls.every((button) => button.parentElement === slot)).toBe(true);
+      expect(document.querySelector(".misty-workspace-tabs")?.contains(controls[2])).toBe(false);
+    } finally {
+      cleanup();
+      slot.remove();
+    }
+  },
+);
 it("fades only the edges with tabs outside the visible scroll area", () => {
   mount();
   const list = screen.getByRole("tablist");
