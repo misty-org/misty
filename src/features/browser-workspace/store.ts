@@ -8,4 +8,6 @@ export const useBrowserSyncStore = create<{
   session: NativeSyncView | null;
   issue: string | null;
   connecting: boolean;
-}>(() => ({ session: null, issue: null, connecting: false }));
+  /** Account whose device the server rejected; its next unlock registers it again. */
+  reenroll: string | null;
+}>(() => ({ session: null, issue: null, connecting: false, reenroll: null }));

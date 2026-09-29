@@ -1,11 +1,14 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { fireEvent } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   user: { id: "account-1" } as { id: string } | null,
   availability: vi.fn(),
   credentials: vi.fn(),
+  unlock: vi.fn(),
+  lock: vi.fn(),
   read: vi.fn(),
   generation: 1,
 }));
@@ -48,14 +51,14 @@ vi.mock("@/features/settings/SettingsControls", () => ({
 vi.mock("./native", () => ({
   vaultAvailability: mocks.availability,
   generateSyncSecret: vi.fn(),
-  unlockNativeSync: vi.fn(),
+  unlockNativeSync: mocks.unlock,
+  lockNativeSync: mocks.lock,
   readNativeSync: mocks.read,
   activeDeviceEpoch: (session: NativeSyncView) =>
     session.workspace.active_device?.device_id === session.device_id
       ? session.workspace.active_device.epoch
       : null,
 }));
-vi.mock("./SyncVaultForm", () => ({ SyncVaultForm: () => <div>Unlock sync</div> }));
 
 import { BrowserSyncSettings } from "./BrowserSyncSettings";
 import { useBrowserSyncStore } from "./store";
@@ -73,7 +76,8 @@ describe("BrowserSyncSettings", () => {
     mocks.generation = 1;
     mocks.credentials.mockResolvedValue("cookie-session:account-1");
     mocks.availability.mockResolvedValue({ local: true, remote: null });
-    useBrowserSyncStore.setState({ session: null, issue: null, connecting: false });
+    mocks.unlock.mockResolvedValue(session());
+    useBrowserSyncStore.setState({ session: null, issue: null, connecting: false, reenroll: null });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -106,6 +110,7 @@ describe("BrowserSyncSettings", () => {
     );
     await mount();
     expect(mocks.availability).not.toHaveBeenCalled();
+    expect(container.querySelector('input[aria-label="Sync password"]')).not.toBeNull();
     await act(async () => restore());
     expect(mocks.availability).toHaveBeenCalledTimes(1);
   });
@@ -114,6 +119,8 @@ describe("BrowserSyncSettings", () => {
     mocks.availability.mockRejectedValueOnce(new Error("Offline"));
     await mount();
     expect(container.textContent).toContain("Offline");
+    expect(container.textContent).toContain("Unlock your sync vault");
+    expect(container.textContent).not.toContain("Create sync vault");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
@@ -123,11 +130,103 @@ describe("BrowserSyncSettings", () => {
 
   it("keeps the unlock form mounted during background retries", async () => {
     await mount();
-    const form = Array.from(container.querySelectorAll("div")).find(
-      (element) => element.textContent === "Unlock sync",
-    );
+    const form = container.querySelector("form");
     await act(async () => useBrowserSyncStore.setState({ connecting: true }));
     expect(form?.isConnected).toBe(true);
+  });
+
+  it("keeps entered unlock details across failed checks and manual retries", async () => {
+    mocks.availability.mockRejectedValue(new Error("Could not reach the sync server."));
+    await mount();
+    const form = container.querySelector("form")!;
+    const password = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Sync password"]',
+    )!;
+    const secret = container.querySelector<HTMLInputElement>('input[aria-label="Sync secret"]')!;
+    await act(async () => {
+      fireEvent.change(password, { target: { value: "test sync password" } });
+      fireEvent.change(secret, { target: { value: `${"A".repeat(43)}=` } });
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    const retry = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Try again",
+    )!;
+    await act(async () => fireEvent.click(retry));
+    expect(mocks.availability).toHaveBeenCalledTimes(3);
+    expect(form.isConnected).toBe(true);
+    expect(password.value).toBe("test sync password");
+    expect(secret.value).toBe(`${"A".repeat(43)}=`);
+    expect(container.textContent).not.toContain("Create sync vault");
+
+    await act(async () => fireEvent.submit(form));
+    expect(mocks.unlock).toHaveBeenCalledWith(
+      { apiBase: "https://misty.example/v1", accountId: "account-1" },
+      "test sync password",
+      `${"A".repeat(43)}=`,
+      true,
+      false,
+      false,
+    );
+    expect(useBrowserSyncStore.getState().session?.account_id).toBe("account-1");
+    expect(container.textContent).not.toContain("Could not reach the sync server.");
+  });
+
+  it("shows unlock recovery when account credential restoration fails", async () => {
+    mocks.credentials.mockRejectedValue(new Error("Sign in again to reconnect sync."));
+    await mount();
+    expect(container.textContent).toContain("Sign in again to reconnect sync.");
+    expect(container.textContent).toContain("Unlock your sync vault");
+    expect(container.textContent).not.toContain("Create sync vault");
+    expect(mocks.availability).not.toHaveBeenCalled();
+  });
+
+  it("only offers vault creation after confirming there is no remote vault", async () => {
+    let resolve!: (value: { local: boolean; remote: boolean }) => void;
+    mocks.availability.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    await mount();
+    expect(container.textContent).toContain("Unlock your sync vault");
+    expect(container.textContent).not.toContain("Create sync vault");
+    await act(async () => resolve({ local: false, remote: false }));
+    expect(container.textContent).toContain("Create sync vault");
+  });
+
+  it("does not unlock the previous account after credentials finish restoring", async () => {
+    await mount();
+    let restore!: () => void;
+    mocks.credentials.mockReturnValue(
+      new Promise<void>((done) => {
+        restore = done;
+      }),
+    );
+    const savedKey = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Use saved device key",
+    )!;
+    await act(async () => fireEvent.click(savedKey));
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    mocks.generation++;
+    await act(async () => restore());
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Your account changed. Reopen sync settings.");
+  });
+
+  it("clears unlock details when the account changes during a failed check", async () => {
+    mocks.availability.mockRejectedValue(new Error("Offline"));
+    await mount();
+    const password = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Sync password"]',
+    )!;
+    await act(async () => fireEvent.change(password, { target: { value: "test sync password" } }));
+    mocks.user = { id: "account-2" };
+    mocks.generation++;
+    await mount();
+    expect(password.isConnected).toBe(false);
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Sync password"]')?.value,
+    ).toBe("");
   });
 
   it("only requests sign-in when there is no restored account", async () => {
@@ -242,5 +341,70 @@ describe("BrowserSyncSettings", () => {
       "Website storage could not verify this browser profile",
     );
     expect(container.textContent).not.toContain("Reconnect");
+  });
+
+  it("asks for the vault password to re-register a device the server rejected", async () => {
+    const rejected = session();
+    rejected.status.phase = "attention";
+    rejected.status.issue = "sync_device_forbidden";
+    useBrowserSyncStore.setState({ session: rejected });
+    await mount();
+    const reconnect = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Reconnect",
+    )!;
+    await act(async () => fireEvent.click(reconnect));
+    // The remembered key opens the rejected identity, so it is dropped rather
+    // than reused.
+    expect(mocks.lock).toHaveBeenCalledWith(rejected.session_id, true);
+    expect(mocks.unlock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Reconnect this device");
+    expect(container.textContent).not.toContain("Use saved device key");
+
+    // A background retry failing on the dropped key must not hide the form.
+    await act(async () =>
+      useBrowserSyncStore.setState({ issue: "Could not unlock encrypted sync data" }),
+    );
+    expect(container.textContent).not.toContain("Could not unlock encrypted sync data");
+
+    const form = container.querySelector("form")!;
+    await act(async () => {
+      fireEvent.change(container.querySelector('input[aria-label="Sync password"]')!, {
+        target: { value: "test sync password" },
+      });
+      fireEvent.change(container.querySelector('input[aria-label="Sync secret"]')!, {
+        target: { value: `${"A".repeat(43)}=` },
+      });
+    });
+    await act(async () => fireEvent.submit(form));
+    expect(mocks.unlock).toHaveBeenCalledWith(
+      { apiBase: "https://misty.example/v1", accountId: "account-1" },
+      "test sync password",
+      `${"A".repeat(43)}=`,
+      true,
+      false,
+      true,
+    );
+    expect(useBrowserSyncStore.getState().reenroll).toBeNull();
+    expect(container.textContent).toContain("Workspace changes up to date");
+  });
+
+  it("reopens with the saved key for issues a new identity cannot fix", async () => {
+    const offline = session();
+    offline.status.phase = "attention";
+    offline.status.issue = "sync_protocol_failed";
+    useBrowserSyncStore.setState({ session: offline });
+    await mount();
+    const reconnect = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Reconnect",
+    )!;
+    await act(async () => fireEvent.click(reconnect));
+    expect(mocks.lock).not.toHaveBeenCalled();
+    expect(mocks.unlock).toHaveBeenCalledWith(
+      { apiBase: "https://misty.example/v1", accountId: "account-1" },
+      null,
+      null,
+      false,
+    );
+    expect(useBrowserSyncStore.getState().reenroll).toBeNull();
   });
 });

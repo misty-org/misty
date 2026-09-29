@@ -110,13 +110,15 @@ export const unlockNativeSync = (
   syncSecret: string | null,
   remember: boolean,
   create = false,
+  /** Register this device again after the server rejected its identity. */
+  reenroll = false,
 ) =>
-  invoke<NativeSyncView>(create ? "browser_sync_setup" : "browser_sync_connect", {
-    ...account,
-    password,
-    syncSecret,
-    remember,
-  });
+  invoke<NativeSyncView>(
+    create ? "browser_sync_setup" : "browser_sync_connect",
+    create
+      ? { ...account, password, syncSecret, remember }
+      : { ...account, password, syncSecret, remember, reenroll },
+  );
 export const lockNativeSync = (sessionId: string, forget = false) =>
   invoke<void>("browser_sync_lock", { sessionId, forget });
 export const forgetNativeSyncKey = (account: SyncAccount) =>
