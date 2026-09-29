@@ -1,4 +1,5 @@
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
+import type { ReactNode } from "react";
 import { IconButton, PortalToId } from "@/shared/ui";
 import { PanelBottomDashed, PanelRightDashed } from "lucide-react";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
@@ -9,6 +10,7 @@ export function WindowsWorkspaceTitlebarControls(props: {
   paneId: string;
   canSplitSideways: boolean;
   canSplitVertically: boolean;
+  closePaneControl: ReactNode;
   windows: WorkspaceVirtualWindow[];
   activeWindowId: string;
   canReopen: boolean;
@@ -43,6 +45,7 @@ export function WindowsWorkspaceTitlebarControls(props: {
       >
         <PanelBottomDashed className="size-4" size={16} />
       </IconButton>
+      {props.closePaneControl}
       <WorkspaceWindowMenu
         windows={props.windows}
         activeWindowId={props.activeWindowId}

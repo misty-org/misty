@@ -300,10 +300,58 @@ describe("browser native view synchronization", () => {
     expect(invoke).toHaveBeenCalledWith("browser_webviews_hide_all");
   });
 
-  it("parks native children for a gapless return from another workspace tab", async () => {
-    await parkAllBrowserWebviews();
+  it("restores a parked browser at unchanged bounds without recreating its page or history", async () => {
+    const tab = browserTab("park-and-return");
+    const input = {
+      tab,
+      url: "https://example.com",
+      bounds: { x: 10, y: 20, width: 800, height: 600 },
+      theme: "dark" as const,
+    };
+    await syncBrowserWebview(input);
+    useBrowserRuntimeStore.getState().replaceHistory(tab.id, {
+      entries: ["https://example.com", "https://example.com/next"],
+      index: 1,
+    });
+    const history = useBrowserRuntimeStore.getState().histories[tab.id];
+    invoke.mockClear();
 
+    await parkAllBrowserWebviews();
     expect(invoke).toHaveBeenCalledWith("browser_webviews_park_all");
+    expect(invoke).not.toHaveBeenCalledWith("browser_webview_close", expect.anything());
+    invoke.mockClear();
+
+    await syncBrowserWebview(input);
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual(["browser_webview_reconcile"]);
+    expect(useBrowserRuntimeStore.getState().histories[tab.id]).toEqual(history);
+  });
+
+  it("parks a browser after an in-flight native reveal finishes", async () => {
+    const tab = browserTab("park-during-reconcile");
+    let finishReconcile: ((exists: boolean) => void) | undefined;
+    invoke.mockImplementation((command) =>
+      command === "browser_webview_reconcile"
+        ? new Promise<boolean>((resolve) => {
+            finishReconcile = resolve;
+          })
+        : Promise.resolve(undefined),
+    );
+    const syncing = syncBrowserWebview({
+      tab,
+      url: "https://example.com",
+      bounds: { x: 10, y: 20, width: 800, height: 600 },
+      theme: "dark",
+    });
+    await vi.waitFor(() => expect(finishReconcile).toBeTypeOf("function"));
+    const parking = parkAllBrowserWebviews();
+    expect(invoke).not.toHaveBeenCalledWith("browser_webviews_park_all");
+
+    finishReconcile?.(true);
+    await Promise.all([syncing, parking]);
+    expect(invoke.mock.calls.map(([command]) => command).slice(-2)).toEqual([
+      "browser_webview_hide",
+      "browser_webviews_park_all",
+    ]);
   });
 
   it("reasserts idle native ownership after the host reloads", async () => {
