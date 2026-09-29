@@ -13,6 +13,7 @@ import {
 import type { AgentScope } from "../model/types";
 import { agentsDeviceSnapshot, chooseProject } from "../store/useAgentsStore";
 import { projectRemote } from "../store/projectGitHub";
+import { useAgentDeviceTargets } from "../store/useAgentDeviceTargets";
 import { useConversationProject } from "../store/useConversationProject";
 import { FromGitHubDialog, PublishDialog } from "./GitHubDialogs";
 import { NewProjectDialog } from "./ProjectDialogs";
@@ -24,7 +25,8 @@ const none = "none";
  * computer the conversation works in, or none. Coding there runs in the person's own
  * coding tool (docs/plans/coding-runner-capabilities.md).
  * Only the chosen project travels with the chat; the next message uses a new
- * choice. Desktop only, since projects are folders on this computer.
+ * choice. Desktop only, since projects are folders on this computer; with another
+ * device picked, its own shared folders apply instead and the menu steps aside.
  */
 export function AgentProjectMenu({
   conversationId,
@@ -42,6 +44,7 @@ export function AgentProjectMenu({
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
   const setProject = useConversationProject((s) => s.setProject);
+  const otherDevice = useAgentDeviceTargets((s) => s.targets.length > 0);
   const load = useCallback(
     () =>
       agentsDeviceSnapshot()
@@ -57,7 +60,7 @@ export function AgentProjectMenu({
     if (chosen && hasTauriInternals())
       void projectRemote(chosen).then((found) => setRemote(found ?? ""));
   }, [chosen]);
-  if (!hasTauriInternals()) return null;
+  if (!hasTauriInternals() || otherDevice) return null;
   const current = projects.find((project) => project.id === chosen);
   const canPublish = current?.kind === "project_folder" && current.available && remote === "";
   const add = async () => {
@@ -81,10 +84,12 @@ export function AgentProjectMenu({
     <DropdownMenu onOpenChange={(open) => open && void load()}>
       <MenuTrigger
         label="Project"
-        value={current?.displayName ?? "No project"}
-        title="The folder this conversation works in"
+        icon={<FolderOpen aria-hidden className="size-4 shrink-0" />}
+        value={current?.displayName ?? "Project"}
+        title={current ? `Project: ${current.displayName}` : "The folder this conversation works in"}
+        chevron={false}
         disabled={disabled}
-        className="agent-mode-toggle h-7 max-w-48 px-2 text-xs font-normal text-cream-muted"
+        className="agent-strip-chip max-w-40"
       />
       <DropdownMenuContent align="start" className="w-72" data-misty-layer-portal>
         <DropdownMenuRadioGroup
@@ -92,10 +97,7 @@ export function AgentProjectMenu({
           onValueChange={(next) => setProject(conversationId, next === none ? null : next)}
         >
           <DropdownMenuRadioItem value={none}>
-            <span className="grid min-w-0 gap-0.5">
-              <span>No project</span>
-              <span className="text-xs text-cream-muted">The agent works without a folder</span>
-            </span>
+            No project
           </DropdownMenuRadioItem>
           {projects.map((project) => (
             <DropdownMenuRadioItem
@@ -103,55 +105,34 @@ export function AgentProjectMenu({
               value={project.id}
               disabled={!project.available}
             >
-              <span className="grid min-w-0 gap-0.5">
-                <span className="truncate">{project.displayName}</span>
+              <span className="min-w-0 flex-1 truncate">{project.displayName}</span>
+              {(!project.available || project.kind !== "project_folder") && (
                 <span className="text-xs text-cream-muted">
-                  {!project.available
-                    ? "Not found on this computer"
-                    : project.kind === "project_folder"
-                      ? "Your coding tool works here"
-                      : "Read only"}
+                  {!project.available ? "Not found" : "Read only"}
                 </span>
-              </span>
+              )}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => setDialog("new")}>
           <FolderPlus aria-hidden="true" />
-          <span className="grid min-w-0 gap-0.5">
-            <span>New project…</span>
-            <span className="text-xs text-cream-muted">
-              A new folder with Git, on this computer
-            </span>
-          </span>
+          New project…
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setDialog("github")}>
           <Download aria-hidden="true" />
-          <span className="grid min-w-0 gap-0.5">
-            <span>From GitHub…</span>
-            <span className="text-xs text-cream-muted">Clone one of your repositories</span>
-          </span>
+          From GitHub…
         </DropdownMenuItem>
         {canPublish ? (
           <DropdownMenuItem onSelect={() => setDialog("publish")}>
             <Upload aria-hidden="true" />
-            <span className="grid min-w-0 gap-0.5">
-              <span>Publish to GitHub…</span>
-              <span className="text-xs text-cream-muted">
-                Push {current.displayName} to a new repository
-              </span>
-            </span>
+            Publish to GitHub…
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem onSelect={() => void add()}>
           <FolderOpen aria-hidden="true" />
-          <span className="grid min-w-0 gap-0.5">
-            <span>Add an existing folder…</span>
-            <span className="text-xs text-cream-muted">
-              {failed || "Choose a folder on this computer"}
-            </span>
-          </span>
+          <span className="min-w-0 flex-1 truncate">Add an existing folder…</span>
+          {failed && <span className="max-w-32 truncate text-xs text-cream-muted">{failed}</span>}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

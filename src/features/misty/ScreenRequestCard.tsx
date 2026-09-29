@@ -1,6 +1,7 @@
-import { AppWindow, Monitor, MousePointer2, PanelsTopLeft } from "lucide-react";
+import { AppWindow, PanelsTopLeft } from "lucide-react";
 import type { ScreenRequest } from "@/features/ai-surface/types";
-import { Button, Spinner } from "@/shared/ui";
+import { Button } from "@/shared/ui";
+import { StatusRow, StatusTable, type StatusState } from "@/features/agents";
 import {
   declineScreenRequest,
   openScreenAndContinue,
@@ -22,15 +23,15 @@ function status(request: ScreenRequest) {
     }[request.state ?? "pending"];
   if (request.kind === "desktop")
     return {
-      opening: "Starting desktop control…",
+      opening: "Starting desktop control",
       opened: "Continuing on your desktop",
       declined: "Desktop not used",
       failed: request.error || "Desktop control could not start.",
-      pending: "Starting desktop control…",
+      pending: "Starting desktop control",
     }[request.state ?? "pending"];
   switch (request.state) {
     case "opening":
-      return look ? "Looking at your screen…" : "Opening a screen…";
+      return look ? "Looking at your screen" : "Opening a screen";
     case "opened":
       return look ? "Continuing with your screen" : "Continuing with the screen open";
     case "declined":
@@ -38,7 +39,7 @@ function status(request: ScreenRequest) {
     case "failed":
       return request.error || "The screen could not open.";
     default:
-      return look ? "Looking at your screen…" : "Opening a screen…";
+      return look ? "Looking at your screen" : "Opening a screen";
   }
 }
 
@@ -71,66 +72,69 @@ export function ScreenRequestCard({
         choice,
       );
   };
-  const Icon =
-    request.kind === "look" ? Monitor : request.kind === "desktop" ? MousePointer2 : AppWindow;
+  const row: StatusState = asking
+    ? "waiting"
+    : stalled
+      ? "waiting"
+      : request.state === "opened"
+        ? "done"
+        : request.state === "failed"
+          ? "failed"
+          : request.state === "declined"
+            ? "skipped"
+            : "running";
+  const actions =
+    stalled || asking ? (
+      <>
+        {stalled ? (
+          <Button size="sm" variant="primary" onClick={() => choose(screenChoice(request.location))}>
+            Continue
+          </Button>
+        ) : (
+          <>
+            <Button size="sm" variant="primary" disabled={working} onClick={() => choose("window")}>
+              <AppWindow className="size-3.5" /> New tab
+            </Button>
+            <Button size="sm" variant="outline" disabled={working} onClick={() => choose("separate")}>
+              <PanelsTopLeft className="size-3.5" /> Separate window
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                conversationId &&
+                declineScreenRequest(
+                  useMistyStore.setState,
+                  useMistyStore.getState,
+                  conversationId,
+                  messageId,
+                )
+              }
+            >
+              Not now
+            </Button>
+          </>
+        )}
+      </>
+    ) : undefined;
   return (
-    <section
-      aria-label={
+    <StatusTable
+      label={
         request.kind === "look"
           ? "Screen look"
           : request.kind === "desktop"
             ? "Desktop request"
             : "Screen request"
       }
-      className="mt-3 rounded-lg border border-charcoal-border bg-charcoal-card p-3"
+      actions={actions}
     >
-      <div className="flex items-center gap-2">
-        <Icon className="size-3.5 shrink-0 text-cream-muted" aria-hidden="true" />
-        <strong className="text-xs text-cream-bright">
-          {asking ? "Where should Misty work?" : status(request)}
-        </strong>
-        {request.state === "opening" ? <Spinner label={false} className="size-3" /> : null}
-      </div>
-      <p className="mt-1.5 break-words text-[11px] leading-4 text-cream-muted">{request.reason}</p>
-      {stalled ? (
-        <div className="mt-3">
-          <Button size="sm" className="h-7" onClick={() => choose(screenChoice(request.location))}>
-            Continue
-          </Button>
-        </div>
-      ) : null}
-      {asking ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" className="h-7" disabled={working} onClick={() => choose("window")}>
-            <AppWindow className="size-3.5" /> New tab
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7"
-            disabled={working}
-            onClick={() => choose("separate")}
-          >
-            <PanelsTopLeft className="size-3.5" /> Separate window
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7"
-            onClick={() =>
-              conversationId &&
-              declineScreenRequest(
-                useMistyStore.setState,
-                useMistyStore.getState,
-                conversationId,
-                messageId,
-              )
-            }
-          >
-            Not now
-          </Button>
-        </div>
-      ) : null}
-    </section>
+      <StatusRow
+        state={row}
+        verb={asking ? "Waiting for you" : undefined}
+        sub={request.reason || undefined}
+      >
+        {asking ? "Where should Misty work?" : status(request)}
+      </StatusRow>
+    </StatusTable>
   );
 }

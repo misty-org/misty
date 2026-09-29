@@ -1,6 +1,6 @@
 import type { SpaceRoadmapNodeDefinition } from "@/api/spaces/dto/plannerExpansionTypes";
 import { Button, cn, IconButton, Input } from "@/shared/ui";
-import { GripVertical, PanelLeftClose, Search, Settings2 } from "lucide-react";
+import { GripVertical, PanelLeftClose, Search, Settings } from "lucide-react";
 import { useMemo, useState } from "react";
 import { RoadmapNodeDefinitionManager } from "./RoadmapNodeDefinitionManager";
 import { roadmapNodeColors, roadmapPalette, type RoadmapPaletteItem } from "./roadmapNodeCatalog";
@@ -100,7 +100,7 @@ export function RoadmapNodeDrawer(props: {
           className="m-2 h-8 justify-start gap-2 text-xs"
           onClick={() => setManagerOpen(true)}
         >
-          <Settings2 className="size-3.5" />
+          <Settings className="size-3.5" />
           Manage custom nodes
         </Button>
       ) : null}

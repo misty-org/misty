@@ -255,7 +255,8 @@ export function applyGlobalInvocationEvent(
       retryable: event.type === "invocation.failed",
       activity: undefined,
     });
-    set({ working: false, error: event.type === "invocation.failed" ? event.error : null });
+    // The transcript shows how the run ended; no popup over the composer.
+    set({ working: false, error: null });
   }
 }
 

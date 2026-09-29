@@ -32,6 +32,8 @@ export function ModelPicker({
   defaultLabel,
   disabled,
   className,
+  chevron = true,
+  showDefaultName = false,
   onChange,
 }: {
   /** Accessible name, e.g. "Thinking model". */
@@ -44,27 +46,60 @@ export function ModelPicker({
   defaultLabel: string;
   disabled?: boolean;
   className?: string;
+  /** False drops the trigger's trailing chevron, as in a strip of chips. */
+  chevron?: boolean;
+  /** Name the model a default follows on the trigger, instead of the default's own name. */
+  showDefaultName?: boolean;
   onChange(model: string): void;
 }) {
   const [open, setOpen] = useState(false);
-  const providers = [...new Set(options.map((option) => option.provider))];
+  const [query, setQuery] = useState("");
+  const [more, setMore] = useState(false);
+  // Models outside each lab's current lineup stay behind "More models"; searching looks through them too.
+  const showMore = more || query.trim() !== "";
+  const visible = options.filter((option) => !option.more || showMore);
+  const hasMore = options.some((option) => option.more);
+  const providers = [...new Set(visible.map((option) => option.provider))];
   const choose = (model: string) => {
     setOpen(false);
     if (model !== value) onChange(model);
   };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          setQuery("");
+          setMore(false);
+        }
+      }}
+    >
       <MenuTrigger
         kind="popover"
         label={label}
         icon={<ModelProviderIcon model={value || defaultModel} />}
-        value={value ? modelName(options, value) : defaultLabel}
+        value={
+          value
+            ? modelName(options, value)
+            : showDefaultName
+              ? modelName(options, defaultModel)
+              : defaultLabel
+        }
+        chevron={chevron}
+        title={`Model: ${modelName(options, value || defaultModel)}`}
         disabled={disabled}
         className={className}
       />
       <PopoverContent align="start" className="w-80 p-0" aria-label={label}>
         <Command label={label}>
-          <CommandInput autoFocus aria-label="Find a model" placeholder="Find a model…" />
+          <CommandInput
+            autoFocus
+            aria-label="Find a model"
+            placeholder="Find a model…"
+            value={query}
+            onValueChange={setQuery}
+          />
           <CommandList>
             <CommandEmpty>No models found.</CommandEmpty>
             <CommandGroup>
@@ -80,7 +115,7 @@ export function ModelPicker({
             {providers.length > 0 && <CommandSeparator />}
             {providers.map((provider) => (
               <CommandGroup key={provider} heading={provider}>
-                {options
+                {visible
                   .filter((option) => option.provider === provider)
                   .map((option) => (
                     <CommandItem
@@ -100,6 +135,16 @@ export function ModelPicker({
                   ))}
               </CommandGroup>
             ))}
+            {hasMore && !query.trim() && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem value="more-models" onSelect={() => setMore((current) => !current)}>
+                    {more ? "Fewer models" : "More models"}
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

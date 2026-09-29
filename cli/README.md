@@ -110,9 +110,12 @@ misty check cli
 misty check all
 
 misty env init dev
+misty env init staging
 misty env init prod
 misty env status dev
+misty env status staging
 misty env check dev
+misty env check staging
 misty env check prod
 
 misty home generate
@@ -140,6 +143,11 @@ misty server prod check
 misty server prod up
 misty server prod logs
 misty server prod down
+misty server staging check
+misty server staging up
+misty server staging status
+misty server staging logs
+misty server staging down
 
 misty release start 0.2.0
 misty release check

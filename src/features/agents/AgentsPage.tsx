@@ -47,7 +47,6 @@ export default function NativeAgentsPage() {
     activeConversationId,
     workspaceRef,
     identityRef,
-    recipientInputRef,
   } = state;
   const { change, setEditorStatus } = guard;
   const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
@@ -125,8 +124,7 @@ export default function NativeAgentsPage() {
         onCancel={guard.cancel}
         onDiscard={guard.discard}
         restoreFocus={() => {
-          if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
-          else if (workspacePage !== "task")
+          if (workspacePage !== "task")
             workspaceRef.current
               ?.querySelector<HTMLButtonElement>('.agent-studio-sidebar [aria-current="page"]')
               ?.focus();

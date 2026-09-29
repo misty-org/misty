@@ -11,13 +11,11 @@ export function createAgentsPageActions(state: AgentsPageState) {
     setChatRevision,
     setSelected,
     setVoiceState,
-    setNewChat,
     setWorkspacePage,
     setDraftSeed,
     setSettingsModalOpen,
     setSettingsModalMode,
     setSettingsModalTab,
-    setRecipientSearch,
     settingsModalMode,
     load,
     guard,
@@ -34,7 +32,6 @@ export function createAgentsPageActions(state: AgentsPageState) {
       setChatRevision((n) => n + 1);
       setSelected(id);
       setVoiceState({ recording: false, busy: false });
-      setNewChat(false);
       setWorkspacePage("task");
       setDraftSeed({ agentId: id, text: prompt });
       setSettingsModalOpen(false);
@@ -56,16 +53,9 @@ export function createAgentsPageActions(state: AgentsPageState) {
     });
   const create = () =>
     change(() => {
-      setNewChat(false);
       setSettingsModalMode("create");
       setSettingsModalTab("settings");
       setSettingsModalOpen(true);
-    });
-  const beginNewChat = () =>
-    change(() => {
-      setNewChat(true);
-      setRecipientSearch("");
-      setSettingsModalOpen(false);
     });
   const closeSettings = () => change(() => setSettingsModalOpen(false), false);
   const saveProfile = async (id: string, companion = false) => {
@@ -97,13 +87,12 @@ export function createAgentsPageActions(state: AgentsPageState) {
     }, false);
   const openTemplates = () =>
     change(() => {
-      setWorkspacePage("templates");
+      setWorkspacePage("workflows");
     }, false);
   return {
     openSettingsModal,
     select,
     create,
-    beginNewChat,
     closeSettings,
     saveProfile,
     removeProfile,
@@ -125,12 +114,11 @@ export function deriveAgentsPageView(state: AgentsPageState, actions: AgentsPage
     workingAgentId,
     conversation,
     guard,
-    newChat,
     settingsModalOpen,
     identityRef,
   } = state;
   const disabled = working || guard.busy;
-  const showWorkspace = !newChat && Boolean(profile);
+  const showWorkspace = Boolean(profile);
   const switcher = {
     agents,
     conversations,
@@ -141,7 +129,10 @@ export function deriveAgentsPageView(state: AgentsPageState, actions: AgentsPage
     triggerRef: identityRef,
     onSelect: actions.select,
     onCreate: actions.create,
-    onSettings: () => actions.openSettingsModal("settings"),
+    onSettings: (agentId: string) => {
+      if (agentId !== profile?.id) actions.select(agentId);
+      actions.openSettingsModal("settings");
+    },
   };
   const taskWorking = Boolean(
     profile && working && (workingAgentId === profile.id || Boolean(conversation)),

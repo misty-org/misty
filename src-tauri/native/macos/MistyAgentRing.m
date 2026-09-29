@@ -14,6 +14,7 @@
 @property(nonatomic, strong) NSNumber *radius;
 - (void)build;
 - (void)fit;
+- (void)breathe;
 @end
 
 static NSHashTable<MistyAgentMistView *> *mists;
@@ -59,11 +60,26 @@ static void breathe(CALayer *layer, NSString *key, id from, id to, CFTimeInterva
   if (!mists) mists = [NSHashTable weakObjectsHashTable];
   [mists addObject:self];
   self.alphaValue = mistWaiting ? mistWaitingAlpha : mistActingAlpha;
-  // Breathes and drifts while an agent acts; still under Reduce motion.
-  if (NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion) return;
+  [self breathe];
+}
+// Breathes and drifts while an agent acts; still under Reduce motion.
+- (void)breathe {
+  if (!self.near) return;
+  if (NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion) {
+    [self.near removeAllAnimations];
+    [self.wide removeAllAnimations];
+    return;
+  }
   breathe(self.near, @"shadowOpacity", @0.45, @0.65, 3.5);
   breathe(self.near, @"shadowRadius", @16, @22, 3.5);
   breathe(self.wide, @"shadowOffset", [NSValue valueWithSize:NSMakeSize(5, -3)], [NSValue valueWithSize:NSMakeSize(-5, 3)], 14);
+}
+// Core Animation drops a layer's animations when its view leaves a window, and a docked
+// window's mist is detached and attached again as the window opens and docks. Starting
+// over each time it joins a window keeps it from freezing at one glow.
+- (void)viewDidMoveToWindow {
+  [super viewDidMoveToWindow];
+  if (self.window) [self breathe];
 }
 - (void)fit {
   if (!self.near) return;

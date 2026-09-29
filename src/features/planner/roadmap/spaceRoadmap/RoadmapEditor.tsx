@@ -31,6 +31,7 @@ import { RoadmapInspector } from "./RoadmapInspector";
 import type { RoadmapPaletteItem } from "./roadmapNodeCatalog";
 import { RoadmapNodeDrawer } from "./RoadmapNodeDrawer";
 import { RoadmapOutline } from "./RoadmapOutline";
+import { RoadmapRefreshCover, useRoadmapRefresh } from "./RoadmapRefreshCover";
 import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./RoadmapRuntime";
 import { roadmapEndpoint } from "./RoadmapWorkspaceHelpers";
 export type RoadmapMutation = <T>(
@@ -105,6 +106,7 @@ export function RoadmapEditor(props: {
     setNodeDrawerOpen,
     setPlacementRequest,
   } = props;
+  const [refreshing, refresh] = useRoadmapRefresh(load);
   const [inspectorAnchor, setInspectorAnchor] = useState<{
     x: number;
     y: number;
@@ -225,7 +227,7 @@ export function RoadmapEditor(props: {
                 : "Refresh roadmap"
             }
             onClick={() =>
-              void (saveState === "unsaved" || saveState === "conflict" ? retrySave() : load())
+              void (saveState === "unsaved" || saveState === "conflict" ? retrySave() : refresh())
             }
           >
             <RefreshCcw className={`size-4 ${saveState === "saving" ? "animate-spin" : ""}`} />
@@ -236,154 +238,151 @@ export function RoadmapEditor(props: {
         <ErrorBanner message={error} onRetry={() => void retrySave()} retryLabel="Retry saving" />
       ) : null}
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        {
-          <RoadmapNodeDrawer
-            open={nodeDrawerOpen}
+        <RoadmapRefreshCover refreshing={refreshing} />
+        <RoadmapNodeDrawer
+          open={nodeDrawerOpen}
+          canManage={canManage}
+          definitions={snapshot.node_definitions}
+          onClose={() => setNodeDrawerOpen(false)}
+          onAdd={(item) =>
+            setPlacementRequest({
+              paletteId: item.id,
+              token: crypto.randomUUID(),
+            })
+          }
+          onCreateDefinition={async (definition) => {
+            await spacesApi.createRoadmapNodeDefinition(spaceId, definition);
+            await load();
+          }}
+          onUpdateDefinition={async (definition) => {
+            await spacesApi.updateRoadmapNodeDefinition(spaceId, definition);
+            await load();
+          }}
+          onArchiveDefinition={async (definition) => {
+            await spacesApi.archiveRoadmapNodeDefinition(spaceId, definition);
+            await load();
+          }}
+        />
+        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
+          <RoadmapCanvas
+            snapshot={snapshot}
+            selectedId={selectedId}
             canManage={canManage}
-            definitions={snapshot.node_definitions}
-            onClose={() => setNodeDrawerOpen(false)}
-            onAdd={(item) =>
-              setPlacementRequest({
-                paletteId: item.id,
-                token: crypto.randomUUID(),
-              })
+            expandedGoalIds={expandedGoalIds}
+            focusRequest={focusRequest}
+            placementRequest={placementRequest}
+            onPlacementHandled={() => setPlacementRequest(undefined)}
+            onToggleGoal={toggleGoal}
+            onOpenTask={(taskId) =>
+              navigate(
+                `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
+              )
             }
-            onCreateDefinition={async (definition) => {
-              await spacesApi.createRoadmapNodeDefinition(spaceId, definition);
-              await load();
+            onSelect={selectForEditing}
+            onLayout={saveLayout}
+            onAddAt={(paletteId, position) => {
+              const item = palette.find((candidate) => candidate.id === paletteId);
+              if (item) addPaletteItem(item, position);
             }}
-            onUpdateDefinition={async (definition) => {
-              await spacesApi.updateRoadmapNodeDefinition(spaceId, definition);
-              await load();
+            onConnect={(connection, edgeType) => {
+              const source = roadmapEndpoint(snapshot, connection.source);
+              const target = roadmapEndpoint(snapshot, connection.target);
+              if (source && target)
+                void mutate(
+                  (version) =>
+                    spacesApi.saveRoadmapEdge(
+                      spaceId,
+                      snapshot.roadmap.id,
+                      {
+                        source,
+                        target,
+                        edge_type: edgeType,
+                        label: "",
+                      },
+                      version,
+                    ),
+                  (current, result) => ({
+                    ...current,
+                    roadmap: {
+                      ...current.roadmap,
+                      graph_version: result.graph_version,
+                    },
+                    edges: [...current.edges, result.edge],
+                  }),
+                );
             }}
-            onArchiveDefinition={async (definition) => {
-              await spacesApi.archiveRoadmapNodeDefinition(spaceId, definition);
-              await load();
+            onDuplicate={(id) => {
+              const goal = snapshot.goals.find((item) => item.id === id);
+              const milestone = snapshot.milestones.find((item) => item.id === id);
+              const supportNode = snapshot.nodes.find((item) => item.id === id);
+              if (goal)
+                void mutate((version) =>
+                  spacesApi.createRoadmapGoal(
+                    spaceId,
+                    snapshot.roadmap.id,
+                    {
+                      milestone_id: goal.milestone_id,
+                      title: `${goal.title} copy`,
+                      description: goal.description,
+                      target_date: goal.target_date,
+                      position_x: goal.position_x + 32,
+                      position_y: goal.position_y + 32,
+                    },
+                    version,
+                  ),
+                );
+              else if (milestone)
+                void mutate((version) =>
+                  spacesApi.createRoadmapMilestone(
+                    spaceId,
+                    snapshot.roadmap.id,
+                    {
+                      title: `${milestone.title} copy`,
+                      description: milestone.description,
+                      target_date: milestone.target_date,
+                      position_x: milestone.position_x + 48,
+                      position_y: milestone.position_y + 48,
+                      width: milestone.width,
+                      height: milestone.height,
+                    },
+                    version,
+                  ),
+                );
+              else if (supportNode)
+                void mutate((version) =>
+                  spacesApi.createRoadmapNode(
+                    spaceId,
+                    snapshot.roadmap.id,
+                    {
+                      ...supportNode,
+                      id: undefined,
+                      title: `${supportNode.title} copy`,
+                      position_x: supportNode.position_x + 32,
+                      position_y: supportNode.position_y + 32,
+                    },
+                    version,
+                  ),
+                );
+            }}
+            onDelete={(id) => {
+              const goal = snapshot.goals.find((item) => item.id === id);
+              const milestone = snapshot.milestones.find((item) => item.id === id);
+              const supportNode = snapshot.nodes.find((item) => item.id === id);
+              const edge = snapshot.edges.find((item) => item.id === id);
+              if (goal)
+                void mutate((version) => spacesApi.archiveRoadmapGoal(spaceId, goal, version));
+              else if (milestone)
+                void mutate((version) =>
+                  spacesApi.archiveRoadmapMilestone(spaceId, milestone, version),
+                );
+              else if (supportNode)
+                void mutate((version) =>
+                  spacesApi.archiveRoadmapNode(spaceId, supportNode, version),
+                );
+              else if (edge)
+                void mutate((version) => spacesApi.deleteRoadmapEdge(spaceId, edge, version));
             }}
           />
-        }
-        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
-          {
-            <RoadmapCanvas
-              snapshot={snapshot}
-              selectedId={selectedId}
-              canManage={canManage}
-              expandedGoalIds={expandedGoalIds}
-              focusRequest={focusRequest}
-              placementRequest={placementRequest}
-              onPlacementHandled={() => setPlacementRequest(undefined)}
-              onToggleGoal={toggleGoal}
-              onOpenTask={(taskId) =>
-                navigate(
-                  `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
-                )
-              }
-              onSelect={selectForEditing}
-              onLayout={saveLayout}
-              onAddAt={(paletteId, position) => {
-                const item = palette.find((candidate) => candidate.id === paletteId);
-                if (item) addPaletteItem(item, position);
-              }}
-              onConnect={(connection, edgeType) => {
-                const source = roadmapEndpoint(snapshot, connection.source);
-                const target = roadmapEndpoint(snapshot, connection.target);
-                if (source && target)
-                  void mutate(
-                    (version) =>
-                      spacesApi.saveRoadmapEdge(
-                        spaceId,
-                        snapshot.roadmap.id,
-                        {
-                          source,
-                          target,
-                          edge_type: edgeType,
-                          label: "",
-                        },
-                        version,
-                      ),
-                    (current, result) => ({
-                      ...current,
-                      roadmap: {
-                        ...current.roadmap,
-                        graph_version: result.graph_version,
-                      },
-                      edges: [...current.edges, result.edge],
-                    }),
-                  );
-              }}
-              onDuplicate={(id) => {
-                const goal = snapshot.goals.find((item) => item.id === id);
-                const milestone = snapshot.milestones.find((item) => item.id === id);
-                const supportNode = snapshot.nodes.find((item) => item.id === id);
-                if (goal)
-                  void mutate((version) =>
-                    spacesApi.createRoadmapGoal(
-                      spaceId,
-                      snapshot.roadmap.id,
-                      {
-                        milestone_id: goal.milestone_id,
-                        title: `${goal.title} copy`,
-                        description: goal.description,
-                        target_date: goal.target_date,
-                        position_x: goal.position_x + 32,
-                        position_y: goal.position_y + 32,
-                      },
-                      version,
-                    ),
-                  );
-                else if (milestone)
-                  void mutate((version) =>
-                    spacesApi.createRoadmapMilestone(
-                      spaceId,
-                      snapshot.roadmap.id,
-                      {
-                        title: `${milestone.title} copy`,
-                        description: milestone.description,
-                        target_date: milestone.target_date,
-                        position_x: milestone.position_x + 48,
-                        position_y: milestone.position_y + 48,
-                        width: milestone.width,
-                        height: milestone.height,
-                      },
-                      version,
-                    ),
-                  );
-                else if (supportNode)
-                  void mutate((version) =>
-                    spacesApi.createRoadmapNode(
-                      spaceId,
-                      snapshot.roadmap.id,
-                      {
-                        ...supportNode,
-                        id: undefined,
-                        title: `${supportNode.title} copy`,
-                        position_x: supportNode.position_x + 32,
-                        position_y: supportNode.position_y + 32,
-                      },
-                      version,
-                    ),
-                  );
-              }}
-              onDelete={(id) => {
-                const goal = snapshot.goals.find((item) => item.id === id);
-                const milestone = snapshot.milestones.find((item) => item.id === id);
-                const supportNode = snapshot.nodes.find((item) => item.id === id);
-                const edge = snapshot.edges.find((item) => item.id === id);
-                if (goal)
-                  void mutate((version) => spacesApi.archiveRoadmapGoal(spaceId, goal, version));
-                else if (milestone)
-                  void mutate((version) =>
-                    spacesApi.archiveRoadmapMilestone(spaceId, milestone, version),
-                  );
-                else if (supportNode)
-                  void mutate((version) =>
-                    spacesApi.archiveRoadmapNode(spaceId, supportNode, version),
-                  );
-                else if (edge)
-                  void mutate((version) => spacesApi.deleteRoadmapEdge(spaceId, edge, version));
-              }}
-            />
-          }
           {
             <RoadmapOutline
               snapshot={snapshot}

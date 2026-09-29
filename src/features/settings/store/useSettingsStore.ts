@@ -174,7 +174,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         set({ error: `Invalid value for ${definition.label}` });
         return;
       }
-      void writeProfilePreference(definition.id, converted).catch((error) =>
+      void writeProfilePreference(definition.id, converted, { stage: true }).catch((error) =>
         set({ error: errorText(error) }),
       );
       return;
@@ -188,7 +188,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     if (entry) entry[request.slot] = request.value;
     else overrides.push({ commandId: request.commandId, [request.slot]: request.value });
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+        stage: true,
+      });
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -204,7 +206,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       else overrides.push({ commandId, [slot]: value });
     }
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+        stage: true,
+      });
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -217,7 +221,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         )
       : [];
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+        stage: true,
+      });
     } catch (error) {
       set({ error: errorText(error) });
     }

@@ -119,10 +119,11 @@
 .agent-method-examples {
   margin-top: 36px;
 }
-.agent-method-examples > h2 {
+.agent-method-examples > :is(h2, h3) {
   font-size: 16px;
   margin-block: 0 16px;
 }
+
 @media (max-width: 850px) {
   .agent-method-row {
     align-items: flex-start;

@@ -18,9 +18,10 @@ describe.each(layouts)("$navigation navigation / $tabs tabs", (layout) => {
     expect(geometry.frame.gridTemplateColumns).toBe(
       `${layout.navigation === "left" ? size : 0}px minmax(0, 1fr) ${layout.navigation === "right" ? size : 0}px`,
     );
-    expect(geometry.frame.gridTemplateRows).toBe(
-      `${layout.navigation === "top" ? size : layout.tabs === "top" ? dockingMetrics.tabStrip : 38}px 0px minmax(0, 1fr) ${layout.navigation === "bottom" ? size : 0}px`,
-    );
+    const top =
+      layout.navigation === "top" ? size : layout.tabs === "top" ? dockingMetrics.tabStrip : 38;
+    const bottom = layout.navigation === "bottom" ? size : 0;
+    expect(geometry.frame.gridTemplateRows).toBe(`${top}px 0px minmax(0, 1fr) ${bottom}px`);
     for (const edge of dockPositions)
       expect(geometry.frame[`--pane-seam-${edge}`]).toBe(
         (layout.tabs === "top" || layout.tabs === "bottom") && edge === layout.tabs

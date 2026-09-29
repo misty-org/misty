@@ -85,8 +85,18 @@ export function BrowserOmniboxView(props: {
       inputRef.current?.setSelectionRange(draft.length, draft.length + completion.length);
   }, [completion, draft]);
 
+  // The page can move on while the field still holds focus (the page is a separate native view,
+  // so clicking a link there never blurs this field). An unedited address follows the page;
+  // only text the person typed is kept.
+  const previousUrl = useRef(props.currentUrl);
   useEffect(() => {
-    if (!focused) setDraft(displayBrowserAddress(props.currentUrl));
+    const previous = previousUrl.current;
+    previousUrl.current = props.currentUrl;
+    setDraft((current) =>
+      !focused || current === displayBrowserAddress(previous)
+        ? displayBrowserAddress(props.currentUrl)
+        : current,
+    );
   }, [focused, props.currentUrl]);
 
   useEffect(() => {
@@ -220,7 +230,7 @@ export function BrowserOmniboxView(props: {
           aria-activedescendant={focused && matches.length ? selected?.id : undefined}
           autoComplete="off"
           spellCheck={false}
-          variant="toolbar"
+          variant="address"
           style={
             props.trailing && !focused && trailingWidth
               ? { paddingRight: trailingWidth + 8 }

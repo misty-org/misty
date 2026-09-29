@@ -1,7 +1,8 @@
-import { ExternalLink, Plug, ShieldQuestion } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Button } from "@/shared/ui";
+import { BrandIcon, brandIconAsset, Button } from "@/shared/ui";
+import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";
 
@@ -88,55 +89,46 @@ export function AppRequestCard({
   const decide = (decision: AppRequestDecision) =>
     act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
-  const Icon = current.kind === "connect" ? Plug : ShieldQuestion;
+  const logo = brandIconAsset(current.subject) ? (
+    <BrandIcon brand={current.subject} size={16} className="mr-1.5 inline-block align-[-3px]" />
+  ) : null;
+  const row: StatusState = pending
+    ? "waiting"
+    : current.state === "connected" || current.state === "approved" || current.state === "used"
+      ? "done"
+      : current.state === "declined"
+        ? "skipped"
+        : "failed";
+  const actions = pending ? (
+    current.kind === "connect" ? (
+      <>
+        <Button size="sm" variant="primary" disabled={busy} onClick={() => void connect()}>
+          <ExternalLink className="size-3.5" /> {opened ? "Open sign-in again" : "Connect"}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void decide("deny")}>
+          Not now
+        </Button>
+      </>
+    ) : (
+      <ApprovalActions request={current} busy={busy} onDecide={(decision) => void decide(decision)} />
+    )
+  ) : undefined;
   return (
-    <section
-      aria-label={current.title}
-      className="mt-3 rounded-lg border border-charcoal-border bg-charcoal-card p-3"
-    >
-      <div className="flex items-center gap-2">
-        <Icon className="size-3.5 shrink-0 text-cream-muted" aria-hidden="true" />
-        <strong className="text-xs text-cream-bright">{current.title}</strong>
-      </div>
-      {current.summary ? (
-        <p className="mt-1.5 whitespace-pre-wrap break-words text-[11px] leading-4 text-cream-muted">
-          {current.summary}
-        </p>
-      ) : null}
-      {pending && current.kind === "connect" ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" className="h-7" disabled={busy} onClick={() => void connect()}>
-            <ExternalLink className="size-3.5" /> {opened ? "Open sign-in again" : "Connect"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7"
-            disabled={busy}
-            onClick={() => void decide("deny")}
-          >
-            Not now
-          </Button>
-          {opened ? (
-            <p className="text-[11px] text-cream-muted">
-              Finish signing in in your browser. Misty continues when you’re done.
-            </p>
-          ) : null}
-        </div>
-      ) : pending ? (
-        <ApprovalActions
-          request={current}
-          busy={busy}
-          onDecide={(decision) => void decide(decision)}
-        />
-      ) : (
-        <p className="mt-2 text-[11px] text-cream-muted">{stateLabel(current, expired)}</p>
-      )}
-      {error ? (
-        <p role="alert" className="mt-2 text-[11px] text-cream-muted">
-          {error}
-        </p>
-      ) : null}
-    </section>
+    <StatusTable label={current.title} actions={actions}>
+      <StatusRow
+        state={row}
+        verb={pending ? "Waiting for you" : stateLabel(current, expired)}
+        sub={
+          error ||
+          (pending && current.kind === "connect" && opened
+            ? "Finish signing in in your browser. Misty continues when you’re done."
+            : current.summary) ||
+          undefined
+        }
+      >
+        {logo}
+        {current.title}
+      </StatusRow>
+    </StatusTable>
   );
 }

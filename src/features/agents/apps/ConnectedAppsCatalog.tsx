@@ -2,9 +2,17 @@ import { Check, Plus, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { IconButton, Input, SkeletonList } from "@/shared/ui";
+import {
+  Button,
+  IconButton,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Skeleton,
+} from "@/shared/ui";
 import { appsApi, type CatalogApp, type ConnectedApp } from "./api";
-import { AppLogo, ConnectedAppGroup, groupApps } from "./ConnectedAppRows";
+import { AppAccountsCard, AppLogo, accountSummary, groupApps } from "./ConnectedAppRows";
 
 /** A sign-in open in the browser, and the accounts that app already had when it began. */
 interface SignIn {
@@ -22,8 +30,22 @@ export function ConnectedAppsCatalog() {
   const [signingIn, setSigningIn] = useState<SignIn | null>(null);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [busy, setBusy] = useState(false);
+  /** The Refresh button was pressed: the grid shows skeletons until the apps are back. */
+  const [refreshing, setRefreshing] = useState(false);
+  const [openApp, setOpenApp] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  const reload = async () => {
+    setRefreshing(true);
+    try {
+      const [list, catalog] = await Promise.all([appsApi.list(), appsApi.catalog(query.trim())]);
+      setAvailable(list.available);
+      setApps(list.apps);
+      setResults(catalog.apps);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const refresh = useCallback(async () => {
     const result = await appsApi.list();
     setAvailable(result.available);
@@ -31,13 +53,15 @@ export function ConnectedAppsCatalog() {
   }, []);
   useEffect(() => {
     let live = true;
+    const show = (result: { available: boolean; apps: ConnectedApp[] }) => {
+      if (!live) return;
+      setAvailable(result.available);
+      setApps(result.apps);
+    };
+    // The saved list paints at once; the fresh one follows.
     appsApi
-      .list()
-      .then((result) => {
-        if (!live) return;
-        setAvailable(result.available);
-        setApps(result.apps);
-      })
+      .list(show)
+      .then(show)
       .catch((reason: unknown) => live && setError(message(reason, "Apps could not be loaded.")));
     return () => {
       live = false;
@@ -48,7 +72,7 @@ export function ConnectedAppsCatalog() {
     let live = true;
     const timer = window.setTimeout(() => {
       appsApi
-        .catalog(query.trim())
+        .catalog(query.trim(), "", (saved) => live && setResults(saved.apps))
         .then((result) => live && setResults(result.apps))
         .catch(
           (reason: unknown) =>
@@ -125,81 +149,116 @@ export function ConnectedAppsCatalog() {
       setCatalogVersion((version) => version + 1);
     });
 
+  const groups = groupApps(apps ?? []);
+  const needle = query.trim().toLowerCase();
+  // Connected apps lead the grid, found even when the catalog page doesn't list them.
+  const connected = groups.filter(
+    (group) =>
+      !needle ||
+      group.name.toLowerCase().includes(needle) ||
+      group.app.toLowerCase().includes(needle),
+  );
+  const rest = results.filter((app) => !groups.some((group) => group.app === app.app));
+  const accountActions = {
+    busy,
+    onAdd: (next: { app: string; name: string }) => void connect(next),
+    onReconnect: (item: ConnectedApp) => void connect(item),
+    onDisconnect: (item: ConnectedApp, label: string) => void disconnect(item, label),
+  };
   return (
     <>
-      <section aria-labelledby="connected-apps-heading" className="agent-integrations-section">
-        <header>
-          <h2 id="connected-apps-heading">Connected apps</h2>
-          <IconButton label="Refresh apps" disabled={busy} onClick={() => void act(refresh)}>
-            <RefreshCw size={14} />
-          </IconButton>
-        </header>
-        {error ? (
-          <p role="alert" className="agent-integrations-description">
-            {error}
-          </p>
-        ) : null}
-        {!available ? (
-          <p className="agent-integrations-description">
-            Connected apps are not set up on this Misty server.
-          </p>
-        ) : null}
-        {signingIn ? (
-          <p role="status" className="agent-integrations-description">
-            Finish signing in to {signingIn.name} in your browser, then come back to Misty.
-          </p>
-        ) : null}
-        {apps === null && !error ? (
-          <SkeletonList
-            label="Connected apps"
-            rows={3}
-            leading="tile"
-            className="agent-integrations-list"
-          />
-        ) : apps?.length ? (
-          <div className="agent-integrations-list">
-            {groupApps(apps).map((group) => (
-              <ConnectedAppGroup
-                key={group.app}
-                group={group}
-                busy={busy}
-                onAdd={(next) => void connect(next)}
-                onReconnect={(item) => void connect(item)}
-                onDisconnect={(item, label) => void disconnect(item, label)}
-              />
-            ))}
-          </div>
-        ) : apps ? (
-          <p className="agent-integrations-description">No apps connected yet.</p>
-        ) : null}
-      </section>
+      {error ? (
+        <p role="alert" className="agent-integrations-description">
+          {error}
+        </p>
+      ) : null}
+      {!available ? (
+        <p className="agent-integrations-description">
+          Connected apps are not set up on this Misty server.
+        </p>
+      ) : null}
+      {signingIn ? (
+        <p role="status" className="agent-integrations-description">
+          Finish signing in to {signingIn.name} in your browser, then come back to Misty.
+        </p>
+      ) : null}
       {available ? (
         <section aria-labelledby="add-app-heading" className="agent-integrations-section">
           <header>
-            <h2 id="add-app-heading">Add an app</h2>
-            <label className="agent-integrations-search">
-              <Search size={14} aria-hidden="true" />
-              <Input
-                variant="bare"
-                value={query}
-                maxLength={100}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Find an app"
-                aria-label="Find an app"
-              />
-            </label>
+            <h2 id="add-app-heading">Apps</h2>
+            <div className="flex items-center gap-2">
+              <label className="agent-integrations-search">
+                <Search size={14} aria-hidden="true" />
+                <Input
+                  variant="bare"
+                  value={query}
+                  maxLength={100}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Find an app"
+                  aria-label="Find an app"
+                />
+              </label>
+              <IconButton label="Refresh apps" disabled={busy} onClick={() => void act(reload)}>
+                <RefreshCw size={14} />
+              </IconButton>
+            </div>
           </header>
-          <div className="agent-integrations-grid">
-            {results.map((app) => (
-              <div key={app.app} className="agent-integrations-tile" title={app.description}>
-                <AppLogo app={app.app} />
-                <div className="agent-integrations-row-text">
-                  <strong>{app.name}</strong>
-                  <span>{app.description}</span>
+          {(apps === null && !error) || refreshing ? (
+            <div
+              role="status"
+              aria-label="Apps"
+              aria-busy="true"
+              className="agent-integrations-grid"
+            >
+              <span className="sr-only">Apps</span>
+              {Array.from({ length: 12 }, (_, index) => (
+                <div key={index} className="agent-integrations-tile">
+                  <Skeleton className="size-6 shrink-0 rounded-md" />
+                  <div className="grid min-w-0 flex-1 gap-1.5">
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-2.5 w-4/5" />
+                  </div>
                 </div>
-                {app.connected ? (
-                  <Check size={14} aria-label="Connected" className="text-cream-muted" />
-                ) : (
+              ))}
+            </div>
+          ) : (
+            <div className="agent-integrations-grid">
+              {connected.map((group) => (
+                <Popover
+                  key={group.app}
+                  open={openApp === group.app}
+                  onOpenChange={(next) => setOpenApp(next ? group.app : null)}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="agent-integrations-tile agent-integrations-tile-button"
+                      aria-label={`${group.name}, ${accountSummary(group)}. Show accounts`}
+                    >
+                      <AppLogo app={group.app} />
+                      <div className="agent-integrations-row-text">
+                        <strong>{group.name}</strong>
+                        <span>{accountSummary(group)}</span>
+                      </div>
+                      <Check size={14} aria-hidden="true" className="text-cream-muted" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-80 p-2">
+                    <AppAccountsCard
+                      group={group}
+                      onDone={() => setOpenApp(null)}
+                      {...accountActions}
+                    />
+                  </PopoverContent>
+                </Popover>
+              ))}
+              {rest.map((app) => (
+                <div key={app.app} className="agent-integrations-tile" title={app.description}>
+                  <AppLogo app={app.app} />
+                  <div className="agent-integrations-row-text">
+                    <strong>{app.name}</strong>
+                    <span>{app.description}</span>
+                  </div>
                   <IconButton
                     label={`Connect ${app.name}`}
                     disabled={busy}
@@ -207,10 +266,10 @@ export function ConnectedAppsCatalog() {
                   >
                     <Plus size={16} />
                   </IconButton>
-                )}
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
     </>

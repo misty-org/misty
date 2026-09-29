@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { DictationController as Controller } from "./dictationController";
+import { DictationController as Controller } from "./dictationEngine";
 import { voiceSettings } from "./voiceSettings";
 
 /**

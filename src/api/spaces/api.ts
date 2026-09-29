@@ -5,6 +5,7 @@ import {
   assertStableApiSession,
   resolveRequiredApiBase,
 } from "@/api/client";
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import {
   isSpaceReferenceOnly,
   isSpaceWriteRequest,
@@ -56,9 +57,15 @@ export async function spaceRequest<T = void>(path: string, init?: SpaceRequestIn
       "offline_reference_only",
     );
   }
-  const { allowWhileReferenceOnly: _allowWhileReferenceOnly, ...requestInit } = init ?? {};
+  const {
+    allowWhileReferenceOnly: _allowWhileReferenceOnly,
+    onCached,
+    ...requestInit
+  } = init ?? {};
   try {
-    return await apiRequest<T>(path, requestInit);
+    return await (onCached
+      ? cachedRequest<T>(path, { onCached: onCached as (value: T) => void, init: requestInit })
+      : apiRequest<T>(path, requestInit));
   } catch (error) {
     if (error instanceof ApiRequestError) {
       throw new SpaceRequestError(
@@ -161,7 +168,8 @@ function quotaReason(responseText: string): string | undefined {
 }
 
 export const spacesApi = {
-  snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
+  snapshot: (onCached?: (value: SpacesSnapshot) => void) =>
+    spaceRequest<SpacesSnapshot>("/spaces", { onCached }),
   ...createSpacePlannerExpansionApi(spaceRequest),
   templates: () =>
     spaceRequest<{
@@ -210,8 +218,10 @@ export const spacesApi = {
         body: JSON.stringify({ connection_id: connectionId, capability }),
       },
     ),
-  nodes: (spaceId: string) =>
-    spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
+  nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>
+    spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {
+      onCached,
+    }),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
     spaceRequest<{ ticket: string; url: string; expires_in: number }>(
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,

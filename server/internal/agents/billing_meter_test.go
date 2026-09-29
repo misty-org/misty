@@ -169,3 +169,17 @@ func TestRuntimeAggregateOmittedDetailsDoNotContradictMeasuredTurns(t *testing.T
 		t.Fatal("explicit zero detail mismatch accepted", err)
 	}
 }
+
+// A run that ends without reporting its usage (canceled mid-turn, or a crashed runtime) has
+// nothing to charge; its hold is released so it stops counting against the person's window.
+func TestRuntimeEndedWithoutUsageReleasesItsHolds(t *testing.T) {
+	request := billingadapter.Request{Version: 1, AccountID: "account", Operation: "agent.model", OperationID: "agent-runtime:run", Key: "agent-runtime:run:model:model:1", Usage: billingadapter.Usage{Provider: "provider", Model: "model"}}
+	store := &completionStore{reservations: []billingadapter.Reservation{{ID: "one", Admission: request}}}
+	meter := BillingMeter{Service: &billingadapter.Service{Adapter: &offlineCompletionAdapter{}, Store: store}}
+	if err := meter.CompleteRuntime(t.Context(), "account", "run", ModelUsage{Estimated: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.entries) != 1 || store.entries[0].Action != "release_group" || len(store.entries[0].Request.ReservationIDs) != 1 {
+		t.Fatalf("the unsettled hold was not released: %+v", store.entries)
+	}
+}

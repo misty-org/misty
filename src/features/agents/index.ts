@@ -33,6 +33,8 @@ export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversat
 
 export type { AppRequest } from "./apps/api";
 export { AppRequestCard } from "./apps/AppRequestCard";
+export { StatusRow, StatusTable, type StatusState } from "./progress/StatusTable";
+export { codingToolForTurn, useConversationCodingTool } from "./store/useConversationCodingTool";
 
 export { ModelPicker } from "./models/ModelPicker";
 export { ReasoningPicker } from "./models/ReasoningPicker";

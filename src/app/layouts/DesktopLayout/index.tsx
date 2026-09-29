@@ -8,7 +8,7 @@ import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermi
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
 import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
-import { useSettingsStore } from "@/features/settings";
+import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { useWindowDockingLayout } from "@/features/workspace";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
@@ -25,7 +25,6 @@ import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
 import {
-  BrowserMenuAccountItems,
   AgentsMenuButton,
   BrowserProfileButton,
   StripDownloads,
@@ -165,7 +164,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       <AccountIsland
         open={profileOpen}
         onOpenChange={(open) => {
-          if (open) setSettingsOpen(false);
+          if (open) {
+            if (blockIfUnsaved()) return;
+            setSettingsOpen(false);
+          }
           setProfileOpen(open);
         }}
         onOpenAccountSettings={openAccountSettings}
@@ -201,7 +203,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       />
     ),
     profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
-    accountItems: <BrowserMenuAccountItems onSyncClick={openSyncSettings} />,
+    accountItems: null,
   };
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>

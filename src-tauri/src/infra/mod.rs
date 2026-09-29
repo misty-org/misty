@@ -40,6 +40,7 @@ pub mod clipboard_bridge;
 pub mod cloud_clipboard;
 pub mod command_defaults;
 pub mod commands;
+pub mod api_cache;
 pub mod credential_store;
 pub mod credentials;
 #[cfg(desktop)]

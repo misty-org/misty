@@ -1,8 +1,8 @@
-import type { ComponentProps, ReactNode, Ref } from "react";
-import { Plus, X } from "lucide-react";
-import { IconButton, Input, Skeleton, Spinner } from "@/shared/ui";
+import type { ComponentProps, ReactNode } from "react";
+import { Skeleton, Spinner } from "@/shared/ui";
 import { useTitlePending } from "@/features/misty/conversationTitles";
 import { AgentConversationActions } from "../components/AgentConversationActions";
+import { AgentAvatar } from "../components/AgentAvatar";
 import { AgentSwitcher } from "../components/AgentSwitcher";
 
 type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
@@ -10,39 +10,29 @@ type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
 /**
  * The conversation title bar. Inside the agent workspace the sidebar owns identity and
  * New task, so the bar carries the conversation's title and a quiet Working status while
- * a task runs; rename and delete live on its Recents row. Outside it (loading, or picking
- * a recipient) the bar keeps the switcher and the conversation's actions.
+ * a task runs; rename and delete live on its Recents row. Outside it (loading) the bar keeps the switcher and the conversation's actions.
  */
 export function AgentConversationHeading({
   workspace = false,
-  newChat,
   conversation,
-  recipientSearch,
-  recipientInputRef,
   switcher,
   disabled,
-  onRecipientSearch,
-  onCloseNewChat,
-  onNewChat,
   working = false,
   actions,
+  panelPicker,
 }: {
   workspace?: boolean;
-  newChat: boolean;
   conversation?: { id: string; title?: string };
-  recipientSearch: string;
-  recipientInputRef: Ref<HTMLInputElement>;
   switcher: SwitcherProps;
   disabled: boolean;
-  onRecipientSearch(value: string): void;
-  onCloseNewChat(): void;
-  onNewChat(): void;
   working?: boolean;
   /** Extra controls after New chat, for a host that is not the Agents page. */
   actions?: ReactNode;
+  /** The Misty panel's conversation picker. Given, the switcher shows only the agent's avatar. */
+  panelPicker?: ReactNode;
 }) {
   const titlePending = useTitlePending(conversation);
-  if (workspace && !newChat)
+  if (workspace)
     return (
       <header
         className="agent-conversation-heading"
@@ -70,7 +60,7 @@ export function AgentConversationHeading({
         {working && (
           <span className="agent-heading-details" role="status">
             <Spinner size="sm" label={false} />
-            Working
+            <span className="misty-shimmer">Working</span>
           </span>
         )}
       </header>
@@ -82,43 +72,21 @@ export function AgentConversationHeading({
       data-tauri-drag-region
       data-misty-window-titlebar-region="true"
     >
-      {newChat ? (
-        <>
-          <label className="agent-recipient-input">
-            <span>To:</span>
-            <Input
-              ref={recipientInputRef}
-              variant="bare"
-              autoFocus
-              aria-label="Search or create agents"
-              placeholder="Search or create agents"
-              value={recipientSearch}
-              onChange={(e) => onRecipientSearch(e.target.value)}
-            />
-          </label>
-          <IconButton label="Close new chat" onClick={onCloseNewChat}>
-            <X size={16} />
-          </IconButton>
-        </>
+      {panelPicker ? (
+        // The panel follows the agent chosen in the navbar pill, so its avatar is not a switch.
+        <span className="agent-heading-avatar">
+          <AgentAvatar agent={switcher.selectedAgent} />
+        </span>
       ) : (
-        <>
-          <AgentSwitcher {...switcher} />
-          <div className="agent-heading-end">
-            {conversation && (
-              <AgentConversationActions conversation={conversation} disabled={disabled} />
-            )}
-            <IconButton
-              label="New chat"
-              data-agent-navigation-control
-              disabled={disabled}
-              onClick={onNewChat}
-            >
-              <Plus />
-            </IconButton>
-            {actions}
-          </div>
-        </>
+        <AgentSwitcher {...switcher} />
       )}
+      {panelPicker}
+      <div className="agent-heading-end">
+        {conversation && (
+          <AgentConversationActions conversation={conversation} disabled={disabled} />
+        )}
+        {actions}
+      </div>
     </header>
   );
 }

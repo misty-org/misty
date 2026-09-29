@@ -11,6 +11,8 @@ vi.mock("./browserRuntime", () => ({
   syncBrowserWebview: runtime.sync,
   requestBrowserWebviewLayout: runtime.layout,
   hideBrowserWebview: runtime.hide,
+  isBrowserRuntimeCreated: () => false,
+  isBrowserLayoutMoving: () => false,
   useBrowserRuntimeStore: { getState: () => ({ errors: {}, setError: vi.fn() }) },
 }));
 vi.mock("@/shared/hooks/useAppZoom", () => ({

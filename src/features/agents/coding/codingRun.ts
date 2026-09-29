@@ -127,6 +127,8 @@ async function runTurns(job: CodingJob, deviceId: string) {
     task?: string;
     mode?: string;
     permissionMode?: string;
+    /** The tool the person picked for this chat; empty uses the Settings default. */
+    tool?: string;
     agentId?: string;
     conversationId?: string;
   };
@@ -150,8 +152,10 @@ async function runTurns(job: CodingJob, deviceId: string) {
       const cap = setting("agents.coding_usage_cap");
       engine = await invoke<string>("coding_route", {
         request: {
-          default: setting("agents.coding_default_tool"),
-          fallback: setting("agents.coding_fallback_tool"),
+          // A tool picked for this chat runs alone: if it can't run, the run stops
+          // rather than quietly switching to another tool.
+          default: input.tool || setting("agents.coding_default_tool"),
+          fallback: input.tool ? "none" : setting("agents.coding_fallback_tool"),
           capPercent: cap ? Number(cap) : undefined,
           mode: input.mode === "plan" ? "plan" : "edit",
           permission,

@@ -1,13 +1,15 @@
 import { useState, type Ref } from "react";
-import { Check, Plus, SlidersHorizontal } from "lucide-react";
+import { Check, Plus, Settings } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
+  cn,
   Command,
   CommandGroup,
   CommandItem,
   CommandList,
   CommandSeparator,
+  IconButton,
   MenuTrigger,
   Popover,
   PopoverContent,
@@ -21,6 +23,7 @@ export function AgentSwitcher({
   restoreTriggerFocus,
   triggerRef,
   className = "agent-heading-identity",
+  iconOnly = false,
   onSelect,
   onCreate,
   onSettings,
@@ -33,10 +36,12 @@ export function AgentSwitcher({
   restoreTriggerFocus: boolean;
   triggerRef?: Ref<HTMLButtonElement>;
   className?: string;
+  /** Only the agent's avatar on the trigger, as in the Misty panel's header. */
+  iconOnly?: boolean;
   onSelect(agentId: string, startNew?: boolean, conversationId?: string): void;
   onCreate(): void;
-  /** Opens the selected agent's settings. */
-  onSettings(): void;
+  /** Opens the given agent's settings. */
+  onSettings(agentId: string): void;
 }) {
   const [open, setOpen] = useState(false);
   const choose = (action: () => void) => {
@@ -51,10 +56,12 @@ export function AgentSwitcher({
       <MenuTrigger
         ref={triggerRef}
         kind="popover"
-        className={className}
+        className={cn(className, iconOnly && "[&_span.truncate]:sr-only")}
         label={`Switch agent: ${selectedAgent?.name || "Agents"}`}
         value={selectedAgent?.name || "Agents"}
         icon={<AgentAvatar agent={selectedAgent} />}
+        chevron={!iconOnly}
+        title={iconOnly ? selectedAgent?.name || "Agents" : undefined}
         data-agent-navigation-control
       />
       <PopoverContent
@@ -74,6 +81,7 @@ export function AgentSwitcher({
                   key={agent.id}
                   value={`agent:${agent.id}`}
                   disabled={disabled}
+                  className="group"
                   onSelect={() =>
                     choose(() => {
                       if (agent.id !== selectedAgent?.id) onSelect(agent.id);
@@ -85,7 +93,28 @@ export function AgentSwitcher({
                   </span>
                   <span className="min-w-0 flex-1 truncate">{agent.name}</span>
                   {!agent.enabled && <span className="text-xs text-cream-muted">Disabled</span>}
-                  {agent.id === selectedAgent?.id && <Check aria-label="Current agent" />}
+                  <span className="relative flex size-6 shrink-0 items-center justify-center">
+                    {agent.id === selectedAgent?.id && (
+                      <Check
+                        aria-label="Current agent"
+                        className="group-hover:invisible group-data-[selected=true]:invisible"
+                      />
+                    )}
+                    <IconButton
+                      label={`${agent.name} settings`}
+                      disabled={disabled}
+                      className={cn(
+                        "absolute inset-0 !h-auto !w-auto opacity-0 focus-visible:opacity-100",
+                        "group-hover:opacity-100 group-data-[selected=true]:opacity-100",
+                      )}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        choose(() => onSettings(agent.id));
+                      }}
+                    >
+                      <Settings className="size-4" />
+                    </IconButton>
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -95,12 +124,6 @@ export function AgentSwitcher({
                 <Plus />
                 New agent
               </CommandItem>
-              {selectedAgent && (
-                <CommandItem disabled={disabled} onSelect={() => choose(onSettings)}>
-                  <SlidersHorizontal />
-                  {selectedAgent.name} settings
-                </CommandItem>
-              )}
             </CommandGroup>
           </CommandList>
         </Command>

@@ -1,5 +1,5 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { invoke } from "@tauri-apps/api/core";
-import { apiRequest } from "@/api/client";
 import { subscribeAccountEvents } from "@/api/accountEvents";
 import { resolveApiBase } from "@/api/deployment/api";
 import { useUserStore } from "@/features/auth/core";
@@ -69,9 +69,8 @@ function watchRequests(accountId: string) {
     if (event.topic !== "invocations" && event.topic !== "reset") return;
     for (const session of sessions()) {
       if (event.topic === "invocations" && event.id && event.id !== session.runId) continue;
-      void apiRequest<{ state: string }>(
+      void cachedRequest<{ state: string }>(
         `/ai/invocations/${encodeURIComponent(session.runId)}/state`,
-        { cache: "no-store" },
       )
         .then(({ state }) => {
           if (state === "canceled") void endHostedSession(session.taskId);

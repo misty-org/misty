@@ -41,7 +41,8 @@ export function MistyComposer(props: {
   busy?: boolean;
   placeholder?: string;
   compact?: boolean;
-  layout?: "default" | "conversation";
+  /** "inline": the box is one row (attach, text, voice, send); Stop replaces Send while a reply runs. */
+  layout?: "default" | "conversation" | "inline";
   /** The surface shows usage itself (the Agents control bar), so the footer omits it. */
   hideUsageEstimate?: boolean;
   className?: string;
@@ -96,7 +97,7 @@ export function MistyComposer(props: {
   // In a conversation the one button turns into Stop while a reply runs, rather than
   // a second button appearing beside Send.
   const sendControl =
-    props.layout === "conversation" && props.trailingControl ? (
+    (props.layout === "conversation" || props.layout === "inline") && props.trailingControl ? (
       props.trailingControl
     ) : (
       <>

@@ -37,7 +37,11 @@ export function createMistyConversationActions(
         conversationsLoading: true,
       });
       try {
-        const response = await globalMistyApi.conversations();
+        // The saved list paints first when nothing is loaded yet; the fresh one replaces it.
+        const response = await globalMistyApi.conversations("", (saved) => {
+          if (get().accountId !== accountId || get().working || get().conversations.length) return;
+          set({ conversations: saved.conversations.map(normalizeConversation) });
+        });
         if (get().accountId !== accountId) return;
         if ((get().working && !reconnect) || epoch !== submissionEpoch()) {
           set({

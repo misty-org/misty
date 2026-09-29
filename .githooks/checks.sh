@@ -39,7 +39,7 @@ billing_contract() { bash "$root/server/scripts/test-billing-contract.sh"; }
 agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
 rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
-rust_desktop() { parallel desktop-crate desktop-windows browser-sync-crate agent-code-crate kiri-crate desktop-services; }
+rust_desktop() { parallel desktop-crate desktop-windows browser-sync-crate kiri-crate desktop-services; }
 desktop_crate() { cargo test --locked --quiet --manifest-path src-tauri/Cargo.toml; }
 # The desktop crate compiles for Windows too. A Windows machine already covers
 # it in desktop-crate; elsewhere cargo-xwin cross-checks every target, so
@@ -55,7 +55,6 @@ desktop_windows() {
 }
 browser_sync_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
 # Code projects: file tools, the Seatbelt sandbox and its escape tests (macOS).
-agent_code_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/agent-code/Cargo.toml; }
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
 kiri_crate() { cargo test --locked --quiet --no-default-features --manifest-path kiri/Cargo.toml; }
 desktop_services() {

@@ -7,6 +7,7 @@ import {
   useActionQuestions,
 } from "./actionQuestions";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
+import { StatusRow, StatusTable } from "./progress/StatusTable";
 
 /**
  * Questions from agents about to pay, send, delete or post, in the control
@@ -33,56 +34,52 @@ export function AgentActionQuestions() {
       .finally(() => setBusy(""));
   };
   return (
-    <div className="grid gap-2" role="group" aria-label="Agent needs your OK">
+    <div className="grid gap-1" role="group" aria-label="Agent needs your OK">
       {questions.map((question) => {
         const name = agents.find((agent) => agent.id === question.agentId)?.name ?? "Your agent";
+        const closed = busy === question.id;
         return (
-          <div
+          <StatusTable
             key={question.id}
-            role="alertdialog"
-            aria-label={`${name} needs your OK`}
-            className="grid gap-2 rounded-xl border border-charcoal-border bg-charcoal-bg p-2"
-          >
-            <p className="m-0 px-1 text-sm text-cream-bright">
-              {actionQuestionText(question, name)}
-            </p>
-            {question.reason ? (
-              <p className="m-0 px-1 text-xs text-cream-muted">{question.reason}</p>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy === question.id}
-                onClick={() => answer(question.id, false)}
-              >
-                Deny
-              </Button>
-              <Button
-                size="sm"
-                disabled={busy === question.id}
-                onClick={() => answer(question.id, true)}
-              >
-                Accept and continue
-              </Button>
-              {question.rememberable && question.origin ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy === question.id}
-                  onClick={() => answer(question.id, true, true)}
-                >
-                  Accept and remember
+            label={`${name} needs your OK`}
+            actions={
+              <>
+                <Button size="sm" variant="primary" disabled={closed} onClick={() => answer(question.id, true)}>
+                  Accept and continue
                 </Button>
-              ) : null}
-            </div>
-            {question.rememberable && question.origin ? (
-              <p className="m-0 px-1 text-xs text-cream-muted">
-                Remember: {actionQuestionVerb(question)} on {question.origin}. Applies when the chat
-                is in Auto.
-              </p>
-            ) : null}
-          </div>
+                {question.rememberable && question.origin ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={closed}
+                    onClick={() => answer(question.id, true, true)}
+                  >
+                    Accept and remember
+                  </Button>
+                ) : null}
+                <Button size="sm" variant="outline" disabled={closed} onClick={() => answer(question.id, false)}>
+                  Deny
+                </Button>
+              </>
+            }
+          >
+            <StatusRow
+              state="waiting"
+              verb="Waiting for you"
+              sub={
+                [
+                  question.reason,
+                  question.rememberable && question.origin
+                    ? `Remember: ${actionQuestionVerb(question)} on ${question.origin}. Applies when the chat is in Auto.`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
+            >
+              {actionQuestionText(question, name)}
+            </StatusRow>
+          </StatusTable>
         );
       })}
       {error ? (

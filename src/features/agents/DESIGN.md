@@ -211,13 +211,13 @@ At a workspace container width of 1100px or less, navigation becomes 190px/170px
 
 The root fills the desktop workspace with the shared collection page. Its heading and search/action row precede section tabs, utility capsules, and rows or cards. The Agents table exposes actual status and last activity; Conversations shows the owning agent; Activity retains recorded work. The old persistent roster is not rendered. Selecting a row opens the flexible conversation with a 340px overview rail when requested. The rail scrolls independently, has 16px outer padding except at its left edge, and contains a single shared Card with 20px padding. Conversation headers are 54px tall.
 
-The centered header identity and right-side panel control toggle the overview. The desktop overview is initially visible for a selected agent; opening setup/companion or the new-chat recipient chooser hides it. Conversations, Activity, and Profile live inside the overview as text-only popover triggers. They no longer form a centered strip above the transcript. The action island above them contains Talk and Companion with monochrome icons.
+The centered header identity and right-side panel control toggle the overview. The desktop overview is initially visible for a selected agent; opening setup/companion hides it. Conversations, Activity, and Profile live inside the overview as text-only popover triggers. They no longer form a centered strip above the transcript. The action island above them contains Talk and Companion with monochrome icons.
 
 The shell is desktop-only. It has no viewport-triggered overview Sheet, roster replacement, or narrow-screen switching. Back navigation returns to the entry collection through existing draft guards.
 
 The transcript and composer share an 836px maximum region. Transcript padding is 28px 24px, matching the composer's gutters so bubbles and composer share edges, with 18px between messages. Only the user's messages are bubbles; replies are plain text on the canvas, inset 5px so the 32px avatar's center meets their first line, and status lines take a 32px row for the same alignment. Composer outer padding is 12px 24px 16px; its textarea grows from 38px to 160px. The welcome centers an 80px cloud, heading, short description or fallback question, and Customize agent action within the empty transcript, while the composer stays at the bottom.
 
-The new-chat recipient chooser occupies the header and a compact results list beneath it. Its composer stays disabled until an agent is selected. Conversations' New chat starts with the current agent.
+Conversations' New chat starts with the current agent.
 
 Profile/history/activity popovers remain workspace-bounded: 432px preferred width, a maximum of the viewport minus 24px and Radix's available width, 12px padding, and maximum height `min(580px, available height)`. They open with a 10px offset and 12px collision padding and scroll without resizing the conversation.
 
@@ -378,20 +378,20 @@ This supersedes the work-location row under the composer. A control bar now sits
 
 Supersedes the Agents collection. `/agents` opens the selected agent's New task conversation: the agent in the URL, else the last-used agent, else Misty, else the first agent. There is no directory page and no Back control.
 
-- **Sidebar:** the agent switcher, then New task, Workflows, Templates, Integrations and Recents. No footer.
+- **Sidebar:** the agent switcher, then New task, Workflows, Integrations and Recents. No footer.
 - **Switcher:** agents with a checkmark on the current one, conversations only while searching, then New agent and the selected agent's settings.
-- **Empty composer:** the launch prompt, the composer, then (only when other devices allow agents) chips for choosing which of them the agent may also use, then two columns on the composer's edges: recent work and templates. "Organize a folder" is the first template; the folder control appears above the composer only while a folder is in progress. What the agent can reach (this computer, shared folders, connected apps) lives in the Reach drawer, not on the landing.
+- **Empty composer:** the launch prompt, the one-row composer with its strip (see Composer strip below), and nothing else: no suggestions, pills or recent work (Recents live in the sidebar, templates on the Templates page; suggestions were tried and removed October 15, 2026); the folder control appears above the composer only while a folder is in progress. What the agent can reach (this computer, shared folders, connected apps) lives in the Reach drawer, not on the landing.
 - **Usage:** an 18px monochrome ring beside the mic that opens the usage popover.
-- **Model:** a compact picker under the composer input. Default follows the account's Thinking choice in Settings › Agents › Models; picking a model pins it to this conversation only. The menu is searchable, grouped by provider, and marks the current choice with a checkmark.
+- **Model:** a chip in the composer strip. Default follows the account's Thinking choice in Settings › Agents › Models; picking a model pins it to this conversation only. The menu is searchable, grouped by provider, and marks the current choice with a checkmark.
 - **Header:** the conversation title only. Rename and Delete live on the Recents row's ⋯ menu. Status never appears in the header.
 - **No side panel (October 9, 2026):** the conversation has no Details, Task, Sources or Files panel and no Activity page. A quiet Working status ends the title bar while a task runs; run status lives on the Recents rows. Goal sits under Act and Plan in the composer's mode menu and opens a dialog with the goal and the approved plan's live checklist.
 - **Workflows:** one list with All · Scheduled chip tabs. A workflow owns at most one schedule: any number of rules (specific dates, every N hours within a window, days, weeks on chosen weekdays, months on days or "the first Monday", years in chosen months) in one timezone, plus skipped dates, scheduled-run inputs and an on/off switch. Scheduled runs always use the workflow's latest version. Rows show the schedule in words and the next run; Run now, Edit, Turn off and Schedule act directly. `?view=workflows` and the retired `?view=scheduled`, `?view=automations` and `/scheduled` links open it; the retired `?view=activity` opens the task.
-- **Templates:** one page of saved templates and examples, no tabs.
+- **Workflows (October 15, 2026):** one page for Workflows; templates are workflows too. It lists the saved ones (a template saved earlier appears among them and still opens a draft to review), then a "Start from an example" gallery of starter workflows with category chips. Replaces the separate Workflows and Templates pages and the short-lived Catalog; old ?view links open it. Integrations lists apps as tiles: connected apps lead the grid, and clicking one opens a popup card with that app's accounts (Reconnect, Disconnect, Add account); there is no separate connected-accounts list.
 - **Integrations:** page heading and intro, then chip tabs: Apps, Skills and Projects (Projects desktop only; it opens with this computer's companion status and a Companion settings button). Skills live only here. Apps holds Connected apps and Add an app. Connected apps show one row per app; an app with several accounts heads a group with each account beneath it, labeled by alias or connection date, plus Add account. Brand logos use the shared `BrandIcon` artwork; everything around them stays monochrome.
 
 ### Plan mode, questions and goals (October 6, 2026)
 
-- **Plan chip:** sits beside the model picker in the composer footer; Shift+Tab also switches. Plan mode gives the composer a dashed frame and a "Plan with…" placeholder. The next message uses the new mode; a running turn keeps its own.
+- **Plan:** a choice in the strip's Mode menu beside Manual and Auto; Shift+Tab also switches. Plan mode gives the composer a dashed frame and a "Plan with…" placeholder. The next message uses the new mode; a running turn keeps its own.
 - **Question card:** sits above the composer. It shows one question at a time with a header chip and "n of m". Options are rows with a checkmark (radio, or checkbox for multi-select) plus an Other field. Number keys pick, Enter advances or submits, and Esc collapses it to a strip. Typing a message instead supersedes the questions. Answers given while the run waited appear under that run's reply as "You answered"; answers after a hand-off are a visible user turn.
 - **Proposed plan:** a card at the end of the transcript shows numbered steps, with risk as an icon and a word, never color. Details expand; assumptions and "Done when" follow, then earlier versions. The actions are Run plan (primary), Edit, Keep planning and Dismiss. Edit makes steps renamable, describable, reorderable (shared pointer reorder or Alt+Shift+Up/Down), addable and removable, and saves as a new version authored by you.
 - **Task drawer:** opens with Goal, then Plan.
@@ -400,3 +400,15 @@ Supersedes the Agents collection. `/agents` opens the selected agent's New task 
 - **Goal continuations:** turns Misty started toward a goal read as a quiet "Continued toward the goal" label rather than a bubble.
 - **Commands:** `/plan [message]` switches to Plan mode; `/goal <objective>` sets a goal and starts it.
 
+## Composer strip — October 15, 2026
+
+Supersedes the sliders popover and the two-row composer. The message box is one row (attach, text, voice, send, `MistyComposer layout="inline"`), and the controls sit in one quiet strip beneath it (`components/ComposerStrip.tsx`). Chips are labeled, have no chevrons, and brighten on hover or while their menu is open.
+
+- **Order:** Device, Project, Mode, Code on the left; then Model and the usage ring at the far end. There is no Thinking control: tasks run at Normal.
+- **Device:** this computer, or another device whose own policy lets agents in. Offline devices are listed with their state in words and can't be picked. "Add a device" opens Settings › Devices. With another device picked, the Project chip steps aside, since that device's shared folders apply.
+- **Project:** projects on this computer only. Coding is independent of it.
+- **Mode:** Manual, Auto or Plan as checkmarked choices, then Goal. Manual is the old Ask.
+- **Code:** the conversation's coding tool, with or without a project. Settings default, then each tool with its official logo (`CodingToolIcon`, shared `BrandIcon`; tools without artwork get a plain terminal mark). Tools not installed or signed in are listed but can't be picked, with the reason in words. "Manage tools" opens Settings › Coding tools.
+- **Narrow (the Misty panel, a container narrower than 560px):** every chip shows only its icon; names stay in tooltips and for assistive technology.
+- **Panel header:** the agent's avatar (the Misty sprite for Misty) opens the agent switcher; beside it a text-only conversation picker (search, recent conversations with the state in words when a run didn't finish well, View all). The panel has no sidebar, so the picker is its Recents; it shows no landing content.
+- **Menus carry no helper copy.** Names and short states only.

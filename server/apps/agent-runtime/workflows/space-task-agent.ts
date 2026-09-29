@@ -1,4 +1,6 @@
 import { WorkflowAgent } from "@ai-sdk/workflow";
+import { admissionInput } from "../src/admission-input.js";
+import { withRuntimeInstructions } from "../src/prompt-cache.js";
 import { isStepCount, tool, type ModelMessage, type ToolSet } from "ai";
 import { FatalError, getWorkflowMetadata } from "workflow";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
@@ -108,7 +110,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   const toolNames = Object.keys(tools);
   const instructions = explaining
     ? context.system
-    : [context.system, "", executionInstructions, taskCompletionInstructions].join("\n");
+    : withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions]);
   let modelTurn = 0;
   // The agent swallows errors thrown from its step hooks, so a failed settlement
   // checkpoint is held here and rethrown once the call returns.
@@ -229,8 +231,8 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       // swallowed while the model runs unmetered.
       const admission = await admitModelTurn(identity, {
         node_id: `model:${modelTurn + 1}`, state: "running", phase: "thinking", progress: Math.min(85, 10 + modelTurn * 6),
-        // Native serialized payload size only. Billing estimates tokens/rates.
-        output: { input_bytes: new TextEncoder().encode(JSON.stringify({ system: instructions, messages, tools: explaining ? [] : catalog.tools })).byteLength },
+        // Native payload size only, with images counted apart from text. Billing estimates tokens/rates.
+        output: admissionInput({ system: instructions, messages, tools: explaining ? [] : catalog.tools }),
       });
       // Past a usage limit the run may finish on a small grace; ask the model,
       // once, to wrap up rather than start new work.

@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest, readApiSessionGeneration } from "@/api/client";
 import { ApiRequestError } from "@/api/client/errors";
@@ -85,7 +86,7 @@ export function UsageSection(_props: SettingsContentProps) {
   const load = useCallback(() => {
     const controller = new AbortController();
     const request = <T,>(path: string) =>
-      apiRequest<T>(path, { signal: controller.signal, cache: "no-store" });
+      cachedRequest<T>(path, { init: { signal: controller.signal } });
     void Promise.all([
       request<BillingUsage>("/billing/usage"),
       request<AccountMeResponse>("/me"),

@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
 /** An app account connected to the Misty account. Every agent can use it. */
@@ -43,10 +44,18 @@ export type AppRequestDecision = "continue" | "remember" | "deny";
 const requestPath = (id: string) => `/me/app-requests/${encodeURIComponent(id)}`;
 
 export const appsApi = {
-  list: () => apiRequest<{ available: boolean; apps: ConnectedApp[] }>("/integrations/apps"),
-  catalog: (search: string, cursor = "") =>
-    apiRequest<{ apps: CatalogApp[]; next_cursor: string }>(
+  list: (onCached?: (value: { available: boolean; apps: ConnectedApp[] }) => void) =>
+    cachedRequest<{ available: boolean; apps: ConnectedApp[] }>("/integrations/apps", {
+      onCached,
+    }),
+  catalog: (
+    search: string,
+    cursor = "",
+    onCached?: (value: { apps: CatalogApp[]; next_cursor: string }) => void,
+  ) =>
+    cachedRequest<{ apps: CatalogApp[]; next_cursor: string }>(
       `/integrations/apps/catalog?${new URLSearchParams({ search, cursor })}`,
+      { onCached },
     ),
   connect: (app: string) =>
     apiRequest<{ url: string }>("/integrations/apps/connect", {

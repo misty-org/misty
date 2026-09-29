@@ -41,6 +41,8 @@ import { setBrowserError } from "./browserErrors";
 import { BrowserNotices } from "./BrowserNotices";
 import { BrowserPageStage } from "./BrowserPageStage";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
+import { BrowserToolbar } from "./BrowserToolbar";
+import { usePaneToolbarHost } from "./paneToolbarHost";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import { BrowserViewportMenu, useBrowserViewport } from "./BrowserViewportMenu";
 import { useBrowserMistyAiAdapter } from "./useBrowserMistyAiAdapter";
@@ -193,6 +195,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   // With vertical tabs the focused pane's toolbar lives in the sidebar; no pane keeps a row.
   const sidebar = Boolean(topSlot);
+  // A pane with horizontal tabs owns the one toolbar row; this page's toolbar is portaled
+  // into it while the page is the pane's active one.
+  const paneToolbarHost = usePaneToolbarHost();
+  const hoisted = !sidebar && paneToolbarHost !== null;
   const claimsNav = paneFocused && sidebar && Boolean(navSlot);
   useEffect(
     () => (claimsNav ? useBrowserToolbarSlot.getState().claimNav() : undefined),
@@ -324,19 +330,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   // pinned extensions and a ⋯ menu (bookmark, Misty, extensions, then the browser menu) fill
   // the sidebar's top slot.
   const toolbar = (
-    <div
-      className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
-      style={{ backgroundColor: browserChromeBackground }}
-      data-window-toolbar
-      data-browser-toolbar
-    >
-      <div className={browserToolbarStyles.group}>
-        {navButtons}
-      </div>
-      {badges}
-      {omnibox}
-      <div className={browserToolbarStyles.group}>{toolButtons}</div>
-    </div>
+    <BrowserToolbar nav={navButtons} badges={badges} address={omnibox} tools={toolButtons} />
   );
   const sidebarTop = (
     <div className={browserToolbarStyles.sidebarTop} data-browser-toolbar data-sidebar>
@@ -358,7 +352,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <section
       className={cn("grid h-full min-h-0 overflow-hidden", "text-cream")}
       style={{
-        gridTemplateRows: `${sidebar ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
+        gridTemplateRows: `${sidebar || hoisted ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
         backgroundColor: browserChromeBackground,
       }}
       data-browser-theme={browserTheme}
@@ -381,6 +375,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
             </Portal>
           ) : null}
           {paneFocused && topSlot ? <Portal container={topSlot}>{sidebarTop}</Portal> : null}
+        </>
+      ) : hoisted ? (
+        <>
+          <div aria-hidden="true" />
+          {active ? <Portal container={paneToolbarHost}>{toolbar}</Portal> : null}
         </>
       ) : (
         toolbar

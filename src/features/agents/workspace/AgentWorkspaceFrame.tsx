@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { LayoutGrid, Menu, Plug, X, Repeat2, SquarePen } from "lucide-react";
+import { Menu, Repeat2, Waypoints, X, SquarePen } from "lucide-react";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
@@ -26,7 +26,7 @@ import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
-export type AgentWorkspacePage = "task" | "workflows" | "templates" | "integrations";
+export type AgentWorkspacePage = "task" | "workflows" | "integrations";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -163,8 +163,7 @@ export function AgentWorkspaceFrame({
           {(
             [
               ["workflows", "Workflows", Repeat2],
-              ["templates", "Templates", LayoutGrid],
-              ["integrations", "Integrations", Plug],
+              ["integrations", "Integrations", Waypoints],
             ] as const
           ).map(([id, label, Icon]) => (
             <Button
@@ -229,8 +228,7 @@ export function AgentWorkspaceFrame({
           <AgentWorkspaceCatalog
             agentId={agent.id}
             agentName={agent.name}
-            page={page === "task" ? "templates" : page}
-            onNavigate={(p) => (p === "new" ? onNewTask() : onPageChange(p))}
+            page={page === "task" ? "workflows" : page}
             onUse={onUseTemplate}
             onConversation={onConversation}
             onStartWork={onStartWork}

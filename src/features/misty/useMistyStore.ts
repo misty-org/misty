@@ -1,6 +1,7 @@
 import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
 import { chatDeviceGrants } from "@/features/agents/deviceGrants";
 import { turnModes, useCollaborationStore } from "@/features/agents/agentCollaboration";
+import { codingToolForTurn, useConversationCodingTool } from "@/features/agents";
 import { awaitConversationTitle, openTurn, planDeepThinking } from "./conversationTurn";
 import { apiRequest } from "@/api/client";
 import {
@@ -580,6 +581,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             collaborationMode === "plan" && planDeepThinking() ? "deep" : requestedThinking,
           collaborationMode,
           permissionMode,
+          codingTool: codingToolForTurn(conversationId, startsConversation),
           selection,
           capture,
           ...(conversationId.startsWith("local-")
@@ -617,7 +619,10 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       patchConversationMessage(set, get, conversationId, assistantMessage.id, {
         invocationId: created.invocationId,
       });
-      if (startsConversation) useCollaborationStore.getState().adoptDraftMode(conversationId);
+      if (startsConversation) {
+        useCollaborationStore.getState().adoptDraftMode(conversationId);
+        useConversationCodingTool.getState().adoptDraft(conversationId);
+      }
       // The server saved a model picked before this conversation existed.
       const pinned = companion ? undefined : requestState.pendingModelOverride;
       set({

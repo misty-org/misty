@@ -1,4 +1,5 @@
-import { SonioxCaptions, sonioxConfig, type Segment, type SonioxContext, type SonioxResult } from "@audeeo/core";
+import { SonioxCaptions, sonioxConfig, type SonioxContext, type SonioxResult } from "./soniox.js";
+import type { Segment } from "./segment.js";
 import type { LiveChannel, LiveTicket } from "./ticket.js";
 
 /** The subset of @soniox/node's RealtimeSttSession the relay uses. */

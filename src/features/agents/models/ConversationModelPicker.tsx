@@ -22,9 +22,12 @@ export function ConversationModelPicker({
   const pending = useMistyStore((s) => s.pendingModelOverride);
   useEffect(() => {
     let active = true;
+    const show = (result: { senses: ModelSense[] }) =>
+      active && setThinking(result.senses.find((s) => s.id === "thinking"));
+    // The saved list paints at once; the fresh one follows.
     sensesApi
-      .list()
-      .then((result) => active && setThinking(result.senses.find((s) => s.id === "thinking")))
+      .list(show)
+      .then(show)
       .catch(() => {});
     return () => {
       active = false;
@@ -63,7 +66,9 @@ export function ConversationModelPicker({
       defaultModel={fallback}
       defaultLabel="Default"
       disabled={disabled}
-      className="h-7 px-2 text-xs text-cream-muted"
+      className="agent-strip-chip"
+      chevron={false}
+      showDefaultName
       onChange={(model) => void choose(model)}
     />
   );

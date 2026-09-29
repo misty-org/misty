@@ -167,7 +167,7 @@ describe("Space loading access boundary", () => {
 
     await useSpacesStore.getState().loadSpace("space");
 
-    expect(apiMocks.members).toHaveBeenCalledWith("space");
+    expect(apiMocks.members).toHaveBeenCalledWith("space", expect.any(Function));
     expect(apiMocks.messages).not.toHaveBeenCalled();
     expect(apiMocks.nodes).not.toHaveBeenCalled();
     expect(useSpacesStore.getState()).toMatchObject({

@@ -1,7 +1,7 @@
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SpaceMembers } from "@/features/spaces/members";
 import { SkeletonList, WorkspaceOverlay } from "@/shared/ui";
-import { Settings2, UsersRound } from "lucide-react";
+import { Settings, UsersRound } from "lucide-react";
 import { SpaceSettingsDangerDialogs } from "./SpaceSettingsDangerDialogs";
 import { SpaceSettingsGeneral } from "./SpaceSettingsGeneral";
 import { useSpaceSettingsController } from "./useSpaceSettingsController";
@@ -10,7 +10,7 @@ const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = 
   {
     id: "general",
     label: "General",
-    icon: Settings2,
+    icon: Settings,
   },
   {
     id: "members",

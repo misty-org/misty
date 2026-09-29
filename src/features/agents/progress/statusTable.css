@@ -1,0 +1,129 @@
+/* The shared table for steps, checklists, requests and unfinished work. */
+.agent-status-table {
+  margin: 6px 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.agent-status-table ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-status-head {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 14px;
+  color: var(--color-cream-muted);
+}
+.agent-status-row + .agent-status-row {
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.agent-status-icon {
+  flex: none;
+  align-self: center;
+  color: var(--color-cream-muted);
+}
+.agent-status-verb {
+  flex: none;
+  white-space: nowrap;
+}
+.agent-status-target {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  color: var(--color-cream);
+}
+.agent-status-target small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+.agent-status-meta {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.agent-status-row-actions {
+  display: inline-flex;
+  flex: none;
+  align-self: center;
+  gap: 6px;
+}
+.agent-status-row[data-state="done"] .agent-status-target,
+.agent-status-row[data-state="next"] .agent-status-target,
+.agent-status-row[data-state="skipped"] .agent-status-target {
+  color: var(--color-cream-muted);
+}
+.agent-status-row[data-state="done"] .agent-status-icon {
+  color: var(--misty-status-done);
+}
+.agent-status-row[data-state="failed"] .agent-status-icon,
+.agent-status-row[data-state="failed"] .agent-status-meta {
+  color: var(--misty-status-failed);
+}
+.agent-status-row[data-state="failed"] .agent-status-target {
+  color: var(--color-cream-muted);
+}
+.agent-status-row[data-state="waiting"] .agent-status-icon,
+.agent-status-row[data-state="waiting"] .agent-status-verb,
+.agent-status-row[data-state="waiting"] .agent-status-meta,
+.agent-status-row[data-state="stopped"] .agent-status-icon,
+.agent-status-row[data-state="stopped"] .agent-status-verb {
+  color: var(--misty-status-attention);
+}
+.agent-status-row[data-state="running"] .agent-status-icon {
+  animation: agent-status-spin 1s linear infinite;
+}
+.agent-status-row[data-state="running"] .agent-status-verb {
+  background: linear-gradient(
+    90deg,
+    var(--color-cream-muted) 40%,
+    var(--color-cream-bright) 50%,
+    var(--color-cream-muted) 60%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: agent-progress-sweep 2s linear infinite;
+}
+.agent-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.agent-status-actions .agent-status-spacer {
+  flex: 1;
+}
+@keyframes agent-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-status-row[data-state="running"] .agent-status-icon {
+    animation: none;
+  }
+  .agent-status-row[data-state="running"] .agent-status-verb {
+    animation: none;
+    background: none;
+    color: var(--color-cream);
+  }
+}

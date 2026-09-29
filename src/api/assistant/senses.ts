@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
 /** A user-facing model choice. Misty's own keys run every model. */
@@ -10,6 +11,8 @@ export interface SenseModel {
   provider: string;
   /** The account's plan cannot use this model; paid plans can. */
   paid_only?: boolean;
+  /** Outside each lab's current lineup; pickers tuck it behind "More models". */
+  more?: boolean;
 }
 
 export interface ModelSense {
@@ -23,7 +26,8 @@ export interface ModelSense {
 }
 
 export const sensesApi = {
-  list: () => apiRequest<{ senses: ModelSense[] }>("/ai/senses"),
+  list: (onCached?: (value: { senses: ModelSense[] }) => void) =>
+    cachedRequest<{ senses: ModelSense[] }>("/ai/senses", { onCached }),
   /** An empty model returns the sense to Misty's default. */
   set: (sense: SenseId, model: string) =>
     apiRequest<void>(`/ai/senses/${encodeURIComponent(sense)}`, {

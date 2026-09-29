@@ -23,21 +23,20 @@ export function useAgentsPageState() {
   const [, setVoiceState] = useState({ recording: false, busy: false });
   const { agents, loading, error, load } = usePersonalAgentsStore();
   const [selected, setSelected] = useState<string>();
-  const [newChat, setNewChat] = useState(false);
-  const [recipientSearch, setRecipientSearch] = useState("");
   const [params, setParams] = useSearchParams();
   const workspaceRef = useRef<HTMLElement>(null);
   const identityRef = useRef<HTMLButtonElement>(null);
-  const recipientInputRef = useRef<HTMLInputElement>(null);
-  // Links: ?view=workflows (and the retired scheduled and automations views) open
-  // Workflows; the retired ?view=activity opens the task.
+  // Links: ?view=workflows (and the earlier catalog, templates, scheduled and automations
+  // views) open Workflows; the retired ?view=activity opens the task.
   const linkedView = params.get("view") ?? "";
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
   const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
   const [chatRevision, setChatRevision] = useState(0);
   const [workspacePage, setWorkspacePage] = useState<AgentWorkspacePage>(() =>
-    ["workflows", "scheduled", "automations"].includes(linkedView) ? "workflows" : "task",
+    ["workflows", "catalog", "templates", "scheduled", "automations"].includes(linkedView)
+      ? "workflows"
+      : "task",
   );
   const [draftSeed, setDraftSeed] = useState({ agentId: "", text: "" });
   const working = useMistyStore((s) => s.working);
@@ -67,7 +66,6 @@ export function useAgentsPageState() {
   useEffect(() => {
     if (!linkedAgentId) return;
     setSelected(linkedAgentId);
-    setNewChat(false);
     setWorkspacePage("task");
     setChatRevision((n) => n + 1);
     const needsLoad =
@@ -123,15 +121,10 @@ export function useAgentsPageState() {
     error,
     load,
     selected,
-    newChat,
-    setNewChat,
-    recipientSearch,
-    setRecipientSearch,
     params,
     setParams,
     workspaceRef,
     identityRef,
-    recipientInputRef,
     settingsModalOpen,
     setSettingsModalOpen,
     settingsModalTab,

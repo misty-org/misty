@@ -245,6 +245,11 @@ enum ServerCommand {
         #[command(subcommand)]
         command: ProdCommand,
     },
+    /// Operate the isolated staging Compose stack.
+    Staging {
+        #[command(subcommand)]
+        command: StagingCommand,
+    },
     Image {
         #[command(subcommand)]
         command: ImageCommand,
@@ -285,6 +290,23 @@ enum ProdCommand {
         #[arg(long)]
         yes: bool,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum StagingCommand {
+    /// Validate staging configuration and Compose expansion.
+    Check,
+    /// Build the current checkout and start staging on this host.
+    Up,
+    /// Stop staging. Data volumes are retained unless --volumes is supplied.
+    Down {
+        #[arg(long)]
+        volumes: bool,
+    },
+    /// Show staging container status.
+    Status,
+    /// Follow staging container logs.
+    Logs,
 }
 
 #[derive(Debug, Args)]
@@ -457,6 +479,9 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                     environment::Target::Prod => {
                         deploy::initialize_production_secrets(&settings.workspace)
                     }
+                    environment::Target::Staging => {
+                        deploy::initialize_staging_secrets(&settings.workspace)
+                    }
                 }
             }
             EnvCommand::Check { target } => environment::check(&settings.workspace, target),
@@ -555,6 +580,15 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                     yes,
                 } => server::production_restore(&settings.workspace, &backup, &identity, yes),
             },
+            ServerCommand::Staging { command } => match command {
+                StagingCommand::Check => server::staging_check(&settings.workspace),
+                StagingCommand::Up => server::staging_up(&settings.workspace),
+                StagingCommand::Down { volumes } => {
+                    server::staging_down(&settings.workspace, volumes)
+                }
+                StagingCommand::Status => server::staging_status(&settings.workspace),
+                StagingCommand::Logs => server::staging_logs(&settings.workspace),
+            },
             ServerCommand::Image { command } => match command {
                 ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),
             },
@@ -652,6 +686,7 @@ fn load_command_environment(command: &Command, settings: &Settings) -> Result<()
     if let Command::Server(server) = command {
         let target = match &server.command {
             ServerCommand::Prod { .. } => environment::Target::Prod,
+            ServerCommand::Staging { .. } => environment::Target::Staging,
             ServerCommand::Worker {
                 command: WorkerCommand::GenerateSecrets { target },
             } => match target {

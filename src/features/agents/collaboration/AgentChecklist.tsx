@@ -1,8 +1,9 @@
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
-import { Button, SkeletonList } from "@/shared/ui";
+import { Fragment } from "react";
+import { SkeletonList } from "@/shared/ui";
+import { WorkGroup } from "../progress/WorkGroup";
+import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { checklistForInvocation, checklistSummary, nestChildren } from "./checklists";
-import { statusText, StepIcon } from "./ChecklistStatus";
+import { statusText } from "./ChecklistStatus";
 import { useCollaborationStore } from "./store";
 import type { AgentChecklist as Checklist, ChecklistItem } from "./types";
 
@@ -16,53 +17,53 @@ function holdText(hold: ChecklistHold) {
   return `Waiting for ${hold.device}`;
 }
 
-function ItemRow({
-  item,
+const stateOf = {
+  pending: "next",
+  in_progress: "running",
+  done: "done",
+  skipped: "skipped",
+  blocked: "failed",
+} as const;
+
+function ItemRows({
+  items,
   hold,
   nested,
+  depth = 0,
 }: {
-  item: ChecklistItem;
-  hold?: string;
-  nested?: Checklist[];
-}) {
-  const status = item.status === "in_progress" && hold ? hold : statusText[item.status];
-  return (
-    <li role="listitem" data-status={item.status} aria-label={`${item.title}: ${status}`}>
-      <span className="agent-plan-check" title={status}>
-        <StepIcon status={item.status} paused={Boolean(hold)} />
-      </span>
-      <div>
-        <p>
-          <span>{item.title}</span>
-          {item.status === "in_progress" && hold ? <small> · {hold}</small> : null}
-        </p>
-        {item.note && <small>{item.note}</small>}
-        {nested?.map((child) => (
-          <ChecklistItems key={child.invocationId} items={child.items} hold={hold} />
-        ))}
-      </div>
-    </li>
-  );
-}
-
-function ChecklistItems(props: {
   items: ChecklistItem[];
   hold?: string;
   nested?: Map<string, Checklist[]>;
+  depth?: number;
 }) {
   return (
-    <ol role="list">
-      {props.items.map((item) => (
-        <ItemRow key={item.id} item={item} hold={props.hold} nested={props.nested?.get(item.id)} />
-      ))}
-    </ol>
+    <>
+      {items.map((item) => {
+        const paused = item.status === "in_progress" && hold;
+        return (
+          <Fragment key={item.id}>
+            <StatusRow
+              state={paused ? (hold === "Stopped" ? "stopped" : "waiting") : stateOf[item.status]}
+              verb={paused ? hold : statusText[item.status]}
+              sub={item.note}
+              depth={depth}
+            >
+              {item.title}
+            </StatusRow>
+            {nested?.get(item.id)?.map((child) => (
+              <ItemRows key={child.invocationId} items={child.items} hold={hold} depth={depth + 1} />
+            ))}
+          </Fragment>
+        );
+      })}
+    </>
   );
 }
 
 /**
  * A run's live checklist, above its progress lines: a one-line summary
- * ("3 of 6 · Editing tests") that opens the steps. Delegated runs' steps nest
- * under the step that handed them off. Monochrome icons; status is always text.
+ * ("3 of 6 · Editing tests") over a table of the steps, which stays open unless
+ * folded. Delegated runs' steps nest under the step that handed them off.
  */
 export function AgentChecklist({
   checklist,
@@ -73,29 +74,19 @@ export function AgentChecklist({
   children?: Checklist[];
   hold?: ChecklistHold;
 }) {
-  const [open, setOpen] = useState(false);
   const label = holdText(hold);
-  const summary = checklistSummary(checklist.items, label);
+  const running = !label && checklist.items.some((item) => item.status === "in_progress");
   return (
-    <section className="agent-plan-checklist agent-live-checklist" aria-label="Checklist">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 justify-self-start px-1.5 text-xs font-normal text-cream-muted"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        <ChevronDown className={open ? "size-3.5" : "size-3.5 -rotate-90"} aria-hidden="true" />
-        <span aria-live="polite">{summary}</span>
-      </Button>
-      {open ? (
-        <ChecklistItems
+    // Open from the start, as Claude shows its to-do list: what the agent means to do is always in view.
+    <WorkGroup summary={checklistSummary(checklist.items)} running={running} openAtStart>
+      <StatusTable label="Checklist">
+        <ItemRows
           items={checklist.items}
           hold={label}
           nested={nestChildren(checklist.items, children)}
         />
-      ) : null}
-    </section>
+      </StatusTable>
+    </WorkGroup>
   );
 }
 

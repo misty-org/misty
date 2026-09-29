@@ -1,5 +1,5 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { invoke } from "@tauri-apps/api/core";
-import { apiRequest } from "@/api/client";
 
 /** A coding tool Misty can hand work to, and what it can do. */
 export interface CodingTool {
@@ -11,21 +11,37 @@ export interface CodingTool {
   fullAccessOnly?: boolean;
   /** Reports how much of its own usage limit it used. */
   reportsUsage: boolean;
+  /** Its maker's artwork in the shared brand icons, when there is some. */
+  brand?: string;
 }
 
 export const codingTools: CodingTool[] = [
-  { id: "claude", name: "Claude Code", asks: true, reportsUsage: false },
-  { id: "codex", name: "Codex", asks: true, reportsUsage: true },
-  { id: "minimax", name: "MiniMax Code", asks: true, reportsUsage: false },
-  { id: "kimi", name: "Kimi Code", asks: true, reportsUsage: false },
+  { id: "claude", name: "Claude Code", brand: "anthropic", asks: true, reportsUsage: false },
+  { id: "codex", name: "Codex", brand: "openai", asks: true, reportsUsage: true },
+  { id: "minimax", name: "MiniMax Code", brand: "minimax", asks: true, reportsUsage: false },
+  { id: "kimi", name: "Kimi Code", brand: "moonshot", asks: true, reportsUsage: false },
   { id: "omp", name: "Oh My Pi", asks: true, reportsUsage: false },
   { id: "opencode", name: "OpenCode", asks: true, reportsUsage: false },
   { id: "pi", name: "Pi", asks: false, reportsUsage: false },
   { id: "agy", name: "Antigravity", asks: false, reportsUsage: false },
   { id: "qoder", name: "Qoder", asks: false, reportsUsage: false },
   { id: "qoder-cn", name: "Qoder (China)", asks: false, reportsUsage: false },
-  { id: "grok", name: "Grok", asks: false, fullAccessOnly: true, reportsUsage: false },
-  { id: "dsh", name: "DeepSeek Shell", asks: false, fullAccessOnly: true, reportsUsage: false },
+  {
+    id: "grok",
+    name: "Grok",
+    brand: "xai",
+    asks: false,
+    fullAccessOnly: true,
+    reportsUsage: false,
+  },
+  {
+    id: "dsh",
+    name: "DeepSeek Shell",
+    brand: "deepseek",
+    asks: false,
+    fullAccessOnly: true,
+    reportsUsage: false,
+  },
 ];
 
 export const codingToolName = (id: string) =>
@@ -50,8 +66,7 @@ export interface CodingAllowance {
   resetsAt?: string;
 }
 
-export const codingAllowance = () =>
-  apiRequest<CodingAllowance>("/me/coding/allowance", { cache: "no-store" });
+export const codingAllowance = () => cachedRequest<CodingAllowance>("/me/coding/allowance");
 
 /** One line on what a tool can do and whether it's ready. */
 export function codingToolStatusText(tool: CodingTool, status?: CodingToolStatus) {

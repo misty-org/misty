@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   MenuTrigger,
+  SplitMenuPill,
   toolbarIconProps,
 } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "../GlobalCreateSpaceDialog";
@@ -35,7 +36,7 @@ function useActiveSpaceId(): string {
   });
 }
 
-/** One button for all Spaces: it lists them, marks the open one, and creates another. */
+/** Direct Space navigation beside a menu for switching or creating Spaces. */
 export function SpacesMenuButton({
   toolbar = false,
   labeled = false,
@@ -57,54 +58,60 @@ export function SpacesMenuButton({
     spaces.find((space) => space.id === activeSpaceId) ??
     spaces.find((space) => space.id === lastSpaceId) ??
     preferredDefaultSpace(spaces);
+  const openSpace = (space: (typeof spaces)[number]) => {
+    const surface = workspaceSurfaceFromRoute(spaceLandingRoute(space.id, user?.id));
+    if (!surface) return;
+    navigate(useWorkspaceStore.getState().openDestination(surface).route, { replace: true });
+  };
   return (
     <GlobalCreateSpaceDialog>
       {(create) => (
         <DropdownMenu>
-          <MenuTrigger
-            iconOnly={!labeled}
-            className={
-              labeled
-                ? "!h-[var(--shell-tab-height,36px)] max-w-full rounded-full bg-cream/[0.07] pl-1 pr-2.5 hover:bg-cream/[0.12]"
-                : undefined
-            }
-            size={toolbar ? undefined : "xs"}
-            label="Spaces"
-            title={shown ? `Spaces: ${shown.name}` : "Spaces"}
-            value={labeled && shown ? shown.name : undefined}
-            icon={
-              labeled && shown ? (
-                <AvatarShuffleStack
-                  activeId={shown.id}
-                  items={spaces.map((space) => ({
-                    id: space.id,
-                    node: (
-                      <SpaceAvatar
-                        space={space}
-                        className="size-5 rounded-full"
-                        fallbackClassName="text-[9px] font-semibold"
-                      />
-                    ),
-                  }))}
-                />
-              ) : toolbar ? (
-                <PanelsTopLeft {...toolbarIconProps} />
-              ) : (
-                <PanelsTopLeft className="size-4" aria-hidden="true" />
-              )
-            }
-          />
+          {labeled ? (
+            <SplitMenuPill
+              label={shown ? spaceNavigationName(shown) : "Spaces"}
+              actionLabel={shown ? `Open ${shown.name}` : "Create a Space"}
+              menuLabel="Choose Space"
+              onAction={() => (shown ? openSpace(shown) : window.setTimeout(create, 0))}
+              icon={
+                shown ? (
+                  <AvatarShuffleStack
+                    activeId={shown.id}
+                    items={spaces.map((space) => ({
+                      id: space.id,
+                      node: (
+                        <SpaceAvatar
+                          space={space}
+                          className="size-5 rounded-full"
+                          fallbackClassName="text-[9px] font-semibold"
+                        />
+                      ),
+                    }))}
+                  />
+                ) : (
+                  <PanelsTopLeft {...toolbarIconProps} />
+                )
+              }
+            />
+          ) : (
+            <MenuTrigger
+              iconOnly
+              size={toolbar ? undefined : "xs"}
+              label="Spaces"
+              icon={
+                toolbar ? (
+                  <PanelsTopLeft {...toolbarIconProps} />
+                ) : (
+                  <PanelsTopLeft className="size-4" aria-hidden="true" />
+                )
+              }
+            />
+          )}
           <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-16px)]">
             {spaces.map((space) => (
               <DropdownMenuItem
                 key={space.id}
-                onSelect={() => {
-                  const surface = workspaceSurfaceFromRoute(spaceLandingRoute(space.id, user?.id));
-                  if (!surface) return;
-                  navigate(useWorkspaceStore.getState().openDestination(surface).route, {
-                    replace: true,
-                  });
-                }}
+                onSelect={() => openSpace(space)}
               >
                 <SpaceAvatar
                   space={space}

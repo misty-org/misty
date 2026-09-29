@@ -4,7 +4,7 @@ import type { ConversationCollaboration, PermissionMode } from "./types";
 
 /** The menu's choices, each with the one line that explains it. */
 export const permissionModes: { id: PermissionMode; label: string; description: string }[] = [
-  { id: "ask", label: "Ask", description: "Pauses before every change for your OK" },
+  { id: "ask", label: "Manual", description: "Pauses before every change for your OK" },
   {
     id: "auto",
     label: "Auto",
@@ -13,7 +13,7 @@ export const permissionModes: { id: PermissionMode; label: string; description: 
 ];
 
 export const permissionModeLabel = (mode: PermissionMode) =>
-  permissionModes.find((option) => option.id === mode)?.label ?? "Ask";
+  permissionModes.find((option) => option.id === mode)?.label ?? "Manual";
 
 /**
  * Ask or Auto for a chat: its own choice, else its agent's default. A new chat

@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "@/api/client";
 
@@ -14,9 +15,7 @@ export interface GitHubRepo {
 
 /** The person's repositories, most recently pushed first. */
 export async function githubRepos(): Promise<GitHubRepo[]> {
-  const result = await apiRequest<{ repos: GitHubRepo[] }>("/integrations/github/repos", {
-    cache: "no-store",
-  });
+  const result = await cachedRequest<{ repos: GitHubRepo[] }>("/integrations/github/repos");
   return result.repos;
 }
 

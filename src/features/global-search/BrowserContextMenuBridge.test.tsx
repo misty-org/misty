@@ -32,17 +32,17 @@ const menu = {
   y: 0.4,
   actions: ["ask", "separator", "copy-link", "open-link"],
 };
-it("uses the shared menu with Ask first and only host-admitted actions", () => {
+it("uses the shared menu without the retired Ask row, keeping only host-admitted actions", () => {
   const select = vi.fn();
   render(<BrowserContextMenuView menu={menu} onSelect={select} />);
   expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual([
-    "Ask Misty…",
-    "Copy Link Address",
-    "Open Link in New Tab",
+    "Copy link address",
+    "Open link in new tab",
   ]);
   expect(screen.queryByText("Create task…")).toBeNull();
-  fireEvent.click(screen.getByText("Ask Misty…"));
-  expect(select).toHaveBeenCalledWith("ask");
+  expect(screen.queryByText(/Ask Misty/)).toBeNull();
+  fireEvent.click(screen.getByText("Copy link address"));
+  expect(select).toHaveBeenCalledWith("copy-link");
 });
 it("supports keyboard navigation and Escape dismissal", async () => {
   const select = vi.fn();
@@ -51,13 +51,13 @@ it("supports keyboard navigation and Escape dismissal", async () => {
   fireEvent.keyDown(root, { key: "ArrowDown" });
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      screen.getByText("Ask Misty…").closest('[role="menuitem"]'),
+      screen.getByText("Copy link address").closest('[role="menuitem"]'),
     ),
   );
   fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      screen.getByText("Copy Link Address").closest('[role="menuitem"]'),
+      screen.getByText("Open link in new tab").closest('[role="menuitem"]'),
     ),
   );
   fireEvent.keyDown(document.activeElement!, { key: "Escape" });
@@ -71,11 +71,11 @@ it("closes the overlay and dispatches a native selection only once", async () =>
   });
   expect(native.suspend).toHaveBeenCalledWith(true, "browser-context-menu");
   expect(native.focus).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByText("Ask Misty…"));
+  fireEvent.click(screen.getByText("Copy link address"));
   expect(screen.queryByRole("menu")).toBeNull();
   expect(native.invoke).toHaveBeenCalledExactlyOnceWith("browser_context_menu_select", {
     key: "native-key",
-    action: "ask",
+    action: "copy-link",
   });
   expect(native.suspend).toHaveBeenLastCalledWith(false, "browser-context-menu");
 });

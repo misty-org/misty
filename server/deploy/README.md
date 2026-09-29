@@ -1,11 +1,11 @@
 # Misty environments
 
-Misty has one canonical API `Dockerfile` and two explicit Compose files:
+Misty has one canonical API `Dockerfile` and two Compose files:
 
 - `compose.dev.yml` for local development.
-- `compose.prod.yml` for production.
+- `compose.prod.yml` for production and staging, selected with separate environment files and Compose project names.
 
-Both environments run PostgreSQL, apply the same versioned SQL migrations, fix
+Both stacks run PostgreSQL, apply the same versioned SQL migrations, fix
 application-role permissions, and then start the API. The migration and
 permission containers are one-shot setup jobs: exit code 0 means they succeeded.
 The API always listens on port 8080 inside its container.
@@ -76,6 +76,52 @@ readiness checks. `--no-build` reuses existing images. Progress is summarized;
 bounded redacted build output lives under `.misty/logs/`. Use
 `misty server logs SERVICE --tail 100 --follow` to investigate a service.
 Database volumes survive `misty server down`; only explicit `--volumes` removes them.
+
+## Staging
+
+Staging uses the production-shaped Compose stack with its own configuration,
+Compose project, database and volumes. It does not run the development tunnel or
+deploy the Journal collaboration Worker. This keeps load-test traffic private;
+Journal collaboration can be added as a separate staging Worker when needed.
+
+On the home server, install Docker Engine and the Compose v2 plugin, clone this
+repository, install the Misty CLI, then initialize and start staging:
+
+```sh
+cargo install --path cli --locked
+misty env init staging
+misty env status staging
+misty env check staging
+misty server staging check
+misty server staging up
+```
+
+Initialization creates private files under `server/.env/staging/`, generates
+staging-only database and signing secrets, selects local filesystem Library
+storage, and builds the API and agent-runtime images from the checked-out source.
+Add AI provider credentials only when a test needs real model calls. Do not copy
+production credentials or customer data into staging. The API is published only
+on `127.0.0.1:8082`; PostgreSQL and the agent runtime have no host ports.
+
+Keep the stack running on the home server. From the computer that runs k6, open
+an SSH tunnel to that loopback port:
+
+```sh
+ssh -L 8082:127.0.0.1:8082 user@home-server
+```
+
+Then follow [`server/bench/README.md`](../bench/README.md) to run the smoke
+scenario against `http://127.0.0.1:8082/v1`. Staging Compose commands are:
+
+```sh
+misty server staging status
+misty server staging logs
+misty server staging down
+```
+
+`down` preserves staging data. `misty server staging down --volumes` explicitly
+deletes its database and Library data. The staging project name is fixed to
+`misty-staging`, keeping its named volumes isolated from production.
 
 ## Production
 

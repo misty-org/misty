@@ -1,4 +1,5 @@
-import { Transcript, type Segment } from "@audeeo/core";
+import { Transcript } from "./transcript/transcript";
+import type { Segment } from "./transcript/segment";
 
 export type LiveChannel = "mic" | "system";
 

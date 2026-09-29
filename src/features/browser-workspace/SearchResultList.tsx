@@ -16,7 +16,7 @@ import {
   Puzzle,
   RotateCcw,
   Search,
-  Settings2,
+  Settings,
   SquareCheck,
   Star,
   type LucideIcon,
@@ -48,7 +48,7 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   "closed-tab": RotateCcw,
   tab: AppWindow,
   download: Download,
-  setting: Settings2,
+  setting: Settings,
   extension: Puzzle,
   action: ChevronRight,
 };
@@ -64,7 +64,7 @@ const scopeIcons: Record<Exclude<SearchScope, "default">, LucideIcon> = {
   history: History,
   tabs: AppWindow,
   downloads: Download,
-  settings: Settings2,
+  settings: Settings,
   extensions: Puzzle,
 };
 

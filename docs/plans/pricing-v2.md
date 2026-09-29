@@ -22,17 +22,18 @@ mode configured; phase 6 (production) and live Stripe remain.
   a Go socket like Realtime's), the fast model, then ElevenLabs Flash v2.5
   speech ($0.04 per 1,000 characters, through the runtime's AI SDK,
   `@ai-sdk/elevenlabs` 3.0.30), about 15k per reply (admission bound ~25k;
-  replies capped at 300 tokens and 600 characters). Paid plans keep Realtime.
+  replies capped at 300 tokens and 600 characters). Every plan uses the pipeline;
+  `MISTY_VOICE_PIPELINE=realtime` opts a server back into Realtime.
   Both use the same voice style prompt (a warm, patient teacher; brief; replies
   in the user's language). The pipeline emits Realtime's event protocol, so the
   session, tools and billing flow are shared. Env (in `integrations/ai.env`):
   `ELEVENLABS_API_KEY` (Misty's own; read by the API and the agent runtime),
   `MISTY_VOICE_ID` (ElevenLabs voice ID; empty uses ElevenLabs' default),
   `MISTY_VOICE_TTS_MODEL` (default `elevenlabs/eleven_flash_v2_5`),
-  `MISTY_VOICE_PIPELINE=all` to use it for every plan; billing
+  billing
   `MISTY_VOICE_STT_HOUR_MICROUSD` (390,000), `MISTY_VOICE_TTS_CHAR_MICROUSD` (40),
   `MISTY_VOICE_PIPELINE_TEXT_MODEL` (must match `MISTY_AI_FAST_MODEL`). Without an
-  ElevenLabs key Basic falls back to Realtime. Billing v0.1.0 predates pipeline
+  ElevenLabs key every plan falls back to Realtime. Billing v0.1.0 predates pipeline
   pricing: release billing again before deploying a server with it.
 - Capacity (2026-10-10): the agent runtime's own rate limits count only failed
   requests (`skipSuccessfulRequests`), because every legitimate call comes from
