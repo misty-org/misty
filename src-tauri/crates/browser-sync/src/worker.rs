@@ -16,12 +16,12 @@ use crate::{
     crypto::{DeviceKey, VaultRoot, VaultScope},
     document::CredentialRecord,
     protocol::*,
-    tree::sync::{Outgoing, TreeSync, TreeView},
     store::{
         BrowserCaptureState, BrowserImportJournal, BrowserObservation, BrowserProfileBinding,
         PendingSnapshot, Store,
     },
     transport::{SyncApi, SyncSocket},
+    tree::sync::{Outgoing, TreeSync, TreeView},
     Error, Result,
 };
 
@@ -101,7 +101,28 @@ enum Command {
     TreeResume(crate::document::Resume, oneshot::Sender<Result<()>>),
     TreeClaim(String, oneshot::Sender<Result<()>>),
     TreeSlotWrite(String, i16, Option<Vec<u8>>, oneshot::Sender<Result<()>>),
-    TreeSlotRead(String, String, i16, oneshot::Sender<Result<Option<Vec<u8>>>>),
+    TreeSlotRead(
+        String,
+        String,
+        i16,
+        oneshot::Sender<Result<Option<Vec<u8>>>>,
+    ),
+    SigninStatus(
+        String,
+        oneshot::Sender<Result<crate::tree::sync::SigninStatus>>,
+    ),
+    SigninWrite(
+        String,
+        Vec<(i16, Option<Vec<u8>>)>,
+        std::collections::BTreeMap<i16, String>,
+        oneshot::Sender<Result<()>>,
+    ),
+    SigninRead(String, i16, oneshot::Sender<Result<Option<Vec<u8>>>>),
+    SigninBind(
+        String,
+        crate::store::DeviceSignin,
+        oneshot::Sender<Result<()>>,
+    ),
 }
 
 #[derive(Clone)]
@@ -392,16 +413,23 @@ impl WorkerHandle {
         receive.await.map_err(|_| Error::Network)?
     }
 
-    async fn call<T>(&self, command: impl FnOnce(oneshot::Sender<Result<T>>) -> Command) -> Result<T> {
+    async fn call<T>(
+        &self,
+        command: impl FnOnce(oneshot::Sender<Result<T>>) -> Command,
+    ) -> Result<T> {
         let (send, receive) = oneshot::channel();
-        self.commands.send(command(send)).await.map_err(|_| Error::Network)?;
+        self.commands
+            .send(command(send))
+            .await
+            .map_err(|_| Error::Network)?;
         receive.await.map_err(|_| Error::Network)?
     }
 
     /// Queues renderer edits durably. Groups and websites go to the shared
     /// tree; windows, layouts and tabs to the tree this device drives.
     pub async fn tree_changes(&self, changes: Vec<crate::document::Change>) -> Result<()> {
-        self.call(|reply| Command::TreeChanges(changes, reply)).await
+        self.call(|reply| Command::TreeChanges(changes, reply))
+            .await
     }
 
     pub async fn tree_resume(&self, resume: crate::document::Resume) -> Result<()> {
@@ -414,12 +442,59 @@ impl WorkerHandle {
     }
 
     /// Native-only: slot plaintext (page state, history) may hold form data.
-    pub async fn write_tab_slot(&self, tab_record: String, slot: i16, plaintext: Option<Vec<u8>>) -> Result<()> {
-        self.call(|reply| Command::TreeSlotWrite(tab_record, slot, plaintext, reply)).await
+    pub async fn write_tab_slot(
+        &self,
+        tab_record: String,
+        slot: i16,
+        plaintext: Option<Vec<u8>>,
+    ) -> Result<()> {
+        self.call(|reply| Command::TreeSlotWrite(tab_record, slot, plaintext, reply))
+            .await
     }
 
-    pub async fn read_tab_slot(&self, tree_id: String, tab_record: String, slot: i16) -> Result<Option<Vec<u8>>> {
-        self.call(|reply| Command::TreeSlotRead(tree_id, tab_record, slot, reply)).await
+    pub async fn read_tab_slot(
+        &self,
+        tree_id: String,
+        tab_record: String,
+        slot: i16,
+    ) -> Result<Option<Vec<u8>>> {
+        self.call(|reply| Command::TreeSlotRead(tree_id, tab_record, slot, reply))
+            .await
+    }
+
+    /// Native-only: whether this session holds a device's lock, the device's
+    /// verified sign-in slots, and this machine's store binding for it.
+    pub async fn signin_status(&self, tree_id: String) -> Result<crate::tree::sync::SigninStatus> {
+        self.call(|reply| Command::SigninStatus(tree_id, reply))
+            .await
+    }
+
+    /// Native-only: queues sign-in shard plaintext for the locked device and
+    /// records the digests of all its current shards.
+    pub async fn write_signin(
+        &self,
+        tree_id: String,
+        writes: Vec<(i16, Option<Vec<u8>>)>,
+        written: std::collections::BTreeMap<i16, String>,
+    ) -> Result<()> {
+        self.call(|reply| Command::SigninWrite(tree_id, writes, written, reply))
+            .await
+    }
+
+    /// Native-only: one verified sign-in shard's plaintext.
+    pub async fn read_signin(&self, tree_id: String, slot: i16) -> Result<Option<Vec<u8>>> {
+        self.call(|reply| Command::SigninRead(tree_id, slot, reply))
+            .await
+    }
+
+    /// Native-only: records which local store holds a device's sign-in data.
+    pub async fn bind_signin(
+        &self,
+        tree_id: String,
+        binding: crate::store::DeviceSignin,
+    ) -> Result<()> {
+        self.call(|reply| Command::SigninBind(tree_id, binding, reply))
+            .await
     }
 
     pub fn account_events(&self) -> broadcast::Receiver<AccountEvent> {
@@ -494,7 +569,11 @@ where
         let mut trees = TreeSync::new(&scope, store.grant());
         trees.load(
             &store,
-            &crate::tree::state::Verifier { root: &root, scope: &scope, grants: &HashMap::new() },
+            &crate::tree::state::Verifier {
+                root: &root,
+                scope: &scope,
+                grants: &HashMap::new(),
+            },
         )?;
         let (tree_view, trees_rx) = watch::channel(trees.view(&store)?);
         let handle = WorkerHandle {
@@ -547,6 +626,7 @@ where
         if let Err(error) = &result {
             let issue = match error {
                 Error::Authentication => "sign_in_required",
+                Error::DeviceForbidden => "sync_device_forbidden",
                 Error::Identity | Error::Unlock => "vault_identity_failed",
                 Error::Sequence => "replay_conflict",
                 Error::Recovery => "checkpoint_or_key_recovery_required",
@@ -719,7 +799,9 @@ where
                 self.refresh_status()?;
             }
             Command::TreeChanges(changes, reply) => {
-                let result = self.trees.apply_changes(&mut self.store, &self.root, changes);
+                let result = self
+                    .trees
+                    .apply_changes(&mut self.store, &self.root, changes);
                 let _ = reply.send(result);
                 self.publish_tree_view()?;
             }
@@ -728,18 +810,56 @@ where
                 let _ = reply.send(result);
             }
             Command::TreeSlotWrite(tab, slot, plaintext, reply) => {
-                let _ = reply.send(self.trees.write_slot(&mut self.store, &self.root, &tab, slot, plaintext));
+                let _ = reply.send(self.trees.write_slot(
+                    &mut self.store,
+                    &self.root,
+                    &tab,
+                    slot,
+                    plaintext,
+                ));
             }
             Command::TreeClaim(tree, reply) => {
                 if !self.connected_now {
                     let _ = reply.send(Err(Error::Network));
                 } else {
                     let grant = self.store.grant().clone();
-                    match self.trees.claim(&mut self.store, &self.scope, &grant, &self.device, &tree, None, Some(reply)) {
+                    match self.trees.claim(
+                        &mut self.store,
+                        &self.scope,
+                        &grant,
+                        &self.device,
+                        &tree,
+                        None,
+                        Some(reply),
+                    ) {
                         Ok(frame) => self.tree_outbox.push(frame),
                         Err(error) => return Err(error),
                     }
                 }
+            }
+            Command::SigninStatus(tree, reply) => {
+                let _ = reply.send(self.trees.signin_status(&self.store, &self.root, &tree));
+            }
+            Command::SigninWrite(tree, writes, written, reply) => {
+                let _ = reply.send(self.trees.write_signin(
+                    &mut self.store,
+                    &self.root,
+                    &tree,
+                    writes,
+                    written,
+                ));
+            }
+            Command::SigninRead(tree, slot, reply) => {
+                if self.connected_now {
+                    if let Some(frame) = self.trees.read_signin(&tree, slot, reply) {
+                        self.tree_outbox.push(frame);
+                    }
+                } else {
+                    let _ = reply.send(Err(Error::Network));
+                }
+            }
+            Command::SigninBind(tree, binding, reply) => {
+                let _ = reply.send(self.store.set_device_signin(&self.root, &tree, &binding));
             }
             Command::TreeSlotRead(tree, tab, slot, reply) => {
                 if self.connected_now {
@@ -845,14 +965,20 @@ where
         let cursor = self.store.applied_sequence()?;
         let pending = self.store.pending_count()?;
         if matches!(phase, Phase::CatchingUp | Phase::Ready) {
-            phase = if self
-                .imported_through
-                .is_some_and(|sequence| sequence >= cursor)
+            // Workspace-wide sign-in imports only exist before device trees.
+            // In tree mode each device's sign-in data has its own state
+            // (reported per device), and nothing advances the legacy import
+            // bookkeeping, so waiting on it would never finish.
+            let imports_settled = self.trees.tree_mode()
+                || (self
+                    .imported_through
+                    .is_some_and(|sequence| sequence >= cursor)
+                    && !self.store.browser_imports_pending(&self.root)?
+                    && !self.store.browser_profiles_staged(&self.root)?);
+            phase = if imports_settled
                 && !self.roster.is_empty()
                 && cursor >= self.head
                 && pending == 0
-                && !self.store.browser_imports_pending(&self.root)?
-                && !self.store.browser_profiles_staged(&self.root)?
             {
                 Phase::Ready
             } else {
@@ -892,11 +1018,13 @@ where
                 return Err(Error::Invalid);
             }
             if device.grant.device_id == self.store.grant().device_id {
-                if device.revoked_at.is_some()
-                    || device.grant.public_key != self.device.public_key()
+                if device.revoked_at.is_some() {
+                    return Err(Error::DeviceForbidden);
+                }
+                if device.grant.public_key != self.device.public_key()
                     || device.grant.key_epoch != self.store.grant().key_epoch
                 {
-                    return Err(Error::Authentication);
+                    return Err(Error::Identity);
                 }
                 if device.last_counter > self.store.allocated_counter()? {
                     return Err(Error::Recovery);
@@ -911,7 +1039,7 @@ where
             }
         }
         if !own {
-            return Err(Error::Authentication);
+            return Err(Error::DeviceForbidden);
         }
         self.roster = roster;
         // A request is delivered through the existing authenticated roster.
@@ -941,7 +1069,15 @@ where
                             .filter(|id| valid_id(id))
                             .unwrap_or_else(|| own.grant.device_id.clone());
                         let grant = self.store.grant().clone();
-                        let frame = self.trees.claim(&mut self.store, &self.scope, &grant, &self.device, &tree, Some(request.to_owned()), None)?;
+                        let frame = self.trees.claim(
+                            &mut self.store,
+                            &self.scope,
+                            &grant,
+                            &self.device,
+                            &tree,
+                            Some(request.to_owned()),
+                            None,
+                        )?;
                         self.tree_outbox.push(frame);
                     }
                 }
@@ -1021,7 +1157,7 @@ where
                         ServerFrame::Blobs { .. } | ServerFrame::BlobAck { .. } => {},
                         ServerFrame::CheckpointRequired { .. } => return Err(Error::Recovery),
                         ServerFrame::Error { code, .. } if code == "sync_unavailable" => return Err(Error::Network),
-                        ServerFrame::Error { code, .. } if code == "sync_device_forbidden" => return Err(Error::Authentication),
+                        ServerFrame::Error { code, .. } if code == "sync_device_forbidden" => return Err(Error::DeviceForbidden),
                         ServerFrame::Error { .. } => return Err(Error::Recovery),
                         _ => return Err(Error::Invalid),
                     }

@@ -31,6 +31,10 @@ const (
 	SyncSlotHistory        int16 = 1
 	SyncSlotPageState      int16 = 2
 	SyncSlotSessionStorage int16 = 3
+	// A device's website sign-in data lives in these slots on its tree's root
+	// node, so the tree's single-driver rule governs who may write it.
+	SyncSlotSigninFirst int16 = 4
+	SyncSlotSigninLast  int16 = SyncTreeMaxSlotKind
 )
 
 // Ciphertexts are nonce||AES-256-GCM output. Clients bind each node to its

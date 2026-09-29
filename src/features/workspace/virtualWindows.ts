@@ -1,5 +1,6 @@
 import {
   recoverPaneHistoryViews,
+  isEmptyLayoutTab,
   layoutTabs,
   mapLayoutViews,
   migrateLayoutTabs,
@@ -46,11 +47,14 @@ export function normalizeWorkspaceLayout(
 ): WorkspaceLayout {
   const migrated = recoverPaneHistoryViews(migrateLayoutTabs(layout));
   const activeId = migrated.activeLayoutTabId ?? layoutTabs(migrated)[0].id;
+  // Having no tabs at all is a real state; only fill panes when other tabs exist.
+  const noTabs = layoutTabs(migrated).every(isEmptyLayoutTab);
   const tabs = layoutTabs(migrated).map((tab) => {
     const source = tab.id === activeId ? migrated : tab;
     const root = normalizeDockNode(
-      fillEmptyDockLeaves(capDockLeaves(source.root, maxWorkspacePanels), () =>
-        createDefaultWorkspaceTab(scopeKey),
+      fillEmptyDockLeaves(
+        capDockLeaves(source.root, maxWorkspacePanels),
+        noTabs ? undefined : () => createDefaultWorkspaceTab(scopeKey),
       ),
     );
     const panes = dockLeaves(root);

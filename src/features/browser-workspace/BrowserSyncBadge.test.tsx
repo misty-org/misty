@@ -106,6 +106,26 @@ it.each(["offline", "attention", "stopped"] as const)(
     expect(status(native).tone).toBe("red");
   },
 );
+it("explains denied device access without asking the user to sign in", () => {
+  const native = session();
+  native.status.phase = "attention";
+  native.status.issue = "sync_device_forbidden";
+  useBrowserSyncStore.setState({ session: native });
+  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
+  expect(
+    screen.getByText(/This device does not have permission to sync this workspace/),
+  ).toBeTruthy();
+  expect(screen.queryByText(/sign.in|required|sync_device_forbidden/i)).toBeNull();
+});
+it("translates an expired sign-in status into readable recovery text", () => {
+  const native = session();
+  native.status.issue = "sign_in_required";
+  expect(status(native)).toMatchObject({
+    tone: "red",
+    detail: "Sign in again to reconnect sync.",
+  });
+});
 it("gives local save failures priority and preserves the essential recovery warning", async () => {
   useWorkspaceRecoveryState.setState({ issue: "Disk unavailable" });
   render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
@@ -137,10 +157,48 @@ it("shows profile failures as red and closes the popover before opening settings
   render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
   fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
   expect(screen.getByRole("heading", { name: "Sync needs attention" })).toBeTruthy();
-  expect(screen.queryByText("Website storage unavailable")).toBeNull();
+  // The fixed native diagnostic explains what needs attention.
+  expect(screen.getByText("Website storage unavailable")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Sync settings" }));
   expect(settings).toHaveBeenCalledOnce();
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+it("points to the per-site report when some website data could not sync", () => {
+  const native = session();
+  native.website_data = [
+    {
+      device_id: native.device_id,
+      state: "synced",
+      checked_at: 1,
+      sites: [
+        {
+          site: "mail.example.test",
+          synced: [{ kind: "cookies", count: 4 }],
+          skipped: [{ kind: "indexed_db", reason: "too_large", count: 1 }],
+        },
+      ],
+    },
+    // Another device's report is not this session's to act on.
+    {
+      device_id: "elsewhere",
+      state: "synced",
+      checked_at: 1,
+      sites: [
+        {
+          site: "x.test",
+          synced: [],
+          skipped: [{ kind: "cookies", reason: "partitioned", count: 9 }],
+        },
+      ],
+    },
+  ];
+  useBrowserSyncStore.setState({ session: native });
+  const settings = vi.fn();
+  render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Sync:/ }));
+  expect(screen.getByText(/Some data on 1 site can’t sync/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "See what’s not synced" }));
+  expect(settings).toHaveBeenCalledOnce();
 });
 it("does not dispatch a cloud retry after an account change during local recovery", async () => {
   useWorkspaceRecoveryState.setState({ issue: "Disk unavailable" });

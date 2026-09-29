@@ -35,7 +35,7 @@ describe("fixed-width navigation rail", () => {
         {content}
       </NavigatorRail>,
     );
-    expect(rail().style.width).toBe("56px");
+    expect(rail().style.width).toBe("64px");
     expect(rail().hasAttribute("inert")).toBe(false);
     expect(screen.queryByRole("button", { name: "Show navigation" })).toBeNull();
     fireEvent.pointerLeave(rail());
@@ -59,7 +59,7 @@ describe("fixed-width navigation rail", () => {
     await settle();
     expect(rail()).toBe(element);
     expect(element.hasAttribute("inert")).toBe(true);
-    expect(element.style.width).toBe("56px");
+    expect(element.style.width).toBe("64px");
     expect(native.suspend).toHaveBeenLastCalledWith(false, "navigator-reveal");
   });
 

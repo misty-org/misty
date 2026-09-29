@@ -25,6 +25,8 @@ import { useBrowserSyncStore } from "./store";
 import { SyncVaultForm } from "./SyncVaultForm";
 import { DeviceNameSettings } from "./DeviceNameSettings";
 import { viewingName } from "./treeControl";
+import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
+import { syncIssueMessage } from "./syncIssueMessage";
 
 function statusLabel(session: NativeSyncView) {
   if (session.status.issue) return "Needs attention";
@@ -187,7 +189,7 @@ export function BrowserSyncSettings() {
             {(issue || session.status.issue) && (
               <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                 <p role="alert" className="text-sm text-destructive">
-                  {issue ?? session.status.issue}
+                  {syncIssueMessage(issue ?? session.status.issue)}
                 </p>
                 <Button variant="outline" disabled={reconnecting} onClick={() => void reconnect()}>
                   {reconnecting ? "Reconnecting…" : "Reconnect"}
@@ -199,6 +201,7 @@ export function BrowserSyncSettings() {
                 {websiteDataLabel(session, issue)}
               </span>
             </SettingsRow>
+            <DeviceWebsiteDataList session={session} />
             {session.browser_profile_issue && (
               <p role="alert" className="px-5 py-3 text-sm text-destructive">
                 {session.browser_profile_issue}

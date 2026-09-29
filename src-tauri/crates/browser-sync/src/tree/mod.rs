@@ -5,6 +5,7 @@ pub mod merkle;
 pub mod model;
 pub mod protocol;
 pub mod seal;
+pub mod signin;
 pub mod state;
 pub mod sync;
 

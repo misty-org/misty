@@ -15,6 +15,7 @@ import {
   activeLayoutView,
   allLayoutViews,
   appendLayoutTab,
+  emptyLayoutTab,
   layoutTabs,
   selectLayoutTab,
   singleViewLayoutTab,
@@ -208,7 +209,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                     tab.groupKey === request.groupKey &&
                     !isPrivateBrowserTab(tab),
                 )
-                .sort(compareTabRecency)[0]
+                // Prefer the tab already showing this route so a close or a URL
+                // change never re-targets a sibling in the same group.
+                .sort(
+                  (a, b) =>
+                    Number(b.route === request.route) - Number(a.route === request.route) ||
+                    compareTabRecency(a, b),
+                )[0]
             : undefined;
         if (existing) {
           get().focusTab(existing.id);
@@ -544,8 +551,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return true;
         }
         let remaining = tabs.filter((tab) => tab.id !== id);
-        if (!remaining.length)
-          remaining = [singleViewLayoutTab(createBlankWorkspaceTab(current.activeScopeKey))];
+        if (!remaining.length) remaining = [emptyLayoutTab()];
         const next =
           remaining.find((tab) => tab.id === current.layout.activeLayoutTabId) ??
           [...remaining].sort(

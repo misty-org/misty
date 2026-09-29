@@ -94,7 +94,9 @@ export function GlobalNavigator(props: {
           className="misty-navigator-body flex min-h-0 flex-1 flex-col overflow-hidden"
           data-misty-window-drag-block="true"
         >
-          <div className="misty-navigator-items grid content-start gap-0.5 overflow-y-auto px-3 pb-2">
+          {/* No visible scrollbar: a classic one appearing as the Space stack
+              grows would narrow the rail and shift every centered icon. */}
+          <div className="misty-navigator-items grid content-start gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <NavigatorHomeLink active={onHome} />
             <NavigatorHeaderHomeButton
               path="/browser"

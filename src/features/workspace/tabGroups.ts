@@ -1,5 +1,5 @@
 import { dockTabs } from "./dockTree";
-import { layoutTabs, selectLayoutTab, singleViewLayoutTab } from "./layoutTabs";
+import { emptyLayoutTab, layoutTabs, selectLayoutTab, singleViewLayoutTab } from "./layoutTabs";
 import type { WorkspaceLayoutTab, WorkspaceScopeKey, WorkspaceTab } from "./model";
 import { createBrowserTabState } from "./model";
 import { isPrivateBrowserTab } from "./privateBrowsing";
@@ -115,7 +115,7 @@ export function tabGroupActions(
 ): TabGroupActions {
   const applyTabs = (tabs: WorkspaceLayoutTab[], selected?: string) => {
     const state = get();
-    if (!tabs.length) tabs = [singleViewLayoutTab(createBlankWorkspaceTab(state.activeScopeKey))];
+    if (!tabs.length) tabs = [emptyLayoutTab()];
     const id = selected && tabs.some((t) => t.id === selected) ? selected : tabs[0].id;
     set(
       withActiveVirtualWindowLayout(
@@ -309,9 +309,7 @@ export function tabGroupActions(
       // A virtual-window move retains all running view identities and split trees.
       const sourceId = state.activeVirtualWindowId;
       const remaining = layoutTabs(state.layout).filter((t) => t.tabGroupId !== id);
-      const sourceTabs = remaining.length
-        ? remaining
-        : [singleViewLayoutTab(createBlankWorkspaceTab(state.activeScopeKey))];
+      const sourceTabs = remaining.length ? remaining : [emptyLayoutTab()];
       const source = selectLayoutTab(
         { ...state.layout, tabs: sourceTabs },
         sourceTabs.some((t) => t.id === state.layout.activeLayoutTabId)

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { DeviceWebsiteData } from "./websiteData";
 import type { Resume, SharedRecord, WorkspaceChange, WorkspaceView } from "./model";
 
 export interface SyncDeviceInfo {
@@ -33,6 +34,12 @@ export interface SyncTreeView {
   >;
   pending: string[];
   displaced_with_edits: boolean;
+  /** The server confirmed `driving_tree` on the current connection. */
+  seat_confirmed?: boolean;
+  /** The tree kept current while this device drives none (the one it drove last). */
+  following?: string | null;
+  /** This device's copy of `driving_tree` caught up with the server; edits apply only then. */
+  writable?: boolean;
 }
 export interface NativeSyncView {
   session_id: string;
@@ -44,6 +51,8 @@ export interface NativeSyncView {
   supports_cookie_handoff?: boolean;
   browser_profile_ready?: boolean;
   browser_profile_issue?: string | null;
+  /** Per device: what each site's cookies and storage contributed to its sync. */
+  website_data?: DeviceWebsiteData[];
   status: {
     phase: "connecting" | "offline" | "catching_up" | "ready" | "attention" | "stopped";
     applied_sequence: number;

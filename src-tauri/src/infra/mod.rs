@@ -128,10 +128,14 @@ pub(crate) mod browser_cookie_store;
 #[cfg(windows)]
 #[path = "browser_cookie_store_windows.rs"]
 pub(crate) mod browser_cookie_store;
+mod browser_data_budget;
+mod browser_data_coverage;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_session_storage;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_storage_restore;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_website_capture;
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) mod browser_website_storage;
 
