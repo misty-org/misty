@@ -195,6 +195,18 @@ export function WorkspaceLayoutTabs(
     const view = useWorkspaceStore.getState().selectLayoutTab(id);
     if (view) props.onOpen(view);
   };
+  const closePaneControl = (
+    <IconButton
+      size="xs"
+      tooltip={false}
+      disabled={dockLeaves(layout.root).length <= 1}
+      label="Close pane"
+      title="Close pane"
+      onClick={() => props.onClosePane(pane.id)}
+    >
+      <ClosePaneIcon className="size-4" size={16} />
+    </IconButton>
+  );
   return (
     <header
       ref={ref}
@@ -418,47 +430,34 @@ export function WorkspaceLayoutTabs(
           onOpen={props.onOpen}
         />
       )}
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-1",
-          vertical ? "mt-2 border-t border-charcoal-border pt-2" : "ml-1.5 h-7",
-        )}
-      >
-        {!props.windowsTitlebarControls ? (
-          <>
-            <IconButton
-              size="xs"
-              tooltip={false}
-              disabled={!canRight}
-              label="Create split right"
-              title="Split right"
-              onClick={() => props.onSplitPane(pane.id, "right")}
-            >
-              <PanelRightDashed className="size-4" size={16} />
-            </IconButton>
-            <IconButton
-              size="xs"
-              tooltip={false}
-              disabled={!canDown}
-              label="Create split down"
-              title="Split down"
-              onClick={() => props.onSplitPane(pane.id, "down")}
-            >
-              <PanelBottomDashed className="size-4" size={16} />
-            </IconButton>
-          </>
-        ) : null}
-        <IconButton
-          size="xs"
-          tooltip={false}
-          disabled={dockLeaves(layout.root).length <= 1}
-          label="Close pane"
-          title="Close pane"
-          onClick={() => props.onClosePane(pane.id)}
+      {!props.windowsTitlebarControls && (
+        <div
+          className={cn(
+            "flex shrink-0 items-center gap-1",
+            vertical ? "mt-2 border-t border-charcoal-border pt-2" : "ml-1.5 h-7",
+          )}
         >
-          <ClosePaneIcon className="size-4" size={16} />
-        </IconButton>
-        {!props.windowsTitlebarControls ? (
+          <IconButton
+            size="xs"
+            tooltip={false}
+            disabled={!canRight}
+            label="Create split right"
+            title="Split right"
+            onClick={() => props.onSplitPane(pane.id, "right")}
+          >
+            <PanelRightDashed className="size-4" size={16} />
+          </IconButton>
+          <IconButton
+            size="xs"
+            tooltip={false}
+            disabled={!canDown}
+            label="Create split down"
+            title="Split down"
+            onClick={() => props.onSplitPane(pane.id, "down")}
+          >
+            <PanelBottomDashed className="size-4" size={16} />
+          </IconButton>
+          {closePaneControl}
           <WorkspaceWindowMenu
             windows={props.virtualWindows}
             activeWindowId={props.activeVirtualWindowId}
@@ -468,14 +467,15 @@ export function WorkspaceLayoutTabs(
             onClose={props.onCloseVirtualWindow}
             onReopen={props.onReopenVirtualWindow}
           />
-        ) : null}
-      </div>
+        </div>
+      )}
       <WindowsWorkspaceTitlebarControls
         enabled={Boolean(props.windowsTitlebarControls)}
         focused
         paneId={pane.id}
         canSplitSideways={canRight}
         canSplitVertically={canDown}
+        closePaneControl={closePaneControl}
         windows={props.virtualWindows}
         activeWindowId={props.activeVirtualWindowId}
         canReopen={props.canReopenVirtualWindow}

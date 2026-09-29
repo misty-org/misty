@@ -530,6 +530,8 @@ pub struct Worker<F> {
     tree_outbox: Vec<Outgoing>,
     connected_now: bool,
     claimed_requests: std::collections::HashSet<String>,
+    /// Consecutive trees dropped and refetched after failing to verify.
+    tree_refetches: u8,
 }
 
 impl<F> Worker<F>
@@ -609,6 +611,7 @@ where
                 tree_outbox: Vec::new(),
                 connected_now: false,
                 claimed_requests: std::collections::HashSet::new(),
+                tree_refetches: 0,
             },
             handle,
         ))
@@ -1148,8 +1151,16 @@ where
                         },
                         ServerFrame::AccountEvent { event } => { let _ = self.events.send(event); },
                         ServerFrame::Trees { trees } => self.tree_roster(socket, trees).await?,
-                        ServerFrame::TreeDelta { delta } => self.tree_delta(socket, delta).await?,
-                        ServerFrame::TreeSnapshot { snapshot } => self.tree_snapshot(snapshot)?,
+                        ServerFrame::TreeDelta { delta } => {
+                            let tree = delta.tree_id.clone();
+                            let result = self.tree_delta(socket, delta).await;
+                            self.tree_verified(&tree, result)?
+                        },
+                        ServerFrame::TreeSnapshot { snapshot } => {
+                            let tree = snapshot.tree_id.clone();
+                            let result = self.tree_snapshot(snapshot).await;
+                            self.tree_verified(&tree, result)?
+                        },
                         ServerFrame::TreeCurrent { tree_id, version } => self.tree_current(socket, &tree_id, version).await?,
                         ServerFrame::TreeAck { request_id, receipt } => self.tree_ack(request_id.as_deref(), receipt)?,
                         ServerFrame::TreeError { code, request_id, operation_id, .. } => self.tree_error(request_id.as_deref(), operation_id.as_deref(), &code)?,

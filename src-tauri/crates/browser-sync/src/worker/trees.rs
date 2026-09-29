@@ -18,6 +18,8 @@ fn tree_mode_operation(device_id: &str) -> String {
     uuid::Uuid::from_bytes(bytes).to_string()
 }
 
+const TREE_REFETCH_LIMIT: u8 = 3;
+
 async fn send_tree(socket: &mut SyncSocket, frame: Outgoing) -> Result<()> {
     match frame {
         Outgoing::Watch { tree_id, after } => {
@@ -165,7 +167,12 @@ where
         self.publish_tree_view()
     }
 
-    pub(super) fn tree_snapshot(&mut self, snapshot: TreeSnapshot) -> Result<()> {
+    pub(super) async fn tree_snapshot(&mut self, snapshot: TreeSnapshot) -> Result<()> {
+        // A snapshot is verified against its last author's grant, like a delta.
+        if let Some(change) = &snapshot.last_change {
+            self.ensure_authors(std::iter::once(&change.device_id))
+                .await?;
+        }
         let verifier = Verifier {
             root: &self.root,
             scope: &self.scope,
@@ -174,6 +181,29 @@ where
         self.trees
             .on_snapshot(&mut self.store, &verifier, snapshot)?;
         self.publish_tree_view()
+    }
+
+    /// The server's copy of a tree is authoritative and every copy is verified
+    /// before use, so one that fails to verify is dropped and fetched again on a
+    /// fresh connection instead of stopping sync. A failure that persists
+    /// across refetches still stops it: that copy cannot be trusted.
+    pub(super) fn tree_verified(&mut self, tree: &str, result: Result<()>) -> Result<()> {
+        match result {
+            Ok(()) => {
+                self.tree_refetches = 0;
+                Ok(())
+            }
+            Err(error @ (Error::Identity | Error::Sequence | Error::Invalid)) => {
+                if self.tree_refetches >= TREE_REFETCH_LIMIT {
+                    return Err(error);
+                }
+                self.tree_refetches += 1;
+                self.trees.forget(&mut self.store, tree)?;
+                let _ = self.publish_tree_view();
+                Err(Error::Network)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub(super) async fn tree_current(

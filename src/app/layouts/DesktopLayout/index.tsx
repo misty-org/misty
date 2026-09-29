@@ -297,15 +297,21 @@ export function DesktopLayout(props: {
   const geometry = dockingGeometry(docking.navigation, navigatorLayout.autoHide, sharedTitlebar);
   const titlebarControlsRef = useRef<HTMLDivElement>(null);
   const [titlebarControlsWidth, setTitlebarControlsWidth] = useState(0);
+  const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
+  const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
   useLayoutEffect(() => {
     const controls = titlebarControlsRef.current;
-    if (!controls) return;
-    const measure = () => setTitlebarControlsWidth(controls.offsetWidth);
+    const windowsControls = windowsTitlebarControlsRef.current;
+    const measure = () => {
+      setTitlebarControlsWidth(controls?.offsetWidth ?? 0);
+      setWindowsTitlebarControlsWidth(windowsControls?.offsetWidth ?? 0);
+    };
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(controls);
+    if (controls) observer.observe(controls);
+    if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
-  }, [isAuthRoute]);
+  }, [isAuthRoute, shouldShowWindowsControls]);
   const titlebarControlsLeft = titlebarNavigationGeometry.left;
   const tabsFollowNavigator = docking.navigation === "left" && !navigatorLayout.autoHide;
   const titlebarReservedWidth = titlebarControlsLeft + (titlebarControlsWidth || 24) + 16;
@@ -319,7 +325,7 @@ export function DesktopLayout(props: {
           left: tabsFollowNavigator
             ? Math.max(0, titlebarReservedWidth - navigatorWidth)
             : Math.max(8, titlebarReservedWidth),
-          right: shouldShowWindowsControls ? 140 / appZoom : 0,
+          right: shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
         }
       : undefined;
   const navigatorContent = (
@@ -398,17 +404,11 @@ export function DesktopLayout(props: {
                 autoHide={navigatorLayout.autoHide}
                 onToggleAutoHide={toggleNavigatorAutoHide}
               />
-              {shouldShowWindowsControls ? (
-                <div
-                  id="misty-windows-workspace-controls"
-                  className={styles.windowsWorkspaceControlsClass}
-                  data-misty-window-drag-block="true"
-                />
-              ) : null}
             </div>
           ) : null}
           {shouldShowWindowsControls ? (
             <div
+              ref={windowsTitlebarControlsRef}
               className={styles.windowsTitlebarControlsClass}
               data-misty-window-drag-block="true"
               style={{
@@ -416,6 +416,13 @@ export function DesktopLayout(props: {
                 transformOrigin: "top right",
               }}
             >
+              {!isAuthRoute ? (
+                <div
+                  id="misty-windows-workspace-controls"
+                  className={styles.windowsWorkspaceControlsClass}
+                  data-misty-window-drag-block="true"
+                />
+              ) : null}
               <Pressable
                 aria-label="Minimize window"
                 className={styles.windowsTitlebarControlButtonClass}

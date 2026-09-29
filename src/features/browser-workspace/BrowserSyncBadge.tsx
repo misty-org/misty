@@ -139,8 +139,8 @@ export function BrowserSyncBadge({
             </Button>
           )}
           {sync.session?.account_id !== accountId && (
-            <Button variant="ghost" size="sm" onClick={openSyncSettings} aria-label="Sync settings">
-              Sync
+            <Button variant="ghost" size="sm" onClick={openSyncSettings}>
+              Unlock sync
             </Button>
           )}
         </div>
