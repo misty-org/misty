@@ -340,3 +340,46 @@ fn a_remembered_seat_is_unconfirmed_until_the_roster_arrives_on_this_connection(
     sync.on_roster(&mut store, &f.root, roster).unwrap();
     assert!(sync.view(&store).unwrap().seat_confirmed);
 }
+
+#[test]
+fn a_forgotten_tree_is_read_only_until_the_server_copy_arrives_again() {
+    let f = fixture();
+    let directory = tempfile::tempdir().unwrap();
+    let mut store = crate::store::Store::initialize_vault(
+        &directory.path().join("workspace.sqlite"),
+        f.scope.clone(),
+        f.grant.clone(),
+        &f.root,
+        &f.key,
+        &crate::document::Document::default().encode().unwrap(),
+        None,
+    )
+    .unwrap();
+    let mut sync = super::sync::TreeSync::new(&f.scope, &f.grant);
+    let roster = vec![super::protocol::Tree {
+        tree_id: DEVICE.into(),
+        shared: false,
+        driver_device_id: Some(DEVICE.into()),
+        driver_epoch: Some("epoch".into()),
+        driver_seen_at: None,
+        version: 0,
+    }];
+    sync.on_connect();
+    sync.on_roster(&mut store, &f.root, roster.clone()).unwrap();
+    sync.on_current(&mut store, DEVICE, 0).unwrap();
+    assert!(sync.view(&store).unwrap().writable);
+
+    // A copy that failed to verify is dropped, not trusted or written back.
+    sync.forget(&mut store, DEVICE).unwrap();
+    assert!(!sync.view(&store).unwrap().writable);
+
+    // The next connection refetches from scratch and catches up again.
+    let frames = sync.on_connect();
+    assert!(frames.iter().any(|frame| matches!(
+        frame,
+        super::sync::Outgoing::Watch { tree_id, after: 0 } if tree_id == DEVICE
+    )));
+    sync.on_roster(&mut store, &f.root, roster).unwrap();
+    sync.on_current(&mut store, DEVICE, 0).unwrap();
+    assert!(sync.view(&store).unwrap().writable);
+}
