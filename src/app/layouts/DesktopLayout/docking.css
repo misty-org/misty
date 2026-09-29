@@ -241,10 +241,13 @@
     width: 24px !important;
     height: 24px !important;
   }
+  /* No top inset: the logo tile's top edge lines up with the workspace
+     panel's top, both sitting directly under the 38px titlebar band. */
   [data-navigator-header] {
-    padding: 4px 6px;
+    padding: 0 6px 4px;
   }
   [data-navigator-server-row] {
+    padding-block: 0;
     flex-direction: column;
     align-items: center;
     gap: 4px;
