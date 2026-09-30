@@ -13,10 +13,10 @@
 use std::collections::BTreeMap;
 
 use aes_gcm::{
-    aead::{Aead, Payload},
+    aead::{Aead, AeadCore, Payload},
     Aes256Gcm, KeyInit, Nonce,
 };
-use rand::{rngs::OsRng, RngCore};
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -77,11 +77,10 @@ pub fn seal(
 ) -> Result<Vec<u8>> {
     let key = record_key(root, scope, collection, &record.id)?;
     let plain = zeroize::Zeroizing::new(serde_json::to_vec(record)?);
-    let mut nonce = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce);
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let sealed = cipher(root, scope, collection)?
         .encrypt(
-            Nonce::from_slice(&nonce),
+            &nonce,
             Payload {
                 msg: &plain,
                 aad: &aad(scope, collection, &key, version)?,
