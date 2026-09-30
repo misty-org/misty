@@ -163,7 +163,9 @@ it("confirms opening another device's tabs without taking its sign-in lease", as
   };
   useBrowserSyncStore.setState({ session: twoWorkspaces() });
   await mount();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Open tabs from .* here/ })));
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: /Open tabs from .* here/ })),
+  );
   expect(mocks.claim).toHaveBeenCalledWith("s", "other");
   expect(screen.getByText("Waiting for the device to confirm…")).toBeTruthy();
   // The online holder keeps the lease; this machine only moves onto its workspace.

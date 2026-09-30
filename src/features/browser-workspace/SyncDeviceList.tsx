@@ -123,7 +123,10 @@ export function SyncDeviceList({
         // existing native safety overlays until that backend migration lands.
         await captureBeforeSwitch();
         if (!valid()) return;
-        await withDeadline(claimNativeWorkspace(session.session_id, request.deviceId), nativeCommandMs);
+        await withDeadline(
+          claimNativeWorkspace(session.session_id, request.deviceId),
+          nativeCommandMs,
+        );
       }
       if (!valid()) return;
       const latest = await withDeadline(readNativeSync(), nativeCommandMs);
