@@ -2,6 +2,7 @@ import { telemetrySetErrorReportingEnabled } from "@/native";
 import { secureId } from "@/shared/platform/secureId";
 import type { CommonClientProperties, TelemetryClient } from "@/telemetry/model/interfaces/types";
 import { analytics } from "./client";
+import { createConsentSync, type ConsentSender } from "./consentSync";
 import { clientMetadata } from "./metadata";
 
 export const ANALYTICS_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -137,6 +138,11 @@ const lifecycle = new AnalyticsLifecycleManager(
 );
 let listenersInstalled = false;
 let serverSessionAuthenticated = false;
+let appliedPreferences: [boolean, boolean] | null = null;
+let telemetryPreferencesSync: ConsentSender | null = null;
+const consent = createConsentSync(() =>
+  serverSessionAuthenticated ? telemetryPreferencesSync : null,
+);
 
 export function initializeAnalyticsLifecycle(): void {
   lifecycle.initialize();
@@ -167,9 +173,13 @@ export function setAnalyticsAuthenticationState(value: boolean): void {
   const becameAuthenticated = value && !serverSessionAuthenticated;
   serverSessionAuthenticated = value;
   lifecycle.setAuthenticationState(value);
+  if (!value) consent.reset();
   if (becameAuthenticated) syncTelemetryPreferencesToServer();
 }
+/** Called whenever the settings document is applied; acts only on a real change. */
 export function telemetryPreferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
+  if (appliedPreferences?.[0] === usageAnalytics && appliedPreferences[1] === errorReports) return;
+  appliedPreferences = [usageAnalytics, errorReports];
   lifecycle.preferencesChanged(usageAnalytics, errorReports);
   void telemetrySetErrorReportingEnabled(errorReports).catch(() => undefined);
   syncTelemetryPreferencesToServer();
@@ -178,17 +188,16 @@ export function trackOnboardingCompleted(): Promise<void> {
   return lifecycle.trackOnboardingCompleted();
 }
 
-type TelemetryPreferencesSync = (usageAnalytics: boolean, errorReports: boolean) => Promise<void>;
-let telemetryPreferencesSync: TelemetryPreferencesSync | null = null;
-
-export function configureTelemetryPreferencesSync(sync: TelemetryPreferencesSync): void {
+export function configureTelemetryPreferencesSync(sync: ConsentSender): void {
   telemetryPreferencesSync = sync;
 }
 
 function syncTelemetryPreferencesToServer(): void {
   if (!serverSessionAuthenticated) return;
-  void telemetryPreferencesSync?.(
+  // The account records the user's choice, not whether this build can honor it.
+  const [usage, errors] = appliedPreferences ?? [
     analytics.isAnalyticsEnabled(),
     analytics.isErrorReportingEnabled(),
-  ).catch(() => undefined);
+  ];
+  consent.update(usage, errors);
 }

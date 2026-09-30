@@ -98,19 +98,32 @@ describe("analytics lifecycle", () => {
   });
 
   it("waits for a verified server session before syncing preferences and stops after sign-out", async () => {
-    const lifecycle = await import("./lifecycle");
-    const sync = vi.fn().mockResolvedValue(undefined);
-    lifecycle.configureTelemetryPreferencesSync(sync);
-    lifecycle.setAnalyticsAuthenticationState(false);
-    lifecycle.telemetryPreferencesChanged(false, false);
-    expect(sync).not.toHaveBeenCalled();
-    lifecycle.setAnalyticsAuthenticationState(true);
-    lifecycle.setAnalyticsAuthenticationState(true);
-    expect(sync).toHaveBeenCalledTimes(1);
-    lifecycle.telemetryPreferencesChanged(false, true);
-    expect(sync).toHaveBeenCalledTimes(2);
-    lifecycle.setAnalyticsAuthenticationState(false);
-    lifecycle.telemetryPreferencesChanged(false, false);
-    expect(sync).toHaveBeenCalledTimes(2);
+    vi.useFakeTimers();
+    try {
+      const lifecycle = await import("./lifecycle");
+      const sync = vi.fn().mockResolvedValue(undefined);
+      lifecycle.configureTelemetryPreferencesSync(sync);
+      lifecycle.setAnalyticsAuthenticationState(false);
+      lifecycle.telemetryPreferencesChanged(false, false);
+      await vi.runAllTimersAsync();
+      expect(sync).not.toHaveBeenCalled();
+      lifecycle.setAnalyticsAuthenticationState(true);
+      lifecycle.setAnalyticsAuthenticationState(true);
+      await vi.runAllTimersAsync();
+      expect(sync).toHaveBeenCalledTimes(1);
+      lifecycle.telemetryPreferencesChanged(false, true);
+      await vi.runAllTimersAsync();
+      expect(sync).toHaveBeenCalledTimes(2);
+      // Re-applying the same settings document sends nothing.
+      for (let i = 0; i < 5; i++) lifecycle.telemetryPreferencesChanged(false, true);
+      await vi.runAllTimersAsync();
+      expect(sync).toHaveBeenCalledTimes(2);
+      lifecycle.setAnalyticsAuthenticationState(false);
+      lifecycle.telemetryPreferencesChanged(false, false);
+      await vi.runAllTimersAsync();
+      expect(sync).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
