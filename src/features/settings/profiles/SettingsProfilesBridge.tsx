@@ -26,7 +26,6 @@ export function SettingsProfilesBridge() {
     if (!loaded || !available || transitioning) return;
     let active = true;
     let stop: (() => void) | undefined;
-    let recovery: ReturnType<typeof setInterval> | undefined;
     const initialize = async () => {
       // A frozen installation baseline prevents a newly selected account from
       // importing the previous account's projected profile preferences.
@@ -81,10 +80,8 @@ export function SettingsProfilesBridge() {
         .getState()
         .configure(JSON.stringify([scope, accountId]), accountId, seed);
       if (!active || !useSettingsProfiles.getState().ready) return;
-      recovery = setInterval(() => {
-        const profiles = useSettingsProfiles.getState();
-        if (navigator.onLine && profiles.accountId) void profiles.refresh().catch(() => {});
-      }, 30_000);
+      // The account stream resets after reconnect/overflow; focus and online
+      // also reconcile. No periodic settings reads are needed.
       stop = observeAccountChanges(accountId, ["settings-profiles"], () =>
         useSettingsProfiles.getState().refresh(),
       );
@@ -93,7 +90,6 @@ export function SettingsProfilesBridge() {
     return () => {
       active = false;
       stop?.();
-      clearInterval(recovery);
       useSettingsProfiles.getState().disconnect();
     };
   }, [loaded, available, transitioning, user?.id, scope, retry]);

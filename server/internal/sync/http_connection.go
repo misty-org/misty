@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
@@ -75,7 +76,10 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 	}
 	conn.SetReadLimit(SyncWorkspaceMaxOpBytes*4/3 + 64<<10)
 	_ = conn.SetReadDeadline(time.Now().Add(45 * time.Second))
-	conn.SetPongHandler(func(string) error { return heartbeat() })
+	conn.SetPongHandler(func(payload string) error {
+		metrics.RecordSyncMessage(ctx, "in", "pong", len(payload))
+		return heartbeat()
+	})
 	windowStart := time.Now()
 	messages := 0
 	for {
@@ -92,7 +96,9 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 			return
 		}
 		var frame syncClientFrame
-		if err = decodeSync(bytes.NewReader(raw), &frame); err != nil {
+		err = decodeSync(bytes.NewReader(raw), &frame)
+		metrics.RecordSyncMessage(ctx, "in", frame.Type, len(raw))
+		if err != nil {
 			send(map[string]any{"type": "error", "code": "invalid_sync_frame"})
 			continue
 		}
@@ -178,7 +184,7 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 		if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
 			return err
 		}
-		return conn.WriteJSON(value)
+		return writeSyncJSON(ctx, conn, value)
 	}
 	vault, err := s.store.BrowserSyncVault(ctx, identity.UserID)
 	if err != nil || vault == nil {
@@ -345,6 +351,7 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 			if conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)) != nil {
 				return
 			}
+			metrics.RecordSyncMessage(ctx, "out", "ping", 0)
 		}
 	}
 }

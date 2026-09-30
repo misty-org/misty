@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   generation: 0,
   apply: vi.fn(async (_values: unknown, _valid?: () => boolean) => {}),
   ensure: vi.fn(),
+  read: vi.fn(),
   patch: vi.fn(),
 }));
 vi.mock("@/api/client/session", () => ({ readApiSessionGeneration: () => mocks.generation }));
@@ -53,6 +54,7 @@ describe("durable settings profile controller", () => {
     vi.stubGlobal("BroadcastChannel", undefined);
     online(false);
     mocks.ensure.mockResolvedValue(a);
+    mocks.read.mockResolvedValue(a);
     mocks.patch.mockImplementation(async (edit) => ({ ...a, revision: 2, values: edit.set }));
   });
   afterEach(() => {
@@ -140,7 +142,7 @@ describe("durable settings profile controller", () => {
 
   it("takes remote updates without a local override", async () => {
     await setup();
-    mocks.ensure.mockResolvedValue({
+    mocks.read.mockResolvedValue({
       ...a,
       revision: 3,
       values: { [key]: "remote", "app.zoom": 1.25 },
@@ -163,6 +165,26 @@ describe("durable settings profile controller", () => {
       expect.objectContaining({ set: { [key]: "offline" } }),
     );
     expect(store.getState().state?.seed).toEqual({});
+  });
+  it("reads enrolled settings without writes or repeated projection", async () => {
+    await setup();
+    mocks.apply.mockClear();
+    online(true);
+    await store.getState().refresh();
+    await store.getState().refresh();
+    expect(mocks.read).toHaveBeenCalledTimes(2);
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    expect(mocks.patch).not.toHaveBeenCalled();
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it("does not enqueue or refresh an unchanged preference", async () => {
+    await setup();
+    mocks.apply.mockClear();
+    online(true);
+    await store.getState().edit(key, "old");
+    expect(store.getState().state?.outbox).toHaveLength(0);
+    expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.apply).not.toHaveBeenCalled();
   });
   it("does not create local-only preferences when signed out", async () => {
     await store.getState().configure("signed-out", "", {});

@@ -14,6 +14,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/transport"
 
 	"github.com/gorilla/websocket"
+	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
@@ -257,6 +258,7 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 			return
 		}
 		defer conn.Close()
+		defer metrics.TrackSyncConnection(r.Context())()
 		challenge, err := security.GenerateSecureToken()
 		if err != nil {
 			return
@@ -264,7 +266,7 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 		conn.SetReadLimit(4096)
 		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		if conn.WriteJSON(map[string]any{"type": "challenge", "protocol_version": version, "challenge": challenge}) != nil {
+		if writeSyncJSON(r.Context(), conn, map[string]any{"type": "challenge", "protocol_version": version, "challenge": challenge}) != nil {
 			return
 		}
 		kind, raw, err := conn.ReadMessage()
@@ -272,7 +274,9 @@ func (s *BrowserSyncService) Connect() http.HandlerFunc {
 			return
 		}
 		var auth syncClientFrame
-		if decodeSync(bytes.NewReader(raw), &auth) != nil || auth.Type != "authenticate" || auth.After < 0 || auth.After > SyncMaxCounter || len(identity.PublicKey) != ed25519.PublicKeySize || !ed25519.Verify(identity.PublicKey, syncConnectionProof(identity.VaultID, identity.DeviceID, challenge), auth.Signature) {
+		decodeErr := decodeSync(bytes.NewReader(raw), &auth)
+		metrics.RecordSyncMessage(r.Context(), "in", auth.Type, len(raw))
+		if decodeErr != nil || auth.Type != "authenticate" || auth.After < 0 || auth.After > SyncMaxCounter || len(identity.PublicKey) != ed25519.PublicKeySize || !ed25519.Verify(identity.PublicKey, syncConnectionProof(identity.VaultID, identity.DeviceID, challenge), auth.Signature) {
 			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Device proof required"), time.Now().Add(time.Second))
 			return
 		}

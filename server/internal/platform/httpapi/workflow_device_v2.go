@@ -12,8 +12,8 @@ import (
 
 // executeLeasedDeviceNode creates an exact, schema-bound node job. A healthy
 // device must already exist; otherwise the attempt fails immediately and the
-// engine applies its ordinary three-attempt/cooldown policy. The bounded poll
-// is only a waiter over durable state—the lease and completion survive a
+// engine applies its ordinary three-attempt/cooldown policy. The event-driven
+// waiter reads durable state—the lease and completion survive a
 // coordinator restart and duplicate completions are idempotent.
 func (s *SpacesService) executeLeasedDeviceNode(ctx context.Context, run *db.SpaceRun, descriptor workflowv2.NodeDescriptor, invocation workflowv2.Invocation) (json.RawMessage, error) {
 	scopeID := workflowScopeID(invocation.Config, invocation.Input)
@@ -29,32 +29,24 @@ func (s *SpacesService) executeLeasedDeviceNode(ctx context.Context, run *db.Spa
 	if err != nil {
 		return nil, err
 	}
-	ticker := time.NewTicker(250 * time.Millisecond)
-	defer ticker.Stop()
-	timeout := time.NewTimer(2 * time.Minute)
-	defer timeout.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-timeout.C:
-			return nil, workflowv2.ErrDeviceUnavailable
-		case <-ticker.C:
-			current, lookupErr := s.database.WorkflowDeviceNodeJob(ctx, run.RequestingMemberID, job.ID)
-			if lookupErr != nil {
-				return nil, lookupErr
-			}
-			switch current.State {
-			case "completed":
-				return current.Output, nil
-			case "failed", "canceled":
-				if current.ErrorCode == "device_unavailable" {
-					return nil, workflowv2.ErrDeviceUnavailable
-				}
-				return nil, errors.New("device node execution failed: " + current.ErrorCode)
-			}
-		}
+	deadline := time.Now().Add(2 * time.Minute)
+	if job.DeadlineAt.Before(deadline) {
+		deadline = job.DeadlineAt
 	}
+	current, err := waitForDeviceJob(ctx, s.database, run.RequestingMemberID, job.ID, deadline)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil, workflowv2.ErrDeviceUnavailable
+	}
+	if err != nil {
+		return nil, err
+	}
+	if current.State == "completed" {
+		return current.Output, nil
+	}
+	if current.ErrorCode == "device_unavailable" {
+		return nil, workflowv2.ErrDeviceUnavailable
+	}
+	return nil, errors.New("device node execution failed: " + current.ErrorCode)
 }
 
 func workflowScopeID(values ...json.RawMessage) string {

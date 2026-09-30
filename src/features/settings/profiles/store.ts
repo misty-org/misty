@@ -20,6 +20,7 @@ interface Context {
   epoch: number;
   session: number;
   seed: Record<string, unknown>;
+  projected?: string;
   channel?: BroadcastChannel;
   refresh?: Promise<void>;
   refreshAgain?: boolean;
@@ -55,17 +56,20 @@ async function publish(ctx: Context, next: DeviceProfileState) {
   const project = async () => {
     if (!fresh(ctx)) return;
     const current = useSettingsProfiles.getState().state;
-    if (current)
-      await useSettingsStore
-        .getState()
-        .applyProfileValues(effectiveValues(current), () => fresh(ctx))
-        .catch((error) => {
-          // A platform integration failure must not prevent the preference from syncing.
-          if (fresh(ctx))
-            useSettingsStore.setState({
-              error: `Could not apply settings: ${error instanceof Error ? error.message : String(error)}`,
-            });
+    if (!current) return;
+    const values = effectiveValues(current);
+    const signature = JSON.stringify(Object.entries(values).sort(([a], [b]) => a.localeCompare(b)));
+    if (ctx.projected === signature) return;
+    try {
+      await useSettingsStore.getState().applyProfileValues(values, () => fresh(ctx));
+      if (fresh(ctx)) ctx.projected = signature;
+    } catch (error) {
+      // Failed platform effects can be retried by the next invalidation or focus.
+      if (fresh(ctx))
+        useSettingsStore.setState({
+          error: `Could not apply settings: ${error instanceof Error ? error.message : String(error)}`,
         });
+    }
   };
   projectionQueue = projectionQueue.catch(() => {}).then(project);
   await projectionQueue;
@@ -75,13 +79,18 @@ async function mutate(
   reducer: (state: DeviceProfileState) => DeviceProfileState,
   notify = false,
 ) {
+  let changed = false;
   const next = await mutateState(
     ctx.scope,
     () => initialProfileState(ctx.seed),
-    (state) => reducer(migrateProfileState(state, ctx.seed)),
+    (state) => {
+      const next = reducer(migrateProfileState(state, ctx.seed));
+      changed = next !== state;
+      return next;
+    },
   );
   await publish(ctx, next);
-  if (notify && fresh(ctx)) ctx.channel?.postMessage("changed");
+  if (notify && changed && fresh(ctx)) ctx.channel?.postMessage("changed");
   return next;
 }
 function cloud<T>(ctx: Context, work: () => Promise<T>): Promise<T> {
@@ -112,7 +121,9 @@ function cloud<T>(ctx: Context, work: () => Promise<T>): Promise<T> {
 async function synchronize(ctx: Context) {
   if (!fresh(ctx)) return;
   const saved = await readState<DeviceProfileState>(ctx.scope);
-  const profile = await api.ensure(saved.state?.seed ?? {});
+  const profile = saved.state?.profile
+    ? await api.read()
+    : await api.ensure(saved.state?.seed ?? {});
   if (!fresh(ctx)) return;
   await mutate(ctx, (state) => reconcileProfile(state, profile));
   while (fresh(ctx)) {
@@ -167,10 +178,8 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       if (!fresh(ctx)) return;
       set({ ready: true });
       registerProfileWriter((id, value) => get().edit(id, value));
-      if (accountId && navigator.onLine)
-        void get()
-          .refresh()
-          .catch(() => {});
+      // The bridge's account observer owns initial/reset/focus reconciliation.
+      // Starting another refresh here duplicates the initial pushed snapshot.
     } catch (error) {
       report(error, ctx);
     }
@@ -210,7 +219,17 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
     try {
       if (!ctx.accountId) throw new Error("Sign in to change settings.");
       const mutationId = crypto.randomUUID();
-      await mutate(ctx, (state) => editPreference(state, id, value, mutationId), true);
+      let changed = false;
+      await mutate(
+        ctx,
+        (state) => {
+          const next = editPreference(state, id, value, mutationId);
+          changed = next !== state;
+          return next;
+        },
+        true,
+      );
+      if (!changed) return;
       if (fresh(ctx)) set({ error: null });
       if (ctx.accountId && navigator.onLine)
         void get()

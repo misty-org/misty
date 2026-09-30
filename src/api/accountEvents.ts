@@ -5,6 +5,7 @@ import {
   apiRequestCredentials,
   readApiAuthToken,
   readApiSessionGeneration,
+  notifyApiSessionInvalid,
 } from "./client/session";
 import { readDeploymentScope, resolveApiBase } from "./deployment/api";
 
@@ -115,6 +116,14 @@ async function stream(signal: AbortSignal, generation: number, deliver: Subscrib
       delay = Math.max(delay, parseRetryAfter(response.headers.get("Retry-After")) ?? 0);
       if (!response.ok || !response.body) {
         await response.body?.cancel();
+        if (
+          response.status === 401 &&
+          !token &&
+          apiRequestCredentials() !== "omit" &&
+          generation === readApiSessionGeneration() &&
+          !signal.aborted
+        )
+          notifyApiSessionInvalid();
         if ([401, 403].includes(response.status)) return;
         if (response.status === 404) delay = Math.max(delay, 60_000);
         throw new Error("Event stream unavailable");
