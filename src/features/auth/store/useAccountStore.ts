@@ -24,7 +24,13 @@ configureAccountApi({ readAnalyticsEnabled: () => analytics.isAnalyticsEnabled()
 function authenticatedUser(data: LoginResponse, operation: string): AccountAuthUser {
   const id = data.user_id ?? data.id;
   if (!id) throw new AccountApiError(`${operation} response did not include a user id.`);
-  return { id, name: data.name, username: data.username, email: data.email };
+  return {
+    id,
+    name: data.name,
+    username: data.username,
+    email: data.email,
+    provider: data.provider,
+  };
 }
 
 async function persistLogin(data: LoginResponse, operation: string): Promise<AccountAuthUser> {
@@ -36,6 +42,44 @@ async function persistLogin(data: LoginResponse, operation: string): Promise<Acc
 
 export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {
   return persistLogin(await accountApi.signIn(email, password), "Sign-in");
+}
+
+export async function accountGoogleSignIn(
+  launch: (url: string) => Promise<void>,
+  signal: AbortSignal,
+): Promise<AccountAuthUser> {
+  const result = await googleFlow(launch, signal, false);
+  if ("reauthentication_token" in result) throw new Error("Unexpected Google sign-in response.");
+  return persistLogin(result, "Google sign-in");
+}
+
+export async function accountGoogleReauthenticate(
+  launch: (url: string) => Promise<void>,
+  signal: AbortSignal,
+): Promise<string> {
+  const result = await googleFlow(launch, signal, true);
+  if (!("reauthentication_token" in result))
+    throw new Error("Unexpected Google reauthentication response.");
+  return result.reauthentication_token;
+}
+
+async function googleFlow(
+  launch: (url: string) => Promise<void>,
+  signal: AbortSignal,
+  reauthenticate: boolean,
+): Promise<LoginResponse | { reauthentication_token: string }> {
+  const flow = await accountApi.beginGoogle(reauthenticate, signal);
+  signal.throwIfAborted();
+  await launch(flow.url);
+  const deadline = Date.now() + Math.min(flow.expires_in, 600) * 1000;
+  while (Date.now() < deadline) {
+    signal.throwIfAborted();
+    const result = await accountApi.completeGoogle(flow.flow_token, signal);
+    signal.throwIfAborted();
+    if (!("status" in result)) return result;
+    await new Promise<void>((resolve) => setTimeout(resolve, 2500));
+  }
+  throw new Error("Google sign-in expired. Please try again.");
 }
 
 /** Ends the account's server session and forgets its saved cookies, so the

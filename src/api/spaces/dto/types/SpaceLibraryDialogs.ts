@@ -75,6 +75,9 @@ export type TextDialogModel = {
 };
 
 export type UnlockDialogModel = {
+  configured: boolean | null;
+  confirmation: string;
+  setConfirmation: (confirmation: string) => void;
   scope: LibraryUnlockScope;
   password: string;
   saving: boolean;

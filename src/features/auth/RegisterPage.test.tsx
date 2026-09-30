@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   }),
 }));
 
+vi.mock("@/api/account/api", () => ({
+  accountApi: { googleAvailable: async () => ({ enabled: false }) },
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof ReactRouterDomModule>("react-router-dom");
   return {

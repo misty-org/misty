@@ -113,6 +113,8 @@ const signedOutPaths = new Set([
   "/self-host/bootstrap",
   "/self-host/enroll",
   "/auth/forgot",
+  "/auth/google",
+  "/auth/google/complete",
   "/auth/reset",
   "/auth/reset/start",
   "/auth/reset/validate",
@@ -146,6 +148,7 @@ export async function cookieSessionFetch(
     });
   }
   const changesSession = [
+    "/auth/google/complete",
     "/login",
     "/register",
     "/logout",
@@ -169,6 +172,8 @@ export async function cookieSessionFetch(
       "/register",
       "/logout",
       "/auth/refresh",
+      "/auth/google",
+      "/auth/google/complete",
       "/self-host/enroll",
       "/self-host/bootstrap",
     ].includes(path)

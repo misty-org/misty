@@ -16,6 +16,10 @@ import {
 } from "../components/DesktopSettingsUI";
 import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
+import { SettingsNote } from "../SettingsControls";
+
+// Self-hosting is paused until the hosted service is ready for users.
+const selfHostingAvailable = false;
 
 export function ServerSection(props: SettingsContentProps) {
   const environment = props.app?.environment;
@@ -65,7 +69,7 @@ export function ServerSection(props: SettingsContentProps) {
     <>
       <SettingsSectionBlock
         title="Connection"
-        description="Choose the Misty server this device uses. Changing servers restarts Misty, and each server keeps its own local data."
+        description="Use Misty’s managed service. Changing the connection restarts Misty."
       >
         <ServerConnectionRow
           icon={Cloud}
@@ -77,79 +81,90 @@ export function ServerSection(props: SettingsContentProps) {
           onConnect={() => void switchTo({ mode: "hosted" })}
         />
 
-        {servers.map((server) => {
-          const current = selfHosted && currentUrl === server.url;
-          return (
+        {selfHostingAvailable ? (
+          <>
+            {servers.map((server) => {
+              const current = selfHosted && currentUrl === server.url;
+              return (
+                <SettingsRow
+                  key={server.url}
+                  label={server.name}
+                  description={deploymentHostLabel(server.url)}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Button
+                      size="sm"
+                      type="button"
+                      variant={current ? "outline" : "default"}
+                      className={settingsDisabledControlClass}
+                      disabled={
+                        current || !nativeAvailable || switchingTo !== null || props.working
+                      }
+                      onClick={() => void switchTo({ mode: "self_hosted", url: server.url })}
+                    >
+                      {current ? (
+                        <>
+                          <Check size={14} aria-hidden="true" /> Current
+                        </>
+                      ) : switchingTo === server.url ? (
+                        "Connecting…"
+                      ) : (
+                        "Connect and restart"
+                      )}
+                    </Button>
+                    {!current ? (
+                      <IconButton
+                        variant="destructive"
+                        label={`Forget ${server.name}`}
+                        className={settingsDisabledControlClass}
+                        disabled={switchingTo !== null || props.working}
+                        onClick={() => setServers(forgetDeployment(server.url))}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                      </IconButton>
+                    ) : null}
+                  </div>
+                </SettingsRow>
+              );
+            })}
+
             <SettingsRow
-              key={server.url}
-              label={server.name}
-              description={deploymentHostLabel(server.url)}
+              label="Connect another server"
+              description="Use a complete HTTPS API URL. Loopback HTTP is accepted for development."
+              last
             >
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex w-full min-w-0 items-center justify-end gap-2 max-[760px]:justify-start">
+                <Input
+                  aria-label="Self-hosted server URL"
+                  className={`min-w-0 flex-1 ${settingsDisabledControlClass}`}
+                  value={newServerUrl}
+                  placeholder="https://misty.example.com/api"
+                  disabled={!nativeAvailable || switchingTo !== null || props.working}
+                  onChange={(event) => setNewServerUrl(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") connectNewServer();
+                  }}
+                />
                 <Button
                   size="sm"
                   type="button"
-                  variant={current ? "outline" : "default"}
-                  className={settingsDisabledControlClass}
-                  disabled={current || !nativeAvailable || switchingTo !== null || props.working}
-                  onClick={() => void switchTo({ mode: "self_hosted", url: server.url })}
+                  className={`shrink-0 ${settingsDisabledControlClass}`}
+                  disabled={
+                    !nativeAvailable ||
+                    !newServerUrl.trim() ||
+                    switchingTo !== null ||
+                    props.working
+                  }
+                  onClick={connectNewServer}
                 >
-                  {current ? (
-                    <>
-                      <Check size={14} aria-hidden="true" /> Current
-                    </>
-                  ) : switchingTo === server.url ? (
-                    "Connecting…"
-                  ) : (
-                    "Connect and restart"
-                  )}
+                  {switchingTo === newServerUrl.trim() ? "Connecting…" : "Connect and restart"}
                 </Button>
-                {!current ? (
-                  <IconButton
-                    variant="destructive"
-                    label={`Forget ${server.name}`}
-                    className={settingsDisabledControlClass}
-                    disabled={switchingTo !== null || props.working}
-                    onClick={() => setServers(forgetDeployment(server.url))}
-                  >
-                    <Trash2 size={15} aria-hidden="true" />
-                  </IconButton>
-                ) : null}
               </div>
             </SettingsRow>
-          );
-        })}
-
-        <SettingsRow
-          label="Connect another server"
-          description="Use a complete HTTPS API URL. Loopback HTTP is accepted for development."
-          last
-        >
-          <div className="flex w-full min-w-0 items-center justify-end gap-2 max-[760px]:justify-start">
-            <Input
-              aria-label="Self-hosted server URL"
-              className={`min-w-0 flex-1 ${settingsDisabledControlClass}`}
-              value={newServerUrl}
-              placeholder="https://misty.example.com/api"
-              disabled={!nativeAvailable || switchingTo !== null || props.working}
-              onChange={(event) => setNewServerUrl(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") connectNewServer();
-              }}
-            />
-            <Button
-              size="sm"
-              type="button"
-              className={`shrink-0 ${settingsDisabledControlClass}`}
-              disabled={
-                !nativeAvailable || !newServerUrl.trim() || switchingTo !== null || props.working
-              }
-              onClick={connectNewServer}
-            >
-              {switchingTo === newServerUrl.trim() ? "Connecting…" : "Connect and restart"}
-            </Button>
-          </div>
-        </SettingsRow>
+          </>
+        ) : (
+          <SettingsNote>Self-hosting is not available in this preview.</SettingsNote>
+        )}
       </SettingsSectionBlock>
 
       {notice ? (
