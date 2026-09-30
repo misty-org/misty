@@ -49,7 +49,7 @@ export function WorkspaceSwitcherList({
                   {[row.os, seatText(row)].filter(Boolean).join(" · ")}
                 </div>
               </div>
-              {row.seat === "you" ? (
+              {row.current ? (
                 <span
                   role="img"
                   aria-label={`Using ${row.name}'s workspace`}
@@ -66,11 +66,7 @@ export function WorkspaceSwitcherList({
                   disabled={Boolean(pending) || !row.canSwitch}
                   onClick={() => onSwitch(row.deviceId)}
                   aria-label={`Open ${row.name}`}
-                  title={
-                    row.seat === "other"
-                      ? `Take over from ${row.seatName}`
-                      : `Continue on ${row.name}'s workspace`
-                  }
+                  title={`Open ${row.name}'s tabs here`}
                   aria-busy={switching}
                 >
                   {switching ? (

@@ -1,4 +1,5 @@
 import type { NativeSyncView } from "./native";
+import { currentDeviceId } from "./websiteData";
 
 export type SyncActionKind = "retry" | "unlock" | "reenroll" | "setup" | "sign-in";
 export interface SyncStatus {
@@ -209,7 +210,7 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
       "Your workspace is up to date. Cookies and sign-in keys are still preparing.",
     );
   const sites = session?.website_data?.find(
-    (d) => d.device_id === (session.sync?.driving_workspace ?? session.device_id),
+    (d) => d.device_id === (currentDeviceId(session) ?? session.device_id),
   )?.sites;
   if (sites?.some((site) => site.skipped.length))
     return {

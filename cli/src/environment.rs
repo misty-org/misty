@@ -1278,7 +1278,7 @@ mod tests {
             ("MISTY_DEV_API_TUNNEL_HOSTNAME", "api.example.com"),
             ("MISTY_BILLING_ADAPTER", "http"),
             ("MISTY_BILLING_URL", "https://billing.example.com/adapter"),
-            ("MISTY_BILLING_SECRET", "fixture-billing-secret-32-bytes-long"),
+            ("MISTY_BILLING_SECRET", "fixture-billing-secret-32-bytes-long"), // gitleaks:allow -- synthetic test fixture
         ] {
             set(&workspace, Target::Dev, key, val).unwrap();
         }
