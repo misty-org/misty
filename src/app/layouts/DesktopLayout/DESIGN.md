@@ -38,7 +38,7 @@ components:
     padding: "3px 8px"
   global-icon-rail:
     backgroundColor: "{colors.workspace}"
-    width: "64px"
+    width: "54px"
 ---
 
 # Design System: Tab groups and global navigation
@@ -63,9 +63,17 @@ Inherit application typography without a new display face. Global navigation use
 
 ## Layout
 
-The global navigator is always a 64px icon rail. Its only modes are always visible and auto-hide: the latter reserves no workspace width and reveals the same rail when hovering the window edge (left by default). Hover reveal overlays the workspace without reflow, then hides after the pointer leaves; keyboard focus and open rail menus keep it available. The titlebar toggle, keyboard shortcut, and Appearance setting share the auto-hide preference. There is no wide or resizable navbar, and retired width preferences cannot restore one. Every rail item, from the Misty menu to Profile, is one square tile (40×40px) around a 23px glyph. Avatars use the shared `tile` shape: a square with soft corners (28% radius), no ring or border, sized to 30px for both Space and Profile identities; uploaded pictures of any aspect ratio crop to that square. Space navigation keeps its labeled rows and 16px glyphs. Preserve accessible names on every tile.
+The global navigator is 54px wide on either side and 38px tall on the top or bottom, with equal 10px horizontal outer gutters. Its modes are pinned and auto-hide. Auto-hide reserves no track and reveals the same mounted rail over the workspace; focus and open menus keep it visible. Settings → Layout and the keyboard shortcut control auto-hide. There is no titlebar toggle. Every tile is 34×34px around an 18px glyph; Space and Profile identities are 20px. Preserve accessible names on every tile.
 
-Search, Activity, and Sync sit in the fixed footer, in that order directly above Settings and Profile. The Misty menu stays at the top, and destinations scroll independently between the header and footer.
+All 16 supported navigation/tab combinations use `dockingGeometry.ts`: stable grid tracks, native titlebar reservations, tab insets and pane seams. Left navigation with top tabs is the visual reference. The other layouts transpose the same tile, gap, tray, footer and tab rules. Horizontal strips are 38px tall; every tab row is 28px, including vertical strips. Side strips use up to 200px (bounded to 35% in narrow windows). New tab follows the tabs on every edge. Do not add orientation-specific borders or spacing patches outside this contract.
+
+Layout settings expose Navigation position and Tabs position as the shared segmented pill selectors, without built-in or saved presets. Navigation and tabs can share any edge: navigation sits against the window edge, with tabs immediately inside. Top navigation shares the native titlebar. When neither navigation nor tabs is on top, the existing page toolbar reaches the window top; `useMergedTitlebar` reserves only the native button overlap in each topmost pane. A page without a toolbar uses its title in that space. Lower split panes retain their normal spacing.
+
+`useDockingTransition` preserves mounted panes and shares the shell's 300ms ease-in-out timeline. Native webviews resume when actual track and relocation animations finish; reduced motion skips relocation. Auto-hide overlays do not reflow content. Shared overlay placement points menus, popovers and tooltips inward; Windows titlebar controls retain downward placement. Escape from revealed navigation returns focus to its edge control.
+
+Use the approved black, white and gray shell palette from AGENTS.md. Historical accent guidance below does not authorize new colored shell controls.
+
+Search, Activity, and Sync sit in the fixed footer, in that order directly above Settings and Profile. These five utility controls never show window-edge indicators, including when hovered, focused, active or open. Edge indicators belong only to navigation destinations. The Misty menu stays at the top, and destinations scroll independently between the header and footer.
 
 Horizontal strips are (38px) tall. Group labels precede a contiguous block of tabs, with a continuous 2px color line from the label through the members, rising around the active tab’s top and sides. The scroll area reserves vertical clearance for that line. Horizontal tabs retain flexible widths bounded between (80px) and (160px).
 
@@ -108,7 +116,7 @@ Implementation handoff validation: one design detector returned zero findings; f
 
 ## Topbar refresh
 
-Custom titlebar and tab-strip icons share a 16px baseline, including tab icons. Icon-only app controls use the shared 24px target with a 4px inset, including the auto-hide navigation toggle. The two-glyph virtual-window trigger retains the same inset and icon size. Windows caption buttons retain equal native-sized targets and use 16px glyphs with a matching stroke. Split controls remain together; a narrow divider precedes the virtual-window trigger, which includes an explicit downward chevron. The shared menu trigger owns its expanded chevron state. The auto-hide navigation toggle retains its pressed accessibility state but has no persistent active background; hover still responds.
+Custom titlebar and tab-strip icons share a 16px baseline, including tab icons. Icon-only app controls use the shared 24px target with a 4px inset, with no titlebar navigation toggle. The two-glyph virtual-window trigger retains the same inset and icon size. Windows caption buttons retain equal native-sized targets and use 16px glyphs with a matching stroke. Split controls remain together; a narrow divider precedes the virtual-window trigger, which includes an explicit downward chevron. The shared menu trigger owns its expanded chevron state.
 
 Shared translucent interaction fills use `control-hover` (10% theme text) and `control-active` (16% theme text), increasing visibility while following both dark and light palettes. Buttons, icon buttons, menu triggers, navigation actions, toggles, segmented controls, and list rows use these shared fills where they previously used a faint text wash. Strong selected surfaces continue to use the existing active theme token.
 
@@ -118,7 +126,7 @@ The synthetic source-component preview in `.impeccable/review/topbar/` historica
 
 Tab-group refinement: the label shows only the name, toggles collapse on click, and opens configuration through right-click or the keyboard context action. The continuous horizontal accent follows the active tab outline. The source-component preview in `.impeccable/review/tab-groups-refined/` was checked at desktop and compact widths and with vertical tabs. All 25 focused tab-group/strip tests and scoped lint passed. Typechecking remains blocked by the existing SettingsNavigation and SettingScope errors.
 
-Navigation visibility correction: `NavigatorRail.tsx` owns edge hover, keyboard reveal/Escape, menu hold-open, and native-browser pointer forwarding. Appearance now exposes `navigator_auto_hide`; `navigator_compact`, expanded-width rendering, and the unused width default were removed. The current source-component fixture and captures are in `.impeccable/review/navbar-visibility/`. Browser verification covers pinned, hidden, edge-revealed, and menu states; native pointer integration is exercised through mocked events, not a native window session.
+Navigation visibility correction: `NavigatorRail.tsx` owns edge hover, keyboard reveal/Escape, menu hold-open, and native-browser pointer forwarding. Layout now exposes `navigator_auto_hide`; `navigator_compact`, expanded-width rendering, and the unused width default were removed. The current source-component fixture and captures are in `.impeccable/review/navbar-visibility/`. Browser verification covers pinned, hidden, edge-revealed, and menu states; native pointer integration is exercised through mocked events, not a native window session.
 
 ## Destination navigation and history
 

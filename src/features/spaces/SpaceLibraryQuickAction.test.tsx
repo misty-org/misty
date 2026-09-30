@@ -1,3 +1,7 @@
+vi.mock("@/features/library/library/LibraryRuntime", () => ({
+  useLibraryAi: vi.fn(),
+  useLibraryTitle: vi.fn(),
+}));
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";

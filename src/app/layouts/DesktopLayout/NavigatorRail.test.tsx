@@ -35,7 +35,7 @@ describe("fixed-width navigation rail", () => {
         {content}
       </NavigatorRail>,
     );
-    expect(rail().style.width).toBe("64px");
+    expect(rail().style.width).toBe("54px");
     expect(rail().hasAttribute("inert")).toBe(false);
     expect(screen.queryByRole("button", { name: "Show navigation" })).toBeNull();
     fireEvent.pointerLeave(rail());
@@ -43,25 +43,30 @@ describe("fixed-width navigation rail", () => {
     expect(rail().getAttribute("aria-hidden")).toBe("false");
   });
 
-  it("reveals on edge hover and hides after leaving without unmounting contents", async () => {
-    render(
-      <NavigatorRail autoHide position="left">
-        {content}
-      </NavigatorRail>,
-    );
-    const element = rail();
-    expect(element.hasAttribute("inert")).toBe(true);
-    fireEvent.pointerEnter(screen.getByRole("button", { name: "Show navigation" }));
-    fireEvent.pointerEnter(element);
-    expect(element.hasAttribute("inert")).toBe(false);
-    expect(native.suspend).toHaveBeenLastCalledWith(true, "navigator-reveal");
-    fireEvent.pointerLeave(element);
-    await settle();
-    expect(rail()).toBe(element);
-    expect(element.hasAttribute("inert")).toBe(true);
-    expect(element.style.width).toBe("64px");
-    expect(native.suspend).toHaveBeenLastCalledWith(false, "navigator-reveal");
-  });
+  it.each(["left", "right", "top", "bottom"] as const)(
+    "reveals the %s edge and hides without unmounting contents",
+    async (position) => {
+      render(
+        <NavigatorRail autoHide position={position}>
+          {content}
+        </NavigatorRail>,
+      );
+      const element = rail();
+      expect(element.hasAttribute("inert")).toBe(true);
+      fireEvent.pointerEnter(screen.getByRole("button", { name: "Show navigation" }));
+      fireEvent.pointerEnter(element);
+      expect(element.hasAttribute("inert")).toBe(false);
+      expect(native.suspend).toHaveBeenLastCalledWith(true, "navigator-reveal");
+      fireEvent.pointerLeave(element);
+      await settle();
+      expect(rail()).toBe(element);
+      expect(element.hasAttribute("inert")).toBe(true);
+      expect(
+        ["left", "right"].includes(position) ? element.style.width : element.style.height,
+      ).toBe(["left", "right"].includes(position) ? "54px" : "38px");
+      expect(native.suspend).toHaveBeenLastCalledWith(false, "navigator-reveal");
+    },
+  );
 
   it("keeps a menu anchor visible until its portaled menu closes", async () => {
     const view = (open: boolean) => (
@@ -112,10 +117,9 @@ describe("fixed-width navigation rail", () => {
     expect(native.suspend).toHaveBeenLastCalledWith(false, "navigator-reveal");
   });
 
-  it("lets keyboard users reveal the rail and Escape back to the toggle", async () => {
+  it("lets keyboard users reveal the rail and Escape back to the reveal edge", async () => {
     render(
       <>
-        <button data-navigator-visibility-toggle>Auto-hide navigation</button>
         <NavigatorRail autoHide position="left">
           {content}
         </NavigatorRail>
@@ -126,8 +130,6 @@ describe("fixed-width navigation rail", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Agents" }));
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(rail().hasAttribute("inert")).toBe(true);
-    expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "Auto-hide navigation" }),
-    );
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Show navigation" }));
   });
 });

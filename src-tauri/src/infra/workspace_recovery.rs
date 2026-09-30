@@ -95,7 +95,7 @@ pub async fn browser_recovery_forget(
         let scope = VaultScope {
             deployment: deployment.clone(),
             account_id: account_id.clone(),
-            workspace_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+            vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
         };
         scope.validate().map_err(error)?;
         let current = client()
@@ -156,7 +156,7 @@ pub async fn browser_recovery_open(
         let scope = VaultScope {
             deployment: deployment.clone(),
             account_id: account_id.clone(),
-            workspace_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+            vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
         };
         let directory = recovery_directory(&app, &deployment, &account_id)?;
         let mut builder = std::fs::DirBuilder::new();

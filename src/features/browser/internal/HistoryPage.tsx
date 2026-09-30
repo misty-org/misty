@@ -145,11 +145,11 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                   title={visit.url}
                   onClick={(event) =>
                     event.metaKey || event.ctrlKey
-                      ? props.openInNewTab(visit.url)
+                      ? props.openInNewView(visit.url)
                       : props.navigate(visit.url)
                   }
                   onAuxClick={(event) => {
-                    if (event.button === 1) props.openInNewTab(visit.url);
+                    if (event.button === 1) props.openInNewView(visit.url);
                   }}
                 >
                   <span className="truncate text-sm text-cream-bright">

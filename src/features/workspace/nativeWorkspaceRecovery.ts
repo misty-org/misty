@@ -13,7 +13,7 @@ import { browserWorkspaceStoreVersion, workspaceRecoveryKey } from "./workspaceR
 import { workspaceStoreStorageKey, legacyWorkspaceCandidate } from "./workspaceRecoveryPlatform";
 import { mergeRecoveredWorkspace } from "./mergeRecoveredWorkspace";
 import type { WorkspaceStore } from "./useWorkspaceStore";
-import { initialVirtualWorkspace } from "./virtualWindows";
+import { initialWorkspaceWindow } from "./windows";
 
 const key = "workspace";
 export const useWorkspaceRecoveryState = create<{
@@ -201,7 +201,7 @@ async function restore(accountId: string, generation: number) {
         envelope ? parsed.state : parsed,
         envelope ? parsed.version : 11,
       );
-      if (!restored.layout) Object.assign(restored, initialVirtualWorkspace());
+      if (!restored.layout) Object.assign(restored, initialWorkspaceWindow());
       if (parsed.syncBaseline)
         syncBaseline = migrateWorkspaceStore(parsed.syncBaseline, browserWorkspaceStoreVersion);
       if (!valid()) return;

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
-import { useWorkspaceTabFocused } from "@/features/workspace/WorkspaceTabRouteScope";
-import type { WorkspaceTab } from "@/features/workspace/core";
+import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
+import type { WorkspaceView } from "@/features/workspace/core";
 import { Button } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
@@ -12,10 +12,10 @@ import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 import { SpaceWorkspaceRail } from "./components/SpaceWorkspaceRail";
 import { SpaceInvitationsNotice } from "./spacesShell/SpaceInvitationsNotice";
 /** Each Space pane owns its navigation and content. */
-export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
+export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const focused = useWorkspaceTabFocused();
+  const focused = useWorkspaceViewFocused();
   const setViewingSpace = useSpacesStore((state) => state.setViewingSpace);
   const route = useSpacePanelRoute();
   const spaces = useSpacesStore((state) => state.spaces);

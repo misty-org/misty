@@ -62,7 +62,6 @@ mod tests {
             "browser_sync_connect",
             "browser_sync_state",
             "browser_sync_edit",
-            "browser_sync_resume",
             "browser_sync_activate",
             "browser_sync_claim",
             "browser_sync_lock",

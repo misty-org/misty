@@ -1,3 +1,6 @@
+vi.mock("@/features/workspace/useWorkspaceStore", () => ({
+  useWorkspaceStore: { getState: () => ({ activeScopeKey: `space:${f.space}` }) },
+}));
 import { beforeEach, expect, it, vi } from "vitest";
 import { useSmartLibraryStore } from "./useSmartLibraryStore";
 const f = vi.hoisted(() => ({

@@ -1,3 +1,8 @@
+import {
+  navigationTreeContentInsetClass,
+  navigationTreeIconClass,
+  navigationTreeSurfaceClass,
+} from "@/shared/ui";
 import type { MountedDevice } from "@/native/ipc";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -52,17 +57,17 @@ describe("Explorer sidebar interaction styles", () => {
   });
 
   it("keeps branch content close to the connector line", () => {
-    expect(sidebarStyles.treeSurface).toContain("ml-1");
-    expect(sidebarStyles.itemButton).toContain("px-2");
-    expect(sidebarStyles.pinnedButton).toContain("px-2");
-    expect(sidebarStyles.deviceButton).toContain("px-2");
-    expect(sidebarStyles.deviceGroupToggle).toContain("px-2");
+    expect(sidebarStyles.treeSurface).toContain(navigationTreeSurfaceClass);
+    expect(sidebarStyles.itemButton).toContain(navigationTreeContentInsetClass);
+    expect(sidebarStyles.pinnedButton).toContain(navigationTreeContentInsetClass);
+    expect(sidebarStyles.deviceButton).toContain(navigationTreeContentInsetClass);
+    expect(sidebarStyles.deviceGroupToggle).toContain(navigationTreeContentInsetClass);
   });
 
   it("uses prominent icons throughout sidebar item rows", () => {
-    expect(sidebarStyles.itemIcon).toContain("size-5");
-    expect(sidebarStyles.itemIcon).toContain("[&_svg]:!size-[18px]");
-    expect(sidebarStyles.remoteIcon).toContain("[&_img]:!size-[18px]");
-    expect(sidebarStyles.deviceIcon).toContain("[&_svg]:!size-[18px]");
+    expect(sidebarStyles.itemIcon).toContain(navigationTreeIconClass);
+    expect(sidebarStyles.itemIcon).toContain(navigationTreeIconClass);
+    expect(sidebarStyles.remoteIcon).toContain(navigationTreeIconClass);
+    expect(sidebarStyles.deviceIcon).toContain(navigationTreeIconClass);
   });
 });

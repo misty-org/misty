@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_RECENT_TOOLS,
   toolIdFromSurfaceId,
-  toolIdFromTab,
+  toolIdFromView,
   useRecentToolsStore,
 } from "./useRecentToolsStore";
 
@@ -49,12 +49,12 @@ describe("useRecentToolsStore", () => {
   });
 
   it("correctly identifies tool IDs from tabs and surface IDs", () => {
-    expect(toolIdFromTab({ surfaceId: "space", route: "/spaces/1/notes" })).toBe("journal");
-    expect(toolIdFromTab({ surfaceId: "space", route: "/spaces/1/planner" })).toBe("planner");
-    expect(toolIdFromTab({ surfaceId: "space", route: "/spaces/1/chat" })).toBe("social");
-    expect(toolIdFromTab({ surfaceId: "space", route: "/spaces/1/library" })).toBe("library");
-    expect(toolIdFromTab({ surfaceId: "code", route: "/code" })).toBe("code");
-    expect(toolIdFromTab({ surfaceId: "terminal", route: "/terminal" })).toBe("terminal");
+    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/notes" })).toBe("journal");
+    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/planner" })).toBe("planner");
+    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/chat" })).toBe("social");
+    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/library" })).toBe("library");
+    expect(toolIdFromView({ surfaceId: "code", route: "/code" })).toBe("code");
+    expect(toolIdFromView({ surfaceId: "terminal", route: "/terminal" })).toBe("terminal");
 
     expect(toolIdFromSurfaceId("space", "Journal")).toBe("journal");
     expect(toolIdFromSurfaceId("space", "Planner")).toBe("planner");

@@ -2,7 +2,7 @@ import {
   browserSearchUrl,
   dockLeaves,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
@@ -23,7 +23,7 @@ interface BrowserMenuCommand {
  * has already checked that the menu is current and the page has not changed.
  */
 export function useBrowserMenuCommands(input: {
-  tab: WorkspaceTab;
+  tab: WorkspaceView;
   commands: BrowserPageCommands;
   travel: (direction: -1 | 1) => boolean;
   reload: () => void;
@@ -69,12 +69,12 @@ export function useBrowserMenuCommands(input: {
   }, [runtimeId]);
 }
 
-function openInSplitView(source: WorkspaceTab, url: string) {
+function openInSplitView(source: WorkspaceView, url: string) {
   const workspace = useWorkspaceStore.getState();
   const pane = dockLeaves(workspace.layout.root).find((candidate) =>
-    candidate.tabs.some((item) => item.id === source.id),
+    candidate.views.some((item) => item.id === source.id),
   );
-  const opened = workspace.openBrowserTab({ url, paneId: pane?.id, sourceTabId: source.id });
+  const opened = workspace.openBrowserView({ url, paneId: pane?.id, sourceViewId: source.id });
   // At the panel limit the link still opens, as a tab beside this one.
   if (pane) workspace.splitPane(pane.id, "right", opened.id);
 }

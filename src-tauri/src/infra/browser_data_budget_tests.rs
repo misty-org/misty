@@ -173,7 +173,7 @@ fn databases_that_could_not_export_keep_their_synced_version() {
 }
 
 #[test]
-fn device_trees_keep_every_area_and_leave_limits_to_the_shard_packer() {
+fn device_workspaces_keep_every_area_and_leave_limits_to_the_shard_packer() {
     let mut coverage = Coverage::default();
     let cookies: Vec<_> = (0..4000).map(|i| cookie(&format!("c{i}"), 200)).collect();
     let candidates = (0..300)

@@ -1,6 +1,7 @@
 //! Native transport for website storage. Plaintext stays between the website's
 //! own origin and the native vault; it never crosses the Misty renderer bridge.
 use super::browser_data_budget::Held;
+use super::browser_signin_scope::with_unsynced;
 use misty_browser_sync::document::{credentials::Area, CredentialRecord};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -48,7 +49,7 @@ async fn evaluate_request(
     view: &Webview,
     physical: &str,
     origin: &str,
-    request: Value,
+    mut request: Value,
 ) -> Result<Value, String> {
     let url = view.url().map_err(|_| "Website storage is unavailable")?;
     if url.origin().ascii_serialization() != origin {
@@ -60,6 +61,7 @@ async fn evaluate_request(
     super::browser_cookie_store::verify_storage_profile(view, physical)
         .await
         .map_err(|_| PROFILE_UNVERIFIED)?;
+    request["scope"] = super::browser_signin_scope::page_scope();
     let request = serde_json::to_string(&request).map_err(|_| "Invalid website storage request")?;
     let script = SCRIPT.replace("__MISTY_STORAGE_REQUEST__", &request);
     #[cfg(target_os = "macos")]
@@ -117,8 +119,8 @@ impl WebsiteStorage {
     pub(super) async fn origin_view(&mut self, origin: &str) -> Result<&Webview, String> {
         self.origin(origin, None).await
     }
-    async fn origin(&mut self, origin: &str, tab_id: Option<&str>) -> Result<&Webview, String> {
-        let key = serde_json::to_string(&(origin, tab_id)).map_err(|_| "Invalid website origin")?;
+    async fn origin(&mut self, origin: &str, view_id: Option<&str>) -> Result<&Webview, String> {
+        let key = serde_json::to_string(&(origin, view_id)).map_err(|_| "Invalid website origin")?;
         if self.origins.get(&key).is_some_and(|view| {
             self.owner
                 .app_handle()
@@ -211,8 +213,8 @@ impl WebsiteStorage {
             let (origin, tab, field) = match &record.area {
                 Area::LocalStorage { origin } => (origin, None, "local"),
                 Area::IndexedDb { origin } => (origin, None, "indexed"),
-                Area::SessionStorage { origin, tab_id } => {
-                    (origin, Some(tab_id.clone()), "session")
+                Area::SessionStorage { origin, view_id } => {
+                    (origin, Some(view_id.clone()), "session")
                 }
                 Area::Cookies => continue,
             };
@@ -248,8 +250,8 @@ impl WebsiteStorage {
             let (origin, tab, field) = match &record.area {
                 Area::LocalStorage { origin } => (origin, None, "local"),
                 Area::IndexedDb { origin } => (origin, None, "indexed"),
-                Area::SessionStorage { origin, tab_id } => {
-                    (origin, Some(tab_id.as_str()), "session")
+                Area::SessionStorage { origin, view_id } => {
+                    (origin, Some(view_id.as_str()), "session")
                 }
                 Area::Cookies => continue,
             };
@@ -260,7 +262,8 @@ impl WebsiteStorage {
                 values.insert(key.clone(), evaluate(view, &physical, origin, None).await?);
             }
             let mut record = record.clone();
-            let actual = values[&key][field].clone();
+            // Storage outside the sign-in scope is never written, so it is not compared.
+            let actual = with_unsynced(&record.area, values[&key][field].clone(), &record.payload);
             record.payload = match self
                 .held
                 .databases
@@ -391,14 +394,14 @@ pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
         &physical,
         origin,
         Some(json!({
-            "local": {"sync-probe": "persisted"},
-            "session": {"sync-probe": "tab-only"},
+            "local": {"sync-probe-token": "persisted"},
+            "session": {"sync-probe-token": "tab-only"},
             "indexed": {"codec_version": 1, "databases": []}
         })),
     )
     .await?;
-    if written["local"]["sync-probe"] != "persisted"
-        || written["session"]["sync-probe"] != "tab-only"
+    if written["local"]["sync-probe-token"] != "persisted"
+        || written["session"]["sync-probe-token"] != "tab-only"
     {
         return Err("Website storage round trip failed".into());
     }
@@ -416,7 +419,7 @@ pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
             && candidate
                 .fresh
                 .as_ref()
-                .is_some_and(|payload| payload["sync-probe"] == "persisted")
+                .is_some_and(|payload| payload["sync-probe-token"] == "persisted")
     }) {
         return Err("Website capture did not read the stored origin data".into());
     }
@@ -424,7 +427,7 @@ pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
     let mut isolated = WebsiteStorage::new(owner.clone(), other.clone());
     let view = isolated.origin(origin, None).await?;
     let empty = evaluate(view, &other, origin, None).await?;
-    if empty["local"].get("sync-probe").is_some() {
+    if empty["local"].get("sync-probe-token").is_some() {
         return Err("Website data leaked across profiles".into());
     }
     assert_background(&owner).await?;

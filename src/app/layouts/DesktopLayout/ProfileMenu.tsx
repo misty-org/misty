@@ -9,15 +9,7 @@ import {
   MenuItem,
   MenuSubmenu,
 } from "@/shared/ui";
-import {
-  Check,
-  ExternalLink,
-  LogIn,
-  LogOut,
-  Plus,
-  Repeat2,
-  UserCircle,
-} from "lucide-react";
+import { Check, ExternalLink, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -89,7 +81,7 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
   };
 
   return (
-    <DropdownMenuContent side="right" align="end" sideOffset={10} width="md" aria-label="Profile">
+    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
       <DropdownMenuLabel className="truncate py-1.5 text-xs font-medium text-cream">
         {email || "Not signed in"}
       </DropdownMenuLabel>

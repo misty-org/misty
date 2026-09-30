@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export type RestoreStatus = "restoring" | "restored" | "partial" | "failed";
 
-export interface TabRestore {
+export interface ViewRestore {
   tabId: string;
   title: string;
   status: RestoreStatus;
@@ -13,8 +13,8 @@ export interface TabRestore {
 }
 
 export const usePageRestoreStore = create<{
-  tabs: Record<string, TabRestore>;
-  set: (tab: TabRestore) => void;
+  tabs: Record<string, ViewRestore>;
+  set: (tab: ViewRestore) => void;
   clear: () => void;
 }>((set) => ({
   tabs: {},

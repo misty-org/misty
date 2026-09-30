@@ -1,3 +1,4 @@
+import { useSettingsStore } from "@/features/settings";
 import {
   clipboardNativeFileRefs,
   clipboardWriteFileRefs,
@@ -9,7 +10,6 @@ import {
   explorerQueuePasteBlob,
   explorerQueuePasteItems,
   explorerQueuePasteText,
-  explorerSetOpenAssociation,
 } from "../../../native";
 import type { ClipboardPayload, FileEntry, PasteItem, PreparedOpenItem } from "@/native/ipc";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -48,7 +48,7 @@ export async function setAssociationForPath(
   filePath: string,
   applicationPath: string,
 ): Promise<void> {
-  await explorerSetOpenAssociation(filePath, applicationPath);
+  await useSettingsStore.getState().setOpenWithAssociation(filePath, applicationPath);
 }
 
 export async function pasteSystemClipboardTextIntoPane(

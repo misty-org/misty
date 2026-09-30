@@ -1,4 +1,5 @@
-//! Misty's native credential files. No OS credential service is contacted.
+//! Native credential files, with a separate Keychain-backed account login store.
+pub mod account;
 use sha2::{Digest, Sha256};
 use std::{
     fs,

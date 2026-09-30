@@ -1,8 +1,8 @@
 import {
   createDockLeaf,
   insertDockSplit,
-  type WorkspaceTab,
-  type WorkspaceVirtualWindow,
+  type WorkspaceView,
+  type WorkspaceWindow,
 } from "@/features/workspace";
 import { act, cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -10,7 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceDockTree } from "./WorkspaceDockTree";
 
 vi.mock("./WorkspaceSurface", () => ({
-  WorkspaceSurface: (props: { tab: WorkspaceTab; active: boolean }) => (
+  EmptyWorkspacePane: () => <div data-empty-pane />,
+  WorkspaceSurface: (props: { tab: WorkspaceView; active: boolean }) => (
     <output data-workspace-surface={props.tab.id} data-active={String(props.active)} />
   ),
 }));
@@ -26,8 +27,8 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     const journal = tab("journal", "/spaces/family/notes");
     const planner = tab("planner", "/spaces/family/planner/tasks/board");
     const pane = createDockLeaf([journal, planner]);
-    pane.activeTabId = journal.id;
-    const workspaceWindow: WorkspaceVirtualWindow = {
+    pane.activeViewId = journal.id;
+    const workspaceWindow: WorkspaceWindow = {
       id: "window-1",
       title: "Window 1",
       layout: { root: pane, focusedPaneId: pane.id },
@@ -37,20 +38,20 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     const props = {
       node: pane,
       focusedPaneId: pane.id,
-      lastUsedTabByGroup: {},
+      lastUsedViewByGroup: {},
       onOpen: vi.fn(),
       onClose: vi.fn(),
-      onMoveTab: vi.fn(() => true),
-      onDockTab: vi.fn(() => true),
+      onMoveView: vi.fn(() => true),
+      onDockView: vi.fn(() => true),
       onSplitPane: vi.fn(() => null),
       onClosePane: vi.fn(),
-      virtualWindows: [workspaceWindow],
-      activeVirtualWindowId: workspaceWindow.id,
-      canReopenVirtualWindow: false,
-      onSelectVirtualWindow: vi.fn(),
-      onCreateVirtualWindow: vi.fn(),
-      onCloseVirtualWindow: vi.fn(),
-      onReopenVirtualWindow: vi.fn(),
+      windows: [workspaceWindow],
+      activeWindowId: workspaceWindow.id,
+      canReopenWindow: false,
+      onSelectWindow: vi.fn(),
+      onCreateWindow: vi.fn(),
+      onCloseWindow: vi.fn(),
+      onReopenWindow: vi.fn(),
       onResizeSplit: vi.fn(),
     };
 
@@ -87,15 +88,13 @@ describe("WorkspaceDockTree tab lifecycle", () => {
       journalElement,
     );
 
-    const nextPane = { ...pane, tabs: [planner, journal], activeTabId: planner.id };
+    const nextPane = { ...pane, views: [planner, journal], activeViewId: planner.id };
     act(() => {
       view.rerender(
         <WorkspaceDockTree
           {...props}
           node={nextPane}
-          virtualWindows={[
-            { ...workspaceWindow, layout: { root: nextPane, focusedPaneId: nextPane.id } },
-          ]}
+          windows={[{ ...workspaceWindow, layout: { root: nextPane, focusedPaneId: nextPane.id } }]}
         />,
       );
     });
@@ -120,7 +119,7 @@ describe("WorkspaceDockTree tab lifecycle", () => {
   });
 });
 
-function tab(tool: "journal" | "planner", route: string): WorkspaceTab {
+function tab(tool: "journal" | "planner", route: string): WorkspaceView {
   return {
     id: `tab-${tool}`,
     surfaceId: "space",

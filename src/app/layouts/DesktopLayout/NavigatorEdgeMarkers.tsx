@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
-import { createPortal } from "react-dom";
+import { Portal } from "@/shared/ui";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { appZoomChangedEvent } from "@/shared/hooks/useAppZoom";
 
@@ -14,6 +14,7 @@ export function NavigatorEdgeMarkers({
   position: DockPosition;
 }) {
   const [markers, setMarkers] = useState<Marker[]>([]);
+  const [edgeOffset, setEdgeOffset] = useState(0);
   const vertical = isSideDock(position);
 
   useEffect(() => {
@@ -24,40 +25,57 @@ export function NavigatorEdgeMarkers({
     let frame = 0;
     const measure = () => {
       frame = 0;
+      const bounds = nav.getBoundingClientRect();
+      setEdgeOffset(
+        {
+          left: bounds.left,
+          right: window.innerWidth - bounds.right,
+          top: bounds.top,
+          bottom: window.innerHeight - bounds.bottom,
+        }[position],
+      );
       const next = Array.from(
         nav.querySelectorAll<HTMLElement>("[data-navigation-destination], [data-spaces-toggle]"),
-      ).map((element): Marker => {
-        if (!ids.has(element)) ids.set(element, nextId++);
-        const rect = element.getBoundingClientRect();
-        const center = vertical ? rect.top + rect.height / 2 : rect.left + rect.width / 2;
-        let visible = rect.width > 0 && rect.height > 0 && !element.closest("[inert]");
-        // A portalled marker must disappear when its source scrolls out of view.
-        for (let parent = element.parentElement; visible && parent; parent = parent.parentElement) {
-          const style = getComputedStyle(parent);
-          if (/(auto|scroll|hidden|clip)/.test(vertical ? style.overflowY : style.overflowX)) {
-            const bounds = parent.getBoundingClientRect();
-            visible = vertical
-              ? center >= bounds.top && center <= bounds.bottom
-              : center >= bounds.left && center <= bounds.right;
+      )
+        // Utility overlays never represent a navigation destination, even if
+        // a shared control carries destination metadata.
+        .filter((element) => !element.closest("[data-navigator-profile-bar]"))
+        .map((element): Marker => {
+          if (!ids.has(element)) ids.set(element, nextId++);
+          const rect = element.getBoundingClientRect();
+          const center = vertical ? rect.top + rect.height / 2 : rect.left + rect.width / 2;
+          let visible = rect.width > 0 && rect.height > 0 && !element.closest("[inert]");
+          // A portalled marker must disappear when its source scrolls out of view.
+          for (
+            let parent = element.parentElement;
+            visible && parent;
+            parent = parent.parentElement
+          ) {
+            const style = getComputedStyle(parent);
+            if (/(auto|scroll|hidden|clip)/.test(vertical ? style.overflowY : style.overflowX)) {
+              const bounds = parent.getBoundingClientRect();
+              visible = vertical
+                ? center >= bounds.top && center <= bounds.bottom
+                : center >= bounds.left && center <= bounds.right;
+            }
+            if (parent === nav) break;
           }
-          if (parent === nav) break;
-        }
-        const active = element.hasAttribute("data-spaces-toggle")
-          ? element.dataset.active === "true" && element.getAttribute("aria-expanded") === "false"
-          : element.matches('[aria-current="page"], [aria-pressed="true"]');
-        return {
-          id: ids.get(element)!,
-          center,
-          state: !visible
-            ? "hidden"
-            : active
-              ? "active"
-              : element.hasAttribute("data-navigation-destination") &&
-                  element.matches(":hover, :focus-visible")
-                ? "hover"
-                : "hidden",
-        };
-      });
+          const active = element.hasAttribute("data-spaces-toggle")
+            ? element.dataset.active === "true" && element.getAttribute("aria-expanded") === "false"
+            : element.matches('[aria-current="page"], [aria-pressed="true"]');
+          return {
+            id: ids.get(element)!,
+            center,
+            state: !visible
+              ? "hidden"
+              : active
+                ? "active"
+                : element.hasAttribute("data-navigation-destination") &&
+                    element.matches(":hover, :focus-visible")
+                  ? "hover"
+                  : "hidden",
+          };
+        });
       setMarkers((previous) =>
         previous.length === next.length &&
         previous.every(
@@ -118,20 +136,24 @@ export function NavigatorEdgeMarkers({
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener(appZoomChangedEvent, schedule);
     };
-  }, [navigatorRef, vertical]);
+  }, [navigatorRef, vertical, position]);
 
-  return createPortal(
-    <div aria-hidden="true" data-navigator-edge-markers="true">
-      {markers.map((marker) => (
-        <span
-          key={marker.id}
-          className="misty-navigator-edge-marker"
-          data-edge={position}
-          data-state={marker.state}
-          style={vertical ? { top: marker.center } : { left: marker.center }}
-        />
-      ))}
-    </div>,
-    document.body,
+  return (
+    <Portal>
+      <div aria-hidden="true" data-navigator-edge-markers="true">
+        {markers.map((marker) => (
+          <span
+            key={marker.id}
+            className="misty-navigator-edge-marker"
+            data-edge={position}
+            data-state={marker.state}
+            style={{
+              [position]: edgeOffset,
+              ...(vertical ? { top: marker.center } : { left: marker.center }),
+            }}
+          />
+        ))}
+      </div>
+    </Portal>
   );
 }

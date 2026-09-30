@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { dockWidgetRegistry } from "./dockRegistry";
-import { createCodeTabState, parseCodeTabState } from "./model";
+import { createCodeViewState, parseCodeViewState } from "./model";
 
 describe("Code tab state", () => {
   it("restores a versioned file viewport through the dock registry", () => {
-    const snapshot = createCodeTabState({
+    const snapshot = createCodeViewState({
       rootPath: "/repo",
       viewport: { kind: "file", activeFilePath: "/repo/src/main.ts" },
       explorerWidth: 28,
@@ -15,7 +15,7 @@ describe("Code tab state", () => {
 
   it("sanitizes legacy or malformed snapshots", () => {
     expect(
-      parseCodeTabState({
+      parseCodeViewState({
         rootPath: "",
         activeFilePath: 42,
         explorerWidth: 100,
@@ -30,7 +30,7 @@ describe("Code tab state", () => {
 
   it("migrates a version-one file viewport", () => {
     expect(
-      parseCodeTabState({
+      parseCodeViewState({
         version: 1,
         rootPath: "/repo",
         activeFilePath: "/repo/a.ts",
@@ -45,7 +45,7 @@ describe("Code tab state", () => {
   });
 
   it("restores reproducible multibuffer specs and expires mutations", () => {
-    const restored = parseCodeTabState({
+    const restored = parseCodeViewState({
       version: 2,
       rootPath: "/repo",
       explorerWidth: 22,

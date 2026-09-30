@@ -45,7 +45,7 @@ describe("browser workspace navigator", () => {
     expect(within(nav).queryByRole("heading", { name: "Groups" })).toBeNull();
     expect(within(nav).queryByRole("button", { name: "Configure groups" })).toBeNull();
     expect(within(nav).queryByText("Reading")).toBeNull();
-    expect(workspace().savedWebsites).toHaveLength(1);
+    expect(workspace().bookmarks).toHaveLength(1);
     const pages = within(nav).getAllByRole("link");
     expect(pages.slice(0, 5).map((page) => page.getAttribute("aria-label"))).toEqual([
       "Home",
@@ -93,7 +93,7 @@ describe("browser workspace navigator", () => {
     expect(useBrowserSearchStore.getState().open).toBe(true);
   });
   it("keeps Browser active for pages opened from bookmarks", () => {
-    workspace().openBrowserTab({ url: "https://example.com", websiteId: "legacy-bookmark" });
+    workspace().openBrowserView({ url: "https://example.com", bookmarkId: "legacy-bookmark" });
     renderNavigator();
     expect(screen.getByRole("link", { name: "Browser" }).getAttribute("aria-current")).toBe("page");
   });

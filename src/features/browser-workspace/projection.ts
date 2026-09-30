@@ -1,18 +1,26 @@
 import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
 import {
-  createBrowserTabState,
+  createBrowserViewState,
   type WorkspaceDockNode,
-  type WorkspaceLayoutTab,
   type WorkspaceTab,
-  type WorkspaceVirtualWindow,
+  type WorkspaceView,
+  type WorkspaceWindow,
 } from "@/features/workspace/model";
-import type { DeviceSelection, RecordKind, SharedRecord, SplitTree, WorkspaceView } from "./model";
+import type { MistyTabGroup } from "@/features/workspace/tabGroups";
+import type {
+  DeviceSelection,
+  RecordKind,
+  SharedRecord,
+  SplitTree,
+  WorkspaceRecords,
+} from "./model";
+import { projectTabGroups } from "./tabGroupSync";
 
 const recoveryWindowId = "recovery:window";
-export const recoveryLayoutId = (tabId: string) => `recovery:layout:${tabId}`;
-export const recoveryPaneId = (tabId: string) => `recovery:pane:${tabId}`;
+export const recoveryTabId = (viewId: string) => `recovery:tab:${viewId}`;
+export const recoveryPaneId = (viewId: string) => `recovery:pane:${viewId}`;
 
-function records<K extends RecordKind>(view: WorkspaceView, kind: K): SharedRecord<K>[] {
+function records<K extends RecordKind>(view: WorkspaceRecords, kind: K): SharedRecord<K>[] {
   return view.records.filter((record) => record.kind === kind) as SharedRecord<K>[];
 }
 function ordered<T extends { id: string; fields: { order: number } }>(values: T[]): T[] {
@@ -22,7 +30,8 @@ const compareId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 function panes(tree: SplitTree): string[] {
   return tree.type === "leaf" ? [tree.id] : [...panes(tree.first), ...panes(tree.second)];
 }
-function asTab(record: SharedRecord<"tab">): WorkspaceTab {
+/** A synced view as the pane content the workspace UI renders. */
+function viewAsWorkspaceView(record: SharedRecord<"view">): WorkspaceView {
   const fields = record.fields;
   return {
     id: record.id,
@@ -38,9 +47,9 @@ function asTab(record: SharedRecord<"tab">): WorkspaceTab {
     state:
       fields.surface === "browser"
         ? {
-            ...createBrowserTabState(fields.url!),
+            ...createBrowserViewState(fields.url!),
             profileId: fields.profile_id!,
-            websiteId: fields.website_id ?? undefined,
+            bookmarkId: fields.bookmark_id ?? undefined,
             agentOwned: fields.agent_owned || undefined,
           }
         : null,
@@ -51,79 +60,92 @@ function asTab(record: SharedRecord<"tab">): WorkspaceTab {
 function emptyPane(id: string): WorkspaceDockNode {
   // Stable placeholders avoid creating a fresh shared tab as a side effect of
   // importing empty geometry. An explicit navigation materializes a real tab.
-  return { type: "leaf", id, tabs: [], activeTabId: null };
+  return { type: "leaf", id, views: [], activeViewId: null };
 }
 
 export interface ProjectedWorkspace {
-  windows: WorkspaceVirtualWindow[];
+  windows: WorkspaceWindow[];
   activeWindowId: string | null;
-  groups: SharedRecord<"group">[];
-  websites: SharedRecord<"website">[];
-  recoveryTabIds: string[];
+  folders: SharedRecord<"folder">[];
+  bookmarks: SharedRecord<"bookmark">[];
+  recoveryViewIds: string[];
+  /** Synced tab groups; absent while they are still local to each machine. */
+  tabGroups?: MistyTabGroup[];
 }
 
 /** Pure projection: never emits edits or mutates the shared placement records.
- * Recovery layouts are local projections until the user explicitly moves a view. */
-export function projectWorkspace(view: WorkspaceView, local: DeviceSelection): ProjectedWorkspace {
+ * Recovery tabs are local projections until the user explicitly moves a view. */
+export function projectWorkspace(
+  view: WorkspaceRecords,
+  local: DeviceSelection,
+  /** This machine's groups when tab groups sync (for local collapsed state). */
+  localGroups?: MistyTabGroup[],
+): ProjectedWorkspace {
+  const groups = localGroups && projectTabGroups(view.records, localGroups);
   if (view.version !== 1 || !Number.isSafeInteger(view.sequence) || view.sequence < 0)
     throw new Error("Unsupported workspace view");
   const windows = ordered(records(view, "window"));
-  const layouts = ordered(records(view, "layout"));
-  const tabs = records(view, "tab").sort(
+  const tabs = ordered(records(view, "tab"));
+  const views = records(view, "view").sort(
     (a, b) => a.fields.placement.order - b.fields.placement.order || compareId(a.id, b.id),
   );
   const placed = new Set<string>();
-  const byWindow = new Map<string, WorkspaceLayoutTab[]>();
-  const recoveryTabIds: string[] = [];
+  const byWindow = new Map<string, WorkspaceTab[]>();
+  const recoveryViewIds: string[] = [];
 
   for (const window of windows) {
-    const windowLayouts: WorkspaceLayoutTab[] = [];
-    for (const layout of layouts.filter((item) => item.fields.window_id === window.id)) {
+    const windowTabs: WorkspaceTab[] = [];
+    for (const tab of tabs.filter((item) => item.fields.window_id === window.id)) {
       const build = (tree: SplitTree): WorkspaceDockNode => {
         if (tree.type === "split")
           return { ...tree, first: build(tree.first), second: build(tree.second) };
-        const candidates = tabs.filter(
-          (tab) =>
-            tab.fields.placement.layout_id === layout.id &&
-            tab.fields.placement.pane_id === tree.id,
+        const candidates = views.filter(
+          (item) =>
+            item.fields.placement.tab_id === tab.id && item.fields.placement.pane_id === tree.id,
         );
         const selected =
-          candidates.find((tab) => tab.id === local.activeTabByPane[tree.id]) ?? candidates[0];
+          candidates.find((item) => item.id === local.activeViewByPane[tree.id]) ?? candidates[0];
         if (!selected) return emptyPane(tree.id);
         placed.add(selected.id);
-        return { type: "leaf", id: tree.id, tabs: [asTab(selected)], activeTabId: selected.id };
+        return {
+          type: "leaf",
+          id: tree.id,
+          views: [viewAsWorkspaceView(selected)],
+          activeViewId: selected.id,
+        };
       };
-      const paneIds = panes(layout.fields.tree);
-      const focused = local.focusedPaneByLayout[layout.id];
-      windowLayouts.push({
-        id: layout.id,
-        title: layout.fields.title,
-        root: build(layout.fields.tree),
+      const paneIds = panes(tab.fields.tree);
+      const focused = local.focusedPaneByTab[tab.id];
+      windowTabs.push({
+        id: tab.id,
+        title: tab.fields.title,
+        root: build(tab.fields.tree),
         focusedPaneId: paneIds.includes(focused) ? focused : paneIds[0],
+        ...(groups ? { tabGroupId: groups.groupOfTab.get(tab.id) } : {}),
       });
     }
-    byWindow.set(window.id, windowLayouts);
+    byWindow.set(window.id, windowTabs);
   }
 
   // Preserve every live view even if a concurrently replaced split/container
   // no longer references its preferred pane, or two devices filled one pane.
-  for (const tab of tabs.filter((tab) => !placed.has(tab.id))) {
-    const sourceLayout = layouts.find((layout) => layout.id === tab.fields.placement.layout_id);
-    const sourceWindow = sourceLayout?.fields.window_id;
+  for (const item of views.filter((item) => !placed.has(item.id))) {
+    const sourceTab = tabs.find((tab) => tab.id === item.fields.placement.tab_id);
+    const sourceWindow = sourceTab?.fields.window_id;
     const targetWindow =
       sourceWindow && byWindow.has(sourceWindow)
         ? sourceWindow
         : (windows[0]?.id ?? recoveryWindowId);
     const target = byWindow.get(targetWindow) ?? [];
-    const paneId = recoveryPaneId(tab.id);
+    const paneId = recoveryPaneId(item.id);
     target.push({
-      id: recoveryLayoutId(tab.id),
-      title: tab.fields.title,
+      id: recoveryTabId(item.id),
+      title: item.fields.title,
       focusedPaneId: paneId,
-      root: { type: "leaf", id: paneId, tabs: [asTab(tab)], activeTabId: tab.id },
+      root: { type: "leaf", id: paneId, views: [viewAsWorkspaceView(item)], activeViewId: item.id },
     });
     byWindow.set(targetWindow, target);
-    recoveryTabIds.push(tab.id);
+    recoveryViewIds.push(item.id);
   }
   if (byWindow.has(recoveryWindowId) && !windows.some((window) => window.id === recoveryWindowId)) {
     windows.push({
@@ -132,15 +154,20 @@ export function projectWorkspace(view: WorkspaceView, local: DeviceSelection): P
       fields: { title: "Recovered tabs", order: 0 },
     });
   }
-  const projected = windows.map((window): WorkspaceVirtualWindow => {
-    const windowLayouts = byWindow.get(window.id)!;
-    if (!windowLayouts.length) {
+  const projected = windows.map((window): WorkspaceWindow => {
+    const windowTabs = byWindow.get(window.id)!;
+    if (!windowTabs.length) {
       const id = `recovery:empty:${window.id}`;
-      windowLayouts.push({ id, root: emptyPane(id), focusedPaneId: id });
+      windowTabs.push({ id, root: emptyPane(id), focusedPaneId: id });
     }
     const selected =
-      windowLayouts.find((layout) => layout.id === local.activeLayoutByWindow[window.id]) ??
-      windowLayouts[0];
+      windowTabs.find((tab) => tab.id === local.activeTabByWindow[window.id]) ??
+      neighbor(
+        windowTabs,
+        local.activeTabByWindow[window.id],
+        local.tabOrderByWindow?.[window.id],
+      ) ??
+      windowTabs[0];
     return {
       id: window.id,
       title: window.fields.title,
@@ -149,8 +176,8 @@ export function projectWorkspace(view: WorkspaceView, local: DeviceSelection): P
       layout: {
         root: selected.root,
         focusedPaneId: selected.focusedPaneId,
-        tabs: windowLayouts,
-        activeLayoutTabId: selected.id,
+        tabs: windowTabs,
+        activeTabId: selected.id,
       },
     };
   });
@@ -160,8 +187,24 @@ export function projectWorkspace(view: WorkspaceView, local: DeviceSelection): P
       projected.find((window) => window.id === local.activeWindowId)?.id ??
       projected[0]?.id ??
       null,
-    groups: ordered(records(view, "group")),
-    websites: ordered(records(view, "website")),
-    recoveryTabIds,
+    folders: ordered(records(view, "folder")),
+    bookmarks: ordered(records(view, "bookmark")),
+    recoveryViewIds,
+    ...(groups ? { tabGroups: groups.tabGroups } : {}),
   };
+}
+
+/** The tab that took a closed tab's place: the next one it was shown beside,
+ * else the previous one, as when closing it locally. */
+function neighbor(
+  tabs: WorkspaceTab[],
+  closed: string | undefined,
+  shown: string[] | undefined,
+): WorkspaceTab | undefined {
+  const index = closed && shown ? shown.indexOf(closed) : -1;
+  if (index < 0) return undefined;
+  const live = (id: string) => tabs.find((tab) => tab.id === id);
+  for (const id of shown!.slice(index + 1)) if (live(id)) return live(id);
+  for (const id of shown!.slice(0, index).reverse()) if (live(id)) return live(id);
+  return undefined;
 }

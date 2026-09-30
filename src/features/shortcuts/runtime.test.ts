@@ -204,7 +204,7 @@ describe("shortcut dispatcher", () => {
     );
     expect(plannerHandler).toHaveBeenCalledOnce();
 
-    store.updateTabRoute(planner.id, "/spaces/alpha/tasks/roadmaps");
+    store.updateViewRoute(planner.id, "/spaces/alpha/tasks/roadmaps");
     const roadmapHandler = vi.fn();
     const removeRoadmap = registerShortcutHandler("roadmap.create", roadmapHandler);
     expect(dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "n", code: "KeyN" }))).toBe(

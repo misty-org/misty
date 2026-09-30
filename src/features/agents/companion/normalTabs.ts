@@ -15,15 +15,15 @@ export async function companionBrowserContext(
   const workspace = useWorkspaceStore.getState();
   const panes = dockLeaves(workspace.layout.root);
   const pane = panes.find((p) => p.id === workspace.layout.focusedPaneId) ?? panes[0];
-  let tab = pane?.tabs.find((t) => t.id === pane.activeTabId && t.surfaceId === "browser");
+  let tab = pane?.views.find((t) => t.id === pane.activeViewId && t.surfaceId === "browser");
   if (!tab)
     tab = panes
-      .flatMap((p) => p.tabs)
+      .flatMap((p) => p.views)
       .find((t) => t.surfaceId === "browser" && browserRuntimeCreated(t));
   // A question must never open a tab as a side effect of assembling context.
   if (!tab && openWhenMissing) {
     assertCurrent();
-    tab = workspace.openBrowserTab({ url: browserHomeUrl() });
+    tab = workspace.openBrowserView({ url: browserHomeUrl() });
     const deadline = Date.now() + 8000;
     while (!browserRuntimeCreated(tab)) {
       assertCurrent();

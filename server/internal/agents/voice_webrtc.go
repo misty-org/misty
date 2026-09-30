@@ -9,12 +9,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 // WebRTC uses a server-authenticated call and sideband control connection. The
@@ -26,7 +26,7 @@ type VoiceWebRTC struct {
 }
 
 func VoiceWebRTCConfigured() bool {
-	return strings.TrimSpace(os.Getenv("MISTY_REALTIME_API_KEY")) != ""
+	return strings.TrimSpace(envconfig.Getenv("MISTY_REALTIME_API_KEY")) != ""
 }
 
 func realtimeRTCConfig() map[string]any {
@@ -46,7 +46,7 @@ func (a *SmartLibraryAnalyzer) OpenVoiceWebRTC(ctx context.Context, offer string
 	if !VoiceWebRTCConfigured() {
 		return nil, "", errors.New("WebRTC is not configured")
 	}
-	return openVoiceWebRTC(ctx, http.DefaultClient, "https://api.openai.com/v1", strings.TrimSpace(os.Getenv("MISTY_REALTIME_API_KEY")), offer)
+	return openVoiceWebRTC(ctx, http.DefaultClient, "https://api.openai.com/v1", strings.TrimSpace(envconfig.Getenv("MISTY_REALTIME_API_KEY")), offer)
 }
 
 func openVoiceWebRTC(ctx context.Context, client *http.Client, base, key, offer string) (*VoiceWebRTC, string, error) {

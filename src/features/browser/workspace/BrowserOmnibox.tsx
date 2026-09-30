@@ -1,5 +1,5 @@
 import { useMemo, type ComponentProps } from "react";
-import { parseBrowserTabState, type WorkspaceTab } from "@/features/workspace/model";
+import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import {
   browserRuntimeId,
@@ -28,16 +28,16 @@ export function BrowserOmnibox(
     | "context"
     | "providers"
     | "onNavigate"
-    | "onSwitchTab"
+    | "onSwitchView"
     | "onOpenInApp"
     | "onRemove"
   > & {
-    tab: WorkspaceTab;
+    tab: WorkspaceView;
     historyEntries: string[];
     onNavigate: (value: string) => void;
   },
 ) {
-  const { profileId, private: isPrivate } = parseBrowserTabState(props.tab.state);
+  const { profileId, private: isPrivate } = parseBrowserViewState(props.tab.state);
   // Keyed on content: callers may pass a fresh array each render, and a new
   // context would rerun every provider.
   const sessionHistoryKey = props.historyEntries.join("\n");
@@ -65,7 +65,7 @@ export function BrowserOmnibox(
         if (typed && /^https?:\/\//i.test(value)) markBrowserNavigationTyped(props.tab.id);
         props.onNavigate(value);
       }}
-      onSwitchTab={(tabId) => useWorkspaceStore.getState().focusTab(tabId)}
+      onSwitchView={(tabId) => useWorkspaceStore.getState().focusView(tabId)}
       onOpenInApp={(route) => {
         // Opens the item in its tool's tab, moving an open one to it.
         const surface = workspaceSurfaceFromRoute(route);
@@ -73,7 +73,7 @@ export function BrowserOmnibox(
         const opened = useWorkspaceStore
           .getState()
           .openSurface({ ...surface, syncExistingRoute: true });
-        useWorkspaceStore.getState().focusTab(opened.id);
+        useWorkspaceStore.getState().focusView(opened.id);
       }}
       onRemove={(match) => forgetBrowserPage(props.tab.id, match.target.url)}
     />

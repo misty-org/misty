@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import type * as SocialRuntimeModule from "@/features/spaces/chat/SocialRuntime";
+vi.mock("@/features/spaces/chat/SocialRuntime", async (importOriginal) => ({
+  ...(await importOriginal<typeof SocialRuntimeModule>()),
+  SocialError: (await import("@/features/activity")).SystemErrorActivity,
+}));
+import { describe, expect, it, vi } from "vitest";
 import { createElement, createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 

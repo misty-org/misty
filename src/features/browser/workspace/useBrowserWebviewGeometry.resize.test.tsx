@@ -18,7 +18,7 @@ vi.mock("@/shared/hooks/useAppZoom", () => ({
   getAppliedAppRenderScale: () => 1,
 }));
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
-import type { WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/workspace";
 
 afterEach(() => {
   cleanup();
@@ -67,7 +67,7 @@ it("lets AppKit own a resize burst and reconciles only the final DOM bounds", as
       hostRef: { current: host },
       nativeRuntime: true,
       nativeLiveResize: true,
-      tab: { id: "browser", instanceKey: "browser" } as WorkspaceTab,
+      tab: { id: "browser", instanceKey: "browser" } as WorkspaceView,
       url: "https://example.com",
       theme: "dark",
     }),

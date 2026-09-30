@@ -8,7 +8,7 @@ fn scope() -> VaultScope {
     VaultScope {
         deployment: "https://sync.example.test".into(),
         account_id: "fixture".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     }
 }
 
@@ -139,7 +139,8 @@ fn shared_rust_go_protocol_fixture_stays_compatible() {
     struct Fixture {
         deployment: String,
         account_id: String,
-        workspace_id: String,
+        #[serde(alias = "workspace_id")]
+        vault_id: String,
         password: String,
         sync_secret: String,
         root_public_key: String,
@@ -157,7 +158,7 @@ fn shared_rust_go_protocol_fixture_stays_compatible() {
     let scope = VaultScope {
         deployment: f.deployment,
         account_id: f.account_id,
-        workspace_id: f.workspace_id,
+        vault_id: f.vault_id,
     };
     let root = VaultRoot::unlock(
         &scope,

@@ -3,12 +3,13 @@
 pub mod crypto;
 pub mod document;
 pub mod protocol;
+pub mod collections;
 pub mod recovery;
 pub mod restore;
 pub mod secure_store;
 pub mod store;
 pub mod transport;
-pub mod tree;
+pub mod workspace;
 pub mod worker;
 
 #[derive(Debug, thiserror::Error)]
@@ -31,7 +32,7 @@ pub enum Error {
     Network,
     #[error("Sign in again to reconnect sync")]
     Authentication,
-    #[error("This device does not have permission to sync this workspace")]
+    #[error("This device does not have permission to sync this account")]
     DeviceForbidden,
     #[error("Sync requires a newer client or a vault recovery step")]
     Recovery,

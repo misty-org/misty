@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLibraryFocused as useWorkspaceTabFocused } from "../LibraryRuntime";
+import { useLibraryFocused as useWorkspaceViewFocused } from "../LibraryRuntime";
 
 const TEXT_ENTRY_SELECTOR = "input, textarea, select, [contenteditable='true']";
 
@@ -18,7 +18,7 @@ export function useLibraryViewerKeyboard(options: {
   onNext: () => void;
 }) {
   const { enabled, index, itemCount, onClose, onPrevious, onNext } = options;
-  const workspaceFocused = useWorkspaceTabFocused();
+  const workspaceFocused = useWorkspaceViewFocused();
 
   useEffect(() => {
     if (!enabled || !workspaceFocused) return;

@@ -102,7 +102,7 @@ export function DownloadsPage(props: BrowserInternalPageProps) {
             key={entry.id}
             entry={entry}
             run={run}
-            retry={() => props.openInNewTab(entry.url)}
+            retry={() => props.openInNewView(entry.url)}
           />
         ))}
       </ul>

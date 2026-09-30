@@ -1,13 +1,13 @@
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { mapLayoutViews } from "./layoutTabs";
 import {
-  browserTabTitle,
-  createBrowserTabState,
-  parseBrowserTabState,
+  browserViewTitle,
+  createBrowserViewState,
+  parseBrowserViewState,
   type WorkspaceLayout,
   type WorkspaceScopeKey,
   type WorkspaceSurfaceId,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "./model";
 
 export function isSupportedWorkspaceSurface(value: unknown): value is WorkspaceSurfaceId {
@@ -20,10 +20,10 @@ export function isSupportedWorkspaceSurface(value: unknown): value is WorkspaceS
     value === "space"
   );
 }
-export function migrateRetiredWorkspaceTab(
-  tab: WorkspaceTab,
+export function migrateRetiredWorkspaceView(
+  tab: WorkspaceView,
   _scopeKey: WorkspaceScopeKey = "global",
-): WorkspaceTab {
+): WorkspaceView {
   const destination = workspaceSurfaceFromRoute(tab.route);
   if (tab.surfaceId === "scheduled" || destination?.surfaceId === "scheduled")
     return {
@@ -60,7 +60,7 @@ export function migrateRetiredWorkspaceTab(
       placeholder: tab.placeholder,
     };
   const wasBrowser = tab.surfaceId === "browser" || tab.groupKey === "app:browser";
-  const state = wasBrowser ? parseBrowserTabState(tab.state) : createBrowserTabState();
+  const state = wasBrowser ? parseBrowserViewState(tab.state) : createBrowserViewState();
   return {
     ...tab,
     surfaceId: "browser",
@@ -69,12 +69,12 @@ export function migrateRetiredWorkspaceTab(
     instanceKey: tab.instanceKey || tab.id,
     state,
     placeholder: tab.placeholder,
-    title: wasBrowser && tab.title ? tab.title : browserTabTitle(state.url),
+    title: wasBrowser && tab.title ? tab.title : browserViewTitle(state.url),
   };
 }
-export function migrateRetiredWorkspaceTabs(
+export function migrateRetiredWorkspaceViews(
   layout: WorkspaceLayout,
   scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceLayout {
-  return mapLayoutViews(layout, (tab) => migrateRetiredWorkspaceTab(tab, scopeKey));
+  return mapLayoutViews(layout, (tab) => migrateRetiredWorkspaceView(tab, scopeKey));
 }

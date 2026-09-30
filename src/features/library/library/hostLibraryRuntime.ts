@@ -1,6 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceTabTitle, useWorkspaceTabFocused } from "@/features/workspace";
+import { useWorkspaceViewTitle, useWorkspaceViewFocused } from "@/features/workspace";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { MistyFilePicker } from "@/features/picker";
@@ -14,8 +14,8 @@ export function initializeHostLibraryRuntime() {
   configureLibraryRuntime({
     api: spacesApi,
     useSpacesStore,
-    useWorkspaceTabTitle,
-    useWorkspaceTabFocused,
+    useWorkspaceViewTitle: useWorkspaceViewTitle,
+    useWorkspaceViewFocused: useWorkspaceViewFocused,
     useAiSurfaceAdapter,
     useShortcutHandler,
     Picker: MistyFilePicker,

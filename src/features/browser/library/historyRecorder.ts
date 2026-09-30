@@ -1,16 +1,16 @@
 import {
   isBrowserInternalUrl,
-  parseBrowserTabState,
+  parseBrowserViewState,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
-import { mapAllVirtualWorkspaceTabs } from "@/features/workspace/virtualWindows";
+import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { browserLibrary } from "./native";
 
 /** Finds a tab in any virtual window or Space, active or not. */
-function findWorkspaceTab(tabId: string): WorkspaceTab | null {
-  let found: WorkspaceTab | null = null;
-  mapAllVirtualWorkspaceTabs(useWorkspaceStore.getState(), (tab) => {
+function findWorkspaceView(tabId: string): WorkspaceView | null {
+  let found: WorkspaceView | null = null;
+  mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (tab) => {
     if (!found && tab.id === tabId) found = tab;
     return tab;
   });
@@ -22,9 +22,9 @@ function findWorkspaceTab(tabId: string): WorkspaceTab | null {
  * for its own work, and Misty's own pages are left out.
  */
 function historyTarget(tabId: string): { profileId?: string } | null {
-  const tab = findWorkspaceTab(tabId);
+  const tab = findWorkspaceView(tabId);
   if (!tab) return null;
-  const state = parseBrowserTabState(tab.state);
+  const state = parseBrowserViewState(tab.state);
   if (state.agentOwned || state.private || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
@@ -65,7 +65,7 @@ export function recordBrowserVisitTitle(tabId: string, url: string, title: strin
   void browserLibrary.setVisitTitle({ ...target, url, title }).catch(() => undefined);
 }
 
-export function browserTabUrl(tabId: string): string | null {
-  const tab = findWorkspaceTab(tabId);
-  return tab ? parseBrowserTabState(tab.state).url : null;
+export function browserViewUrl(tabId: string): string | null {
+  const tab = findWorkspaceView(tabId);
+  return tab ? parseBrowserViewState(tab.state).url : null;
 }

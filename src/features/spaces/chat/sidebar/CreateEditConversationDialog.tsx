@@ -64,8 +64,7 @@ export function CreateEditConversationDialog({
     onOpenChange(false);
   };
 
-  const actorKey = (actor: SpaceActorRef) =>
-    `person:${actor.user_id}`;
+  const actorKey = (actor: SpaceActorRef) => `person:${actor.user_id}`;
   const toggleActor = (actor: SpaceActorRef, checked: boolean) => {
     const key = actorKey(actor);
     setSelectedActors((current) =>
@@ -113,9 +112,7 @@ export function CreateEditConversationDialog({
         <form onSubmit={(event) => void submit(event)}>
           <DialogHeader>
             <DialogTitle>{conversation ? "Edit conversation" : "New conversation"}</DialogTitle>
-            <DialogDescription>
-              Choose the people in this conversation.
-            </DialogDescription>
+            <DialogDescription>Choose the people in this conversation.</DialogDescription>
           </DialogHeader>
           <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">
             Name <span className="font-normal text-cream-muted/75">(optional)</span>

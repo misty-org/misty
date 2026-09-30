@@ -16,13 +16,13 @@ export function openBrowserPopup(payload: {
     return null;
   const store = useWorkspaceStore.getState();
   const source = allLayoutPanes(store.layout)
-    .flatMap((pane) => pane.tabs)
+    .flatMap((pane) => pane.views)
     .find((tab) => tab.id === sourceTabId);
   if (!source) return null;
   // A live, registered browser owns this popup regardless of its App's type.
   // Adopt the original native window to retain its opener and account profile.
   if (url.data === "about:blank" && !payload.popupInstanceKey) return null;
-  const tab = store.openBrowserTab({ url: url.data, sourceTabId });
+  const tab = store.openBrowserView({ url: url.data, sourceViewId: sourceTabId });
   if (tab) inheritProviderBrowser(tab.id, payload.sourceId, url.data, payload.popupInstanceKey);
   return tab;
 }

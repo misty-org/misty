@@ -2,8 +2,8 @@ import { agentRestore } from "./agentRestore";
 import { reserveAgentRestore } from "./budget";
 import { restorePageState } from "./native";
 import { pageRestoreSettings } from "./settings";
-import { usePageRestoreStore, type TabRestore } from "./store";
-import { liveBrowserTabs, pageReady, runtimeOf } from "./tabs";
+import { usePageRestoreStore, type ViewRestore } from "./store";
+import { liveBrowserViews, pageReady, runtimeOf } from "./tabs";
 
 const SETTLE_MS = 800;
 const WATCH_MS = 10 * 60_000;
@@ -18,7 +18,7 @@ export function restoreAfterSwitch(stillCurrent: () => boolean, only?: string[])
   const store = usePageRestoreStore.getState();
   if (!only) store.clear();
   const pending = new Set(
-    liveBrowserTabs()
+    liveBrowserViews()
       .map((tab) => tab.id)
       .filter((id) => !only || only.includes(id)),
   );
@@ -28,9 +28,9 @@ export function restoreAfterSwitch(stillCurrent: () => boolean, only?: string[])
   const started = Date.now();
 
   const restoreTab = async (tabId: string) => {
-    const tab = liveBrowserTabs().find((candidate) => candidate.id === tabId);
+    const tab = liveBrowserViews().find((candidate) => candidate.id === tabId);
     if (!tab) return;
-    const base: Omit<TabRestore, "status"> = {
+    const base: Omit<ViewRestore, "status"> = {
       tabId,
       title: tab.title,
       remaining: 0,
@@ -80,7 +80,7 @@ export function restoreAfterSwitch(stillCurrent: () => boolean, only?: string[])
       window.clearInterval(timer);
       return;
     }
-    for (const tab of liveBrowserTabs()) {
+    for (const tab of liveBrowserViews()) {
       if (!pending.has(tab.id) || busy.has(tab.id) || !pageReady(tab)) continue;
       pending.delete(tab.id);
       busy.add(tab.id);

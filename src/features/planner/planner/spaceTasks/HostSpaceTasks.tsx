@@ -5,7 +5,7 @@ import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
 import { SystemErrorActivity } from "@/features/activity";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import { useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { SpaceTasksView } from "../SpaceTasksView";
 import { useCreateTaskShortcut } from "./useCreateTaskShortcut";
 import type { PlannerTaskIntegration } from "./taskRuntime";
@@ -68,7 +68,7 @@ function HostTaskIntegration(props: PlannerTaskIntegration & { workspaceTabId?: 
     [props.adapter],
   );
   useAiSurfaceAdapter(adapter);
-  useWorkspaceTabTitle(props.workspaceTabId, props.title);
+  useWorkspaceViewTitle(props.workspaceTabId, props.title);
   useCreateTaskShortcut(props.canCreate, props.onCreate);
   return null;
 }

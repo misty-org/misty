@@ -3,11 +3,9 @@ import {
   cn,
   IconButton,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  RadioGroup,
+  RadioGroupItem,
+  SegmentedControl,
   Slider,
   Switch,
   Textarea,
@@ -99,27 +97,63 @@ export function SelectControl(props: {
   disabled: boolean;
   onChange: (value: number) => void;
 }) {
-  const ariaLabel = useSettingsControlLabel("Setting");
   return (
-    <Select
-      value={String(Math.min(props.value, props.options.length - 1))}
+    <ChoiceControl
+      value={String(props.value)}
+      options={props.options.map((label, value) => ({ value: String(value), label }))}
       disabled={props.disabled}
       onValueChange={(value) => props.onChange(Number(value))}
+    />
+  );
+}
+
+/** Visible choices keep settings discoverable without opening a dropdown. */
+export function ChoiceControl(props: {
+  value: string;
+  presentation?: "list" | "pills";
+  options: { value: string; label: string; disabled?: boolean; title?: string }[];
+  disabled: boolean;
+  onValueChange(value: string): void;
+}) {
+  const ariaLabel = useSettingsControlLabel("Setting");
+  if (props.presentation === "pills") {
+    return (
+      <SegmentedControl
+        label={ariaLabel}
+        value={props.value}
+        options={props.options}
+        disabled={props.disabled}
+        onChange={props.onValueChange}
+      />
+    );
+  }
+  return (
+    <RadioGroup
+      value={props.value}
+      onValueChange={props.onValueChange}
+      aria-label={ariaLabel}
+      disabled={props.disabled}
+      className="grid min-w-0 gap-2 text-sm text-cream disabled:text-cream-muted"
     >
-      <SelectTrigger
-        aria-label={ariaLabel}
-        className={cn("w-[220px] max-w-full", settingsDisabledControlClass)}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {props.options.map((option, index) => (
-          <SelectItem key={option} value={String(index)}>
-            {option}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      {props.options.map((option) => (
+        <label
+          key={option.value}
+          title={option.title}
+          className={cn(
+            "flex items-center gap-2",
+            option.disabled ? "cursor-default text-cream-muted" : "cursor-pointer",
+          )}
+        >
+          <RadioGroupItem
+            value={option.value}
+            aria-label={option.label}
+            className="size-3.5 shrink-0"
+            disabled={option.disabled}
+          />
+          {option.label}
+        </label>
+      ))}
+    </RadioGroup>
   );
 }
 

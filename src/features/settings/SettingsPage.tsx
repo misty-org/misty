@@ -1,8 +1,6 @@
-import { openAccountSettingsInBrowser } from "@/features/account";
 import { useAppStore } from "@/features/app-shell";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Input } from "@/shared/ui";
-import { CircleUserRound, ExternalLink } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -13,33 +11,23 @@ import {
   SettingsSearchResults,
   type SettingsSearchResult,
 } from "./components/SettingsSearchResults";
-import { SettingsPageScope, SettingsScopePill } from "./profiles/SettingScope";
+import { SettingsPageScope } from "./profiles/SettingScope";
 import { useSettingsProfiles } from "./profiles/store";
 import { NativeAvailability } from "./sections/FeatureSections";
-import {
-  canonicalSettingsSection,
-  settingsAreas,
-  settingsPageTitle,
-  settingsRegistry,
-} from "./settingsRegistry";
+import { canonicalSettingsSection, settingsAreas, settingsRegistry } from "./settingsRegistry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import { useSettingsStore } from "./store/useSettingsStore";
 export { canonicalSettingsSection, settingsRegistry } from "./settingsRegistry";
 export type { SettingsArea, SettingsRegistryEntry } from "./settingsRegistry";
-const navItems: DesktopSettingsNavEntry<SettingsSection>[] = settingsRegistry.map(
-  (entry, index) => {
-    const area = settingsAreas[entry.area];
-    const multiPage = settingsRegistry.filter((item) => item.area === entry.area).length > 1;
-    const firstOfArea = settingsRegistry[index - 1]?.area !== entry.area;
-    return {
-      id: entry.id,
-      label: multiPage ? entry.label : area.label,
-      icon: area.icon,
-      parent: multiPage ? { id: entry.area, label: area.label, icon: area.icon } : undefined,
-      breakBefore: firstOfArea && area.breakBefore,
-    };
-  },
-);
+const navItems: DesktopSettingsNavEntry<SettingsSection>[] = settingsRegistry
+  .filter(
+    (entry, index) => settingsRegistry.findIndex((item) => item.area === entry.area) === index,
+  )
+  .map((entry) => ({
+    id: entry.id,
+    hasSections: settingsRegistry.filter((item) => item.area === entry.area).length > 1,
+    ...settingsAreas[entry.area],
+  }));
 /** Scrolls to, focuses, and briefly highlights the row a search result pointed at. */
 function useFocusSettingRow(focus: { label: string; request: number }) {
   const content = useRef<HTMLDivElement>(null);
@@ -52,14 +40,18 @@ function useFocusSettingRow(focus: { label: string; request: number }) {
           (e) => e.getAttribute(attribute) === focus.label,
         );
       const element =
-        find("[data-setting-label]", "data-setting-label") ?? find("[aria-label]", "aria-label");
+        find("[data-setting-label]", "data-setting-label") ??
+        find("[aria-label]", "aria-label") ??
+        find("[data-settings-target]", "data-settings-target");
       if (!element) return;
-      element.scrollIntoView?.({ block: "center" });
-      (
-        element.querySelector<HTMLElement>(
-          "[data-setting-control] input:not(:disabled),[data-setting-control] button:not(:disabled),[data-setting-control] select:not(:disabled)",
-        ) ?? element
-      ).focus();
+      const wholePage = focus.label.startsWith("page:");
+      element.scrollIntoView?.({ block: wholePage ? "start" : "center" });
+      const target = wholePage
+        ? element
+        : (element.querySelector<HTMLElement>(
+            "[data-setting-control] input:not(:disabled),[data-setting-control] button:not(:disabled),[data-setting-control] select:not(:disabled)",
+          ) ?? element);
+      target.focus({ preventScroll: true });
       element.dataset.settingFlash = "true";
       clearFlash = setTimeout(() => delete element.dataset.settingFlash, 900);
     }, 0);
@@ -96,7 +88,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   const app = useAppStore((state) => state.app);
   const profile = useSettingsProfiles();
   const [query, setQuery] = useState("");
-  const [linkError, setLinkError] = useState("");
   const [focus, setFocus] = useState({ label: "", request: 0 });
   const content = useFocusSettingRow(focus);
   const { settings, load } = store;
@@ -106,13 +97,14 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   useEffect(() => {
     if (!settings) void load();
   }, [settings, load]);
-  const select = (id: SettingsSection, label = "") => {
+  const select = (id: SettingsSection, label = `page:${id}`) => {
     store.setActiveSection(id);
     setFocus((current) => ({ label, request: current.request + 1 }));
     setQuery("");
   };
-  const openResult = (result: SettingsSearchResult) => select(result.page, result.focus);
-  const Active = entry.Component;
+  const openResult = (result: SettingsSearchResult) =>
+    select(result.page, result.focus || `page:${result.page}`);
+  const areaEntries = settingsRegistry.filter((item) => item.area === entry.area);
   const controls: SettingsContentProps = {
     document: store.settings?.document ?? {},
     launchOnLogin: store.launchOnLogin,
@@ -133,15 +125,14 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   };
   return (
     <DesktopSettingsFrame
-      activeId={entry.id}
+      activeId={areaEntries[0].id}
       ariaLabel="Settings"
       items={navItems}
       navigationLabel="Settings sections"
       onClose={props.onClose}
       onSelect={(id) => select(id)}
       presentation={props.presentation}
-      title={settingsPageTitle(entry)}
-      titleAccessory={<SettingsScopePill owner={entry.owner} />}
+      title={settingsAreas[entry.area].label}
       navigationHeader={
         <Input
           aria-label="Search settings"
@@ -162,33 +153,11 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
           <SettingsSearchResults query={query} results={results} onSelect={openResult} />
         ) : undefined
       }
-      navigationFooter={
-        <div className="mt-2 border-t border-charcoal-border/70 pt-2">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2 text-xs text-cream-muted"
-            aria-label="Account settings (opens in your browser)"
-            onClick={() => {
-              setLinkError("");
-              void openAccountSettingsInBrowser().catch((e) => setLinkError(String(e)));
-            }}
-          >
-            <CircleUserRound className="size-4" aria-hidden="true" />
-            Account
-            <ExternalLink className="ml-auto size-3" aria-hidden="true" />
-          </Button>
-          {linkError && (
-            <p role="alert" className="text-xs text-destructive">
-              {linkError}
-            </p>
-          )}
-        </div>
-      }
       contentHeader={
         <>
-          {(store.error || profile.error) && (
-            <div role="alert" className="mb-5 text-sm text-destructive">
-              {store.error || profile.error}
+          {(store.error || (entry.area !== "sync" && profile.error)) && (
+            <div role="alert" className="mb-5 text-sm text-cream">
+              {store.error || (entry.area !== "sync" && profile.error)}
               <Button
                 variant="ghost"
                 onClick={() =>
@@ -205,22 +174,30 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
               </Button>
             </div>
           )}
-          {profile.state?.notice && (
-            <p role="status" className="mb-4 text-sm text-cream-muted">
-              {profile.state.notice}
-            </p>
-          )}
         </>
       }
     >
       <div ref={content}>
-        <SettingsPageScope.Provider value={{ page: entry.id, owner: entry.owner }}>
-          {entry.native && !hasTauriInternals() ? (
-            <NativeAvailability feature={entry.label} />
-          ) : (
-            <Active {...controls} />
-          )}
-        </SettingsPageScope.Provider>
+        {areaEntries.map((item) => {
+          const Active = item.Component;
+          return (
+            <div
+              key={item.id}
+              data-settings-page={item.id}
+              data-settings-target={`page:${item.id}`}
+              tabIndex={-1}
+              className="mb-6 last:mb-0"
+            >
+              <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
+                {item.native && !hasTauriInternals() ? (
+                  <NativeAvailability feature={item.label} />
+                ) : (
+                  <Active {...controls} />
+                )}
+              </SettingsPageScope.Provider>
+            </div>
+          );
+        })}
       </div>
     </DesktopSettingsFrame>
   );

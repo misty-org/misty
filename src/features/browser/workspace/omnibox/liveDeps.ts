@@ -2,8 +2,8 @@ import { bookmarks } from "@/features/bookmarks/library";
 import { invoke } from "@tauri-apps/api/core";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { searchLocalMistyContent } from "@/features/global-search/localContentSearch";
-import { allLayoutViews, parseBrowserTabState, useWorkspaceStore } from "@/features/workspace";
-import { currentVirtualWindows } from "@/features/workspace/virtualWindows";
+import { allLayoutViews, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
+import { currentWindows } from "@/features/workspace/windows";
 import {
   browserSearchEngine,
   browserSearchSuggestionsEnabled,
@@ -27,7 +27,7 @@ export const liveOmniboxDeps: OmniboxDeps = {
   historySuggestions: (request) =>
     hasTauriInternals() ? browserLibrary.historySuggestions(request) : Promise.resolve([]),
   bookmarks: () =>
-    bookmarks(useWorkspaceStore.getState().savedWebsites).map(({ url, title }) => ({ url, title })),
+    bookmarks(useWorkspaceStore.getState().bookmarks).map(({ url, title }) => ({ url, title })),
   mistyContent: (text, limit) =>
     searchLocalMistyContent(text, limit).map((result) => ({
       id: result.canonicalId ?? `${result.kind}:${result.id}`,
@@ -38,11 +38,11 @@ export const liveOmniboxDeps: OmniboxDeps = {
   clipboardUrl: () => (hasTauriInternals() ? readText() : Promise.resolve(null)),
   openTabs: () =>
     // The same windows `focusTab` can switch to.
-    currentVirtualWindows(useWorkspaceStore.getState())
+    currentWindows(useWorkspaceStore.getState())
       .flatMap((window) => allLayoutViews(window.layout))
       .filter((tab) => tab.surfaceId === "browser")
       .map((tab) => {
-        const state = parseBrowserTabState(tab.state);
+        const state = parseBrowserViewState(tab.state);
         return {
           tabId: tab.id,
           url: state.url,

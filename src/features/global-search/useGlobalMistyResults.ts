@@ -29,7 +29,7 @@ export function useGlobalMistyResults(input: {
       const surface = workspaceSurfaceFromRoute(result.href);
       if (surface) {
         const tab = useWorkspaceStore.getState().openSurface(surface);
-        useWorkspaceStore.getState().focusTab(tab.id);
+        useWorkspaceStore.getState().focusView(tab.id);
       }
       navigate(result.href);
       return;
@@ -67,7 +67,7 @@ export function useGlobalMistyResults(input: {
       const tab = useWorkspaceStore.getState().openSurface({
         ...surface,
       });
-      useWorkspaceStore.getState().focusTab(tab.id);
+      useWorkspaceStore.getState().focusView(tab.id);
     }
     navigate(filesRoute);
   };

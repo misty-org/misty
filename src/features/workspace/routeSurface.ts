@@ -1,8 +1,8 @@
 import {
-  createBrowserTabState,
+  createBrowserViewState,
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "./model";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
@@ -101,7 +101,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     return {
       ...request("browser", "tool:browser", "Browser", "/browser", undefined, "multiple"),
       scopeKey: "global",
-      state: createBrowserTabState(url ?? undefined),
+      state: createBrowserViewState(url ?? undefined),
     };
   }
   return null;
@@ -114,8 +114,8 @@ export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceToo
 }
 
 /** Whether a tab owns the route even when a nested route or redirect changed its exact URL. */
-export function workspaceTabMatchesRoute(
-  tab: Pick<WorkspaceTab, "surfaceId" | "groupKey">,
+export function workspaceViewMatchesRoute(
+  tab: Pick<WorkspaceView, "surfaceId" | "groupKey">,
   pathname: string,
 ): boolean {
   const surface = workspaceSurfaceFromRoute(pathname);

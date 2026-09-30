@@ -7,7 +7,7 @@ fn scope() -> VaultScope {
     VaultScope {
         deployment: "https://example.test".into(),
         account_id: "owner".into(),
-        workspace_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+        vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
     }
 }
 

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { WebsiteDataCoverage } from "./WebsiteDataCoverage";
 import { skippedLabel, websiteDataSummary, type WebsiteDataSite } from "./websiteData";
@@ -28,9 +28,7 @@ it("leads with sites whose data is partly unsynced and explains why", () => {
   expect(
     screen.getByText("Not synced · 1 cookie: partitioned cookies can’t be copied between devices"),
   ).toBeTruthy();
-  // Fully synced sites stay tucked away until asked for.
-  expect(screen.queryByText("docs.example.test")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /Fully synced sites \(1\)/ }));
+  // Coverage is visible without a disclosure.
   expect(screen.getByText("docs.example.test")).toBeTruthy();
 });
 

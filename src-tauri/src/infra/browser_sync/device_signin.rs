@@ -1,9 +1,15 @@
-//! Tree mode: every device (tree) owns one set of website sign-in data. It is
-//! published in the device tree's sign-in slots and held, on each machine that
-//! writes it, in a native browser store for that device. Only the session
-//! holding a device's lock, confirmed by the server, captures or publishes its
-//! data, and a store that no longer reflects the device's published slots is
-//! loaded from them before this session publishes anything again.
+//! Workspace mode: every device (workspace) owns one set of website sign-in data. It is
+//! published in the workspace's sign-in slots and held, on each machine on
+//! that device, in a native browser store for it. Any machine may be on a
+//! device and edit its tabs, but only its sign-in lease holder (confirmed by
+//! the server) captures and publishes sign-ins: the device's own machine when
+//! online, else a machine on it (`workspaces::lease_to_claim`). Other machines load
+//! the published sign-ins once when they open the device and browse with them.
+//! A holder's store that no longer reflects the published slots is loaded from
+//! them before it publishes anything again.
+mod baseline_migration;
+use baseline_migration::migrated_baseline;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
@@ -11,7 +17,7 @@ use misty_browser_sync::{
     document::CredentialRecord,
     restore::{EngineError, QuiescentProfile},
     store::{credentials_equivalent, signin_digest_hex, BrowserObservation, DeviceSignin},
-    tree::{
+    workspace::{
         signin::{self, PackReason, FIRST_SLOT, LAST_SLOT},
         sync::SigninStatus,
     },
@@ -19,21 +25,26 @@ use misty_browser_sync::{
 
 use super::super::browser_data_budget::Limit;
 use super::super::browser_data_coverage::{area_site, site, Coverage, DataKind, SkipReason};
+use super::super::browser_signin_scope::scope_records;
 use super::device_data::{self, Baseline, DeviceBrowser, DeviceDataState, DeviceWebsiteData};
 use super::*;
 
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Published data is narrowed to the sign-in scope, so a copy published before
+/// the scope existed neither restores nor carries application data.
 fn records(logical: &str, observations: Vec<BrowserObservation>) -> Vec<CredentialRecord> {
-    observations
-        .into_iter()
-        .map(|observation| CredentialRecord {
-            sequence: 0,
-            profile_id: logical.into(),
-            area: observation.area,
-            payload: observation.payload,
-        })
-        .collect()
+    scope_records(
+        observations
+            .into_iter()
+            .map(|observation| CredentialRecord {
+                sequence: 0,
+                profile_id: logical.into(),
+                area: observation.area,
+                payload: observation.payload,
+            })
+            .collect(),
+    )
 }
 
 fn parse_digest(value: &str) -> Option<[u8; 32]> {
@@ -62,15 +73,15 @@ fn engine(error: EngineError) -> String {
     .into()
 }
 
-fn set_state(active: &mut Session, tree: &str, state: DeviceDataState) {
+fn set_state(active: &mut Session, workspace: &str, state: DeviceDataState) {
     let sites = active
         .website_data
-        .get(tree)
+        .get(workspace)
         .map(|data| data.sites.clone())
         .unwrap_or_default();
     active
         .website_data
-        .insert(tree.into(), DeviceWebsiteData::new(tree, state, sites));
+        .insert(workspace.into(), DeviceWebsiteData::new(workspace, state, sites));
 }
 
 /// What one periodic pass has to do for the device this session writes.
@@ -86,7 +97,7 @@ pub(super) enum Pass {
 
 pub(super) struct CapturePlan {
     session: String,
-    tree: String,
+    workspace: String,
     logical: String,
     binding: DeviceSignin,
     previous: Vec<CredentialRecord>,
@@ -122,16 +133,44 @@ pub(super) async fn prepare(app: &tauri::AppHandle, active: &mut Session) -> Res
             "Website sign-in sync requires macOS 14 or newer, or Windows.",
         )));
     }
-    let tree = {
-        let view = active.handle.trees.borrow();
-        view.driving_tree.clone().filter(|_| view.seat_confirmed)
+    let (workspace, holder) = {
+        let view = active.handle.workspaces.borrow();
+        if let Some(claim) =
+            workspaces::lease_to_claim(&view, &active.handle.presence.borrow(), &active.device_id)
+                .filter(|workspace| workspaces::claim_due(workspace))
+        {
+            let handle = active.handle.clone();
+            tokio::spawn(async move {
+                // A lost race or a dropped connection is retried next pass.
+                let _ = handle.claim_workspace(claim).await;
+            });
+        }
+        let workspace = view.on_workspace.clone().filter(|_| view.seat_confirmed);
+        let holder = workspace.is_some() && view.driving_workspace == workspace;
+        (workspace, holder)
     };
-    let Some(tree) = tree else {
+    let Some(workspace) = workspace else {
         return Ok(Pass::Done(None));
     };
+    if !holder {
+        // Without the lease this machine only reads the device's sign-ins:
+        // once, when it opens the device. Reloading on every publish would
+        // close its pages each time the holder's cookies change.
+        return Ok(
+            if active
+                .device_browser
+                .as_ref()
+                .is_some_and(|browser| browser.workspace == workspace)
+            {
+                Pass::Done(None)
+            } else {
+                Pass::Exclusive
+            },
+        );
+    }
     let status = active
         .handle
-        .signin_status(tree.clone())
+        .signin_status(workspace.clone())
         .await
         .map_err(issue)?;
     if !status.writer || !status.current {
@@ -157,10 +196,10 @@ pub(super) async fn prepare(app: &tauri::AppHandle, active: &mut Session) -> Res
         return Ok(Pass::Exclusive);
     }
     active.device_browser = Some(DeviceBrowser {
-        tree: tree.clone(),
+        workspace: workspace.clone(),
         physical: binding.physical_id.clone(),
     });
-    let previous = baseline(active, &tree, &binding, &status).await?;
+    let previous = baseline(active, &workspace, &binding, &status).await?;
     if active
         .capture_view
         .as_ref()
@@ -177,7 +216,7 @@ pub(super) async fn prepare(app: &tauri::AppHandle, active: &mut Session) -> Res
         .clone();
     Ok(Pass::Capture(CapturePlan {
         session: active.id.clone(),
-        tree,
+        workspace,
         logical,
         binding,
         previous,
@@ -197,7 +236,7 @@ pub(super) async fn finish(
     }
     let status = active
         .handle
-        .signin_status(plan.tree.clone())
+        .signin_status(plan.workspace.clone())
         .await
         .map_err(issue)?;
     if !status.writer || !status.current || status.binding.as_ref() != Some(&plan.binding) {
@@ -208,7 +247,7 @@ pub(super) async fn finish(
         Ok(collected) => {
             publish(
                 active,
-                &plan.tree,
+                &plan.workspace,
                 &plan.logical,
                 plan.binding,
                 &status,
@@ -219,7 +258,7 @@ pub(super) async fn finish(
         Err(error) => Err(error),
     };
     if result.is_err() {
-        set_state(active, &plan.tree, DeviceDataState::Attention);
+        set_state(active, &plan.workspace, DeviceDataState::Attention);
     }
     result
 }
@@ -239,32 +278,36 @@ pub(super) async fn reconcile(
             "Website sign-in sync requires macOS 14 or newer, or Windows.",
         ));
     }
-    // A session without a confirmed lock never writes; the blocker covers it.
-    let tree = {
-        let view = active.handle.trees.borrow();
-        view.driving_tree.clone().filter(|_| view.seat_confirmed)
+    let (workspace, holder) = {
+        let view = active.handle.workspaces.borrow();
+        let workspace = view.on_workspace.clone().filter(|_| view.seat_confirmed);
+        let holder = workspace.is_some() && view.driving_workspace == workspace;
+        (workspace, holder)
     };
-    let Some(tree) = tree else { return Ok(None) };
+    let Some(workspace) = workspace else { return Ok(None) };
     let status = active
         .handle
-        .signin_status(tree.clone())
+        .signin_status(workspace.clone())
         .await
         .map_err(issue)?;
+    if !holder {
+        return open_without_lease(app, active, &workspace, &status).await;
+    }
     if !status.writer || !status.current {
         return Ok(None);
     }
     let logical = default_profile_id(&active.scope)?;
     let binding = match status.binding.clone() {
         Some(binding) => binding,
-        None => device_data::adopt(active, &tree, &logical).await?,
+        None => device_data::adopt(active, &workspace, &logical).await?,
     };
     // Changes queued here are still on their way; the server lags behind them.
     if !status.pending && !binding.reflects(&status.server) {
-        set_state(active, &tree, DeviceDataState::Loading);
-        let result = load(app, active, &tree, &logical, binding, &status.server).await;
+        set_state(active, &workspace, DeviceDataState::Loading);
+        let result = load(app, active, &workspace, &logical, binding, &status.server).await;
         set_state(
             active,
-            &tree,
+            &workspace,
             if result.is_ok() {
                 DeviceDataState::Synced
             } else {
@@ -273,12 +316,47 @@ pub(super) async fn reconcile(
         );
         return result.map(|()| None);
     }
-    switch_to(app, active, &tree, &logical, &binding.physical_id)?;
-    let result = capture(app, active, &tree, &logical, binding, &status).await;
+    switch_to(app, active, &workspace, &logical, &binding.physical_id)?;
+    let result = capture(app, active, &workspace, &logical, binding, &status).await;
     if result.is_err() {
-        set_state(active, &tree, DeviceDataState::Attention);
+        set_state(active, &workspace, DeviceDataState::Attention);
     }
     result
+}
+
+/// A machine that opened a device without its lease: its pages use that
+/// device's published sign-ins (loaded now if this machine's copy is older),
+/// and nothing it does in them is published.
+async fn open_without_lease(
+    app: &tauri::AppHandle,
+    active: &mut Session,
+    workspace: &str,
+    status: &SigninStatus,
+) -> Result<Option<&'static str>, String> {
+    if !status.current {
+        return Ok(None);
+    }
+    let logical = default_profile_id(&active.scope)?;
+    let binding = match status.binding.clone() {
+        Some(binding) => binding,
+        None => device_data::adopt(active, workspace, &logical).await?,
+    };
+    if !binding.reflects(&status.server) {
+        set_state(active, workspace, DeviceDataState::Loading);
+        let result = load(app, active, workspace, &logical, binding, &status.server).await;
+        set_state(
+            active,
+            workspace,
+            if result.is_ok() {
+                DeviceDataState::Synced
+            } else {
+                DeviceDataState::Attention
+            },
+        );
+        return result.map(|()| None);
+    }
+    switch_to(app, active, workspace, &logical, &binding.physical_id)?;
+    Ok(None)
 }
 
 /// Points new pages at this device's store. Pages of another store close
@@ -286,7 +364,7 @@ pub(super) async fn reconcile(
 fn switch_to(
     app: &tauri::AppHandle,
     active: &mut Session,
-    tree: &str,
+    workspace: &str,
     logical: &str,
     physical: &str,
 ) -> Result<(), String> {
@@ -295,7 +373,7 @@ fn switch_to(
         physical: physical.into(),
     };
     let browser = DeviceBrowser {
-        tree: tree.into(),
+        workspace: workspace.into(),
         physical: physical.into(),
     };
     let current = selected_profile()
@@ -320,14 +398,14 @@ fn switch_to(
 /// Reads and verifies every published shard of the device.
 async fn read_shards(
     active: &Session,
-    tree: &str,
+    workspace: &str,
     server: &BTreeMap<i16, [u8; 32]>,
 ) -> Result<(Vec<Vec<u8>>, BTreeMap<i16, String>), String> {
     let mut shards = Vec::new();
     let mut written = BTreeMap::new();
     for kind in server.keys() {
         let plaintext =
-            tokio::time::timeout(READ_TIMEOUT, active.handle.read_signin(tree.into(), *kind))
+            tokio::time::timeout(READ_TIMEOUT, active.handle.read_signin(workspace.into(), *kind))
                 .await
                 .map_err(|_| "Reading this device's sign-ins timed out. Retrying automatically.")?
                 .map_err(issue)?
@@ -345,12 +423,12 @@ async fn read_shards(
 async fn load(
     app: &tauri::AppHandle,
     active: &mut Session,
-    tree: &str,
+    workspace: &str,
     logical: &str,
     binding: DeviceSignin,
     server: &BTreeMap<i16, [u8; 32]>,
 ) -> Result<(), String> {
-    let (shards, written) = read_shards(active, tree, server).await?;
+    let (shards, written) = read_shards(active, workspace, server).await?;
     let observations = signin::unpack(shards.iter().map(Vec::as_slice))
         .map_err(|_| "This device's published sign-in data is invalid.")?;
     let target = records(logical, observations);
@@ -361,7 +439,7 @@ async fn load(
     active.device_browser = None;
     super::super::browser::close_account_views_except(app, None)?;
     let physical = binding.physical_id.clone();
-    let result = replace(app, active, tree, logical, binding, server, written, target).await;
+    let result = replace(app, active, workspace, logical, binding, server, written, target).await;
     // Pages open in this device's store either way. After a failed load it is
     // not captured from: its binding still differs from the published slots,
     // so the next pass loads again before anything is published.
@@ -372,7 +450,7 @@ async fn load(
         physical: physical.clone(),
     });
     active.device_browser = Some(DeviceBrowser {
-        tree: tree.into(),
+        workspace: workspace.into(),
         physical,
     });
     let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
@@ -383,7 +461,7 @@ async fn load(
 async fn replace(
     app: &tauri::AppHandle,
     active: &mut Session,
-    tree: &str,
+    workspace: &str,
     logical: &str,
     mut binding: DeviceSignin,
     server: &BTreeMap<i16, [u8; 32]>,
@@ -410,11 +488,11 @@ async fn replace(
     binding.written = written.clone();
     active
         .handle
-        .bind_signin(tree.into(), binding.clone())
+        .bind_signin(workspace.into(), binding.clone())
         .await
         .map_err(issue)?;
     active.baselines.insert(
-        tree.into(),
+        workspace.into(),
         Baseline {
             written,
             server: server.clone(),
@@ -429,25 +507,25 @@ async fn replace(
 /// kept instead of read as deleted. After a restart it is re-read once.
 async fn baseline(
     active: &mut Session,
-    tree: &str,
+    workspace: &str,
     binding: &DeviceSignin,
     status: &SigninStatus,
 ) -> Result<Vec<CredentialRecord>, String> {
-    if let Some(cached) = active.baselines.get(tree).filter(|cached| {
+    if let Some(cached) = active.baselines.get(workspace).filter(|cached| {
         cached.written == binding.written
             || (!cached.server.is_empty() && cached.server == status.server)
     }) {
         return Ok(cached.records.clone());
     }
     if status.server.is_empty() {
-        return migrated_baseline(active, tree).await;
+        return migrated_baseline(active, workspace).await;
     }
-    let (shards, written) = read_shards(active, tree, &status.server).await?;
+    let (shards, written) = read_shards(active, workspace, &status.server).await?;
     let observations = signin::unpack(shards.iter().map(Vec::as_slice))
         .map_err(|_| "This device's published sign-in data is invalid.")?;
     let records = records(&default_profile_id(&active.scope)?, observations);
     active.baselines.insert(
-        tree.into(),
+        workspace.into(),
         Baseline {
             written,
             server: status.server.clone(),
@@ -456,38 +534,6 @@ async fn baseline(
         },
     );
     Ok(records)
-}
-
-/// Migration: before device trees, this machine's store was loaded from the
-/// workspace-wide sign-in log, and its import receipt records exactly what it
-/// received. This machine's own device starts from that receipt, so synced
-/// storage of sites without an open page carries over instead of vanishing.
-async fn migrated_baseline(active: &Session, tree: &str) -> Result<Vec<CredentialRecord>, String> {
-    if tree != active.device_id {
-        return Ok(Vec::new());
-    }
-    let logical = default_profile_id(&active.scope)?;
-    // Best effort: an unreadable legacy receipt only means less carries over.
-    let Ok(journal) = active.handle.browser_import_journal(logical.clone()).await else {
-        return Ok(Vec::new());
-    };
-    Ok(journal
-        .applied
-        .map(|receipt| receipt.credentials)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|record| {
-            record.profile_id == logical
-                && !matches!(
-                    record.area,
-                    misty_browser_sync::document::credentials::Area::Cookies
-                )
-        })
-        .map(|record| CredentialRecord {
-            sequence: 0,
-            ..record
-        })
-        .collect())
 }
 
 fn items(observation: &BrowserObservation) -> u32 {
@@ -538,12 +584,12 @@ fn report_pack_skips(
 async fn capture(
     app: &tauri::AppHandle,
     active: &mut Session,
-    tree: &str,
+    workspace: &str,
     logical: &str,
     binding: DeviceSignin,
     status: &SigninStatus,
 ) -> Result<Option<&'static str>, String> {
-    let previous = baseline(active, tree, &binding, status).await?;
+    let previous = baseline(active, workspace, &binding, status).await?;
     if active
         .capture_view
         .as_ref()
@@ -567,7 +613,7 @@ async fn capture(
         Limit::Shards,
     )
     .await?;
-    publish(active, tree, logical, binding, status, collected).await
+    publish(active, workspace, logical, binding, status, collected).await
 }
 
 /// Identifies one capture's input: equal fingerprints pack to equal shards.
@@ -581,7 +627,7 @@ fn fingerprint(observations: &[BrowserObservation], coverage: &Coverage) -> Opti
 
 async fn publish(
     active: &mut Session,
-    tree: &str,
+    workspace: &str,
     logical: &str,
     binding: DeviceSignin,
     status: &SigninStatus,
@@ -593,7 +639,7 @@ async fn publish(
     if observed.is_some()
         && active
             .baselines
-            .get(tree)
+            .get(workspace)
             .is_some_and(|base| base.observed == observed && base.written == binding.written)
     {
         active.held = collected.held;
@@ -604,12 +650,12 @@ async fn publish(
         };
         let sites = active
             .website_data
-            .get(tree)
+            .get(workspace)
             .map(|data| data.sites.clone())
             .unwrap_or_default();
         active
             .website_data
-            .insert(tree.into(), DeviceWebsiteData::new(tree, state, sites));
+            .insert(workspace.into(), DeviceWebsiteData::new(workspace, state, sites));
         return Ok(None);
     }
     let mut coverage = collected.coverage;
@@ -633,14 +679,14 @@ async fn publish(
     if !writes.is_empty() {
         active
             .handle
-            .write_signin(tree.into(), writes, written.clone())
+            .write_signin(workspace.into(), writes, written.clone())
             .await
             .map_err(issue)?;
     }
     let published = signin::unpack(packed.shards.values().map(Vec::as_slice))
         .map_err(|_| "Could not prepare this device's sign-in data.")?;
     active.baselines.insert(
-        tree.into(),
+        workspace.into(),
         Baseline {
             written,
             server: BTreeMap::new(),
@@ -649,76 +695,17 @@ async fn publish(
         },
     );
     active.held = collected.held;
-    let state = if status.pending || binding.written != active.baselines[tree].written {
+    let state = if status.pending || binding.written != active.baselines[workspace].written {
         DeviceDataState::Publishing
     } else {
         DeviceDataState::Synced
     };
     active.website_data.insert(
-        tree.into(),
-        DeviceWebsiteData::new(tree, state, coverage.report()),
+        workspace.into(),
+        DeviceWebsiteData::new(workspace, state, coverage.report()),
     );
     Ok(None)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn digests_round_trip_through_their_stored_hex_form() {
-        let digest = signin::digest(b"shard");
-        assert_eq!(parse_digest(&signin_digest_hex(&digest)), Some(digest));
-        assert_eq!(parse_digest("zz"), None);
-        assert_eq!(parse_digest(&"a".repeat(62)), None);
-    }
-
-    #[test]
-    fn units_the_shard_packer_drops_are_reported_as_not_synced() {
-        use misty_browser_sync::document::credentials::Area;
-        let observations = vec![
-            BrowserObservation {
-                area: Area::Cookies,
-                payload: serde_json::json!([{
-                    "name": "a", "value": "v", "domain": "example.test", "path": "/", "host_only": true,
-                    "secure": true, "http_only": true, "same_site": "lax", "expires_unix_seconds": null, "partition_key": null
-                }]),
-            },
-            BrowserObservation {
-                area: Area::LocalStorage {
-                    origin: "https://big.test".into(),
-                },
-                payload: serde_json::json!({ "a": "1", "b": "2" }),
-            },
-        ];
-        let mut coverage = Coverage::default();
-        coverage.synced("example.test", DataKind::Cookies, 1);
-        coverage.synced("big.test", DataKind::LocalStorage, 2);
-        // The packer could not fit big.test's local storage anywhere.
-        let packed = signin::Packed {
-            shards: BTreeMap::new(),
-            digests: BTreeMap::new(),
-            skipped: vec![signin::PackSkip {
-                area: observations[1].area.clone(),
-                cookie_domain: None,
-                count: 1,
-                reason: PackReason::TooLarge,
-            }],
-        };
-        report_pack_skips(&mut coverage, &packed, &observations);
-        let report = coverage.report();
-        let big = report.iter().find(|site| site.site == "big.test").unwrap();
-        assert!(big.synced.is_empty());
-        assert_eq!(big.skipped[0].count, 2);
-        assert_eq!(big.skipped[0].reason, SkipReason::TooLarge);
-        assert_eq!(
-            report
-                .iter()
-                .find(|site| site.site == "example.test")
-                .unwrap()
-                .synced[0]
-                .count,
-            1
-        );
-    }
-}
+mod tests;

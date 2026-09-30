@@ -2,6 +2,12 @@
 // renderer IPC, console output, or extra browser storage is used for transport.
 const request = __MISTY_STORAGE_REQUEST__;
 if (location.origin !== request.origin || !/^https?:$/.test(location.protocol)) throw new Error('origin_changed');
+// Only sign-in storage syncs. Everything else on the site is never read, and
+// never overwritten or deleted by a restore.
+const scope = request.scope;
+const signinKey = (key, value) => typeof value === 'string' && value.length <= scope.max_value &&
+  scope.keys.some(marker => key.toLowerCase().includes(marker));
+const signinDatabase = name => scope.databases.includes(name);
 const limit = 8 * 1024 * 1024;
 let total = 0;
 const budget = (size) => { total += size; if (total > limit) throw new Error('storage_too_large'); };
@@ -56,10 +62,11 @@ const operation = (req) => new Promise((resolve, reject) => {
   req.onsuccess = () => resolve(req.result);
   req.onerror = req.onblocked = () => reject(new Error('database_unavailable'));
 });
-const entries = (storage) => Object.fromEntries(Object.keys(storage).sort().map(key => [key, storage.getItem(key)]));
+const entries = (storage) => Object.fromEntries(Object.keys(storage).sort()
+  .map(key => [key, storage.getItem(key)]).filter(([key, value]) => signinKey(key, value)));
 const writeEntries = (storage, values) => {
-  for (const key of Object.keys(storage)) if (!Object.hasOwn(values, key)) storage.removeItem(key);
-  for (const [key, value] of Object.entries(values)) if (storage.getItem(key) !== value) storage.setItem(key, value);
+  for (const key of Object.keys(entries(storage))) if (!Object.hasOwn(values, key)) storage.removeItem(key);
+  for (const [key, value] of Object.entries(values)) if (signinKey(key, value) && storage.getItem(key) !== value) storage.setItem(key, value);
 };
 // Why a database or area was skipped. Only these fixed reasons leave the page.
 const reasonOf = (error) => ({ unsupported_storage_value: 'unsupported_values', cyclic_storage_value: 'unsupported_values', storage_too_large: 'too_large' })[error?.message] ?? 'unreadable';
@@ -68,7 +75,7 @@ const reasonOf = (error) => ({ unsupported_storage_value: 'unsupported_values', 
 const exportDatabases = async (skipped = []) => {
   if (!indexedDB.databases) throw new Error('database_enumeration_unavailable');
   const databases = [];
-  const names = (await indexedDB.databases()).filter(v => typeof v.name === 'string').sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  const names = (await indexedDB.databases()).filter(v => typeof v.name === 'string' && signinDatabase(v.name)).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   for (const info of names.slice(256)) skipped.push({ name: info.name, reason: 'sync_limit' });
   for (const info of names.slice(0, 256)) {
     const before = total;
@@ -110,7 +117,7 @@ const importDatabases = async (target, hold) => {
   const desired = new Map(target.databases.map(db => [db.name, db]));
   for (const old of current.databases) if (!desired.has(old.name)) await operation(indexedDB.deleteDatabase(old.name));
   for (const spec of target.databases) {
-    if (hold.has(spec.name)) continue;
+    if (hold.has(spec.name) || !signinDatabase(spec.name)) continue;
     if (stable(current.databases.find(db => db.name === spec.name)) === stable(spec)) continue;
     // Decode before removing the previous database. Native keeps the encrypted
     // previous profile snapshot until the complete import has been verified.
@@ -163,10 +170,13 @@ const digest = (text) => {
 // schedule for writes that change neither.
 const indexedStamp = async () => {
   if (!indexedDB.databases || !navigator.storage?.estimate) return null;
-  const [list, estimate] = await Promise.all([indexedDB.databases(), navigator.storage.estimate()]);
+  const [all, estimate] = await Promise.all([indexedDB.databases(), navigator.storage.estimate()]);
+  const list = all.filter(db => typeof db.name === 'string' && signinDatabase(db.name));
+  // Most sites have no sign-in database: a stable stamp, so nothing is exported.
+  if (!list.length) return '[]';
   const usage = estimate.usageDetails?.indexedDB ?? estimate.usage;
   if (typeof usage !== 'number') return null;
-  return JSON.stringify([list.map(db => [String(db.name), db.version ?? null]).sort(), usage]);
+  return JSON.stringify([list.map(db => [db.name, db.version ?? null]).sort(), usage]);
 };
 // Anything that cannot be exported is skipped and reported by kind and reason;
 // native keeps its last synced copy instead of treating it as deleted.

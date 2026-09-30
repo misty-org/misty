@@ -27,6 +27,8 @@ describe("browser annotation paths", () => {
 describe("browser viewport presets", () => {
   it("uses practical device sizes with a 1080p desktop", () => {
     expect(browserViewportDefaults).toEqual({
+      tablet: { width: 820, height: 1180 },
+      mobile: { width: 390, height: 844 },
       desktop: {
         width: 1920,
         height: 1080,

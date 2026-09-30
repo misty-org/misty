@@ -9,13 +9,13 @@ import {
   useBrowserRuntimeStore,
 } from "./browserRuntime";
 import type { BrowserBounds, BrowserTheme } from "./types";
-import type { WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/workspace";
 
 interface BrowserGeometryInput {
   hostRef: RefObject<HTMLDivElement | null>;
   nativeRuntime: boolean;
   nativeLiveResize: boolean;
-  tab: WorkspaceTab;
+  tab: WorkspaceView;
   url: string;
   theme: BrowserTheme;
   offline?: boolean;

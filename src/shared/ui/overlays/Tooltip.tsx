@@ -1,6 +1,7 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as React from "react";
 
+import { OverlaySideProvider, useOverlaySide } from "./OverlaySide";
 import { cn } from "../utils";
 
 const TooltipProvider = TooltipPrimitive.Provider;
@@ -9,10 +10,8 @@ const Tooltip = TooltipPrimitive.Root;
 
 const TooltipTrigger = TooltipPrimitive.Trigger;
 
-type TooltipSide = "top" | "right" | "bottom" | "left";
-const TooltipSideContext = React.createContext<TooltipSide | undefined>(undefined);
-/** Points navigation hints toward the workspace, including through portals. */
-const TooltipSideProvider = TooltipSideContext.Provider;
+/** Backward-compatible name for navigation hint placement. */
+const TooltipSideProvider = OverlaySideProvider;
 
 function TooltipHint({
   children,
@@ -35,7 +34,7 @@ const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, side, sideOffset, collisionPadding = 8, children, ...props }, ref) => {
-  const navigationSide = React.useContext(TooltipSideContext);
+  const navigationSide = useOverlaySide();
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content

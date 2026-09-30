@@ -1,5 +1,3 @@
-import { ChevronRight } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui";
 import { skippedLabel, syncedLabel, websiteDataSummary, type WebsiteDataSite } from "./websiteData";
 
 function SiteRow({ site }: { site: WebsiteDataSite }) {
@@ -12,7 +10,7 @@ function SiteRow({ site }: { site: WebsiteDataSite }) {
         </p>
       )}
       {site.skipped.map((skip) => (
-        <p key={`${skip.kind}:${skip.reason}`} className="text-sm text-avatar-yellow">
+        <p key={`${skip.kind}:${skip.reason}`} className="text-sm text-cream">
           Not synced · {skippedLabel(skip)}
         </p>
       ))}
@@ -39,22 +37,16 @@ export function WebsiteDataCoverage({ sites }: { sites: WebsiteDataSite[] }) {
         </ul>
       )}
       {complete.length > 0 && (
-        <Collapsible>
-          <CollapsibleTrigger className="group mt-2 flex items-center gap-1 text-sm text-cream-muted hover:text-cream-bright">
-            <ChevronRight
-              aria-hidden
-              className="size-4 transition-transform group-data-[state=open]:rotate-90"
-            />
+        <div>
+          <h3 className="mt-3 text-xs font-medium text-cream-muted">
             Fully synced sites ({complete.length})
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <ul className="divide-y divide-charcoal-border">
-              {complete.map((site) => (
-                <SiteRow key={site.site} site={site} />
-              ))}
-            </ul>
-          </CollapsibleContent>
-        </Collapsible>
+          </h3>
+          <ul className="divide-y divide-charcoal-border">
+            {complete.map((site) => (
+              <SiteRow key={site.site} site={site} />
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

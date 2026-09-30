@@ -1,4 +1,4 @@
-//! Per-device website data state kept by a session. A device is one tree;
+//! Per-device website data state kept by a session. A device is one workspace;
 //! each has its own sign-in data, sync state and coverage report.
 use std::collections::BTreeMap;
 
@@ -10,7 +10,7 @@ use super::super::browser_data_coverage::SiteCoverage;
 /// The native browser store this session uses for the device it writes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct DeviceBrowser {
-    pub tree: String,
+    pub workspace: String,
     pub physical: String,
 }
 
@@ -75,10 +75,10 @@ impl DeviceWebsiteData {
 /// starts from a new, empty store that is loaded from its published data.
 pub(super) async fn adopt(
     active: &mut super::Session,
-    tree: &str,
+    workspace: &str,
     logical: &str,
 ) -> Result<misty_browser_sync::store::DeviceSignin, String> {
-    let physical_id = if tree == active.device_id {
+    let physical_id = if workspace == active.device_id {
         let selected = super::selected_profile()
             .lock()
             .map_err(|_| "Browser profile state is unavailable")?
@@ -110,7 +110,7 @@ pub(super) async fn adopt(
     };
     active
         .handle
-        .bind_signin(tree.into(), binding.clone())
+        .bind_signin(workspace.into(), binding.clone())
         .await
         .map_err(super::issue)?;
     Ok(binding)
@@ -122,12 +122,12 @@ pub(super) async fn device_store(
     active: &mut super::Session,
     logical: &str,
 ) -> Result<super::SelectedProfile, String> {
-    let tree = active.handle.trees.borrow().driving_tree.clone();
-    let tree = tree.ok_or("Choose a device to continue before opening pages.")?;
+    let workspace = active.handle.workspaces.borrow().on_workspace.clone();
+    let workspace = workspace.ok_or("Device sync is still loading this workspace.")?;
     if let Some(browser) = active
         .device_browser
         .as_ref()
-        .filter(|browser| browser.tree == tree)
+        .filter(|browser| browser.workspace == workspace)
     {
         return Ok(super::SelectedProfile {
             logical: logical.into(),
@@ -136,12 +136,12 @@ pub(super) async fn device_store(
     }
     let status = active
         .handle
-        .signin_status(tree.clone())
+        .signin_status(workspace.clone())
         .await
         .map_err(super::issue)?;
     let binding = match status.binding {
         Some(binding) => binding,
-        None => adopt(active, &tree, logical).await?,
+        None => adopt(active, &workspace, logical).await?,
     };
     Ok(super::SelectedProfile {
         logical: logical.into(),
@@ -154,11 +154,11 @@ pub(super) fn tab_session(
     active: &super::Session,
     area: &misty_browser_sync::document::credentials::Area,
 ) -> Option<serde_json::Value> {
-    let tree = active.device_browser.as_ref()?.tree.clone();
+    let workspace = active.device_browser.as_ref()?.workspace.clone();
     let key = serde_json::to_value(area).ok()?;
     active
         .baselines
-        .get(&tree)?
+        .get(&workspace)?
         .records
         .iter()
         .find(|record| serde_json::to_value(&record.area).ok().as_ref() == Some(&key))

@@ -1,9 +1,9 @@
 import { migrateSavedLinkGroups } from "@/features/workspace/tabGroups";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { layoutTabs, mapLayoutViews } from "@/features/workspace/layoutTabs";
-import { scrubPrivateTab } from "@/features/workspace/privateBrowsing";
+import { scrubPrivateView } from "@/features/workspace/privateBrowsing";
 import { dockLeaves } from "@/features/workspace/dockTree";
-import { parseBrowserTabState, type WorkspaceVirtualWindow } from "@/features/workspace/model";
+import { parseBrowserViewState, type WorkspaceWindow } from "@/features/workspace/model";
 import {
   navigateSyncedBrowserWebview,
   useBrowserRuntimeStore,
@@ -11,17 +11,17 @@ import {
 import type { WorkspaceSource } from "./controller";
 import { retainDeviceState } from "./deviceState";
 
-const browserTabs = (windows: WorkspaceVirtualWindow[]) =>
+const browserViews = (windows: WorkspaceWindow[]) =>
   windows.flatMap((window) =>
     layoutTabs(window.layout).flatMap((layout) =>
       dockLeaves(layout.root).flatMap((pane) =>
-        pane.tabs.filter((tab) => tab.surfaceId === "browser"),
+        pane.views.filter((tab) => tab.surfaceId === "browser"),
       ),
     ),
   );
 
-function emptyWindow(): WorkspaceVirtualWindow {
-  const root = { type: "leaf" as const, id: "recovery:empty-pane", tabs: [], activeTabId: null };
+function emptyWindow(): WorkspaceWindow {
+  const root = { type: "leaf" as const, id: "recovery:empty-pane", views: [], activeViewId: null };
   return {
     id: "recovery:empty-window",
     title: "Window",
@@ -30,8 +30,8 @@ function emptyWindow(): WorkspaceVirtualWindow {
     layout: {
       root,
       focusedPaneId: root.id,
-      activeLayoutTabId: "recovery:empty-layout",
-      tabs: [{ id: "recovery:empty-layout", root, focusedPaneId: root.id }],
+      activeTabId: "recovery:empty-tab",
+      tabs: [{ id: "recovery:empty-tab", root, focusedPaneId: root.id }],
     },
   };
 }
@@ -40,13 +40,14 @@ export const workspaceSource: WorkspaceSource = {
     const state = useWorkspaceStore.getState();
     return {
       // Private tabs travel only as placeholders, never with their pages.
-      windows: (state.virtualWindowsByScope.global ?? []).map((window) => ({
+      windows: (state.windowsByScope.global ?? []).map((window) => ({
         ...window,
-        layout: mapLayoutViews(window.layout, scrubPrivateTab),
+        layout: mapLayoutViews(window.layout, scrubPrivateView),
       })),
-      activeWindowId: state.activeVirtualWindowIdByScope.global ?? "",
-      groups: state.websiteGroups,
-      websites: state.savedWebsites,
+      activeWindowId: state.activeWindowIdByScope.global ?? "",
+      folders: state.bookmarkFolders,
+      bookmarks: state.bookmarks,
+      tabGroups: state.tabGroups,
     };
   },
   subscribe(changed) {
@@ -55,41 +56,44 @@ export const workspaceSource: WorkspaceSource = {
   write(projected) {
     const state = useWorkspaceStore.getState();
     const previousTabs = new Map(
-      browserTabs(state.virtualWindowsByScope.global ?? []).map((tab) => [tab.id, tab]),
+      browserViews(state.windowsByScope.global ?? []).map((tab) => [tab.id, tab]),
     );
     const windows = retainDeviceState(
       projected.windows.length ? projected.windows : [emptyWindow()],
-      state.virtualWindowsByScope.global ?? [],
+      state.windowsByScope.global ?? [],
+      projected.tabGroups !== undefined,
     );
     const active = windows.find((window) => window.id === projected.activeWindowId) ?? windows[0];
     // Do not call the legacy normalizer: it creates random Google tabs for empty
     // remote panes, which would be mistaken for local edits and sent back.
     const groupMigration = migrateSavedLinkGroups({
       ...state,
-      websiteGroups: projected.groups.filter((g) => g.fields.icon !== "folder"),
-      savedWebsites: projected.websites,
+      bookmarkFolders: projected.folders.filter((folder) => folder.fields.icon !== "folder"),
+      bookmarks: projected.bookmarks,
     });
     useWorkspaceStore.setState({
       ...groupMigration,
-      websiteGroups: projected.groups,
-      savedWebsites: projected.websites,
+      bookmarkFolders: projected.folders,
+      bookmarks: projected.bookmarks,
       activeScopeKey: "global",
-      activeVirtualWindowId: active.id,
-      activeVirtualWindowIdByScope: { ...state.activeVirtualWindowIdByScope, global: active.id },
-      virtualWindowsByScope: { ...state.virtualWindowsByScope, global: windows },
+      activeWindowId: active.id,
+      activeWindowIdByScope: { ...state.activeWindowIdByScope, global: active.id },
+      windowsByScope: { ...state.windowsByScope, global: windows },
       layoutsByScope: { ...state.layoutsByScope, global: active.layout },
       layout: active.layout,
+      // Synced once every device supports it; otherwise each machine keeps its own.
+      ...(projected.tabGroups ? { tabGroups: projected.tabGroups } : {}),
     });
-    for (const tab of browserTabs(windows)) {
+    for (const tab of browserViews(windows)) {
       const previous = previousTabs.get(tab.id);
-      const next = parseBrowserTabState(tab.state);
-      if (!previous || parseBrowserTabState(previous.state).url === next.url) continue;
+      const next = parseBrowserViewState(tab.state);
+      if (!previous || parseBrowserViewState(previous.state).url === next.url) continue;
       const stillCurrent = () => {
-        const current = browserTabs(
-          useWorkspaceStore.getState().virtualWindowsByScope.global ?? [],
-        ).find((candidate) => candidate.id === tab.id && candidate.instanceKey === tab.instanceKey);
+        const current = browserViews(useWorkspaceStore.getState().windowsByScope.global ?? []).find(
+          (candidate) => candidate.id === tab.id && candidate.instanceKey === tab.instanceKey,
+        );
         if (!current) return false;
-        const browser = parseBrowserTabState(current.state);
+        const browser = parseBrowserViewState(current.state);
         return browser.url === next.url && browser.profileId === next.profileId;
       };
       void navigateSyncedBrowserWebview(tab, next.url, stillCurrent).catch((error: unknown) => {
@@ -102,7 +106,7 @@ export const workspaceSource: WorkspaceSource = {
     // Route synchronization follows this device's retained selection. It does
     // not import another device's focused pane or execute an agent action.
     const layout = layoutTabs(active.layout).find(
-      (layout) => layout.id === active.layout.activeLayoutTabId,
+      (layout) => layout.id === active.layout.activeTabId,
     );
     if (layout && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("misty:workspace-projection-applied"));

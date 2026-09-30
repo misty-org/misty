@@ -1,172 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
 import { dockLeaves } from "@/features/workspace/dockTree";
-import { canProjectWorkspace, WorkspaceSyncController, type WorkspaceSource } from "./controller";
-import { EditJournal, type JournalStorage } from "./editJournal";
+import { describe, expect, it, vi } from "vitest";
+import { canProjectWorkspace, WorkspaceSyncController } from "./controller";
+import { EditJournal } from "./editJournal";
+import type { SharedRecord } from "./model";
 import type { NativeSyncView } from "./native";
-import type { SharedRecord, WorkspaceChange } from "./model";
-import { projectWorkspace } from "./projection";
 
-function native(): NativeSyncView {
-  return {
-    session_id: "session:a",
-    deployment: "https://misty.test",
-    account_id: "account:a",
-    workspace_id: "workspace:a",
-    device_id: "device:a",
-    profile_id: "a".repeat(64),
-    status: {
-      phase: "catching_up",
-      applied_sequence: 3,
-      head_sequence: 3,
-      pending_changes: 0,
-      issue: null,
-    },
-    presence: [],
-    pending_operation_ids: [],
-    workspace: {
-      active_device: { device_id: "device:a", epoch: "epoch:a", sequence: 1 },
-      version: 1,
-      sequence: 3,
-      resumes: {},
-      orphaned_tab_ids: [],
-      orphaned_website_ids: [],
-      records: [
-        { kind: "window", id: "window:a", fields: { title: "Work", order: 0 } },
-        {
-          kind: "layout",
-          id: "layout:a",
-          fields: {
-            window_id: "window:a",
-            title: "",
-            order: 0,
-            tree: { type: "leaf", id: "pane:a" },
-          },
-        },
-        {
-          kind: "tab",
-          id: "tab:a",
-          fields: {
-            surface: "browser",
-            title: "Page",
-            placement: { layout_id: "layout:a", pane_id: "pane:a", order: 0 },
-            url: "https://example.test",
-            profile_id: "a".repeat(64),
-            website_id: null,
-            tool_route: null,
-            agent_owned: false,
-          },
-        },
-      ],
-    },
-  };
-}
-function storage() {
-  const values = new Map<string, string>();
-  return {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: vi.fn((key: string, value: string) => {
-      values.set(key, value);
-    }),
-  };
-}
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
-// Flush only promise work; no timers, network, or implementation-specific sleeps.
-async function settled() {
-  for (let i = 0; i < 25; i++) await Promise.resolve();
-}
-function harness(disk: JournalStorage = storage()) {
-  let current: NativeSyncView | null = native();
-  let visible = projectWorkspace(current.workspace, {
-    activeLayoutByWindow: {},
-    activeTabByPane: {},
-    focusedPaneByLayout: {},
-  });
-  const listeners = new Set<() => void>();
-  const source: WorkspaceSource = {
-    read: () => ({
-      windows: visible.windows,
-      activeWindowId: visible.activeWindowId ?? "",
-      groups: visible.groups,
-      websites: visible.websites,
-    }),
-    write: vi.fn((next) => {
-      visible = next;
-      for (const listener of listeners) listener();
-    }),
-    subscribe: (changed) => {
-      listeners.add(changed);
-      return () => listeners.delete(changed);
-    },
-  };
-  const journal = new EditJournal(disk, current);
-  const applied = new Set<string>();
-  const accept = (id: string, changes: WorkspaceChange[]) => {
-    if (applied.has(id)) return id;
-    applied.add(id);
-    for (const change of changes) {
-      const records = current!.workspace.records;
-      const index = records.findIndex(
-        (record) => record.kind === change.kind && record.id === change.id,
-      );
-      if (change.action === "delete") records.splice(index, 1);
-      else if (change.action === "create")
-        records.push({ kind: change.kind, id: change.id, fields: change.fields } as SharedRecord);
-      else
-        records[index] = {
-          ...records[index],
-          fields: { ...records[index].fields, ...change.fields },
-        } as SharedRecord;
-    }
-    current!.workspace.sequence++;
-    return id;
-  };
-  const ports = {
-    source,
-    journal,
-    read: vi.fn(async () => structuredClone(current)),
-    publish: vi.fn(async (_session: string, id: string, changes: WorkspaceChange[]) =>
-      accept(id, changes),
-    ),
-    state: vi.fn(),
-    error: vi.fn(),
-    locked: vi.fn(),
-    closed: vi.fn(),
-  };
-  const editTitle = (title: string) => {
-    const next = structuredClone(visible);
-    dockLeaves(next.windows[0].layout.tabs![0].root)[0].tabs[0].title = title;
-    source.write(next);
-  };
-  return {
-    ports,
-    journal,
-    accept,
-    applied,
-    editTitle,
-    start: () => new WorkspaceSyncController(structuredClone(current!), ports),
-    title: () => dockLeaves(visible.windows[0].layout.tabs![0].root)[0].tabs[0].title,
-    current: () => current!,
-    unlock: (view: NativeSyncView) => {
-      current = view;
-    },
-    lock: () => {
-      current = null;
-    },
-  };
-}
-
+import { deferred, harness, native, settled, storage } from "./controller.testFixtures";
 describe("workspace sync controller recovery", () => {
   it("publishes a closed recovered tab before remote projection can restore it", async () => {
     const h = harness();
     const record = structuredClone(
-      h.current().workspace.records.find((record) => record.kind === "tab")!,
-    ) as SharedRecord<"tab">;
+      h.current().workspace.records.find((record) => record.kind === "view")!,
+    ) as SharedRecord<"view">;
     record.id = "tab:orphan";
     record.fields.placement.pane_id = "pane:removed";
     h.current().workspace.records.push(record);
@@ -176,14 +21,14 @@ describe("workspace sync controller recovery", () => {
       const next = structuredClone(h.ports.source.read());
       expect(next.windows[0].layout.tabs).toHaveLength(2);
       next.windows[0].layout.tabs = next.windows[0].layout.tabs!.filter(
-        (tab) => tab.id !== "recovery:layout:tab:orphan",
+        (tab) => tab.id !== "recovery:tab:tab:orphan",
       );
       h.ports.publish.mockRejectedValueOnce(new Error("Temporarily offline"));
-      h.ports.source.write({ ...next, groups: [], websites: [], recoveryTabIds: [] });
+      h.ports.source.write({ ...next, folders: [], bookmarks: [], recoveryViewIds: [] });
       await settled();
       expect(h.journal.pending[0].changes).toContainEqual({
         action: "delete",
-        kind: "tab",
+        kind: "view",
         id: "tab:orphan",
       });
       controller.refresh();
@@ -247,7 +92,7 @@ describe("workspace sync controller recovery", () => {
     controller.refresh();
     await settled();
     h.editTitle("Independent local tab");
-    h.current().workspace.records.find((r) => r.kind === "tab")!.fields.title = "Cloud tab";
+    h.current().workspace.records.find((r) => r.kind === "view")!.fields.title = "Cloud tab";
     h.current().workspace.sequence++;
     controller.refresh();
     await settled();
@@ -279,18 +124,47 @@ describe("workspace sync controller recovery", () => {
     expect(h.ports.error).not.toHaveBeenCalled();
     controller.stop();
   });
+  it("keeps this machine's selected tab when another machine focuses a different one", async () => {
+    const h = harness();
+    const second = structuredClone(h.current().workspace.records[2]) as SharedRecord<"view">;
+    second.id = "tab:b";
+    second.fields.placement = { ...second.fields.placement, order: 1 };
+    h.current().workspace.records.push(second);
+    const controller = h.start();
+    await settled();
+    const selected = () =>
+      dockLeaves(h.ports.source.read().windows[0].layout.tabs![0].root)[0].activeViewId;
+    expect(selected()).toBe("tab:a");
+    // Another machine focuses tab:b and retitles tab:a.
+    h.current().workspace.resumes = {
+      "device:b": {
+        sequence: 99,
+        resume: {
+          active_window_id: "window:a",
+          active_tab_id: "layout:a",
+          focused_pane_id: "pane:a",
+          active_view_by_pane: { "pane:a": "tab:b" },
+        },
+      },
+    };
+    (h.current().workspace.records[2] as SharedRecord<"view">).fields.title = "Renamed elsewhere";
+    h.current().workspace.sequence++;
+    controller.refresh();
+    await settled();
+    expect(selected()).toBe("tab:a");
+    expect(h.title()).toBe("Renamed elsewhere");
+    controller.stop();
+  });
   it("does not publish follower page-load, title, or selection changes", async () => {
     const h = harness();
     h.current().workspace.active_device!.device_id = "device:b";
-    const publishResume = vi.fn();
-    const controller = new WorkspaceSyncController(h.current(), { ...h.ports, publishResume });
+    const controller = new WorkspaceSyncController(h.current(), h.ports);
     await settled();
     h.editTitle("Title reported by the follower's page load");
     await controller.flushLocal();
     await settled();
     expect(h.journal.pending).toHaveLength(0);
     expect(h.ports.publish).not.toHaveBeenCalled();
-    expect(publishResume).not.toHaveBeenCalled();
     const writes = vi.mocked(h.ports.source.write).mock.calls.length;
     h.current().workspace.sequence++;
     controller.refresh();
@@ -326,7 +200,7 @@ describe("workspace sync controller recovery", () => {
       [
         {
           action: "patch",
-          kind: "tab",
+          kind: "view",
           id: "tab:a",
           fields: { title: "New edit after taking control" },
         },
@@ -437,7 +311,7 @@ describe("workspace sync controller recovery", () => {
     await settled();
     expect(h.ports.publish).toHaveBeenCalledTimes(1);
     expect(h.ports.publish.mock.calls[0][2]).toEqual([
-      { action: "patch", kind: "tab", id: "tab:a", fields: { title: "Edited here" } },
+      { action: "patch", kind: "view", id: "tab:a", fields: { title: "Edited here" } },
     ]);
     controller.refresh();
     await settled();
@@ -449,7 +323,7 @@ describe("workspace sync controller recovery", () => {
   it("merges group field edits without echoing received navigation records", async () => {
     const h = harness();
     h.current().workspace.records.push({
-      kind: "group",
+      kind: "folder",
       id: "group:a",
       fields: { label: "Reading", icon: "library", order: 0, hidden: false },
     });
@@ -460,16 +334,16 @@ describe("workspace sync controller recovery", () => {
     h.ports.source.write({
       ...source,
       activeWindowId: source.activeWindowId,
-      groups: source.groups!.map((group) => ({
+      folders: source.folders!.map((group) => ({
         ...group,
         fields: { ...group.fields, label: "Research" },
       })),
-      websites: [],
-      recoveryTabIds: [],
+      bookmarks: [],
+      recoveryViewIds: [],
     });
     await settled();
     expect(h.ports.publish.mock.calls[0][2]).toEqual([
-      { action: "patch", kind: "group", id: "group:a", fields: { label: "Research" } },
+      { action: "patch", kind: "folder", id: "group:a", fields: { label: "Research" } },
     ]);
     controller.refresh();
     await settled();
@@ -552,10 +426,15 @@ describe("workspace sync controller recovery", () => {
     const controller = h.start();
     await settled();
     const read = deferred<NativeSyncView>();
+    const started = deferred<void>();
     const stale = structuredClone(h.current());
-    h.ports.read.mockImplementationOnce(() => read.promise);
+    h.ports.read.mockImplementationOnce(() => {
+      started.resolve();
+      return read.promise;
+    });
     controller.refresh();
-    const tab = h.current().workspace.records.find((record) => record.kind === "tab")!;
+    await started.promise;
+    const tab = h.current().workspace.records.find((record) => record.kind === "view")!;
     tab.fields.title = "Remote change";
     controller.refresh();
     read.resolve(stale);
@@ -592,7 +471,7 @@ describe("workspace sync controller recovery", () => {
     await settled();
     const resumed = structuredClone(h.current());
     resumed.session_id = "session:unlocked";
-    const remoteTab = resumed.workspace.records.find((record) => record.kind === "tab")!;
+    const remoteTab = resumed.workspace.records.find((record) => record.kind === "view")!;
     remoteTab.fields.url = "https://changed-remotely.test";
     h.lock();
     controller.refresh();
@@ -610,11 +489,11 @@ describe("workspace sync controller recovery", () => {
     expect(h.ports.publish).toHaveBeenCalledExactlyOnceWith(
       "session:unlocked",
       pending[0].id,
-      [{ action: "patch", kind: "tab", id: "tab:a", fields: { title: "Local after lock" } }],
+      [{ action: "patch", kind: "view", id: "tab:a", fields: { title: "Local after lock" } }],
       "epoch:a",
     );
     expect(h.title()).toBe("Local after lock");
-    expect(h.current().workspace.records.find((record) => record.kind === "tab")?.fields.url).toBe(
+    expect(h.current().workspace.records.find((record) => record.kind === "view")?.fields.url).toBe(
       "https://changed-remotely.test",
     );
     expect(h.journal.pending).toHaveLength(0);

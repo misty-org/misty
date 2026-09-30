@@ -97,7 +97,7 @@ export function BrowserSearchDialog() {
     try {
       const url = browserSearchDestination(query);
       if (!url) return;
-      const tab = useWorkspaceStore.getState().openBrowserTab({ url });
+      const tab = useWorkspaceStore.getState().openBrowserView({ url });
       useBrowserSearchStore.getState().close();
       navigate(tab.route, { replace: true });
     } catch {

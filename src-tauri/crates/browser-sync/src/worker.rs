@@ -10,7 +10,8 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
-mod trees;
+mod collections;
+mod workspaces;
 
 use crate::{
     crypto::{DeviceKey, VaultRoot, VaultScope},
@@ -21,7 +22,7 @@ use crate::{
         PendingSnapshot, Store,
     },
     transport::{SyncApi, SyncSocket},
-    tree::sync::{Outgoing, TreeSync, TreeView},
+    workspace::sync::{Outgoing, WorkspaceSync, SyncState},
     Error, Result,
 };
 
@@ -97,11 +98,17 @@ enum Command {
         String,
         oneshot::Sender<Result<BrowserImportJournal>>,
     ),
-    TreeChanges(Vec<crate::document::Change>, oneshot::Sender<Result<()>>),
-    TreeResume(crate::document::Resume, oneshot::Sender<Result<()>>),
-    TreeClaim(String, oneshot::Sender<Result<()>>),
-    TreeSlotWrite(String, i16, Option<Vec<u8>>, oneshot::Sender<Result<()>>),
-    TreeSlotRead(
+    WorkspaceChanges(Vec<crate::document::Change>, oneshot::Sender<Result<()>>),
+    WorkspaceClaim(String, oneshot::Sender<Result<()>>),
+    WorkspaceOpen(String, oneshot::Sender<Result<()>>),
+    RecordsList(String, oneshot::Sender<Result<(u64, Vec<crate::document::ViewRecord>)>>),
+    RecordsWrite(
+        String,
+        Vec<(String, Option<crate::document::ViewRecord>)>,
+        oneshot::Sender<Result<()>>,
+    ),
+    WorkspaceSlotWrite(String, i16, Option<Vec<u8>>, oneshot::Sender<Result<()>>),
+    WorkspaceSlotRead(
         String,
         String,
         i16,
@@ -109,7 +116,7 @@ enum Command {
     ),
     SigninStatus(
         String,
-        oneshot::Sender<Result<crate::tree::sync::SigninStatus>>,
+        oneshot::Sender<Result<crate::workspace::sync::SigninStatus>>,
     ),
     SigninWrite(
         String,
@@ -133,8 +140,8 @@ pub struct WorkerHandle {
     pub status: watch::Receiver<Status>,
     pub presence: watch::Receiver<Vec<Presence>>,
     pub devices: watch::Receiver<Vec<Device>>,
-    /// Per-device trees: roster, the driven tree and the shared tree.
-    pub trees: watch::Receiver<TreeView>,
+    /// Workspaces: roster, the driven workspace and the shared workspace.
+    pub workspaces: watch::Receiver<SyncState>,
     pub traffic: Arc<crate::transport::TrafficCounters>,
     events: broadcast::Sender<AccountEvent>,
 }
@@ -425,47 +432,69 @@ impl WorkerHandle {
         receive.await.map_err(|_| Error::Network)?
     }
 
-    /// Queues renderer edits durably. Groups and websites go to the shared
-    /// tree; windows, layouts and tabs to the tree this device drives.
-    pub async fn tree_changes(&self, changes: Vec<crate::document::Change>) -> Result<()> {
-        self.call(|reply| Command::TreeChanges(changes, reply))
+    /// Queues renderer edits durably. Folders and bookmarks go to the shared
+    /// workspace; windows, tabs and views to the workspace this device drives.
+    pub async fn workspace_changes(&self, changes: Vec<crate::document::Change>) -> Result<()> {
+        self.call(|reply| Command::WorkspaceChanges(changes, reply))
             .await
     }
 
-    pub async fn tree_resume(&self, resume: crate::document::Resume) -> Result<()> {
-        self.call(|reply| Command::TreeResume(resume, reply)).await
+    /// Moves this device's sign-in lease to `workspace_id` (the machine most
+    /// recently active on a device publishes its sign-ins). Requires a connection.
+    pub async fn claim_workspace(&self, workspace_id: String) -> Result<()> {
+        self.call(|reply| Command::WorkspaceClaim(workspace_id, reply)).await
     }
 
-    /// Moves this device's driver seat to `tree_id`. Requires a connection.
-    pub async fn claim_tree(&self, tree_id: String) -> Result<()> {
-        self.call(|reply| Command::TreeClaim(tree_id, reply)).await
+    /// Shows and edits `workspace_id` on this machine. Works offline; any number
+    /// of machines may be on one workspace at once.
+    pub async fn open_workspace(&self, workspace_id: String) -> Result<()> {
+        self.call(|reply| Command::WorkspaceOpen(workspace_id, reply)).await
+    }
+
+    /// Native-only: a pulled collection as shown here (pending writes on
+    /// top), with the server cursor it was read through.
+    pub async fn records_list(
+        &self,
+        collection: String,
+    ) -> Result<(u64, Vec<crate::document::ViewRecord>)> {
+        self.call(|reply| Command::RecordsList(collection, reply)).await
+    }
+
+    /// Native-only: replaces whole records (`None` deletes); queued durably
+    /// and pushed when connected.
+    pub async fn records_write(
+        &self,
+        collection: String,
+        writes: Vec<(String, Option<crate::document::ViewRecord>)>,
+    ) -> Result<()> {
+        self.call(|reply| Command::RecordsWrite(collection, writes, reply)).await
     }
 
     /// Native-only: slot plaintext (page state, history) may hold form data.
-    pub async fn write_tab_slot(
+    pub async fn write_page_slot(
         &self,
         tab_record: String,
         slot: i16,
         plaintext: Option<Vec<u8>>,
     ) -> Result<()> {
-        self.call(|reply| Command::TreeSlotWrite(tab_record, slot, plaintext, reply))
+        self.call(|reply| Command::WorkspaceSlotWrite(tab_record, slot, plaintext, reply))
             .await
     }
 
-    pub async fn read_tab_slot(
+    pub async fn read_page_slot(
         &self,
-        tree_id: String,
+        workspace_id: String,
         tab_record: String,
         slot: i16,
     ) -> Result<Option<Vec<u8>>> {
-        self.call(|reply| Command::TreeSlotRead(tree_id, tab_record, slot, reply))
+        self.call(|reply| Command::WorkspaceSlotRead(workspace_id, tab_record, slot, reply))
             .await
     }
 
     /// Native-only: whether this session holds a device's lock, the device's
     /// verified sign-in slots, and this machine's store binding for it.
-    pub async fn signin_status(&self, tree_id: String) -> Result<crate::tree::sync::SigninStatus> {
-        self.call(|reply| Command::SigninStatus(tree_id, reply))
+    pub async fn signin_status(&self, workspace_id: String) -> Result<crate::workspace::sync::SigninStatus> {
+        self.call(|reply| Command::SigninStatus(workspace_id, reply))
             .await
     }
 
@@ -473,27 +502,27 @@ impl WorkerHandle {
     /// records the digests of all its current shards.
     pub async fn write_signin(
         &self,
-        tree_id: String,
+        workspace_id: String,
         writes: Vec<(i16, Option<Vec<u8>>)>,
         written: std::collections::BTreeMap<i16, String>,
     ) -> Result<()> {
-        self.call(|reply| Command::SigninWrite(tree_id, writes, written, reply))
+        self.call(|reply| Command::SigninWrite(workspace_id, writes, written, reply))
             .await
     }
 
     /// Native-only: one verified sign-in shard's plaintext.
-    pub async fn read_signin(&self, tree_id: String, slot: i16) -> Result<Option<Vec<u8>>> {
-        self.call(|reply| Command::SigninRead(tree_id, slot, reply))
+    pub async fn read_signin(&self, workspace_id: String, slot: i16) -> Result<Option<Vec<u8>>> {
+        self.call(|reply| Command::SigninRead(workspace_id, slot, reply))
             .await
     }
 
     /// Native-only: records which local store holds a device's sign-in data.
     pub async fn bind_signin(
         &self,
-        tree_id: String,
+        workspace_id: String,
         binding: crate::store::DeviceSignin,
     ) -> Result<()> {
-        self.call(|reply| Command::SigninBind(tree_id, binding, reply))
+        self.call(|reply| Command::SigninBind(workspace_id, binding, reply))
             .await
     }
 
@@ -524,14 +553,15 @@ pub struct Worker<F> {
     imported_through: Option<u64>,
     roster: HashMap<String, DeviceGrant>,
     head: u64,
-    trees: TreeSync,
-    tree_view: watch::Sender<TreeView>,
+    workspaces: WorkspaceSync,
+    sync_state: watch::Sender<SyncState>,
     /// Frames produced by commands, sent by the connected loop.
-    tree_outbox: Vec<Outgoing>,
+    workspace_outbox: Vec<Outgoing>,
     connected_now: bool,
     claimed_requests: std::collections::HashSet<String>,
-    /// Consecutive trees dropped and refetched after failing to verify.
-    tree_refetches: u8,
+    /// Consecutive workspaces dropped and refetched after failing to verify.
+    workspace_refetches: u8,
+    collections: collections::CollectionSync,
 }
 
 impl<F> Worker<F>
@@ -568,16 +598,16 @@ where
         let (presence, presence_rx) = watch::channel(Vec::new());
         let (devices, devices_rx) = watch::channel(Vec::new());
         let (events, _) = broadcast::channel(32);
-        let mut trees = TreeSync::new(&scope, store.grant());
-        trees.load(
+        let mut workspaces = WorkspaceSync::new(&scope, store.grant());
+        workspaces.load(
             &store,
-            &crate::tree::state::Verifier {
+            &crate::workspace::state::Verifier {
                 root: &root,
                 scope: &scope,
                 grants: &HashMap::new(),
             },
         )?;
-        let (tree_view, trees_rx) = watch::channel(trees.view(&store)?);
+        let (sync_state, workspaces_rx) = watch::channel(workspaces.optimistic_view(&store, &root)?);
         let handle = WorkerHandle {
             browser_imports: Arc::new(tokio::sync::Mutex::new(())),
             commands: commands_tx,
@@ -585,7 +615,7 @@ where
             status: status_rx,
             presence: presence_rx,
             devices: devices_rx,
-            trees: trees_rx,
+            workspaces: workspaces_rx,
             traffic: api.traffic(),
             events: events.clone(),
         };
@@ -606,12 +636,13 @@ where
                 imported_through: None,
                 roster: HashMap::new(),
                 head,
-                trees,
-                tree_view,
-                tree_outbox: Vec::new(),
+                workspaces,
+                sync_state,
+                workspace_outbox: Vec::new(),
                 connected_now: false,
                 claimed_requests: std::collections::HashSet::new(),
-                tree_refetches: 0,
+                workspace_refetches: 0,
+                collections: collections::CollectionSync::default(),
             },
             handle,
         ))
@@ -682,16 +713,16 @@ where
             let started = Instant::now();
             let result = match connected {
                 Ok(mut socket) => {
-                    if socket.workspace.head_sequence < self.head {
+                    if socket.vault.head_sequence < self.head {
                         return Err(Error::Recovery);
                     }
-                    self.store.confirm_enrollment(&socket.workspace)?;
-                    self.store.observe_head(socket.workspace.head_sequence)?;
-                    self.head = self.head.max(socket.workspace.head_sequence);
+                    self.store.confirm_enrollment(&socket.vault)?;
+                    self.store.observe_head(socket.vault.head_sequence)?;
+                    self.head = self.head.max(socket.vault.head_sequence);
                     self.connected_now = true;
                     let result = self.connected(&mut socket).await;
                     self.connected_now = false;
-                    self.trees_disconnected();
+                    self.workspaces_disconnected();
                     result
                 }
                 Err(error) => Err(error),
@@ -801,19 +832,20 @@ where
                 let _ = reply.send(result);
                 self.refresh_status()?;
             }
-            Command::TreeChanges(changes, reply) => {
-                let result = self
-                    .trees
-                    .apply_changes(&mut self.store, &self.root, changes);
+            Command::WorkspaceChanges(changes, reply) => {
+                // Bookmarks go to their collection; the rest to the workspace.
+                let result = self.route_record_changes(changes).and_then(|rest| {
+                    if rest.is_empty() {
+                        Ok(())
+                    } else {
+                        self.workspaces.apply_changes(&mut self.store, &self.root, rest)
+                    }
+                });
                 let _ = reply.send(result);
-                self.publish_tree_view()?;
+                self.publish_sync_state()?;
             }
-            Command::TreeResume(resume, reply) => {
-                let result = self.trees.set_resume(&mut self.store, &self.root, resume);
-                let _ = reply.send(result);
-            }
-            Command::TreeSlotWrite(tab, slot, plaintext, reply) => {
-                let _ = reply.send(self.trees.write_slot(
+            Command::WorkspaceSlotWrite(tab, slot, plaintext, reply) => {
+                let _ = reply.send(self.workspaces.write_slot(
                     &mut self.store,
                     &self.root,
                     &tab,
@@ -821,53 +853,75 @@ where
                     plaintext,
                 ));
             }
-            Command::TreeClaim(tree, reply) => {
+            Command::WorkspaceClaim(workspace, reply) => {
                 if !self.connected_now {
                     let _ = reply.send(Err(Error::Network));
                 } else {
                     let grant = self.store.grant().clone();
-                    match self.trees.claim(
+                    match self.workspaces.claim(
                         &mut self.store,
                         &self.scope,
                         &grant,
                         &self.device,
-                        &tree,
+                        &workspace,
                         None,
                         Some(reply),
                     ) {
-                        Ok(frame) => self.tree_outbox.push(frame),
+                        Ok(frame) => self.workspace_outbox.push(frame),
                         Err(error) => return Err(error),
                     }
                 }
             }
-            Command::SigninStatus(tree, reply) => {
-                let _ = reply.send(self.trees.signin_status(&self.store, &self.root, &tree));
+            Command::RecordsList(collection, reply) => {
+                let _ = reply.send(self.records_list(&collection));
             }
-            Command::SigninWrite(tree, writes, written, reply) => {
-                let _ = reply.send(self.trees.write_signin(
+            Command::RecordsWrite(collection, writes, reply) => {
+                let _ = reply.send(self.records_write(&collection, writes));
+                self.publish_sync_state()?;
+            }
+            Command::WorkspaceOpen(workspace, reply) => {
+                match self.workspaces.open(&mut self.store, &workspace) {
+                    Ok(frames) => {
+                        // Offline, the next connection watches it anyway.
+                        if self.connected_now {
+                            self.workspace_outbox.extend(frames);
+                        }
+                        let _ = reply.send(Ok(()));
+                    }
+                    Err(error) => {
+                        let _ = reply.send(Err(error));
+                    }
+                }
+                self.publish_sync_state()?;
+            }
+            Command::SigninStatus(workspace, reply) => {
+                let _ = reply.send(self.workspaces.signin_status(&self.store, &self.root, &workspace));
+            }
+            Command::SigninWrite(workspace, writes, written, reply) => {
+                let _ = reply.send(self.workspaces.write_signin(
                     &mut self.store,
                     &self.root,
-                    &tree,
+                    &workspace,
                     writes,
                     written,
                 ));
             }
-            Command::SigninRead(tree, slot, reply) => {
+            Command::SigninRead(workspace, slot, reply) => {
                 if self.connected_now {
-                    if let Some(frame) = self.trees.read_signin(&tree, slot, reply) {
-                        self.tree_outbox.push(frame);
+                    if let Some(frame) = self.workspaces.read_signin(&workspace, slot, reply) {
+                        self.workspace_outbox.push(frame);
                     }
                 } else {
                     let _ = reply.send(Err(Error::Network));
                 }
             }
-            Command::SigninBind(tree, binding, reply) => {
-                let _ = reply.send(self.store.set_device_signin(&self.root, &tree, &binding));
+            Command::SigninBind(workspace, binding, reply) => {
+                let _ = reply.send(self.store.set_device_signin(&self.root, &workspace, &binding));
             }
-            Command::TreeSlotRead(tree, tab, slot, reply) => {
+            Command::WorkspaceSlotRead(workspace, tab, slot, reply) => {
                 if self.connected_now {
-                    let frame = self.trees.read_slot(&tree, &tab, slot, reply);
-                    self.tree_outbox.push(frame);
+                    let frame = self.workspaces.read_slot(&workspace, &tab, slot, reply);
+                    self.workspace_outbox.push(frame);
                 } else {
                     let _ = reply.send(Err(Error::Network));
                 }
@@ -968,11 +1022,11 @@ where
         let cursor = self.store.applied_sequence()?;
         let pending = self.store.pending_count()?;
         if matches!(phase, Phase::CatchingUp | Phase::Ready) {
-            // Workspace-wide sign-in imports only exist before device trees.
-            // In tree mode each device's sign-in data has its own state
+            // Workspace-wide sign-in imports only exist before workspaces.
+            // In workspace mode each device's sign-in data has its own state
             // (reported per device), and nothing advances the legacy import
             // bookkeeping, so waiting on it would never finish.
-            let imports_settled = self.trees.tree_mode()
+            let imports_settled = self.workspaces.workspace_mode()
                 || (self
                     .imported_through
                     .is_some_and(|sequence| sequence >= cursor)
@@ -1056,43 +1110,43 @@ where
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis() as u64;
-            if self.trees.idle() {
-                self.store.resync_tree_counter(own.tree_last_counter)?;
+            if self.workspaces.idle() {
+                self.store.resync_workspace_counter(own.workspace_last_counter)?;
             } else {
-                self.store.observe_tree_counter(own.tree_last_counter)?;
+                self.store.observe_workspace_counter(own.workspace_last_counter)?;
             }
-            // Tree protocol: the target signs a claim reusing the request ID,
-            // which the server checks against the request's tree and expiry.
+            // Workspace protocol: the target signs a claim reusing the request ID,
+            // which the server checks against the request's workspace and expiry.
             if own.full_sync && own.activation_expires_at > now {
                 if let Some(request) = own.activation_request.as_deref().filter(|id| valid_id(id)) {
                     if self.claimed_requests.insert(request.to_owned()) {
-                        let tree = own
-                            .activation_tree_id
+                        let workspace = own
+                            .activation_workspace_id
                             .clone()
                             .filter(|id| valid_id(id))
                             .unwrap_or_else(|| own.grant.device_id.clone());
                         let grant = self.store.grant().clone();
-                        let frame = self.trees.claim(
+                        let frame = self.workspaces.claim(
                             &mut self.store,
                             &self.scope,
                             &grant,
                             &self.device,
-                            &tree,
+                            &workspace,
                             Some(request.to_owned()),
                             None,
                         )?;
-                        self.tree_outbox.push(frame);
+                        self.workspace_outbox.push(frame);
                     }
                 }
             }
         }
         self.devices.send_replace(enrolled);
-        Ok(())
+        self.refresh_shared_retirement()
     }
 
     async fn connected(&mut self, socket: &mut SyncSocket) -> Result<()> {
         self.report(Phase::CatchingUp, None)?;
-        self.trees_connected(socket).await?;
+        self.workspaces_connected(socket).await?;
         let mut tick = interval(Duration::from_millis(250));
         tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let mut heartbeat = interval(Duration::from_secs(15));
@@ -1149,23 +1203,30 @@ where
                             self.head = self.head.max(replay.head_sequence);
                             if in_flight.as_ref().is_some_and(|(id, _)| page.iter().any(|(e, _)| e.mutation.operation_id == *id)) { in_flight = None; }
                         },
-                        ServerFrame::AccountEvent { event } => { let _ = self.events.send(event); },
-                        ServerFrame::Trees { trees } => self.tree_roster(socket, trees).await?,
-                        ServerFrame::TreeDelta { delta } => {
-                            let tree = delta.tree_id.clone();
-                            let result = self.tree_delta(socket, delta).await;
-                            self.tree_verified(&tree, result)?
+                        ServerFrame::AccountEvent { event } => {
+                            if event.topic == "browser-records" {
+                                if let Some(collection) = event.id.as_deref() { self.collections.hinted(collection); }
+                            }
+                            let _ = self.events.send(event);
                         },
-                        ServerFrame::TreeSnapshot { snapshot } => {
-                            let tree = snapshot.tree_id.clone();
-                            let result = self.tree_snapshot(snapshot).await;
-                            self.tree_verified(&tree, result)?
+                        ServerFrame::Workspaces { workspaces } => self.workspace_roster(socket, workspaces).await?,
+                        ServerFrame::WorkspaceDelta { delta } => {
+                            let workspace = delta.workspace_id.clone();
+                            let result = self.workspace_delta(socket, delta).await;
+                            self.workspace_verified(&workspace, result)?
                         },
-                        ServerFrame::TreeCurrent { tree_id, version } => self.tree_current(socket, &tree_id, version).await?,
-                        ServerFrame::TreeAck { request_id, receipt } => self.tree_ack(request_id.as_deref(), receipt)?,
-                        ServerFrame::TreeError { code, request_id, operation_id, .. } => self.tree_error(request_id.as_deref(), operation_id.as_deref(), &code)?,
-                        ServerFrame::Slot { request_id, slot } => self.trees.on_slot(&self.root, &self.scope, request_id.as_deref(), slot),
+                        ServerFrame::WorkspaceSnapshot { snapshot } => {
+                            let workspace = snapshot.workspace_id.clone();
+                            let result = self.workspace_snapshot(snapshot).await;
+                            self.workspace_verified(&workspace, result)?
+                        },
+                        ServerFrame::WorkspaceCurrent { workspace_id, version } => self.workspace_current(socket, &workspace_id, version).await?,
+                        ServerFrame::WorkspaceAck { request_id, receipt } => self.workspace_ack(request_id.as_deref(), receipt)?,
+                        ServerFrame::WorkspaceError { code, request_id, operation_id, .. } => self.workspace_error(request_id.as_deref(), operation_id.as_deref(), &code)?,
+                        ServerFrame::Slot { request_id, slot } => self.workspaces.on_slot(&self.root, &self.scope, request_id.as_deref(), slot),
                         ServerFrame::Blobs { .. } | ServerFrame::BlobAck { .. } => {},
+                        ServerFrame::Records { request_id, listing } => self.records_listing(request_id.as_deref(), listing)?,
+                        ServerFrame::RecordsAck { request_id, results, .. } => self.records_ack(request_id.as_deref(), results)?,
                         ServerFrame::CheckpointRequired { .. } => return Err(Error::Recovery),
                         ServerFrame::Error { code, .. } if code == "sync_unavailable" => return Err(Error::Network),
                         ServerFrame::Error { code, .. } if code == "sync_device_forbidden" => return Err(Error::DeviceForbidden),
@@ -1177,13 +1238,14 @@ where
                 _ = heartbeat.tick() => {
                     let status = self.status.borrow().clone();
                     let document = serde_json::from_slice::<crate::document::Document>(&self.store.committed_snapshot(&self.root)?).ok();
-                    let active_epoch = document.as_ref().filter(|v| !v.tree_mode && v.is_active(&self.store.grant().device_id))
+                    let active_epoch = document.as_ref().filter(|v| !v.workspace_mode && v.is_active(&self.store.grant().device_id))
                         .and_then(|v| v.active_device.as_ref()).map(|v| v.epoch.as_str());
                     socket.send(&ClientFrame::Heartbeat { applied_sequence: status.applied_sequence, ready: status.phase == Phase::Ready, active_epoch, activation: None }).await?;
                 },
                 _ = tick.tick() => {
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
-                    self.tree_tick(socket).await?;
+                    self.workspace_tick(socket).await?;
+                    self.records_tick(socket).await?;
                     // Catch up before publishing offline credentials; the reducer
                     // will enforce their base-version preconditions atomically.
                     if in_flight.is_none() && self.devices.borrow().iter().any(|d| d.grant.device_id == self.store.grant().device_id && d.full_sync) && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {
@@ -1236,7 +1298,7 @@ mod control_tests {
         let scope = VaultScope {
             deployment: api.deployment(),
             account_id: "fixture".into(),
-            workspace_id: uuid::Uuid::new_v4().to_string(),
+            vault_id: uuid::Uuid::new_v4().to_string(),
         };
         let root = VaultRoot::generate();
         let key = DeviceKey::generate();
@@ -1289,7 +1351,7 @@ mod control_tests {
         let scope = VaultScope {
             deployment: api.deployment(),
             account_id: "fixture".into(),
-            workspace_id: uuid::Uuid::new_v4().to_string(),
+            vault_id: uuid::Uuid::new_v4().to_string(),
         };
         let root = VaultRoot::generate();
         let key = DeviceKey::generate();
@@ -1319,7 +1381,7 @@ mod control_tests {
         worker
             .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
             .unwrap();
-        assert!(worker.tree_outbox.is_empty());
+        assert!(worker.workspace_outbox.is_empty());
         json["activation_expires_at"] = (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -1330,7 +1392,7 @@ mod control_tests {
         worker
             .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
             .unwrap();
-        assert!(worker.tree_outbox.is_empty());
+        assert!(worker.workspace_outbox.is_empty());
         assert!(!handle.devices.borrow()[0].full_sync);
         json["full_sync"] = true.into();
         // Existing clients ignore the additive metadata, including the flattened grant.
@@ -1350,13 +1412,13 @@ mod control_tests {
                 .update_roster(vec![serde_json::from_value(json.clone()).unwrap()])
                 .unwrap();
         }
-        // One signed claim reusing the request ID; the device's own tree is
+        // One signed claim reusing the request ID; the device's own workspace is
         // the default target when the request names none.
-        assert_eq!(worker.tree_outbox.len(), 1);
-        match &worker.tree_outbox[0] {
+        assert_eq!(worker.workspace_outbox.len(), 1);
+        match &worker.workspace_outbox[0] {
             Outgoing::Claim { claim, .. } => {
                 assert_eq!(claim.operation_id, request);
-                assert_eq!(claim.tree_id, grant.device_id);
+                assert_eq!(claim.workspace_id, grant.device_id);
             }
             _ => panic!("expected a tree claim"),
         }

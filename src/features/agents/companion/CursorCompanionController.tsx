@@ -1,3 +1,8 @@
+import {
+  useSettingsProfiles,
+  effectiveValues,
+  writeProfilePreference,
+} from "@/features/settings/sync";
 import { assistantApi } from "@/api/assistant/api";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -15,19 +20,7 @@ import {
   type CompanionSubmission,
 } from "./companionState";
 import { controlEvent, type DisplayCapture, type Presentation } from "./protocol";
-let nativeLifecycle = Promise.resolve<unknown>(undefined);
-const nativeConfiguration = (accountId: string) => {
-  const next = nativeLifecycle
-    .catch(() => {})
-    .then(() =>
-      invoke<number>("cursor_companion_configure", {
-        accountId,
-      }),
-    );
-  nativeLifecycle = next;
-  return next;
-};
-
+import { nativeConfiguration } from "./nativeConfiguration";
 /** Lives only in the signed-in main window. Overlay webviews never receive auth or provider clients. */
 export function CursorCompanionController({ accountId }: { accountId: string }) {
   useEffect(() => {
@@ -101,21 +94,23 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       };
       publish();
     };
-    const persist = () => {
-      try {
-        localStorage.setItem(
-          preferenceKey,
-          JSON.stringify({
-            visible: show,
-            model: state.model,
-            size: state.size,
-            ask: state.ask === true,
-          }),
-        );
-      } catch {
-        /* optional preference */
-      }
+    const applyPreferences = () => {
+      const settings = useSettingsProfiles.getState();
+      if (settings.accountId !== accountId || !settings.state) return;
+      const values = effectiveValues(settings.state);
+      show = values["agents.companion.visible"] !== false;
+      change({
+        visible: show || state.phase !== "idle" || pointPending,
+        size: normalizeCompanionSize(values["agents.companion.size"]),
+        ask: values["agents.companion.ask"] === true,
+        model:
+          typeof values["agents.companion.model"] === "string"
+            ? values["agents.companion.model"]
+            : "",
+      });
     };
+    const stopPreferences = useSettingsProfiles.subscribe(applyPreferences);
+    applyPreferences();
     const maybeHide = () => {
       if (
         state.error ||
@@ -442,31 +437,32 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
       const control = async (control: CompanionControl) => {
         if (disposed || useMistyStore.getState().accountId !== accountId) return;
         if (control.kind === "visibility") {
+          await writeProfilePreference("agents.companion.visible", control.visible);
           show = control.visible;
-          persist();
           change({
             visible: show || state.phase !== "idle" || pointPending,
           });
         } else if (control.kind === "size") {
+          await writeProfilePreference(
+            "agents.companion.size",
+            normalizeCompanionSize(control.size),
+          );
           change({
             size: normalizeCompanionSize(control.size),
           });
-          persist();
         } else if (control.kind === "ask") {
           // End existing ownership before changing the next takeover's policy.
           if (await interruptNative()) {
+            await writeProfilePreference("agents.companion.ask", control.ask);
             change({ ask: control.ask });
-            persist();
           }
         } else if (
           control.kind === "model" &&
           (control.model === "" || state.models?.some((m) => m.id === control.model))
         ) {
           if (await interruptNative()) {
-            change({
-              model: control.model,
-            });
-            persist();
+            await writeProfilePreference("agents.companion.model", control.model);
+            change({ model: control.model });
           }
         } else if (control.kind === "stop") {
           if (await interruptNative())
@@ -582,6 +578,7 @@ export function CursorCompanionController({ accountId }: { accountId: string }) 
     void setup().catch((e) => fail(turn, e));
     return () => {
       disposed = true;
+      stopPreferences();
       unsubscribe();
       stopAudio();
       clearTimeout(hideTimer);

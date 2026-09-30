@@ -8,14 +8,30 @@ use crate::{Error, Result};
 
 pub type Fields = BTreeMap<String, Value>;
 
+/// Record kinds. Serialized names are the stored ones (`group`, `website`,
+/// `layout`, `tab`): they are inside encrypted records and hashed into node
+/// IDs, so they never change. Record fields renamed in code keep their stored
+/// names the same way.
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
-    Group,
-    Website,
+    #[serde(rename = "group")]
+    Folder,
+    #[serde(rename = "website")]
+    Bookmark,
     Window,
-    Layout,
+    #[serde(rename = "layout")]
     Tab,
+    #[serde(rename = "tab")]
+    View,
+    /// An open tab group in a workspace: name, color and the tabs in it.
+    /// Written only once every device understands it (see `SyncState::all_upgraded`).
+    TabGroup,
+    /// A closed tab group kept to reopen on any device (`tab_groups` collection).
+    SavedTabGroup,
+    /// One device's browsing history for one hour, or one part of it
+    /// (`history` collection).
+    HistoryBatch,
 }
 
 impl Kind {
@@ -23,12 +39,16 @@ impl Kind {
         if !valid_id(id) || id.starts_with("recovery:") {
             return Err(Error::Invalid);
         }
+        // Stored key prefixes; see `Kind`.
         let kind = match self {
-            Self::Group => "group",
-            Self::Website => "website",
+            Self::Folder => "group",
+            Self::Bookmark => "website",
             Self::Window => "window",
-            Self::Layout => "layout",
-            Self::Tab => "tab",
+            Self::Tab => "layout",
+            Self::View => "tab",
+            Self::TabGroup => "tab_group",
+            Self::SavedTabGroup => "saved_tab_group",
+            Self::HistoryBatch => "history_batch",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -73,7 +93,7 @@ fn order(value: f64) -> Result<()> {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Group {
+pub struct Folder {
     pub label: String,
     pub icon: String,
     pub order: f64,
@@ -82,12 +102,59 @@ pub struct Group {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Website {
-    pub group_id: String,
+pub struct Bookmark {
+    #[serde(rename = "group_id")]
+    pub folder_id: String,
     pub title: String,
     pub url: String,
     pub order: f64,
     pub pinned: bool,
+}
+
+/// Tab group colors, as named by the renderer.
+const TAB_GROUP_COLORS: &[&str] = &["gray", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TabGroup {
+    pub name: String,
+    pub color: String,
+    pub order: f64,
+    /// Tabs in the group, in tab-strip order.
+    #[serde(rename = "layout_ids")]
+    pub tab_ids: Vec<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SavedTabGroup {
+    pub name: String,
+    pub color: String,
+    pub order: f64,
+    /// The group's saved tabs as the renderer stores them (JSON text).
+    #[serde(rename = "layouts")]
+    pub tabs: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Visit {
+    pub url: String,
+    pub title: String,
+    /// Milliseconds since the Unix epoch.
+    pub visited_at: i64,
+    pub typed: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryBatch {
+    /// The device that browsed.
+    pub origin: String,
+    /// Hours since the Unix epoch.
+    pub hour: i64,
+    pub part: u32,
+    pub visits: Vec<Visit>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -162,7 +229,7 @@ impl SplitTree {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Layout {
+pub struct Tab {
     pub window_id: String,
     pub title: String,
     pub order: f64,
@@ -179,25 +246,27 @@ pub enum Surface {
     Space,
 }
 
-/// Moving a view is one field: concurrent moves cannot combine a layout from
+/// Moving a view is one field: concurrent moves cannot combine a tab from
 /// one device with a pane/order from another.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Placement {
-    pub layout_id: String,
+    #[serde(rename = "layout_id")]
+    pub tab_id: String,
     pub pane_id: String,
     pub order: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Tab {
+pub struct View {
     pub surface: Surface,
     pub title: String,
     pub placement: Placement,
     pub url: Option<String>,
     pub profile_id: Option<String>,
-    pub website_id: Option<String>,
+    #[serde(rename = "website_id")]
+    pub bookmark_id: Option<String>,
     pub tool_route: Option<String>,
     pub agent_owned: bool,
 }
@@ -239,15 +308,15 @@ fn group_icon(value: &str) -> Result<()> {
 pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
     let value = serde_json::to_value(fields)?;
     match kind {
-        Kind::Group => {
-            let v: Group = serde_json::from_value(value)?;
+        Kind::Folder => {
+            let v: Folder = serde_json::from_value(value)?;
             text(&v.label, 160, false)?;
             group_icon(&v.icon)?;
             order(v.order)?;
         }
-        Kind::Website => {
-            let v: Website = serde_json::from_value(value)?;
-            if !valid_id(&v.group_id) {
+        Kind::Bookmark => {
+            let v: Bookmark = serde_json::from_value(value)?;
+            if !valid_id(&v.folder_id) {
                 return Err(Error::Invalid);
             }
             text(&v.title, 512, false)?;
@@ -259,8 +328,8 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             text(&v.title, 160, true)?;
             order(v.order)?;
         }
-        Kind::Layout => {
-            let v: Layout = serde_json::from_value(value)?;
+        Kind::Tab => {
+            let v: Tab = serde_json::from_value(value)?;
             if !valid_id(&v.window_id) {
                 return Err(Error::Invalid);
             }
@@ -268,13 +337,48 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             order(v.order)?;
             v.tree.panes()?;
         }
-        Kind::Tab => {
-            let v: Tab = serde_json::from_value(value)?;
+        Kind::TabGroup => {
+            let v: TabGroup = serde_json::from_value(value)?;
+            text(&v.name, 160, true)?;
+            if !TAB_GROUP_COLORS.contains(&v.color.as_str())
+                || v.tab_ids.len() > 1024
+                || v.tab_ids.iter().any(|id| !valid_id(id))
+            {
+                return Err(Error::Invalid);
+            }
+            order(v.order)?;
+        }
+        Kind::SavedTabGroup => {
+            let v: SavedTabGroup = serde_json::from_value(value)?;
+            text(&v.name, 160, true)?;
+            if !TAB_GROUP_COLORS.contains(&v.color.as_str())
+                || v.tabs.len() > 48 << 10
+                || serde_json::from_str::<Value>(&v.tabs).map_or(true, |l| !l.is_array())
+            {
+                return Err(Error::Invalid);
+            }
+            order(v.order)?;
+        }
+        Kind::HistoryBatch => {
+            let v: HistoryBatch = serde_json::from_value(value)?;
+            if !valid_id(&v.origin) || v.hour < 0 || v.part > 64 || v.visits.len() > 2000 {
+                return Err(Error::Invalid);
+            }
+            for visit in &v.visits {
+                web_url(&visit.url)?;
+                text(&visit.title, 512, true)?;
+                if visit.visited_at / 3_600_000 != v.hour {
+                    return Err(Error::Invalid);
+                }
+            }
+        }
+        Kind::View => {
+            let v: View = serde_json::from_value(value)?;
             text(&v.title, 2048, true)?;
             order(v.placement.order)?;
-            if !valid_id(&v.placement.layout_id)
+            if !valid_id(&v.placement.tab_id)
                 || !valid_id(&v.placement.pane_id)
-                || v.website_id.as_ref().is_some_and(|id| !valid_id(id))
+                || v.bookmark_id.as_ref().is_some_and(|id| !valid_id(id))
             {
                 return Err(Error::Invalid);
             }
@@ -289,7 +393,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                     }
                 }
                 Surface::Home | Surface::Files | Surface::Agents | Surface::Space => {
-                    if v.url.is_some() || v.profile_id.is_some() || v.website_id.is_some() {
+                    if v.url.is_some() || v.profile_id.is_some() || v.bookmark_id.is_some() {
                         return Err(Error::Invalid);
                     }
                     let route = v.tool_route.as_deref().ok_or(Error::Invalid)?;

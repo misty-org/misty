@@ -1,307 +1,219 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { create } from "zustand";
-import type { NativeSyncView } from "./native";
 const mocks = vi.hoisted(() => ({
-  retry: vi.fn(),
+  availability: vi.fn(),
+  unlock: vi.fn(),
+  lock: vi.fn(),
+  forget: vi.fn(),
   read: vi.fn(),
   control: vi.fn(),
-  activate: vi.fn(),
+  claim: vi.fn(),
+  rename: vi.fn(),
+  refresh: vi.fn(),
+  recovery: vi.fn(),
+  credentials: vi.fn(),
   generation: 1,
+  user: { id: "a", name: "User" } as { id: string; name: string } | null,
 }));
 vi.mock("@/api/client/session", () => ({
   isApiSessionTransitioning: () => false,
   readApiSessionGeneration: () => mocks.generation,
+  readApiAuthToken: mocks.credentials,
 }));
-vi.mock("@/features/workspace/workspaceRecoveryPlatform", () => ({
-  nativeWorkspaceRecoveryEnabled: () => true,
+vi.mock("@/api/deployment/api", () => ({ resolveApiBase: async () => "https://example.test" }));
+vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
+vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: mocks.user, transitioning: false }) }));
+vi.mock("@/features/auth/core", () => ({
+  useUserStore: (select: (s: unknown) => unknown) => select({ me: { name: "User" } }),
+}));
+vi.mock("@/features/settings/profiles/store", () => ({
+  useSettingsProfiles: create(() => ({
+    accountId: "a",
+    ready: true,
+    syncing: false,
+    error: null,
+    state: { outbox: [], profile: {} },
+    refresh: mocks.refresh,
+  })),
 }));
 vi.mock("@/features/workspace/nativeWorkspaceRecovery", () => ({
   useWorkspaceRecoveryState: create(() => ({
     accountId: "a",
     ready: true,
     usable: true,
-    issue: null as string | null,
+    issue: null,
   })),
 }));
 vi.mock("@/features/workspace/useWorkspaceRecoveryRetry", () => ({
-  retryWorkspaceRecovery: mocks.retry,
+  retryWorkspaceRecovery: mocks.recovery,
 }));
-import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
-import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
+vi.mock("@/features/workspace/workspaceRecoveryPlatform", () => ({
+  nativeWorkspaceRecoveryEnabled: () => true,
+}));
 vi.mock("./native", () => ({
   readNativeSync: mocks.read,
-  activateNativeDevice: mocks.activate,
+  unlockNativeSync: mocks.unlock,
+  lockNativeSync: mocks.lock,
+  forgetNativeSyncKey: mocks.forget,
+  vaultAvailability: mocks.availability,
   controlNativeDevice: mocks.control,
+  claimNativeWorkspace: mocks.claim,
+  renameNativeDevice: mocks.rename,
+  generateSyncSecret: async () => "A".repeat(43) + "=",
 }));
-import { BrowserSyncBadge } from "./BrowserSyncBadge";
-import { syncBadgeStatus } from "./syncBadgeStatus";
-function session(): NativeSyncView {
-  return {
-    account_id: "a",
-    session_id: "s",
-    deployment: "https://example.test",
-    device_id: "d",
-    workspace_id: "w",
-    profile_id: "p",
-    browser_profile_ready: true,
-    status: {
-      phase: "ready",
-      applied_sequence: 1,
-      head_sequence: 1,
-      pending_changes: 0,
-      issue: null,
-    },
-    presence: [],
-    pending_operation_ids: [],
-    workspace: {
-      version: 1,
-      sequence: 1,
-      active_device: null,
-      records: [],
-      resumes: {},
-      orphaned_tab_ids: [],
-      orphaned_website_ids: [],
-    },
-  };
-}
-function status(native = session()) {
-  return syncBadgeStatus({
-    accountId: "a",
-    recovery: useWorkspaceRecoveryState.getState(),
-    ...useBrowserSyncStore.getState(),
-    session: native,
-  });
-}
+vi.mock("./restore/capture", () => ({ captureAll: async () => {} }));
+import { useBrowserSyncStore } from "./store";
+import { syncSession } from "./syncTestFixtures";
+import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.generation = 1;
+  mocks.user = { id: "a", name: "User" };
+  mocks.availability.mockResolvedValue({ local: true, remote: true });
+  mocks.unlock.mockResolvedValue(syncSession());
   mocks.read.mockResolvedValue(null);
-  mocks.control.mockResolvedValue("request");
-  mocks.activate.mockResolvedValue("request");
-  mocks.retry.mockResolvedValue(undefined);
+  mocks.refresh.mockResolvedValue(undefined);
+  mocks.credentials.mockResolvedValue("token");
   useWorkspaceRecoveryState.setState({ accountId: "a", ready: true, issue: null });
-  useBrowserSyncStore.setState({ session: session(), issue: null, connecting: false });
-});
-afterEach(cleanup);
-it("offers a direct unlock action when sync cannot connect", () => {
-  useBrowserSyncStore.setState({ session: null, issue: "Could not reach the sync server." });
-  const settings = vi.fn();
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
-  fireEvent.click(screen.getByRole("button", { name: "Unlock sync" }));
-  expect(settings).toHaveBeenCalledOnce();
-  expect(screen.queryByRole("dialog")).toBeNull();
-});
-it("shows green for confirmed healthy sync and live work, with no warning outside the popover", () => {
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  expect(
-    screen.getByRole("button", { name: "Sync: Up to date" }).getAttribute("data-sync-status"),
-  ).toBe("green");
-  expect(
-    screen.getByRole("button", { name: "Sync: Up to date" }).querySelector(".lucide-refresh-cw"),
-  ).toBeTruthy();
-  expect(document.querySelector("[data-sync-issue-badge]")).toBeNull();
-  expect(screen.queryByRole("dialog")).toBeNull();
-  const pending = session();
-  pending.status.pending_changes = 2;
-  expect(status(pending)).toMatchObject({ tone: "green", title: "Syncing", spinning: true });
-});
-it.each(["offline", "attention", "stopped"] as const)(
-  "shows red for %s even without an error message",
-  (phase) => {
-    const native = session();
-    native.status.phase = phase;
-    expect(status(native).tone).toBe("red");
-  },
-);
-it("explains denied device access without asking the user to sign in", () => {
-  const native = session();
-  native.status.phase = "attention";
-  native.status.issue = "sync_device_forbidden";
-  useBrowserSyncStore.setState({ session: native });
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
-  expect(
-    screen.getByText(/This device does not have permission to sync this workspace/),
-  ).toBeTruthy();
-  expect(screen.queryByText(/sign.in|required|sync_device_forbidden/i)).toBeNull();
-});
-it("translates an expired sign-in status into readable recovery text", () => {
-  const native = session();
-  native.status.issue = "sign_in_required";
-  expect(status(native)).toMatchObject({
-    tone: "red",
-    detail: "Sign in again to reconnect sync.",
+  useBrowserSyncStore.setState({
+    session: syncSession(),
+    issue: null,
+    reenroll: null,
+    connecting: false,
+    locked: null,
   });
 });
-it("gives local save failures priority and preserves the essential recovery warning", async () => {
-  useWorkspaceRecoveryState.setState({ issue: "Disk unavailable" });
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  const trigger = screen.getByRole("button", { name: "Sync: Local saving needs attention" });
-  expect(trigger.getAttribute("data-sync-status")).toBe("red");
-  expect(trigger.querySelector(".lucide-refresh-cw")).toBeTruthy();
-  expect(trigger.querySelector("[data-sync-issue-badge]")?.textContent).toBe("!");
-  fireEvent.click(trigger);
-  expect(screen.getByRole("dialog", { name: "Device control center" })).toBeTruthy();
-  expect(screen.getByText("Keep Misty open until saved.")).toBeTruthy();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Retry now" })));
-  expect(mocks.retry).toHaveBeenCalledWith("a", expect.any(Function));
-  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-  expect(screen.queryByRole("dialog")).toBeNull();
-});
-it("does not show green for an unknown connection or another account", () => {
-  const native = session();
-  native.account_id = "b";
-  expect(status(native)).toMatchObject({ tone: "neutral", title: "Sync is not connected" });
-  native.account_id = "a";
-  native.status.phase = "connecting";
-  expect(status(native).tone).toBe("neutral");
-});
-it("shows profile failures as red and closes the popover before opening settings", () => {
-  const native = session();
-  native.browser_profile_issue = "Website storage unavailable";
-  useBrowserSyncStore.setState({ session: native });
-  const settings = vi.fn();
+afterEach(cleanup);
+import { BrowserSyncBadge } from "./BrowserSyncBadge";
+import { retrySync } from "./retrySync";
+async function open(settings = vi.fn()) {
   render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync: Sync needs attention" }));
-  expect(screen.getByRole("heading", { name: "Sync needs attention" })).toBeTruthy();
-  // The fixed native diagnostic explains what needs attention.
-  expect(screen.getByText("Website storage unavailable")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Sync settings" }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: /^Sync:/ })));
+  return settings;
+}
+it("leads with status and detail, shows visible tabs actions and no mode switches", async () => {
+  const settings = await open();
+  const popup = screen.getByRole("dialog", { name: "Sync" });
+  expect(within(popup).getByText(/Your workspace and account settings are synced/)).toBeTruthy();
+  expect(within(popup).getByRole("button", { name: "Open tabs from Office here" })).toBeTruthy();
+  expect(within(popup).queryByRole("switch")).toBeNull();
+  expect(popup.textContent).not.toMatch(/take over|seat|Switch to/);
+  fireEvent.click(within(popup).getByRole("button", { name: "Manage sync" }));
   expect(settings).toHaveBeenCalledOnce();
   expect(screen.queryByRole("dialog")).toBeNull();
 });
-it("points to the per-site report when some website data could not sync", () => {
-  const native = session();
-  native.website_data = [
-    {
-      device_id: native.device_id,
-      state: "synced",
-      checked_at: 1,
-      sites: [
-        {
-          site: "mail.example.test",
-          synced: [{ kind: "cookies", count: 4 }],
-          skipped: [{ kind: "indexed_db", reason: "too_large", count: 1 }],
-        },
-      ],
-    },
-    // Another device's report is not this session's to act on.
-    {
-      device_id: "elsewhere",
-      state: "synced",
-      checked_at: 1,
-      sites: [
-        {
-          site: "x.test",
-          synced: [],
-          skipped: [{ kind: "cookies", reason: "partitioned", count: 9 }],
-        },
-      ],
-    },
-  ];
-  useBrowserSyncStore.setState({ session: native });
-  const settings = vi.fn();
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={settings} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Sync:/ }));
-  expect(screen.getByText(/Some data on 1 site can’t sync/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "See what’s not synced" }));
-  expect(settings).toHaveBeenCalledOnce();
+it("unlocks with the saved key in place", async () => {
+  useBrowserSyncStore.setState({ session: null, locked: "a" });
+  const settings = await open();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Unlock sync" })));
+  expect(mocks.unlock).toHaveBeenCalledWith(
+    { apiBase: "https://example.test", accountId: "a" },
+    null,
+    null,
+    false,
+  );
+  expect(settings).not.toHaveBeenCalled();
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect(screen.getByText("Up to date")).toBeTruthy();
 });
-it("does not dispatch a cloud retry after an account change during local recovery", async () => {
-  useWorkspaceRecoveryState.setState({ issue: "Disk unavailable" });
+it("offers one reconnect action and replaces it with the re-enrollment form", async () => {
+  useBrowserSyncStore.setState({ issue: "sync_device_forbidden" });
+  await open();
+  expect(screen.getAllByRole("button", { name: "Reconnect device" })).toHaveLength(1);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Reconnect device" })));
+  expect(mocks.lock).toHaveBeenCalledWith("s", true);
+  expect(mocks.unlock).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Sync password")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Use saved device key" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Reconnect device" })).toHaveLength(1);
+});
+it("falls back to credentials when no saved key is available", async () => {
+  useBrowserSyncStore.setState({ session: null });
+  mocks.availability.mockResolvedValue({ local: false, remote: true });
+  mocks.unlock.mockRejectedValue(new Error("no key"));
+  await open();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Unlock sync" })));
+  expect(screen.getByLabelText("Sync secret")).toBeTruthy();
+});
+it("waits for acknowledged opening and keeps account transitions safe", async () => {
+  await open();
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: "Open tabs from Office here" })),
+  );
+  expect(mocks.claim).toHaveBeenCalledWith("s", "other");
+  expect(screen.getByText("Waiting for the device to confirm…")).toBeTruthy();
+  act(() =>
+    useBrowserSyncStore.setState({
+      session: syncSession({ sync: { ...syncSession().sync!, driving_workspace: "other" } }),
+    }),
+  );
+  expect(screen.getByText("Open here")).toBeTruthy();
+});
+it("does not reconnect after an account change during recovery", async () => {
+  useWorkspaceRecoveryState.setState({ issue: "disk" });
   let finish!: () => void;
-  mocks.retry.mockImplementation(
+  mocks.recovery.mockImplementation(
     () =>
       new Promise<void>((resolve) => {
         finish = resolve;
       }),
   );
-  const request = vi.fn();
-  window.addEventListener(browserSyncRetryEvent, request);
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync: Local saving needs attention" }));
-  fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+  await open();
+  fireEvent.click(screen.getByRole("button", { name: "Retry sync" }));
   mocks.generation++;
   await act(async () => finish());
-  expect(request).not.toHaveBeenCalled();
-  window.removeEventListener(browserSyncRetryEvent, request);
+  expect(mocks.unlock).not.toHaveBeenCalled();
 });
 
-it("shows independent mode instead of promising that a paused workspace is syncing", () => {
-  const view = session();
-  view.full_sync = false;
-  view.status.pending_changes = 8;
-  expect(status(view)).toMatchObject({
-    title: "Independent workspace",
-    spinning: false,
-    websiteData: "Kept on this device",
-  });
-});
-
-it("routes a remote switch and waits for signed activation rather than the HTTP reply", async () => {
-  const view = session();
-  view.devices = [
-    {
-      device_id: "d",
-      display_name: "Local",
-      platform: "macos",
-      control_version: 1,
-      full_sync: true,
-    },
-    {
-      device_id: "remote",
-      display_name: "Office",
-      platform: "windows",
-      control_version: 1,
-      full_sync: true,
-    },
-  ];
-  view.presence = [{ device_id: "remote", online: true, ready: true, applied_sequence: 1 }];
-  view.workspace.active_device = { device_id: "d", epoch: "old", sequence: 1 };
-  useBrowserSyncStore.setState({ session: view });
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sync: Up to date" })));
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Switch to Office" })));
-  expect(mocks.control).toHaveBeenCalledWith("s", "remote", null, true);
-  expect(screen.getByLabelText("Switching…")).toBeTruthy();
-  expect(
-    screen.getByRole("switch", { name: "Full sync for Office" }).getAttribute("disabled"),
-  ).not.toBeNull();
-  act(() =>
-    useBrowserSyncStore.setState({
-      session: {
-        ...view,
-        workspace: {
-          ...view.workspace,
-          active_device: { device_id: "remote", epoch: "new", sequence: 2 },
-        },
-      },
-    }),
-  );
-  expect(screen.queryByLabelText("Switching…")).toBeNull();
-  expect(screen.queryByRole("button", { name: "Switch to Office" })).toBeNull();
-  expect(screen.getByRole("img", { name: "Active device: Office" })).toBeTruthy();
-  await act(async () =>
-    fireEvent.click(screen.getByRole("switch", { name: "Full sync for Office" })),
-  );
-  expect(mocks.control).toHaveBeenLastCalledWith("s", "remote", false, false);
-  expect(screen.getByRole("status").textContent).toContain("Turning Full sync off…");
-});
-it("does not let a delayed device poll replace a new account's state", async () => {
-  let resolve!: (value: NativeSyncView) => void;
-  mocks.read.mockImplementationOnce(
+it("shares one in-flight native recovery across surfaces", async () => {
+  let finish!: (value: ReturnType<typeof syncSession>) => void;
+  mocks.unlock.mockImplementation(
     () =>
-      new Promise<NativeSyncView>((done) => {
-        resolve = done;
+      new Promise((resolve) => {
+        finish = resolve;
       }),
   );
-  render(<BrowserSyncBadge accountId="a" onOpenSettings={vi.fn()} />);
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Sync: Up to date" })));
-  const other = { ...session(), account_id: "b", session_id: "other" };
+  const first = retrySync("a");
+  const second = retrySync("a");
+  expect(first).toBe(second);
+  await waitFor(() => expect(mocks.unlock).toHaveBeenCalledOnce());
+  finish(syncSession());
+  expect(await first).toBe("complete");
+});
+it("does not let a settings-only retry swallow workspace recovery", async () => {
+  let finish!: () => void;
+  const refreshing = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  mocks.refresh.mockReturnValue(refreshing);
+  const settings = retrySync("a", "retry", true);
+  const workspace = retrySync("a");
+  expect(settings).not.toBe(workspace);
+  finish();
+  expect(await settings).toBe("complete");
+  expect(await workspace).toBe("complete");
+  expect(mocks.unlock).toHaveBeenCalledOnce();
+});
+it("discards native results after an account transition", async () => {
+  let finish!: (value: ReturnType<typeof syncSession>) => void;
+  mocks.unlock.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const attempt = retrySync("a");
+  await waitFor(() => expect(mocks.unlock).toHaveBeenCalledOnce());
   mocks.generation++;
-  act(() => useBrowserSyncStore.setState({ session: other }));
-  await act(async () => resolve(session()));
-  expect(useBrowserSyncStore.getState().session).toBe(other);
+  useBrowserSyncStore.setState({ session: null });
+  finish(syncSession());
+  expect(await attempt).toBe("stale");
+  expect(useBrowserSyncStore.getState().session).toBeNull();
+});
+
+it("still reconnects the workspace when settings refresh fails", async () => {
+  mocks.refresh.mockRejectedValue(new Error("settings unavailable"));
+  expect(await retrySync("a")).toBe("complete");
+  expect(mocks.unlock).toHaveBeenCalledOnce();
 });

@@ -11,21 +11,13 @@ import {
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiSurfaceId } from "@/features/ai-surface/types";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import {
-  cn,
-  Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Switch,
-} from "@/shared/ui";
+import { cn, Button, Switch } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
+import { ChoiceControl } from "../SettingsControls";
 import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
 import { MistyBriefingsSection } from "./MistyBriefingsSection";
@@ -244,25 +236,15 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
               description="Accepted work and required security audits follow their domain retention rules."
               muted={!settings || !settings.enabled}
             >
-              <Select
+              <ChoiceControl
                 value={String(settings?.retention_days ?? 30)}
                 disabled={!settings || working || !settings.enabled}
                 onValueChange={(value) => void updateSettings(true, Number(value))}
-              >
-                <SelectTrigger
-                  aria-label="Conversation retention"
-                  className={`w-40 ${settingsDisabledControlClass}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[7, 30, 90, 365].map((days) => (
-                    <SelectItem key={days} value={String(days)}>
-                      {days} days
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={[7, 30, 90, 365].map((days) => ({
+                  value: String(days),
+                  label: `${days} days`,
+                }))}
+              />
             </SettingsRow>
             <SettingsRow
               label="Personal by default"

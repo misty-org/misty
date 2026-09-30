@@ -10,7 +10,7 @@ describe("workspace shortcut actions", () => {
 
   it("cycles window tabs and wraps", () => {
     const store = useWorkspaceStore.getState();
-    const defaultTab = findDockLeaf(store.layout.root, store.layout.focusedPaneId)?.tabs[0];
+    const defaultTab = findDockLeaf(store.layout.root, store.layout.focusedPaneId)?.views[0];
     const first = store.addSurface({
       surfaceId: "files",
       groupKey: "tool:files",
@@ -26,9 +26,9 @@ describe("workspace shortcut actions", () => {
       instancePolicy: "multiple",
       forceNew: true,
     });
-    expect(useWorkspaceStore.getState().cycleTab(1)?.id).toBe(defaultTab?.id);
-    expect(useWorkspaceStore.getState().cycleTab(1)?.id).toBe(first.id);
-    expect(useWorkspaceStore.getState().cycleTab(-1)?.id).toBe(defaultTab?.id);
+    expect(useWorkspaceStore.getState().cycleView(1)?.id).toBe(defaultTab?.id);
+    expect(useWorkspaceStore.getState().cycleView(1)?.id).toBe(first.id);
+    expect(useWorkspaceStore.getState().cycleView(-1)?.id).toBe(defaultTab?.id);
   });
 
   it("selects the last tab for slot nine", () => {
@@ -47,7 +47,7 @@ describe("workspace shortcut actions", () => {
       route: "/browser",
       forceNew: true,
     });
-    expect(useWorkspaceStore.getState().selectTab("last")?.id).toBe(last.id);
+    expect(useWorkspaceStore.getState().selectView("last")?.id).toBe(last.id);
   });
 
   it("reopens the most recently closed tab in the focused pane", () => {
@@ -67,11 +67,11 @@ describe("workspace shortcut actions", () => {
       route: "/browser",
       forceNew: true,
     });
-    store.closeTab(tab.id);
-    const restored = useWorkspaceStore.getState().reopenClosedTab();
+    store.closeView(tab.id);
+    const restored = useWorkspaceStore.getState().reopenClosedView();
     expect(restored).toMatchObject({ id: tab.id, state: { rootPath: "/project" } });
     const layout = useWorkspaceStore.getState().layout;
-    expect(findDockLeaf(layout.root, layout.focusedPaneId)?.activeTabId).toBe(tab.id);
+    expect(findDockLeaf(layout.root, layout.focusedPaneId)?.activeViewId).toBe(tab.id);
   });
 
   it("recreates a collapsed panel when reopening its last tab", () => {
@@ -92,21 +92,21 @@ describe("workspace shortcut actions", () => {
       forceNew: true,
     });
     const firstPane = { id: sourcePaneId };
-    expect(store.dockTab(browser.id, firstPane.id, "right")).toBe(true);
+    expect(store.dockView(browser.id, firstPane.id, "right")).toBe(true);
     const browserPane = dockLeaves(useWorkspaceStore.getState().layout.root).find((pane) =>
-      pane.tabs.some((tab) => tab.id === browser.id),
+      pane.views.some((tab) => tab.id === browser.id),
     )!;
     const split = useWorkspaceStore.getState().layout.root;
     if (split.type === "split") store.updateSplitRatio(split.id, 0.38);
 
-    expect(useWorkspaceStore.getState().closeTab(browser.id)).toBe(true);
+    expect(useWorkspaceStore.getState().closeView(browser.id)).toBe(true);
     expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(1);
 
-    const restored = useWorkspaceStore.getState().reopenClosedTab();
+    const restored = useWorkspaceStore.getState().reopenClosedView();
     const restoredLayout = useWorkspaceStore.getState().layout;
     expect(restored?.id).toBe(browser.id);
     expect(dockLeaves(restoredLayout.root)).toHaveLength(2);
-    expect(findDockLeaf(restoredLayout.root, browserPane.id)?.activeTabId).toBe(browser.id);
+    expect(findDockLeaf(restoredLayout.root, browserPane.id)?.activeViewId).toBe(browser.id);
     expect(restoredLayout.root).toMatchObject({ direction: "horizontal", ratio: 0.38 });
   });
 
@@ -128,9 +128,9 @@ describe("workspace shortcut actions", () => {
       forceNew: true,
     });
     const firstPane = { id: sourcePaneId };
-    store.dockTab(browser.id, firstPane.id, "right");
+    store.dockView(browser.id, firstPane.id, "right");
     const browserPane = dockLeaves(useWorkspaceStore.getState().layout.root).find((pane) =>
-      pane.tabs.some((tab) => tab.id === browser.id),
+      pane.views.some((tab) => tab.id === browser.id),
     )!;
     store.addSurface({
       surfaceId: "code",
@@ -141,11 +141,11 @@ describe("workspace shortcut actions", () => {
       paneId: browserPane.id,
     });
 
-    store.closeTab(browser.id);
-    store.focusTab(files.id);
-    store.reopenClosedTab();
+    store.closeView(browser.id);
+    store.focusView(files.id);
+    store.reopenClosedView();
 
-    expect(findDockLeaf(useWorkspaceStore.getState().layout.root, browserPane.id)?.tabs).toEqual(
+    expect(findDockLeaf(useWorkspaceStore.getState().layout.root, browserPane.id)?.views).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: browser.id })]),
     );
   });

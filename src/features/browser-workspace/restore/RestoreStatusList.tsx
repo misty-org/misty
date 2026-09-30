@@ -8,14 +8,18 @@ export function RestoreStatusList() {
   if (!tabs.length) return null;
   return (
     <section aria-label="Restored pages" className="border-t border-charcoal-border py-3">
-      <h2 className="pb-2 text-sm font-medium">Restoring pages</h2>
+      <h2 className="pb-2 text-sm font-medium">
+        {tabs.some((tab) => tab.status === "restoring")
+          ? "Restoring pages"
+          : "Page restore results"}
+      </h2>
       <ul className="space-y-2 text-sm">
         {tabs.map((tab) => (
           <li key={tab.tabId} className="flex items-center gap-2">
             {tab.status === "restoring" ? (
               <Spinner label="Restoring" className="shrink-0 text-cream-muted" />
             ) : tab.status === "restored" ? (
-              <CircleCheck aria-hidden className="size-4 shrink-0 text-status-green" />
+              <CircleCheck aria-hidden className="size-4 shrink-0 text-cream" />
             ) : (
               <CircleAlert aria-hidden className="size-4 shrink-0 text-cream-muted" />
             )}
