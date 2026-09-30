@@ -192,6 +192,9 @@ GET /api/ai/smart-library/folders/{folderID}/progress
 GET /api/ai/smart-library/folders/{folderID}/results
 GET /api/ai/smart-library/index-status
 GET /api/ai/status
+GET /api/auth/google
+GET /api/auth/google/callback
+GET /api/auth/google/start
 GET /api/auth/handoff/start
 GET /api/auth/reset/start
 GET /api/auth/reset/validate
@@ -218,6 +221,7 @@ GET /api/me/agent-approvals/{approvalID}
 GET /api/me/agent-interventions
 GET /api/me/avatar
 GET /api/me/home
+GET /api/me/library-lock
 GET /api/me/settings
 GET /api/me/space-templates
 GET /api/misty/agents
@@ -311,6 +315,9 @@ GET /api/sync/devices
 GET /api/sync/vault
 GET /api/sync/ws
 GET /api/webhooks/social/instagram
+GET /auth/google
+GET /auth/google/callback
+GET /auth/google/start
 GET /auth/handoff/start
 GET /auth/reset/start
 GET /auth/reset/validate
@@ -338,6 +345,7 @@ GET /me/agent-approvals/{approvalID}
 GET /me/agent-interventions
 GET /me/avatar
 GET /me/home
+GET /me/library-lock
 GET /me/settings
 GET /me/space-templates
 GET /misty/agents
@@ -447,6 +455,9 @@ GET /v1/ai/smart-library/folders/{folderID}/progress
 GET /v1/ai/smart-library/folders/{folderID}/results
 GET /v1/ai/smart-library/index-status
 GET /v1/ai/status
+GET /v1/auth/google
+GET /v1/auth/google/callback
+GET /v1/auth/google/start
 GET /v1/auth/handoff/start
 GET /v1/auth/reset/start
 GET /v1/auth/reset/validate
@@ -473,6 +484,7 @@ GET /v1/me/agent-approvals/{approvalID}
 GET /v1/me/agent-interventions
 GET /v1/me/avatar
 GET /v1/me/home
+GET /v1/me/library-lock
 GET /v1/me/settings
 GET /v1/me/space-templates
 GET /v1/misty/agents
@@ -711,6 +723,8 @@ POST /api/ai/smart-library/reindex
 POST /api/ai/smart-library/reindex/{jobID}/complete
 POST /api/ai/smart-library/search
 POST /api/auth/forgot
+POST /api/auth/google
+POST /api/auth/google/complete
 POST /api/auth/handoff
 POST /api/auth/refresh
 POST /api/auth/reset
@@ -736,6 +750,7 @@ POST /api/me/deletion
 POST /api/me/export
 POST /api/me/home/apps
 POST /api/me/home/visits
+POST /api/me/library-lock
 POST /api/me/space-templates
 POST /api/misty/agent-execution
 POST /api/misty/agent-followup
@@ -839,6 +854,8 @@ POST /api/sync/ticket
 POST /api/sync/vault
 POST /api/webhooks/social/instagram
 POST /auth/forgot
+POST /auth/google
+POST /auth/google/complete
 POST /auth/handoff
 POST /auth/refresh
 POST /auth/reset
@@ -873,6 +890,7 @@ POST /me/deletion
 POST /me/export
 POST /me/home/apps
 POST /me/home/visits
+POST /me/library-lock
 POST /me/space-templates
 POST /misty/agent-execution
 POST /misty/agent-followup
@@ -1009,6 +1027,8 @@ POST /v1/ai/smart-library/reindex
 POST /v1/ai/smart-library/reindex/{jobID}/complete
 POST /v1/ai/smart-library/search
 POST /v1/auth/forgot
+POST /v1/auth/google
+POST /v1/auth/google/complete
 POST /v1/auth/handoff
 POST /v1/auth/refresh
 POST /v1/auth/reset
@@ -1034,6 +1054,7 @@ POST /v1/me/deletion
 POST /v1/me/export
 POST /v1/me/home/apps
 POST /v1/me/home/visits
+POST /v1/me/library-lock
 POST /v1/me/space-templates
 POST /v1/misty/agent-execution
 POST /v1/misty/agent-followup
