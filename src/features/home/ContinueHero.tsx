@@ -1,4 +1,4 @@
-import { Button, cn, IconButton } from "@/shared/ui";
+import { Button, cn, IconButton, Pressable } from "@/shared/ui";
 import { ArrowLeft, ArrowRight, Play } from "lucide-react";
 import { useState } from "react";
 import { formatRelativeDate } from "./homeFormat";
@@ -41,17 +41,21 @@ export function ContinueHero(props: { items: ContinueItem[]; preparing?: boolean
     <section
       aria-label="Continue where you left off"
       aria-roledescription="carousel"
-      className="grid min-h-64 lg:min-h-0 grid-rows-[minmax(140px,1fr)_auto] overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card/55"
+      className={cn(
+        "grid min-h-64 lg:min-h-0 grid-rows-[minmax(140px,1fr)_auto] overflow-hidden rounded-2xl border",
+        "border-charcoal-border bg-charcoal-card/55",
+      )}
     >
       <div className="relative min-h-0 overflow-hidden border-b border-charcoal-border bg-charcoal-bg">
         <HomePagePreview key={item.tab.id} item={item} />
-        <Button
+        <Pressable
           type="button"
-          variant="ghost"
-          size="none"
           aria-label={`Resume ${item.tab.title || item.detail}`}
           onClick={() => resumeTab(item)}
-          className="absolute inset-0 rounded-none border-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-cream-bright"
+          className={cn(
+            "absolute inset-0 rounded-none border-0 focus-visible:outline focus-visible:outline-2",
+            "focus-visible:-outline-offset-4 focus-visible:outline-cream-bright",
+          )}
         />
       </div>
       <div className="flex min-w-0 flex-col p-4">

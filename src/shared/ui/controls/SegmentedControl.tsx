@@ -63,8 +63,9 @@ function SegmentedControl<T extends string>({
       onValueChange={(next) => onChange(next as T)}
       onKeyDown={(event) => {
         // Arrow keys already choose as they move; Home and End choose the ends too.
-        if (event.key !== "Home" && event.key !== "End") return;
-        const edge = event.key === "Home" ? options[0] : options[options.length - 1];
+        if (disabled || (event.key !== "Home" && event.key !== "End")) return;
+        const available = options.filter((option) => !option.disabled);
+        const edge = event.key === "Home" ? available[0] : available[available.length - 1];
         if (edge && edge.value !== value) onChange(edge.value);
       }}
     >

@@ -5,14 +5,18 @@ useDefault = true
 # public OAuth identifiers and test-only certificates. It is not linked into
 # Misty's desktop or server. Scan Misty's first-party code and configuration;
 # audit the pinned upstream distribution separately when it is updated.
-[[allowlists]]
+[allowlist]
 description = "Vendored upstream fixtures"
 paths = [
   '''^service/''',
   '''^vendor/''',
 ]
 
-[[allowlists]]
+# CI pins v8.24.3, before multiple global allowlists. Extend only the JWT rule
+# for these public, test-only proof tokens; keep path AND field matching.
+[[rules]]
+id = "jwt"
+[[rules.allowlists]]
 description = "Public cross-language fixtures signed with a documented test-only key"
 condition = "AND"
 paths = ['''(?:^|/)server/test/fixtures/compatibility/self-host-proofs\.json$''']

@@ -1,41 +1,41 @@
 import { describe, expect, it } from "vitest";
 import { dockLeaves } from "@/features/workspace/dockTree";
-import type { DeviceSelection, SharedRecord, WorkspaceView } from "./model";
-import { projectWorkspace, recoveryLayoutId } from "./projection";
+import type { DeviceSelection, SharedRecord, WorkspaceRecords } from "./model";
+import { projectWorkspace, recoveryTabId } from "./projection";
 
 const local = (): DeviceSelection => ({
-  activeLayoutByWindow: {},
-  activeTabByPane: {},
-  focusedPaneByLayout: {},
+  activeTabByWindow: {},
+  activeViewByPane: {},
+  focusedPaneByTab: {},
 });
-const view = (records: SharedRecord[]): WorkspaceView => ({
+const view = (records: SharedRecord[]): WorkspaceRecords => ({
   version: 1,
   sequence: 3,
   records,
   resumes: {},
-  orphaned_tab_ids: [],
-  orphaned_website_ids: [],
+  orphaned_view_ids: [],
+  orphaned_bookmark_ids: [],
 });
 const windowRecord = (id: string, order = 0): SharedRecord<"window"> => ({
   kind: "window",
   id,
   fields: { title: id, order },
 });
-const layoutRecord = (id: string, window: string, pane: string): SharedRecord<"layout"> => ({
-  kind: "layout",
+const layoutRecord = (id: string, window: string, pane: string): SharedRecord<"tab"> => ({
+  kind: "tab",
   id,
   fields: { window_id: window, title: "", order: 0, tree: { type: "leaf", id: pane } },
 });
-const tabRecord = (id: string, layout: string, pane: string): SharedRecord<"tab"> => ({
-  kind: "tab",
+const tabRecord = (id: string, layout: string, pane: string): SharedRecord<"view"> => ({
+  kind: "view",
   id,
   fields: {
     surface: "browser",
     title: id,
-    placement: { layout_id: layout, pane_id: pane, order: 0 },
+    placement: { tab_id: layout, pane_id: pane, order: 0 },
     url: `https://example.test/${id}`,
     profile_id: "a".repeat(64),
-    website_id: null,
+    bookmark_id: null,
     tool_route: null,
     agent_owned: false,
   },
@@ -45,7 +45,7 @@ function visibleTabIds(projected: ReturnType<typeof projectWorkspace>) {
   return projected.windows
     .flatMap((window) =>
       window.layout.tabs!.flatMap((layout) =>
-        dockLeaves(layout.root).flatMap((pane) => pane.tabs.map((tab) => tab.id)),
+        dockLeaves(layout.root).flatMap((pane) => pane.views.map((tab) => tab.id)),
       ),
     )
     .sort();
@@ -65,18 +65,18 @@ describe("native browser workspace projection", () => {
       sequence: 3,
       resume: {
         active_window_id: "window:a",
-        active_layout_id: "layout:a",
+        active_tab_id: "layout:a",
         focused_pane_id: "pane:a",
-        active_tab_by_pane: { "pane:a": "tab:a" },
+        active_view_by_pane: { "pane:a": "tab:a" },
       },
     };
     const selected = {
       ...local(),
       activeWindowId: "window:b",
-      activeLayoutByWindow: { "window:b": "layout:b" },
+      activeTabByWindow: { "window:b": "layout:b" },
     };
     expect(projectWorkspace(shared, selected).activeWindowId).toBe("window:b");
-    expect(projectWorkspace(shared, selected).windows[1].layout.activeLayoutTabId).toBe("layout:b");
+    expect(projectWorkspace(shared, selected).windows[1].layout.activeTabId).toBe("layout:b");
     shared.resumes.other.resume.active_window_id = "window:b";
     expect(
       projectWorkspace(shared, { ...local(), activeWindowId: "window:a" }).activeWindowId,
@@ -94,13 +94,11 @@ describe("native browser workspace projection", () => {
     const before = structuredClone(shared);
     const result = projectWorkspace(shared, {
       ...local(),
-      activeTabByPane: { "pane:kept": "tab:three" },
+      activeViewByPane: { "pane:kept": "tab:three" },
     });
     expect(visibleTabIds(result)).toEqual(["tab:one", "tab:three", "tab:two"]);
-    expect(result.windows[0].layout.tabs!.map((tab) => tab.id)).toContain(
-      recoveryLayoutId("tab:two"),
-    );
-    expect(result.recoveryTabIds).toEqual(["tab:one", "tab:two"]);
+    expect(result.windows[0].layout.tabs!.map((tab) => tab.id)).toContain(recoveryTabId("tab:two"));
+    expect(result.recoveryViewIds).toEqual(["tab:one", "tab:two"]);
     expect(shared).toEqual(before);
     const again = projectWorkspace(shared, local());
     expect(visibleTabIds(again)).toEqual(visibleTabIds(result));
@@ -121,15 +119,15 @@ describe("native browser workspace projection", () => {
   it("keeps launch URLs separate from the live tab URL and preserves profile references", () => {
     const shared = view([
       {
-        kind: "group",
+        kind: "folder",
         id: "social",
         fields: { label: "Social", icon: "messages", order: 0, hidden: false },
       },
       {
-        kind: "website",
+        kind: "bookmark",
         id: "drive",
         fields: {
-          group_id: "social",
+          folder_id: "social",
           title: "Drive",
           url: "https://drive.google.com",
           order: 0,
@@ -143,16 +141,16 @@ describe("native browser workspace projection", () => {
         fields: {
           ...tabRecord("tab:a", "layout:a", "pane:a").fields,
           url: "https://drive.google.com/folders/current",
-          website_id: "drive",
+          bookmark_id: "drive",
         },
       },
     ]);
     const result = projectWorkspace(shared, local());
-    expect(result.websites[0].fields.url).toBe("https://drive.google.com");
-    const state = dockLeaves(result.windows[0].layout.root)[0].tabs[0].state;
+    expect(result.bookmarks[0].fields.url).toBe("https://drive.google.com");
+    const state = dockLeaves(result.windows[0].layout.root)[0].views[0].state;
     expect(state).toMatchObject({
       url: "https://drive.google.com/folders/current",
-      websiteId: "drive",
+      bookmarkId: "drive",
       profileId: "a".repeat(64),
     });
   });
@@ -179,9 +177,41 @@ it("restores Space routes from another device without changing their pane", () =
   );
   const pane = dockLeaves(result.windows[0].layout.root)[0];
   expect(pane.id).toBe("pane:a");
-  expect(pane.tabs[0]).toMatchObject({
+  expect(pane.views[0]).toMatchObject({
     surfaceId: "space",
     route: "/spaces/project/planner/tasks/list",
     groupKey: "space:project:planner",
+  });
+});
+
+describe("selection after a remote close", () => {
+  const records = (layouts: string[]): SharedRecord[] => [
+    windowRecord("window:a"),
+    ...layouts.flatMap((id) => [
+      layoutRecord(id, "window:a", `pane:${id}`),
+      tabRecord(`tab:${id}`, id, `pane:${id}`),
+    ]),
+  ];
+  const selection = (active: string): DeviceSelection => ({
+    ...local(),
+    activeWindowId: "window:a",
+    activeTabByWindow: { "window:a": active },
+    tabOrderByWindow: { "window:a": ["layout:a", "layout:b", "layout:c"] },
+  });
+
+  it("moves to the next layout, not the first, when the shown one closes elsewhere", () => {
+    const projected = projectWorkspace(
+      view(records(["layout:a", "layout:c"])),
+      selection("layout:b"),
+    );
+    expect(projected.windows[0].layout.activeTabId).toBe("layout:c");
+  });
+
+  it("falls back to the previous layout when the last one closes elsewhere", () => {
+    const projected = projectWorkspace(
+      view(records(["layout:a", "layout:b"])),
+      selection("layout:c"),
+    );
+    expect(projected.windows[0].layout.activeTabId).toBe("layout:b");
   });
 });

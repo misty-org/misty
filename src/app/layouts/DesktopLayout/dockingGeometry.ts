@@ -1,52 +1,72 @@
 import type { CSSProperties } from "react";
-import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
+import {
+  isSideDock,
+  type DockPosition,
+  type DockingLayout,
+} from "@/features/app-shell/dockingLayout";
 import { navigatorRailWidth } from "./navigatorMode";
 
-/** Top tabs share the native chrome band; other tab edges leave it reserved. */
-export function dockingGeometry(position: DockPosition, hidden: boolean, shareTopBand = true) {
+export const dockingMetrics = {
+  titlebar: 38,
+  rail: navigatorRailWidth,
+  horizontalRail: 38,
+  sideTabs: 200,
+  gap: 8,
+  tab: 28,
+};
+export const dockingMotion = { duration: 300, easing: "ease-in-out" };
+type ShellStyle = CSSProperties & Record<`--${string}`, string | number>;
+
+/** The only owner of shell tracks, native chrome insets and pane seams. */
+export function dockingGeometry({
+  navigation: position,
+  tabs,
+  autoHide = false,
+  shareTopBand = tabs === "top",
+  chromeLeft = 84,
+  chromeRight = 0,
+}: DockingLayout & {
+  autoHide?: boolean;
+  shareTopBand?: boolean;
+  /** Already adjusted for application zoom. */
+  chromeLeft?: number;
+  chromeRight?: number;
+}) {
+  const { titlebar, rail, gap } = dockingMetrics;
   const side = isSideDock(position);
-  const width = navigatorRailWidth;
-  const size = hidden ? 0 : width;
-  const frame: CSSProperties = side
-    ? {
-        gridTemplateColumns:
-          position === "left" ? `${size}px minmax(0, 1fr)` : `minmax(0, 1fr) ${size}px`,
-        gridTemplateRows: "38px minmax(0, 1fr)",
-      }
-    : {
-        gridTemplateColumns: "minmax(0, 1fr)",
-        gridTemplateRows:
-          position === "top" ? `38px ${size}px minmax(0, 1fr)` : `38px minmax(0, 1fr) ${size}px`,
-      };
+  const thickness = side ? rail : dockingMetrics.horizontalRail;
+  const size = autoHide ? 0 : thickness;
+  const topTabs = shareTopBand && tabs === "top";
+  const shared = topTabs && !(position === "top" && !autoHide);
+  const edges = new Set<DockPosition>([tabs, ...(!autoHide ? [position] : [])]);
+  const frame: ShellStyle = {
+    // Keep the same track topology on every edge, including auto-hide.
+    gridTemplateColumns: `${position === "left" ? size : 0}px minmax(0, 1fr) ${position === "right" ? size : 0}px`,
+    gridTemplateRows: `${position === "top" ? size : titlebar}px 0px minmax(0, 1fr) ${position === "bottom" ? size : 0}px`,
+    "--shell-titlebar": `${titlebar}px`,
+    "--shell-side-tabs": `${dockingMetrics.sideTabs}px`,
+    "--shell-tab-height": `${dockingMetrics.tab}px`,
+    "--shell-gap": `${gap}px`,
+    "--shell-motion-duration": `${dockingMotion.duration}ms`,
+    "--shell-motion-easing": dockingMotion.easing,
+  };
+  for (const edge of ["top", "right", "bottom", "left"] as const)
+    frame[`--pane-seam-${edge}`] = edges.has(edge) ? "1px" : "0px";
+  for (const y of ["top", "bottom"] as const)
+    for (const x of ["left", "right"] as const)
+      frame[`--pane-corner-${y}-${x}`] = edges.has(y) && edges.has(x) ? "12px" : "0px";
   const navigation: CSSProperties = {
-    gridColumn: position === "right" ? 2 : 1,
-    gridRow: position === "bottom" ? 3 : 2,
-    ...(side ? { width } : {}),
+    gridColumn: side ? (position === "right" ? 3 : 1) : "1 / -1",
+    gridRow: side ? "2 / -1" : position === "bottom" ? 4 : 1,
+    ...(side ? { width: rail } : { height: thickness }),
   };
   const content: CSSProperties = {
-    gridColumn: position === "left" ? 2 : 1,
-    gridRow:
-      shareTopBand && position !== "top"
-        ? position === "bottom"
-          ? "1 / 3"
-          : "1 / -1"
-        : position === "top"
-          ? 3
-          : 2,
+    gridColumn: 2,
+    gridRow: position === "top" && !autoHide ? 3 : "1 / 4",
   };
   const floating: CSSProperties = side
-    ? {
-        top: 38,
-        bottom: 0,
-        width,
-        [position]: 0,
-      }
-    : {
-        left: 0,
-        right: 0,
-        height: width,
-        [position]: position === "top" ? 38 : 0,
-      };
+    ? { top: titlebar, bottom: 0, width: rail, [position]: 0 }
+    : { left: 0, right: 0, height: thickness, [position]: 0 };
   const reveal: CSSProperties = side ? { ...floating, width: 8 } : { ...floating, height: 8 };
   const translate = {
     left: "translateX(-100%)",
@@ -54,5 +74,13 @@ export function dockingGeometry(position: DockPosition, hidden: boolean, shareTo
     top: "translateY(-100%)",
     bottom: "translateY(100%)",
   }[position];
-  return { frame, navigation, content, floating, reveal, translate };
+  const titlebarInsets = topTabs
+    ? {
+        animate: true,
+        left: shared ? Math.max(gap, chromeLeft + gap - (position === "left" ? size : 0)) : gap,
+        right: shared ? Math.max(0, chromeRight - (position === "right" ? size : 0)) : 0,
+      }
+    : undefined;
+  return { frame, navigation, content, floating, reveal, translate, titlebarInsets };
 }
+export type DockingGeometry = ReturnType<typeof dockingGeometry>;

@@ -37,7 +37,7 @@ export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;
 
-export interface BrowserTabState {
+export interface BrowserViewState {
   version: 1;
   url: string;
   faviconUrl: string | null;
@@ -45,7 +45,7 @@ export interface BrowserTabState {
   /** Native browser profile identity; preserved across navigation. */
   profileId?: string;
   /** Saved website used to open this tab, independent of its current URL. */
-  websiteId?: string;
+  bookmarkId?: string;
   /** A private tab: throwaway website data, no history, never saved or synced. */
   private?: true;
 }
@@ -90,20 +90,20 @@ export type CodeViewportState =
   | { kind: "file"; activeFilePath: string | null }
   | { kind: "multibuffer"; spec: CodeMultibufferSpec };
 
-export interface CodeTabState {
+export interface CodeViewState {
   version: 2;
   rootPath: string | null;
   viewport: CodeViewportState;
   explorerWidth: number;
 }
 
-export function createCodeTabState(
-  initial: Partial<Omit<CodeTabState, "version" | "viewport">> & {
+export function createCodeViewState(
+  initial: Partial<Omit<CodeViewState, "version" | "viewport">> & {
     viewport?: CodeViewportState;
     /** Accepted while callers migrate from version 1. */
     activeFilePath?: string | null;
   } = {},
-): CodeTabState {
+): CodeViewState {
   return {
     version: 2,
     rootPath: initial.rootPath ?? null,
@@ -114,13 +114,13 @@ export function createCodeTabState(
   };
 }
 
-export function parseCodeTabState(value: unknown): CodeTabState {
-  if (!value || typeof value !== "object") return createCodeTabState();
-  const candidate = value as Partial<CodeTabState> & {
+export function parseCodeViewState(value: unknown): CodeViewState {
+  if (!value || typeof value !== "object") return createCodeViewState();
+  const candidate = value as Partial<CodeViewState> & {
     activeFilePath?: unknown;
     version?: unknown;
   };
-  return createCodeTabState({
+  return createCodeViewState({
     rootPath:
       typeof candidate.rootPath === "string" && candidate.rootPath.trim()
         ? candidate.rootPath
@@ -139,7 +139,7 @@ export function parseCodeTabState(value: unknown): CodeTabState {
   });
 }
 
-export function codeTabActiveFilePath(state: CodeTabState): string | null {
+export function codeViewActiveFilePath(state: CodeViewState): string | null {
   return state.viewport.kind === "file" ? state.viewport.activeFilePath : null;
 }
 
@@ -201,7 +201,7 @@ function clampCodeExplorerWidth(value: unknown): number {
     : 22;
 }
 
-export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {
+export function createBrowserViewState(url = browserHomeUrl()): BrowserViewState {
   return {
     version: 1,
     url,
@@ -209,9 +209,10 @@ export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {
   };
 }
 
-export function parseBrowserTabState(value: unknown): BrowserTabState {
-  if (!value || typeof value !== "object") return createBrowserTabState();
-  const candidate = value as Partial<BrowserTabState>;
+export function parseBrowserViewState(value: unknown): BrowserViewState {
+  if (!value || typeof value !== "object") return createBrowserViewState();
+  const candidate = value as Partial<BrowserViewState> & { websiteId?: unknown };
+  const bookmarkId = candidate.bookmarkId ?? candidate.websiteId;
   const url =
     typeof candidate.url === "string" && candidate.url.trim() ? candidate.url : browserHomeUrl();
   return {
@@ -226,10 +227,9 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
       typeof candidate.profileId === "string" && /^[a-f0-9]{64}$/.test(candidate.profileId)
         ? candidate.profileId
         : undefined,
-    websiteId:
-      typeof candidate.websiteId === "string" &&
-      /^[A-Za-z0-9:_.-]{1,200}$/.test(candidate.websiteId)
-        ? candidate.websiteId
+    bookmarkId:
+      typeof bookmarkId === "string" && /^[A-Za-z0-9:_.-]{1,200}$/.test(bookmarkId)
+        ? bookmarkId
         : undefined,
     private: candidate.private === true || undefined,
   };
@@ -259,10 +259,10 @@ export function sanitizeBrowserTitle(title?: string, url?: string): string {
   if (trimmed && !isPlaceholderBrowserTitle(trimmed)) {
     return trimmed;
   }
-  return url ? browserTabTitle(url) : "New Tab";
+  return url ? browserViewTitle(url) : "New Tab";
 }
 
-export function browserTabTitle(url: string): string {
+export function browserViewTitle(url: string): string {
   if (url === blankBrowserUrl) return "New Tab";
   const internal = browserInternalPage(url);
   if (internal) return browserInternalPages[internal].title;
@@ -309,7 +309,7 @@ export interface DockWidgetDescriptor<TState = unknown> {
   dispose?: (state: TState) => void;
 }
 
-export interface WorkspaceTab {
+export interface WorkspaceView {
   /** An unused new tab or split can take the next selected destination. */
   placeholder?: boolean;
   /** Stable identity of this pane’s app group, independent of its label. */
@@ -329,9 +329,9 @@ export interface WorkspaceTab {
 export interface WorkspacePane {
   type: "leaf";
   id: string;
-  tabs: WorkspaceTab[];
-  activeTabId: string | null;
-  history?: { entries: WorkspaceTab[]; index: number };
+  views: WorkspaceView[];
+  activeViewId: string | null;
+  history?: { entries: WorkspaceView[]; index: number };
 }
 
 export interface WorkspaceSplit {
@@ -349,12 +349,12 @@ export interface WorkspaceLayout {
   /** Active tab projection, retained for pane/runtime consumers. */
   root: WorkspaceDockNode;
   focusedPaneId: string;
-  tabs?: WorkspaceLayoutTab[];
-  activeLayoutTabId?: string;
+  tabs?: WorkspaceTab[];
+  activeTabId?: string;
 }
 
 /** A window tab owns a split tree; each leaf contains one app view. */
-export interface WorkspaceLayoutTab {
+export interface WorkspaceTab {
   /** Chrome-style grouping of visible layout tabs, independent of pane identities. */
   tabGroupId?: string;
   id: string;
@@ -365,7 +365,7 @@ export interface WorkspaceLayoutTab {
   focusedPaneId: string;
 }
 
-export interface WorkspaceVirtualWindow {
+export interface WorkspaceWindow {
   dockingLayout?: DockingLayout;
   id: string;
   title: string;
@@ -376,14 +376,14 @@ export interface WorkspaceVirtualWindow {
 
 export interface WorkspaceSnapshot {
   tabGroups?: MistyTabGroup[];
-  version: 2 | 3;
+  version: 2 | 3 | 4;
   accountId: string;
   deviceId: string;
   savedAt: number;
   layout: WorkspaceLayout;
-  lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
-  virtualWindows?: WorkspaceVirtualWindow[];
-  activeVirtualWindowId?: string;
+  lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
+  windows?: WorkspaceWindow[];
+  activeWindowId?: string;
 }
 
 export interface OpenWorkspaceSurfaceRequest {

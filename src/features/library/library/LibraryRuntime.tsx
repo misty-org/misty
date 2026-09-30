@@ -1,7 +1,7 @@
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { spacesApi } from "@/api/spaces/api";
 import type { useSpacesStore } from "@/features/spaces";
-import type { useWorkspaceTabTitle, useWorkspaceTabFocused } from "@/features/workspace";
+import type { useWorkspaceViewTitle, useWorkspaceViewFocused } from "@/features/workspace";
 import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { MistyFilePicker } from "@/features/picker";
 import type { SystemErrorActivity } from "@/features/activity";
@@ -10,8 +10,8 @@ import type { PhotoEditor } from "@/features/editor";
 export interface LibraryRuntime {
   api: typeof spacesApi;
   useSpacesStore: typeof useSpacesStore;
-  useWorkspaceTabTitle: typeof useWorkspaceTabTitle;
-  useWorkspaceTabFocused: typeof useWorkspaceTabFocused;
+  useWorkspaceViewTitle: typeof useWorkspaceViewTitle;
+  useWorkspaceViewFocused: typeof useWorkspaceViewFocused;
   useAiSurfaceAdapter: typeof useAiSurfaceAdapter;
   useShortcutHandler(id: string, handler: () => boolean | void, enabled?: boolean): void;
   Picker: typeof MistyFilePicker;
@@ -48,10 +48,10 @@ export const useLibrarySpaces = new Proxy(
       ),
   },
 );
-export const useLibraryTitle: typeof useWorkspaceTabTitle = (...args) =>
-  libraryRuntime().useWorkspaceTabTitle(...args);
-export const useLibraryFocused: typeof useWorkspaceTabFocused = (...args) =>
-  libraryRuntime().useWorkspaceTabFocused(...args);
+export const useLibraryTitle: typeof useWorkspaceViewTitle = (...args) =>
+  libraryRuntime().useWorkspaceViewTitle(...args);
+export const useLibraryFocused: typeof useWorkspaceViewFocused = (...args) =>
+  libraryRuntime().useWorkspaceViewFocused(...args);
 export const useLibraryAi: typeof useAiSurfaceAdapter = (...args) =>
   libraryRuntime().useAiSurfaceAdapter(...args);
 export const useLibraryShortcut: LibraryRuntime["useShortcutHandler"] = (...args) =>

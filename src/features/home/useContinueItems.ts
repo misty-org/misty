@@ -1,14 +1,14 @@
 import {
   allLayoutViews,
-  isPrivateBrowserTab,
-  parseBrowserTabState,
+  isPrivateBrowserView,
+  parseBrowserViewState,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
 import { useMemo } from "react";
 
 export interface ContinueItem {
-  tab: WorkspaceTab;
+  tab: WorkspaceView;
   /** Where the tab lives: a site's host, a Files location, or a Space tool. */
   detail: string;
   faviconUrl: string | null;
@@ -23,15 +23,15 @@ export interface ContinueItem {
  */
 export function useContinueItems(limit = Infinity): ContinueItem[] {
   const layout = useWorkspaceStore((state) => state.layout);
-  const windowsByScope = useWorkspaceStore((state) => state.virtualWindowsByScope);
-  const activeWindowId = useWorkspaceStore((state) => state.activeVirtualWindowId);
+  const windowsByScope = useWorkspaceStore((state) => state.windowsByScope);
+  const activeWindowId = useWorkspaceStore((state) => state.activeWindowId);
 
   return useMemo(() => {
     const seen = new Set<string>();
     const items: ContinueItem[] = [];
-    const add = (tabs: WorkspaceTab[], windowTitle: string) => {
+    const add = (tabs: WorkspaceView[], windowTitle: string) => {
       for (const tab of tabs) {
-        if (seen.has(tab.id) || tab.placeholder || isPrivateBrowserTab(tab)) continue;
+        if (seen.has(tab.id) || tab.placeholder || isPrivateBrowserView(tab)) continue;
         seen.add(tab.id);
         items.push({ tab, windowTitle, ...describeTab(tab) });
       }
@@ -48,10 +48,10 @@ export function useContinueItems(limit = Infinity): ContinueItem[] {
 }
 
 export function describeTab(
-  tab: WorkspaceTab,
+  tab: WorkspaceView,
 ): Pick<ContinueItem, "detail" | "faviconUrl" | "spaceId"> {
   if (tab.surfaceId === "browser") {
-    const state = parseBrowserTabState(tab.state);
+    const state = parseBrowserViewState(tab.state);
     let host = "";
     try {
       host = /^https?:/i.test(state.url) ? new URL(state.url).host.replace(/^www\./, "") : "";
@@ -72,9 +72,9 @@ export function describeTab(
 }
 
 /** Only external websites have content suitable for Home's visual previews. */
-export function isHomePreviewTab(tab: WorkspaceTab): boolean {
+export function isHomePreviewTab(tab: WorkspaceView): boolean {
   if (tab.surfaceId !== "browser" || tab.placeholder) return false;
-  const browser = parseBrowserTabState(tab.state);
+  const browser = parseBrowserViewState(tab.state);
   if (browser.private) return false;
   try {
     const { protocol } = new URL(browser.url);

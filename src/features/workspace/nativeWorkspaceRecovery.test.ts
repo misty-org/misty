@@ -137,7 +137,7 @@ it("migrates the owned latest global layout, archives account/legacy copies, the
   const h = await context();
   const browserWrite = vi.spyOn(localStorage, "setItem");
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Latest");
+  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Latest");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "a",
     ready: true,
@@ -162,13 +162,13 @@ it("preserves browser originals on failed native writes and can retry without re
   expect(localStorage.getItem("misty:workspace-account:a")).toBe(raw);
   expect(h.useWorkspaceRecoveryState.getState().ready).toBe(false);
   expect(h.useWorkspaceRecoveryState.getState().usable).toBe(true);
-  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Recover me");
-  const tab = h.workspace.getState().openBrowserTab({
+  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
+  const tab = h.workspace.getState().openBrowserView({
     url: "https://new.example",
   });
   native.fail = false;
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Recover me");
+  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
   expect(localStorage.getItem("misty:workspace-account:a")).toBeNull();
   expect(JSON.stringify(h.workspace.getState().layout)).toContain(tab.id);
   expect(h.pendingRecoveredWorkspace("a")).toBeDefined();
@@ -176,7 +176,7 @@ it("preserves browser originals on failed native writes and can retry without re
 it("keeps temporary tabs selected while restoring old windows after an unreadable store recovers", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  const saved = h.workspace.getState().openBrowserTab({
+  const saved = h.workspace.getState().openBrowserView({
     url: "https://saved.example",
   });
   await h.flushNativeWorkspace("a");
@@ -187,23 +187,23 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
     usable: true,
     ready: false,
   });
-  const added = h.workspace.getState().openBrowserTab({
+  const added = h.workspace.getState().openBrowserView({
     url: "https://temporary.example",
   });
-  const active = h.workspace.getState().activeVirtualWindowId;
+  const active = h.workspace.getState().activeWindowId;
   await expect(h.flushNativeWorkspace("a")).rejects.toThrow("unsaved changes");
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().activeVirtualWindowId).toBe(active);
+  expect(h.workspace.getState().activeWindowId).toBe(active);
   native.failRead = false;
   await h.restoreNativeWorkspace("a");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     ready: true,
     issue: null,
   });
-  const windows = JSON.stringify(h.workspace.getState().virtualWindowsByScope);
+  const windows = JSON.stringify(h.workspace.getState().windowsByScope);
   expect(windows).toContain(saved.id);
   expect(windows).toContain(added.id);
-  expect(h.workspace.getState().activeVirtualWindowId).toBe(active);
+  expect(h.workspace.getState().activeWindowId).toBe(active);
   const persisted = native.values.get("a:workspace")!.value;
   expect(JSON.parse(persisted).syncBaseline).toBeDefined();
   h.closeNativeWorkspaceRecovery();
@@ -215,7 +215,7 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
 it("does not expose a previous account when recovery fails for the next account", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  h.workspace.getState().openBrowserTab({
+  h.workspace.getState().openBrowserView({
     url: "https://private.example",
   });
   await h.flushNativeWorkspace("a");
@@ -223,9 +223,7 @@ it("does not expose a previous account when recovery fails for the next account"
   native.generation++;
   native.failRead = true;
   await h.restoreNativeWorkspace("b");
-  expect(JSON.stringify(h.workspace.getState().virtualWindowsByScope)).not.toContain(
-    "private.example",
-  );
+  expect(JSON.stringify(h.workspace.getState().windowsByScope)).not.toContain("private.example");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "b",
     usable: true,
@@ -253,7 +251,7 @@ it("does not import an unowned global layout into a newly signed-in account", as
   expect(
     h.workspace
       .getState()
-      .websiteGroups.some((group) => group.fields.label === "Private old layout"),
+      .bookmarkFolders.some((group) => group.fields.label === "Private old layout"),
   ).toBe(false);
   expect(localStorage.getItem("misty:desktop-dock:space-apps-v1")).toBe(raw);
 });
@@ -288,7 +286,7 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
   native.invoke.mockClear();
   for (let i = 0; i < 50; i++)
     h.workspace.setState({
-      selectedWebsiteByGroup: {
+      selectedBookmarkByFolder: {
         saved: `site-${i}`,
       },
     });
@@ -299,7 +297,7 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
   native.invoke.mockClear();
   for (let i = 0; i < 10; i++) {
     h.workspace.setState({
-      selectedWebsiteByGroup: {
+      selectedBookmarkByFolder: {
         saved: `later-${i}`,
       },
     });

@@ -4,7 +4,7 @@ import { useAuth } from "@/features/auth";
 import {
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
 import {
   appIconStrokeWidth,
@@ -47,7 +47,7 @@ function usePersistentOpen() {
     });
   return [open, toggle] as const;
 }
-function activeSpaceIdFromTab(tab: WorkspaceTab | undefined): string {
+function activeSpaceIdFromTab(tab: WorkspaceView | undefined): string {
   if (tab?.surfaceId !== "space") return "";
   const segment = tab.route.split(/[?#]/)[0].split("/")[2] ?? "";
   try {
@@ -63,7 +63,7 @@ export function WorkspaceSpaceNavigation({
   activeTab,
   onOpen,
 }: {
-  activeTab: WorkspaceTab | undefined;
+  activeTab: WorkspaceView | undefined;
   onOpen?: () => void;
 }) {
   const navigate = useNavigate();

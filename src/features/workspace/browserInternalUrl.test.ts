@@ -5,7 +5,7 @@ import {
   browserInternalUrl,
   isBrowserInternalUrl,
 } from "./browserInternalUrl";
-import { browserTabTitle } from "./model";
+import { browserViewTitle } from "./model";
 
 describe("browser internal pages", () => {
   it("recognizes Misty's own pages regardless of case or a trailing slash", () => {
@@ -24,7 +24,7 @@ describe("browser internal pages", () => {
   });
 
   it("titles internal tabs by page name", () => {
-    expect(browserTabTitle("misty://scheduled")).toBe("Scheduled");
-    expect(browserTabTitle("misty://extensions")).toBe("Extensions");
+    expect(browserViewTitle("misty://scheduled")).toBe("Scheduled");
+    expect(browserViewTitle("misty://extensions")).toBe("Extensions");
   });
 });

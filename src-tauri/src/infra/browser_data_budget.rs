@@ -97,7 +97,7 @@ pub(crate) struct Fitted {
 pub(crate) enum Limit {
     /// Legacy workspaces: everything shares one credential sync event.
     SingleEvent,
-    /// Device trees: sign-in shards enforce their own per-slot limits.
+    /// Workspaces: sign-in shards enforce their own per-slot limits.
     Shards,
 }
 

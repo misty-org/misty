@@ -1,3 +1,4 @@
+import { registerProfileWriter } from "@/features/settings/profiles/bridge";
 import { beforeEach, expect, it } from "vitest";
 import {
   dockPositions,
@@ -8,17 +9,19 @@ import {
 } from "./dockingLayout";
 
 beforeEach(() => {
+  registerProfileWriter(async (_id, value) => {
+    useDockingLayoutStore.setState({ savedLayouts: JSON.parse(String(value)) });
+  });
   localStorage.clear();
   useDockingLayoutStore.setState({ initialLayout: defaultDockingLayout, savedLayouts: [] });
 });
-it("accepts the twelve distinct edge pairs and rejects sharing an edge", () => {
+it("accepts all sixteen edge pairs, including shared edges", () => {
   for (const navigation of dockPositions)
-    for (const tabs of dockPositions)
-      expect(validDockingLayout({ navigation, tabs })).toBe(navigation !== tabs);
+    for (const tabs of dockPositions) expect(validDockingLayout({ navigation, tabs })).toBe(true);
   for (const preset of dockingPresets) expect(validDockingLayout(preset)).toBe(true);
 });
 it("restores named presets without changing the default for other windows", async () => {
-  useDockingLayoutStore.getState().saveLayout("  Focus  ", dockingPresets[2]);
+  await useDockingLayoutStore.getState().saveLayout("  Focus  ", dockingPresets[2]);
   const stored = localStorage.getItem("misty:desktop-docking:v1")!;
   useDockingLayoutStore.setState({ savedLayouts: [] });
   localStorage.setItem("misty:desktop-docking:v1", stored);
@@ -28,15 +31,15 @@ it("restores named presets without changing the default for other windows", asyn
     expect.objectContaining({ name: "Focus", navigation: "bottom", tabs: "left" }),
   ]);
 });
-it("updates a named preset without duplicates and allows deleting it", () => {
+it("updates a named preset without duplicates and allows deleting it", async () => {
   const state = useDockingLayoutStore.getState();
-  expect(state.saveLayout(" ", defaultDockingLayout)).toBeNull();
-  expect(state.saveLayout("Invalid", { navigation: "top", tabs: "top" })).toBeNull();
-  const id = state.saveLayout("Focus", defaultDockingLayout);
-  expect(state.saveLayout("focus", dockingPresets[3])).toBe(id);
+  expect(await state.saveLayout(" ", defaultDockingLayout)).toBeNull();
+  expect(validDockingLayout({ navigation: "center", tabs: "top" })).toBe(false);
+  const id = await state.saveLayout("Focus", defaultDockingLayout);
+  expect(await state.saveLayout("focus", dockingPresets[3])).toBe(id);
   expect(useDockingLayoutStore.getState().savedLayouts).toHaveLength(1);
   expect(useDockingLayoutStore.getState().savedLayouts[0].navigation).toBe("right");
-  state.removeLayout(id!);
+  await state.removeLayout(id!);
   expect(useDockingLayoutStore.getState().savedLayouts).toEqual([]);
 });
 it("preserves the old global choice as the initial layout for unmigrated windows", async () => {
@@ -56,7 +59,7 @@ it("repairs invalid stored edges and discards malformed named layouts", async ()
     "misty:desktop-docking:v1",
     JSON.stringify({
       state: {
-        layout: { navigation: "bottom", tabs: "bottom" },
+        layout: { navigation: "center", tabs: "bottom" },
         savedLayouts: [
           null,
           { id: "bad", name: "Bad", navigation: "center", tabs: "top" },

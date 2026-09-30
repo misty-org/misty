@@ -32,8 +32,8 @@ describe("whole pane arrangement", () => {
     const moved = moveDockPane(root, a.id, "up", c.id);
     expect(dockLeaves(moved)).toHaveLength(4);
     expect(dockLeaves(moved).map((pane) => pane.id)).toEqual([a.id, d.id, b.id, c.id]);
-    expect(dockLeaves(moved)[0].tabs).toBe(c.tabs);
-    expect(dockLeaves(moved)[3].tabs).toBe(a.tabs);
+    expect(dockLeaves(moved)[0].views).toBe(c.views);
+    expect(dockLeaves(moved)[3].views).toBe(a.views);
     expect(dockLeaves(root)).toEqual([a, d, b, c]);
   });
   it("ignores self, missing targets and the sole pane", () => {

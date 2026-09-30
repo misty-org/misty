@@ -3,8 +3,8 @@ const fixture = vi.hoisted(() => ({ state: {} as any, registrations: {} as any }
 vi.mock("@/features/workspace/useWorkspaceStore", () => ({
   useWorkspaceStore: { getState: () => fixture.state },
 }));
-vi.mock("@/features/workspace/virtualWindows", () => ({
-  currentVirtualWindows: () => fixture.state.windows,
+vi.mock("@/features/workspace/windows", () => ({
+  currentWindows: () => fixture.state.windows,
 }));
 vi.mock("@/features/ai-surface/store", () => ({
   useAiSurfaceStore: { getState: () => ({ registrations: fixture.registrations }) },
@@ -13,14 +13,14 @@ import { resolveMistyContext, contextOptions } from "./context";
 const pane = (id: string) => ({
   id,
   type: "leaf",
-  tabs: [{ id: `view-${id}`, title: id }],
-  activeTabId: `view-${id}`,
+  views: [{ id: `view-${id}`, title: id }],
+  activeViewId: `view-${id}`,
   history: [{ id: "private-history" }],
 });
 beforeEach(() => {
   fixture.state = {
     activeScopeKey: "global",
-    activeVirtualWindowId: "w",
+    activeWindowId: "w",
     layout: { focusedPaneId: "p" },
     windows: [
       {

@@ -20,7 +20,7 @@ export function BrowserOmniboxView(props: {
   setOverlay: (reason: string, active: boolean) => Promise<void>;
   /** `typed` is true when the person chose a page by its address rather than a search. */
   onNavigate: (value: string, options: { typed: boolean }) => void;
-  onSwitchTab: (tabId: string) => void;
+  onSwitchView: (tabId: string) => void;
   /** Opens a place inside Misty, such as a note, by its app route. */
   onOpenInApp: (route: string) => void;
   onRemove?: (match: OmniboxMatch) => Promise<void>;
@@ -83,7 +83,7 @@ export function BrowserOmniboxView(props: {
     inputRef.current?.blur();
   };
   const choose = (match: OmniboxMatch | undefined) => {
-    if (match?.target.type === "switch-tab") props.onSwitchTab(match.target.tabId);
+    if (match?.target.type === "switch-tab") props.onSwitchView(match.target.tabId);
     else if (match?.target.type === "open-in-app") props.onOpenInApp(match.target.url);
     else if (match) {
       const typed = match.kind !== "search" && match.kind !== "suggestion";
@@ -203,8 +203,8 @@ export function BrowserOmniboxView(props: {
               selected={match === selected}
               onChoose={() => choose(match)}
               onPoint={() => setSelectedId(match.id)}
-              onSwitchTab={(tabId) => {
-                props.onSwitchTab(tabId);
+              onSwitchView={(tabId) => {
+                props.onSwitchView(tabId);
                 close();
               }}
               onRemove={match.removable && props.onRemove ? () => remove(match) : undefined}

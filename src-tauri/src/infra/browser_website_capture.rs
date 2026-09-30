@@ -39,31 +39,19 @@ fn observed() -> &'static Mutex<ObservedCache> {
     CACHE.get_or_init(Default::default)
 }
 
-const FIELDS: [(&str, &str); 3] = [
-    ("local", "local_storage"),
-    ("session", "session_storage"),
-    ("indexed", "indexed_db"),
-];
+// sessionStorage belongs to one tab and holds no lasting sign-in; not read.
+const FIELDS: [(&str, &str); 2] = [("local", "local_storage"), ("indexed", "indexed_db")];
 
-fn cache_key(origin: &str, field: &str, tab_id: Option<&str>) -> String {
-    match (field, tab_id) {
-        ("session", Some(tab)) => format!("{origin}\u{0}session\u{0}{tab}"),
-        _ => format!("{origin}\u{0}{field}"),
-    }
+fn cache_key(origin: &str, field: &str) -> String {
+    format!("{origin}\u{0}{field}")
 }
 
 /// The request for one page: which areas to read and the stamps already held.
-fn read_request(
-    cache: &ObservedCache,
-    origin: &str,
-    tab_id: Option<&str>,
-    first: bool,
-    now: Instant,
-) -> (Value, Value) {
-    let read = json!({"local": first, "session": tab_id.is_some(), "indexed": first});
+fn read_request(cache: &ObservedCache, origin: &str, now: Instant) -> (Value, Value) {
+    let read = json!({"local": true, "session": false, "indexed": true});
     let mut known = serde_json::Map::new();
     for (field, _) in FIELDS {
-        if let Some(entry) = cache.areas.get(&cache_key(origin, field, tab_id)) {
+        if let Some(entry) = cache.areas.get(&cache_key(origin, field)) {
             if field == "indexed" && now.duration_since(entry.at) >= INDEXED_REFRESH {
                 continue;
             }
@@ -75,17 +63,11 @@ fn read_request(
 
 /// Restores unchanged areas from the cache and records freshly exported ones,
 /// so the page report looks exactly like a full export.
-fn merge_observed(
-    cache: &mut ObservedCache,
-    value: &mut Value,
-    origin: &str,
-    tab_id: Option<&str>,
-    now: Instant,
-) {
+fn merge_observed(cache: &mut ObservedCache, value: &mut Value, origin: &str, now: Instant) {
     let unchanged: BTreeSet<String> =
         serde_json::from_value(value["unchanged"].clone()).unwrap_or_default();
     for (field, kind) in FIELDS {
-        let key = cache_key(origin, field, tab_id);
+        let key = cache_key(origin, field);
         if unchanged.contains(field) {
             let Some(entry) = cache.areas.get(&key) else {
                 continue;
@@ -166,49 +148,18 @@ impl Slots {
         );
     }
 
-    /// One page's report: session storage for its tab, plus local storage and
-    /// IndexedDB the first time its origin is seen in this capture.
-    fn absorb(
-        &mut self,
-        value: &Value,
-        origin: &str,
-        tab_id: Option<String>,
-        first: bool,
-        coverage: &mut Coverage,
-    ) {
+    /// One origin's report: its local storage and IndexedDB.
+    fn absorb(&mut self, value: &Value, origin: &str, coverage: &mut Coverage) {
         let host = site(origin);
         let skips: Vec<PageSkip> =
             serde_json::from_value(value["skipped"].clone()).unwrap_or_default();
-        for skip in skips
-            .into_iter()
-            .filter(|skip| first || skip.kind == DataKind::SessionStorage)
-        {
+        for skip in skips {
             coverage.skipped(&host, skip.kind, skip.reason, skip.count);
         }
-        let mut fields = vec![];
-        if let Some(tab_id) = tab_id {
-            fields.push((
-                Area::SessionStorage {
-                    origin: origin.into(),
-                    tab_id,
-                },
-                "session",
-            ));
-        }
-        if first {
-            fields.push((
-                Area::LocalStorage {
-                    origin: origin.into(),
-                },
-                "local",
-            ));
-            fields.push((
-                Area::IndexedDb {
-                    origin: origin.into(),
-                },
-                "indexed",
-            ));
-        }
+        let fields = [
+            (Area::LocalStorage { origin: origin.into() }, "local"),
+            (Area::IndexedDb { origin: origin.into() }, "indexed"),
+        ];
         for (area, field) in fields {
             let mut payload = value[field].clone();
             // Skipped by the page and reported above: its synced copy stands in.
@@ -237,13 +188,10 @@ impl Slots {
     }
 }
 
-fn unreadable(origin: &str, first: bool, coverage: &mut Coverage) {
+fn unreadable(origin: &str, coverage: &mut Coverage) {
     let host = site(origin);
-    coverage.skipped(&host, DataKind::SessionStorage, SkipReason::Unreadable, 1);
-    if first {
-        coverage.skipped(&host, DataKind::LocalStorage, SkipReason::Unreadable, 1);
-        coverage.skipped(&host, DataKind::IndexedDb, SkipReason::Unreadable, 1);
-    }
+    coverage.skipped(&host, DataKind::LocalStorage, SkipReason::Unreadable, 1);
+    coverage.skipped(&host, DataKind::IndexedDb, SkipReason::Unreadable, 1);
 }
 
 pub(super) async fn capture(
@@ -256,10 +204,9 @@ pub(super) async fn capture(
     // Keep already captured, closed origins in the complete observation. They
     // cannot be mistaken for deletions merely because their tab isn't mounted.
     let mut slots = Slots::default();
-    for record in previous
-        .iter()
-        .filter(|record| !matches!(record.area, Area::Cookies))
-    {
+    for record in previous.iter().filter(|record| {
+        !matches!(record.area, Area::Cookies | Area::SessionStorage { .. })
+    }) {
         slots.candidates.insert(
             Held::key(&record.area),
             Candidate {
@@ -271,14 +218,16 @@ pub(super) async fn capture(
     }
     let mut origins = BTreeSet::new();
     let mut live_keys = BTreeSet::new();
-    for (tab_id, view) in super::browser::sync_storage_views(app, physical)? {
+    for (_, view) in super::browser::sync_storage_views(app, physical)? {
         let Ok(url) = view.url() else { continue };
         if !matches!(url.scheme(), "http" | "https") {
             continue;
         }
         let origin = url.origin().ascii_serialization();
         // Local storage and IndexedDB are per origin: read them from one tab.
-        let first = origins.insert(origin.clone());
+        if !origins.insert(origin.clone()) {
+            continue;
+        }
         let now = Instant::now();
         let (read, known) = {
             let mut cache = observed()
@@ -290,25 +239,23 @@ pub(super) async fn capture(
                     ..Default::default()
                 };
             }
-            read_request(&cache, &origin, Some(&tab_id), first, now)
+            read_request(&cache, &origin, now)
         };
         for (field, _) in FIELDS {
-            if field == "session" || first {
-                live_keys.insert(cache_key(&origin, field, Some(&tab_id)));
-            }
+            live_keys.insert(cache_key(&origin, field));
         }
         match evaluate_read(&view, physical, &origin, read, known).await {
             Ok(mut value) => {
                 if let Ok(mut cache) = observed().lock() {
                     if cache.physical == physical {
-                        merge_observed(&mut cache, &mut value, &origin, Some(&tab_id), now);
+                        merge_observed(&mut cache, &mut value, &origin, now);
                     }
                 }
-                slots.absorb(&value, &origin, Some(tab_id), first, coverage)
+                slots.absorb(&value, &origin, coverage)
             }
             Err(error) if error == PROFILE_UNVERIFIED => return Err(error),
             // Navigation or a busy page: its last synced copy stays; retried next pass.
-            Err(_) => unreadable(&origin, first, coverage),
+            Err(_) => unreadable(&origin, coverage),
         }
     }
     // Forget pages that closed, so the cache stays bounded by what is open.
@@ -328,9 +275,9 @@ pub(super) async fn capture(
                 Err(error) => Err(error),
             };
             match value {
-                Ok(value) => slots.absorb(&value, &origin, None, true, coverage),
+                Ok(value) => slots.absorb(&value, &origin, coverage),
                 Err(error) if error == PROFILE_UNVERIFIED => return Err(error),
-                Err(_) => unreadable(&origin, true, coverage),
+                Err(_) => unreadable(&origin, coverage),
             }
         }
     }
@@ -350,28 +297,20 @@ mod observed_tests {
         json!({
             "origin": ORIGIN,
             "local": {"theme": "dark"},
-            "session": {"draft": "1"},
             "indexed": {"codec_version": 1, "databases": [{"name": "cache", "version": 1, "stores": []}]},
             "skipped": [{"kind": "indexed_db", "reason": "too_large", "count": 1}],
             "skipped_databases": ["huge"],
             "unchanged": [],
-            "stamps": {"local": "l1", "session": "s1", "indexed": "i1"}
+            "stamps": {"local": "l1", "indexed": "i1"}
         })
     }
 
     #[test]
-    fn a_second_tab_of_an_origin_reads_only_its_own_session_storage() {
-        let cache = ObservedCache::default();
-        let now = Instant::now();
-        let (read, _) = read_request(&cache, ORIGIN, Some("tab-1"), true, now);
+    fn session_storage_is_never_read() {
+        let (read, _) = read_request(&ObservedCache::default(), ORIGIN, Instant::now());
         assert_eq!(
             read,
-            json!({"local": true, "session": true, "indexed": true})
-        );
-        let (read, _) = read_request(&cache, ORIGIN, Some("tab-2"), false, now);
-        assert_eq!(
-            read,
-            json!({"local": false, "session": true, "indexed": false})
+            json!({"local": true, "session": false, "indexed": true})
         );
     }
 
@@ -380,28 +319,22 @@ mod observed_tests {
         let mut cache = ObservedCache::default();
         let now = Instant::now();
         let mut first = exported();
-        merge_observed(&mut cache, &mut first, ORIGIN, Some("tab-1"), now);
+        merge_observed(&mut cache, &mut first, ORIGIN, now);
         // The next pass offers the stamps it holds...
-        let (_, known) = read_request(&cache, ORIGIN, Some("tab-1"), true, now);
+        let (_, known) = read_request(&cache, ORIGIN, now);
         assert_eq!(
             known,
-            json!({"local": "l1", "session": "s1", "indexed": "i1"})
+            json!({"local": "l1", "indexed": "i1"})
         );
         // ...and a page that reports everything unchanged sends no data.
         let mut report = json!({
-            "origin": ORIGIN, "local": null, "session": null, "indexed": null,
+            "origin": ORIGIN, "local": null, "indexed": null,
             "skipped": [], "skipped_databases": [],
-            "unchanged": ["local", "session", "indexed"],
-            "stamps": {"local": "l1", "session": "s1", "indexed": "i1"}
+            "unchanged": ["local", "indexed"],
+            "stamps": {"local": "l1", "indexed": "i1"}
         });
-        merge_observed(&mut cache, &mut report, ORIGIN, Some("tab-1"), now);
-        for field in [
-            "local",
-            "session",
-            "indexed",
-            "skipped",
-            "skipped_databases",
-        ] {
+        merge_observed(&mut cache, &mut report, ORIGIN, now);
+        for field in ["local", "indexed", "skipped", "skipped_databases"] {
             assert_eq!(report[field], exported()[field], "{field}");
         }
     }
@@ -410,16 +343,16 @@ mod observed_tests {
     fn indexed_db_is_fully_exported_again_after_a_bounded_interval() {
         let mut cache = ObservedCache::default();
         let then = Instant::now();
-        merge_observed(&mut cache, &mut exported(), ORIGIN, Some("tab-1"), then);
+        merge_observed(&mut cache, &mut exported(), ORIGIN, then);
         // Writes that change neither the database list nor the usage are
         // invisible to the stamp; a stale stamp is not offered, forcing export.
-        let (_, known) = read_request(&cache, ORIGIN, Some("tab-1"), true, then + INDEXED_REFRESH);
-        assert_eq!(known, json!({"local": "l1", "session": "s1"}));
+        let (_, known) = read_request(&cache, ORIGIN, then + INDEXED_REFRESH);
+        assert_eq!(known, json!({"local": "l1"}));
         // A page without a usable stamp is never cached, so it always exports.
         let mut unstamped = exported();
         unstamped["stamps"]["indexed"] = Value::Null;
-        merge_observed(&mut cache, &mut unstamped, ORIGIN, Some("tab-1"), then);
-        let (_, known) = read_request(&cache, ORIGIN, Some("tab-1"), true, then);
+        merge_observed(&mut cache, &mut unstamped, ORIGIN, then);
+        let (_, known) = read_request(&cache, ORIGIN, then);
         assert!(known.get("indexed").is_none());
     }
 }

@@ -69,7 +69,7 @@ export default tseslint.config(
   {
     ignores: [
       "**/node_modules/**",
-      "dist/**",
+      "**/dist/**",
       "dist-*/**",
       "build/**",
       "vendor/**",
@@ -229,6 +229,7 @@ export default tseslint.config(
   {
     files: [
       "src/**/*.test.{ts,tsx}",
+      "src/**/*.testFixtures.{ts,tsx}",
       "src/tests/**/*.{ts,tsx}",
       "server/**/*.test.ts",
       "server/**/test/**/*.ts",

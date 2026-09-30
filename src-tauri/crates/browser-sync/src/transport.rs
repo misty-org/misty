@@ -203,15 +203,15 @@ impl SyncApi {
         }
     }
 
-    pub async fn workspace(&self) -> Result<Option<Workspace>> {
+    pub async fn vault(&self) -> Result<Option<Vault>> {
         #[derive(Deserialize)]
         struct Response {
-            workspace: Option<Workspace>,
+            vault: Option<Vault>,
         }
         let response: Response = self
-            .request(reqwest::Method::GET, "workspace", None::<&()>)
+            .request(reqwest::Method::GET, "vault", None::<&()>)
             .await?;
-        Ok(response.workspace)
+        Ok(response.vault)
     }
 
     pub async fn bootstrap(
@@ -228,12 +228,12 @@ impl SyncApi {
         }
         #[derive(Deserialize)]
         struct Response {
-            workspace_id: String,
+            vault_id: String,
         }
         let response: Response = self
             .request(
                 reqwest::Method::POST,
-                "workspace",
+                "vault",
                 Some(&Body {
                     root_public_key,
                     key_envelope,
@@ -241,7 +241,7 @@ impl SyncApi {
                 }),
             )
             .await?;
-        if response.workspace_id != device.workspace_id {
+        if response.vault_id != device.vault_id {
             return Err(Error::Identity);
         }
         Ok(())
@@ -272,19 +272,19 @@ impl SyncApi {
         Ok(response.devices)
     }
 
-    /// `tree_id` asks an activated device to claim that tree instead of its own.
+    /// `workspace_id` asks an activated device to claim that workspace instead of its own.
     pub async fn control_device(
         &self,
         device_id: &str,
         full_sync: Option<bool>,
         activate: bool,
-        tree_id: Option<&str>,
+        workspace_id: Option<&str>,
     ) -> Result<String> {
         let mut body = serde_json::json!({
             "device_id": device_id, "full_sync": full_sync, "activate": activate,
         });
-        if let Some(tree) = tree_id {
-            body["tree_id"] = tree.into();
+        if let Some(workspace) = workspace_id {
+            body["workspace_id"] = workspace.into();
         }
         let response: serde_json::Value = self
             .request(reqwest::Method::POST, "control", Some(&body))
@@ -326,7 +326,7 @@ impl SyncApi {
     async fn ticket(&self, scope: &VaultScope, device_id: &str) -> Result<String> {
         #[derive(Serialize)]
         struct Body<'a> {
-            workspace_id: &'a str,
+            vault_id: &'a str,
             device_id: &'a str,
             protocol_version: u8,
         }
@@ -340,7 +340,7 @@ impl SyncApi {
                 reqwest::Method::POST,
                 "ticket",
                 Some(&Body {
-                    workspace_id: &scope.workspace_id,
+                    vault_id: &scope.vault_id,
                     device_id,
                     protocol_version: PROTOCOL_VERSION,
                 }),
@@ -379,7 +379,7 @@ async fn decode_response<T: DeserializeOwned>(mut response: reqwest::Response) -
 
 pub struct SyncSocket {
     stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    pub workspace: Workspace,
+    pub vault: Vault,
     pub connection_id: String,
     last_received: Instant,
     traffic: Arc<TrafficCounters>,
@@ -396,7 +396,7 @@ impl SyncSocket {
     ) -> Result<Self> {
         scope.validate()?;
         if scope.deployment != api.deployment()
-            || scope.workspace_id != grant.workspace_id
+            || scope.vault_id != grant.vault_id
             || device.public_key() != grant.public_key
             || after > MAX_COUNTER
         {
@@ -456,7 +456,7 @@ impl SyncSocket {
             },
         )
         .await?;
-        let (workspace, connection_id) = match timeout(
+        let (vault, connection_id) = match timeout(
             WRITE_TIMEOUT,
             receive(&mut stream, &mut last_received, &api.traffic),
         )
@@ -464,23 +464,23 @@ impl SyncSocket {
         .map_err(|_| Error::Network)??
         {
             ServerFrame::Welcome {
-                workspace,
+                vault,
                 connection_id,
-            } => (workspace, connection_id),
+            } => (vault, connection_id),
             _ => return Err(Error::Identity),
         };
-        if workspace.workspace_id != scope.workspace_id
-            || workspace.root_public_key != expected_root
-            || workspace.key_epoch != grant.key_epoch
-            || workspace.head_sequence < after
-            || workspace.head_sequence > MAX_COUNTER
+        if vault.vault_id != scope.vault_id
+            || vault.root_public_key != expected_root
+            || vault.key_epoch != grant.key_epoch
+            || vault.head_sequence < after
+            || vault.head_sequence > MAX_COUNTER
             || !valid_id(&connection_id)
         {
             return Err(Error::Identity);
         }
         Ok(Self {
             stream,
-            workspace,
+            vault,
             connection_id,
             last_received,
             traffic: api.traffic(),
@@ -515,7 +515,7 @@ async fn send(
     frame: &ClientFrame<'_>,
 ) -> Result<()> {
     let data = serde_json::to_string(frame)?;
-    // A maximal tree op is 1400 KiB of ciphertext, base64 encoded.
+    // A maximal workspace op is 1400 KiB of ciphertext, base64 encoded.
     if data.len() > 2 << 20 {
         return Err(Error::TooLarge);
     }

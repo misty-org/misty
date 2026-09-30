@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import type { WorkspaceTab } from "@/features/workspace/model";
+import type { WorkspaceView } from "@/features/workspace/model";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { WorkspaceSurface } from "./WorkspaceSurface";
 
 vi.mock("@/features/workspace", () => ({
-  WorkspaceTabRouteScope: ({ children }: { children: ReactNode }) => children,
+  WorkspaceViewRouteScope: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("@/features/spaces/SpaceWorkspaceSurface", () => ({
   SpaceWorkspaceSurface: () => <div>Space content</div>,
@@ -29,7 +29,7 @@ vi.mock("@/features/files/workspace/explorer", async () => {
   };
 });
 
-const filesTab: WorkspaceTab = {
+const filesTab: WorkspaceView = {
   id: "files",
   surfaceId: "files",
   groupKey: "tool:files",
@@ -41,7 +41,7 @@ const filesTab: WorkspaceTab = {
   createdAt: 1,
   lastFocusedAt: 1,
 };
-const browserTab: WorkspaceTab = {
+const browserTab: WorkspaceView = {
   ...filesTab,
   id: "browser",
   surfaceId: "browser",

@@ -1,301 +1,79 @@
-import { useEffect, useState } from "react";
-import { resolveApiBase } from "@/api/deployment/api";
-import {
-  isApiSessionTransitioning,
-  readApiAuthToken,
-  readApiSessionGeneration,
-} from "@/api/client/session";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/features/auth";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
 import {
-  DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSection,
+  DesktopSettingsSection as Section,
+  DesktopSettingsRow as Row,
 } from "@/features/settings/desktop";
 import { SettingsNote } from "@/features/settings/SettingsControls";
-import {
-  generateSyncSecret,
-  lockNativeSync,
-  unlockNativeSync,
-  vaultAvailability,
-  type NativeSyncView,
-  type SyncAccount,
-  activeDeviceEpoch,
-} from "./native";
-import { useBrowserSyncStore } from "./store";
-import { SyncVaultForm } from "./SyncVaultForm";
-import { DeviceNameSettings } from "./DeviceNameSettings";
-import { viewingName } from "./treeControl";
+import type { SettingsContentProps } from "@/features/settings/settingsTypes";
+import { SettingsSyncSection, SyncRestoreSettings } from "@/features/settings/syncSettings";
 import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
-import { syncIssueMessage } from "./syncIssueMessage";
+import { deviceRows, publishingDeviceId } from "./deviceControl";
+import { SyncDeviceList } from "./SyncDeviceList";
+import { SyncStatusView } from "./SyncStatusView";
+import { SyncAccountSettings } from "./SyncAccountSettings";
+import { useSyncController } from "./useSyncController";
 
-function statusLabel(session: NativeSyncView) {
-  if (session.status.issue) return "Needs attention";
-  if (session.status.phase === "offline")
-    return activeDeviceEpoch(session)
-      ? "Offline · edits queued on this device"
-      : "Offline · waiting to receive changes";
-  if (session.status.phase === "connecting") return "Connecting";
-  if (session.status.pending_changes)
-    return `${session.status.pending_changes} changes waiting to sync`;
-  if (session.status.applied_sequence < session.status.head_sequence)
-    return "Receiving workspace changes";
-  if (session.status.phase === "stopped" || session.status.phase === "attention")
-    return "Needs attention";
-  return "Workspace changes up to date";
-}
-function websiteDataLabel(session: NativeSyncView, issue: string | null) {
-  if (session.supports_cookie_handoff === false) return "Not supported on this device";
-  if (issue || session.status.issue || session.browser_profile_issue) return "Needs attention";
-  if (session.status.phase === "offline" || session.status.phase === "connecting")
-    return "Waiting for sync connection";
-  if (session.status.phase === "stopped" || session.status.phase === "attention")
-    return "Needs attention";
-  if (!activeDeviceEpoch(session))
-    return session.workspace.active_device?.device_id
-      ? "Receiving from the active device"
-      : "Waiting for an active device";
-  if (session.browser_profile_ready) return "Automatic sync enabled";
-  if (session.status.applied_sequence < session.status.head_sequence)
-    return "Waiting for workspace changes";
-  if (session.status.pending_changes > 0) return "Waiting for changes to finish syncing";
-  if (session.workspace.records.length === 0) return "Waiting for workspace data";
-  return "Preparing website storage";
-}
-
-export function BrowserSyncSettings() {
-  const { user, transitioning } = useAuth();
-  const accountId = user?.id;
-  const connecting = useBrowserSyncStore((state) => state.connecting);
-  const session = useBrowserSyncStore((state) => state.session);
-  const issue = useBrowserSyncStore((state) => state.issue);
-  const reenroll = useBrowserSyncStore((state) => !!accountId && state.reenroll === accountId);
-  const [available, setAvailable] = useState<{
-    account: SyncAccount;
-    generation: number;
-    local: boolean;
-    remote: boolean | null;
-  } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [reconnecting, setReconnecting] = useState(false);
-  const native = hasTauriInternals();
+export function BrowserSyncSettings(props: SettingsContentProps) {
+  const { user } = useAuth();
+  const controller = useSyncController(user?.id ?? "");
+  const { session } = controller;
+  const accountSection = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    let active = true;
-    const generation = readApiSessionGeneration();
-    const valid = () =>
-      active && !isApiSessionTransitioning() && generation === readApiSessionGeneration();
-    setAvailable((previous) =>
-      native &&
-      !transitioning &&
-      previous &&
-      previous.account.accountId === accountId &&
-      previous.generation === generation
-        ? previous
-        : null,
-    );
-    setError(null);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let checking = false;
-    const check = async () => {
-      if (!native || !accountId || transitioning || !valid() || checking) return;
-      checking = true;
-      clearTimeout(timer);
-      try {
-        const account = { apiBase: await resolveApiBase(), accountId };
-        if (!valid()) return;
-        // Unlocking must remain reachable even if restoring account credentials
-        // or checking the server fails. Only offer creation after the server
-        // confirms there is no existing vault.
-        setAvailable((previous) =>
-          previous?.account.accountId === accountId &&
-          previous.account.apiBase === account.apiBase &&
-          previous.generation === generation
-            ? previous
-            : { account, generation, local: false, remote: null },
-        );
-        await readApiAuthToken();
-        if (!valid()) return;
-        const found = await vaultAvailability(account);
-        if (valid()) {
-          setAvailable({ account, generation, ...found });
-          setError(null);
-        }
-      } catch (failure) {
-        if (valid()) setError(failure instanceof Error ? failure.message : String(failure));
-      } finally {
-        checking = false;
-        if (valid()) timer = setTimeout(() => void check(), 30_000);
-      }
-    };
-    const retry = () => {
-      clearTimeout(timer);
-      void check();
-    };
-    void check();
-    window.addEventListener("online", retry);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      window.removeEventListener("online", retry);
-    };
-  }, [accountId, native, attempt, transitioning]);
-  const reconnect = async () => {
-    if (!accountId || reconnecting || transitioning) return;
-    const generation = readApiSessionGeneration();
-    const valid = () => !isApiSessionTransitioning() && generation === readApiSessionGeneration();
-    setReconnecting(true);
-    setError(null);
-    try {
-      if (session && (issue ?? session.status.issue) === "sync_device_forbidden") {
-        // The saved key opens the rejected identity, so reopening with it only
-        // reconnects into the same rejection. Drop it and ask for the password,
-        // which lets native register this device again.
-        await lockNativeSync(session.session_id, true);
-        if (valid())
-          useBrowserSyncStore.setState({ session: null, issue: null, reenroll: accountId });
-        setAttempt((value) => value + 1);
-        return;
-      }
-      await readApiAuthToken();
-      const account = { apiBase: await resolveApiBase(), accountId };
-      if (!valid()) return;
-      const opened = await unlockNativeSync(account, null, null, false);
-      if (valid()) useBrowserSyncStore.setState({ session: opened, issue: null });
-    } catch (failure) {
-      if (!valid()) return;
-      // Opening stops the terminal worker before trying the remembered key. If
-      // no key was saved, expose the normal unlock form without blocking the app.
-      useBrowserSyncStore.setState({ session: null, issue: null });
-      setError(failure instanceof Error ? failure.message : String(failure));
-      setAttempt((value) => value + 1);
-    } finally {
-      setReconnecting(false);
-    }
-  };
+    if (!controller.form) return;
+    accountSection.current?.scrollIntoView?.({ block: "start" });
+    accountSection.current
+      ?.querySelector<HTMLInputElement>('input[aria-label="Sync password"]')
+      ?.focus();
+  }, [controller.form]);
+  // The actual active publisher is distinct from the workspace being viewed.
+  const publisherId = session ? publishingDeviceId(session) : null;
+  const publisher =
+    session && deviceRows(session, user?.name).find((d) => d.device_id === publisherId);
   return (
-    <div className="grid gap-6">
-      <SettingsSection
-        title="Sync"
-        description="Keep your tabs, splits and virtual windows in an encrypted workspace across devices."
-      >
-        <SettingsNote>
-          Sync runs in the background and reconnects automatically. Some websites may ask you to
-          sign in again on a new device.
-        </SettingsNote>
-        {!native ? (
-          <SettingsNote>Open the Misty desktop app to set up sync.</SettingsNote>
-        ) : !accountId ? (
-          <SettingsNote>Sign in to Misty before setting up sync.</SettingsNote>
-        ) : session?.account_id === accountId ? (
-          <>
-            <SettingsRow label="Workspace">
-              <span className="text-sm text-cream-muted">
-                {session.trees
-                  ? session.trees.driving_tree === session.device_id
-                    ? "This device’s workspace"
-                    : session.trees.driving_tree
-                      ? `${viewingName(session, user?.name)}’s workspace`
-                      : "Choose a workspace to continue"
-                  : activeDeviceEpoch(session)
-                    ? "This device"
-                    : "Wake Misty to use this device"}
-              </span>
-            </SettingsRow>
-            <SettingsRow label="Workspace status">
-              <span role="status" className="text-sm text-cream-muted">
-                {issue ? "Needs attention" : statusLabel(session)}
-              </span>
-            </SettingsRow>
-            <SettingsRow label="Other devices online">
-              <span className="text-sm text-cream-muted">
-                {session.status.phase === "ready" || session.status.phase === "catching_up"
-                  ? session.presence.filter(
-                      (device) => device.device_id !== session.device_id && device.online,
-                    ).length
-                  : "Waiting for sync connection"}
-              </span>
-            </SettingsRow>
-            {(issue || session.status.issue) && (
-              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                <p role="alert" className="text-sm text-destructive">
-                  {syncIssueMessage(issue ?? session.status.issue)}
-                </p>
-                <Button variant="outline" disabled={reconnecting} onClick={() => void reconnect()}>
-                  {reconnecting ? "Reconnecting…" : "Reconnect"}
-                </Button>
-              </div>
-            )}
-            <SettingsRow label="Website data">
-              <span role="status" className="text-sm text-cream-muted">
-                {websiteDataLabel(session, issue)}
-              </span>
-            </SettingsRow>
-            <DeviceWebsiteDataList session={session} />
-            {session.browser_profile_issue && (
-              <p role="alert" className="px-5 py-3 text-sm text-destructive">
-                {session.browser_profile_issue}
-              </p>
-            )}
-          </>
-        ) : null}
-        {/* While re-enrolling, background retries fail on the dropped key; the
-            unlock form explains the next step instead. */}
-        {(error || (issue && !reenroll)) && session?.account_id !== accountId && (
-          <div className="px-5 pb-4">
-            <p role="alert" className="mb-3 text-sm text-destructive">
-              {syncIssueMessage(error ?? issue)}
-            </p>
-            <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>
-              Try again
-            </Button>
-          </div>
-        )}
-        {native && accountId && session?.account_id !== accountId && (
+    <>
+      <Section title="Overview">
+        <div className="p-5">
+          <SyncStatusView
+            status={controller.status}
+            busy={controller.busy}
+            onAction={() => void controller.retry()}
+          />
+        </div>
+      </Section>
+      <Section title="Workspace devices">
+        {session ? (
+          <SyncDeviceList key={session.session_id} session={session} />
+        ) : (
           <SettingsNote>
-            {connecting
-              ? "Connecting in the background…"
-              : "Sync retries automatically when a connection is available."}
+            {controller.desktop
+              ? "Devices appear when this workspace is connected to sync."
+              : "Open the Misty desktop app to sync workspace devices."}
           </SettingsNote>
         )}
-      </SettingsSection>
-      {native && session && session.account_id === accountId && (
-        <SettingsSection title="Device names">
-          <DeviceNameSettings session={session} />
-        </SettingsSection>
-      )}
-      {available &&
-        available.account.accountId === accountId &&
-        !transitioning &&
-        session?.account_id !== accountId && (
-          <SyncVaultForm
-            key={`${available.account.apiBase}:${accountId}:${available.generation}`}
-            local={available.local}
-            reenroll={reenroll}
-            create={!reenroll && !available.local && available.remote === false}
-            onGenerateSecret={generateSyncSecret}
-            onUnlock={async ({ password, syncSecret, remember }) => {
-              const generation = available.generation;
-              const valid = () =>
-                !isApiSessionTransitioning() && readApiSessionGeneration() === generation;
-              if (!valid()) throw new Error("Your account changed. Reopen sync settings.");
-              await readApiAuthToken();
-              if (!valid()) throw new Error("Your account changed. Reopen sync settings.");
-              const opened = await unlockNativeSync(
-                available.account,
-                password,
-                syncSecret,
-                remember,
-                !reenroll && !available.local && available.remote === false,
-                reenroll,
-              );
-              if (valid()) {
-                setError(null);
-                useBrowserSyncStore.setState({ session: opened, issue: null, reenroll: null });
-              }
-            }}
-          />
-        )}
-    </div>
+      </Section>
+      <Section title="Website sign-ins">
+        <SettingsNote>
+          Sync cookies and sign-in keys so websites can recognize you on another device. Some
+          websites may ask you to sign in again.
+        </SettingsNote>
+        <Row
+          label="Publishing from"
+          description="The machine currently publishing website sign-ins."
+        >
+          <span className="text-sm text-cream-muted">
+            {session?.supports_cookie_handoff === false
+              ? "Not supported on this device"
+              : (publisher?.name ?? "Waiting for a publishing device")}
+          </span>
+        </Row>
+        {session && <DeviceWebsiteDataList session={session} />}
+      </Section>
+      <SyncRestoreSettings {...props} />
+      <SettingsSyncSection showStatus={false} />
+      <div ref={accountSection}>
+        <SyncAccountSettings controller={controller} />
+      </div>
+    </>
   );
 }

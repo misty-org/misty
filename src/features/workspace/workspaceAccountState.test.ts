@@ -102,7 +102,7 @@ it("backs up each legacy account before migration and removes its backup on acco
   saveAccountWorkspace("legacy-owner");
   expect(localStorage.getItem(workspaceRecoveryKey(key))).toBe(raw);
   expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
-    version: 14,
+    version: 17,
     state: { activeScopeKey: "global" },
   });
   removeAccountWorkspace("legacy-owner");

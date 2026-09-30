@@ -9,12 +9,12 @@ import { useShortcutHandler } from "@/features/shortcuts";
 import {
   blankBrowserUrl,
   browserInternalPage,
-  browserTabTitle,
-  createBrowserTabState,
+  browserViewTitle,
+  createBrowserViewState,
   dockLeaves,
-  parseBrowserTabState,
+  parseBrowserViewState,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -49,6 +49,7 @@ import {
   type BrowserMistyPage,
 } from "./browserRuntime";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
+import { browserThemeFromDocument } from "./browserTheme";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   browserViewportFrameStyle,
@@ -57,27 +58,19 @@ import {
   useBrowserViewport,
 } from "./BrowserViewportMenu";
 import type { BrowserTheme } from "./types";
+import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
 import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
-import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
 import { useBrowserPageCommands } from "./useBrowserPageCommands";
-import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 import { useBrowserPagePreview } from "./useBrowserPagePreview";
+import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 export { normalizeBrowserAddress } from "./browserAddress";
 export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
-function browserThemeFromDocument(): BrowserTheme {
-  const theme = document.documentElement.dataset.theme;
-  if (theme === "light" || theme === "dark") return theme;
-  return typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: light)").matches
-    ? "light"
-    : "dark";
-}
-export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
+export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
     const pane = panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ?? panes[0];
-    const candidate = pane?.tabs.find((item) => item.id === pane.activeTabId);
+    const candidate = pane?.views.find((item) => item.id === pane.activeViewId);
     return candidate?.surfaceId === "browser" ? candidate : undefined;
   });
   const tab = props.tab ?? fallbackTab;
@@ -90,12 +83,12 @@ export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
   }
   return <ActiveBrowserWorkspace tab={tab} />;
 }
-function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
+function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const active = useWorkspaceStore((state) =>
-    dockLeaves(state.layout.root).some((pane) => pane.activeTabId === tab.id),
+    dockLeaves(state.layout.root).some((pane) => pane.activeViewId === tab.id),
   );
   const nativeRuntime = hasTauriInternals();
-  const state = parseBrowserTabState(tab.state);
+  const state = parseBrowserViewState(tab.state);
   const pageHostRef = useRef<HTMLDivElement | null>(null);
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
@@ -291,9 +284,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
                 }
               ).url,
             );
-            useWorkspaceStore.getState().updateBrowserTab(tab.id, {
-              ...createBrowserTabState(url),
-              title: browserTabTitle(url),
+            useWorkspaceStore.getState().updateBrowserView(tab.id, {
+              ...createBrowserViewState(url),
+              title: browserViewTitle(url),
             });
             useBrowserRuntimeStore.getState().pushHistory(tab.id, url);
           }
@@ -368,9 +361,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const navigateActiveTab = (rawAddress: string) => {
     useWorkspaceStore.getState().commitPlaceholder(tab.id);
     const url = normalizeBrowserAddress(rawAddress);
-    useWorkspaceStore.getState().updateBrowserTab(tab.id, {
-      ...createBrowserTabState(url),
-      title: browserTabTitle(url),
+    useWorkspaceStore.getState().updateBrowserView(tab.id, {
+      ...createBrowserViewState(url),
+      title: browserViewTitle(url),
     });
     useBrowserRuntimeStore.getState().pushHistory(tab.id, url);
     // Misty draws its own pages; the hidden native page keeps its place.
@@ -443,9 +436,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     if (!step) return false;
     const url = step.url;
     const leavingInternalPage = browserInternalPage(state.url) !== null;
-    useWorkspaceStore.getState().updateBrowserTab(tab.id, {
+    useWorkspaceStore.getState().updateBrowserView(tab.id, {
       url,
-      title: browserTabTitle(url),
+      title: browserViewTitle(url),
     });
     if (browserInternalPage(url)) return true;
     useBrowserRuntimeStore.getState().setLoading(tab.id, true);
@@ -474,7 +467,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     const pane = dockLeaves(workspace.layout.root).find(
       (candidate) => candidate.id === workspace.layout.focusedPaneId,
     );
-    return pane?.activeTabId === tab.id;
+    return pane?.activeViewId === tab.id;
   };
   useShortcutHandler(
     "browser.edit_address",
@@ -540,6 +533,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         style={{
           backgroundColor: browserChromeBackground,
         }}
+        data-window-toolbar
         data-browser-toolbar
       >
         <div className={browserToolbarStyles.group}>
@@ -598,7 +592,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
         ) : null}
         <BrowserOmnibox
-          compact={Boolean(state.websiteId)}
+          compact={Boolean(state.bookmarkId)}
           pageTitle={tab.title}
           focusRequest={addressFocusRequest}
           currentUrl={state.url}
@@ -767,7 +761,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               page={internalPage}
               profileId={state.profileId}
               navigate={navigateActiveTab}
-              openInNewTab={page.commands.openInNewTab}
+              openInNewView={page.commands.openInNewTab}
               openPage={page.commands.openPage}
               clearBrowsingData={page.commands.clearBrowsingData}
             />

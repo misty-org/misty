@@ -4397,12 +4397,16 @@ dependencies = [
 name = "misty-credential-store"
 version = "0.1.0"
 dependencies = [
+ "core-foundation 0.10.1",
  "dirs",
  "hex",
  "libc",
+ "security-framework",
+ "security-framework-sys",
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
+ "zeroize",
 ]
 
 [[package]]

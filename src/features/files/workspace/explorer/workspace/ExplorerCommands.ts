@@ -52,8 +52,8 @@ export function runExplorerCommand(
   const dockPane = dockLeaves(workspace.layout.root).find(
     (pane) => pane.id === workspace.layout.focusedPaneId,
   );
-  const dockTab = dockPane?.tabs.find(
-    (tab) => tab.id === dockPane.activeTabId && tab.surfaceId === "files",
+  const dockTab = dockPane?.views.find(
+    (tab) => tab.id === dockPane.activeViewId && tab.surfaceId === "files",
   );
   const openDockedFiles = () => {
     const path = activeTab?.path ?? explorer.panes[paneId]?.listing?.path ?? "/";
@@ -67,7 +67,7 @@ export function runExplorerCommand(
       paneId: dockPane?.id,
       state: { version: 1, path },
     });
-    workspace.focusTab(tab.id);
+    workspace.focusView(tab.id);
     navigateRoute(tab.route);
   };
   switch (commandId) {
@@ -150,7 +150,7 @@ export function runExplorerCommand(
       break;
     case "explorer.next_workspace": {
       if (dockPane && dockTab) {
-        const filesTabs = dockPane.tabs.filter((tab) => tab.surfaceId === "files");
+        const filesTabs = dockPane.views.filter((tab) => tab.surfaceId === "files");
         if (filesTabs.length <= 1) break;
         const activeIndex = Math.max(
           0,
@@ -158,7 +158,7 @@ export function runExplorerCommand(
         );
         const next = filesTabs[(activeIndex + 1) % filesTabs.length];
         if (next) {
-          workspace.focusTab(next.id);
+          workspace.focusView(next.id);
           navigateRoute(next.route);
         }
         break;
@@ -183,9 +183,9 @@ export function runExplorerCommand(
     case "explorer.tab_9": {
       const index = Number(commandId.slice("explorer.tab_".length)) - 1;
       if (dockPane && dockTab) {
-        const tab = dockPane.tabs.filter((candidate) => candidate.surfaceId === "files")[index];
+        const tab = dockPane.views.filter((candidate) => candidate.surfaceId === "files")[index];
         if (tab) {
-          workspace.focusTab(tab.id);
+          workspace.focusView(tab.id);
           navigateRoute(tab.route);
         }
         break;

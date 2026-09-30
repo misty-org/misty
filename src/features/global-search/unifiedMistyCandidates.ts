@@ -71,7 +71,7 @@ export function buildUnifiedMistyCandidates(
 }
 function emptyCandidates(): UnifiedMistyCandidate[] {
   const state = useWorkspaceStore.getState();
-  const recent = (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
+  const recent = (state.windowsByScope[state.activeScopeKey] ?? [])
     .flatMap((window) => allLayoutViews(window.layout))
     .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)
     .slice(0, 4)

@@ -66,7 +66,7 @@ export function useExplorerKeyboardShortcuts(options: {
       const pane = dockLeaves(workspace.layout.root).find(
         (candidate) => candidate.id === workspace.layout.focusedPaneId,
       );
-      const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId);
+      const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
       return options.workspaceId ? tab?.id === options.workspaceId : tab?.surfaceId === "files";
     };
     const onKeyDown = (event: KeyboardEvent) => {

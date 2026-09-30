@@ -77,9 +77,9 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                 ) {
                     continue;
                 }
-                // Device trees keep sign-in data per device; legacy workspaces
+                // Workspaces keep sign-in data per device; legacy workspaces
                 // keep one set for the whole workspace.
-                if trees::tree_mode(&active.handle.trees.borrow()) {
+                if workspaces::workspace_mode(&active.handle.workspaces.borrow()) {
                     device_signin::prepare(&app, active).await
                 } else {
                     Ok(device_signin::Pass::Exclusive)
@@ -108,7 +108,7 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                     else {
                         break;
                     };
-                    let result = if trees::tree_mode(&active.handle.trees.borrow()) {
+                    let result = if workspaces::workspace_mode(&active.handle.workspaces.borrow()) {
                         device_signin::reconcile(&app, active).await
                     } else {
                         reconcile(&app, active).await
@@ -149,7 +149,7 @@ async fn report(
         let _ = app.emit_to(
             "main",
             "misty:browser-sync-changed",
-            &active.scope.workspace_id,
+            &active.scope.vault_id,
         );
     }
 }

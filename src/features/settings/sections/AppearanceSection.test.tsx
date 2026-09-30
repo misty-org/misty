@@ -93,14 +93,11 @@ describe("AppearanceSection app zoom", () => {
     expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.1);
   });
 
-  it("offers auto-hide without restoring the retired wide layout preference", () => {
+  it("leaves navigation visibility in Layout settings", () => {
     render(
       <AppearanceSection {...props} document={{ appearance: { navigator_compact: false } }} />,
     );
     expect(screen.queryByRole("switch", { name: "Compact navigation" })).toBeNull();
-    const autoHide = screen.getByRole("switch", { name: "Auto-hide navigation" });
-    expect(autoHide.getAttribute("aria-checked")).toBe("false");
-    fireEvent.click(autoHide);
-    expect(onSettingChange).toHaveBeenCalledWith("appearance", "navigator_auto_hide", true);
+    expect(screen.queryByRole("switch", { name: "Auto-hide navigation" })).toBeNull();
   });
 });

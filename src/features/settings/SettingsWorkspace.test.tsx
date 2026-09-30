@@ -145,19 +145,19 @@ describe("SettingsWorkspace", () => {
     await act(async () => root.unmount());
     container.remove();
   });
-  it("lists flat areas with multi-page areas as disclosures and no combined labels", async () => {
+  it("lists flat areas with unique icons and no Account footer or disclosures", async () => {
     await render();
     expect(
       [...container.querySelectorAll("[data-settings-nav-parent]")].map((e) =>
         e.getAttribute("data-settings-nav-parent"),
       ),
-    ).toEqual(["browser", "files", "spaces", "agents", "about"]);
+    ).toEqual([]);
     expect(container.querySelector('[data-settings-nav-entry="general"]')).not.toBeNull();
     expect(
       settingsRegistry.every((e) => !e.label.includes("&") && !e.label.includes(" and ")),
     ).toBe(true);
     expect(settingsRegistry.some((e) => e.id === "account" || e.id === "profiles")).toBe(false);
-    expect(container.querySelector('[aria-label^="Account settings"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label^="Account settings"]')).toBeNull();
   });
   it.each(SECTIONS)("renders a functional or capability-gated %s page", async (section) => {
     await render(section);
@@ -165,14 +165,12 @@ describe("SettingsWorkspace", () => {
     expect(main.textContent!.length).toBeGreaterThan(30);
     expect(main.textContent).not.toContain("Coming soon");
   });
-  it("opens the active area and allows independent collapse", async () => {
+  it("renders all Browser sections together without expanding navigation", async () => {
     await render("browser");
-    const toggle = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Collapse Browser settings"]',
-    )!;
-    expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).not.toBeNull();
-    await act(async () => toggle.click());
+    expect(container.querySelector('[data-settings-page="browser-downloads"]')).not.toBeNull();
+    expect(container.querySelector('[data-settings-page="browser-privacy"]')).not.toBeNull();
     expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
+    expect(container.querySelector("[aria-expanded]")).toBeNull();
   });
   it("shows actual available models", async () => {
     await render("models");
@@ -183,12 +181,13 @@ describe("SettingsWorkspace", () => {
       expect(settingsRegistry.find((e) => e.id === id)).toBeDefined();
     expect(settingsRegistry.find((e) => e.id === "diagnostics")?.area).toBe("about");
   });
-  it("preserves aliases and separates browser handoff from settings sync", () => {
+  it("redirects browser handoff to the single Sync area", () => {
     expect(canonicalSettingsSection("advanced")).toBe("diagnostics");
     expect(canonicalSettingsSection("agents")).toBe("agents-defaults");
     expect(canonicalSettingsSection("profiles")).toBe("sync");
     expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("sync");
-    expect(settingsRegistry.find((e) => e.id === "browser-handoff")?.area).toBe("browser");
+    expect(settingsRegistry.find((e) => e.id === "browser-handoff")).toBeUndefined();
+    expect(canonicalSettingsSection("browser-handoff")).toBe("sync");
   });
   it("searches individual preferences and opens their canonical page", async () => {
     await render();

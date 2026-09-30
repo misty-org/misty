@@ -217,7 +217,7 @@ describe("SpaceAgenda", () => {
       container.querySelector<HTMLButtonElement>('[aria-label="Google Calendar"]')?.click();
     });
     expect(document.body.querySelector('input[aria-label="Search calendars"]')).not.toBeNull();
-    expect(document.body.querySelector('[data-social-provider-icon="misty"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="switch"][aria-label="Show Misty"]')).not.toBeNull();
     expect(document.body.textContent).toContain("Add another account");
     expect(document.body.textContent).toContain("Not connected");
     expect(document.body.textContent).not.toContain("No Google account connected");

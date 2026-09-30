@@ -1,23 +1,20 @@
-import type { WorkspaceVirtualWindow } from "@/features/workspace/model";
+import type { WorkspaceWindow } from "@/features/workspace/model";
+import type { MistyTabGroup } from "@/features/workspace/tabGroups";
 import { deviceSelection, sameValue, workspaceChanges } from "./changes";
 import type { EditJournal } from "./editJournal";
 import { activeDeviceEpoch, type NativeSyncView } from "./native";
 import { recordChanges } from "./recordChanges";
-import type {
-  Resume,
-  DeviceSelection,
-  SharedRecord,
-  WorkspaceChange,
-  WorkspaceView,
-} from "./model";
+import type { DeviceSelection, SharedRecord, WorkspaceChange, WorkspaceRecords } from "./model";
 import { projectWorkspace, type ProjectedWorkspace } from "./projection";
+import { tabGroupRecords } from "./tabGroupSync";
 
 export interface WorkspaceSource {
   read(): {
-    windows: WorkspaceVirtualWindow[];
+    windows: WorkspaceWindow[];
     activeWindowId: string;
-    groups?: SharedRecord<"group">[];
-    websites?: SharedRecord<"website">[];
+    folders?: SharedRecord<"folder">[];
+    bookmarks?: SharedRecord<"bookmark">[];
+    tabGroups?: MistyTabGroup[];
   };
   write(projected: ProjectedWorkspace): void;
   subscribe(changed: () => void): () => void;
@@ -30,12 +27,6 @@ interface Ports {
     sessionId: string,
     operationId: string,
     changes: WorkspaceChange[],
-    activeEpoch: string,
-  ): Promise<string>;
-  publishResume?(
-    sessionId: string,
-    operationId: string,
-    resume: Resume,
     activeEpoch: string,
   ): Promise<string>;
   state(view: NativeSyncView, preserveIssue?: boolean): void;
@@ -66,16 +57,15 @@ export class WorkspaceSyncController {
   private running = false;
   private dirty = false;
   private captureBlocked = false;
-  private previous: WorkspaceVirtualWindow[];
+  private previous: WorkspaceWindow[];
   private previousNavigation: SharedRecord[];
-  private previousResume: Resume | null = null;
-  private followedSequence = 0;
   private unsubscribe: () => void;
   private captureTimer?: ReturnType<typeof setTimeout>;
   private captureDeadline?: ReturnType<typeof setTimeout>;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private failures = 0;
   private projectedContent: unknown;
+  private scheduled = false;
   constructor(
     private current: NativeSyncView,
     private ports: Ports,
@@ -83,21 +73,24 @@ export class WorkspaceSyncController {
     if (!canProjectWorkspace(current))
       throw new Error("Waiting for the server workspace before starting device sync");
     this.previous = ports.source.read().windows;
-    this.previousNavigation = navigationRecords(ports.source.read());
+    this.previousNavigation = navigationRecords(ports.source.read(), groupsSynced(current));
     // An empty first vault adopts the existing browser workspace once. A
     // reconnect with queued edits uses its original journal IDs instead.
     ports.journal.retainActiveEpoch(activeDeviceEpoch(current));
     const seed = this.seed();
     if (!seed && !ports.journal.pending.length && !this.unselectedEmpty(current)) {
       const selection = ports.source.read();
-      ports.source.write(projectWorkspace(current.workspace, this.selection(current, selection)));
+      ports.source.write(
+        projectWorkspace(
+          current.workspace,
+          localSelection(selection),
+          localGroups(current, selection),
+        ),
+      );
       this.projectedContent = projectionContent(current.workspace);
       this.previous = ports.source.read().windows;
-      this.previousNavigation = navigationRecords(ports.source.read());
+      this.previousNavigation = navigationRecords(ports.source.read(), groupsSynced(current));
     }
-    this.previousResume = workspaceResume(ports.source.read());
-    if (seed && this.previousResume && ports.publishResume)
-      ports.journal.appendResume(this.previousResume, activeDeviceEpoch(current)!);
     this.unsubscribe = ports.source.subscribe(() => this.scheduleCapture());
     this.refresh();
   }
@@ -137,11 +130,19 @@ export class WorkspaceSyncController {
     this.captureDeadline = undefined;
     this.capture();
   }
+  /** Native notifications arrive in bursts (another machine opening many
+   * tabs). Notifications in one tick share a pump, and any arriving while it
+   * reads are folded into its next pass: one projection per burst. */
   refresh(): void {
     if (!this.active) return;
     if (this.captureBlocked) this.capture(false);
     this.dirty = true;
-    if (!this.running) void this.pump();
+    if (this.running || this.scheduled) return;
+    this.scheduled = true;
+    queueMicrotask(() => {
+      this.scheduled = false;
+      if (this.active && !this.running) void this.pump();
+    });
   }
   private capture(refresh = true): void {
     if (!this.active || this.applying) return;
@@ -149,14 +150,13 @@ export class WorkspaceSyncController {
     const epoch = activeDeviceEpoch(this.current);
     if (!epoch) {
       this.previous = source.windows;
-      this.previousNavigation = navigationRecords(source);
-      this.previousResume = workspaceResume(source);
+      this.previousNavigation = navigationRecords(source, groupsSynced(this.current));
       this.captureBlocked = false;
       return;
     }
     try {
       const edit = workspaceChanges(this.previous, source.windows, this.current.profile_id);
-      const navigation = navigationRecords(source);
+      const navigation = navigationRecords(source, groupsSynced(this.current));
       const changes = [...edit.changes, ...recordChanges(this.previousNavigation, navigation)];
       if (changes.length) this.ports.journal.append(changes, epoch);
       if (edit.remapped.size) {
@@ -165,9 +165,9 @@ export class WorkspaceSyncController {
           this.ports.source.write({
             windows: edit.windows,
             activeWindowId: edit.remapped.get(source.activeWindowId) ?? source.activeWindowId,
-            groups: source.groups ?? [],
-            websites: source.websites ?? [],
-            recoveryTabIds: [],
+            folders: source.folders ?? [],
+            bookmarks: source.bookmarks ?? [],
+            recoveryViewIds: [],
           });
         } finally {
           this.applying = false;
@@ -175,12 +175,8 @@ export class WorkspaceSyncController {
       }
       this.previous = this.ports.source.read().windows;
       this.previousNavigation = navigation;
-      const resume = workspaceResume(this.ports.source.read());
-      const resumeChanged = resume && !sameValue(resume, this.previousResume);
-      if (resumeChanged && this.ports.publishResume) this.ports.journal.appendResume(resume, epoch);
-      this.previousResume = resume;
       this.captureBlocked = false;
-      if (refresh && (changes.length || resumeChanged)) this.refresh();
+      if (refresh && changes.length) this.refresh();
     } catch (error) {
       // Do not erase the user's visible edit. The existing workspace backup
       // retains it, and the error remains actionable rather than claiming sync.
@@ -188,39 +184,11 @@ export class WorkspaceSyncController {
       this.ports.error(error);
     }
   }
-  private selection(
-    view: NativeSyncView,
-    source: ReturnType<WorkspaceSource["read"]>,
-  ): DeviceSelection {
-    const selection = deviceSelection(source.windows, source.activeWindowId);
-    // Server sequence, rather than wall clocks, orders which device last moved
-    // focus. Applying it updates our baseline without publishing it back.
-    const latest = Object.entries(view.workspace.resumes).sort(
-      (a, b) => b[1].sequence - a[1].sequence,
-    )[0];
-    if (!latest || latest[1].sequence <= this.followedSequence) return selection;
-    this.followedSequence = latest[1].sequence;
-    if (latest[0] === view.device_id) return selection;
-    const resume = latest[1].resume;
-    return {
-      ...selection,
-      activeWindowId: resume.active_window_id,
-      activeLayoutByWindow: {
-        ...selection.activeLayoutByWindow,
-        [resume.active_window_id]: resume.active_layout_id,
-      },
-      focusedPaneByLayout: {
-        ...selection.focusedPaneByLayout,
-        [resume.active_layout_id]: resume.focused_pane_id,
-      },
-      activeTabByPane: { ...selection.activeTabByPane, ...resume.active_tab_by_pane },
-    };
-  }
   private matches(view: NativeSyncView): boolean {
     return (
       view.deployment === this.current.deployment &&
       view.account_id === this.current.account_id &&
-      view.workspace_id === this.current.workspace_id &&
+      view.vault_id === this.current.vault_id &&
       view.device_id === this.current.device_id
     );
   }
@@ -240,7 +208,7 @@ export class WorkspaceSyncController {
     const source = this.ports.source.read();
     const changes = [
       ...workspaceChanges([], source.windows, view.profile_id).changes,
-      ...recordChanges([], navigationRecords(source)),
+      ...recordChanges([], navigationRecords(source, groupsSynced(this.current))),
     ];
     if (!changes.length) return false;
     this.ports.journal.append(changes, epoch);
@@ -272,6 +240,7 @@ export class WorkspaceSyncController {
           return;
         }
         const wasIndependent = this.current.full_sync === false;
+        const groupsStarted = !groupsSynced(this.current) && groupsSynced(latest);
         if (
           wasIndependent ||
           latest.session_id !== this.current.session_id ||
@@ -282,13 +251,18 @@ export class WorkspaceSyncController {
           this.failures = 0;
         }
         this.current = latest;
+        // Every device now syncs tab groups: send this machine's before any
+        // projection, so the (still empty) synced list never replaces them.
+        if (groupsStarted) this.capture(false);
         this.ports.state(latest, this.failures > 0 && this.ports.journal.pending.length > 0);
         if (latest.full_sync === false) {
           // Keep local browsing and its durable journal intact while continuing
           // to observe connection/policy changes. Never project remote content.
           this.previous = this.ports.source.read().windows;
-          this.previousNavigation = navigationRecords(this.ports.source.read());
-          this.previousResume = workspaceResume(this.ports.source.read());
+          this.previousNavigation = navigationRecords(
+            this.ports.source.read(),
+            groupsSynced(this.current),
+          );
           return;
         }
         if (wasIndependent) this.projectedContent = null;
@@ -304,20 +278,18 @@ export class WorkspaceSyncController {
           await this.ports.journal.flush();
           if (!this.active) return;
           const edit = this.ports.journal.pending[0];
+          // Selection no longer syncs; an older journal's focus entry is dropped.
+          if (edit.resume) {
+            this.ports.journal.acknowledge(edit.id);
+            continue;
+          }
           publishing = true;
-          const accepted = edit.resume
-            ? await this.ports.publishResume!(
-                this.current.session_id,
-                edit.id,
-                edit.resume,
-                edit.activeEpoch!,
-              )
-            : await this.ports.publish(
-                this.current.session_id,
-                edit.id,
-                edit.changes,
-                edit.activeEpoch!,
-              );
+          const accepted = await this.ports.publish(
+            this.current.session_id,
+            edit.id,
+            edit.changes,
+            edit.activeEpoch!,
+          );
           publishing = false;
           if (!this.active) return;
           if (accepted !== edit.id) throw new Error("Native sync acknowledged a different edit");
@@ -335,8 +307,13 @@ export class WorkspaceSyncController {
         // Transport heartbeats and credential receipts are not navigation.
         // Re-projecting them can repeatedly reload a follower's redirected page.
         if (sameValue(content, this.projectedContent)) continue;
-        const selection = this.ports.source.read();
-        const projected = projectWorkspace(latest.workspace, this.selection(latest, selection));
+        // Remote edits only populate data: this machine's selection is its own.
+        const visible = this.ports.source.read();
+        const projected = projectWorkspace(
+          latest.workspace,
+          localSelection(visible),
+          localGroups(latest, visible),
+        );
         this.applying = true;
         try {
           this.ports.source.write(projected);
@@ -345,8 +322,10 @@ export class WorkspaceSyncController {
           this.applying = false;
         }
         this.previous = this.ports.source.read().windows;
-        this.previousNavigation = navigationRecords(this.ports.source.read());
-        this.previousResume = workspaceResume(this.ports.source.read());
+        this.previousNavigation = navigationRecords(
+          this.ports.source.read(),
+          groupsSynced(this.current),
+        );
         this.ports.state(latest);
       }
     } catch (error) {
@@ -379,23 +358,34 @@ export class WorkspaceSyncController {
   }
 }
 
-function projectionContent(view: WorkspaceView) {
-  return { records: view.records, resumes: view.resumes, activeDevice: view.active_device };
+/** Another machine's focus is not content: it never triggers a projection. */
+function projectionContent(view: WorkspaceRecords) {
+  return { records: view.records, activeDevice: view.active_device };
 }
 
-function navigationRecords(source: ReturnType<WorkspaceSource["read"]>): SharedRecord[] {
-  return [...(source.groups ?? []), ...(source.websites ?? [])];
+function localSelection(source: ReturnType<WorkspaceSource["read"]>): DeviceSelection {
+  return deviceSelection(source.windows, source.activeWindowId);
 }
 
-function workspaceResume(source: ReturnType<WorkspaceSource["read"]>): Resume | null {
-  const selection = deviceSelection(source.windows, source.activeWindowId);
-  const layout = selection.activeLayoutByWindow[source.activeWindowId];
-  const pane = selection.focusedPaneByLayout[layout];
-  if (!source.activeWindowId || !layout || !pane) return null;
-  return {
-    active_window_id: source.activeWindowId,
-    active_layout_id: layout,
-    focused_pane_id: pane,
-    active_tab_by_pane: selection.activeTabByPane,
-  };
+/** Records captured by diff rather than from the window structure: bookmark
+ * folders and links, and tab groups once every device syncs them. */
+function navigationRecords(
+  source: ReturnType<WorkspaceSource["read"]>,
+  withGroups: boolean,
+): SharedRecord[] {
+  return [
+    ...(source.folders ?? []),
+    ...(source.bookmarks ?? []),
+    ...(withGroups ? tabGroupRecords(source.windows, source.tabGroups ?? []) : []),
+  ];
+}
+
+/** Tab groups sync only once every device understands them. */
+function groupsSynced(view: NativeSyncView): boolean {
+  return view.sync?.all_upgraded === true;
+}
+
+/** This machine's groups, for their local collapsed state, when groups sync. */
+function localGroups(view: NativeSyncView, source: ReturnType<WorkspaceSource["read"]>) {
+  return groupsSynced(view) ? (source.tabGroups ?? []) : undefined;
 }

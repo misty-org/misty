@@ -8,8 +8,9 @@ const apiMocks = vi.hoisted(() => ({
   conversationMessages: vi.fn(),
 }));
 
-vi.mock("@/api/spaces/api", () => ({
-  spacesApi: apiMocks,
+vi.mock("./SocialRuntime", () => ({
+  socialApi: apiMocks,
+  socialEvents: window,
 }));
 
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";

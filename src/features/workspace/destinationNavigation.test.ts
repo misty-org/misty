@@ -3,23 +3,23 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { activeLayoutView, allLayoutViews, layoutTabs } from "./layoutTabs";
 import { dockLeaves, findDockLeaf } from "./dockTree";
-import { configureWorkspaceDefaultTab } from "./workspaceDefaultTab";
+import { configureWorkspaceDefaultView } from "./workspaceDefaultView";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
-import { normalizeWorkspaceLayout } from "./virtualWindows";
+import { normalizeWorkspaceLayout } from "./windows";
 import { setWorkspaceUnsaved } from "./unsavedChanges";
 
 const store = () => useWorkspaceStore.getState();
 const go = (route: string) => store().openDestination(workspaceSurfaceFromRoute(route)!);
 beforeEach(() => {
-  configureWorkspaceDefaultTab(0);
+  configureWorkspaceDefaultView(0);
   store().reset();
 });
-afterEach(() => configureWorkspaceDefaultTab(0));
+afterEach(() => configureWorkspaceDefaultView(0));
 
 it("returns to the most recently used browser without losing either URL or runtime identity", () => {
-  const one = store().openBrowserTab({ url: "https://one.example" });
-  const two = store().openBrowserTab({ url: "https://two.example" });
-  store().focusTab(one.id);
+  const one = store().openBrowserView({ url: "https://one.example" });
+  const two = store().openBrowserView({ url: "https://two.example" });
+  store().focusView(one.id);
   go("/home");
   const resumed = go("/browser");
   expect(resumed).toMatchObject({
@@ -37,7 +37,7 @@ it("returns to the most recently used browser without losing either URL or runti
 
 it("reuses Files at its last route without mixing navbar selection into Back/Forward", () => {
   const files = go("/files");
-  store().updateTabRoute(files.id, "/files?path=Projects");
+  store().updateViewRoute(files.id, "/files?path=Projects");
   go("/home");
   expect(store().navigatePane(-1)).toBeNull();
   expect(go("/files")).toMatchObject({ id: files.id, route: "/files?path=Projects" });
@@ -48,34 +48,34 @@ it("reuses Files at its last route without mixing navbar selection into Back/For
 
 it("fills a fresh tab even when the selected destination is already open", () => {
   const first = go("/files");
-  store().newLayoutTab();
-  const layoutId = store().layout.activeLayoutTabId;
+  store().newTab();
+  const layoutId = store().layout.activeTabId;
   const second = go("/files");
   expect(second.id).not.toBe(first.id);
-  expect(store().layout.activeLayoutTabId).toBe(layoutId);
+  expect(store().layout.activeTabId).toBe(layoutId);
   expect(layoutTabs(store().layout)).toHaveLength(2);
   expect(store().navigatePane(-1)).toBeNull();
 });
 
 it("fills a fresh split and later restores the whole split without replacing occupied panes", () => {
   const first = go("/browser");
-  const splitTabId = store().layout.activeLayoutTabId;
+  const splitTabId = store().layout.activeTabId;
   const pane = store().splitPane(store().layout.focusedPaneId, "right")!;
   const second = go("/browser");
   expect(second.id).not.toBe(first.id);
   expect(store().layout.focusedPaneId).toBe(pane);
-  expect(store().layout.activeLayoutTabId).toBe(splitTabId);
+  expect(store().layout.activeTabId).toBe(splitTabId);
   go("/files");
   expect(dockLeaves(store().layout.root)).toHaveLength(1);
   expect(go("/browser").id).toBe(second.id);
-  expect(store().layout.activeLayoutTabId).toBe(splitTabId);
+  expect(store().layout.activeTabId).toBe(splitTabId);
   expect(dockLeaves(store().layout.root)).toHaveLength(2);
-  expect(findDockLeaf(store().layout.root, pane)?.tabs[0].id).toBe(second.id);
+  expect(findDockLeaf(store().layout.root, pane)?.views[0].id).toBe(second.id);
 });
 
 it("treats each Space as one destination and resumes its last section", () => {
   const space = go("/spaces/family/chat");
-  store().updateTabRoute(space.id, "/spaces/family/planner?view=week");
+  store().updateViewRoute(space.id, "/spaces/family/planner?view=week");
   go("/spaces/work/chat");
   expect(go("/spaces/family/chat")).toMatchObject({
     id: space.id,
@@ -85,9 +85,9 @@ it("treats each Space as one destination and resumes its last section", () => {
 
 it("keeps destination reuse inside the current window and excludes private browser tabs", () => {
   const first = go("/browser");
-  store().openBrowserTab({ url: "https://private.example", private: true });
+  store().openBrowserView({ url: "https://private.example", private: true });
   expect(go("/browser").id).toBe(first.id);
-  store().createVirtualWindow();
+  store().createWindow();
   expect(go("/browser").id).not.toBe(first.id);
 });
 
@@ -97,15 +97,15 @@ it("preserves unsaved work when navigating to another destination", () => {
   try {
     expect(go("/home").surfaceId).toBe("home");
     expect(go("/files").id).toBe(files.id);
-    expect(store().closeTab(files.id)).toBe(false);
+    expect(store().closeView(files.id)).toBe(false);
   } finally {
     setWorkspaceUnsaved(files.id, false);
   }
 });
 
 it("starts configured fresh tabs and stops replacing them after interaction", () => {
-  configureWorkspaceDefaultTab(2);
-  const fresh = store().newLayoutTab();
+  configureWorkspaceDefaultView(2);
+  const fresh = store().newTab();
   expect(fresh).toMatchObject({ surfaceId: "files", placeholder: true });
   store().commitPlaceholder(fresh.id);
   go("/home");
@@ -117,7 +117,7 @@ it("starts configured fresh tabs and stops replacing them after interaction", ()
 
 it("preserves established and fresh tabs across persistence", () => {
   const files = go("/files");
-  const fresh = store().newLayoutTab();
+  const fresh = store().newTab();
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
   useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
   expect(activeLayoutView(store().layout)).toMatchObject({
@@ -140,7 +140,7 @@ it("recovers views hidden by old cross-app history as visible tabs", () => {
     ...current,
     root,
     tabs: [{ id: "legacy", root, focusedPaneId: pane.id }],
-    activeLayoutTabId: "legacy",
+    activeTabId: "legacy",
   });
   expect(
     allLayoutViews(migrated)
@@ -154,7 +154,7 @@ it("recovers views hidden by old cross-app history as visible tabs", () => {
 it("preserves an occupied split when an explicit browser open targets it", () => {
   const browser = go("/browser");
   const paneId = store().layout.focusedPaneId;
-  const opened = store().openBrowserTab({ paneId, url: "https://new.example" });
+  const opened = store().openBrowserView({ paneId, url: "https://new.example" });
   expect(opened.id).not.toBe(browser.id);
   expect(allLayoutViews(store().layout).map((view) => view.id)).toEqual(
     expect.arrayContaining([browser.id, opened.id]),
@@ -163,11 +163,11 @@ it("preserves an occupied split when an explicit browser open targets it", () =>
 });
 
 it("keeps a default browser replaceable through metadata updates, then commits navigation", () => {
-  configureWorkspaceDefaultTab(1);
-  const fresh = store().newLayoutTab();
-  store().updateBrowserTab(fresh.id, { title: "Loaded default" });
+  configureWorkspaceDefaultView(1);
+  const fresh = store().newTab();
+  store().updateBrowserView(fresh.id, { title: "Loaded default" });
   expect(activeLayoutView(store().layout)?.placeholder).toBe(true);
-  store().updateBrowserTab(fresh.id, { url: "https://work.example" });
+  store().updateBrowserView(fresh.id, { url: "https://work.example" });
   expect(activeLayoutView(store().layout)?.placeholder).toBe(false);
   go("/files");
   expect(allLayoutViews(store().layout).some((view) => view.id === fresh.id)).toBe(true);
@@ -176,7 +176,7 @@ it("keeps a default browser replaceable through metadata updates, then commits n
 it("restores Scheduled task selection independently of Agents and persists its identity", () => {
   const agents = go("/agents");
   const scheduled = go("/scheduled");
-  store().updateTabRoute(scheduled.id, "/scheduled?task=weekly");
+  store().updateViewRoute(scheduled.id, "/scheduled?task=weekly");
   expect(go("/agents").id).toBe(agents.id);
   expect(go("/scheduled")).toMatchObject({ id: scheduled.id, route: "/scheduled?task=weekly" });
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
@@ -190,7 +190,7 @@ it("restores Scheduled task selection independently of Agents and persists its i
 
 it("migrates saved Scheduled views out of Agents without losing the selected task", () => {
   const agents = go("/agents");
-  store().updateTabRoute(agents.id, "/agents?view=scheduled&task=weekly");
+  store().updateViewRoute(agents.id, "/agents?view=scheduled&task=weekly");
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
   useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
   expect(activeLayoutView(store().layout)).toMatchObject({

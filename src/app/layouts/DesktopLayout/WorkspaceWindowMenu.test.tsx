@@ -1,4 +1,4 @@
-import { createWorkspaceVirtualWindow } from "@/features/workspace/virtualWindows";
+import { createWorkspaceWindow } from "@/features/workspace/windows";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
@@ -29,8 +29,8 @@ describe("WorkspaceWindowMenu", () => {
   afterEach(cleanup);
 
   it("lists, creates, closes, and reopens virtual windows", () => {
-    const first = createWorkspaceVirtualWindow(undefined, "Writing");
-    const second = createWorkspaceVirtualWindow(undefined, "Research");
+    const first = createWorkspaceWindow(undefined, "Writing");
+    const second = createWorkspaceWindow(undefined, "Research");
     const onCreate = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -71,7 +71,7 @@ describe("WorkspaceWindowMenu", () => {
   });
 
   it("renames through the account-backed native store without selecting the window", async () => {
-    const first = createWorkspaceVirtualWindow(undefined, "Window 1");
+    const first = createWorkspaceWindow(undefined, "Window 1");
     const onSelect = vi.fn();
     const menu = (
       <WorkspaceWindowMenu
@@ -115,8 +115,8 @@ describe("WorkspaceWindowMenu", () => {
   });
 
   it("hides a window close icon when that window is protected", () => {
-    const first = createWorkspaceVirtualWindow(undefined, "Home window");
-    const second = createWorkspaceVirtualWindow(undefined, "Research");
+    const first = createWorkspaceWindow(undefined, "Home window");
+    const second = createWorkspaceWindow(undefined, "Research");
     render(
       <WorkspaceWindowMenu
         windows={[first, second]}

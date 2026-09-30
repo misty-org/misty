@@ -8,11 +8,11 @@ const starterGroups = [
   ["library", "Library", "library"],
 ] as const;
 
-export function userWebsiteGroups(
-  groups: SharedRecord<"group">[],
-  websites: SharedRecord<"website">[],
+export function userBookmarkFolders(
+  groups: SharedRecord<"folder">[],
+  websites: SharedRecord<"bookmark">[],
 ) {
-  const occupied = new Set(websites.map((site) => site.fields.group_id));
+  const occupied = new Set(websites.map((site) => site.fields.folder_id));
   return groups.filter(
     (group) =>
       !starterGroups.some(
@@ -27,17 +27,17 @@ export function userWebsiteGroups(
   );
 }
 
-export interface WebsiteNavigationState {
-  websiteGroups: SharedRecord<"group">[];
-  savedWebsites: SharedRecord<"website">[];
-  expandedWebsiteGroups: Record<string, boolean>;
-  selectedWebsiteByGroup: Record<string, string>;
+export interface BookmarkNavigationState {
+  bookmarkFolders: SharedRecord<"folder">[];
+  bookmarks: SharedRecord<"bookmark">[];
+  expandedBookmarkFolders: Record<string, boolean>;
+  selectedBookmarkByFolder: Record<string, string>;
 }
-export function initialWebsiteNavigation(): WebsiteNavigationState {
+export function initialBookmarkNavigation(): BookmarkNavigationState {
   return {
-    websiteGroups: [],
-    savedWebsites: [],
-    expandedWebsiteGroups: {},
-    selectedWebsiteByGroup: {},
+    bookmarkFolders: [],
+    bookmarks: [],
+    expandedBookmarkFolders: {},
+    selectedBookmarkByFolder: {},
   };
 }

@@ -1,9 +1,9 @@
 import { AppWindow, Eraser, History } from "lucide-react";
 import {
   isBrowserInternalUrl,
-  parseBrowserTabState,
+  parseBrowserViewState,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
 import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
 import { DropdownMenuLabel, DropdownMenuSeparator, MenuItem, MenuSubmenu } from "@/shared/ui";
@@ -11,9 +11,9 @@ import { ShortcutText } from "@/features/shortcuts";
 
 const recentLimit = 8;
 
-function ClosedTabIcon({ tab }: { tab: WorkspaceTab }) {
+function ClosedViewIcon({ tab }: { tab: WorkspaceView }) {
   if (tab.surfaceId !== "browser") return <AppWindow />;
-  const url = parseBrowserTabState(tab.state).url;
+  const url = parseBrowserViewState(tab.state).url;
   return isBrowserInternalUrl(url) ? (
     <History />
   ) : (
@@ -26,10 +26,10 @@ function ClosedTabIcon({ tab }: { tab: WorkspaceTab }) {
 /** History, like Chrome's: the full history page plus recently closed tabs. */
 export function BrowserHistoryMenu(props: {
   openHistory: () => void;
-  reopenClosedTab: (index: number) => void;
+  reopenClosedView: (index: number) => void;
   clearBrowsingData: () => void;
 }) {
-  const closedTabs = useWorkspaceStore((state) => state.closedTabs);
+  const closedTabs = useWorkspaceStore((state) => state.closedItems);
   const recent = closedTabs.slice(0, recentLimit);
   return (
     <MenuSubmenu icon={<History />} label="History" width="xl">
@@ -50,11 +50,11 @@ export function BrowserHistoryMenu(props: {
       {recent.length ? (
         recent.map((closed, index) => (
           <MenuItem
-            key={`${closed.tab.id}:${index}`}
-            icon={<ClosedTabIcon tab={closed.tab} />}
-            label={closed.tab.title || "Untitled"}
+            key={`${closed.view.id}:${index}`}
+            icon={<ClosedViewIcon tab={closed.view} />}
+            label={closed.view.title || "Untitled"}
             shortcut={index === 0 ? <ShortcutText commandId="workspace.reopen_tab" /> : undefined}
-            onSelect={() => props.reopenClosedTab(index)}
+            onSelect={() => props.reopenClosedView(index)}
           />
         ))
       ) : (

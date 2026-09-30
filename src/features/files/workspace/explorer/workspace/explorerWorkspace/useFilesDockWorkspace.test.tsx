@@ -1,4 +1,4 @@
-import { createMultiPanelStore, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import { createMultiPanelStore, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { NavigateFunction } from "react-router-dom";
@@ -25,8 +25,8 @@ describe("useFilesDockWorkspace", () => {
         root: {
           type: "leaf",
           id: "pane-1",
-          activeTabId: filesTab.id,
-          tabs: [filesTab],
+          activeViewId: filesTab.id,
+          views: [filesTab],
         },
       },
     });
@@ -86,14 +86,14 @@ describe("useFilesDockWorkspace", () => {
 
     const rootNode = useWorkspaceStore.getState().layout.root;
     const updatedTab =
-      rootNode.type === "leaf" ? rootNode.tabs.find((t) => t.id === filesTab.id) : null;
+      rootNode.type === "leaf" ? rootNode.views.find((t) => t.id === filesTab.id) : null;
 
     expect(updatedTab?.state).toEqual({ version: 1, path: "/Users/misty/Downloads" });
     expect(updatedTab?.title).toBe("Downloads");
   });
 });
 
-const filesTab: WorkspaceTab = {
+const filesTab: WorkspaceView = {
   id: "files-tab",
   surfaceId: "files",
   groupKey: "tool:files",

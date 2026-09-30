@@ -17,9 +17,9 @@ afterEach(cleanup);
 
 it("keeps window arrangements through persistence, scope changes, and reopening", () => {
   const store = useWorkspaceStore.getState();
-  const first = store.activeVirtualWindowId;
+  const first = store.activeWindowId;
   store.setWindowDockingLayout(dockingPresets[2]);
-  const second = store.createVirtualWindow("Research");
+  const second = store.createWindow("Research");
   store.setWindowDockingLayout(dockingPresets[3]);
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState())));
   store.reset();
@@ -36,12 +36,12 @@ it("keeps window arrangements through persistence, scope changes, and reopening"
   });
   expect(result.current).toEqual({ navigation: "right", tabs: "bottom" });
   act(() => {
-    store.closeVirtualWindow(second.id);
+    store.closeWindow(second.id);
   });
-  expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(first);
+  expect(useWorkspaceStore.getState().activeWindowId).toBe(first);
   expect(result.current).toEqual({ navigation: "bottom", tabs: "left" });
   act(() => {
-    store.reopenClosedVirtualWindow();
+    store.reopenClosedWindow();
   });
   expect(result.current).toEqual({ navigation: "right", tabs: "bottom" });
   const snapshot = store.createSnapshot("account", "device");
@@ -52,25 +52,41 @@ it("keeps window arrangements through persistence, scope changes, and reopening"
   expect(result.current).toEqual({ navigation: "right", tabs: "bottom" });
 });
 
-it("rejects occupied edges without altering open panes and falls back for malformed saved values", () => {
+it("accepts stacked edges without altering open panes and falls back for malformed saved values", () => {
   const store = useWorkspaceStore.getState();
   const panes = store.layout;
   store.setWindowDockingLayout(dockingPresets[2]);
   store.setWindowDockingLayout({ navigation: "bottom", tabs: "bottom" });
   expect(useWorkspaceStore.getState().layout).toBe(panes);
   const { result } = renderHook(useWindowDockingLayout);
-  expect(result.current).toEqual({ navigation: "bottom", tabs: "left" });
+  expect(result.current).toEqual({ navigation: "bottom", tabs: "bottom" });
   const state = useWorkspaceStore.getState();
   act(() =>
     useWorkspaceStore.setState({
-      virtualWindowsByScope: {
-        ...state.virtualWindowsByScope,
-        global: state.virtualWindowsByScope.global!.map((window) => ({
+      windowsByScope: {
+        ...state.windowsByScope,
+        global: state.windowsByScope.global!.map((window) => ({
           ...window,
-          dockingLayout: { navigation: "bottom", tabs: "bottom" },
+          dockingLayout: {
+            navigation: "center",
+            tabs: "bottom",
+          } as unknown as typeof defaultDockingLayout,
         })),
       },
     }),
   );
   expect(result.current).toEqual(defaultDockingLayout);
 });
+
+it.each(["left", "top", "right", "bottom"] as const)(
+  "preserves stacked %s bars in workspace snapshots",
+  (edge) => {
+    const store = useWorkspaceStore.getState();
+    store.setWindowDockingLayout({ navigation: edge, tabs: edge });
+    const snapshot = store.createSnapshot("account", "device");
+    store.reset();
+    store.replaceSnapshot(JSON.parse(JSON.stringify(snapshot)));
+    const { result } = renderHook(useWindowDockingLayout);
+    expect(result.current).toEqual({ navigation: edge, tabs: edge });
+  },
+);

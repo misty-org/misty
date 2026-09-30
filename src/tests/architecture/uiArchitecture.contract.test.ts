@@ -14,6 +14,9 @@ const extensions = new Set([".ts", ".tsx"]);
 const uiImplementationRoots = ["src/shared/ui/"];
 /** Files whose job is defining custom properties that stylesheets read. */
 const customPropertyDefinitionOwners = new Set([
+  // Runtime geometry and user-selected group colors feed the shell stylesheets.
+  "src/app/layouts/DesktopLayout/dockingGeometry.ts",
+  "src/app/layouts/DesktopLayout/MistyTabGroups.tsx",
   // The theme store writes the palette every surface reads.
   "src/features/settings/store/extensionTheme.ts",
   // The companion's runtime size feeds four rules in cursorCompanion.css.
@@ -69,6 +72,8 @@ describe("UI architecture contract", () => {
     const failures = walk("src", new Set([".tsx"]))
       .map(repositoryPath)
       .filter((path) => !/\.test\.tsx$/.test(path))
+      // AGENTS.md requires this single navigation registry at its stable path.
+      .filter((path) => path !== "src/features/settings/settingsRegistry.tsx")
       .filter((path) => {
         const name = path
           .split("/")

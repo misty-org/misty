@@ -44,6 +44,14 @@ export async function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
   return hydrateShortcutsSnapshot(await invoke<NativeShortcutsSnapshot>("shortcuts_snapshot"));
 }
 
+export async function shortcutsReplace(
+  overrides: NativeShortcutsSnapshot["overrides"],
+): Promise<ShortcutsSnapshot> {
+  return hydrateShortcutsSnapshot(
+    await invoke<NativeShortcutsSnapshot>("shortcuts_replace", { overrides }),
+  );
+}
+
 export async function shortcutsReset(
   request: ResetShortcutRequest = {},
 ): Promise<ShortcutsSnapshot> {
