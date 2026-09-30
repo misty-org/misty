@@ -28,6 +28,9 @@ fn a_record_opens_only_under_the_key_and_version_it_was_sealed_for() {
     assert_eq!(key.len(), 64);
     assert_ne!(key, record_key(&root, &scope, TAB_GROUPS, "b1").unwrap());
     let sealed = seal(&root, &scope, BOOKMARKS, 3, &record).unwrap();
+    let resealed = seal(&root, &scope, BOOKMARKS, 3, &record).unwrap();
+    assert_ne!(&sealed[..12], &resealed[..12]);
+    assert!(open(&root, &scope, BOOKMARKS, &key, 3, &resealed).unwrap() == record);
     assert!(open(&root, &scope, BOOKMARKS, &key, 3, &sealed).unwrap() == record);
     // Replayed as an older version, or filed under another record: rejected.
     assert!(open(&root, &scope, BOOKMARKS, &key, 2, &sealed).is_err());
