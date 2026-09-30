@@ -1,5 +1,5 @@
-import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceTab } from "./model";
-function leaves(node: WorkspaceDockNode): Array<{ id: string; tabs: WorkspaceTab[] }> {
+import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceView } from "./model";
+function leaves(node: WorkspaceDockNode): Array<{ id: string; views: WorkspaceView[] }> {
   return node.type === "leaf" ? [node] : [...leaves(node.first), ...leaves(node.second)];
 }
 /** Keep the destination group's identity on merge; a partial move creates a new group. */
@@ -13,12 +13,12 @@ export function reconcileGroupIdentities(
     if (node.type !== "leaf")
       return { ...node, first: visit(node.first), second: visit(node.second) };
     const ids = new Map<string, string>();
-    for (const tab of node.tabs) {
+    for (const tab of node.views) {
       if (ids.has(tab.groupKey)) continue;
-      const same = node.tabs.filter((t) => t.groupKey === tab.groupKey);
+      const same = node.views.filter((t) => t.groupKey === tab.groupKey);
       const original = before
         .find((p) => p.id === node.id)
-        ?.tabs.find((t) => t.groupKey === tab.groupKey && same.some((s) => s.id === t.id));
+        ?.views.find((t) => t.groupKey === tab.groupKey && same.some((s) => s.id === t.id));
       let id = original?.groupInstanceId ?? same.find((t) => t.groupInstanceId)?.groupInstanceId;
       if (
         id &&
@@ -26,9 +26,9 @@ export function reconcileGroupIdentities(
         before.some(
           (p) =>
             p.id !== node.id &&
-            p.tabs.some((t) => t.groupInstanceId === id) &&
+            p.views.some((t) => t.groupInstanceId === id) &&
             after.some(
-              (next) => next.id === p.id && next.tabs.some((t) => t.groupInstanceId === id),
+              (next) => next.id === p.id && next.views.some((t) => t.groupInstanceId === id),
             ),
         )
       )
@@ -38,12 +38,12 @@ export function reconcileGroupIdentities(
         id ?? (previous ? `group:${crypto.randomUUID()}` : `group:${node.id}:${tab.groupKey}`),
       );
     }
-    const tabs = node.tabs.map((t) =>
+    const tabs = node.views.map((t) =>
       t.groupInstanceId === ids.get(t.groupKey)
         ? t
         : { ...t, groupInstanceId: ids.get(t.groupKey)! },
     );
-    return tabs.every((t, i) => t === node.tabs[i]) ? node : { ...node, tabs };
+    return tabs.every((t, i) => t === node.views[i]) ? node : { ...node, views: tabs };
   };
   return { ...layout, root: visit(layout.root) };
 }

@@ -14,6 +14,8 @@ export interface VaultUnlockRequest {
 export function SyncVaultForm(props: {
   create: boolean;
   local: boolean;
+  compact?: boolean;
+  sectionTitle?: string;
   /** The server rejected this device's identity; unlocking registers it again. */
   reenroll?: boolean;
   onGenerateSecret(): Promise<string>;
@@ -89,16 +91,18 @@ export function SyncVaultForm(props: {
   return (
     <form onSubmit={submit} className="ph-no-capture" data-private="true">
       <SettingsSection
+        surface={props.compact ? "plain" : "card"}
         title={
-          props.create
+          props.sectionTitle ??
+          (props.create
             ? "Create your sync vault"
             : props.reenroll
               ? "Reconnect this device"
-              : "Unlock your sync vault"
+              : "Unlock your sync vault")
         }
         description={
           props.create
-            ? "Choose a separate sync password. Your password and sync secret unlock this workspace on your other devices."
+            ? "Choose a separate sync password. Your password and sync secret unlock this vault on your other devices."
             : props.reenroll
               ? "This device lost its sync access. Enter your sync password and secret to register it again. Its previous local sync data stays on this device."
               : "Use the sync password and secret from your first device. Your Misty account password does not unlock the vault."
@@ -207,7 +211,7 @@ export function SyncVaultForm(props: {
           account, device, connection and sync timing metadata.
         </SettingsNote>
         {error && (
-          <p role="alert" className="px-5 py-3 text-sm text-destructive">
+          <p role="alert" className="px-5 py-3 text-sm text-cream">
             {error}
           </p>
         )}

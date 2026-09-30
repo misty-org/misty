@@ -27,6 +27,6 @@ export function openFilesTabRevealing(result: SearchResult): string {
     state: { version: 1, path },
   });
   pendingReveals.set(tab.id, result);
-  workspace.focusTab(tab.id);
+  workspace.focusView(tab.id);
   return tab.route;
 }

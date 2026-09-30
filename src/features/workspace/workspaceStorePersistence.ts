@@ -1,36 +1,38 @@
 import { initialTabGroups, migrateSavedLinkGroups, savableGroupTabs } from "./tabGroups";
 import {
-  initialWebsiteNavigation,
-  userWebsiteGroups,
+  initialBookmarkNavigation,
+  userBookmarkFolders,
 } from "@/features/browser-workspace/navigationDefaults";
-import { layoutTabs, mapLayoutViews, selectLayoutTab } from "./layoutTabs";
+import { layoutTabs, mapLayoutViews, activateTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import {
-  createWorkspaceVirtualWindow,
+  createWorkspaceWindow,
   initialWorkspaceLayout,
-  mapAllVirtualWorkspaceTabs,
+  mapAllWorkspaceWindowViews,
   normalizeWorkspaceLayout,
-} from "./virtualWindows";
-import { isPrivateBrowserTab, scrubPrivateTab } from "./privateBrowsing";
-import { migrateRetiredWorkspaceTab, migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
-import { migrateClosedWorkspaceTabs } from "./closedWorkspaceTabs";
-import type { WorkspaceScopeKey, WorkspaceVirtualWindow } from "./model";
+} from "./windows";
+import { isPrivateBrowserView, scrubPrivateView } from "./privateBrowsing";
+import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
+import { migrateClosedWorkspaceItems } from "./closedWorkspaceItems";
+import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
+import type { WorkspaceScopeKey, WorkspaceWindow } from "./model";
 
 export function migrateWorkspaceStore(persisted: unknown, version: number): WorkspaceStore {
-  const state = persisted as Partial<WorkspaceStore> | undefined;
+  // Every load path (storage, native recovery, account switch) comes through here.
+  const state = upgradeWorkspaceShape(persisted) as Partial<WorkspaceStore> | undefined;
   if (!state) return state as unknown as WorkspaceStore;
 
   let migrated: Partial<WorkspaceStore> = state;
   if (version >= 6) {
     migrated = state;
   } else if (version >= 5) {
-    migrated = { ...state, closedTabs: migrateClosedWorkspaceTabs(state.closedTabs) };
+    migrated = { ...state, closedItems: migrateClosedWorkspaceItems(state.closedItems) };
   } else if (version >= 4) {
     migrated = {
       ...state,
-      closedTabs: migrateClosedWorkspaceTabs(state.closedTabs),
-      closedVirtualWindowsByScope: {},
+      closedItems: migrateClosedWorkspaceItems(state.closedItems),
+      closedWindowsByScope: {},
     };
   } else {
     const layoutsByScope = Object.fromEntries(
@@ -38,7 +40,7 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
         scope,
         layout
           ? normalizeWorkspaceLayout(
-              migrateRetiredWorkspaceTabs(layout),
+              migrateRetiredWorkspaceViews(layout),
               scope as WorkspaceScopeKey,
             )
           : layout,
@@ -46,7 +48,7 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     ) as WorkspaceStore["layoutsByScope"];
     const activeScopeKey = state.activeScopeKey ?? "global";
     const activeLayout = normalizeWorkspaceLayout(
-      migrateRetiredWorkspaceTabs(
+      migrateRetiredWorkspaceViews(
         state.layout ?? layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(),
       ),
       activeScopeKey,
@@ -55,36 +57,39 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     const virtualWindowsByScope = Object.fromEntries(
       Object.entries(layoutsByScope).flatMap(([scope, layout]) =>
         layout
-          ? [[scope, [createWorkspaceVirtualWindow(layout, undefined, scope as WorkspaceScopeKey)]]]
+          ? [[scope, [createWorkspaceWindow(layout, undefined, scope as WorkspaceScopeKey)]]]
           : [],
       ),
-    ) as WorkspaceStore["virtualWindowsByScope"];
+    ) as WorkspaceStore["windowsByScope"];
     const activeVirtualWindowIdByScope = Object.fromEntries(
       Object.entries(virtualWindowsByScope).map(([scope, windows]) => [scope, windows?.[0]?.id]),
-    ) as WorkspaceStore["activeVirtualWindowIdByScope"];
+    ) as WorkspaceStore["activeWindowIdByScope"];
     migrated = {
       ...state,
       activeScopeKey,
       layout: activeLayout,
       layoutsByScope,
-      virtualWindowsByScope,
-      activeVirtualWindowIdByScope,
-      activeVirtualWindowId: activeVirtualWindowIdByScope[activeScopeKey]!,
-      closedTabs: migrateClosedWorkspaceTabs(state.closedTabs),
-      closedVirtualWindowsByScope: {},
+      windowsByScope: virtualWindowsByScope,
+      activeWindowIdByScope: activeVirtualWindowIdByScope,
+      activeWindowId: activeVirtualWindowIdByScope[activeScopeKey]!,
+      closedItems: migrateClosedWorkspaceItems(state.closedItems),
+      closedWindowsByScope: {},
     };
   }
 
   return {
-    ...initialWebsiteNavigation(),
+    ...initialBookmarkNavigation(),
     ...initialTabGroups(),
     ...sanitizeRetiredWorkspaceSurfaces(migrated),
     ...migrateSavedLinkGroups({
       ...migrated,
-      websiteGroups: userWebsiteGroups(migrated.websiteGroups ?? [], migrated.savedWebsites ?? []),
-      savedWebsites: migrated.savedWebsites ?? [],
+      bookmarkFolders: userBookmarkFolders(
+        migrated.bookmarkFolders ?? [],
+        migrated.bookmarks ?? [],
+      ),
+      bookmarks: migrated.bookmarks ?? [],
     }),
-    websiteGroups: userWebsiteGroups(migrated.websiteGroups ?? [], migrated.savedWebsites ?? []),
+    bookmarkFolders: userBookmarkFolders(migrated.bookmarkFolders ?? [], migrated.bookmarks ?? []),
   } as WorkspaceStore;
 }
 
@@ -92,7 +97,7 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
   const activeScopeKey = state.activeScopeKey ?? "global";
   const migrateLayout = (layout: WorkspaceLayout, scopeKey: WorkspaceScopeKey) => {
     const migrated = normalizeWorkspaceLayout(
-      migrateRetiredWorkspaceTabs(layout, scopeKey),
+      migrateRetiredWorkspaceViews(layout, scopeKey),
       scopeKey,
     );
     const history = (node: WorkspaceDockNode): WorkspaceDockNode => {
@@ -100,7 +105,7 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
         return { ...node, first: history(node.first), second: history(node.second) };
       if (!node.history?.entries?.length) return node;
       const entries = node.history.entries.map((view) =>
-        migrateRetiredWorkspaceTab(view, scopeKey),
+        migrateRetiredWorkspaceView(view, scopeKey),
       );
       const index = Math.max(
         0,
@@ -109,12 +114,10 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
       return { ...node, history: { entries, index } };
     };
     const tabs = layoutTabs(migrated).map((tab) => ({ ...tab, root: history(tab.root) }));
-    return selectLayoutTab({ ...migrated, tabs }, migrated.activeLayoutTabId ?? tabs[0].id);
+    return activateTab({ ...migrated, tabs }, migrated.activeTabId ?? tabs[0].id);
   };
-  const migrateWindows = (
-    windows: WorkspaceVirtualWindow[] | undefined,
-    scopeKey: WorkspaceScopeKey,
-  ) => windows?.map((window) => ({ ...window, layout: migrateLayout(window.layout, scopeKey) }));
+  const migrateWindows = (windows: WorkspaceWindow[] | undefined, scopeKey: WorkspaceScopeKey) =>
+    windows?.map((window) => ({ ...window, layout: migrateLayout(window.layout, scopeKey) }));
 
   const layoutsByScope = Object.fromEntries(
     Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
@@ -123,36 +126,36 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
     ]),
   ) as WorkspaceStore["layoutsByScope"];
   const virtualWindowsByScope = Object.fromEntries(
-    Object.entries(state.virtualWindowsByScope ?? {}).map(([scope, windows]) => [
+    Object.entries(state.windowsByScope ?? {}).map(([scope, windows]) => [
       scope,
       migrateWindows(windows, scope as WorkspaceScopeKey),
     ]),
-  ) as WorkspaceStore["virtualWindowsByScope"];
+  ) as WorkspaceStore["windowsByScope"];
   const closedVirtualWindowsByScope = Object.fromEntries(
-    Object.entries(state.closedVirtualWindowsByScope ?? {}).map(([scope, windows]) => [
+    Object.entries(state.closedWindowsByScope ?? {}).map(([scope, windows]) => [
       scope,
       migrateWindows(windows, scope as WorkspaceScopeKey),
     ]),
-  ) as WorkspaceStore["closedVirtualWindowsByScope"];
+  ) as WorkspaceStore["closedWindowsByScope"];
 
   return {
     ...state,
     activeScopeKey,
     layout: state.layout ? migrateLayout(state.layout, activeScopeKey) : state.layout,
     layoutsByScope,
-    virtualWindowsByScope,
-    closedVirtualWindowsByScope,
-    closedTabs: migrateClosedWorkspaceTabs(state.closedTabs).map((closed) => ({
+    windowsByScope: virtualWindowsByScope,
+    closedWindowsByScope: closedVirtualWindowsByScope,
+    closedItems: migrateClosedWorkspaceItems(state.closedItems).map((closed) => ({
       ...closed,
-      tab: migrateRetiredWorkspaceTab(closed.tab, activeScopeKey),
-      ...(closed.layoutTab
+      view: migrateRetiredWorkspaceView(closed.view, activeScopeKey),
+      ...(closed.tab
         ? {
-            layoutTab: layoutTabs(
+            tab: layoutTabs(
               migrateLayout(
                 {
-                  ...closed.layoutTab,
-                  tabs: [closed.layoutTab],
-                  activeLayoutTabId: closed.layoutTab.id,
+                  ...closed.tab,
+                  tabs: [closed.tab],
+                  activeTabId: closed.tab.id,
                 },
                 activeScopeKey,
               ),
@@ -165,35 +168,35 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
 
 export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceStore> {
   // Private tabs are never written anywhere with their pages or titles.
-  const scrubbed = mapAllVirtualWorkspaceTabs(state, scrubPrivateTab);
+  const scrubbed = mapAllWorkspaceWindowViews(state, scrubPrivateView);
   const closedVirtualWindowsByScope = Object.fromEntries(
-    Object.entries(state.closedVirtualWindowsByScope).map(([scope, windows]) => [
+    Object.entries(state.closedWindowsByScope).map(([scope, windows]) => [
       scope,
       windows?.map((window) => ({
         ...window,
-        layout: mapLayoutViews(window.layout, scrubPrivateTab),
+        layout: mapLayoutViews(window.layout, scrubPrivateView),
       })),
     ]),
-  ) as WorkspaceStore["closedVirtualWindowsByScope"];
-  state = { ...state, ...scrubbed, closedVirtualWindowsByScope };
+  ) as WorkspaceStore["closedWindowsByScope"];
+  state = { ...state, ...scrubbed, closedWindowsByScope: closedVirtualWindowsByScope };
   return {
     tabGroups: state.tabGroups.map((g) => ({
       ...g,
       savedTabs: g.savedTabs ? savableGroupTabs(g.savedTabs) : undefined,
     })),
     migratedTabGroupIds: state.migratedTabGroupIds,
-    websiteGroups: state.websiteGroups,
-    savedWebsites: state.savedWebsites,
-    expandedWebsiteGroups: state.expandedWebsiteGroups,
-    selectedWebsiteByGroup: state.selectedWebsiteByGroup,
+    bookmarkFolders: state.bookmarkFolders,
+    bookmarks: state.bookmarks,
+    expandedBookmarkFolders: state.expandedBookmarkFolders,
+    selectedBookmarkByFolder: state.selectedBookmarkByFolder,
     activeScopeKey: state.activeScopeKey,
     layout: state.layout,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: state.layout },
-    virtualWindowsByScope: state.virtualWindowsByScope,
-    activeVirtualWindowIdByScope: state.activeVirtualWindowIdByScope,
-    activeVirtualWindowId: state.activeVirtualWindowId,
-    lastUsedTabByGroup: state.lastUsedTabByGroup,
-    closedTabs: state.closedTabs.filter((closed) => !isPrivateBrowserTab(closed.tab)),
-    closedVirtualWindowsByScope: state.closedVirtualWindowsByScope,
+    windowsByScope: state.windowsByScope,
+    activeWindowIdByScope: state.activeWindowIdByScope,
+    activeWindowId: state.activeWindowId,
+    lastUsedViewByGroup: state.lastUsedViewByGroup,
+    closedItems: state.closedItems.filter((closed) => !isPrivateBrowserView(closed.view)),
+    closedWindowsByScope: state.closedWindowsByScope,
   };
 }

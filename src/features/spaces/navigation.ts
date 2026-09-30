@@ -22,7 +22,7 @@ export function spaceLandingRoute(
     const leaves = dockLeaves(spaceLayout.root);
     const focused = leaves.find((leaf) => leaf.id === spaceLayout.focusedPaneId) ?? leaves[0];
     const activeTab =
-      focused?.tabs.find((tab) => tab.id === focused.activeTabId) ?? focused?.tabs[0];
+      focused?.views.find((tab) => tab.id === focused.activeViewId) ?? focused?.views[0];
     if (activeTab?.route?.startsWith(`/spaces/${encodeURIComponent(spaceId)}/`)) {
       return activeTab.route;
     }

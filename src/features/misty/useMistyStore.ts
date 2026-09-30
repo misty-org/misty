@@ -1,3 +1,4 @@
+import { companionRequestsBrowser } from "./companionBrowserIntent";
 import {
   runtimeAgentsApi as agentsApi,
   runtimeAiApi as aiSurfaceApi,
@@ -445,10 +446,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
               ? {
                   normalTabs: true,
                   openWhenMissing:
-                    companion.interactionMode === "auto" ||
-                    /^(?:(?:please|misty)[, ]+)*(?:(?:can|could|would|will) you (?:please )?)?(?:open|navigate|go to|search|find|book|buy|download|upload|fill|click|do this|do that|take over)\b/i.test(
-                      normalized,
-                    ),
+                    companion.interactionMode === "auto" || companionRequestsBrowser(normalized),
                 }
               : undefined,
         );

@@ -1,4 +1,4 @@
-import type { WorkspaceTab } from "@/features/workspace/model";
+import type { WorkspaceView } from "@/features/workspace/model";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -12,7 +12,7 @@ import { useCallback } from "react";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 export function BrowserMenu(props: {
   nativeRuntime: boolean;
-  tab: WorkspaceTab;
+  tab: WorkspaceView;
   url: string;
   commands?: BrowserPageCommands;
 }) {

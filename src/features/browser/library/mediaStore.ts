@@ -9,7 +9,7 @@ interface BrowserMediaStore {
   muted: Record<string, boolean>;
   setAudible: (tabId: string, audible: boolean) => void;
   toggleMuted: (tabId: string) => Promise<void>;
-  removeTab: (tabId: string) => void;
+  removeView: (tabId: string) => void;
 }
 
 export const useBrowserMediaStore = create<BrowserMediaStore>((set, get) => ({
@@ -28,7 +28,7 @@ export const useBrowserMediaStore = create<BrowserMediaStore>((set, get) => ({
     await invoke<void>("browser_webview_set_muted", { request: { id: runtimeId, muted } });
     set((state) => ({ muted: { ...state.muted, [tabId]: muted } }));
   },
-  removeTab: (tabId) =>
+  removeView: (tabId) =>
     set((state) => {
       const audible = { ...state.audible };
       const muted = { ...state.muted };

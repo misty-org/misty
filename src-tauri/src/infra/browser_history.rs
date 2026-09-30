@@ -56,8 +56,8 @@ pub fn browser_history_record(
     let repeated = connection
         .execute(
             "UPDATE visits SET visited_at = ?3, title = CASE WHEN ?4 = '' THEN title ELSE ?4 END,
-                               typed = MAX(typed, ?6)
-             WHERE id = (SELECT id FROM visits WHERE profile_id = ?1 ORDER BY visited_at DESC LIMIT 1)
+                               typed = MAX(typed, ?6), changed = 1
+             WHERE id = (SELECT id FROM visits WHERE profile_id = ?1 AND origin = '' ORDER BY visited_at DESC LIMIT 1)
                AND url = ?2 AND visited_at >= ?5",
             params![profile, url, now, title, now - REPEAT_VISIT_WINDOW_MS, request.typed],
         )
@@ -86,8 +86,8 @@ pub fn browser_history_set_title(
     }
     library(&app)?
         .execute(
-            "UPDATE visits SET title = ?3
-             WHERE id = (SELECT id FROM visits WHERE profile_id = ?1 AND url = ?2 ORDER BY visited_at DESC LIMIT 1)",
+            "UPDATE visits SET title = ?3, changed = 1
+             WHERE id = (SELECT id FROM visits WHERE profile_id = ?1 AND url = ?2 AND origin = '' ORDER BY visited_at DESC LIMIT 1)",
             params![profile_key(request.profile_id), url, title],
         )
         .map_err(|error| error.to_string())?;
@@ -234,6 +234,7 @@ pub fn browser_history_delete(
 ) -> Result<(), String> {
     let connection = library(&app)?;
     for id in request.ids {
+        mark_dirty(&connection, "id = ?1", params![id])?;
         connection
             .execute("DELETE FROM visits WHERE id = ?1", params![id])
             .map_err(|error| error.to_string())?;
@@ -255,10 +256,13 @@ pub fn browser_history_forget(
     request: BrowserHistoryForgetRequest,
 ) -> Result<(), String> {
     let Some(url) = history_url(&request.url) else { return Ok(()) };
-    library(&app)?
+    let connection = library(&app)?;
+    let profile = profile_key(request.profile_id);
+    mark_dirty(&connection, "profile_id = ?1 AND url = ?2", params![profile, url])?;
+    connection
         .execute(
             "DELETE FROM visits WHERE profile_id = ?1 AND url = ?2",
-            params![profile_key(request.profile_id), url],
+            params![profile, url],
         )
         .map_err(|error| error.to_string())?;
     Ok(())
@@ -280,6 +284,14 @@ pub fn browser_history_clear(
 ) -> Result<(), String> {
     let since = request.since.unwrap_or(0);
     let connection = library(&app)?;
+    match &request.profile_id {
+        Some(profile) => mark_dirty(
+            &connection,
+            "profile_id = ?1 AND visited_at >= ?2",
+            params![profile_key(Some(profile.clone())), since],
+        ),
+        None => mark_dirty(&connection, "visited_at >= ?1", params![since]),
+    }?;
     match request.profile_id {
         Some(profile) => connection.execute(
             "DELETE FROM visits WHERE profile_id = ?1 AND visited_at >= ?2",
@@ -289,6 +301,25 @@ pub fn browser_history_clear(
     }
     .map_err(|error| error.to_string())?;
     Ok(())
+}
+
+/// Records the hours of visits about to be deleted, so their synced batches
+/// are rewritten without them (on every device, not just this one).
+fn mark_dirty(
+    connection: &rusqlite::Connection,
+    filter: &str,
+    values: impl rusqlite::Params,
+) -> Result<(), String> {
+    connection
+        .execute(
+            &format!(
+                "INSERT OR IGNORE INTO history_dirty(origin, hour)
+                 SELECT DISTINCT origin, visited_at / 3600000 FROM visits WHERE {filter}"
+            ),
+            values,
+        )
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
 import { useLibraryShortcut as useShortcutHandler } from "../LibraryRuntime";
-import { useLibraryFocused as useWorkspaceTabFocused } from "../LibraryRuntime";
+import { useLibraryFocused as useWorkspaceViewFocused } from "../LibraryRuntime";
 import type { LibrarySharedReference, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useCallback } from "react";
 import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "../libraryClipboard";
@@ -9,7 +9,7 @@ import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
 /** Copying, duplicating and pasting edits across the current selection. */
 export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promise<void>) {
-  const workspaceFocused = useWorkspaceTabFocused();
+  const workspaceFocused = useWorkspaceViewFocused();
   const { spaceId, canEditLibrary, canCopyLibrary, selectedItems, selectedItemId } = data;
   const { setSelectedItemIds, bulkSaving, setBulkSaving, setLocalError } = data;
   const { copiedEditDefinition, sensitiveCollectionToken } = data;

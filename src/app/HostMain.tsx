@@ -16,7 +16,7 @@ if (!isWebBuild) {
       throw new Error("Misty Browser is unavailable outside the desktop app.");
     const { useWorkspaceStore } = await import("@/features/workspace");
     if (
-      !useWorkspaceStore.getState().openBrowserTab({
+      !useWorkspaceStore.getState().openBrowserView({
         url,
       })
     )

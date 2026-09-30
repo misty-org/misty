@@ -1,5 +1,5 @@
-import { beforeEach, expect, it, vi } from "vitest";
-import type { WorkspaceTab } from "@/features/workspace";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { WorkspaceView } from "@/features/workspace";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
@@ -14,15 +14,22 @@ const tab = {
   instanceKey: "preview",
   surfaceId: "browser",
   state: { url: "https://example.test", private: false },
-} as WorkspaceTab;
+} as WorkspaceView;
 const bounds = { width: 800, height: 600 };
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.resetModules();
   native.invoke
     .mockReset()
     .mockImplementation(async (command) =>
       command === "browser_webview_preview_document" ? image : true,
     );
+});
+afterEach(async () => {
+  // Suspension resumes over two animation frames. Settle it before another
+  // module instance or test reuses the native command mock.
+  await vi.runAllTimersAsync();
+  vi.useRealTimers();
 });
 async function setup(candidate = tab) {
   const runtime = await import("./browserRuntime");

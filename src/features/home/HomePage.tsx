@@ -16,7 +16,7 @@ import { useHomeAgenda } from "./useHomeAgenda";
 
 import { useHomePreviewItems } from "./useHomePreviewItems";
 import { usePrepareHomePreviews } from "./usePrepareHomePreviews";
-import { useWorkspaceTabFocused } from "@/features/workspace/WorkspaceTabRouteScope";
+import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 
 const heroCount = 4;
 
@@ -30,7 +30,7 @@ export function HomePage() {
   const spacesLoading = useSpacesStore((state) => state.loading);
   const [now] = useState(() => new Date());
   const recent = useContinueItems();
-  const active = useWorkspaceTabFocused();
+  const active = useWorkspaceViewFocused();
   const preparingPreviews = usePrepareHomePreviews(recent, active, heroCount);
   const previews = useHomePreviewItems(recent, heroCount);
   const previewIds = new Set(previews.map((item) => item.tab.id));

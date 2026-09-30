@@ -117,17 +117,6 @@ export function AppearanceSection(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Auto-hide navigation"
-          description="Reveal the icon rail when you move to the window edge."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "navigator_auto_hide", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "navigator_auto_hide", value)}
-          />
-        </SettingsRow>
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Pane focus">

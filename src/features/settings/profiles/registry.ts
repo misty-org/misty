@@ -1,5 +1,5 @@
 import definitions from "./definitions.json";
-export type SettingOwnership = "profile" | "device" | "account" | "resource";
+export type SettingOwnership = "account" | "resource";
 export type SettingsPlatform = "desktop" | "web";
 export type PreferenceValue = string | number | boolean;
 export type PreferenceValues = Record<string, PreferenceValue>;
@@ -18,16 +18,19 @@ export interface SettingDefinition {
   legacyValues?: string[];
   min?: number;
   max?: number;
+  maxLength?: number;
+  format?: "json";
 }
 export const settingDefinitions = definitions as SettingDefinition[];
 export type SettingSearchEntry = Pick<
   SettingDefinition,
   "id" | "label" | "page" | "owner" | "platforms" | "keywords"
 >;
-// Account and resource controls are discoverable without becoming portable
-// values. Profile serialization and updates use settingDefinitions exclusively.
+// Controls with their own server APIs are searchable alongside preferences.
+// Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  ...settingDefinitions,
+  // Retain stored preset data for compatibility, but no longer offer that control.
+  ...settingDefinitions.filter((definition) => definition.id !== "app.layout.presets"),
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -61,52 +64,12 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     keywords: ["available", "capabilities", "provider"],
   },
   {
-    id: "agents.companion.visible",
-    label: "Show cursor companion",
-    page: "agents-companion",
-    owner: "device",
-    platforms: ["desktop"],
-    keywords: ["Misty", "cursor", "visibility"],
-  },
-  {
-    id: "agents.companion.size",
-    label: "Companion size",
-    page: "agents-companion",
-    owner: "device",
-    platforms: ["desktop"],
-    keywords: ["Misty", "cursor", "scale"],
-  },
-  {
-    id: "app.profiles.selection",
-    label: "Settings profile",
-    page: "profiles",
-    owner: "device",
-    platforms: ["desktop", "web"],
-    keywords: ["select", "switch", "local only"],
-  },
-  {
-    id: "app.profiles.create",
-    label: "Profile name",
-    page: "profiles",
-    owner: "account",
-    platforms: ["desktop", "web"],
-    keywords: ["create", "duplicate", "copy", "defaults"],
-  },
-  {
     id: "app.server.endpoint",
     label: "Connect another server",
     page: "server",
-    owner: "device",
+    owner: "account",
     platforms: ["desktop"],
     keywords: ["deployment", "self-hosted", "URL", "hosted"],
-  },
-  {
-    id: "app.shortcuts.bindings",
-    label: "Search shortcuts",
-    page: "shortcuts",
-    owner: "device",
-    platforms: ["desktop"],
-    keywords: ["keyboard", "bindings", "hotkeys", "reassign"],
   },
 ];
 export const definitionById = new Map(settingDefinitions.map((d) => [d.id, d]));
@@ -122,8 +85,45 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
       (d.max !== undefined && value > d.max))
   )
     return false;
-  if (typeof value === "string" && (value.length > 4096 || (d.enum && !d.enum.includes(value))))
+  if (
+    typeof value === "string" &&
+    (value.length > (d.maxLength ?? 4096) || (d.enum && !d.enum.includes(value)))
+  )
     return false;
+  if (d.format === "json") {
+    try {
+      const parsed: unknown = JSON.parse(String(value));
+      if (d.id === "files.openWith")
+        return Boolean(
+          parsed &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed) &&
+          Object.values(parsed).every((path) => typeof path === "string" && path.length <= 4096),
+        );
+      if (!Array.isArray(parsed)) return false;
+      if (d.id === "app.shortcuts.bindings")
+        return parsed.every(
+          (entry) =>
+            entry &&
+            typeof entry.commandId === "string" &&
+            [entry.primary, entry.alternate].every(
+              (slot) => slot === undefined || slot === null || typeof slot === "string",
+            ),
+        );
+      if (d.id === "app.layout.presets")
+        return parsed.every(
+          (entry) =>
+            entry &&
+            typeof entry.id === "string" &&
+            typeof entry.name === "string" &&
+            ["left", "right", "top", "bottom"].includes(entry.navigation) &&
+            ["left", "right", "top", "bottom"].includes(entry.tabs) &&
+            entry.navigation !== entry.tabs,
+        );
+    } catch {
+      return false;
+    }
+  }
   return true;
 }
 export function fromLegacy(d: SettingDefinition, value: unknown): PreferenceValue {
@@ -133,9 +133,13 @@ export function fromLegacy(d: SettingDefinition, value: unknown): PreferenceValu
 export function portableValues(document: Record<string, unknown>): PreferenceValues {
   const values: PreferenceValues = {};
   for (const d of settingDefinitions) {
-    if (d.owner !== "profile") continue;
     const section = document[d.section] as Record<string, unknown> | undefined;
     if (section?.[d.key] !== undefined) values[d.id] = fromLegacy(d, section[d.key]);
+  }
+  if (document.open_with && typeof document.open_with === "object") {
+    const associations = JSON.stringify(document.open_with);
+    if (validPreference(definitionById.get("files.openWith")!, associations))
+      values["files.openWith"] = associations;
   }
   return values;
 }
@@ -165,10 +169,13 @@ export const runtimeAdapters = new Map<string, SettingRuntimeAdapter>(
 export function projectPreferences(document: Record<string, unknown>, values: PreferenceValues) {
   const result = structuredClone(document);
   for (const d of settingDefinitions) {
-    if (d.owner !== "profile") continue;
     runtimeAdapters
       .get(d.id)!
       .write(result, validPreference(d, values[d.id]) ? values[d.id] : d.default);
   }
+  const associations = values["files.openWith"];
+  result.open_with = validPreference(definitionById.get("files.openWith")!, associations)
+    ? JSON.parse(String(associations))
+    : {};
   return result;
 }

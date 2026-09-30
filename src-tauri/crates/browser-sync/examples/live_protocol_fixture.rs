@@ -5,7 +5,7 @@ use std::{path::Path, time::Duration};
 use misty_browser_sync::{
     crypto::{generate_sync_secret, DeviceKey, VaultRoot, VaultScope},
     document::{self, entities::Kind, Document},
-    protocol::Workspace,
+    protocol::Vault,
     store::{CachedVault, Store},
     transport::{SyncApi, SyncSocket},
     worker::{Phase, Worker, WorkerHandle},
@@ -96,7 +96,7 @@ async fn main() {
     let scope = VaultScope {
         deployment: api.deployment(),
         account_id: "owner".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     };
     let root = VaultRoot::generate();
     let secret = generate_sync_secret();
@@ -111,14 +111,14 @@ async fn main() {
     let gb = root
         .grant(&scope, &Uuid::new_v4().to_string(), 1, &b)
         .unwrap();
-    assert!(api.workspace().await.unwrap().is_none());
+    assert!(api.vault().await.unwrap().is_none());
     let directory = tempfile::tempdir().unwrap();
     let path_a = directory.path().join("a.sqlite");
     let path_b = directory.path().join("b.sqlite");
     let initial = Document::default().encode().unwrap();
     let cached_a = CachedVault {
-        workspace: Workspace {
-            workspace_id: scope.workspace_id.clone(),
+        vault: Vault {
+            vault_id: scope.vault_id.clone(),
             key_epoch: 1,
             head_sequence: 0,
             root_public_key: public.clone(),
@@ -150,7 +150,7 @@ async fn main() {
     )
     .unwrap();
     assert!(matches!(
-        anonymous.workspace().await,
+        anonymous.vault().await,
         Err(Error::Authentication)
     ));
     drop(root);
@@ -159,10 +159,10 @@ async fn main() {
         .unwrap();
     let root = VaultRoot::unlock(
         &scope,
-        &cached.workspace.key_envelope,
+        &cached.vault.key_envelope,
         password,
         &secret,
-        &cached.workspace.root_public_key,
+        &cached.vault.root_public_key,
     )
     .unwrap();
     let root_b = VaultRoot::unlock(&scope, &wrapper, password, &secret, &public).unwrap();
@@ -187,11 +187,11 @@ async fn main() {
         Err(Error::Identity)
     ));
     assert_eq!(
-        api.workspace().await.unwrap().unwrap().root_public_key,
+        api.vault().await.unwrap().unwrap().root_public_key,
         public
     );
     let cached_b = CachedVault {
-        workspace: api.workspace().await.unwrap().unwrap(),
+        vault: api.vault().await.unwrap().unwrap(),
         bootstrap_pending: false,
         enrollment_pending: true,
     };
@@ -334,7 +334,7 @@ async fn main() {
     let state_b = hb.snapshot().await.unwrap();
     assert_eq!(*state_a, *state_b);
     let document: Document = serde_json::from_slice(&state_a).unwrap();
-    let group = document.live(Kind::Group, "social").unwrap().values();
+    let group = document.live(Kind::Folder, "social").unwrap().values();
     assert_eq!(group["label"], "Offline rename");
     assert_eq!(group["hidden"], true);
     assert!(document

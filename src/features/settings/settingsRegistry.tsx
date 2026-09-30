@@ -17,7 +17,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { SyncSection } from "./profiles/ProfileControls";
 import type { SettingOwnership } from "./profiles/registry";
 import { AdvancedSection } from "./sections/AdvancedSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
@@ -48,9 +47,8 @@ import { UpdatesSection } from "./sections/UpdatesSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
 /**
- * Top-level sidebar entries. An area with one page is a plain row; an area with several
- * pages is a disclosure whose children are those pages. `breakBefore` draws an
- * unlabeled hairline above the area.
+ * Flat sidebar areas. Registry entries within an area render together on one page.
+ * `breakBefore` preserves the incumbent group dividers; chevrons never expand lists.
  */
 export type SettingsArea =
   | "general"
@@ -81,7 +79,7 @@ export const settingsAreas: Record<
   spaces: { label: "Spaces", icon: Layers },
   agents: { label: "Agents", icon: Sparkles },
   sync: { label: "Sync", icon: RefreshCw, breakBefore: true },
-  devices: { label: "Devices", icon: MonitorSmartphone },
+  devices: { label: "File sharing", icon: MonitorSmartphone },
   server: { label: "Server", icon: Server },
   privacy: { label: "Privacy", icon: Shield },
   about: { label: "About", icon: Info },
@@ -99,7 +97,7 @@ const page = (
   id: SettingsSection,
   label: string,
   Component: ComponentType<SettingsContentProps>,
-  owner: SettingOwnership = "profile",
+  owner: SettingOwnership = "account",
   native = false,
 ): SettingsRegistryEntry => ({ area, id, label, Component, owner, native });
 /** Order here is sidebar order; pages of one area must be adjacent. */
@@ -108,7 +106,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("appearance", "appearance", "Appearance", AppearanceSection),
   page("layout", "layout", "Layout", LayoutSection, "resource", true),
   page("notifications", "notifications", "Notifications", NotificationsSection),
-  page("shortcuts", "shortcuts", "Shortcuts", ShortcutsSection, "device", true),
+  page("shortcuts", "shortcuts", "Shortcuts", ShortcutsSection, "account", true),
   page("browser", "browser", "Browsing", BrowserSection),
   page("browser", "browser-downloads", "Downloads", (p) => (
     <BrowserSection {...p} page="downloads" />
@@ -126,25 +124,24 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "browser-privacy",
     "Privacy",
     (p) => <PrivacySection {...p} page="browser" />,
-    "device",
+    "account",
   ),
-  page("browser", "browser-handoff", "Sync", BrowserSyncSettings, "resource"),
   page("files", "files", "Browsing", FilesSection),
   page(
     "files",
     "files-locations",
     "Locations",
     (p) => <FilesSection {...p} page="locations" />,
-    "device",
+    "account",
     true,
   ),
-  page("files", "search", "Search", (p) => <SearchSection {...p} page="search" />, "device", true),
+  page("files", "search", "Search", (p) => <SearchSection {...p} page="search" />, "account", true),
   page(
     "files",
     "files-indexing",
     "Indexing",
     (p) => <SearchSection {...p} page="indexing" />,
-    "device",
+    "account",
     true,
   ),
   page("spaces", "spaces-defaults", "Defaults", SpaceDefaultsSection),
@@ -162,14 +159,14 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   ),
   page("agents", "agents-connections", "Connections", AgentConnectionsSection, "resource"),
   page("agents", "agents-permissions", "Permissions", AgentPermissionsSection, "resource"),
-  page("agents", "agents-companion", "Companion", CompanionSection, "device"),
-  page("sync", "sync", "Sync", SyncSection),
-  page("devices", "devices", "Devices", DevicesSection, "device"),
-  page("server", "server", "Server", ServerSection, "device", true),
-  page("privacy", "privacy", "Privacy", PrivacySection, "device"),
-  page("about", "about", "Version", AboutSection, "device"),
-  page("about", "updates", "Updates", UpdatesSection, "device", true),
-  page("about", "diagnostics", "Diagnostics", AdvancedSection, "device", true),
+  page("agents", "agents-companion", "Companion", CompanionSection, "account"),
+  page("sync", "sync", "Sync", BrowserSyncSettings),
+  page("devices", "devices", "File sharing", DevicesSection, "account"),
+  page("server", "server", "Server", ServerSection, "account", true),
+  page("privacy", "privacy", "Privacy", PrivacySection, "account"),
+  page("about", "about", "Version", AboutSection, "account"),
+  page("about", "updates", "Updates", UpdatesSection, "account", true),
+  page("about", "diagnostics", "Diagnostics", AdvancedSection, "account", true),
 ];
 /** Pages that no longer exist on their own resolve to where their settings now live. */
 export function canonicalSettingsSection(section: SettingsSection): SettingsSection {
@@ -181,6 +178,7 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
         support: "about",
         account: "general",
         profiles: "sync",
+        "browser-handoff": "sync",
         inbox: "notifications",
         social: "spaces-defaults",
         journal: "spaces-defaults",

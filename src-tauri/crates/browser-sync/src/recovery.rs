@@ -69,7 +69,7 @@ impl RecoveryStore {
         if let Some(proof) = proof {
             let bytes = root.open_local(
                 &scope,
-                &scope.workspace_id,
+                &scope.vault_id,
                 "workspace-recovery:identity:v1",
                 &serde_json::from_str(&proof)?,
             )?;
@@ -79,7 +79,7 @@ impl RecoveryStore {
         } else {
             let proof = root.seal_local(
                 &scope,
-                &scope.workspace_id,
+                &scope.vault_id,
                 "workspace-recovery:identity:v1",
                 b"misty-workspace-recovery-v1",
             )?;
@@ -114,7 +114,7 @@ impl RecoveryStore {
         }
         let raw = self.root.open_local(
             &self.scope,
-            &self.scope.workspace_id,
+            &self.scope.vault_id,
             &aad(key, revision),
             &serde_json::from_str(&envelope)?,
         )?;
@@ -146,7 +146,7 @@ impl RecoveryStore {
         let raw = Zeroizing::new(value.as_bytes().to_vec());
         let encrypted = serde_json::to_string(&self.root.seal_local(
             &self.scope,
-            &self.scope.workspace_id,
+            &self.scope.vault_id,
             &aad(key, revision),
             &raw,
         )?)?;

@@ -1,7 +1,7 @@
 import { cn, IconButton } from "@/shared/ui";
 import { X } from "lucide-react";
 import { createContext, type ReactNode } from "react";
-import { SettingActionsMenu, SettingScopeBadge } from "../profiles/SettingScope";
+import { SettingActionsMenu } from "../profiles/SettingScope";
 import { type DesktopSettingsNavEntry, SettingsNavigation } from "./SettingsNavigation";
 export type { DesktopSettingsNavEntry } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
@@ -37,7 +37,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       <div aria-hidden="true" className="bg-charcoal-border" />
 
       <main className="flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
-        <header className="shrink-0 border-b border-charcoal-border/60">
+        <header className="shrink-0 border-b border-charcoal-border">
           <div className="flex min-h-12 min-w-0 items-center gap-3 px-5 py-2 max-[720px]:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-cream">
@@ -72,9 +72,10 @@ export function DesktopSettingsSection(props: {
   title: string;
   description?: string;
   children: ReactNode;
+  surface?: "card" | "plain";
 }) {
   return (
-    <section className="mb-6 min-w-0 last:mb-0">
+    <section aria-label={props.title} className="@container/settings mb-6 min-w-0 last:mb-0">
       <div className="mb-2.5 min-w-0">
         <h2 className="text-[13px] font-medium leading-5 text-cream-muted">{props.title}</h2>
         {props.description ? (
@@ -83,7 +84,12 @@ export function DesktopSettingsSection(props: {
           </p>
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-lg border border-charcoal-border/80 bg-charcoal-card">
+      <div
+        className={cn(
+          "overflow-hidden",
+          props.surface !== "plain" && "rounded-lg border border-charcoal-border bg-charcoal-card",
+        )}
+      >
         {props.children}
       </div>
     </section>
@@ -106,9 +112,9 @@ export function DesktopSettingsRow(props: {
       aria-disabled={props.muted || undefined}
       className={cn(
         "group/setting-row grid min-h-14 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5",
-        "border-b border-charcoal-border/70 px-5 py-3 last:border-b-0 outline-none",
+        "border-b border-charcoal-border px-5 py-3 last:border-b-0 outline-none",
         "transition-colors duration-700 data-[setting-flash=true]:bg-charcoal-hover data-[setting-flash=true]:duration-0",
-        "max-[760px]:grid-cols-1 max-[760px]:items-start max-[760px]:gap-3",
+        "@max-[560px]/settings:grid-cols-1 @max-[560px]/settings:items-start @max-[560px]/settings:gap-3",
         props.indent && "pl-10",
         props.last && "border-b-0",
       )}
@@ -117,13 +123,12 @@ export function DesktopSettingsRow(props: {
         <span className="flex min-w-0 items-center gap-2">
           <strong
             className={cn(
-              "truncate text-sm font-medium leading-5",
+              "text-sm font-medium leading-5",
               props.muted ? "text-cream-muted" : "text-cream",
             )}
           >
             {props.label}
           </strong>
-          <SettingScopeBadge label={props.label} />
         </span>
         {props.description ? (
           <span className="text-[13px] leading-[18px] text-cream-muted">{props.description}</span>
@@ -132,7 +137,7 @@ export function DesktopSettingsRow(props: {
       <SettingsControlLabelContext.Provider value={props.label}>
         <div
           data-setting-control
-          className="flex min-w-0 items-center justify-end gap-2 max-[760px]:w-full max-[760px]:justify-start"
+          className="flex min-w-0 items-center justify-end gap-2 @max-[560px]/settings:w-full @max-[560px]/settings:justify-start"
         >
           <SettingActionsMenu label={props.label} />
           {props.children}

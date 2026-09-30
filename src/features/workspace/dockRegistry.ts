@@ -1,9 +1,9 @@
 import type { DockWidgetDescriptor, WorkspaceSurfaceId } from "./model";
 import {
-  createBrowserTabState,
-  createCodeTabState,
-  parseBrowserTabState,
-  parseCodeTabState,
+  createBrowserViewState,
+  createCodeViewState,
+  parseBrowserViewState,
+  parseCodeViewState,
 } from "./model";
 
 const identityState = {
@@ -18,16 +18,16 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   space: descriptor("space", "per-space", "suspend", 360, 240),
   browser: {
     ...descriptor("browser", "multiple", "keep-alive", 360, 240),
-    create: createBrowserTabState,
-    serialize: parseBrowserTabState,
-    restore: parseBrowserTabState,
+    create: createBrowserViewState,
+    serialize: parseBrowserViewState,
+    restore: parseBrowserViewState,
   },
   terminal: descriptor("terminal", "multiple", "keep-alive", 320, 180),
   code: {
     ...descriptor("code", "multiple", "keep-alive", 480, 280),
-    create: createCodeTabState,
-    serialize: parseCodeTabState,
-    restore: parseCodeTabState,
+    create: createCodeViewState,
+    serialize: parseCodeViewState,
+    restore: parseCodeViewState,
   },
   files: descriptor("files", "multiple", "suspend", 360, 240),
   scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),

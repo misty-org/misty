@@ -2,7 +2,7 @@ import { useState } from "react";
 import { clearNavigationRestoreHistory } from "@/features/navigation-names/clearHistory";
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { useNavigationNames, windowNameKey } from "@/features/navigation-names/store";
-import type { WorkspaceVirtualWindow } from "@/features/workspace";
+import type { WorkspaceWindow } from "@/features/workspace";
 import {
   cn,
   DropdownMenu,
@@ -16,10 +16,10 @@ import {
 import { AppWindow, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export function WorkspaceWindowMenu(props: {
-  windows: WorkspaceVirtualWindow[];
+  windows: WorkspaceWindow[];
   activeWindowId: string;
   canReopen: boolean;
-  canCloseWindow?: (workspaceWindow: WorkspaceVirtualWindow) => boolean;
+  canCloseWindow?: (workspaceWindow: WorkspaceWindow) => boolean;
   onSelect: (windowId: string) => void;
   onCreate: () => void;
   onClose: (windowId: string) => void;
@@ -27,7 +27,7 @@ export function WorkspaceWindowMenu(props: {
 }) {
   const [error, setError] = useState("");
   const names = useNavigationNames((state) => state.names);
-  const canClose = (workspaceWindow: WorkspaceVirtualWindow) =>
+  const canClose = (workspaceWindow: WorkspaceWindow) =>
     props.windows.length > 1 && (!props.canCloseWindow || props.canCloseWindow(workspaceWindow));
   const activeWindow = props.windows.find(
     (workspaceWindow) => workspaceWindow.id === props.activeWindowId,

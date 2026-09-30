@@ -27,7 +27,7 @@ fn account(scope: &VaultScope) -> Result<String> {
     let digest = Sha256::digest(serde_json::to_vec(&(
         &scope.deployment,
         &scope.account_id,
-        &scope.workspace_id,
+        &scope.vault_id,
     ))?);
     Ok(digest.iter().map(|b| format!("{b:02x}")).collect())
 }
@@ -283,7 +283,7 @@ mod tests {
         let mut scope = VaultScope {
             deployment: "https://sync.example.test".into(),
             account_id: "user@example.test".into(),
-            workspace_id: "01951d32-40ac-7000-8000-000000000001".into(),
+            vault_id: "01951d32-40ac-7000-8000-000000000001".into(),
         };
         let original = account(&scope).unwrap();
         assert_eq!(original.len(), 64);
@@ -302,7 +302,7 @@ mod tests {
         let scope = VaultScope {
             deployment: "https://credential-store-fixture.invalid".into(),
             account_id: "public-disposable-test".into(),
-            workspace_id: uuid::Uuid::new_v4().to_string(),
+            vault_id: uuid::Uuid::new_v4().to_string(),
         };
         struct Cleanup(VaultScope);
         impl Drop for Cleanup {

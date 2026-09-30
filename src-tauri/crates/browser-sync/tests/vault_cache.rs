@@ -1,7 +1,7 @@
 use misty_browser_sync::{
     crypto::{generate_sync_secret, DeviceKey, VaultRoot, VaultScope},
     document::Document,
-    protocol::Workspace,
+    protocol::Vault,
     store::{CachedVault, Store},
 };
 use uuid::Uuid;
@@ -16,13 +16,13 @@ fn fixture() -> (
     let scope = VaultScope {
         deployment: "https://sync.example.test/v1".into(),
         account_id: "fixture".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     };
     let root = VaultRoot::generate();
     let device = DeviceKey::generate();
     let secret = generate_sync_secret();
-    let workspace = Workspace {
-        workspace_id: scope.workspace_id.clone(),
+    let vault = Vault {
+        vault_id: scope.vault_id.clone(),
         key_epoch: 1,
         head_sequence: 0,
         root_public_key: root.public_key().unwrap(),
@@ -35,7 +35,7 @@ fn fixture() -> (
         root,
         device,
         CachedVault {
-            workspace,
+            vault,
             bootstrap_pending: true,
             enrollment_pending: true,
         },
@@ -79,21 +79,21 @@ fn interrupted_setup_recovers_same_root_device_and_outbox_without_network() {
     assert!(saved.bootstrap_pending && saved.enrollment_pending);
     let root = VaultRoot::unlock(
         &scope,
-        &saved.workspace.key_envelope,
+        &saved.vault.key_envelope,
         "public fixture password",
         &secret,
-        &saved.workspace.root_public_key,
+        &saved.vault.root_public_key,
     )
     .unwrap();
     let (mut store, device) = Store::unlock(&path, scope, &root).unwrap();
     assert_eq!(store.grant().device_id, device_id);
     assert_eq!(device.public_key(), public);
     assert!(store.pending(false, 1).unwrap()[0] == operation);
-    let mut wrong = saved.workspace.clone();
+    let mut wrong = saved.vault.clone();
     wrong.root_public_key = VaultRoot::generate().public_key().unwrap();
     assert!(store.confirm_enrollment(&wrong).is_err());
     assert!(store.cached_vault().unwrap().unwrap().bootstrap_pending);
-    let mut confirmed = saved.workspace;
+    let mut confirmed = saved.vault;
     confirmed.head_sequence = 2;
     store.confirm_enrollment(&confirmed).unwrap();
     let settled = store.cached_vault().unwrap().unwrap();
@@ -126,7 +126,7 @@ fn metadata_and_device_creation_roll_back_together() {
         .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)
         .unwrap();
     let connection = rusqlite::Connection::open(&path).unwrap();
-    connection.execute_batch("CREATE TABLE sync_vault(singleton INTEGER PRIMARY KEY,workspace TEXT NOT NULL,bootstrap_pending INTEGER NOT NULL,enrollment_pending INTEGER NOT NULL);
+    connection.execute_batch("CREATE TABLE sync_vault(singleton INTEGER PRIMARY KEY,vault TEXT NOT NULL,bootstrap_pending INTEGER NOT NULL,enrollment_pending INTEGER NOT NULL);
         CREATE TRIGGER fail_metadata BEFORE INSERT ON sync_vault BEGIN SELECT RAISE(ABORT,'fixture disk failure'); END;").unwrap();
     assert!(Store::initialize_vault(
         &path,

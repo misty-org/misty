@@ -187,7 +187,7 @@ mod probe {
         let scope = VaultScope {
             deployment: base.clone(),
             account_id: "synthetic-probe".into(),
-            workspace_id: uuid::Uuid::new_v4().to_string(),
+            vault_id: uuid::Uuid::new_v4().to_string(),
         };
         let root = VaultRoot::generate();
         let device = DeviceKey::generate();

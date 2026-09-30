@@ -1,17 +1,19 @@
-import { createHomeWorkspaceTab } from "./workspaceDefaultTab";
+import { createHomeWorkspaceView } from "./workspaceDefaultView";
 import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createDockLeaf, dockLeaves, dockTabs, insertDockSplit } from "./dockTree";
-import { activeLayoutView, allLayoutViews, layoutTabs, layoutTabLabel } from "./layoutTabs";
+import { createDockLeaf, dockLeaves, dockTreeViews, insertDockSplit } from "./dockTree";
+import { activeLayoutView, allLayoutViews, layoutTabs, tabLabel } from "./layoutTabs";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
-import { normalizeWorkspaceLayout } from "./virtualWindows";
-import type { WorkspaceTab } from "./model";
+import { normalizeWorkspaceLayout } from "./windows";
+import type { WorkspaceView } from "./model";
 
 const state = () => useWorkspaceStore.getState();
-const browser = (url: string) => state().openBrowserTab({ url });
+const browser = (url: string) => state().openBrowserView({ url });
 const owner = (viewId: string) =>
-  layoutTabs(state().layout).find((tab) => dockTabs(tab.root).some((view) => view.id === viewId))!;
+  layoutTabs(state().layout).find((tab) =>
+    dockTreeViews(tab.root).some((view) => view.id === viewId),
+  )!;
 
 beforeEach(() => {
   state().reset();
@@ -25,7 +27,7 @@ describe("window → tabs → panes", () => {
     expect(activeLayoutView(state().layout)?.id).toBe(second.id);
     expect(
       layoutTabs(state().layout).every((tab) =>
-        dockLeaves(tab.root).every((pane) => pane.tabs.length === 1),
+        dockLeaves(tab.root).every((pane) => pane.views.length === 1),
       ),
     ).toBe(true);
   });
@@ -34,14 +36,14 @@ describe("window → tabs → panes", () => {
     const first = browser("https://one.example");
     const firstTab = owner(first.id).id;
     const pane = state().splitPane(state().layout.focusedPaneId, "right")!;
-    const beside = state().openBrowserTab({ url: "https://beside.example", paneId: pane });
+    const beside = state().openBrowserView({ url: "https://beside.example", paneId: pane });
     const root = state().layout.root;
     if (root.type !== "split") throw new Error("Expected split");
     state().updateSplitRatio(root.id, 0.63);
     const second = browser("https://two.example");
     expect(dockLeaves(state().layout.root)).toHaveLength(1);
-    state().updateBrowserTab(beside.id, { title: "Background title" });
-    state().selectLayoutTab(firstTab);
+    state().updateBrowserView(beside.id, { title: "Background title" });
+    state().selectTab(firstTab);
     expect(dockLeaves(state().layout.root)).toHaveLength(2);
     expect(state().layout.root).toMatchObject({ id: root.id, ratio: 0.63 });
     expect(state().layout.focusedPaneId).toBe(pane);
@@ -56,71 +58,80 @@ describe("window → tabs → panes", () => {
       secondTab = owner(second.id).id;
     state().splitPane(state().layout.focusedPaneId, "down");
     const ids = layoutTabs(state().layout).map((tab) => tab.id);
-    state().reorderLayoutTabs([
+    state().reorderTabs([
       secondTab,
       firstTab,
       ...ids.filter((id) => id !== firstTab && id !== secondTab),
     ]);
-    expect(state().selectTab(0)?.id).toBe(activeLayoutView(owner(second.id))?.id);
-    expect(state().cycleTab(1)?.id).toBe(first.id);
-    expect(state().layout.activeLayoutTabId).toBe(firstTab);
+    expect(state().selectView(0)?.id).toBe(activeLayoutView(owner(second.id))?.id);
+    expect(state().cycleView(1)?.id).toBe(first.id);
+    expect(state().layout.activeTabId).toBe(firstTab);
   });
 
   it("closes and reopens a complete tab with all panes and its custom name", () => {
     const first = browser("https://one.example"),
       id = owner(first.id).id;
     const pane = state().splitPane(state().layout.focusedPaneId, "down")!;
-    const second = state().openBrowserTab({ url: "https://two.example", paneId: pane });
-    state().renameLayoutTab(id, "Research");
+    const second = state().openBrowserView({ url: "https://two.example", paneId: pane });
+    state().renameTab(id, "Research");
     const saved = owner(first.id);
-    expect(state().closeLayoutTab(id)).toBe(true);
+    expect(state().closeTab(id)).toBe(true);
     expect(
       allLayoutViews(state().layout).some((view) => view.id === first.id || view.id === second.id),
     ).toBe(false);
-    state().reopenClosedTab();
+    state().reopenClosedView();
     expect(owner(first.id)).toMatchObject(saved);
-    expect(state().layout.activeLayoutTabId).toBe(id);
+    expect(state().layout.activeTabId).toBe(id);
   });
 
   it("closes a pane without hiding its contents in another pane and can reopen it", () => {
     const first = browser("https://one.example");
     const pane = state().splitPane(state().layout.focusedPaneId, "right")!;
-    const second = state().openBrowserTab({ url: "https://two.example", paneId: pane });
+    const second = state().openBrowserView({ url: "https://two.example", paneId: pane });
     state().closePane(pane);
-    expect(dockTabs(state().layout.root).map((view) => view.id)).toEqual([first.id]);
-    state().reopenClosedTab();
+    expect(dockTreeViews(state().layout.root).map((view) => view.id)).toEqual([first.id]);
+    state().reopenClosedView();
     expect(dockLeaves(state().layout.root)).toHaveLength(2);
-    expect(dockTabs(state().layout.root).map((view) => view.id)).toEqual([first.id, second.id]);
+    expect(dockTreeViews(state().layout.root).map((view) => view.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
   });
 
   it("moves a view from another tab into a split and removes its empty source tab", () => {
     const first = browser("https://one.example"),
       second = browser("https://two.example");
     const sourceId = owner(second.id).id;
-    state().focusTab(first.id);
-    expect(state().dockTab(second.id, state().layout.focusedPaneId, "right")).toBe(true);
-    expect(dockTabs(state().layout.root).map((view) => view.id)).toEqual([first.id, second.id]);
+    state().focusView(first.id);
+    expect(state().dockView(second.id, state().layout.focusedPaneId, "right")).toBe(true);
+    expect(dockTreeViews(state().layout.root).map((view) => view.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
     expect(layoutTabs(state().layout).some((tab) => tab.id === sourceId)).toBe(false);
   });
 
   it("exchanges views on a center drop rather than creating nested tabs", () => {
     const first = browser("https://one.example");
     const pane = state().splitPane(state().layout.focusedPaneId, "right")!;
-    const second = state().openBrowserTab({ url: "https://two.example", paneId: pane });
-    expect(state().dockTab(first.id, pane, "center")).toBe(true);
-    expect(dockTabs(state().layout.root).map((view) => view.id)).toEqual([second.id, first.id]);
-    expect(dockLeaves(state().layout.root).every((pane) => pane.tabs.length === 1)).toBe(true);
+    const second = state().openBrowserView({ url: "https://two.example", paneId: pane });
+    expect(state().dockView(first.id, pane, "center")).toBe(true);
+    expect(dockTreeViews(state().layout.root).map((view) => view.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    expect(dockLeaves(state().layout.root).every((pane) => pane.views.length === 1)).toBe(true);
   });
 
   it("keeps tab collections and background metadata independent between windows", () => {
-    const firstWindow = state().activeVirtualWindowId;
+    const firstWindow = state().activeWindowId;
     const first = browser("https://one.example");
     const second = browser("https://two.example");
-    state().createVirtualWindow("Other work");
-    state().updateBrowserTab(first.id, { title: "Updated while hidden" });
+    state().createWindow("Other work");
+    state().updateBrowserView(first.id, { title: "Updated while hidden" });
     expect(allLayoutViews(state().layout).some((view) => view.id === second.id)).toBe(false);
-    state().focusTab(first.id);
-    expect(state().activeVirtualWindowId).toBe(firstWindow);
+    state().focusView(first.id);
+    expect(state().activeWindowId).toBe(firstWindow);
     expect(activeLayoutView(state().layout)?.title).toBe("Updated while hidden");
     expect(allLayoutViews(state().layout).some((view) => view.id === second.id)).toBe(true);
   });
@@ -129,7 +140,7 @@ describe("window → tabs → panes", () => {
     const first = browser("https://one.example"),
       id = owner(first.id).id;
     state().splitPane(state().layout.focusedPaneId, "right");
-    state().renameLayoutTab(id, "Research");
+    state().renameTab(id, "Research");
     browser("https://two.example");
     const persisted = JSON.parse(JSON.stringify(partialWorkspaceStore(state())));
     const saved = JSON.parse(JSON.stringify(state().createSnapshot("account", "device")));
@@ -140,13 +151,13 @@ describe("window → tabs → panes", () => {
     state().reset();
     state().replaceSnapshot(saved);
     expect(allLayoutViews(state().layout).map((view) => view.id)).toEqual(expectedIds);
-    state().selectLayoutTab(id);
+    state().selectTab(id);
     expect(dockLeaves(state().layout.root)).toHaveLength(2);
     expect(owner(first.id).title).toBe("Research");
   });
 
   it("migrates old splits without losing hidden tabs, view identities, state, or proportions", () => {
-    const view = (id: string): WorkspaceTab => ({
+    const view = (id: string): WorkspaceView => ({
       id,
       surfaceId: "official-app",
       groupKey: "app:browser",
@@ -160,12 +171,12 @@ describe("window → tabs → panes", () => {
     });
     const left = createDockLeaf([view("a"), view("b")]);
     const right = createDockLeaf([view("c"), view("d")]);
-    left.activeTabId = "b";
-    right.activeTabId = "c";
+    left.activeViewId = "b";
+    right.activeViewId = "c";
     const root = insertDockSplit(left, left.id, right, "right");
     if (root.type === "split") root.ratio = 0.7;
     const migrated = normalizeWorkspaceLayout({ root, focusedPaneId: right.id });
-    expect(dockTabs(migrated.root).map((view) => view.id)).toEqual(["b", "c"]);
+    expect(dockTreeViews(migrated.root).map((view) => view.id)).toEqual(["b", "c"]);
     expect(migrated.root).toMatchObject({ ratio: 0.7 });
     expect(
       allLayoutViews(migrated)
@@ -178,8 +189,8 @@ describe("window → tabs → panes", () => {
 });
 
 it("keeps destination histories separate while preserving route state", () => {
-  state().newLayoutTab();
-  const initial = state().openSurface(createHomeWorkspaceTab("global"));
+  state().newTab();
+  const initial = state().openSurface(createHomeWorkspaceView("global"));
   const paneId = state().layout.focusedPaneId;
   const first = state().openSurface({
     surfaceId: "official-app",
@@ -188,8 +199,8 @@ it("keeps destination histories separate while preserving route state", () => {
     route: "/apps/planner",
     state: { viewport: 3 },
   });
-  state().updateTabRoute(first.id, "/apps/planner?view=agenda");
-  state().updateTabState(first.id, { viewport: 9 });
+  state().updateViewRoute(first.id, "/apps/planner?view=agenda");
+  state().updateViewState(first.id, { viewport: 9 });
   const second = state().openSurface({
     surfaceId: "marketplace",
     groupKey: "tool:marketplace",
@@ -199,7 +210,7 @@ it("keeps destination histories separate while preserving route state", () => {
   expect(state().layout.focusedPaneId).not.toBe(paneId);
   expect(allLayoutViews(state().layout).some((view) => view.id === first.id)).toBe(true);
   expect(state().navigatePane(-1)).toBeNull();
-  state().focusTab(first.id);
+  state().focusView(first.id);
   expect(activeLayoutView(state().layout)).toMatchObject({
     id: first.id,
     route: "/apps/planner?view=agenda",
@@ -213,43 +224,41 @@ it("keeps destination histories separate while preserving route state", () => {
 });
 
 it("opens replaceable Home in new tabs and splits and navigates inside the selected split", () => {
-  expect(state().newLayoutTab()).toMatchObject({
+  expect(state().newTab()).toMatchObject({
     title: "Home",
     surfaceId: "home",
     placeholder: true,
   });
-  const tabId = state().layout.activeLayoutTabId;
+  const tabId = state().layout.activeTabId;
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   expect(activeLayoutView(state().layout)).toMatchObject({
     title: "Home",
     surfaceId: "home",
     placeholder: true,
   });
-  const view = state().openBrowserTab({ url: "https://example.com", paneId });
-  expect(state().layout.activeLayoutTabId).toBe(tabId);
-  expect(dockTabs(state().layout.root)).toHaveLength(2);
+  const view = state().openBrowserView({ url: "https://example.com", paneId });
+  expect(state().layout.activeTabId).toBe(tabId);
+  expect(dockTreeViews(state().layout.root)).toHaveLength(2);
   expect(activeLayoutView(state().layout)?.id).toBe(view.id);
 });
 
 it("updates automatic titles live while preserving custom names through history and reload", () => {
-  const view = state().openSurface(createHomeWorkspaceTab("global")),
-    id = state().layout.activeLayoutTabId!;
-  state().renameTab(view.id, "Updated content");
-  expect(layoutTabLabel(owner(view.id))).toBe("Updated content");
-  state().renameLayoutTab(id, "Research");
-  state().renameTab(view.id, "Later content");
-  expect(layoutTabLabel(owner(view.id))).toBe("Research");
+  const view = state().openSurface(createHomeWorkspaceView("global")),
+    id = state().layout.activeTabId!;
+  state().renameView(view.id, "Updated content");
+  expect(tabLabel(owner(view.id))).toBe("Updated content");
+  state().renameTab(id, "Research");
+  state().renameView(view.id, "Later content");
+  expect(tabLabel(owner(view.id))).toBe("Research");
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(state())));
   const restored = migrateWorkspaceStore(saved, 11);
-  expect(layoutTabLabel(layoutTabs(restored.layout).find((tab) => tab.id === id)!)).toBe(
-    "Research",
-  );
-  state().renameLayoutTab(id, "");
-  expect(layoutTabLabel(owner(view.id))).toBe("Later content");
+  expect(tabLabel(layoutTabs(restored.layout).find((tab) => tab.id === id)!)).toBe("Research");
+  state().renameTab(id, "");
+  expect(tabLabel(owner(view.id))).toBe("Later content");
 });
 
 it("restores a closed pane's own history and split proportions", () => {
-  state().newLayoutTab();
+  state().newTab();
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   const one = state().openSurface({
     surfaceId: "files",
@@ -258,17 +267,17 @@ it("restores a closed pane's own history and split proportions", () => {
     route: "/files",
     paneId,
   });
-  state().updateTabRoute(one.id, "/files?path=Downloads");
+  state().updateViewRoute(one.id, "/files?path=Downloads");
   state().closePane(paneId);
-  state().reopenClosedTab();
+  state().reopenClosedView();
   expect(state().layout.focusedPaneId).toBe(paneId);
   expect(activeLayoutView(state().layout)?.route).toBe("/files?path=Downloads");
   expect(state().navigatePane(-1)).toMatchObject({ id: one.id, route: "/files" });
 });
 
 it("allows destination switching while preserving unsaved work and blocking its closure", () => {
-  state().newLayoutTab();
-  const first = state().openSurface(createHomeWorkspaceTab("global"));
+  state().newTab();
+  const first = state().openSurface(createHomeWorkspaceView("global"));
   const code = state().openSurface({
     surfaceId: "official-app",
     groupKey: "app:code",
@@ -285,9 +294,9 @@ it("allows destination switching while preserving unsaved work and blocking its 
         route: "/discover",
       }).id,
     ).not.toBe(code.id);
-    state().focusTab(code.id);
+    state().focusView(code.id);
     expect(state().navigatePane(-1)).toBeNull();
-    expect(state().closeLayoutTab(state().layout.activeLayoutTabId!)).toBe(false);
+    expect(state().closeTab(state().layout.activeTabId!)).toBe(false);
   } finally {
     setWorkspaceUnsaved(code.id, false);
   }

@@ -133,6 +133,8 @@ mod browser_data_coverage;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_session_storage;
 #[cfg(any(target_os = "macos", windows))]
+mod browser_signin_scope;
+#[cfg(any(target_os = "macos", windows))]
 mod browser_storage_restore;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_website_capture;

@@ -59,11 +59,11 @@
   --navigation-primary-icon-size: var(--misty-navigation-icon-size);
 }
 
-/* The global rail uses square 42px tiles around 22px glyphs and 24px avatars. */
+/* The global rail uses square 34px tiles around 18px glyphs and 20px avatars. */
 .misty-global-navigator {
-  --misty-navigation-icon-size: 22px;
-  --misty-navigation-tile-size: 42px;
-  --misty-navigation-identity-size: 24px;
+  --misty-navigation-icon-size: 18px;
+  --misty-navigation-tile-size: 34px;
+  --misty-navigation-identity-size: 20px;
 }
 
 .misty-navigation-icons :is(svg, img:not([data-slot="avatar-image"])) {

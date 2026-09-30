@@ -30,7 +30,7 @@ function baseProps(overrides: Partial<Parameters<typeof BrowserOmniboxView>[0]> 
     suspensionReason: "test-address",
     setOverlay: vi.fn(async () => {}),
     onNavigate: vi.fn(),
-    onSwitchTab: vi.fn(),
+    onSwitchView: vi.fn(),
     onOpenInApp: vi.fn(),
     ...overrides,
   };
