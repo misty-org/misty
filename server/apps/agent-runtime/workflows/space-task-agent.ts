@@ -23,6 +23,7 @@ import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome,
 import { executeTool } from "../src/tool-calls.js";
 import { rejectedWithoutEffect } from "../src/tool-execution.js";
 import { toolMonitor } from "../src/tool-monitor.js";
+import { agentTools, toolLoadTool, toolState, toolUseTool } from "../src/toolsets.js";
 import { executionInstructions, finalText, incompleteToolResultText, unfinishedModelResult } from "../src/tool-outcomes.js";
 import type { SpaceTaskContext } from "../src/types.js";
 
@@ -74,7 +75,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     });
     throw new FatalError("Misty's capability registry is unavailable.");
   }
-  const catalog = modelCatalog(mcpCatalog.tools, [taskCompletionTool]);
+  const catalog = modelCatalog(mcpCatalog.tools, [taskCompletionTool, toolUseTool, toolLoadTool]);
   const advertised = new Set(mcpCatalog.tools.map((descriptor) => descriptor.name));
   await execution.checkpoint({
     node_id: "mcp:catalog", state: "completed", phase: "tools_ready", progress: 8,
@@ -93,11 +94,14 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     const declined = order.declined(callId);
     if (declined) throw new Error(declined);
   };
+  // agent.tool: answer by default; browse, desktop, code and loaded families on request.
+  const toolsets = agentTools(catalog);
   const tools: ToolSet = explaining ? {} : {
     ...catalogTools(catalog, async (callId, name, value) => {
       guard(callId);
       return await execution.executeCapability(callId, name, value);
     }),
+    ...toolsets.tools,
     [taskCompletionTool]: tool({
       description: "Report the final task outcome and user-facing answer. Call alone after completing all possible work, or when a real blocker prevents further progress. This records a report; it grants no capabilities and performs no external action.",
       inputSchema: taskCompletionSchema,
@@ -110,7 +114,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   const toolNames = Object.keys(tools);
   const instructions = explaining
     ? context.system
-    : withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions]);
+    : withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, toolsets.instructions].filter(Boolean));
+  // Recomputed from the transcript before every model call.
+  let visibleTools = toolNames;
   let modelTurn = 0;
   // The agent swallows errors thrown from its step hooks, so a failed settlement
   // checkpoint is held here and rethrown once the call returns.
@@ -121,7 +127,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     model: new InstanceModel(context.model_id, identity),
     instructions,
     tools,
-    prepareStep: () => ({ activeTools: explaining ? [] : monitor.activeTools(toolNames) }),
+    prepareStep: () => ({ activeTools: explaining ? [] : monitor.activeTools(visibleTools) }),
     // One model call per stream lets the coordinator refresh the active-time
     // deadline after durable tool waits. The aggregate loop below owns the cap.
     stopWhen: isStepCount(1),
@@ -224,6 +230,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       const steering = await takeSteering(identity, `${modelTurn}:before`, false);
       for (const message of steering.messages) messages.push({ role: "user", content: message.text });
       await manageContext();
+      visibleTools = toolsets.visible(toolNames, toolState(messages, toolsets.initial));
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);
       // Admission (billing's hold for this turn) happens before the model call and
