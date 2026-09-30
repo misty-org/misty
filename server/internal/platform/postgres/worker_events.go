@@ -21,7 +21,7 @@ type workerEventHub struct {
 
 func workerQueue(kind string) bool {
 	switch kind {
-	case "library-ai", "library-edit", "library-faces", "note-control", "drawing-control", "drawing-purge", "embedding", "social", "billing":
+	case "library-ai", "library-edit", "library-faces", "note-control", "drawing-control", "drawing-purge", "embedding", "social", "billing", "abuse-blocks", "abuse-retention":
 		return true
 	}
 	return false

@@ -45,6 +45,8 @@ func (db *Database) NextWorkerDelay(ctx context.Context, queue string) (time.Dur
    (SELECT lease_expires_at AS due FROM library_processing_jobs j
     WHERE job_kind='` + kind + `' AND state IN ('leased','running') AND ` + eligible + ` ORDER BY lease_expires_at LIMIT 1)
    ) pending`
+	case "abuse-retention":
+		deadline = `SELECT min(blocked_until)+interval '1 day' FROM abuse_blocks`
 	case "note-control":
 		deadline = `SELECT min(next_attempt_at) FROM space_note_control_outbox WHERE delivered_at IS NULL`
 	case "drawing-control":

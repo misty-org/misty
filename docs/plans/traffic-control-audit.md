@@ -156,3 +156,16 @@ Validation: race-enabled scheduler tests cover idle silence, bounded draining, n
 Apply `20271001030000_worker_notifications.sql` before starting event-driven workers. It is additive and compatible with old polling workers during a rolling deployment. PostgreSQL remains the only queue infrastructure; one persistent session per API process must reach PostgreSQL directly or through a session-compatible pooler for LISTEN. Ordinary query-pool settings remain unchanged.
 
 Remaining: the Personal Agent dispatcher, combined retention/scheduled-maintenance loop, abuse propagation, presence/control protocol, other client/native timers, and the wider failure/load matrix remain active work. The baseline inventory above is historical; use the implementation deltas for current status.
+
+
+## Implementation progress — abuse propagation
+
+T28 now uses committed PostgreSQL hints and reconnect reconciliation instead of the 30-second refresh ticker. Guards subscribe before reading, coalesce bursts to at most ten background snapshots per second, and perform no timed database reads while unchanged. `misty_worker_wakes_total` includes abuse snapshots and retention wake causes; notifications contain only the fixed queue name, with no caller/IP data.
+
+A successful snapshot now applies operator unblocks on every instance. Failed reads preserve cached blocks, and failed local writes remain enforced until their own expiry. Persistence uses one temporary writer per guard over its existing bounded strike map, retries with capped exponential backoff and jitter, and exits when empty. Snapshot/persistence ordering prevents a stale read from forgiving an in-flight local block. Shutdown cancels retries. Ordinary request checks and block expiry remain in memory.
+
+Expired database rows retain the previous one-day grace period, then use indexed next-deadline planning and bounded `SKIP LOCKED` deletion batches. Cleanup is independent of block snapshot reads and has no empty-queue timer. Apply `20271001040000_abuse_block_notifications.sql` before deploying these workers; the migration is additive.
+
+Validation: race-enabled tests verify idle silence, block/unblock/reset handling, failed-refresh recovery without another event, preservation and retry of failed local writes, and one writer for a 100-block burst. Disposable PostgreSQL tests verify transactional notifications, rollback silence, bounded retention, two independent guard/database instances (including the ordinary application role), and a block committed while both LISTEN sessions reconnect. The full 16-migration schema and existing abuse contracts pass; all internal Go packages compile.
+
+Capacity still needs measurement: notifications currently trigger coalesced full snapshots, and the existing guard cap is 20,000 tracked callers per process. This is not proof of propagation or memory/latency budgets under an unbounded distributed abuse workload. Per-key distribution or another bounded representation may be needed after the planned load tests. T34/T37 and the wider traffic goal remain active.
