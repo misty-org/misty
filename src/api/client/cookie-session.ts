@@ -9,6 +9,32 @@ const refreshResults = new Map<string, { generation: number; revision: number; v
 let refreshRevision = 0;
 const sessionLocks = new Map<string, Promise<unknown>>();
 
+let sessionChannel: BroadcastChannel | undefined;
+function shareSessionChange(base?: string): void {
+  // Another same-origin window can establish valid cookies without changing
+  // this window's account generation. Its hint only clears cached rejection;
+  // the next real request still has to authenticate with the server.
+  if (
+    !sessionChannel &&
+    typeof window !== "undefined" &&
+    typeof window.BroadcastChannel === "function"
+  ) {
+    try {
+      sessionChannel = new window.BroadcastChannel("misty:cookie-session");
+      sessionChannel.onmessage = ({ data }: MessageEvent<unknown>) => {
+        if (typeof data === "string") refreshResults.delete(data);
+      };
+    } catch {
+      /* Sandboxed windows can disallow channels. */
+    }
+  }
+  if (base) sessionChannel?.postMessage(base);
+}
+function clearRefreshResult(base: string): void {
+  refreshResults.delete(base);
+  shareSessionChange(base);
+}
+
 async function withSessionLock<T>(base: string, operation: () => Promise<T>): Promise<T> {
   if (typeof navigator !== "undefined" && navigator.locks) {
     return await navigator.locks.request(`misty-session:${base}`, operation);
@@ -25,7 +51,7 @@ async function withSessionLock<T>(base: string, operation: () => Promise<T>): Pr
 
 export async function captureAccountCookies(base: string, accountId?: string): Promise<void> {
   await persistAccountCookies(base, accountId);
-  refreshResults.delete(base);
+  clearRefreshResult(base);
 }
 
 async function persistAccountCookies(base: string, accountId?: string): Promise<void> {
@@ -40,7 +66,7 @@ export async function restoreAccountCookies(
   if (!hasTauriInternals()) return true;
   return withSessionLock(base, async () => {
     const restored = await invoke<boolean>("auth_cookie_restore", { apiBase: base, accountId });
-    refreshResults.delete(base);
+    clearRefreshResult(base);
     return restored;
   });
 }
@@ -93,6 +119,7 @@ async function refresh(base: string, generation: number, revision: number): Prom
     if (!response.ok) throw new Error("Session refresh is temporarily unavailable.");
     await persistAccountCookies(base);
     assertGeneration(generation);
+    shareSessionChange(base);
     refreshResults.set(base, { generation, revision: ++refreshRevision, valid: true });
     return true;
   };
@@ -126,6 +153,7 @@ export async function cookieSessionFetch(
   input: RequestInfo | URL,
   init: RequestInit,
 ): Promise<Response> {
+  shareSessionChange();
   const generation = readApiSessionGeneration();
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   const bases = [await resolveApiBase(), resolveHostedApiBase()].filter(Boolean);
@@ -147,6 +175,24 @@ export async function cookieSessionFetch(
       headers: { "Content-Type": "application/json" },
     });
   }
+  // /me and refresh have both rejected this generation. Keep background
+  // producers local until a successful login/cookie restore or account switch.
+  // Explicit bearer/device credentials are independent of the account cookie.
+  const rejected = refreshResults.get(base);
+  if (
+    rejected?.generation === generation &&
+    !rejected.valid &&
+    !headers.has("Authorization") &&
+    options.credentials !== "omit" &&
+    !signedOutPaths.has(path) &&
+    path !== "/logout"
+  ) {
+    assertGeneration(generation);
+    return new Response(JSON.stringify({ code: "not_authenticated" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const changesSession = [
     "/auth/google/complete",
     "/login",
@@ -158,7 +204,7 @@ export async function cookieSessionFetch(
   const send = async () => {
     assertGeneration(generation);
     const response = await accountFetch(input instanceof Request ? input.clone() : input, options);
-    if (changesSession && response.ok) refreshResults.delete(base);
+    if (changesSession && response.ok) clearRefreshResult(base);
     return response;
   };
   const response = await (changesSession ? withSessionLock(base, send) : send());

@@ -47,6 +47,56 @@ describe("JWT cookie transport", () => {
     });
   });
 
+  it("blocks rejected cookie generations locally but permits login and independent credentials", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(null, { status: 401 }));
+    const { cookieSessionFetch } = await import("./cookie-session");
+    const url = "https://misty.example/v1/settings/preferences";
+    expect((await cookieSessionFetch(url, {})).status).toBe(401);
+    expect(fetch).toHaveBeenCalledTimes(3); // request, /me validation, refresh
+    expect((await cookieSessionFetch(url, {})).status).toBe(401);
+    expect((await cookieSessionFetch("https://misty.example/v1/me", {})).status).toBe(401);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await cookieSessionFetch(url, { headers: { Authorization: "Bearer device-credential" } });
+    expect(fetch).toHaveBeenCalledTimes(4);
+    fetch.mockImplementation(async () => new Response(null, { status: 204 }));
+    await cookieSessionFetch("https://misty.example/v1/login", { method: "POST", body: "{}" });
+    expect((await cookieSessionFetch(url, {})).status).toBe(204);
+    expect(fetch).toHaveBeenCalledTimes(6);
+  });
+
+  it("clears a rejected generation after another window establishes cookies", async () => {
+    const channels: TestChannel[] = [];
+    class TestChannel {
+      onmessage?: (event: { data: string }) => void;
+      constructor() {
+        channels.push(this);
+      }
+      postMessage(data: string) {
+        for (const channel of channels) if (channel !== this) channel.onmessage?.({ data });
+      }
+    }
+    vi.stubGlobal("BroadcastChannel", TestChannel);
+    try {
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () => new Response(null, { status: 401 }));
+      const first = await import("./cookie-session");
+      const base = "https://misty.example/v1";
+      await first.cookieSessionFetch(`${base}/me`, {});
+      expect(fetch).toHaveBeenCalledTimes(3);
+      vi.resetModules(); // Separate window with its own transport cache.
+      const second = await import("./cookie-session");
+      fetch.mockImplementation(async () => new Response(null, { status: 204 }));
+      await second.cookieSessionFetch(`${base}/login`, { method: "POST" });
+      expect((await first.cookieSessionFetch(`${base}/me`, {})).status).toBe(204);
+      expect(fetch).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("answers account requests locally while signed out, without refreshing", async () => {
     native.enabled = true;
     native.fetch.mockImplementation(async () => new Response(null, { status: 204 }));

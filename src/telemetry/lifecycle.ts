@@ -1,3 +1,5 @@
+import { readApiSessionGeneration } from "@/api/client/session";
+import { ConsentSync, type ConsentWriter } from "./consentSync";
 import { telemetrySetErrorReportingEnabled } from "@/native";
 import { secureId } from "@/shared/platform/secureId";
 import type { CommonClientProperties, TelemetryClient } from "@/telemetry/model/interfaces/types";
@@ -44,8 +46,10 @@ export class AnalyticsLifecycleManager {
   }
 
   preferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
-    this.client.setAnalyticsEnabled(usageAnalytics);
-    this.client.setErrorReportingEnabled(errorReports);
+    if (this.client.isAnalyticsEnabled() !== usageAnalytics)
+      this.client.setAnalyticsEnabled(usageAnalytics);
+    if (this.client.isErrorReportingEnabled() !== errorReports)
+      this.client.setErrorReportingEnabled(errorReports);
     if (usageAnalytics) void this.emitFirstOpenAndSession("process_launch");
   }
 
@@ -164,10 +168,9 @@ export function initializeAnalyticsLifecycle(): void {
 }
 
 export function setAnalyticsAuthenticationState(value: boolean): void {
-  const becameAuthenticated = value && !serverSessionAuthenticated;
   serverSessionAuthenticated = value;
   lifecycle.setAuthenticationState(value);
-  if (becameAuthenticated) syncTelemetryPreferencesToServer();
+  syncTelemetryPreferencesToServer();
 }
 export function telemetryPreferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
   lifecycle.preferencesChanged(usageAnalytics, errorReports);
@@ -178,17 +181,16 @@ export function trackOnboardingCompleted(): Promise<void> {
   return lifecycle.trackOnboardingCompleted();
 }
 
-type TelemetryPreferencesSync = (usageAnalytics: boolean, errorReports: boolean) => Promise<void>;
-let telemetryPreferencesSync: TelemetryPreferencesSync | null = null;
+let consentSync: ConsentSync | undefined;
 
-export function configureTelemetryPreferencesSync(sync: TelemetryPreferencesSync): void {
-  telemetryPreferencesSync = sync;
+export function configureTelemetryPreferencesSync(sync: ConsentWriter): void {
+  consentSync?.update(null, [false, false]);
+  consentSync = new ConsentSync(sync);
 }
 
 function syncTelemetryPreferencesToServer(): void {
-  if (!serverSessionAuthenticated) return;
-  void telemetryPreferencesSync?.(
+  consentSync?.update(serverSessionAuthenticated ? String(readApiSessionGeneration()) : null, [
     analytics.isAnalyticsEnabled(),
     analytics.isErrorReportingEnabled(),
-  ).catch(() => undefined);
+  ]);
 }

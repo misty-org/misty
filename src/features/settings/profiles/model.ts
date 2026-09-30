@@ -84,6 +84,7 @@ export function editPreference(
 ): DeviceProfileState {
   const d = definitionById.get(id);
   if (!d || (value !== undefined && !validPreference(d, value))) throw new Error("Invalid setting");
+  if (effectiveValues(state)[id] === value) return state;
   return {
     ...state,
     outbox: [
@@ -100,6 +101,6 @@ export function reconcileProfile(
   state: DeviceProfileState,
   profile: SettingsProfile,
 ): DeviceProfileState {
-  if (state.profile && state.profile.revision > profile.revision) return state;
+  if (state.profile?.id === profile.id && state.profile.revision >= profile.revision) return state;
   return { ...state, profile, seed: {} };
 }

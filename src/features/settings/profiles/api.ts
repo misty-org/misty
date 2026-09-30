@@ -3,6 +3,7 @@ import type { ProfileMutation, SettingsProfile } from "./model";
 import type { PreferenceValues } from "./registry";
 const root = "/settings/preferences";
 export const settingsProfilesApi = {
+  read: () => apiRequest<SettingsProfile>(root),
   ensure: (values: PreferenceValues) =>
     apiRequest<SettingsProfile>(root, {
       method: "POST",
