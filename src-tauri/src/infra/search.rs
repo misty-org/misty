@@ -2521,7 +2521,10 @@ fn query_documents(
 ) -> ApiResult<Vec<SearchDoc>> {
     let searcher = reader.searcher();
     let hits = searcher
-        .search(&build_query(fields, text), &TopDocs::with_limit(10_000))
+        .search(
+            &build_query(fields, text),
+            &TopDocs::with_limit(10_000).order_by_score(),
+        )
         .map_err(|e| ApiError::Message(e.to_string()))?;
     hits.into_iter()
         .filter_map(
