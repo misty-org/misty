@@ -26,7 +26,7 @@ type appsCall struct {
 func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 	var call appsCall
 	if json.Unmarshal(request.Arguments, &call) != nil || !composio.ValidToolSlug(call.ToolSlug) {
-		return nil, serveragent.ErrInvalidRequest("tool_slug must be an exact slug from apps_search, such as GMAIL_SEND_EMAIL")
+		return nil, serveragent.ErrInvalidRequest("tool_slug must be an exact slug from integration_search, such as GMAIL_SEND_EMAIL")
 	}
 	if len(call.Arguments) == 0 || string(call.Arguments) == "null" {
 		call.Arguments = json.RawMessage(`{}`)
@@ -41,7 +41,7 @@ func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.I
 	}
 	info, err := client.Tool(ctx, call.ToolSlug)
 	if composio.NotFound(err) {
-		return nil, serveragent.ErrInvalidRequest("Unknown app tool " + call.ToolSlug + ". Use apps_search to find exact slugs.")
+		return nil, serveragent.ErrInvalidRequest("Unknown app tool " + call.ToolSlug + ". Use integration_search to find exact slugs.")
 	}
 	if err != nil {
 		return nil, appsError(err)
@@ -75,7 +75,7 @@ func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.I
 	}, func() (json.RawMessage, error) {
 		if approval != nil {
 			if used, err := s.database.ResolveAgentAppRequest(bounded, invocation.UserID, approval.ID, "approved", "used"); err != nil || !used {
-				return nil, errors.Join(db.ErrAgentToolboxNotAttempted, serveragent.ErrInvalidRequest("That approval was already used. Call apps_execute again to ask the user again."))
+				return nil, errors.Join(db.ErrAgentToolboxNotAttempted, serveragent.ErrInvalidRequest("That approval was already used. Call integration_execute again to ask the user again."))
 			}
 		}
 		result, err := s.runAppTool(bounded, invocation.UserID, call)

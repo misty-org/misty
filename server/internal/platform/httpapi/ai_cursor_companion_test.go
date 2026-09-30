@@ -97,13 +97,13 @@ func TestCompanionTeachingTurnShowsWithoutTools(t *testing.T) {
 	if err := validateCompanionInput(&body); err != nil {
 		t.Fatal(err)
 	}
-	system := aiInvocationSystem(aiSystemPromptInput{body: body, agent: &db.AskIdentity{Name: "Misty"}, now: time.Unix(0, 0).UTC(), tools: []string{"browser.workspace.visual", "apps.search"}})
+	system := aiInvocationSystem(aiSystemPromptInput{body: body, agent: &db.AskIdentity{Name: "Misty"}, now: time.Unix(0, 0).UTC(), tools: []string{"browser.workspace.visual", "integration.search"}})
 	for _, text := range []string{"teach instead of doing it", "This turn has no tools", "[POINT:x,y:label:screenN]", "Personal agent: Misty"} {
 		if !strings.Contains(system, text) {
 			t.Fatalf("teaching prompt lacks %q", text)
 		}
 	}
-	for _, text := range []string{agentExecutionGuidance, "Do the requested work with your tools", "browser_act", "apps_search", "you do not need per-action approval"} {
+	for _, text := range []string{agentExecutionGuidance, "Do the requested work with your tools", "browser_act", "integration_search", "you do not need per-action approval"} {
 		if strings.Contains(system, text) {
 			t.Fatalf("teaching prompt must not carry %q", text)
 		}

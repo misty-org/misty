@@ -33,8 +33,8 @@ it("attaches only the chat's project, for delegated coding", async () => {
   const contexts = await desktopDeviceGrants([], "scope_site");
   expect(kinds(contexts)).toEqual(["project_folder:scope_site", "workspace:workspace:device_1"]);
   expect(contexts[0]!.capabilities).toEqual(projectCapabilities);
-  expect(projectCapabilities).toEqual(["files.list", "files.read", "files.send", "code.delegate"]);
-  expect(projectCapabilities).toContain("files.read");
+  expect(projectCapabilities).toEqual(["folder.list", "folder.read", "folder.send", "code.delegate"]);
+  expect(projectCapabilities).toContain("folder.read");
 });
 
 it("gives a folder shared read-only before projects only the read-only tools", async () => {

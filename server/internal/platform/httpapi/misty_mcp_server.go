@@ -300,7 +300,7 @@ func mcpToolError(err error) *mcp.CallToolResult {
 	} else if errors.Is(err, db.ErrSpaceInvalid) {
 		message = "The tool arguments are invalid."
 	} else if strings.Contains(err.Error(), "drawing_conflict") {
-		message = "The drawing changed since it was read. Call drawings_read again, then retry with its latest base_hash."
+		message = "The drawing changed since it was read. Call drawing_read again, then retry with its latest base_hash."
 	} else if strings.Contains(err.Error(), "document_too_large") {
 		message = "The drawing would exceed the collaboration document size limit. Apply a smaller scene or delete unused elements first."
 	}

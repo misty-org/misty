@@ -55,7 +55,7 @@ type aiInvocationInput struct {
 	IdempotencyKey        string                      `json:"idempotency_key"`
 	Timezone              string                      `json:"timezone,omitempty"`
 	// NotebookKey and DelegatedFrom are set by the server for sub-agents
-	// (agents_delegate); requests from clients never carry them.
+	// (agent_delegate); requests from clients never carry them.
 	NotebookKey   string `json:"notebook_key,omitempty"`
 	DelegatedFrom string `json:"delegated_from,omitempty"`
 	// CurrentTab is the Misty browser tab in front of the user when they wrote,

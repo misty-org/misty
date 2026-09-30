@@ -404,7 +404,7 @@ pub fn run() {
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
-                    agents_list_scoped_files,
+                    agents_list_scoped_files, infra::web_fetch::agents_web_fetch,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
                     #[cfg(desktop)]

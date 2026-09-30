@@ -39,7 +39,7 @@ func TestRecallToolsAreOfferedOnlyWithMemoryAndGateThemselves(t *testing.T) {
 func TestCursorCompanionMentionsMemoryOnlyWhenRecallIsOffered(t *testing.T) {
 	with := companionSystemPrompt(aiInvocationInput{Mode: "companion"}, []string{screenLookTool, recallSearchTool})
 	without := companionSystemPrompt(aiInvocationInput{Mode: "companion"}, []string{screenLookTool})
-	if !strings.Contains(with, "recall_search") || strings.Contains(without, "recall_search") {
-		t.Fatal("the cursor prompt should mention Memory only when recall.search is in the run")
+	if !strings.Contains(with, "memory_history_search") || strings.Contains(without, "memory_history_search") {
+		t.Fatal("the cursor prompt should mention Memory only when memory.history.search is in the run")
 	}
 }

@@ -79,7 +79,7 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 			browserCapabilities[descriptor.Name] = activeBrowserRuntimeCapability(contexts, descriptor.Name)
 		}
 	}
-	connected := append(s.webSearchToolRegistrations(ctx, run.OwnerUserID), s.appsToolRegistrations()...)
+	connected := withWebFetch(append(s.webSearchToolRegistrations(ctx, run.OwnerUserID), s.appsToolRegistrations()...))
 	connected = append(connected, agentMemberToolRegistrations(s.database)...)
 	connected = append(connected, s.accountAdminToolRegistrations()...)
 	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{

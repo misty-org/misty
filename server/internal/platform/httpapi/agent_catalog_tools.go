@@ -15,7 +15,7 @@ import (
 // every kind of item, and the account's devices.
 const (
 	searchAllTool   = "search.all"
-	devicesListTool = "devices.list"
+	devicesListTool = "device.list"
 )
 
 func agentToolSchema(properties map[string]any, required []string) json.RawMessage {

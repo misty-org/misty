@@ -17,17 +17,17 @@ func methodToolRegistrations(database *db.Database) []agenttools.Registration {
 	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer,
 		AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Risk: serveragent.RiskRead, Idempotent: true}
 	list, use := base, base
-	list.Name = "methods.list"
+	list.Name = "method.list"
 	list.Description = "List the saved methods (reusable workflows) this agent has, with the inputs each one takes."
 	list.InputSchema = agentToolSchema(map[string]any{}, nil)
-	use.Name = "methods.use"
+	use.Name = "method.use"
 	use.Description = "Get one saved method's instructions filled in with its inputs. Follow them now with your other tools; nothing runs by itself."
 	use.InputSchema = agentToolSchema(map[string]any{
-		"method": map[string]any{"type": "string", "minLength": 1, "maxLength": 200, "description": "Method id or exact title from methods_list."},
+		"method": map[string]any{"type": "string", "minLength": 1, "maxLength": 200, "description": "Method id or exact title from method_list."},
 		"inputs": map[string]any{"type": "object", "maxProperties": 12},
 	}, []string{"method"})
 	save := base
-	save.Name, save.Risk, save.Idempotent, save.AuditEvent = "methods.save", serveragent.RiskWrite, false, "agent.method.saved"
+	save.Name, save.Risk, save.Idempotent, save.AuditEvent = "method.save", serveragent.RiskWrite, false, "agent.method.saved"
 	save.Description = "Save a reusable method for this agent, or update one by id. Use only when the user asked to save or change a method. " +
 		"Inputs are named blanks the user fills each time it runs."
 	save.InputSchema = agentToolSchema(map[string]any{
@@ -81,7 +81,7 @@ func methodToolRegistrations(database *db.Database) []agenttools.Registration {
 				}
 				instructions, err := db.RenderAgentMethod(method.Definition, input.Inputs)
 				if err != nil {
-					return nil, serveragent.ErrInvalidRequest("those inputs do not fit " + method.Definition.Title + "; check its inputs in methods_list")
+					return nil, serveragent.ErrInvalidRequest("those inputs do not fit " + method.Definition.Title + "; check its inputs in method_list")
 				}
 				result := map[string]any{"method": method.Definition.Title, "instructions": instructions}
 				if method.Definition.Target != "cloud" {
@@ -89,7 +89,7 @@ func methodToolRegistrations(database *db.Database) []agenttools.Registration {
 				}
 				return json.Marshal(result)
 			}
-			return nil, serveragent.ErrInvalidRequest("no enabled method " + reference + "; call methods_list")
+			return nil, serveragent.ErrInvalidRequest("no enabled method " + reference + "; call method_list")
 		}},
 	}
 }
@@ -124,7 +124,7 @@ func saveAgentMethod(ctx context.Context, database *db.Database, invocation agen
 		return nil, agenttools.ErrArgumentsInvalid
 	}
 	if invocation.AgentID == "" {
-		return nil, serveragent.ErrInvalidRequest("methods_save is available only to agents")
+		return nil, serveragent.ErrInvalidRequest("method_save is available only to agents")
 	}
 	if input.Inputs == nil {
 		input.Inputs = []db.AgentMethodInput{}
@@ -144,7 +144,7 @@ func saveAgentMethod(ctx context.Context, database *db.Database, invocation agen
 			}
 		}
 		if expected == 0 {
-			return nil, serveragent.ErrInvalidRequest("no method " + id + " for this agent; call methods_list")
+			return nil, serveragent.ErrInvalidRequest("no method " + id + " for this agent; call method_list")
 		}
 	}
 	if err := db.ValidateAgentMethod(method.Definition); err != nil {
@@ -152,7 +152,7 @@ func saveAgentMethod(ctx context.Context, database *db.Database, invocation agen
 	}
 	saved, err := database.SaveAgentMethod(ctx, invocation.UserID, method, expected)
 	if err != nil {
-		return nil, serveragent.ErrInvalidRequest("the method could not be saved; it may have changed, so read it again with methods_list")
+		return nil, serveragent.ErrInvalidRequest("the method could not be saved; it may have changed, so read it again with method_list")
 	}
 	return json.Marshal(map[string]any{"method": map[string]any{"id": saved.ID, "title": saved.Definition.Title, "version": saved.Version}})
 }

@@ -34,7 +34,7 @@ func TestSpaceAgentPersistsFinishedFiveParagraphJournalEssay(t *testing.T) {
 	}
 	markdown := strings.Join(paragraphs, "\n\n")
 	createdRaw, err := api.TestingExecuteSpaceConversationTool(
-		ctx, database, owner.ID, space.ID, "", prompt, "notes.create",
+		ctx, database, owner.ID, space.ID, "", prompt, "note.create",
 		json.RawMessage(`{"title":"The First Operating System","markdown":`+strconv.Quote(markdown)+`}`),
 	)
 	if err != nil {

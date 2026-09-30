@@ -37,7 +37,7 @@ func TestAppsSearchViewSpeaksMistyToolNames(t *testing.T) {
 	}
 	encoded, _ := json.Marshal(appsSearchView(result, searchAppPolicy{}))
 	text := string(encoded)
-	for _, want := range []string{"apps_execute after apps_schemas", `"input_schema":{"type":"object"}`, "Call apps_schemas for this tool", "Call apps_connect with app googledrive"} {
+	for _, want := range []string{"integration_execute after integration_schemas", `"input_schema":{"type":"object"}`, "Call integration_schemas for this tool", "Call integration_connect with app googledrive"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("search view lacks %q: %s", want, text)
 		}
@@ -86,11 +86,11 @@ func TestSearchAppsNeedTheUserToNameThem(t *testing.T) {
 	if quiet.mayConnect("exa") || !quiet.mayConnect("googledrive") {
 		t.Fatal("an unnamed search app may connect, or an ordinary app may not")
 	}
-	if next := quiet.next("exa"); !strings.Contains(next, "web_search") || strings.Contains(next, "apps_connect") {
+	if next := quiet.next("exa"); !strings.Contains(next, "web_search") || strings.Contains(next, "integration_connect") {
 		t.Fatalf("unnamed search app next = %q", next)
 	}
 	named := searchAppPolicy{webSearch: true, request: "Use Exa to find recent papers"}
-	if !named.mayConnect("exa") || !strings.Contains(named.next("exa"), "apps_connect") {
+	if !named.mayConnect("exa") || !strings.Contains(named.next("exa"), "integration_connect") {
 		t.Fatal("a search app the user named cannot connect")
 	}
 	offered := searchAppPolicy{offer: true, request: "Find recent papers"}

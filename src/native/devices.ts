@@ -109,7 +109,7 @@ export const devicesNative = {
   ) => invoke<SignedRecord[]>("device_sign_run_grants", { ...account, grants }),
   verifyJob: (operation: string, scopeId: string, config: unknown) =>
     invoke<void>("device_verify_job", { operation, scopeId, config }),
-  /** A shared folder's file for a `files.send` job, checked against the job's
+  /** A shared folder's file for a `folder.send` job, checked against the job's
    * run grant natively. Arrives as raw bytes (at most 128 MiB). */
   readSharedFile: (scopeId: string, input: unknown, config: unknown) =>
     invoke<ArrayBuffer>("device_read_shared_file", { scopeId, input, config }),

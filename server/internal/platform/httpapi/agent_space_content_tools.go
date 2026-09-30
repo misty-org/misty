@@ -30,10 +30,10 @@ func agentNoteWriteResult(note *db.SpaceNote, title, markdown, operation string)
 }
 
 const (
-	toolboxNotesSearch = "notes.search"
-	toolboxNotesRead   = "notes.read"
-	toolboxNotesCreate = "notes.create"
-	toolboxNotesUpdate = "notes.update"
+	toolboxNotesSearch = "note.search"
+	toolboxNotesRead   = "note.read"
+	toolboxNotesCreate = "note.create"
+	toolboxNotesUpdate = "note.update"
 )
 
 func noteAgentToolDescriptors() []agenttools.Descriptor {

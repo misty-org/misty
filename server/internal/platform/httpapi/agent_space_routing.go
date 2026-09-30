@@ -52,7 +52,7 @@ func spaceDataToolDescriptors() []agenttools.Descriptor {
 }
 
 // routedSpaceRegistrations exposes every Space data tool to an account-level
-// run, plus spaces.list for naming destinations. context.get is omitted because
+// run, plus space.list for naming destinations. agent.context is omitted because
 // the run context already states the time and timezone.
 func routedSpaceRegistrations(database *db.Database, except ...string) []agenttools.Registration {
 	registrations := []agenttools.Registration{{Descriptor: spacesListToolDescriptor(), Handler: func(ctx context.Context, invocation agenttools.Invocation, _ serveragent.ToolRequest) (json.RawMessage, error) {
@@ -71,7 +71,7 @@ func routedSpaceRegistrations(database *db.Database, except ...string) []agentto
 
 func spacesListToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
-		Name: "spaces.list", Version: 1, Risk: serveragent.RiskRead, Approval: agenttools.ApprovalNone,
+		Name: "space.list", Version: 1, Risk: serveragent.RiskRead, Approval: agenttools.ApprovalNone,
 		Description: "List the Spaces this account can access, including the personal Space and the Space you live in. Use a Space's name or id as the `space` argument of other tools.",
 		InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}, "additionalProperties": false}),
 		OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,

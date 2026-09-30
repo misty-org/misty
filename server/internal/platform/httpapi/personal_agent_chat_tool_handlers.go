@@ -104,7 +104,7 @@ func createAgentToolMessage(ctx context.Context, database *db.Database, actor sp
 // executeSpaceSearchTool checks read permission, parses the query and dispatches to message or library search.
 func executeSpaceSearchTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, tool serveragent.ToolRequest) (json.RawMessage, error) {
 	permission := db.PermissionMessagesRead
-	if tool.Name == "library.search" {
+	if tool.Name == "file.search" {
 		permission = db.PermissionLibraryView
 	}
 	allowed, err := permittedSpaceConversationRead(ctx, database, actor.userID, actor.spaceID, actor.agentID, permission)
@@ -125,7 +125,7 @@ func executeSpaceSearchTool(ctx context.Context, database *db.Database, actor sp
 	if input.Limit < 1 || input.Limit > 50 {
 		input.Limit = 20
 	}
-	if tool.Name == "library.search" {
+	if tool.Name == "file.search" {
 		return executeLibrarySearchTool(ctx, database, actor, input.Query, input.Limit)
 	}
 	return executeSpaceMessageSearchTool(ctx, database, actor, input.Query, input.Limit)
@@ -169,7 +169,7 @@ func executeSpaceMessageSearchTool(ctx context.Context, database *db.Database, a
 // authorizeSpaceConversationTool checks the tool's task permission for the user and, for agents, the agent's grant.
 func authorizeSpaceConversationTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, toolName string) error {
 	permission := db.PermissionTasksView
-	if toolName == "tasks.create" || toolName == "tasks.update" {
+	if toolName == "task.create" || toolName == "task.update" {
 		permission = db.PermissionTasksManage
 	}
 	allowed, err := database.HasSpacePermission(ctx, actor.userID, actor.spaceID, permission)
@@ -191,13 +191,13 @@ func executePermissionedSpaceTool(ctx context.Context, database *db.Database, ac
 		return nil, err
 	}
 	switch tool.Name {
-	case "calendar.query":
+	case "event.query":
 		return executeCalendarQueryTool(ctx, database, actor, tool)
-	case "tasks.query":
+	case "task.query":
 		return executeTasksQueryTool(ctx, database, actor, tool)
-	case "tasks.create":
+	case "task.create":
 		return executeTasksCreateTool(ctx, database, actor, originalPrompt, tool)
-	case "tasks.update":
+	case "task.update":
 		return executeTasksUpdateTool(ctx, database, actor, tool)
 	default:
 		return nil, workflowv2.ErrCapabilityDenied

@@ -13,15 +13,15 @@ import (
 )
 
 const (
-	toolboxMessagesSearch = "messages.search"
-	toolboxLibrarySearch  = "library.search"
-	toolboxContextGet     = "context.get"
-	toolboxMembersList    = "members.list"
-	toolboxMembersResolve = "members.resolve"
-	toolboxTasksQuery     = "tasks.query"
-	toolboxTasksCreate    = "tasks.create"
-	toolboxTasksUpdate    = "tasks.update"
-	toolboxAgentsDelegate = "ask.delegate"
+	toolboxMessagesSearch = "message.search"
+	toolboxLibrarySearch  = "file.search"
+	toolboxContextGet     = "agent.context"
+	toolboxMembersList    = "space.member.list"
+	toolboxMembersResolve = "space.member.resolve"
+	toolboxTasksQuery     = "task.query"
+	toolboxTasksCreate    = "task.create"
+	toolboxTasksUpdate    = "task.update"
+	toolboxAgentsDelegate = "agent.background"
 )
 
 // agentToolboxOptions describes one run's toolbox. Account-level toolboxes
@@ -31,7 +31,7 @@ type agentToolboxOptions struct {
 	accountLevel        bool
 	browserTabs         []string
 	browserCapabilities map[string]bool
-	// delegation registers ask.delegate for runs that may start a worker.
+	// delegation registers agent.background for runs that may start a worker.
 	delegation agenttools.Handler
 	// memberRequest builds the toolbox for work another member's agent asked
 	// for: Space data only, without the owner's memory or agent settings.

@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	recallSearchTool   = "recall.search"
-	recallTimelineTool = "recall.timeline"
-	recallForgetTool   = "recall.forget"
+	recallSearchTool   = "memory.history.search"
+	recallTimelineTool = "memory.history.timeline"
+	recallForgetTool   = "memory.history.forget"
 )
 
 // recallToolRegistrations let an agent look through the person's Memory
@@ -39,7 +39,7 @@ func recallToolRegistrationsFor(s *SpacesService) []agenttools.Registration {
 	search.Description = "Search the user's Memory: pages they read and things they said or recorded on their devices. Use it when they ask about something they saw or heard before. Asks the user first."
 	search.InputSchema = agentToolSchema(map[string]any{"query": map[string]any{"type": "string", "minLength": 1, "maxLength": 500}, "limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 20}}, []string{"query"})
 	timeline := base
-	timeline.Name, timeline.Risk, timeline.Idempotent, timeline.AuditEvent = recallTimelineTool, serveragent.RiskRead, true, "recall.timeline"
+	timeline.Name, timeline.Risk, timeline.Idempotent, timeline.AuditEvent = recallTimelineTool, serveragent.RiskRead, true, "memory.history.timeline"
 	timeline.Description = "List what the user read, said or recorded in a time range, newest first, optionally on one site. Asks the user first."
 	timeline.InputSchema = agentToolSchema(map[string]any{"from": when, "to": when, "site": site, "limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 100}}, []string{"from"})
 	forget := base

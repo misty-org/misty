@@ -35,27 +35,17 @@ export function loadTasks(): WorkflowTask[] {
 }
 
 /**
- * Agent names (as the model sees them) to today's model-visible names. A null
- * target is a tool that doesn't exist yet: required, it can't be met; forbidden,
- * it can't be broken. The phase that adds it is noted.
+ * Agent names (as the model sees them) to the names the harness has today. A
+ * null target is a tool that doesn't exist yet: required, it can't be met;
+ * forbidden, it can't be broken. Tools took their agent names in phase 2.
  */
 const today: Record<string, string | null> = {
-  agent_tool_use: null, // phase 2
-  web_fetch: null, // phase 1
-  memory_pref_update: "memory_update",
-  memory_pref_list: "memory_list",
-  attached_file_read: "attached_files_read",
-  integration_execute: "apps_execute",
-  agent_delegate: "agents_delegate",
   desktop_visual: "browser_workspace_visual",
 };
-const families: Record<string, string> = { integration_: "apps_", memory_history_: "recall_", agent_: "agents_" };
 
-/** Today's name or prefix for an agent name, or null when the tool doesn't exist yet. */
+/** Today's name for an agent name, or null when the tool doesn't exist yet. */
 export function todayName(name: string): string | null {
-  if (name in today) return today[name] ?? null;
-  for (const [agent, current] of Object.entries(families)) if (name.startsWith(agent)) return current + name.slice(agent.length);
-  return name;
+  return name in today ? (today[name] ?? null) : name;
 }
 
 /** Whether a called tool matches a rule: exact, or a family ending in `*`. */

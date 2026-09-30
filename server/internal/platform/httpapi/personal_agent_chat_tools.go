@@ -11,7 +11,7 @@ import (
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
-const toolboxMessagesSend = "messages.send"
+const toolboxMessagesSend = "message.send"
 
 func permittedSpaceConversationRead(ctx context.Context, database *db.Database, userID, spaceID, agentID, permission string) (bool, error) {
 	allowed, err := database.HasSpacePermission(ctx, userID, spaceID, permission)
@@ -58,7 +58,7 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 	if tool.Name == toolboxMessagesSend {
 		return executeAgentMessageSend(ctx, database, actor, originalPrompt, tool)
 	}
-	if tool.Name == "space.search_messages" || tool.Name == "library.search" {
+	if tool.Name == "space.search_messages" || tool.Name == "file.search" {
 		return executeSpaceSearchTool(ctx, database, actor, tool)
 	}
 	return executePermissionedSpaceTool(ctx, database, actor, originalPrompt, tool)

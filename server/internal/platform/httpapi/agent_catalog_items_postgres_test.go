@@ -125,7 +125,7 @@ func TestAgentItemToolsPostgres(t *testing.T) {
 	}
 	tags := noteTagsToolRegistration(database).Handler
 	if raw := call(tags, inSpace, `{"id":"`+note.ID+`","tags":["launch","q4"]}`); !strings.Contains(string(raw), "q4") {
-		t.Fatalf("notes.tags = %s", raw)
+		t.Fatalf("note.tag = %s", raw)
 	}
 
 	// Resending an existing invitation refreshes its link.
@@ -146,15 +146,15 @@ func TestAgentItemToolsPostgres(t *testing.T) {
 	var saved struct {
 		Method struct{ ID string } `json:"method"`
 	}
-	_ = json.Unmarshal(call(methods["methods.save"], invocation, `{"title":"Standup","instructions":"Summarize yesterday for the team.","inputs":[{"key":"team","label":"Team","type":"text","required":true}]}`), &saved)
-	if raw := call(methods["methods.save"], invocation, `{"id":"`+saved.Method.ID+`","title":"Daily standup","instructions":"Summarize yesterday."}`); !strings.Contains(string(raw), `"version":2`) {
-		t.Fatalf("methods.save update = %s", raw)
+	_ = json.Unmarshal(call(methods["method.save"], invocation, `{"title":"Standup","instructions":"Summarize yesterday for the team.","inputs":[{"key":"team","label":"Team","type":"text","required":true}]}`), &saved)
+	if raw := call(methods["method.save"], invocation, `{"id":"`+saved.Method.ID+`","title":"Daily standup","instructions":"Summarize yesterday."}`); !strings.Contains(string(raw), `"version":2`) {
+		t.Fatalf("method.save update = %s", raw)
 	}
-	if raw := call(methods["methods.use"], invocation, `{"method":"Daily standup"}`); !strings.Contains(string(raw), "Summarize yesterday") {
-		t.Fatalf("methods.use after save = %s", raw)
+	if raw := call(methods["method.use"], invocation, `{"method":"Daily standup"}`); !strings.Contains(string(raw), "Summarize yesterday") {
+		t.Fatalf("method.use after save = %s", raw)
 	}
 	var invalid agent.ErrInvalidRequest
-	if _, err := methods["methods.save"](ctx, invocation, agent.ToolRequest{ID: "bad", Arguments: json.RawMessage(`{"id":"missing","title":"x","instructions":"y"}`)}); !errors.As(err, &invalid) {
+	if _, err := methods["method.save"](ctx, invocation, agent.ToolRequest{ID: "bad", Arguments: json.RawMessage(`{"id":"missing","title":"x","instructions":"y"}`)}); !errors.As(err, &invalid) {
 		t.Fatalf("saving an unknown method = %v", err)
 	}
 }

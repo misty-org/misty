@@ -9,6 +9,7 @@ import {
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
+import { readablePage } from "./webFetchText";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
 /**
@@ -18,13 +19,14 @@ import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
  * tabs are never listed.
  */
 export const deviceAgentOperations = new Set([
-  "files.list",
-  "files.read",
-  "files.send",
-  "tabs.list",
-  "tabs.open",
-  "bookmarks.list",
-  "bookmarks.add",
+  "folder.list",
+  "folder.read",
+  "folder.send",
+  "browser.tab.list",
+  "browser.tab.open",
+  "bookmark.list",
+  "bookmark.add",
+  "web.fetch",
 ]);
 
 const readLimit = 20_000;
@@ -61,7 +63,7 @@ export async function runDeviceAgentOperation(
 ): Promise<Record<string, unknown>> {
   const input = record(job.input);
   switch (job.operation) {
-    case "files.send": {
+    case "folder.send": {
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
       if (!job.spaceId) throw new Error("no_space");
@@ -72,11 +74,11 @@ export async function runDeviceAgentOperation(
       const uploaded = await uploadLibraryBlob(job.spaceId, new Blob([bytes]), name);
       return { name, size: bytes.byteLength, libraryItemId: uploaded.item?.id ?? null };
     }
-    case "files.list":
+    case "folder.list":
       return invoke<Record<string, unknown>>("agents_list_scoped_files", {
         request: scopedPath(job),
       });
-    case "files.read": {
+    case "folder.read": {
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
       const document = await agentsPrepareScopedDocument(target, signal);
@@ -85,7 +87,7 @@ export async function runDeviceAgentOperation(
       text = text.slice(0, readLimit);
       return { name: document.displayName, mimeType: document.mimeType, text, truncated };
     }
-    case "tabs.list": {
+    case "browser.tab.list": {
       const tabs: Array<{ id: string; title: string; url: string }> = [];
       const seen = new Set<string>();
       mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (view) => {
@@ -98,12 +100,12 @@ export async function runDeviceAgentOperation(
       });
       return { tabs: tabs.slice(0, 200) };
     }
-    case "tabs.open": {
+    case "browser.tab.open": {
       const url = webAddress(input.url);
       const view = useWorkspaceStore.getState().openBrowserView({ url });
       return { opened: url, tabId: view.id };
     }
-    case "bookmarks.list": {
+    case "bookmark.list": {
       const query = typeof input.query === "string" ? input.query.trim().toLowerCase() : "";
       const items = bookmarks(useWorkspaceStore.getState().bookmarks)
         .filter(
@@ -116,7 +118,26 @@ export async function runDeviceAgentOperation(
         .map((item) => ({ id: item.id, title: item.title, url: item.url }));
       return { bookmarks: items };
     }
-    case "bookmarks.add": {
+    case "web.fetch": {
+      // Fetched natively without cookies; the network checks live in web_fetch.rs.
+      const page = await invoke<{
+        finalUrl: string;
+        status: number;
+        contentType: string;
+        body: string;
+        truncated: boolean;
+      }>("agents_web_fetch", { url: webAddress(input.url) });
+      const question = typeof input.question === "string" ? input.question : "";
+      const readable = readablePage(page.body, page.contentType, question);
+      return {
+        url: page.finalUrl,
+        status: page.status,
+        title: readable.title,
+        text: readable.text,
+        truncated: readable.truncated || page.truncated,
+      };
+    }
+    case "bookmark.add": {
       const url = webAddress(input.url);
       const title = typeof input.title === "string" ? input.title : "";
       return { bookmarkId: saveBookmark({ url, title }), url };

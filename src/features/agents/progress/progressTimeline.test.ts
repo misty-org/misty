@@ -18,13 +18,13 @@ describe("progress timeline", () => {
       id: "1",
       type: "tool.started",
       toolCallId: "a",
-      toolName: "tabs.list",
+      toolName: "browser.tab.list",
     });
     expect(started).toEqual({
       content: "",
       progress: [
         { type: "note", text: "Let me check your tabs." },
-        { type: "tool", id: "a", name: "tabs.list", state: "running" },
+        { type: "tool", id: "a", name: "browser.tab.list", state: "running" },
       ],
     });
     message = started;
@@ -33,7 +33,7 @@ describe("progress timeline", () => {
         id: "2",
         type: "tool.failed",
         toolCallId: "a",
-        toolName: "tabs.list",
+        toolName: "browser.tab.list",
         error: "Tabs were unavailable.",
       }).progress[1],
     ).toMatchObject({ state: "failed", error: "Tabs were unavailable." });
@@ -42,7 +42,7 @@ describe("progress timeline", () => {
         id: "3",
         type: "tool.detail",
         toolCallId: "a",
-        toolName: "tabs.list",
+        toolName: "browser.tab.list",
         activity: { result: "4 results" },
       }).progress[1],
     ).toMatchObject({ activity: { result: "4 results" } });
@@ -50,10 +50,10 @@ describe("progress timeline", () => {
 
   it("folds consecutive tools into one group", () => {
     const groups = groupProgress([
-      { type: "tool", id: "a", name: "tabs.list", state: "completed" },
+      { type: "tool", id: "a", name: "browser.tab.list", state: "completed" },
       { type: "tool", id: "b", name: "browser.read", state: "failed" },
       { type: "note", text: "Found it." },
-      { type: "tool", id: "c", name: "notes.search", state: "running" },
+      { type: "tool", id: "c", name: "note.search", state: "running" },
     ]);
     expect(groups.map((group) => group.type)).toEqual(["tools", "note", "tools"]);
     expect(toolGroupSummary(groups[0].type === "tools" ? groups[0].tools : [])).toBe(
@@ -99,10 +99,10 @@ describe("progress timeline", () => {
   });
 
   it("names tools in plain words", () => {
-    expect(toolLabel("tabs.list", false)).toBe("Listed tabs");
+    expect(toolLabel("browser.tab.list", false)).toBe("Listed tabs");
     expect(toolLabel("misty_notes_search", true)).toBe("Searching notes");
-    expect(toolLabel("calendar.query", false)).toBe("Checked calendar");
+    expect(toolLabel("event.query", false)).toBe("Checked calendar");
     expect(toolLabel("weather.forecast", false)).toBe("Used weather forecast");
-    expect(toolLabel("misty.finish.task", false)).toBe("Wrapped up");
+    expect(toolLabel("agent.finish", false)).toBe("Wrapped up");
   });
 });

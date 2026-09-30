@@ -40,7 +40,7 @@ func TestSpaceToolboxDropsWritesWhenPermissionIsRevoked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if slices.Contains(names, "tasks.update") || !slices.Contains(names, "tasks.query") {
+	if slices.Contains(names, "task.update") || !slices.Contains(names, "task.query") {
 		t.Fatalf("toolbox must follow the member's current permissions: %v", names)
 	}
 }

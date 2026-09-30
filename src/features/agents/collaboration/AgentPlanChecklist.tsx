@@ -9,7 +9,7 @@ import type { AgentGoal, AgentPlan, PlanStepStatus } from "./types";
 
 /**
  * The plan in the Goal dialog. Once approved it is a live checklist the agent
- * ticks off with checklist_update; a proposed plan points back to the conversation.
+ * ticks off with log_work_checklist; a proposed plan points back to the conversation.
  */
 export function AgentPlanChecklist({
   plan,

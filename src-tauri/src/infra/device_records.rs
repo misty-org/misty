@@ -446,7 +446,7 @@ mod tests {
             requester_device_id: member('a', 1).device_id,
             target_device_id: member('b', 2).device_id,
             agent_id: String::new(),
-            capabilities: vec!["files.read".into()],
+            capabilities: vec!["folder.read".into()],
             scopes: vec!["scope-1".into()],
             issued_at: 1_000,
             expires_at: 2_000,
@@ -454,9 +454,9 @@ mod tests {
         let payload = grant.payload().unwrap();
         let record = SignedRecord::new(&payload, identity.sign_record(&payload).unwrap());
         let verified = RunGrant::verify(&record, &identity.public_key(), 1_500).unwrap();
-        assert!(verified.allows("scope-1", "files.read"));
-        assert!(!verified.allows("scope-1", "files.send"));
-        assert!(!verified.allows("scope-2", "files.read"));
+        assert!(verified.allows("scope-1", "folder.read"));
+        assert!(!verified.allows("scope-1", "folder.send"));
+        assert!(!verified.allows("scope-2", "folder.read"));
         assert!(RunGrant::verify(&record, &identity.public_key(), 2_000).is_none());
         assert!(RunGrant::verify(&record, &STANDARD.encode([9u8; 32]), 1_500).is_none());
         assert_eq!(

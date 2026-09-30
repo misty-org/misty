@@ -9,7 +9,7 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// roadmaps.canvas adds risks, decisions, metrics and notes to a roadmap and
+// roadmap.canvas adds risks, decisions, metrics and notes to a roadmap and
 // links them to goals and milestones. Custom node types stay in the canvas
 // editor, where their fields are designed.
 func roadmapCanvasToolRegistration(database *db.Database) agenttools.Registration {
@@ -21,7 +21,7 @@ func roadmapCanvasToolRegistration(database *db.Database) agenttools.Registratio
 	}}
 	return agenttools.Registration{
 		Descriptor: agenttools.Descriptor{
-			Name: "roadmaps.canvas", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
+			Name: "roadmap.canvas", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
 			Description: "Add risks, decisions, metrics and notes to a roadmap in the current Space and link them. Actions: add_node (roadmap_id, node_kind, title), " +
 				"update_node (roadmap_id, node_id), archive_node (roadmap_id, node_id), link (roadmap_id, source, target, edge_type), unlink (roadmap_id, edge_id). " +
 				"Edge types: depends_on (goal to goal), blocks (goal or risk to goal or milestone), enables (goal or decision to goal or milestone), " +

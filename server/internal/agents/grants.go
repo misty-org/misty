@@ -47,7 +47,7 @@ const (
 	ActionScreenControl  GrantAction = "screen.control"  // a consequential action on the whole screen
 	ActionAccountSetting GrantAction = "account.setting" // account and security settings
 	ActionOutsideProject GrantAction = "project.outside" // a path outside the attached project
-	ActionRecallForget   GrantAction = "recall.forget"   // deleting what Memory kept
+	ActionRecallForget   GrantAction = "memory.history.forget"   // deleting what Memory kept
 )
 
 // RecallScopeID is the scope id of a Memory grant: Memory is per person.

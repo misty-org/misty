@@ -27,12 +27,12 @@ func albumToolRegistrations(database *db.Database) []agenttools.Registration {
 		return map[string]any{"type": "string", "minLength": 1, "maxLength": max}
 	}
 	read, organize := base, base
-	read.Name, read.Risk, read.Idempotent, read.RequiredPermission = "library.albums", serveragent.RiskRead, true, db.PermissionLibraryView
+	read.Name, read.Risk, read.Idempotent, read.RequiredPermission = "file.album.list", serveragent.RiskRead, true, db.PermissionLibraryView
 	read.Description = "List the albums in the current Space's Library, or pass album_id to list that album's items."
 	read.InputSchema = agentToolSchema(map[string]any{"album_id": text(200)}, nil)
-	organize.Name, organize.Risk, organize.AuditEvent, organize.RequiredPermission = "library.organize", serveragent.RiskWrite, "library.album.updated", db.PermissionLibraryEdit
+	organize.Name, organize.Risk, organize.AuditEvent, organize.RequiredPermission = "file.organize", serveragent.RiskWrite, "library.album.updated", db.PermissionLibraryEdit
 	organize.Description = "Organize the current Space's Library albums. Actions: create (name, description), rename (album_id, name, description), " +
-		"add_items (album_id, item_ids from library_search), remove_item (album_id, item_id), restore_item (item_id from the trash)."
+		"add_items (album_id, item_ids from file_search), remove_item (album_id, item_id), restore_item (item_id from the trash)."
 	organize.InputSchema = agentToolSchema(map[string]any{
 		"action":      map[string]any{"type": "string", "enum": []string{"create", "rename", "add_items", "remove_item", "restore_item"}},
 		"album_id":    text(200),
@@ -156,7 +156,7 @@ func executeAlbumOrganize(ctx context.Context, database *db.Database, invocation
 func albumError(err error) error {
 	switch {
 	case errors.Is(err, db.ErrSpaceNotFound), errors.Is(err, db.ErrLibraryNotFound):
-		return serveragent.ErrInvalidRequest("that album or item was not found in this Space; call library_albums or library_search")
+		return serveragent.ErrInvalidRequest("that album or item was not found in this Space; call file_album_list or file_search")
 	case errors.Is(err, db.ErrLibraryForbidden), errors.Is(err, db.ErrSpaceForbidden):
 		return serveragent.ErrInvalidRequest("you do not have permission to change this Space's Library albums")
 	case errors.Is(err, db.ErrSpaceInvalid), errors.Is(err, db.ErrSpaceConflict):

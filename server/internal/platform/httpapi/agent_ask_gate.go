@@ -43,7 +43,7 @@ func gatedByAsk(descriptor agenttools.Descriptor) bool {
 	if descriptor.Risk == serveragent.RiskRead || descriptor.Locality == agenttools.LocalityRouted {
 		return false
 	}
-	if selfGatedTools[descriptor.Name] || strings.HasPrefix(descriptor.Name, "notebook.") {
+	if selfGatedTools[descriptor.Name] || strings.HasPrefix(descriptor.Name, "log.work.") {
 		return false
 	}
 	return true

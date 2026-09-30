@@ -35,8 +35,8 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 			return s.executeAssignedTaskAttachedFiles(toolCtx, run, tool)
 		}},
 	}
-	requested := []string{toolboxTasksQuery, "tasks.update_assigned", "task.activity.write", "attached_files.read"}
-	// The assigned task keeps its own tasks.query; other Misty data is reachable
+	requested := []string{toolboxTasksQuery, "task.update_assigned", "task.activity.write", "attached_file.read"}
+	// The assigned task keeps its own task.query; other Misty data is reachable
 	// in any Space the owner can access.
 	for _, registration := range routedSpaceRegistrations(s.database, toolboxTasksQuery) {
 		registrations = append(registrations, registration)
@@ -54,7 +54,7 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 			requested = append(requested, descriptor.Name)
 		}
 	}
-	for _, registration := range append(s.webSearchToolRegistrations(ctx, run.RequestingMemberID), s.appsToolRegistrations()...) {
+	for _, registration := range withWebFetch(append(s.webSearchToolRegistrations(ctx, run.RequestingMemberID), s.appsToolRegistrations()...)) {
 		registrations = append(registrations, registration)
 		requested = append(requested, registration.Descriptor.Name)
 	}
@@ -73,9 +73,9 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 
 func assignedTaskAttachedFilesToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
-		Name: "attached_files.read", Version: 1, Description: "Read only files explicitly attached to the assigned Task.",
+		Name: "attached_file.read", Version: 1, Description: "Read only files explicitly attached to the assigned Task.",
 		Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}}), OutputSchema: agentToolObjectOutputSchema(),
-		AgentPermission: "attached_files.read", AllowCustomAgent: true, Approval: agenttools.ApprovalNone,
+		AgentPermission: "attached_file.read", AllowCustomAgent: true, Approval: agenttools.ApprovalNone,
 		Locality: agenttools.LocalityServer, Idempotent: true, Sources: []string{"task_assignment"},
 	}
 }
@@ -91,7 +91,7 @@ func assignedTasksQueryToolDescriptor() agenttools.Descriptor {
 
 func assignedTasksUpdateToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
-		Name: "tasks.update_assigned", Version: 1, Description: "Update only the Task assigned to this Agent run.",
+		Name: "task.update_assigned", Version: 1, Description: "Update only the Task assigned to this Agent run.",
 		Risk: serveragent.RiskWrite, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{"status": map[string]any{"type": "string", "enum": []string{"in_progress", "done", "canceled"}}, "notes": map[string]any{"type": "string"}}}), OutputSchema: agentToolObjectOutputSchema(),
 		RequiredPermission: db.PermissionTasksManage, AgentPermission: db.PermissionTasksManage, AllowCustomAgent: true,
 		Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, AuditEvent: "task.updated", Sources: []string{"task_assignment"},
