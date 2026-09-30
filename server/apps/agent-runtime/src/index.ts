@@ -1,4 +1,5 @@
 import express, { type Request } from "express";
+import { rateLimit } from "express-rate-limit";
 import { instanceModelConfig } from "./model-provider.js";
 import { vercelHarness as harness } from "./vercel-harness.js";
 import { MISTY_HARNESS_VERSION } from "./harness.js";
@@ -15,6 +16,15 @@ interface RawRequest extends Request {
 
 instanceModelConfig();
 const app = express();
+// Throttle before body parsing and signature verification. Do not trust caller-
+// supplied forwarding headers to choose a different rate-limit bucket.
+app.use("/v1", rateLimit({
+  windowMs: 60_000,
+  limit: 600,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { code: "rate_limited" },
+}));
 app.use(
   express.json({
     limit: "2mb",
