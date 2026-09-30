@@ -141,3 +141,8 @@ Retained connection-health mechanism: one shared worker LISTEN session per API p
 ## Implementation delta (abuse propagation)
 
 Removed the 30-second abuse-block refresh ticker. Committed changes and LISTEN reconnects trigger a coalesced authoritative snapshot, with a 100ms minimum gap during bursts and no timer while unchanged. Local expiry checks use the request's current time without I/O. Pending failed writes use a single bounded writer with exponential backoff; it exits when the map has no unpersisted active blocks. Expired database rows use their actual expiry plus the existing one-day grace period and bounded deadline-driven deletion, rather than cleanup inside every snapshot read. The shared PostgreSQL listener and its already documented connection-health probes are reused.
+
+
+## Implementation delta (resource leases)
+
+Removed the workflow resource lease's 500ms contention poll. Each waiter now subscribes to a resource-specific committed hint before claiming and arms only the current lease holder's actual database-clock deadline. Unrelated resource transitions cause no reads. LISTEN reconnect triggers reconciliation; cancellation or a closed subscription stops the waiter. A five-second one-shot deadline bounds post-action release. These use the existing shared listener, not a PostgreSQL session per resource/waiter.
