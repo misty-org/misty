@@ -6,7 +6,6 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/security"
 	browsersync "github.com/kannachi323/misty/server/internal/sync"
 	"net/http"
-	"time"
 
 	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 
@@ -40,7 +39,7 @@ func (s *Server) MountHandlers() error {
 	// them; the per-request counters stay in memory for speed.
 	abuseGuard := api.NewAbuseGuard(api.DefaultAbusePolicy()).
 		WithStore(context.Background(), s.Database)
-	abuseGuard.StartRefreshLoop(context.Background(), 30*time.Second)
+	s.AbuseGuard = abuseGuard
 	s.Router.Use(abuseGuard.Middleware)
 	s.Router.Use(api.NewAPIRateLimiter().WithAbuseGuard(abuseGuard).Middleware)
 	s.Metrics = metrics.New()

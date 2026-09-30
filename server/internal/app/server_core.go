@@ -18,6 +18,7 @@ import (
 )
 
 type Server struct {
+	AbuseGuard               *api.AbuseGuard
 	Router                   *chi.Mux
 	Database                 *db.Database
 	EmailSender              email.Sender

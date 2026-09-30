@@ -13,7 +13,7 @@ func (m *Registry) RecordWorkerWake(queue, reason string) {
 		return
 	}
 	switch queue {
-	case "library-ai", "library-edit", "library-faces", "note-control", "drawing-control", "drawing-purge", "embedding", "social", "billing":
+	case "library-ai", "library-edit", "library-faces", "note-control", "drawing-control", "drawing-purge", "embedding", "social", "billing", "abuse-blocks", "abuse-retention":
 	default:
 		return
 	}

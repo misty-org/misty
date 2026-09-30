@@ -43,6 +43,14 @@ func Run() {
 	startWorkers(
 		workerContext,
 		WorkerFunc(func(ctx context.Context) { runBillingCompletions(ctx, server) }),
+		WorkerFunc(func(ctx context.Context) {
+			if server.AbuseGuard != nil {
+				server.AbuseGuard.Run(ctx, func(reason string) { server.Metrics.RecordWorkerWake("abuse-blocks", reason) })
+			}
+		}),
+		WorkerFunc(func(ctx context.Context) {
+			runDatabaseQueue(ctx, server, "abuse-retention", func(ctx context.Context) (int, error) { return server.Database.PurgeExpiredAbuseBlocks(ctx, 250) })
+		}),
 		WorkerFunc(func(ctx context.Context) { runAgentRetention(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runPersonalAgentTaskProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryPeopleProcessing(ctx, server) }),
