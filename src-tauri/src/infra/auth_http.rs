@@ -82,6 +82,7 @@ pub async fn auth_http_start(
     let login = method == reqwest::Method::POST
         && [
             "/login",
+            "/auth/google/complete",
             "/register",
             "/self-host/bootstrap",
             "/self-host/enroll",

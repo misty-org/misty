@@ -7,7 +7,7 @@ import (
 )
 
 func BillingAdapter() (billingadapter.Adapter, error) {
-	mode := strings.ToLower(strings.TrimSpace(Getenv("MISTY_DEPLOYMENT_MODE")))
+	mode := DeploymentMode()
 	if mode != "" && mode != "hosted" && mode != "self_hosted" {
 		return nil, fmt.Errorf("invalid MISTY_DEPLOYMENT_MODE")
 	}

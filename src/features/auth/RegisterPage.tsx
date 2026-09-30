@@ -8,6 +8,7 @@ import AuthField from "./components/AuthField";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
+import GoogleSignInButton from "./components/GoogleSignInButton";
 import { accountRegister } from "./store/useAccountStore";
 
 export default function RegisterPage() {
@@ -88,6 +89,12 @@ export default function RegisterPage() {
         }
       >
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+          <GoogleSignInButton
+            disabled={loading}
+            onBusy={setLoading}
+            onError={setError}
+            onSuccess={() => navigate(from, { replace: true })}
+          />
           <AuthField
             id="register-name"
             label="Name"

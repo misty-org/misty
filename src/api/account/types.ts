@@ -1,4 +1,5 @@
 export interface AccountAuthUser {
+  provider?: "misty" | "google";
   id: string;
   name: string;
   username: string;
@@ -6,6 +7,7 @@ export interface AccountAuthUser {
 }
 
 export interface AccountMeResponse {
+  provider?: "misty" | "google";
   id: string;
   name: string;
   username: string;
@@ -33,6 +35,7 @@ export type AccountHandoffPath =
   "/settings" | "/settings/account" | "/settings/usage" | "/settings/billing" | "/settings/privacy";
 
 export interface LoginResponse {
+  provider?: "misty" | "google";
   id?: string;
   user_id?: string;
   name: string;

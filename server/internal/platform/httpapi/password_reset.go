@@ -170,7 +170,7 @@ func (s *PasswordResetService) handleForgotPassword(ctx context.Context, emailAd
 		log.Printf("forgot password lookup failed for %q: %v", emailAddress, err)
 		return
 	}
-	if user == nil {
+	if user == nil || user.Provider != "misty" {
 		return
 	}
 

@@ -13,6 +13,26 @@ export function configureAccountApi(context: { readAnalyticsEnabled: () => boole
   readAnalyticsEnabled = context.readAnalyticsEnabled;
 }
 export const accountApi = {
+  libraryLock: () => requestJson<{ configured: boolean }>("GET", "/me/library-lock"),
+  setLibraryPassword: (password: string, confirmation: string) =>
+    requestJson<{ configured: boolean }>("POST", "/me/library-lock", { password, confirmation }),
+  googleAvailable: () => requestJson<{ enabled: boolean }>("GET", "/auth/google"),
+  beginGoogle: (reauthenticate = false, signal?: AbortSignal) =>
+    requestJson<{ url: string; flow_token: string; expires_in: number }>(
+      "POST",
+      "/auth/google",
+      { reauthenticate },
+      signal,
+    ),
+  completeGoogle: (flowToken: string, signal?: AbortSignal) =>
+    requestJson<LoginResponse | { status: "pending" } | { reauthentication_token: string }>(
+      "POST",
+      "/auth/google/complete",
+      {
+        flow_token: flowToken,
+      },
+      signal,
+    ),
   signIn: (email: string, password: string) =>
     requestJson<LoginResponse>("POST", "/login", {
       email,
@@ -54,7 +74,12 @@ export const accountApi = {
     }),
   resolveBase: resolveApiBase,
 };
-async function requestJson<T>(method: AccountMethod, path: string, body?: unknown): Promise<T> {
+async function requestJson<T>(
+  method: AccountMethod,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   const accountGeneration = readApiSessionGeneration();
   const apiBase = await resolveRequiredAccountApiBase();
   assertAccountGeneration(accountGeneration);
@@ -68,6 +93,7 @@ async function requestJson<T>(method: AccountMethod, path: string, body?: unknow
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: "include",
+      signal,
     });
     assertAccountGeneration(accountGeneration);
     if (response.status === 401 && shouldAttachAuthToken(path) && !token) {
@@ -185,6 +211,8 @@ function shouldAttachAuthToken(path: string): boolean {
     "/self-host/bootstrap",
     "/self-host/enroll",
     "/auth/forgot",
+    "/auth/google",
+    "/auth/google/complete",
     "/logout",
   ].includes(path);
 }
