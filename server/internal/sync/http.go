@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kannachi323/misty/server/internal/accounts"
+	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	"github.com/kannachi323/misty/server/internal/platform/transport"
 
 	"github.com/gorilla/websocket"
@@ -23,6 +24,7 @@ type BrowserSyncService struct {
 	store      *Store
 	workspaces workspaceCaches
 	restore    RestoreCompleter
+	meter      *metrics.SocketMeter
 }
 
 func NewBrowserSyncService(database *db.Database) *BrowserSyncService {

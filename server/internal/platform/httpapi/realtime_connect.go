@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
@@ -50,6 +51,7 @@ func (s *RealtimeService) Connect() http.HandlerFunc {
 			_ = conn.Close()
 			return
 		}
+		s.meter.Sent("replay", len(initial))
 		s.register(client)
 		go s.writeLoop(client)
 		s.readLoop(client)
@@ -206,12 +208,16 @@ func (s *RealtimeService) readLoop(client *TestingRealtimeClient) {
 	defer func() { s.TestingUnregister(client); _ = client.conn.Close() }()
 	client.conn.SetReadLimit(4096)
 	_ = client.conn.SetReadDeadline(time.Now().Add(realtimePongWait))
-	client.conn.SetPongHandler(func(string) error { return client.conn.SetReadDeadline(time.Now().Add(realtimePongWait)) })
+	client.conn.SetPongHandler(func(string) error {
+		s.meter.Received("pong", 0)
+		return client.conn.SetReadDeadline(time.Now().Add(realtimePongWait))
+	})
 	for {
 		_, payload, err := client.conn.ReadMessage()
 		if err != nil {
 			return
 		}
+		s.meter.Received(metrics.FrameType(payload), len(payload))
 		s.handleClientMessage(client, payload)
 	}
 }
@@ -226,11 +232,13 @@ func (s *RealtimeService) writeLoop(client *TestingRealtimeClient) {
 			if err := client.conn.WriteMessage(websocket.TextMessage, payload); err != nil {
 				return
 			}
+			s.meter.Sent(metrics.FrameType(payload), len(payload))
 		case <-ticker.C:
 			_ = client.conn.SetWriteDeadline(time.Now().Add(realtimeWriteWait))
 			if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
+			s.meter.Sent("ping", 0)
 		case <-s.closed:
 			return
 		case <-client.TestingDone:

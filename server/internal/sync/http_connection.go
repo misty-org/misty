@@ -75,7 +75,7 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 	}
 	conn.SetReadLimit(SyncWorkspaceMaxOpBytes*4/3 + 64<<10)
 	_ = conn.SetReadDeadline(time.Now().Add(45 * time.Second))
-	conn.SetPongHandler(func(string) error { return heartbeat() })
+	conn.SetPongHandler(func(string) error { s.meter.Received("pong", 0); return heartbeat() })
 	windowStart := time.Now()
 	messages := 0
 	for {
@@ -93,9 +93,11 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 		}
 		var frame syncClientFrame
 		if err = decodeSync(bytes.NewReader(raw), &frame); err != nil {
+			s.meter.Received("invalid", len(raw))
 			send(map[string]any{"type": "error", "code": "invalid_sync_frame"})
 			continue
 		}
+		s.meter.Received(frame.Type, len(raw))
 		if version == syncWorkspaceProtocol && isWorkspaceFrame(frame.Type) {
 			bounded, stop := context.WithTimeout(ctx, 10*time.Second)
 			ok := s.handleWorkspaceFrame(bounded, identity, frame, send, watches)
@@ -174,12 +176,7 @@ func (s *BrowserSyncService) serveConnection(parent context.Context, conn *webso
 }
 
 func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocket.Conn, identity SyncConnectionIdentity, connectionID string, cursor int64, events <-chan db.AccountEvent, outgoing <-chan any, resume <-chan int64, watches <-chan workspaceWatch) {
-	write := func(value any) error {
-		if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
-			return err
-		}
-		return conn.WriteJSON(value)
-	}
+	write := func(value any) error { return writeSyncFrame(conn, s.meter, value) }
 	vault, err := s.store.BrowserSyncVault(ctx, identity.UserID)
 	if err != nil || vault == nil {
 		return
@@ -345,6 +342,7 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 			if conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)) != nil {
 				return
 			}
+			s.meter.Sent("ping", 0)
 		}
 	}
 }

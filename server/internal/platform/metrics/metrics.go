@@ -33,6 +33,7 @@ type Registry struct {
 	aiInvocations *prometheus.CounterVec
 	aiDuration    *prometheus.HistogramVec
 	aiFirstOutput *prometheus.HistogramVec
+	traffic       *traffic
 
 	mu       sync.Mutex
 	samplers []sampler
@@ -95,6 +96,7 @@ func New() *Registry {
 		}, []string{"surface", "action", "model"}),
 	}
 	registry.MustRegister(m.requests, m.duration, m.inFlight, m.sampleAge, m.sampleFail, m.aiInvocations, m.aiDuration, m.aiFirstOutput)
+	m.traffic = newTraffic(registry)
 	return m
 }
 
@@ -189,7 +191,7 @@ func (m *Registry) ageSampleAge(ctx context.Context, since time.Time) {
 	}
 }
 
-// Middleware records request counts and latency per route.
+// Middleware records request counts, latency, and body bytes per route.
 func (m *Registry) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// chi's wrapper preserves http.Hijacker and http.Flusher. A naive
@@ -205,6 +207,7 @@ func (m *Registry) Middleware(next http.Handler) http.Handler {
 			method := r.Method
 			m.requests.WithLabelValues(route, method, statusClass(wrapped.Status())).Inc()
 			m.duration.WithLabelValues(route, method).Observe(time.Since(started).Seconds())
+			m.traffic.recordHTTP(route, method, r.ContentLength, wrapped.BytesWritten())
 		}()
 
 		next.ServeHTTP(wrapped, r)

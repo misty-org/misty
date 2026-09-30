@@ -53,8 +53,10 @@ func Run() {
 		WorkerFunc(func(ctx context.Context) { runAIEmbeddingProcessing(ctx, server) }),
 	)
 	// Domain gauges refresh on their own schedule so a scrape never holds a
-	// database connection.
-	if server.Metrics != nil {
+	// database connection. Kept as a timer (not an event) because gauges are
+	// point-in-time samples, but only when /metrics is mounted: without a
+	// token nobody can read them, and the sampler's queries would be pure load.
+	if server.Metrics != nil && metricsToken() != "" {
 		server.Metrics.StartSampling(workerContext, 15*time.Second)
 	}
 
