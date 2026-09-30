@@ -204,14 +204,20 @@ describe("BrowserWorkspace", () => {
       await settleBrowserOverlay();
     });
     const focusedOptions = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(focusedOptions.some((option) => option.textContent?.includes("youtube.com"))).toBe(true);
+    expect(focusedOptions.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("youtube.com")]),
+    );
     await act(async () => {
       fireEvent.change(input!, { target: { value: "vimeo.com" } });
       await settleBrowserOverlay();
     });
     const options = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(options.some((option) => option.textContent?.includes("vimeo.com"))).toBe(true);
-    expect(options.some((option) => option.textContent?.includes("Search with Google"))).toBe(true);
+    expect(options.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("vimeo.com")]),
+    );
+    expect(options.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Search with Google")]),
+    );
   });
   it("opens a functional browser menu", async () => {
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));

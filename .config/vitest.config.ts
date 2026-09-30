@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -13,7 +14,7 @@ export default defineConfig({
     environment: "jsdom",
     // Each UI worker loads the application graph and a full DOM. Bound contention
     // so real interaction tests retain their normal timeouts in the full suite.
-    maxWorkers: 4,
+    maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)),
     include: ["src/**/*.test.{ts,tsx}"],
     restoreMocks: true,
     setupFiles: ["./src/tests/setup.ts"],
