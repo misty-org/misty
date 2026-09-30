@@ -13,6 +13,8 @@ import {
   type NativeSyncView,
 } from "./native";
 import { useBrowserSyncStore } from "./store";
+import { onWorkspace } from "./workspaceControl";
+import { captureBeforeSwitch, nativeCommandMs, withDeadline } from "./deadline";
 
 type Pending = { deviceId: string; mode?: boolean; name?: string; started: number };
 /** Shared roster for Overview and the popup. All mode changes await server acknowledgment. */
@@ -45,7 +47,7 @@ export function SyncDeviceList({
         return;
       reading = true;
       try {
-        const latest = await readNativeSync();
+        const latest = await withDeadline(readNativeSync(), nativeCommandMs);
         if (
           !stopped &&
           generation === readApiSessionGeneration() &&
@@ -77,7 +79,7 @@ export function SyncDeviceList({
         ? device?.display_name === pending.name
         : pending.mode !== undefined
           ? device?.full_sync === pending.mode
-          : session.sync?.driving_workspace === pending.deviceId;
+          : onWorkspace(session) === pending.deviceId;
     if (confirmed) {
       setPending(null);
       setEditing(null);
@@ -107,18 +109,24 @@ export function SyncDeviceList({
       useBrowserSyncStore.getState().session?.session_id === session.session_id;
     try {
       if (request.name !== undefined)
-        await renameNativeDevice(session.session_id, request.deviceId, request.name);
+        await withDeadline(
+          renameNativeDevice(session.session_id, request.deviceId, request.name),
+          nativeCommandMs,
+        );
       else if (request.mode !== undefined)
-        await controlNativeDevice(session.session_id, request.deviceId, request.mode, false);
+        await withDeadline(
+          controlNativeDevice(session.session_id, request.deviceId, request.mode, false),
+          nativeCommandMs,
+        );
       else {
         // Part A3 owns replacement of the native exclusive claim contract. Keep
         // existing native safety overlays until that backend migration lands.
-        await import("./restore/capture").then(({ captureAll }) => captureAll(true));
+        await captureBeforeSwitch();
         if (!valid()) return;
-        await claimNativeWorkspace(session.session_id, request.deviceId);
+        await withDeadline(claimNativeWorkspace(session.session_id, request.deviceId), nativeCommandMs);
       }
       if (!valid()) return;
-      const latest = await readNativeSync();
+      const latest = await withDeadline(readNativeSync(), nativeCommandMs);
       if (
         valid() &&
         latest?.session_id === session.session_id &&
@@ -144,7 +152,7 @@ export function SyncDeviceList({
             : device.connection === "Offline"
               ? "Offline"
               : "Connection unknown";
-          const opened = session.sync?.driving_workspace === device.device_id;
+          const opened = onWorkspace(session) === device.device_id;
           const reason = !online
             ? "Connect this device to open its tabs."
             : !device.full_sync || session.full_sync === false
