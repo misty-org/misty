@@ -120,8 +120,11 @@ func TestSettlementSurvivesOutageAndRetriesSameKey(t *testing.T) {
 		t.Fatal("usage was not durably accepted")
 	}
 	a.fail = false
-	if err := r.Flush(context.Background(), 10); err != nil {
-		t.Fatal(err)
+	if count, err := r.FlushBatch(context.Background(), 10); err != nil || count != 1 {
+		t.Fatal("completed batch count", count, err)
+	}
+	if count, err := r.FlushBatch(context.Background(), 10); err != nil || count != 0 {
+		t.Fatal("empty batch must allow worker to sleep", count, err)
 	}
 	if len(s.entries) != 0 || len(a.keys) != 2 || a.keys[0] != a.keys[1] {
 		t.Fatal("retry was not idempotent", a.keys)

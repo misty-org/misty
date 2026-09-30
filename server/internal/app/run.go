@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -66,63 +67,39 @@ func Run() {
 }
 
 func runSocialDeliveryProcessing(ctx context.Context, server *Server) {
-	if server.Spaces == nil {
+	if server.Spaces == nil || strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_SOCIAL_SEND_DISABLED")), "true") {
 		return
 	}
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Spaces.ProcessSocialDelivery(ctx, 20); err != nil {
-				log.Printf("Social delivery processing failed: %v", err)
-			}
-		}
-	}
+	runDatabaseQueue(ctx, server, "social", func(ctx context.Context) (int, error) { return server.Spaces.ProcessSocialDelivery(ctx, 20) })
 }
 
 func runAIEmbeddingProcessing(ctx context.Context, server *Server) {
 	if server.AIAnalyzer == nil || strings.TrimSpace(server.AIAnalyzer.APIKey) == "" {
 		return
 	}
-	process := func() {
-		// Claim immediately before each provider call so queued work cannot exhaust
-		// its lease while earlier chunks are still being processed.
-		for i := 0; i < 32 && ctx.Err() == nil; i++ {
+	runDatabaseQueue(ctx, server, "embedding", func(ctx context.Context) (int, error) {
+		processed := 0
+		// Claim immediately before each provider call; queued chunks cannot outlive
+		// their leases while an earlier chunk is processed.
+		for processed < 32 && ctx.Err() == nil {
 			chunks, err := server.Database.PendingAIEmbeddingChunks(ctx, 1)
 			if err != nil {
-				log.Printf("AI retrieval embedding scan failed: %v", err)
-				return
+				return processed, err
 			}
 			if len(chunks) == 0 {
-				return
+				return processed, nil
 			}
 			chunk := chunks[0]
+			processed++
 			if err := embedRetrievalChunk(ctx, server, chunk); err != nil {
-				log.Printf("AI retrieval embedding attempt failed: %v", err)
 				cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-				if retryErr := server.Database.RetryAIEmbeddingChunk(cleanup, chunk); retryErr != nil {
-					log.Printf("AI embedding retry persistence failed: %v", retryErr)
-				}
+				retryErr := server.Database.RetryAIEmbeddingChunk(cleanup, chunk)
 				cancel()
-				return
+				return processed, errors.Join(err, retryErr)
 			}
 		}
-	}
-
-	process()
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			process()
-		}
-	}
+		return processed, ctx.Err()
+	})
 }
 
 func runPersonalAgentTaskProcessing(ctx context.Context, server *Server) {
@@ -139,88 +116,6 @@ func runPersonalAgentTaskProcessing(ctx context.Context, server *Server) {
 		case <-ticker.C:
 			if _, err := server.Spaces.ProcessAssignedPersonalAgentRuns(ctx, workerID, 2); err != nil {
 				log.Printf("Personal Agent Task processing failed: %v", err)
-			}
-		}
-	}
-}
-
-func runNoteControlProcessing(ctx context.Context, server *Server) {
-	if server.Spaces == nil {
-		return
-	}
-	log.Printf("Journal collaboration command processing enabled for %s", server.Spaces.JournalCollab().Host)
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Spaces.ProcessNoteControlCommands(ctx, 50); err != nil {
-				log.Printf("Journal note collaboration command processing failed: %v", err)
-			}
-			if _, err := server.Spaces.ProcessDrawingControlCommands(ctx, 50); err != nil {
-				log.Printf("Drawing collaboration command processing failed: %v", err)
-			}
-			if _, err := server.Database.PurgeDeletedDrawings(ctx, 100); err != nil {
-				log.Printf("Drawing retention purge failed: %v", err)
-			}
-		}
-	}
-}
-
-func runLibraryIntelligenceProcessing(ctx context.Context, server *Server) {
-	if server.Library == nil {
-		return
-	}
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-	workerID := "intelligence-worker-" + uuid.NewString()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Library.ProcessIntelligenceJobs(ctx, workerID, 2); err != nil {
-				log.Printf("Library intelligence processing failed: %v", err)
-			}
-		}
-	}
-}
-
-func runLibraryRenditionProcessing(ctx context.Context, server *Server) {
-	if server.Library == nil {
-		return
-	}
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	workerID := "rendition-worker-" + uuid.NewString()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Library.ProcessRenditionJobs(ctx, workerID, 2); err != nil {
-				log.Printf("Library rendition processing failed: %v", err)
-			}
-		}
-	}
-}
-
-func runLibraryPeopleProcessing(ctx context.Context, server *Server) {
-	if server.Library == nil {
-		return
-	}
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-	workerID := "people-worker-" + uuid.NewString()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Library.ProcessPeopleJobs(ctx, workerID, 4); err != nil {
-				log.Printf("Library People processing failed: %v", err)
 			}
 		}
 	}
