@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"github.com/lib/pq"
 )
@@ -48,6 +49,7 @@ type RealtimeService struct {
 	TestingViewers map[string]map[*TestingRealtimeClient]struct{}
 	closed         chan struct{}
 	closeOnce      sync.Once
+	meter          *metrics.SocketMeter
 }
 
 func NewRealtimeService(database *db.Database, dsn string) *RealtimeService {
