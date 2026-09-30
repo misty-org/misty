@@ -1,4 +1,5 @@
 import { telemetrySetErrorReportingEnabled } from "@/native";
+import { secureId } from "@/shared/platform/secureId";
 import type { CommonClientProperties, TelemetryClient } from "@/telemetry/model/interfaces/types";
 import { analytics } from "./client";
 import { clientMetadata } from "./metadata";
@@ -21,10 +22,7 @@ export class AnalyticsLifecycleManager {
     private readonly storage: Pick<Storage, "getItem" | "setItem">,
     private readonly metadata: () => Promise<CommonClientProperties>,
     private readonly now: () => number = Date.now,
-    private readonly uuid: () => string = () =>
-      typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    private readonly uuid: () => string = secureId,
   ) {
     this.lastActivity = now();
     try {

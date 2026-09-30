@@ -6,6 +6,7 @@ import {
 } from "@/api/deployment/api";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { devicesApi } from "@/api/devices/api";
+import { secureId } from "@/shared/platform/secureId";
 import type { AgentDevice } from "../model/interfaces/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
 
@@ -19,10 +20,7 @@ const heartbeatIntervalMs = 30_000;
 // failures only for this deployment/account generation and exact identity.
 const registrationAttempts = new Map<string, Promise<ServerTrustedDevice>>();
 const registrationConflicts = new Map<string, ManagedAiRequestError>();
-export let browserDeviceSessionId =
-  typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `browser-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+export let browserDeviceSessionId = secureId();
 
 export const agentDeviceCapabilities = {
   document_intelligence: true,
