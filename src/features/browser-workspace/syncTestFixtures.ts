@@ -46,6 +46,7 @@ export function syncSession(overrides: Partial<NativeSyncView> = {}): NativeSync
       device_id: "d",
       shared_workspace_id: "shared",
       driving_workspace: "d",
+      on_workspace: "d",
       workspaces: [
         {
           workspace_id: "d",

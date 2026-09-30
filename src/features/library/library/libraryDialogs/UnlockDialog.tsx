@@ -32,7 +32,8 @@ export function UnlockDialog({ model }: { model: UnlockDialogModel }) {
             </DialogTitle>
             <DialogDescription>
               {setup
-                ? "Create a separate password for Hidden and Recently Deleted. This password protects your library across devices and does not change how you sign in to Misty."
+                ? "Create a separate password for Hidden and Recently Deleted. " +
+                  "This password protects your library across devices and does not change how you sign in to Misty."
                 : "Enter your library password to temporarily access this protected collection."}
             </DialogDescription>
           </DialogHeader>

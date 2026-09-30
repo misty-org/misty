@@ -9,7 +9,9 @@ export interface WorkspaceRow {
   os: string;
   local: boolean;
   connection: string;
-  /** Who is using this device's workspace right now. */
+  /** This machine shows and edits this workspace now. */
+  current: boolean;
+  /** Who holds this workspace's sign-in lease. Not a lock: any machine may open it. */
   seat: WorkspaceSeat;
   seatName: string | null;
   canSwitch: boolean;
@@ -34,6 +36,7 @@ export function workspaceRows(
   ownerName?: string | null,
 ): WorkspaceRow[] {
   const rows = deviceRows(session, ownerName);
+  const shown = onWorkspace(session);
   const nameOf = (id: string) => rows.find((row) => row.device_id === id)?.name ?? "another device";
   return rows.map((row) => {
     const driver = state.workspaces.find(
@@ -52,16 +55,17 @@ export function workspaceRows(
       os: osLabel(row.platform, row.os_version),
       local: row.local,
       connection: row.connection,
+      current: row.device_id === shown,
       seat,
       // A device using its own workspace just reads "In use".
       seatName: driver && seat === "other" && driver !== row.device_id ? nameOf(driver) : null,
-      canSwitch: seat !== "you" && row.full_sync && session.full_sync !== false,
+      canSwitch: row.device_id !== shown && row.full_sync && session.full_sync !== false,
     };
   });
 }
 
 export function seatText(row: WorkspaceRow) {
-  if (row.seat === "you") return row.local ? "In use here" : "Open on this device";
+  if (row.current) return row.local ? "In use here" : "Open on this device";
   if (row.seat === "other") return row.seatName ? `In use on ${row.seatName}` : "In use";
   return row.connection === "Offline" ? "Offline" : "Not in use";
 }

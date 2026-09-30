@@ -1,5 +1,6 @@
 import type { NativeSyncView, SyncDeviceInfo } from "./native";
 import { deviceLabels } from "./deviceNames";
+import { currentDeviceId } from "./websiteData";
 
 export function deviceRows(session: NativeSyncView, ownerName?: string | null) {
   const revoked = new Set(
@@ -70,7 +71,7 @@ export function publishingDeviceId(session: NativeSyncView): string | null {
   if (session.sync)
     return (
       session.sync.workspaces.find(
-        (workspace) => workspace.workspace_id === session.sync?.driving_workspace,
+        (workspace) => workspace.workspace_id === currentDeviceId(session),
       )?.driver_device_id ?? null
     );
   return session.workspace.active_device?.device_id ?? null;
