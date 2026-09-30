@@ -28,7 +28,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 ciborium = "0.2"
 dirs = "6.0.0"
 hex = "0.4"
-jsonwebtoken = "9"
+jsonwebtoken = { version = "10.3", default-features = false, features = ["aws_lc_rs"] }
 misty-credential-store = { path = "vendor/misty-credential-store" }
 misty-browser-sync = { path = "crates/browser-sync" }
 libc = "0.2"
@@ -72,7 +72,7 @@ xcap = "0.9"
 iroh = "1.0.3"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 zune-psd = "0.5.1"
-tantivy = "0.25"
+tantivy = "0.26.2"
 calamine = "0.31"
 csv = "1"
 pdf-extract = "0.12"
@@ -97,6 +97,8 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
+# Use the JWT crypto backend's bundled assembly when NASM is unavailable.
+aws-lc-rs = { version = "1.18.1", features = ["prebuilt-nasm"] }
 webview2-com = "0.38.2"
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
@@ -132,3 +134,6 @@ arboard = { path = "vendor/arboard" }
 
 # Honor focused(false) when creating background WebKit views on macOS.
 wry = { path = "vendor/wry" }
+
+# Backport the upstream VariantStrIter soundness fix to Tauri's GTK3-compatible GLib.
+glib = { path = "vendor/glib" }
