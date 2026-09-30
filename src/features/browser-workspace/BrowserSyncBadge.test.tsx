@@ -143,9 +143,10 @@ it("waits for acknowledged opening and keeps account transitions safe", async ()
   );
   expect(mocks.claim).toHaveBeenCalledWith("s", "other");
   expect(screen.getByText("Waiting for the device to confirm…")).toBeTruthy();
+  // Opening moves this machine onto the workspace; the online owner keeps its lease.
   act(() =>
     useBrowserSyncStore.setState({
-      session: syncSession({ sync: { ...syncSession().sync!, driving_workspace: "other" } }),
+      session: syncSession({ sync: { ...syncSession().sync!, on_workspace: "other" } }),
     }),
   );
   expect(screen.getByText("Open here")).toBeTruthy();
