@@ -433,7 +433,7 @@ impl WorkerHandle {
     }
 
     /// Queues renderer edits durably. Folders and bookmarks go to the shared
-    /// workspace; windows, tabs and views to the workspace this device drives.
+    /// workspace; windows, tabs and views to the workspace this machine is on.
     pub async fn workspace_changes(&self, changes: Vec<crate::document::Change>) -> Result<()> {
         self.call(|reply| Command::WorkspaceChanges(changes, reply))
             .await

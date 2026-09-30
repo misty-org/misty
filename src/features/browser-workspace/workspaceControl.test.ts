@@ -80,3 +80,16 @@ it("a device using its own workspace reads just In use", () => {
   const view = session("a", { a: "a", c: "c" });
   expect(seatText(workspaceRows(view, view.sync!).find((r) => r.deviceId === "c")!)).toBe("In use");
 });
+
+it("marks the workspace this machine is on, not the lease it holds", () => {
+  // This machine holds its own lease but opened Studio's tabs; Studio keeps its lease.
+  const view = session("a", { a: "a", c: "c" });
+  view.sync!.on_workspace = "c";
+  const rows = workspaceRows(view, view.sync!);
+  const row = (id: string) => rows.find((r) => r.deviceId === id)!;
+  expect(row("c").current).toBe(true);
+  expect(row("c").canSwitch).toBe(false);
+  expect(seatText(row("c"))).toBe("Open on this device");
+  expect(row("a").current).toBe(false);
+  expect(row("a").canSwitch).toBe(true);
+});

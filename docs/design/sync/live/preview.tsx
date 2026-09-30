@@ -20,7 +20,7 @@ window.__TAURI_INTERNALS__ = { invoke: async (command, args) => {
   if(command==='browser_sync_lock'){native=null;return;}
   if(command==='browser_sync_connect'){native=syncSession();return structuredClone(native);}
   if(command==='browser_sync_generate_secret')return 'A'.repeat(43)+'=';
-  if(command==='browser_sync_claim'){native.sync.driving_workspace=args.treeId;return;}
+  if(command==='browser_sync_claim'){native.sync.on_workspace=args.workspaceId;return;}
   return null;
 }};
 useSettingsStore.setState({activeSection:'sync',settings:{document:{},revision:1},working:false,updateSetting:(section,key,value)=>useSettingsStore.setState(s=>({settings:{...s.settings,document:{...s.settings.document,[section]:{...s.settings.document[section],[key]:value}}}}))});

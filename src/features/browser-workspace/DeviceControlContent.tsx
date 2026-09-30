@@ -13,6 +13,7 @@ import { useBrowserSyncStore } from "./store";
 import { deviceRows } from "./deviceControl";
 import { useUserStore } from "@/features/auth/core";
 import { WorkspaceSwitcherList } from "./WorkspaceSwitcherList";
+import { captureBeforeSwitch, nativeCommandMs, withDeadline } from "./deadline";
 
 type Pending = { deviceId: string; fullSync: boolean | null; started: number };
 export function DeviceControlContent({
@@ -41,7 +42,7 @@ export function DeviceControlContent({
       if (reading || !valid()) return;
       reading = true;
       try {
-        const latest = await readNativeSync();
+        const latest = await withDeadline(readNativeSync(), nativeCommandMs);
         if (
           !valid() ||
           latest?.session_id !== session.session_id ||
@@ -100,12 +101,15 @@ export function DeviceControlContent({
       // Tree mode: switching claims that device's workspace on this device.
       if (fullSync === null && session.sync) {
         // Save this workspace's pages before leaving it for another one.
-        // Loaded on demand: capture pulls in the workspace store.
-        await import("./restore/capture").then(({ captureAll }) => captureAll(true));
-        await claimNativeWorkspace(session.session_id, deviceId);
+        await captureBeforeSwitch();
+        await withDeadline(claimNativeWorkspace(session.session_id, deviceId), nativeCommandMs);
       } else if (fullSync === null && deviceId === session.device_id)
-        await activateNativeDevice(session.session_id);
-      else await controlNativeDevice(session.session_id, deviceId, fullSync, fullSync === null);
+        await withDeadline(activateNativeDevice(session.session_id), nativeCommandMs);
+      else
+        await withDeadline(
+          controlNativeDevice(session.session_id, deviceId, fullSync, fullSync === null),
+          nativeCommandMs,
+        );
     } catch {
       if (mounted.current && generation === readApiSessionGeneration()) {
         setPending(null);

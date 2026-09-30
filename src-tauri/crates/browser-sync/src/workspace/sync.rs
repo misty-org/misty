@@ -51,10 +51,11 @@ pub struct WorkspaceContent {
 pub struct SyncState {
     pub device_id: String,
     pub shared_workspace_id: String,
-    /// The workspace this device drives; `None` after another device took it.
+    /// The workspace whose sign-in lease this device holds; `None` while another
+    /// machine holds it. Not a lock: editing follows `on_workspace`.
     pub driving_workspace: Option<String>,
     pub workspaces: Vec<Workspace>,
-    /// Verified content of the driven workspace and the shared workspace.
+    /// Verified content of the workspace this machine is on and the shared workspace.
     pub contents: BTreeMap<String, WorkspaceContent>,
     /// Workspaces with local edits not yet accepted by the server.
     pub pending: BTreeSet<String>,
@@ -868,8 +869,8 @@ impl WorkspaceSync {
     }
 
     /// Publishes at most one op per workspace, only once the workspace's server state
-    /// has arrived on this connection, and only for workspaces this device may
-    /// write (its driven workspace, and the shared workspace).
+    /// has arrived on this connection, for the workspace this machine is on and
+    /// the shared workspace. Sign-in writes go only with the lease.
     pub fn tick(
         &mut self,
         store: &mut Store,
