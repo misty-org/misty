@@ -311,3 +311,63 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
     native.invoke.mock.calls.filter(([command]) => command === "browser_recovery_write"),
   ).toHaveLength(1);
 });
+
+it("restores what it can from an unreadable save and lists the rest, keeping the original", async () => {
+  native.values.set("a:workspace", { revision: 1, value: "{not a workspace" });
+  const h = await context();
+  await h.restoreNativeWorkspace("a");
+  expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
+    usable: true,
+    ready: true,
+    issue: null,
+    notRestored: [{ id: "workspace", title: "Saved windows and tabs" }],
+  });
+  const archived = [...native.values].filter(([id]) => id.startsWith("a:archive:"));
+  expect(archived.map(([, record]) => record.value)).toContain("{not a workspace");
+  // The fresh workspace saves normally over the unreadable copy.
+  const tab = h.workspace.getState().openBrowserView({ url: "https://after.example" });
+  await h.flushNativeWorkspace("a");
+  expect(native.values.get("a:workspace")?.value).toContain(tab.id);
+});
+
+it("keeps other tabs when one saved view cannot be restored", async () => {
+  const h = await context();
+  await h.restoreNativeWorkspace("a");
+  const damaged = h.workspace.getState().openBrowserView({ url: "https://damaged.example" });
+  const kept = h.workspace.getState().openBrowserView({ url: "https://kept.example" });
+  await h.flushNativeWorkspace("a");
+  h.closeNativeWorkspaceRecovery();
+  const record = native.values.get("a:workspace")!;
+  const saved = JSON.parse(record.value);
+  // An unparseable URL is damage restore cannot repair, so migrating it throws.
+  // (A missing or non-string route is repaired instead.)
+  let hits = 0;
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const view = node as { id?: string; route?: unknown };
+    if (view.id === damaged.id && "route" in view) {
+      view.route = "http://[";
+      hits++;
+    }
+    Object.values(node).forEach(walk);
+  };
+  walk(saved);
+  expect(hits).toBeGreaterThan(0);
+  native.values.set("a:workspace", { ...record, value: JSON.stringify(saved) });
+  const again = await context();
+  await again.restoreNativeWorkspace("a");
+  const state = again.useWorkspaceRecoveryState.getState();
+  expect(state).toMatchObject({ usable: true, ready: true, issue: null });
+  expect(state.notRestored.map((view) => view.id)).toContain(damaged.id);
+  expect(JSON.stringify(again.workspace.getState().windowsByScope)).toContain(kept.id);
+});
+
+it("lists refused saves per item instead of reporting a blanket failure", async () => {
+  const h = await context();
+  native.fail = true;
+  await h.restoreNativeWorkspace("a");
+  const state = h.useWorkspaceRecoveryState.getState();
+  expect(state.issue).toBeNull();
+  expect(state.usable).toBe(true);
+  expect(state.saves.failed.map((f) => f.key)).toContain("workspace");
+});

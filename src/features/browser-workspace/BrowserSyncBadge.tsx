@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight, RefreshCw, Settings } from "lucide-react";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { Button, cn, Popover, PopoverContent, PopoverTrigger, IconButton } from "@/shared/ui";
 import { RestoreStatusList } from "./restore/RestoreStatusList";
+import { LocalSaveStatusList } from "./restore/LocalSaveStatusList";
+import { SyncedTabsStatusList } from "./restore/SyncedTabsStatusList";
 import { SyncDeviceList } from "./SyncDeviceList";
 import { SyncStatusView } from "./SyncStatusView";
 import { SyncUnlockForm } from "./SyncAccountSettings";
@@ -55,6 +57,7 @@ export function BrowserSyncBadge({
           status={status}
           busy={controller.busy}
           hideAction={controller.form}
+          compact
           onAction={() => void controller.retry()}
         />
         {controller.form && (
@@ -66,7 +69,7 @@ export function BrowserSyncBadge({
           aria-label="Devices in this workspace"
           className="mt-4 border-t border-charcoal-border pt-3"
         >
-          <h2 className="text-xs font-medium text-cream-muted">Devices in this workspace</h2>
+          <h2 className="text-xs font-medium text-cream-muted">Devices</h2>
           {session ? (
             <SyncDeviceList key={session.session_id} session={session} compact />
           ) : (
@@ -76,16 +79,22 @@ export function BrowserSyncBadge({
           )}
         </section>
         <RestoreStatusList />
+        <LocalSaveStatusList />
+        {session && <SyncedTabsStatusList session={session} />}
         <div className="mt-2 border-t border-charcoal-border pt-3">
           <Button
             variant="ghost"
             className="w-full justify-between"
+            aria-label="Sync settings"
             onClick={() => {
               setOpen(false);
               onOpenSettings();
             }}
           >
-            Manage sync
+            <span className="flex items-center gap-2">
+              <Settings aria-hidden className="size-4" />
+              Settings
+            </span>
             <ChevronRight aria-hidden className="size-4" />
           </Button>
         </div>

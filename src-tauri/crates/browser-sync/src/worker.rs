@@ -658,6 +658,13 @@ where
             result = self.run_inner() => result,
         };
         if let Err(error) = &result {
+            // The status only carries a code; keep the cause for diagnosis.
+            // SQLite errors name the failing constraint or table, never values.
+            let line = match error {
+                Error::Storage(cause) => format!("browser sync stopped: {error}: {cause}"),
+                _ => format!("browser sync stopped: {error}"),
+            };
+            eprintln!("{line}");
             let issue = match error {
                 Error::Authentication => "sign_in_required",
                 Error::DeviceForbidden => "sync_device_forbidden",

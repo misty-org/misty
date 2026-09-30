@@ -264,6 +264,7 @@ pub fn run() {
 
     builder
         .on_window_event(|_window, _event| {
+            platform::app_lifecycle::window_event(_window, _event);
             #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 let (window, event) = (_window, _event);
@@ -302,6 +303,7 @@ pub fn run() {
                     crate::infra::workspace_recovery::browser_recovery_read,
                     crate::infra::workspace_recovery::browser_recovery_write,
                     crate::infra::workspace_recovery::browser_recovery_forget,
+                    crate::platform::app_lifecycle::app_quit_confirmed,
                     crate::infra::browser_sync::browser_sync_generate_secret,
                     crate::infra::browser_sync::browser_sync_setup,
                     crate::infra::browser_sync::browser_sync_connect,
@@ -758,19 +760,5 @@ pub fn run() {
         })
         .build(context)
         .expect("failed to build Misty Tauri app")
-        .run(|_app, event| {
-            // Dock activation must work even if the frontend is still loading
-            // or failed before it could report readiness.
-            #[cfg(target_os = "macos")]
-            if matches!(event, tauri::RunEvent::Reopen { .. }) {
-                if let Err(error) = tray::show_main_window(_app) {
-                    eprintln!("Could not reopen Misty: {error}");
-                }
-            }
-            if matches!(event, tauri::RunEvent::Exit) {
-                #[cfg(desktop)]
-                platform::mini_app::shutdown(_app);
-                telemetry::shutdown();
-            }
-        });
+        .run(platform::app_lifecycle::run_event);
 }

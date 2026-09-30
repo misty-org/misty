@@ -184,6 +184,26 @@ it("restores Space routes from another device without changing their pane", () =
   });
 });
 
+it("gives a synced tool view without a route its tool's root route", () => {
+  const record = tabRecord("tab:files", "layout:a", "pane:a");
+  const { tool_route: _omitted, ...fields } = {
+    ...record.fields,
+    surface: "files" as const,
+    url: null,
+    profile_id: null,
+  };
+  // Records from older clients may omit tool_route entirely.
+  record.fields = fields as typeof record.fields;
+  const result = projectWorkspace(
+    view([windowRecord("window:a"), layoutRecord("layout:a", "window:a", "pane:a"), record]),
+    local(),
+  );
+  expect(dockLeaves(result.windows[0].layout.root)[0].views[0]).toMatchObject({
+    surfaceId: "files",
+    route: "/files",
+  });
+});
+
 describe("selection after a remote close", () => {
   const records = (layouts: string[]): SharedRecord[] => [
     windowRecord("window:a"),

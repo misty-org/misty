@@ -43,7 +43,10 @@ vi.mock("@/features/workspace/nativeWorkspaceRecovery", () => ({
     ready: true,
     usable: true,
     issue: null,
+    saves: { pending: [], failed: [] },
+    notRestored: [],
   })),
+  restoreNativeWorkspace: vi.fn(async () => undefined),
 }));
 vi.mock("@/features/workspace/useWorkspaceRecoveryRetry", () => ({
   retryWorkspaceRecovery: mocks.recovery,
@@ -95,11 +98,13 @@ async function open(settings = vi.fn()) {
 it("leads with status and detail, shows visible tabs actions and no mode switches", async () => {
   const settings = await open();
   const popup = screen.getByRole("dialog", { name: "Sync" });
-  expect(within(popup).getByText(/Your workspace and account settings are synced/)).toBeTruthy();
+  // Healthy status is one line: the title, with no explanatory sentence.
+  expect(within(popup).getByText("Up to date")).toBeTruthy();
+  expect(within(popup).queryByText(/Your workspace and account settings are synced/)).toBeNull();
   expect(within(popup).getByRole("button", { name: "Open tabs from Office here" })).toBeTruthy();
   expect(within(popup).queryByRole("switch")).toBeNull();
   expect(popup.textContent).not.toMatch(/take over|seat|Switch to/);
-  fireEvent.click(within(popup).getByRole("button", { name: "Manage sync" }));
+  fireEvent.click(within(popup).getByRole("button", { name: "Sync settings" }));
   expect(settings).toHaveBeenCalledOnce();
   expect(screen.queryByRole("dialog")).toBeNull();
 });
@@ -142,14 +147,16 @@ it("waits for acknowledged opening and keeps account transitions safe", async ()
     fireEvent.click(screen.getByRole("button", { name: "Open tabs from Office here" })),
   );
   expect(mocks.claim).toHaveBeenCalledWith("s", "other");
-  expect(screen.getByText("Waiting for the device to confirm…")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Open tabs from Office here" }).textContent).toBe(
+    "Opening…",
+  );
   // Opening moves this machine onto the workspace; the online owner keeps its lease.
   act(() =>
     useBrowserSyncStore.setState({
       session: syncSession({ sync: { ...syncSession().sync!, on_workspace: "other" } }),
     }),
   );
-  expect(screen.getByText("Open here")).toBeTruthy();
+  expect(screen.getByText("Viewing")).toBeTruthy();
 });
 it("does not reconnect after an account change during recovery", async () => {
   useWorkspaceRecoveryState.setState({ issue: "disk" });
@@ -217,4 +224,59 @@ it("still reconnects the workspace when settings refresh fails", async () => {
   mocks.refresh.mockRejectedValue(new Error("settings unavailable"));
   expect(await retrySync("a")).toBe("complete");
   expect(mocks.unlock).toHaveBeenCalledOnce();
+});
+
+it("lists what has not synced yet, per tab, and says everything else is synced", async () => {
+  const view = syncSession();
+  view.sync = {
+    ...view.sync!,
+    unsynced: [
+      { workspace_id: "d", kind: "view", id: "v-gone", deleted: true, title: "Mail" },
+      { workspace_id: "d", kind: "tab", id: "t1", deleted: false, title: null },
+    ],
+    retired_edits: 1,
+  };
+  useBrowserSyncStore.setState({ session: view });
+  await open();
+  const section = screen.getByRole("region", { name: "Synced across devices" });
+  expect(within(section).getByText("Mail")).toBeTruthy();
+  expect(within(section).getByText("Closed · waiting to sync")).toBeTruthy();
+  expect(within(section).getByText("Tab arrangement")).toBeTruthy();
+  expect(within(section).getByText("Kept on this device · not synced")).toBeTruthy();
+  expect(within(section).getByText("Everything else is synced")).toBeTruthy();
+});
+
+it("shows no per-tab list when everything is synced", async () => {
+  await open();
+  expect(screen.queryByRole("region", { name: "Synced across devices" })).toBeNull();
+});
+
+it("offers a way back to this device's tabs and says whose tabs each device shows", async () => {
+  const view = syncSession();
+  view.sync = {
+    ...view.sync!,
+    on_workspace: "other",
+    workspaces: [
+      ...view.sync!.workspaces,
+      {
+        workspace_id: "other",
+        shared: false,
+        driver_device_id: "d",
+        driver_epoch: "o",
+        driver_seen_at: 1,
+        version: 1,
+      },
+    ],
+  };
+  useBrowserSyncStore.setState({ session: view });
+  await open();
+  const popup = screen.getByRole("dialog", { name: "Sync" });
+  expect(within(popup).getByText("This device · Viewing Office")).toBeTruthy();
+  expect(within(popup).getByRole("button", { name: "Show this device’s tabs" }).textContent).toBe(
+    "Return",
+  );
+  await act(async () =>
+    fireEvent.click(within(popup).getByRole("button", { name: "Show this device’s tabs" })),
+  );
+  expect(mocks.claim).toHaveBeenCalledWith("s", "d");
 });

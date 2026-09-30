@@ -6,6 +6,7 @@ import {
   recoveryKey,
   registerRecoveryFlush,
   type NativeRecoveryStorage,
+  type RecoverySaveStatus,
 } from "@/features/browser-workspace/recovery";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
@@ -14,14 +15,29 @@ import { workspaceStoreStorageKey, legacyWorkspaceCandidate } from "./workspaceR
 import { mergeRecoveredWorkspace } from "./mergeRecoveredWorkspace";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { initialWorkspaceWindow } from "./windows";
+import { collectUnrestoredViews, type UnrestoredView } from "./workspaceMigrations";
+import { SaveRetryBackoff } from "./saveRetryBackoff";
 
 const key = "workspace";
+const noSaves: RecoverySaveStatus = { pending: [], failed: [] };
+const closedRecoveryState = {
+  accountId: null,
+  ready: false,
+  usable: false,
+  issue: null,
+  saves: noSaves,
+  notRestored: [],
+};
+/** `issue` means this device cannot save at all. Per-item results live in
+ * `saves` (waiting in the pending file, or refused) and `notRestored`. */
 export const useWorkspaceRecoveryState = create<{
   accountId: string | null;
   ready: boolean;
   usable: boolean;
   issue: string | null;
-}>(() => ({ accountId: null, ready: false, usable: false, issue: null }));
+  saves: RecoverySaveStatus;
+  notRestored: UnrestoredView[];
+}>(() => ({ ...closedRecoveryState }));
 let temporary:
   | {
       accountId: string;
@@ -66,7 +82,7 @@ export function closeNativeWorkspaceRecovery() {
   temporary?.unregister();
   temporary = undefined;
   syncBaseline = undefined;
-  useWorkspaceRecoveryState.setState({ accountId: null, ready: false, usable: false, issue: null });
+  useWorkspaceRecoveryState.setState({ ...closedRecoveryState });
 }
 export async function flushNativeWorkspace(accountId: string) {
   if (temporary) {
@@ -114,21 +130,24 @@ export class WorkspaceRecoveryWriter {
     private storage: NativeRecoveryStorage,
     private capture: () => string,
     private failed: (error: unknown) => void,
+    private saved: () => void = () => undefined,
   ) {}
   changed() {
     this.since ??= Date.now();
     clearTimeout(this.timer);
     this.timer = setTimeout(
       () => {
-        void this.flush().catch(this.failed);
+        void this.flush().then(this.saved, this.failed);
       },
       Math.max(0, Math.min(400, 2000 - (Date.now() - this.since))),
     );
   }
-  async flush() {
+  /** `retry` also re-attempts saves native refused before; background saves
+   * leave those alone until their value changes. */
+  async flush(retry = false) {
     this.cancel();
     this.storage.setItem(key, this.capture());
-    await this.storage.flush();
+    await (retry ? this.storage.retry() : this.storage.flush());
   }
   cancel() {
     clearTimeout(this.timer);
@@ -156,13 +175,20 @@ async function restore(accountId: string, generation: number) {
     throw new Error("Save and close the previous workspace before changing accounts.");
   const attempt = ++epoch;
   const valid = () => attempt === epoch && generation === readApiSessionGeneration();
-  useWorkspaceRecoveryState.setState({ accountId, ready: false });
+  useWorkspaceRecoveryState.setState({ accountId, ready: false, notRestored: [] });
   let recovery: Awaited<ReturnType<typeof openWorkspaceRecovery>> | undefined;
   try {
     const apiBase = await resolveApiBase();
     if (!valid()) return;
-    recovery = await openWorkspaceRecovery(apiBase, accountId);
+    let backoff: SaveRetryBackoff | undefined;
+    recovery = await openWorkspaceRecovery(apiBase, accountId, (saves) => {
+      if (!valid()) return;
+      useWorkspaceRecoveryState.setState({ saves });
+      backoff?.update(saves.failed.length);
+    });
     const storage = recovery.storage;
+    // Refused saves are listed per item in `saves`; only other failures are an issue.
+    const saveIssue = (error: unknown) => (storage.status().failed.length ? null : failure(error));
     await storage.load(key);
     if (!valid()) return;
     const legacyKey = deploymentStorageKey(`misty:workspace-account:${accountId}`);
@@ -191,24 +217,37 @@ async function restore(accountId: string, generation: number) {
         : accountRaw);
     let restored: ReturnType<typeof migrateWorkspaceStore> | undefined;
     if (persisted !== null) {
-      const parsed = JSON.parse(persisted);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-        throw new Error(
-          "The saved workspace needs recovery. Its original copy has been preserved.",
-        );
-      const envelope = typeof parsed.version === "number" && parsed.state;
-      restored = migrateWorkspaceStore(
-        envelope ? parsed.state : parsed,
-        envelope ? parsed.version : 11,
-      );
-      if (!restored.layout) Object.assign(restored, initialWorkspaceWindow());
-      if (parsed.syncBaseline)
-        syncBaseline = migrateWorkspaceStore(parsed.syncBaseline, browserWorkspaceStoreVersion);
-      if (!valid()) return;
-      // Preserve the original independently of the normalized live snapshot.
+      // Preserve the original before decoding it, so whatever cannot be
+      // restored below is still kept exactly as it was saved.
       const archive = await recoveryKey("archive", [key, persisted]);
       await storage.load(archive);
       storage.setItem(archive, persisted);
+      if (!valid()) return;
+      const { result, skipped } = collectUnrestoredViews(() => {
+        try {
+          const parsed = JSON.parse(persisted);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+            throw new Error("The saved windows and tabs are not in a readable format.");
+          const envelope = typeof parsed.version === "number" && parsed.state;
+          const state = migrateWorkspaceStore(
+            envelope ? parsed.state : parsed,
+            envelope ? parsed.version : 11,
+          );
+          if (!state.layout) Object.assign(state, initialWorkspaceWindow());
+          if (parsed.syncBaseline)
+            syncBaseline = migrateWorkspaceStore(parsed.syncBaseline, browserWorkspaceStoreVersion);
+          return { state, error: null };
+        } catch (error) {
+          return { state: undefined, error };
+        }
+      });
+      restored = result.state;
+      // Report what did not come back instead of failing the whole restore.
+      useWorkspaceRecoveryState.setState({
+        notRestored: result.error
+          ? [{ id: key, title: "Saved windows and tabs", reason: failure(result.error) }]
+          : skipped,
+      });
     }
     if (!valid()) return;
     if (temporary?.accountId === accountId) {
@@ -228,15 +267,24 @@ async function restore(accountId: string, generation: number) {
       useWorkspaceStore.getState().reset();
     }
     const restoredBaseline = partialWorkspaceStore(useWorkspaceStore.getState());
-    const writer = new WorkspaceRecoveryWriter(storage, captureWorkspace, (error) => {
-      if (!valid()) return;
-      const issue = failure(error);
-      useWorkspaceRecoveryState.setState({ issue });
-    });
+    const writer = new WorkspaceRecoveryWriter(
+      storage,
+      captureWorkspace,
+      (error) => {
+        if (valid()) useWorkspaceRecoveryState.setState({ issue: saveIssue(error) });
+      },
+      // A later save that lands clears an earlier failure.
+      () => {
+        if (valid() && useWorkspaceRecoveryState.getState().issue)
+          useWorkspaceRecoveryState.setState({ issue: null });
+      },
+    );
     const unsubscribe = useWorkspaceStore.subscribe(() => writer.changed());
+    // Callers of this flush (retry, account switch, acknowledging a restore)
+    // ask explicitly, so refused saves are tried again.
     const flush = async () => {
       try {
-        await writer.flush();
+        await writer.flush(true);
         if (!valid()) return;
         for (const [source, raw] of sources) {
           if (localStorage.getItem(source) === raw) localStorage.removeItem(source);
@@ -245,18 +293,21 @@ async function restore(accountId: string, generation: number) {
       } catch (error) {
         if (valid()) {
           if (!useWorkspaceRecoveryState.getState().ready) syncBaseline ??= restoredBaseline;
-          useWorkspaceRecoveryState.setState({ issue: failure(error) });
+          useWorkspaceRecoveryState.setState({ issue: saveIssue(error) });
         }
         throw error;
       }
     };
     const unregister = registerRecoveryFlush(flush);
+    backoff = new SaveRetryBackoff(flush);
+    const retries = backoff;
     const release = recovery.release;
     owner = {
       accountId,
       storage,
       flush,
       close: () => {
+        retries.dispose();
         writer.cancel();
         unsubscribe();
         unregister();
@@ -265,7 +316,11 @@ async function restore(accountId: string, generation: number) {
     };
     recovery = undefined;
     useWorkspaceRecoveryState.setState({ accountId, usable: true });
-    await flush();
+    // The workspace is restored even if some saves were refused; those are
+    // listed per item and retried, not a reason for a temporary workspace.
+    await flush().catch((error) => {
+      if (!storage.status().failed.length) throw error;
+    });
   } catch (error) {
     if (valid()) continueWithTemporaryWorkspace(accountId, error);
   } finally {
