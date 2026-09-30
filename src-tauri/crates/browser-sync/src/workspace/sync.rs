@@ -78,6 +78,24 @@ pub struct SyncState {
     /// Every active device understands tab groups and collections.
     /// Set by the worker; tab groups sync only then.
     pub all_upgraded: bool,
+    /// Records with changes the server has not confirmed yet (queued or in
+    /// flight), one entry per record, so the renderer can name them per tab.
+    pub unsynced: Vec<UnsyncedRecord>,
+    /// Edits an older version set aside unsent: kept for recovery, never replayed.
+    pub retired_edits: usize,
+}
+
+/// One record waiting to sync. Crosses to the renderer as `{kind, id}`, so it
+/// gets renderer kind names like every other record.
+#[derive(Clone, Serialize, PartialEq)]
+pub struct UnsyncedRecord {
+    pub workspace_id: String,
+    pub kind: crate::document::entities::Kind,
+    pub id: String,
+    /// The newest waiting change removes the record (a closed tab).
+    pub deleted: bool,
+    /// The newest title a waiting change gave it, for records already gone here.
+    pub title: Option<String>,
 }
 
 pub enum Outgoing {
@@ -1001,12 +1019,35 @@ impl WorkspaceSync {
         if self.roster.is_empty() {
             shown.insert(self.device_id.clone());
         }
+        let mut unsynced = BTreeMap::new();
         for workspace in shown {
             if let Some(state) = self.states.get(&workspace) {
                 let pending = match root {
                     Some(root) => store.workspace_desired(root, &workspace)?,
                     None => None,
                 };
+                for change in pending.iter().flat_map(|desired| &desired.changes) {
+                    let (kind, id, fields, deleted) = match change {
+                        Change::Create { kind, id, fields }
+                        | Change::Patch { kind, id, fields } => (*kind, id, Some(fields), false),
+                        Change::Delete { kind, id } => (*kind, id, None, true),
+                    };
+                    let entry = unsynced
+                        .entry((workspace.clone(), kind, id.clone()))
+                        .or_insert_with(|| UnsyncedRecord {
+                            workspace_id: workspace.clone(),
+                            kind,
+                            id: id.clone(),
+                            deleted,
+                            title: None,
+                        });
+                    entry.deleted = deleted;
+                    if let Some(title) =
+                        fields.and_then(|f| f.get("title")).and_then(|t| t.as_str())
+                    {
+                        entry.title = Some(title.to_owned());
+                    }
+                }
                 // A pending edit that no longer applies shows the verified copy;
                 // the next tick rebases or drops it the same way.
                 let records = pending
@@ -1046,6 +1087,8 @@ impl WorkspaceSync {
             on_workspace: self.on_workspace().map(str::to_owned),
             collections: BTreeMap::new(),
             all_upgraded: false,
+            unsynced: unsynced.into_values().collect(),
+            retired_edits: store.retired_workspace_count()?,
         })
     }
 

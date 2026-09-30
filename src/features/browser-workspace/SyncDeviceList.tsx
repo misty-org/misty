@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Check, Laptop, Monitor } from "lucide-react";
 import { useUserStore } from "@/features/auth/core";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { Button } from "@/shared/ui";
@@ -145,6 +146,18 @@ export function SyncDeviceList({
       requesting.current = false;
     }
   };
+  const shownWorkspace = onWorkspace(session);
+  const nameOf = (id: string) => rows.find((row) => row.device_id === id)?.name ?? "another device";
+  /** The other device's workspace this device is on, judged by the lease it
+   * holds: a machine takes the lease of the workspace it is using. */
+  const showingOther = (deviceId: string) =>
+    deviceId === session.device_id
+      ? shownWorkspace && shownWorkspace !== deviceId
+        ? shownWorkspace
+        : null
+      : (session.sync?.workspaces.find(
+          (w) => !w.shared && w.driver_device_id === deviceId && w.workspace_id !== deviceId,
+        )?.workspace_id ?? null);
   return (
     <div>
       <ul className="divide-y divide-charcoal-border">
@@ -155,24 +168,32 @@ export function SyncDeviceList({
             : device.connection === "Offline"
               ? "Offline"
               : "Connection unknown";
-          const opened = onWorkspace(session) === device.device_id;
-          const reason = !online
-            ? "Connect this device to open its tabs."
-            : !device.full_sync || session.full_sync === false
-              ? "Enable Full sync on both devices to open tabs here."
-              : !session.sync
-                ? "Update Misty on both devices before opening this workspace's tabs here."
-                : null;
+          const opened = shownWorkspace === device.device_id;
+          const showing = showingOther(device.device_id);
+          // Compact rows say only what differs from "online and on its own tabs".
+          const note = [
+            device.local && "This device",
+            !online && !device.local && connection,
+            showing && `Viewing ${nameOf(showing)}`,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const reason =
+            !online && !device.local
+              ? "Connect this device to open its tabs."
+              : !device.full_sync || session.full_sync === false
+                ? "Enable Full sync on both devices to open tabs here."
+                : !session.sync
+                  ? "Update Misty on both devices before opening this workspace's tabs here."
+                  : null;
           const busy = pending?.deviceId === device.device_id;
-          const open =
-            !device.local &&
-            (opened ? (
-              <span className="text-xs text-cream-muted">Open here</span>
-            ) : (
+          const open = device.local ? (
+            // Opening another device's tabs must never strand this one there.
+            !opened && (
               <Button
                 size="sm"
                 variant="outline"
-                aria-label={`Open tabs from ${device.name} here`}
+                aria-label="Show this device’s tabs"
                 title={reason ?? undefined}
                 disabled={!!pending || !!reason}
                 onClick={() => void change({ deviceId: device.device_id })}
@@ -180,10 +201,35 @@ export function SyncDeviceList({
                 {busy && pending?.mode === undefined && pending?.name === undefined
                   ? "Opening…"
                   : compact
-                    ? "Open tabs here"
-                    : "Open its tabs here"}
+                    ? "Return"
+                    : "Show this device’s tabs"}
               </Button>
-            ));
+            )
+          ) : opened ? (
+            compact ? (
+              <span className="flex shrink-0 items-center gap-1 text-xs text-cream-muted">
+                <Check aria-hidden className="size-3.5" />
+                Viewing
+              </span>
+            ) : (
+              <span className="text-xs text-cream-muted">Open here</span>
+            )
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label={`Open tabs from ${device.name} here`}
+              title={reason ?? undefined}
+              disabled={!!pending || !!reason}
+              onClick={() => void change({ deviceId: device.device_id })}
+            >
+              {busy && pending?.mode === undefined && pending?.name === undefined
+                ? "Opening…"
+                : compact
+                  ? "Open"
+                  : "Open its tabs here"}
+            </Button>
+          );
           return (
             <li key={device.device_id} className={compact ? "py-3" : "py-1"}>
               <div
@@ -195,10 +241,14 @@ export function SyncDeviceList({
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-sm font-medium text-cream">
-                    <span
-                      aria-hidden
-                      className={`size-1.5 shrink-0 rounded-full ${online ? "bg-cream" : "bg-cream-muted"}`}
-                    />
+                    {compact ? (
+                      <PlatformIcon platform={device.platform} dim={!online && !device.local} />
+                    ) : (
+                      <span
+                        aria-hidden
+                        className={`size-1.5 shrink-0 rounded-full ${online ? "bg-cream" : "bg-cream-muted"}`}
+                      />
+                    )}
                     <span className="break-words">{device.name}</span>
                     {!compact && (
                       <Button
@@ -214,10 +264,15 @@ export function SyncDeviceList({
                       </Button>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-cream-muted">
-                    {connection}
-                    {device.local ? " · This device" : ""}
-                  </p>
+                  {compact ? (
+                    note && <p className="mt-0.5 truncate pl-6 text-xs text-cream-muted">{note}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-cream-muted">
+                      {connection}
+                      {device.local ? " · This device" : ""}
+                      {showing ? ` · Showing ${nameOf(showing)}’s tabs` : ""}
+                    </p>
+                  )}
                 </div>
                 {open}
               </div>
@@ -258,7 +313,7 @@ export function SyncDeviceList({
                   )}
                 </>
               )}
-              {busy && (
+              {busy && !compact && (
                 <p role="status" className="px-5 py-2 text-xs text-cream-muted">
                   Waiting for the device to confirm…
                 </p>
@@ -273,5 +328,13 @@ export function SyncDeviceList({
         </p>
       )}
     </div>
+  );
+}
+
+/** Mac laptops and desktop PCs read differently at a glance; offline devices dim. */
+function PlatformIcon({ platform, dim }: { platform: string; dim: boolean }) {
+  const Icon = platform === "macos" ? Laptop : Monitor;
+  return (
+    <Icon aria-hidden className={`size-4 shrink-0 ${dim ? "text-cream-muted" : "text-cream"}`} />
   );
 }

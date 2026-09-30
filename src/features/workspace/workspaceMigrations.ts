@@ -20,10 +20,69 @@ export function isSupportedWorkspaceSurface(value: unknown): value is WorkspaceS
     value === "space"
   );
 }
+/** Saved views synced from records without a route; restore them at their tool's root. */
+const missingRouteFallback: Partial<Record<string, string>> = {
+  home: "/home",
+  space: "/spaces",
+  files: "/files",
+  agents: "/agents",
+  scheduled: "/scheduled",
+};
+/** A saved view restore could not carry forward. Its original stays in the
+ * archived copy of the saved workspace. */
+export interface UnrestoredView {
+  id: string;
+  title: string;
+  reason: string;
+}
+let unrestored: UnrestoredView[] | undefined;
+/** Runs a restore and lists the views it had to replace with placeholders. */
+export function collectUnrestoredViews<T>(restore: () => T): {
+  result: T;
+  skipped: UnrestoredView[];
+} {
+  const previous = unrestored;
+  unrestored = [];
+  try {
+    const result = restore();
+    return { result, skipped: unrestored };
+  } finally {
+    unrestored = previous;
+  }
+}
+
+/** Never throws: one damaged view becomes an empty placeholder in its place
+ * instead of stopping the rest of the workspace from restoring. */
 export function migrateRetiredWorkspaceView(
-  tab: WorkspaceView,
-  _scopeKey: WorkspaceScopeKey = "global",
+  view: WorkspaceView,
+  scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceView {
+  try {
+    return migrateView(view, scopeKey);
+  } catch (error) {
+    const id = typeof view?.id === "string" && view.id ? view.id : crypto.randomUUID();
+    const title = typeof view?.title === "string" ? view.title : "";
+    unrestored?.push({ id, title, reason: error instanceof Error ? error.message : String(error) });
+    return {
+      id,
+      instanceKey: id,
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title,
+      route: "/browser",
+      sidebarVisible: false,
+      state: createBrowserViewState(),
+      placeholder: true,
+      createdAt: typeof view?.createdAt === "number" ? view.createdAt : 0,
+      lastFocusedAt: typeof view?.lastFocusedAt === "number" ? view.lastFocusedAt : 0,
+    };
+  }
+}
+function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): WorkspaceView {
+  const tab =
+    typeof view.route === "string"
+      ? view
+      : { ...view, route: missingRouteFallback[view.surfaceId] ?? "/browser" };
   const destination = workspaceSurfaceFromRoute(tab.route);
   if (tab.surfaceId === "scheduled" || destination?.surfaceId === "scheduled")
     return {

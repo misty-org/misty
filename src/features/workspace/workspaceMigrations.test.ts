@@ -130,3 +130,15 @@ it("preserves Home as a supported workspace surface", () => {
   const home = legacyTab();
   expect(migrateRetiredWorkspaceView(home)).toEqual(home);
 });
+
+it("restores saved views that lost their route instead of failing the whole workspace", () => {
+  const home = legacyTab({ route: undefined as unknown as string });
+  expect(migrateRetiredWorkspaceView(home)).toMatchObject({ surfaceId: "home", route: "/home" });
+  const files = legacyTab({
+    surfaceId: "files",
+    groupKey: "tool:files",
+    title: "Files",
+    route: undefined as unknown as string,
+  });
+  expect(migrateRetiredWorkspaceView(files)).toMatchObject({ surfaceId: "files", route: "/files" });
+});

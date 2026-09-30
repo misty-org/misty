@@ -41,7 +41,29 @@ describe("one sync status selector", () => {
         issue: "sync_device_forbidden",
         recovery: { accountId: "a", ready: false, issue: "disk" },
       }),
-    ).toEqual(syncIssues.local_storage_unavailable);
+    ).toMatchObject({ tone: "attention", title: "Saving on this device is paused" });
+    const refused = { pending: [], failed: [{ key: "workspace", error: "too large" }] };
+    expect(
+      selectSyncStatus({
+        ...base,
+        recovery: { accountId: "a", ready: false, issue: null, saves: refused },
+      }),
+    ).toMatchObject({ tone: "attention", title: "Some changes are not saved on this device" });
+  });
+  it("reports tabs that did not come back and saves still waiting, item by item", () => {
+    const recovery = { accountId: "a", ready: true, issue: null };
+    expect(
+      selectSyncStatus({
+        ...base,
+        recovery: { ...recovery, notRestored: [{ id: "v", title: "Docs", reason: "bad" }] },
+      }),
+    ).toMatchObject({ tone: "neutral", title: "Some tabs were not restored" });
+    expect(
+      selectSyncStatus({
+        ...base,
+        recovery: { ...recovery, saves: { pending: ["workspace"], failed: [] } },
+      }).title,
+    ).toBe("Saving on this device");
     expect(
       selectSyncStatus({ ...base, recovery: { accountId: "a", ready: false, issue: null } }).title,
     ).toBe("Restoring workspace");
