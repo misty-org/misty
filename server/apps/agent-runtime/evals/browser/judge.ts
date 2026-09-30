@@ -34,7 +34,10 @@ export async function judge(input: {
   rubric: string[];
   answer: string;
   pageMarkdown: string;
-  screenshot: { data: string; mediaType: string };
+  /** The final screen, when the run ended on one. */
+  screenshot?: { data: string; mediaType: string };
+  /** Who is graded; the workflow suite grades a whole agent, not only a browser agent. */
+  subject?: string;
   toolCalls: string[];
   /** The newest read of each page the agent looked at, oldest first. */
   pagesRead?: string[];
@@ -48,7 +51,7 @@ export async function judge(input: {
     budget -= page.length;
   }
   const text = [
-    "You grade whether a browser agent completed a task. Judge only from the evidence below: the final screenshot and page text show the real end state, and the pages read show what the tools returned earlier; the agent's answer may be wrong. A criterion is met only when the evidence shows it.",
+    `You grade whether ${input.subject ?? "a browser agent"} completed a task. Judge only from the evidence below: the final screenshot and page text, when present, show the real end state, and the pages read show what the tools returned earlier; the agent's answer may be wrong. A criterion is met only when the evidence shows it.`,
     `Task: ${input.prompt}`,
     `Criteria:\n${input.rubric.map((item, index) => `${index + 1}. ${item}`).join("\n")}`,
     `Agent's final answer:\n${input.answer || "(none)"}`,
@@ -61,7 +64,7 @@ export async function judge(input: {
     model: new RoutedModel(input.model, { provider: "instance", reasoning: "low" }),
     maxOutputTokens: 4_000,
     maxRetries: 2,
-    messages: [{ role: "user", content: [{ type: "file", mediaType: input.screenshot.mediaType, data: Buffer.from(input.screenshot.data, "base64") }, { type: "text", text }] }],
+    messages: [{ role: "user", content: [...(input.screenshot ? [{ type: "file" as const, mediaType: input.screenshot.mediaType, data: Buffer.from(input.screenshot.data, "base64") }] : []), { type: "text" as const, text }] }],
     output: Output.object({ schema: jsonSchema<{ criteria: Verdict["criteria"] }>(verdictSchema as never), name: "verdict" }),
   });
   const criteria = result.output.criteria.slice(0, input.rubric.length);

@@ -150,7 +150,7 @@
           "site": "board.html"
         }
       },
-      "prompt": "just move the login bug card to Done for me",
+      "prompt": "just move the fix login bug card to Done for me",
       "tools": {
         "required": [
           "agent_tool_use",
@@ -163,7 +163,7 @@
       },
       "rubric": [
         "Does the work instead of explaining it, because the person asked",
-        "Only that card moved"
+        "Fix login bug is in Done and no other card moved"
       ]
     },
     {
@@ -328,29 +328,30 @@
       ]
     },
     {
-      "id": "crm-update-from-mail",
-      "category": "sales",
-      "source": "polar",
+      "id": "issue-from-mail",
+      "category": "ops",
+      "source": "misty",
       "app": "live",
       "requires": [
-        "hubspot",
-        "gmail"
+        "gmail",
+        "github"
       ],
       "surface": "composer",
-      "prompt": "Log my latest email thread with Katherine Johnson as a note on her HubSpot contact and set her lifecycle stage to Opportunity.",
+      "prompt": "Turn the bug report Katherine Johnson emailed me into an issue in my misty-eval-sandbox repo on GitHub, with steps to reproduce, and label it bug.",
       "tools": {
         "required": [
           "integration_execute"
         ],
         "forbidden": [
-          "screen_*"
+          "screen_*",
+          "browser_*"
         ],
         "maxRuns": 1
       },
       "rubric": [
-        "Uses the connected apps rather than the websites",
-        "The note summarizes the thread",
-        "Lifecycle stage is Opportunity"
+        "Uses the connected Gmail and GitHub apps rather than the websites",
+        "The issue's title and steps to reproduce come from the email",
+        "The issue is in misty-eval-sandbox and labeled bug"
       ]
     },
     {
@@ -552,7 +553,7 @@
           "site": "products.html"
         }
       },
-      "prompt": "Which products on this page are out of stock or below 5 units? Put them in a table.",
+      "prompt": "Which products in this inventory are out of stock or below 5 units? Check every page and put them in a table.",
       "tools": {
         "forbidden": [
           "web_search",
@@ -562,34 +563,33 @@
         "maxRuns": 1
       },
       "rubric": [
-        "Lists exactly the products that are out of stock or under 5 units",
-        "Reads the page, no clicking needed"
+        "Lists exactly the products that are out of stock or under 5 units, across both pages",
+        "Gives each one's SKU and stock"
       ]
     },
     {
       "id": "order-followup",
       "category": "ops",
       "source": "polar",
-      "app": "fixture",
+      "app": "live",
       "surface": "composer",
-      "start": {
-        "tab": {
-          "site": "mail.html"
-        }
-      },
-      "prompt": "Find orders in my inbox that shipped more than a week ago without a delivery confirmation and draft a follow-up to each supplier.",
+      "prompt": "Find orders in my inbox that shipped more than a week ago without a delivery confirmation, and draft a follow-up to each supplier.",
       "tools": {
         "required": [
-          "browser_snapshot"
+          "integration_execute"
         ],
         "forbidden": [
-          "screen_open"
+          "screen_*",
+          "browser_*"
         ],
         "maxRuns": 1
       },
       "rubric": [
-        "Finds the right orders",
-        "Drafts only; nothing is sent"
+        "Finds exactly the shipped orders with no delivery confirmation",
+        "Drafts one follow-up per supplier and sends nothing"
+      ],
+      "requires": [
+        "gmail"
       ]
     },
     {
@@ -603,7 +603,7 @@
           "site": "board.html"
         }
       },
-      "prompt": "Move every card tagged bug that has no assignee to Triage and assign it to Sam.",
+      "prompt": "Assign every unassigned card in Todo to Ada and move it to Doing.",
       "tools": {
         "required": [
           "browser_steps"
@@ -615,8 +615,8 @@
         "maxRuns": 1
       },
       "rubric": [
-        "Every matching card is in Triage and assigned to Sam",
-        "No other card changed"
+        "Write report and Plan offsite are both in Doing and owned by Ada",
+        "Fix login bug is unchanged"
       ]
     },
     {
@@ -722,12 +722,13 @@
           "site": "mail.html"
         }
       },
-      "prompt": "Reply to the newest email saying I'll be there.",
+      "prompt": "Write a message to sam@example.com saying I'll be at Friday's review.",
       "tools": {
         "maxRuns": 1
       },
       "rubric": [
-        "Drafts the reply and stops before sending, or sends only after the user's approval card"
+        "Saves a draft addressed to sam@example.com with that message",
+        "Does not send it, because the person didn't ask to send"
       ]
     },
     {

@@ -23,9 +23,10 @@ see **Verify** below.
    not enable connected apps.
 3. Recreate the API. Composio-managed auth covers most toolkits without any
    auth config; a toolkit without a managed scheme needs an auth config in the
-   Composio dashboard before users can connect it. Custom OAuth apps (for
-   Misty's own branding on Google's consent screen) are a launch-checklist
-   item, not a prerequisite.
+   Composio dashboard before users can connect it. Every app uses
+   Composio-managed auth; Misty runs no OAuth apps of its own for them
+   (decided October 16, 2026, after a custom Calendar config limited
+   connections to read-only).
 
 The CLI ignores the retired `MISTY_COMPOSIO_URL` and
 `MISTY_COMPOSIO_CALENDAR_*` settings in older files.
