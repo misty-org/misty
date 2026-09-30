@@ -11,7 +11,8 @@ import (
 )
 
 // One additional LISTEN connection per API process, shared by every worker.
-// Coalesced hints carry only a bounded queue name, never task or account data.
+// Coalesced hints carry a bounded queue name or a resource-key digest, never
+// raw resource names, task payloads or account data.
 type workerEventHub struct {
 	mu          sync.Mutex
 	listener    *pq.Listener
@@ -44,6 +45,10 @@ func (db *Database) SubscribeWorkerEvents(ctx context.Context, kind string) (<-c
 	if !workerQueue(kind) {
 		return nil, nil, errors.New("unknown worker queue")
 	}
+	return db.subscribeWorkerTopic(ctx, kind)
+}
+
+func (db *Database) subscribeWorkerTopic(ctx context.Context, kind string) (<-chan struct{}, func(), error) {
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
@@ -118,7 +123,7 @@ func (h *workerEventHub) listen() {
 	for notification := range h.listener.Notify {
 		if notification == nil {
 			h.publish("")
-		} else if workerQueue(notification.Extra) {
+		} else if workerQueue(notification.Extra) || resourceLeaseTopic(notification.Extra) {
 			h.publish(notification.Extra)
 		}
 	}
@@ -129,15 +134,19 @@ func (h *workerEventHub) publish(kind string) {
 	if h.closed {
 		return
 	}
-	for queue, subs := range h.subscribers {
-		if kind != "" && kind != queue {
-			continue
-		}
-		for ch := range subs {
-			select {
-			case ch <- struct{}{}:
-			default:
-			}
+	if kind != "" {
+		deliverWorkerHint(h.subscribers[kind])
+		return
+	}
+	for _, subs := range h.subscribers {
+		deliverWorkerHint(subs)
+	}
+}
+func deliverWorkerHint(subs map[chan struct{}]struct{}) {
+	for ch := range subs {
+		select {
+		case ch <- struct{}{}:
+		default:
 		}
 	}
 }
