@@ -1,6 +1,6 @@
 # Agents at your cursor — approved direction
 
-Revision 3, approved October 10, 2026. Revision 2 ("companion as orchestrator") was approved; the
+Revision 3, approved October 10, 2026; amended October 15, 2026 to capture every display (decision 2), following Clicky. Revision 2 ("companion as orchestrator") was approved; the
 owner then dropped the companion as a separate idea, and this revision follows that direction. It builds on the [agent architecture brief](../agent-architecture/BRIEF.md)
 (one durable loop for every entry point), the
 [agents-on-devices brief](../agents-on-devices/BRIEF.md) and Phase 4 of
@@ -25,17 +25,17 @@ become tools every agent has.
    Same agent, same conversation, same model, same tools and permissions. The companion's own
    model setting, its teaching mode (`companion_intent: "teach"`) and its separate prompt go
    away.
-2. **It sees what you see, one screen at a time.** Every turn you start at the cursor carries a
-   screenshot of the display your cursor is on, system-wide, whatever app is in front. That
+2. **It sees what you see.** Every turn you start at the cursor carries a screenshot of every
+   display, the cursor's first and marked primary, system-wide, whatever app is in front. That
    screenshot is always there; structure is added when it can be read (the visible Misty tab's
    element list from the page layer, or another app's Accessibility tree), and many apps,
-   canvases and games have none. Other displays are not captured. No "look at my screen" step,
+   canvases and games have none. Misty's own windows are left out of captures. No "look at my screen" step,
    no hand-off run.
 3. **It decides what to do, like any agent.** It answers, points, works on the screen in front of
    you (with the mist and island), opens hidden tabs, or delegates to sub-agents, by its own
    judgment. Nothing forces a hand-off.
 4. **Clicky's toolkit becomes every agent's toolkit:**
-   - **See the screen:** `screen.look` captures the cursor's display and its structure into the
+   - **See the screen:** `screen.look` captures every display (the cursor's first) and its structure into the
      same run, as an ordinary device job; it no longer ends the run. Agents not at the cursor can
      call it too, when a screen is attached.
    - **Point:** `[POINT:ref]` at a real element (page-layer ref or Accessibility id), with
@@ -217,8 +217,7 @@ over the app's own commands (new tab, new window, switch tab, close tab, as
 
 ## Rules
 
-- **Asking is consent for that turn.** The cursor's screen is captured only for a turn you start,
-  and only that display.
+- **Asking is consent for that turn.** Your displays are captured only for a turn you start.
 - **Secrets stay out.** Secure text fields (`AXSecureTextField`) and password-manager windows are
   never read.
 - **Screen content is data.** Text read from the screen is untrusted and never instructions.
@@ -235,7 +234,6 @@ over the app's own commands (new tab, new window, switch tab, close tab, as
 | The companion as a concept, its model setting and Ask setting | The agent's own model; the account's existing desktop-control Ask |
 | Teaching mode, `companion_teach_turn.txt`, the tools-off switch | The agent's normal prompt, with a screen section whenever a screen is attached |
 | `screen.look` ending the run, and continuation runs | `screen.look` as a device job inside the run |
-| Capturing every display | The cursor's display only |
 | Six voice functions | ask, status, stop |
 | Two read-aloud paths (typed, voice) | One: read the run's reply when voice started it |
 | Screenshot-only screen context | The capture's `Controls`, filled from Misty's interface (`mistyControls.ts`), the page layer and Accessibility |
@@ -248,8 +246,8 @@ over the app's own commands (new tab, new window, switch tab, close tab, as
    `MistyAgentRing.m` (display, page and window, with `misty_agent_mist_waiting`), the island in
    `AgentControlIsland.tsx` and its native view in `MistyDesktopControl.m`. Not yet seen in a live
    agent run.
-2. **`screen.look` in the run.** A device job that returns the cursor display's screenshot and
-   structure; the continuation run and the teaching mode go away; turns started at the cursor
+2. **`screen.look` in the run.** A device job that returns every display's screenshot (the cursor's
+   first) and structure; the continuation run and the teaching mode go away; turns started at the cursor
    attach it up front.
 3. **One agent at the cursor.** The agent you choose lives at the cursor with its one cursor
    session; voice shrinks to ask, status and stop; the companion settings fold into the agent's.
