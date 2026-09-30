@@ -206,7 +206,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="font-medium text-sage-fg hover:text-cream"
+                className="font-medium text-cream hover:text-cream"
                 onClick={() => {
                   const requests = lastUndo;
                   setLastUndo(null);
@@ -281,7 +281,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
                                 {shortcutScopeLabel(definition.scope)}
                               </span>
                               {customized ? (
-                                <span className="rounded-sm bg-sage-bg px-1.5 py-0.5 text-[10px] text-sage-fg">
+                                <span className="rounded-sm bg-charcoal-hover px-1.5 py-0.5 text-[10px] text-cream">
                                   Custom
                                 </span>
                               ) : null}
@@ -343,10 +343,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
                           </div>
                           {capture?.commandId === definition.id &&
                           (captureError || pendingConflict) ? (
-                            <div
-                              className="text-xs text-notification-red md:col-start-2"
-                              role="alert"
-                            >
+                            <div className="text-xs text-cream md:col-start-2" role="alert">
                               {pendingConflict ? (
                                 <div className="flex flex-wrap items-center justify-end gap-2">
                                   <span>{pendingConflict.message}</span>

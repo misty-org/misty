@@ -39,10 +39,10 @@ export function SpaceSidebarLink({
         strip
           ? "relative h-8 w-full grid-cols-1 place-items-center gap-0 !px-0"
           : iconOnly
-          ? "misty-space-rail-control relative size-10 grid-cols-1 place-items-center gap-0 p-0 [@media(pointer:coarse)]:size-11"
-          : horizontal
-            ? "w-auto shrink-0"
-            : "w-full",
+            ? "misty-space-rail-control relative size-10 grid-cols-1 place-items-center gap-0 p-0 [@media(pointer:coarse)]:size-11"
+            : horizontal
+              ? "w-auto shrink-0"
+              : "w-full",
         active && "text-cream-bright",
       )}
       to={to}

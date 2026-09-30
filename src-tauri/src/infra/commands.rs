@@ -23,10 +23,24 @@ pub struct CommandService {
 #[serde(rename_all = "camelCase")]
 pub struct ShortcutOverride {
     pub command_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_override_slot",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub primary: Option<Option<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_override_slot",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub alternate: Option<Option<String>>,
+}
+
+fn deserialize_override_slot<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -90,6 +104,20 @@ impl CommandService {
     pub async fn reassign(&self, request: ReassignShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
         run_command_worker(self.path.clone(), move |path| {
             reassign_shortcut(path, request)
+        })
+        .await
+    }
+
+    pub async fn replace(&self, entries: Vec<ShortcutOverride>) -> ApiResult<ShortcutsSnapshot> {
+        run_command_worker(self.path.clone(), move |path| {
+            let mut overrides = BTreeMap::new();
+            for entry in entries {
+                validate_command_id(&entry.command_id)?;
+                overrides.insert(entry.command_id.clone(), entry);
+            }
+            remove_empty_overrides(&mut overrides);
+            write_overrides(&path, &overrides)?;
+            snapshot_from(path, overrides)
         })
         .await
     }

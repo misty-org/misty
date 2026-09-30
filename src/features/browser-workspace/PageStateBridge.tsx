@@ -3,14 +3,19 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useBrowserSyncStore } from "./store";
 import { startPageStateCapture } from "./restore/capture";
 import { restoreAfterSwitch } from "./restore/restorer";
-import { hydrateTabHistories, startTabHistorySync } from "./restore/history";
+import { hydrateViewHistories, startViewHistorySync } from "./restore/history";
 
-/** Saves page state and tab histories while this device drives a workspace,
- * and restores tabs after it takes a workspace over from another device. */
+const shownWorkspace = () => {
+  const state = useBrowserSyncStore.getState().session?.sync;
+  return state ? (state.on_workspace ?? state.driving_workspace) : undefined;
+};
+
+/** Saves page state and tab histories for the workspace this machine is on,
+ * and restores tabs after it opens another device's tabs. */
 export function PageStateBridge({ accountId }: { accountId: string }) {
   const driving = useBrowserSyncStore((state) =>
-    state.session?.account_id === accountId && state.session.trees
-      ? state.session.trees.driving_tree
+    state.session?.account_id === accountId && state.session.sync
+      ? (state.session.sync.on_workspace ?? state.session.sync.driving_workspace)
       : undefined,
   );
   const current = useRef(driving);
@@ -18,7 +23,7 @@ export function PageStateBridge({ accountId }: { accountId: string }) {
   useEffect(() => {
     if (!hasTauriInternals() || !accountId) return;
     const stopCapture = startPageStateCapture(() => Boolean(current.current));
-    const stopHistory = startTabHistorySync(() => Boolean(current.current));
+    const stopHistory = startViewHistorySync(() => Boolean(current.current));
     return () => {
       stopCapture();
       stopHistory();
@@ -29,9 +34,7 @@ export function PageStateBridge({ accountId }: { accountId: string }) {
   useEffect(() => {
     if (!hasTauriInternals() || !driving) return;
     const seat = driving;
-    void hydrateTabHistories(
-      () => useBrowserSyncStore.getState().session?.trees?.driving_tree === seat,
-    );
+    void hydrateViewHistories(() => shownWorkspace() === seat);
   }, [driving]);
   const previous = useRef<string | null | undefined>(undefined);
   useEffect(() => {
@@ -39,9 +42,7 @@ export function PageStateBridge({ accountId }: { accountId: string }) {
     previous.current = driving;
     // Startup and first connection are not switches; a new seat is.
     if (!hasTauriInternals() || before === undefined || !driving || driving === before) return;
-    return restoreAfterSwitch(
-      () => useBrowserSyncStore.getState().session?.trees?.driving_tree === driving,
-    );
+    return restoreAfterSwitch(() => shownWorkspace() === driving);
   }, [driving]);
   return null;
 }

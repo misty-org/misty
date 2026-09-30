@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Monitor, MousePointer2 } from "lucide-react";
-import { Button, cn, Spinner, Switch } from "@/shared/ui";
+import { Check, Monitor } from "lucide-react";
+import { Button, Spinner, Switch } from "@/shared/ui";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import {
   activateNativeDevice,
-  claimNativeTree,
+  claimNativeWorkspace,
   controlNativeDevice,
   readNativeSync,
   type NativeSyncView,
@@ -12,7 +12,7 @@ import {
 import { useBrowserSyncStore } from "./store";
 import { deviceRows } from "./deviceControl";
 import { useUserStore } from "@/features/auth/core";
-import { TreeSwitcherList } from "./TreeSwitcherList";
+import { WorkspaceSwitcherList } from "./WorkspaceSwitcherList";
 
 type Pending = { deviceId: string; fullSync: boolean | null; started: number };
 export function DeviceControlContent({
@@ -70,8 +70,8 @@ export function DeviceControlContent({
     if (!pending) return;
     const confirmed =
       pending.fullSync === null
-        ? session.trees
-          ? session.trees.driving_tree === pending.deviceId
+        ? session.sync
+          ? (session.sync.on_workspace ?? session.sync.driving_workspace) === pending.deviceId
           : session.workspace.active_device?.device_id === pending.deviceId
         : session.devices?.some(
             (device) =>
@@ -98,11 +98,11 @@ export function DeviceControlContent({
     const generation = readApiSessionGeneration();
     try {
       // Tree mode: switching claims that device's workspace on this device.
-      if (fullSync === null && session.trees) {
+      if (fullSync === null && session.sync) {
         // Save this workspace's pages before leaving it for another one.
         // Loaded on demand: capture pulls in the workspace store.
         await import("./restore/capture").then(({ captureAll }) => captureAll(true));
-        await claimNativeTree(session.session_id, deviceId);
+        await claimNativeWorkspace(session.session_id, deviceId);
       } else if (fullSync === null && deviceId === session.device_id)
         await activateNativeDevice(session.session_id);
       else await controlNativeDevice(session.session_id, deviceId, fullSync, fullSync === null);
@@ -129,10 +129,10 @@ export function DeviceControlContent({
           Sync
         </Button>
       </div>
-      {session.trees ? (
-        <TreeSwitcherList
+      {session.sync ? (
+        <WorkspaceSwitcherList
           session={session}
-          trees={session.trees}
+          state={session.sync}
           pending={pending}
           onSwitch={(deviceId) => void change(deviceId, null)}
           onFullSync={(deviceId, enabled) => void change(deviceId, enabled)}
@@ -159,45 +159,29 @@ export function DeviceControlContent({
                     <Check aria-hidden className="size-4" />
                   </span>
                 ) : (
-                  <span
-                    className={cn(
-                      "flex size-8 shrink-0 items-center justify-center",
-                      !(pending?.deviceId === device.device_id && pending.fullSync === null) && [
-                        "pointer-events-none opacity-0 group-hover/device:pointer-events-auto",
-                        "group-hover/device:opacity-100",
-                        "group-focus-within/device:pointer-events-auto",
-                        "group-focus-within/device:opacity-100",
-                        "[@media(hover:none)]:pointer-events-auto",
-                        "[@media(hover:none)]:opacity-100",
-                      ],
-                    )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="shrink-0"
+                    disabled={
+                      Boolean(pending) ||
+                      device.connection !== "Connected" ||
+                      !device.full_sync ||
+                      (!device.local && device.control_version < 1)
+                    }
+                    onClick={() => void change(device.device_id, null)}
+                    aria-label={`Open ${device.name}`}
+                    title={`Open ${device.name}`}
+                    aria-busy={pending?.deviceId === device.device_id && pending.fullSync === null}
                   >
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="size-8 shrink-0 p-0"
-                      disabled={
-                        Boolean(pending) ||
-                        device.connection !== "Connected" ||
-                        !device.full_sync ||
-                        (!device.local && device.control_version < 1)
-                      }
-                      onClick={() => void change(device.device_id, null)}
-                      aria-label={`Switch to ${device.name}`}
-                      title={`Switch to ${device.name}`}
-                      aria-busy={
-                        pending?.deviceId === device.device_id && pending.fullSync === null
-                      }
-                    >
-                      {pending?.deviceId === device.device_id && pending.fullSync === null ? (
-                        <>
-                          <Spinner label="Switching…" />
-                        </>
-                      ) : (
-                        <MousePointer2 aria-hidden className="size-4" />
-                      )}
-                    </Button>
-                  </span>
+                    {pending?.deviceId === device.device_id && pending.fullSync === null ? (
+                      <>
+                        <Spinner label="Switching…" />
+                      </>
+                    ) : (
+                      "Open"
+                    )}
+                  </Button>
                 )}
                 <span
                   className="flex w-14 shrink-0 justify-center"

@@ -4,12 +4,16 @@ import { FilesPage } from "@/features/files/workspace";
 import { BrowserWorkspace } from "@/features/browser/workspace";
 import { HomePage } from "@/features/home";
 import { AgentsPage } from "@/features/agents";
-import { WorkspaceTabRouteScope, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
-import { migrateRetiredWorkspaceTab } from "@/features/workspace/workspaceMigrations";
+import {
+  WorkspaceViewRouteScope,
+  useWorkspaceStore,
+  type WorkspaceView,
+} from "@/features/workspace";
+import { migrateRetiredWorkspaceView } from "@/features/workspace/workspaceMigrations";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 
-export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; active?: boolean }) {
-  const current = migrateRetiredWorkspaceTab(tab);
+export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceView; active?: boolean }) {
+  const current = migrateRetiredWorkspaceView(tab);
   return (
     <RenderErrorBoundary key={`${current.id}:${current.surfaceId}`} scope="tab">
       <div
@@ -17,7 +21,7 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; ac
         onInputCapture={() => useWorkspaceStore.getState().commitPlaceholder(current.id)}
         onClickCapture={() => useWorkspaceStore.getState().commitPlaceholder(current.id)}
       >
-        <WorkspaceTabRouteScope tab={current}>
+        <WorkspaceViewRouteScope tab={current}>
           {current.surfaceId === "home" ? (
             <HomePage />
           ) : current.surfaceId === "space" ? (
@@ -36,7 +40,7 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; ac
           ) : (
             <BrowserWorkspace tab={current} />
           )}
-        </WorkspaceTabRouteScope>
+        </WorkspaceViewRouteScope>
       </div>
     </RenderErrorBoundary>
   );

@@ -75,7 +75,7 @@ use app::commands::{
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{
-    shortcuts_reassign, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
+    shortcuts_reassign, shortcuts_replace, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
 };
 #[cfg(desktop)]
 use infra::browser::{
@@ -307,7 +307,6 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_connect,
                     crate::infra::browser_sync::browser_sync_state,
                     crate::infra::browser_sync::browser_sync_edit,
-                    crate::infra::browser_sync::browser_sync_resume,
                     crate::infra::browser_sync::browser_sync_activate,
                     crate::infra::browser_sync::browser_sync_claim,
                     crate::infra::browser_sync::browser_sync_rename_device,
@@ -316,8 +315,8 @@ pub fn run() {
                     crate::infra::page_state::browser_page_state_controls,
                     crate::infra::page_state::browser_page_state_act,
                     crate::infra::page_state::browser_page_state_guard,
-                    crate::infra::page_state::history::browser_tab_history_save,
-                    crate::infra::page_state::history::browser_tab_history_load,
+                    crate::infra::page_state::history::browser_view_history_save,
+                    crate::infra::page_state::history::browser_view_history_load,
                     crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_forget_key,
@@ -704,6 +703,7 @@ pub fn run() {
                     shortcuts_update,
                     shortcuts_reassign,
                     shortcuts_reset,
+                    shortcuts_replace,
                     transfers_snapshot,
                     transfers_delete_selected,
                     transfers_delete_all,

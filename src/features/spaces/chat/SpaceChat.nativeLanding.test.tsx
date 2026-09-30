@@ -81,7 +81,7 @@ it("shows existing Everyone messages when opening Misty without a conversation s
       clearError: noop,
     })),
     useAiSurfaceAdapter: noop,
-    useWorkspaceTabTitle: noop,
+    useWorkspaceViewTitle: noop,
     useSpaceChatDraft,
   } as unknown as SocialRuntime);
   const ui = render(

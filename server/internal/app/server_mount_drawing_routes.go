@@ -304,6 +304,8 @@ func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 }
 
 func (s *Server) mountMistyRoutes(prefix string, aiService *api.AIService) {
+	s.Router.Post(prefix+"/settings/preferences", aiService.AccountPreferences())
+	s.Router.Patch(prefix+"/settings/preferences", aiService.AccountPreferences())
 	s.Router.Get(prefix+"/settings/profiles", aiService.SettingsProfiles())
 	s.Router.Post(prefix+"/settings/profiles", aiService.SettingsProfiles())
 	s.Router.Get(prefix+"/settings/profiles/{profileID}", aiService.SettingsProfiles())

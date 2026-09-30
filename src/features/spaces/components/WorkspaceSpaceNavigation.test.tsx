@@ -59,9 +59,7 @@ it("opens a Space from its avatar without closing the stack", () => {
   expect(view?.surfaceId).toBe("space");
   expect(view?.route.startsWith("/spaces/work/")).toBe(true);
   expect(onOpen).toHaveBeenCalledOnce();
-  expect(screen.getByRole("button", { name: "Spaces" }).getAttribute("aria-expanded")).toBe(
-    "true",
-  );
+  expect(screen.getByRole("button", { name: "Spaces" }).getAttribute("aria-expanded")).toBe("true");
 });
 it("marks the active Space and the Spaces toggle", () => {
   const tab = useWorkspaceStore

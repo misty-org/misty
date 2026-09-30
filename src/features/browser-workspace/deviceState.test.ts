@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import {
-  createBrowserTabState,
-  type WorkspaceTab,
-  type WorkspaceVirtualWindow,
+  createBrowserViewState,
+  type WorkspaceView,
+  type WorkspaceWindow,
 } from "@/features/workspace/model";
 import { retainDeviceState } from "./deviceState";
-function fixture(surface: "browser" | "files" = "browser"): WorkspaceVirtualWindow[] {
-  const tab: WorkspaceTab = {
+function fixture(surface: "browser" | "files" = "browser"): WorkspaceWindow[] {
+  const tab: WorkspaceView = {
     id: "tab:a",
     instanceKey: "tab:a",
     surfaceId: surface,
@@ -17,12 +17,12 @@ function fixture(surface: "browser" | "files" = "browser"): WorkspaceVirtualWind
     sidebarVisible: false,
     state:
       surface === "browser"
-        ? { ...createBrowserTabState("https://example.test"), profileId: "a".repeat(64) }
+        ? { ...createBrowserViewState("https://example.test"), profileId: "a".repeat(64) }
         : null,
     createdAt: 0,
     lastFocusedAt: 0,
   };
-  const root = { type: "leaf" as const, id: "pane:a", tabs: [tab], activeTabId: tab.id };
+  const root = { type: "leaf" as const, id: "pane:a", views: [tab], activeViewId: tab.id };
   const layout = { id: "layout:a", root, focusedPaneId: root.id };
   return [
     {
@@ -30,11 +30,11 @@ function fixture(surface: "browser" | "files" = "browser"): WorkspaceVirtualWind
       title: "Work",
       createdAt: 0,
       lastFocusedAt: 0,
-      layout: { ...layout, tabs: [layout], activeLayoutTabId: layout.id },
+      layout: { ...layout, tabs: [layout], activeTabId: layout.id },
     },
   ];
 }
-const view = (windows: WorkspaceVirtualWindow[]) => dockLeaves(windows[0].layout.root)[0].tabs[0];
+const view = (windows: WorkspaceWindow[]) => dockLeaves(windows[0].layout.root)[0].views[0];
 describe("device state retention during shared projection", () => {
   it("retains local view history, timestamps and favicon without mutating shared inputs", () => {
     const previous = fixture(),
@@ -72,9 +72,9 @@ describe("device state retention during shared projection", () => {
       faviconUrl: "https://example.test/private.ico",
     };
     view(incoming).state = {
-      ...createBrowserTabState("https://next.test"),
+      ...createBrowserViewState("https://next.test"),
       profileId: "b".repeat(64),
-      websiteId: "website:new",
+      bookmarkId: "website:new",
     };
     expect(view(retainDeviceState(incoming, previous)).state).toEqual(view(incoming).state);
   });
@@ -94,8 +94,8 @@ describe("device state retention during shared projection", () => {
       incoming = fixture();
     dockLeaves(previous[0].layout.root)[0].history = { entries: [view(previous)], index: 0 };
     const pane = dockLeaves(incoming[0].layout.root)[0];
-    pane.tabs[0].id = "tab:new";
-    pane.activeTabId = "tab:new";
+    pane.views[0].id = "tab:new";
+    pane.activeViewId = "tab:new";
     expect(
       dockLeaves(retainDeviceState(incoming, previous)[0].layout.root)[0].history,
     ).toBeUndefined();

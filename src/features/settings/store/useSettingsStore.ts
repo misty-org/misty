@@ -1,3 +1,8 @@
+import {
+  useDockingLayoutStore,
+  validDockingLayout,
+  type SavedDockingLayout,
+} from "@/features/app-shell/dockingLayout";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { mutateState, readState } from "../profiles/persistence";
 import {
@@ -14,13 +19,10 @@ import {
   settingsApplyLaunchOnLogin,
   settingsLaunchOnLoginSnapshot,
   settingsOpenWithAssociations,
-  settingsRemoveOpenWithAssociation,
   settingsSave,
   settingsSnapshot,
-  shortcutsReset,
-  shortcutsReassign,
+  shortcutsReplace,
   shortcutsSnapshot,
-  shortcutsUpdate,
 } from "@/native";
 import type {
   LaunchOnLoginSnapshot,
@@ -41,7 +43,7 @@ import {
   configureBrowserSearchEngine,
   configureBrowserSearchSuggestions,
 } from "@/features/workspace/browserSearchEngine";
-import { configureWorkspaceDefaultTab } from "@/features/workspace/workspaceDefaultTab";
+import { configureWorkspaceDefaultView } from "@/features/workspace/workspaceDefaultView";
 import {
   setBrowserDownloadDirectory,
   setBrowserDownloadPrompt,
@@ -56,7 +58,6 @@ export type { SettingsSection, SettingValue } from "../types/store";
 export * from "./preferences";
 
 let settingsLoad: Promise<void> | null = null;
-let settingsSaveSequence = 0;
 let settingsWriteQueue: Promise<unknown> = Promise.resolve();
 async function saveLocalDocument(document: Record<string, unknown>): Promise<SettingsSnapshot> {
   if (hasTauriInternals()) return settingsSave({ document });
@@ -102,17 +103,22 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                 detail: "Native app required",
               }),
         ]);
-        const normalizedSettings = settingsWithLaunchOnLoginSnapshot(settings, launchOnLogin);
-        applySettingsSideEffects(normalizedSettings.document, false);
+        if (
+          shortcuts &&
+          !(settings.document.shortcuts as Record<string, unknown> | undefined)?.overrides_json
+        ) {
+          settings.document.shortcuts = {
+            ...((settings.document.shortcuts as Record<string, unknown>) ?? {}),
+            overrides_json: JSON.stringify(shortcuts.overrides),
+          };
+        }
+        applySettingsSideEffects(settings.document, false);
         set({
-          settings: normalizedSettings,
+          settings,
           launchOnLogin,
           openWithAssociations,
           shortcuts,
         });
-        if (normalizedSettings !== settings) {
-          void saveLocalDocument(normalizedSettings.document).catch(() => undefined);
-        }
       } catch (error) {
         set({ error: errorText(error) });
       } finally {
@@ -134,7 +140,28 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const saved = await saveLocalDocument(document);
       if (!valid()) return;
       applySettingsSideEffects(saved.document);
-      set({ settings: saved });
+      set({
+        settings: saved,
+        openWithAssociations: Object.entries(
+          (saved.document.open_with as Record<string, string>) ?? {},
+        ).map(([key, applicationPath]) => ({ key, applicationPath })),
+      });
+      if (hasTauriInternals()) {
+        const desired = settingsBoolean(saved.document, "general", "launch_on_login", false);
+        const launch = get().launchOnLogin;
+        if (launch?.supported && launch.enabled !== desired) {
+          const applied = await settingsApplyLaunchOnLogin(desired);
+          if (!valid()) return;
+          set({ launchOnLogin: applied });
+        }
+        const overrides = currentShortcutOverrides(saved.document, null);
+        if (JSON.stringify(overrides) !== JSON.stringify(get().shortcuts?.overrides ?? [])) {
+          const shortcuts = await shortcutsReplace(overrides);
+          if (!valid()) return;
+          set({ shortcuts });
+          window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
+        }
+      }
     };
     settingsWriteQueue = settingsWriteQueue.catch(() => {}).then(apply);
     await settingsWriteQueue;
@@ -142,7 +169,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   updateSetting: (section, key, value) => {
     const definition = definitionForLegacy(section, key);
-    if (definition?.owner === "profile") {
+    if (definition) {
       const converted =
         definition.legacyValues && typeof value === "number"
           ? definition.legacyValues[value]
@@ -156,187 +183,107 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       );
       return;
     }
-    const requestId = ++settingsSaveSequence;
-    const current = get().settings;
-    const document = cloneDocument(current?.document ?? {});
-    const sectionValue = document[section];
-    const sectionDocument =
-      sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
-        ? { ...(sectionValue as Record<string, unknown>) }
-        : {};
-    sectionDocument[key] = value;
-    document[section] = sectionDocument;
-
-    set({
-      settings: current ? { ...current, document } : { path: "", document },
-      error: null,
-      message: null,
-    });
-
-    const applyNativeSetting =
-      section === "general" && key === "launch_on_login"
-        ? settingsApplyLaunchOnLogin(Boolean(value))
-        : Promise.resolve<LaunchOnLoginSnapshot | null>(null);
-
-    void applyNativeSetting
-      .then((launchOnLogin) =>
-        (settingsWriteQueue = settingsWriteQueue
-          .catch(() => {})
-          .then(() => {
-            const latest = cloneDocument(get().settings?.document ?? document);
-            latest[section] = {
-              ...((latest[section] as Record<string, unknown>) ?? {}),
-              [key]: value,
-            };
-            return saveLocalDocument(latest);
-          })).then((settings) => ({ settings: settings as SettingsSnapshot, launchOnLogin })),
-      )
-      .then(({ settings, launchOnLogin }) => {
-        if (requestId !== settingsSaveSequence) return;
-        applySettingsSideEffects(settings.document);
-        set({
-          settings,
-          ...(launchOnLogin ? { launchOnLogin } : {}),
-        });
-      })
-      .catch((error) => {
-        if (requestId !== settingsSaveSequence) return;
-        set({
-          settings: current,
-          error: errorText(error),
-        });
-      });
+    set({ error: `Unknown setting: ${section}.${key}` });
   },
 
+  setOpenWithAssociation: async (filePath, applicationPath) => {
+    const name = filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? filePath;
+    const dot = name.lastIndexOf(".");
+    const key = (dot >= 0 ? name.slice(dot) : name).toLowerCase();
+    const associations = {
+      ...((get().settings?.document.open_with as Record<string, string>) ?? {}),
+      [key]: applicationPath,
+    };
+    await writeProfilePreference("files.openWith", JSON.stringify(associations));
+  },
   removeOpenWithAssociation: async (key) => {
-    set({ working: true, error: null, message: null });
+    const associations = {
+      ...((get().settings?.document.open_with as Record<string, string>) ?? {}),
+    };
+    delete associations[key];
     try {
-      const settings = await settingsRemoveOpenWithAssociation(key);
-      set({
-        settings,
-        openWithAssociations: hasTauriInternals() ? await settingsOpenWithAssociations() : [],
-        message: `Removed Open With association for ${key}.`,
-      });
+      await writeProfilePreference("files.openWith", JSON.stringify(associations));
     } catch (error) {
       set({ error: errorText(error) });
-    } finally {
-      set({ working: false });
     }
   },
 
   updateShortcut: async (request) => {
-    const previous = get().shortcuts;
-    if (!previous) return;
-    set({ shortcuts: optimisticShortcutUpdate(previous, request), error: null, message: null });
+    const overrides = currentShortcutOverrides(get().settings?.document, get().shortcuts);
+    const entry = overrides.find((entry) => entry.commandId === request.commandId);
+    if (entry) entry[request.slot] = request.value;
+    else overrides.push({ commandId: request.commandId, [request.slot]: request.value });
     try {
-      set({
-        shortcuts: await shortcutsUpdate(request),
-        message: "Shortcut updated.",
-      });
-      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
     } catch (error) {
-      set({ shortcuts: previous, error: errorText(error) });
+      set({ error: errorText(error) });
     }
   },
-
   reassignShortcut: async (request) => {
-    const previous = get().shortcuts;
-    if (!previous) return;
-    set({ shortcuts: optimisticShortcutReassign(previous, request), error: null, message: null });
+    const overrides = currentShortcutOverrides(get().settings?.document, get().shortcuts);
+    for (const [commandId, slot, value] of [
+      [request.conflictingCommandId, request.conflictingSlot, null],
+      [request.commandId, request.slot, request.value],
+    ] as const) {
+      const entry = overrides.find((entry) => entry.commandId === commandId);
+      if (entry) entry[slot] = value;
+      else overrides.push({ commandId, [slot]: value });
+    }
     try {
-      set({
-        shortcuts: await shortcutsReassign(request),
-        message: "Shortcut reassigned.",
-      });
-      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
     } catch (error) {
-      set({ shortcuts: previous, error: errorText(error) });
+      set({ error: errorText(error) });
     }
   },
-
   resetShortcuts: async (request = {}) => {
-    const previous = get().shortcuts;
-    set({ working: true, error: null, message: null });
+    const ids = new Set(request.commandId ? [request.commandId] : (request.commandIds ?? []));
+    const overrides = ids.size
+      ? currentShortcutOverrides(get().settings?.document, get().shortcuts).filter(
+          (entry) => !ids.has(entry.commandId),
+        )
+      : [];
     try {
-      set({ shortcuts: await shortcutsReset(request), message: "Shortcuts restored to defaults." });
-      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
     } catch (error) {
-      set({ shortcuts: previous, error: errorText(error) });
-    } finally {
-      set({ working: false });
+      set({ error: errorText(error) });
     }
   },
 }));
 
-function optimisticShortcutUpdate(
-  snapshot: ShortcutsSnapshot,
-  request: UpdateShortcutRequest,
-): ShortcutsSnapshot {
-  const effectiveBindings = snapshot.effectiveBindings.map((binding) =>
-    binding.commandId === request.commandId
-      ? {
-          ...binding,
-          [request.slot]: request.value,
-          [`${request.slot}Source`]: "user",
-        }
-      : binding,
-  );
-  return {
-    ...snapshot,
-    effectiveBindings,
-    bindings: effectiveBindings.flatMap((binding) =>
-      binding.primary
-        ? [
-            {
-              commandId: binding.commandId,
-              shortcut: binding.primary,
-              source: binding.primarySource,
-            },
-          ]
-        : [],
-    ),
-  };
-}
-
-function optimisticShortcutReassign(
-  snapshot: ShortcutsSnapshot,
-  request: ReassignShortcutRequest,
-): ShortcutsSnapshot {
-  return optimisticShortcutUpdate(
-    optimisticShortcutUpdate(snapshot, {
-      commandId: request.conflictingCommandId,
-      slot: request.conflictingSlot,
-      value: null,
-    }),
-    request,
-  );
-}
-
-function cloneDocument(document: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(document)) as Record<string, unknown>;
-}
-
-function settingsWithLaunchOnLoginSnapshot(
-  settings: SettingsSnapshot,
-  launchOnLogin: LaunchOnLoginSnapshot,
-): SettingsSnapshot {
-  if (!launchOnLogin.supported) return settings;
-  const current = settingsBoolean(settings.document, "general", "launch_on_login", false);
-  if (current === launchOnLogin.enabled) return settings;
-
-  const document = cloneDocument(settings.document);
-  const sectionValue = document.general;
-  document.general =
-    sectionValue && typeof sectionValue === "object" && !Array.isArray(sectionValue)
-      ? { ...(sectionValue as Record<string, unknown>), launch_on_login: launchOnLogin.enabled }
-      : { launch_on_login: launchOnLogin.enabled };
-  return { ...settings, document };
+function currentShortcutOverrides(
+  document: Record<string, unknown> | undefined,
+  snapshot: ShortcutsSnapshot | null,
+): ShortcutsSnapshot["overrides"] {
+  const raw = (document?.shortcuts as Record<string, unknown> | undefined)?.overrides_json;
+  try {
+    const value = typeof raw === "string" ? JSON.parse(raw) : (snapshot?.overrides ?? []);
+    return Array.isArray(value) ? structuredClone(value) : [];
+  } catch {
+    return [];
+  }
 }
 
 function applySettingsSideEffects(
   document: Record<string, unknown>,
   applyPortableLayout = true,
 ): void {
+  const presets = settingsString(document, "appearance", "saved_layouts_json", "[]");
+  try {
+    const parsed: unknown = JSON.parse(presets);
+    if (applyPortableLayout && Array.isArray(parsed))
+      useDockingLayoutStore.setState({
+        savedLayouts: parsed.filter(
+          (item): item is SavedDockingLayout =>
+            validDockingLayout(item) &&
+            "id" in item &&
+            typeof item.id === "string" &&
+            "name" in item &&
+            typeof item.name === "string",
+        ),
+      });
+  } catch {
+    /* Invalid legacy data uses the last applied presets. */
+  }
   const appearance = document.appearance as Record<string, unknown> | undefined;
   if (applyPortableLayout && typeof appearance?.navigator_auto_hide === "boolean") {
     const layout = readNavigatorLayout();
@@ -359,7 +306,7 @@ function applySettingsSideEffects(
   configureBrowserSearchSuggestions(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
-  configureWorkspaceDefaultTab(
+  configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", 0),
   );
   setBrowserStatusBubbleEnabled(
@@ -391,6 +338,7 @@ export interface SettingsStore {
   load: () => Promise<void>;
   applyProfileValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
+  setOpenWithAssociation: (filePath: string, applicationPath: string) => Promise<void>;
   removeOpenWithAssociation: (key: string) => Promise<void>;
   updateShortcut: (request: UpdateShortcutRequest) => Promise<void>;
   reassignShortcut: (request: ReassignShortcutRequest) => Promise<void>;

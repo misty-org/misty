@@ -5,8 +5,8 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 export function useWindowDockingLayout() {
   const layout = useWorkspaceStore(
     (state) =>
-      state.virtualWindowsByScope[state.activeScopeKey]?.find(
-        (window) => window.id === state.activeVirtualWindowId,
+      state.windowsByScope[state.activeScopeKey]?.find(
+        (window) => window.id === state.activeWindowId,
       )?.dockingLayout,
   );
   const initialLayout = useDockingLayoutStore((state) => state.initialLayout);

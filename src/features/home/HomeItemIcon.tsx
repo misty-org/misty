@@ -41,7 +41,7 @@ export function HomeItemIcon(props: { item: ContinueItem; size: "md" | "lg" }) {
 
 /** Brings a tab forward in whichever window holds it, then shows its route. */
 export function resumeTab(item: ContinueItem) {
-  if (!useWorkspaceStore.getState().focusTab(item.tab.id)) return;
+  if (!useWorkspaceStore.getState().focusView(item.tab.id)) return;
   // The shell mirrors the selected tab. Home's scoped router must not navigate Home itself.
   window.dispatchEvent(new Event("misty:workspace-projection-applied"));
 }

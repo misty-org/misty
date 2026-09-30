@@ -1,3 +1,4 @@
+import { useOverlaySide } from "./OverlaySide";
 import {
   menuContentClass,
   menuIndicatorClass,
@@ -76,18 +77,22 @@ DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayNam
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & { width?: MenuWidth }
->(({ className, align = "start", sideOffset = 4, width, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
-      ref={ref}
-      data-slot="dropdown-menu-content"
-      sideOffset={sideOffset}
-      align={align}
-      className={cn(menuContentClass, width && menuWidthClass[width], className)}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-));
+>(({ className, align = "start", side, sideOffset = 4, width, ...props }, ref) => {
+  const placement = useOverlaySide();
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        ref={ref}
+        data-slot="dropdown-menu-content"
+        side={side ?? placement}
+        sideOffset={sideOffset}
+        align={align}
+        className={cn(menuContentClass, width && menuWidthClass[width], className)}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  );
+});
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 const DropdownMenuItem = React.forwardRef<

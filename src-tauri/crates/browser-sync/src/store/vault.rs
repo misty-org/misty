@@ -5,7 +5,7 @@ use crate::transport::SyncApi;
 
 #[derive(Clone)]
 pub struct CachedVault {
-    pub workspace: Workspace,
+    pub vault: Vault,
     pub bootstrap_pending: bool,
     pub enrollment_pending: bool,
 }
@@ -17,18 +17,18 @@ impl CachedVault {
         root: &VaultRoot,
         grant: &DeviceGrant,
     ) -> Result<()> {
-        if self.workspace.workspace_id != scope.workspace_id
-            || self.workspace.root_public_key != root.public_key()?
-            || self.workspace.key_epoch != grant.key_epoch
-            || self.workspace.head_sequence > MAX_COUNTER
+        if self.vault.vault_id != scope.vault_id
+            || self.vault.root_public_key != root.public_key()?
+            || self.vault.key_epoch != grant.key_epoch
+            || self.vault.head_sequence > MAX_COUNTER
             || (self.bootstrap_pending
                 && (!self.enrollment_pending
-                    || self.workspace.head_sequence != 0
-                    || self.workspace.key_epoch != 1))
+                    || self.vault.head_sequence != 0
+                    || self.vault.key_epoch != 1))
         {
             return Err(Error::Identity);
         }
-        let wrapped = &self.workspace.key_envelope;
+        let wrapped = &self.vault.key_envelope;
         if wrapped.version != 1 || wrapped.kdf != "argon2id-m65536-t3-p1" {
             return Err(Error::Invalid);
         }
@@ -42,17 +42,17 @@ impl CachedVault {
         Ok(())
     }
 
-    pub fn check_remote(&self, remote: &Workspace) -> Result<()> {
-        if remote.workspace_id != self.workspace.workspace_id
-            || remote.root_public_key != self.workspace.root_public_key
+    pub fn check_remote(&self, remote: &Vault) -> Result<()> {
+        if remote.vault_id != self.vault.vault_id
+            || remote.root_public_key != self.vault.root_public_key
         {
             return Err(Error::Identity);
         }
         // Password/key rotation needs an authenticated transition; never replace
         // the locally pinned identity/wrapper merely because a server sent one.
-        if remote.key_epoch != self.workspace.key_epoch
-            || remote.key_envelope != self.workspace.key_envelope
-            || remote.head_sequence < self.workspace.head_sequence
+        if remote.key_epoch != self.vault.key_epoch
+            || remote.key_envelope != self.vault.key_envelope
+            || remote.head_sequence < self.vault.head_sequence
             || remote.head_sequence > MAX_COUNTER
         {
             return Err(Error::Recovery);
@@ -67,13 +67,13 @@ impl CachedVault {
         if !self.enrollment_pending {
             return Ok(());
         }
-        match api.workspace().await? {
+        match api.vault().await? {
             Some(remote) => self.check_remote(&remote)?,
             None if self.bootstrap_pending => {
                 match api
                     .bootstrap(
-                        &self.workspace.root_public_key,
-                        &self.workspace.key_envelope,
+                        &self.vault.root_public_key,
+                        &self.vault.key_envelope,
                         grant,
                     )
                     .await
@@ -81,7 +81,7 @@ impl CachedVault {
                     Ok(()) => {}
                     // Another retry may have just committed the same bootstrap.
                     Err(Error::Recovery) => {
-                        self.check_remote(&api.workspace().await?.ok_or(Error::Recovery)?)?;
+                        self.check_remote(&api.vault().await?.ok_or(Error::Recovery)?)?;
                     }
                     Err(error) => return Err(error),
                 }
@@ -118,7 +118,7 @@ impl Store {
                 let expected = VaultScope {
                     deployment: deployment.into(),
                     account_id: account_id.into(),
-                    workspace_id: cached.workspace.workspace_id.clone(),
+                    vault_id: cached.vault.vault_id.clone(),
                 };
                 if stored != fingerprint(&expected)? {
                     return Err(Error::Identity);
@@ -135,7 +135,7 @@ impl Store {
                 let expected = VaultScope {
                     deployment: deployment.into(),
                     account_id: account_id.into(),
-                    workspace_id: grant.workspace_id,
+                    vault_id: grant.vault_id,
                 };
                 if stored != fingerprint(&expected)? {
                     return Err(Error::Identity);
@@ -173,7 +173,7 @@ impl Store {
         let scope = VaultScope {
             deployment: deployment.into(),
             account_id: account_id.into(),
-            workspace_id: grant.workspace_id,
+            vault_id: grant.vault_id,
         };
         Ok(stored == fingerprint(&scope)?)
     }
@@ -183,7 +183,7 @@ impl Store {
     pub fn cache_verified_vault(&mut self, root: &VaultRoot, vault: &CachedVault) -> Result<()> {
         vault.verify(&self.scope, root, &self.grant)?;
         if let Some(existing) = self.cached_vault()? {
-            existing.check_remote(&vault.workspace)?;
+            existing.check_remote(&vault.vault)?;
             return Ok(());
         }
         let tx = self
@@ -192,14 +192,14 @@ impl Store {
         tx.execute(
             "INSERT INTO sync_vault VALUES(1,?1,?2,?3)",
             params![
-                serde_json::to_string(&vault.workspace)?,
+                serde_json::to_string(&vault.vault)?,
                 vault.bootstrap_pending,
                 vault.enrollment_pending
             ],
         )?;
         tx.execute(
             "UPDATE sync_high_watermark SET observed_head=max(observed_head,?1) WHERE singleton=1",
-            [vault.workspace.head_sequence],
+            [vault.vault.head_sequence],
         )?;
         tx.commit()?;
         Ok(())
@@ -209,7 +209,7 @@ impl Store {
         read(&self.connection)
     }
 
-    pub fn confirm_enrollment(&mut self, remote: &Workspace) -> Result<()> {
+    pub fn confirm_enrollment(&mut self, remote: &Vault) -> Result<()> {
         let Some(cached) = self.cached_vault()? else {
             return Ok(());
         };
@@ -220,7 +220,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute("UPDATE sync_vault SET workspace=?1,bootstrap_pending=0,enrollment_pending=0 WHERE singleton=1", [serde_json::to_string(remote)?])?;
+        tx.execute("UPDATE sync_vault SET vault=?1,bootstrap_pending=0,enrollment_pending=0 WHERE singleton=1", [serde_json::to_string(remote)?])?;
         tx.execute(
             "UPDATE sync_high_watermark SET observed_head=max(observed_head,?1) WHERE singleton=1",
             [remote.head_sequence],
@@ -232,12 +232,12 @@ impl Store {
 
 fn read(connection: &Connection) -> Result<Option<CachedVault>> {
     let row: Option<(String, bool, bool)> = connection.query_row(
-        "SELECT workspace,bootstrap_pending,enrollment_pending FROM sync_vault WHERE singleton=1", [],
+        "SELECT vault,bootstrap_pending,enrollment_pending FROM sync_vault WHERE singleton=1", [],
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
     ).optional()?;
-    row.map(|(workspace, bootstrap_pending, enrollment_pending)| {
+    row.map(|(vault, bootstrap_pending, enrollment_pending)| {
         Ok(CachedVault {
-            workspace: serde_json::from_str(&workspace)?,
+            vault: serde_json::from_str(&vault)?,
             bootstrap_pending,
             enrollment_pending,
         })

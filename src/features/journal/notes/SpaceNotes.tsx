@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
 import { useMemo } from "react";
 import { NewNoteDialog } from "./components/NewNoteDialog";
@@ -12,7 +12,7 @@ import { useNotesStore } from "./store";
 export type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
 const emptyMembers: never[] = [];
 function Integration(props: Parameters<NotesViewRuntime["renderIntegration"]>[0]) {
-  useWorkspaceTabTitle(props.workspaceTabId, props.title);
+  useWorkspaceViewTitle(props.workspaceTabId, props.title);
   return null;
 }
 export function SpaceNotes(props: SpaceNotesProps) {

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/workspace";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
@@ -14,7 +14,7 @@ const tab = {
   instanceKey: "preview",
   surfaceId: "browser",
   state: { url: "https://example.test", private: false },
-} as WorkspaceTab;
+} as WorkspaceView;
 const bounds = { width: 800, height: 600 };
 beforeEach(() => {
   vi.resetModules();

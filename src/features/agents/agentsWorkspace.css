@@ -37,9 +37,10 @@
 }
 .agents-roster-search > svg {
   position: absolute;
-  top: 50%;
+  top: 0;
+  bottom: 0;
+  margin-block: auto;
   left: 10px;
-  transform: translateY(-50%);
   color: var(--color-cream-muted);
   pointer-events: none;
 }

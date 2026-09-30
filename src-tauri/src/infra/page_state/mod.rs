@@ -2,7 +2,7 @@
 //!
 //! Capture is two-phase: the page reports field metadata, native code
 //! classifies each field, and only permitted values are then read. The saved
-//! state is written to the tab's encrypted page-state slot in the tree this
+//! state is written to the tab's encrypted page-state slot in the workspace this
 //! device drives. Restore reads that slot after a device switch and applies it
 //! locally; fields it cannot place are returned for the agent pass, minus
 //! anything sensitive or secret. Nothing here submits a form.
@@ -12,7 +12,7 @@ pub mod history;
 use std::collections::BTreeSet;
 
 use classify::{Class, FieldMeta};
-use misty_browser_sync::tree::protocol::SLOT_PAGE_STATE;
+use misty_browser_sync::workspace::protocol::PAGE_STATE;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, Webview};
@@ -123,7 +123,7 @@ fn http_url(url: &str) -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct CaptureRequest {
     runtime_id: String,
-    tab_id: String,
+    view_id: String,
     /// The site is on the user's do-not-capture list: URL and scroll only.
     excluded: bool,
     force: bool,
@@ -211,7 +211,7 @@ pub async fn browser_page_state_capture(app: AppHandle, webview_caller: Webview,
     };
     let plaintext = serde_json::to_vec(&saved).map_err(|_| "Could not encode page state")?;
     let handle = super::browser_sync::page_state_worker().await?;
-    handle.write_tab_slot(request.tab_id, SLOT_PAGE_STATE, Some(plaintext)).await.map_err(|e| e.to_string())?;
+    handle.write_page_slot(request.view_id, PAGE_STATE, Some(plaintext)).await.map_err(|e| e.to_string())?;
     Ok(true)
 }
 
@@ -241,7 +241,7 @@ pub struct RestoreReport {
 #[serde(rename_all = "camelCase")]
 pub struct RestoreRequest {
     runtime_id: String,
-    tab_id: String,
+    view_id: String,
 }
 
 /// Restores a tab from the page state the previous driver saved.
@@ -249,9 +249,9 @@ pub struct RestoreRequest {
 pub async fn browser_page_state_restore(app: AppHandle, webview_caller: Webview, request: RestoreRequest) -> Result<RestoreReport, String> {
     require_main(&webview_caller)?;
     let view = webview(&app, &request.runtime_id)?;
-    let (handle, tree) = super::browser_sync::page_state_reader().await?;
+    let (handle, workspace) = super::browser_sync::page_state_reader().await?;
     let Some(plaintext) = handle
-        .read_tab_slot(tree, request.tab_id, SLOT_PAGE_STATE)
+        .read_page_slot(workspace, request.view_id, PAGE_STATE)
         .await
         .map_err(|e| e.to_string())?
     else {

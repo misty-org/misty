@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { allLayoutViews } from "./layoutTabs";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
-describe("useWorkspaceStore - space scoping", () => {
+describe("legacy workspace scope restoration", () => {
   beforeEach(() => {
     useWorkspaceStore.getState().reset();
   });
@@ -19,7 +19,13 @@ describe("useWorkspaceStore - space scoping", () => {
       route: "/spaces/space-a/notes",
       scopeKey: "space:space-a",
     });
-    const spaceATab2 = store.openBrowserTab({ url: "https://example-a.com" });
+    const spaceATab2 = store.openSurface({
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title: "Browser",
+      route: "/browser",
+      scopeKey: "space:space-a",
+    });
 
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.id)).toEqual([
       spaceATab1.id,
@@ -74,7 +80,7 @@ describe("useWorkspaceStore - space scoping", () => {
       route: "/inbox",
     });
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.surfaceId)).toEqual([
-      "space",
+      "home",
       "inbox",
     ]);
 
@@ -91,7 +97,7 @@ describe("useWorkspaceStore - space scoping", () => {
     // 3. Switch back to Space A
     useWorkspaceStore.getState().setScope("space:space-a");
     const tabsInA = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["space", "inbox"]);
+    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["home", "inbox"]);
     expect(tabsInA.find((tab) => tab.surfaceId === "inbox")?.id).toBe(inboxTab.id);
   });
 });

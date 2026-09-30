@@ -1,6 +1,6 @@
-import type { WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/workspace";
 import { describe, expect, it } from "vitest";
-import { groupTabs, tabForGroupedShortcut } from "./WorkspaceDockTree";
+import { groupViews, viewForGroupedShortcut } from "./WorkspaceDockTree";
 
 describe("workspace tab groups", () => {
   it("keeps each Space tool in its own tab group", () => {
@@ -11,7 +11,7 @@ describe("workspace tab groups", () => {
       spaceTab("library", "Library", "/spaces/one/library"),
     ];
 
-    expect(groupTabs(tabs)).toMatchObject([
+    expect(groupViews(tabs)).toMatchObject([
       {
         key: "space:one:journal",
         surfaceId: "space",
@@ -51,7 +51,7 @@ describe("workspace tab groups", () => {
       spaceTab("library", "Library", "/spaces/one/library"),
     ].map((tab) => ({ ...tab, groupKey: "space:one" as const }));
 
-    expect(groupTabs(tabs).map((group) => group.key)).toEqual([
+    expect(groupViews(tabs).map((group) => group.key)).toEqual([
       "space:one:journal",
       "space:one:planner",
       "space:one:social",
@@ -60,13 +60,13 @@ describe("workspace tab groups", () => {
   });
 
   it("groups multiple browser tabs together into a single tab group", () => {
-    const tabs: WorkspaceTab[] = [
+    const tabs: WorkspaceView[] = [
       browserTab("tab-1", "Google", "https://google.com"),
       browserTab("tab-2", "GitHub", "https://github.com"),
       browserTab("tab-3", "Misty", "https://misty.com"),
     ];
 
-    expect(groupTabs(tabs)).toMatchObject([
+    expect(groupViews(tabs)).toMatchObject([
       {
         key: "tool:browser",
         surfaceId: "browser",
@@ -77,7 +77,7 @@ describe("workspace tab groups", () => {
   });
 
   it("labels persisted catalog tabs as Discover", () => {
-    const tabs: WorkspaceTab[] = [
+    const tabs: WorkspaceView[] = [
       {
         ...browserTab("store", "Legacy catalog", ""),
         surfaceId: "marketplace",
@@ -86,7 +86,7 @@ describe("workspace tab groups", () => {
       },
     ];
 
-    expect(groupTabs(tabs)[0]).toMatchObject({
+    expect(groupViews(tabs)[0]).toMatchObject({
       surfaceId: "marketplace",
       label: "Discover",
       contextLabel: "Discover",
@@ -94,7 +94,7 @@ describe("workspace tab groups", () => {
   });
 
   it("maps numeric shortcuts to visible groups rather than hidden group members", () => {
-    const tabs: WorkspaceTab[] = [
+    const tabs: WorkspaceView[] = [
       browserTab("browser-a", "A", "https://a.example"),
       browserTab("browser-b", "B", "https://b.example"),
       {
@@ -103,13 +103,13 @@ describe("workspace tab groups", () => {
         groupKey: "tool:terminal",
       },
     ];
-    expect(tabForGroupedShortcut(tabs, 0, { "tool:browser": "browser-b" })?.id).toBe("browser-b");
-    expect(tabForGroupedShortcut(tabs, 1, {})?.id).toBe("terminal-a");
-    expect(tabForGroupedShortcut(tabs, "last", {})?.id).toBe("terminal-a");
+    expect(viewForGroupedShortcut(tabs, 0, { "tool:browser": "browser-b" })?.id).toBe("browser-b");
+    expect(viewForGroupedShortcut(tabs, 1, {})?.id).toBe("terminal-a");
+    expect(viewForGroupedShortcut(tabs, "last", {})?.id).toBe("terminal-a");
   });
 });
 
-function browserTab(id: string, title: string, url: string): WorkspaceTab {
+function browserTab(id: string, title: string, url: string): WorkspaceView {
   return {
     id,
     surfaceId: "browser",
@@ -128,7 +128,7 @@ function spaceTab(
   tool: "journal" | "planner" | "social" | "library",
   title: string,
   route: string,
-): WorkspaceTab {
+): WorkspaceView {
   return {
     id: `tab:${tool}`,
     surfaceId: "space",

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { activeLayoutView, parseBrowserTabState, useWorkspaceStore } from "@/features/workspace";
+import { activeLayoutView, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { BrowserSearchDialog } from "./BrowserSearchDialog";
 import { useBrowserSearchStore } from "./search";
 vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: vi.fn() }));
@@ -28,7 +28,7 @@ describe("browser search submission", () => {
     const tab = activeLayoutView(useWorkspaceStore.getState().layout)!;
     expect(tab.surfaceId).toBe("browser");
     expect(tab.route).toBe("/browser");
-    expect(parseBrowserTabState(tab.state).url).toBe(
+    expect(parseBrowserViewState(tab.state).url).toBe(
       "https://www.google.com/search?q=workspace%20sync",
     );
   });

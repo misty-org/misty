@@ -23,8 +23,8 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
   useWorkspaceStore: {
     getState: () => ({
       activeScopeKey: "global",
-      activeVirtualWindowId: "window",
-      layout: { focusedPaneId: "pane", activeLayoutTabId: "tab" },
+      activeWindowId: "window",
+      layout: { focusedPaneId: "pane", activeTabId: "tab" },
     }),
     subscribe: (cb: () => void) => {
       mocks.watch.push(cb);
@@ -32,8 +32,8 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
     },
   },
 }));
-vi.mock("@/features/workspace/virtualWindows", () => ({
-  currentVirtualWindows: () => [{ id: "window", title: "Work", layout: {} }],
+vi.mock("@/features/workspace/windows", () => ({
+  currentWindows: () => [{ id: "window", title: "Work", layout: {} }],
 }));
 vi.mock("@/features/workspace/layoutTabs", () => ({
   layoutTabs: () => [{ id: "tab", title: "Notes", root: {} }],
@@ -42,8 +42,8 @@ vi.mock("@/features/workspace/dockTree", () => ({
   dockLeaves: () => [
     {
       id: "pane",
-      activeTabId: "current",
-      tabs: [{ id: "current", surfaceId: "official-app", title: "Brief", route: "/notes/brief" }],
+      activeViewId: "current",
+      views: [{ id: "current", surfaceId: "official-app", title: "Brief", route: "/notes/brief" }],
       history: { entries: [{ title: "Private old view" }] },
     },
   ],

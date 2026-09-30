@@ -1,4 +1,4 @@
-import { createBrowserTabState, type WorkspaceTab } from "@/features/workspace";
+import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   browserTabIdForRuntime,
@@ -24,7 +24,7 @@ const invoke = vi.hoisted(() =>
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
-function browserTab(instanceKey: string): WorkspaceTab {
+function browserTab(instanceKey: string): WorkspaceView {
   return {
     id: `tab:${instanceKey}`,
     surfaceId: "browser",
@@ -33,7 +33,7 @@ function browserTab(instanceKey: string): WorkspaceTab {
     title: "Browser",
     route: "/browser",
     sidebarVisible: true,
-    state: createBrowserTabState("https://example.com"),
+    state: createBrowserViewState("https://example.com"),
     createdAt: 1,
     lastFocusedAt: 1,
   };

@@ -7,9 +7,12 @@ export function isCompanionExplanation(prompt: string): boolean {
     )
   )
     return false;
-  return /^(?:(?:can|could|would|will) you\s+)?(?:explain|describe|summari[sz]e|(?:show|tell) me (?:the )?(?:solution|answer|meaning)|(?:what|why|where|how)\b)/i.test(
-    text,
-  );
+  return new RegExp(
+    "^(?:(?:can|could|would|will) you\\s+)?" +
+      "(?:explain|describe|summari[sz]e|(?:show|tell) me (?:the )?" +
+      "(?:solution|answer|meaning)|(?:what|why|where|how)\\b)",
+    "i",
+  ).test(text);
 }
 
 export function requestsScreenContext(prompt: string): boolean {

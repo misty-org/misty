@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDockLeaf, dockTabs } from "./dockTree";
-import { createBrowserTabState, type WorkspaceTab } from "./model";
-import { migrateRetiredWorkspaceTab, migrateRetiredWorkspaceTabs } from "./workspaceMigrations";
+import { createDockLeaf, dockTreeViews } from "./dockTree";
+import { createBrowserViewState, type WorkspaceView } from "./model";
+import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
 import { migrateWorkspaceStore } from "./workspaceStorePersistence";
 
-function legacyTab(overrides: Partial<WorkspaceTab> = {}): WorkspaceTab {
+function legacyTab(overrides: Partial<WorkspaceView> = {}): WorkspaceView {
   return {
     id: "saved-tab",
     instanceKey: "saved-tab",
@@ -21,11 +21,11 @@ function legacyTab(overrides: Partial<WorkspaceTab> = {}): WorkspaceTab {
 }
 
 describe("browser workspace migration", () => {
-  it.each(["home", "space", "code", "terminal", "marketplace"] as const)(
+  it.each(["space", "code", "terminal", "marketplace"] as const)(
     "replaces retired %s views without changing tab identity",
     (surfaceId) => {
       const tab = legacyTab({ surfaceId, state: { savedDocument: "recovery-data" } });
-      expect(migrateRetiredWorkspaceTab(tab, "space:family")).toMatchObject({
+      expect(migrateRetiredWorkspaceView(tab, "space:family")).toMatchObject({
         id: tab.id,
         surfaceId: "browser",
         route: "/browser",
@@ -47,32 +47,38 @@ describe("browser workspace migration", () => {
         title: "Documents",
         state: { directory: "/Users/ada", selected: ["notes.txt"] },
       });
-      const migrated = migrateRetiredWorkspaceTab(tab);
+      const migrated = migrateRetiredWorkspaceView(tab);
       expect(migrated).toMatchObject({
         ...tab,
         surfaceId: "files",
         groupKey: "tool:files",
         route: "/files?path=%2FUsers%2Fada&select=notes.txt",
       });
-      expect(migrateRetiredWorkspaceTab(migrated)).toEqual(migrated);
+      expect(migrateRetiredWorkspaceView(migrated)).toEqual(migrated);
     },
   );
   it("preserves browser URLs and website identity", () => {
     const tab = legacyTab({
       surfaceId: "browser",
       groupKey: "app:browser",
-      state: { ...createBrowserTabState("https://example.com/report"), websiteId: "saved-website" },
+      state: {
+        ...createBrowserViewState("https://example.com/report"),
+        websiteId: "saved-website",
+      },
       title: "Report",
     });
-    expect(migrateRetiredWorkspaceTab(tab)).toMatchObject({
+    expect(migrateRetiredWorkspaceView(tab)).toMatchObject({
       id: tab.id,
-      state: tab.state,
+      state: {
+        ...createBrowserViewState("https://example.com/report"),
+        bookmarkId: "saved-website",
+      },
       title: "Report",
     });
   });
   it("preserves saved agent run links", () => {
     expect(
-      migrateRetiredWorkspaceTab(
+      migrateRetiredWorkspaceView(
         legacyTab({
           surfaceId: "official-app",
           groupKey: "app:agents",
@@ -101,13 +107,13 @@ describe("browser workspace migration", () => {
       },
       6,
     );
-    expect(dockTabs(migrated.layout.root)[0]).toMatchObject({
+    expect(dockTreeViews(migrated.layout.root)[0]).toMatchObject({
       id: tab.id,
       surfaceId: "files",
       state: tab.state,
     });
     expect(migrated.layout.focusedPaneId).toBe(pane.id);
-    expect(dockTabs(migrateRetiredWorkspaceTabs(layout).root)[0].surfaceId).toBe("files");
+    expect(dockTreeViews(migrateRetiredWorkspaceViews(layout).root)[0].surfaceId).toBe("files");
   });
 });
 
@@ -117,5 +123,10 @@ it("preserves restored Space tabs during persistence migration", () => {
     route: "/spaces/project/notes?note=one",
     groupKey: "space:project:notes",
   });
-  expect(migrateRetiredWorkspaceTab(tab)).toEqual(tab);
+  expect(migrateRetiredWorkspaceView(tab)).toEqual(tab);
+});
+
+it("preserves Home as a supported workspace surface", () => {
+  const home = legacyTab();
+  expect(migrateRetiredWorkspaceView(home)).toEqual(home);
 });

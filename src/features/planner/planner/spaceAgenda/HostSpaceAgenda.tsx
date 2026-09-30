@@ -5,7 +5,7 @@ import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import { useAuth } from "@/features/auth";
 import { useSpaceAgendaPreferences, useSpacesStore } from "@/features/spaces";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import { useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { SystemErrorActivity } from "@/features/activity";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
@@ -74,6 +74,6 @@ function HostAgendaIntegration(
   props: Pick<PlannerTaskIntegration, "title" | "adapter"> & { workspaceTabId?: string },
 ) {
   useAiSurfaceAdapter(props.adapter);
-  useWorkspaceTabTitle(props.workspaceTabId, props.title);
+  useWorkspaceViewTitle(props.workspaceTabId, props.title);
   return null;
 }

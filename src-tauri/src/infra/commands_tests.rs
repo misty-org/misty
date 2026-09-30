@@ -126,3 +126,24 @@ fn reassign_atomically_unbinds_the_conflict_and_preserves_plugin_overrides() {
         Some("Ctrl+K")
     );
 }
+
+#[tokio::test]
+async fn shared_shortcut_replacement_preserves_unbound_slots_and_resets_removed_entries() {
+    let directory = tempdir().unwrap();
+    let service = CommandService {
+        path: directory.path().join("commands.msy"),
+    };
+    let entries: Vec<ShortcutOverride> = serde_json::from_str(
+        r#"[{"commandId":"workspace.new_tab","primary":null,"alternate":"Ctrl+N"}]"#,
+    )
+    .unwrap();
+    let applied = service.replace(entries).await.unwrap();
+    assert!(matches!(applied.overrides[0].primary, Some(None)));
+    assert_eq!(
+        applied.overrides[0].alternate,
+        Some(Some("Ctrl+N".to_owned()))
+    );
+    let reloaded = service.snapshot().await.unwrap();
+    assert!(matches!(reloaded.overrides[0].primary, Some(None)));
+    assert!(service.replace(vec![]).await.unwrap().overrides.is_empty());
+}

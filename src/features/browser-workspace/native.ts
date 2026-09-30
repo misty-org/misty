@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { DeviceWebsiteData } from "./websiteData";
-import type { Resume, SharedRecord, WorkspaceChange, WorkspaceView } from "./model";
+import type { Resume, SharedRecord, WorkspaceChange, WorkspaceRecords } from "./model";
 
 export interface SyncDeviceInfo {
   device_id: string;
@@ -13,39 +13,49 @@ export interface SyncDeviceInfo {
   full_sync: boolean;
   revoked_at?: string | null;
 }
-/** One device's workspace tree and its single-driver seat. */
-export interface SyncTree {
-  tree_id: string;
+/** One workspace: a device sign-in's windows and tabs, and which machine
+ * holds its sign-in lease. */
+export interface SyncWorkspace {
+  workspace_id: string;
   shared: boolean;
   driver_device_id: string | null;
   driver_epoch: string | null;
   driver_seen_at: number | null;
   version: number;
 }
-export interface SyncTreeView {
+export interface SyncState {
   device_id: string;
-  shared_tree_id: string;
-  /** The tree this device drives; null after another device took it. */
-  driving_tree: string | null;
-  trees: SyncTree[];
-  workspaces: Record<
+  shared_workspace_id: string;
+  /** The workspace whose sign-in lease this device holds (it publishes that
+   * workspace's sign-ins). Not a lock: editing follows `on_workspace`. */
+  driving_workspace: string | null;
+  /** The workspace this machine shows and edits. Any number of machines may
+   * be on one workspace at once. */
+  on_workspace?: string | null;
+  workspaces: SyncWorkspace[];
+  /** Verified content of each workspace this machine keeps current. */
+  contents: Record<
     string,
     { version: number; records: SharedRecord[]; resume: Resume | null; author: string | null }
   >;
   pending: string[];
   displaced_with_edits: boolean;
-  /** The server confirmed `driving_tree` on the current connection. */
+  /** The server confirmed `driving_workspace` on the current connection. */
   seat_confirmed?: boolean;
-  /** The tree kept current while this device drives none (the one it drove last). */
+  /** The workspace kept current while this device drives none (the one it drove last). */
   following?: string | null;
-  /** This device's copy of `driving_tree` caught up with the server; edits apply only then. */
+  /** This machine has a copy of `on_workspace` to edit. */
   writable?: boolean;
+  /** Collections as shown, by name (bookmarks, saved tab groups). */
+  collections?: Record<string, SharedRecord[]>;
+  /** Every device runs a version that syncs tab groups; until then they stay local. */
+  all_upgraded?: boolean;
 }
 export interface NativeSyncView {
   session_id: string;
   deployment: string;
   account_id: string;
-  workspace_id: string;
+  vault_id: string;
   device_id: string;
   profile_id: string;
   supports_cookie_handoff?: boolean;
@@ -64,10 +74,11 @@ export interface NativeSyncView {
   full_sync?: boolean;
   traffic?: { uploaded_bytes: number; downloaded_bytes: number };
   presence: { device_id: string; online: boolean; ready: boolean; applied_sequence: number }[];
-  workspace: WorkspaceView;
+  workspace: WorkspaceRecords;
   pending_operation_ids: string[];
-  /** Per-device trees; absent before this workspace switched to them. */
-  trees?: SyncTreeView | null;
+  /** Workspaces and this machine's standing in them; absent before this
+   * vault switched to workspaces. */
+  sync?: SyncState | null;
 }
 export interface SyncAccount {
   apiBase: string;
@@ -84,19 +95,13 @@ export const editNativeWorkspace = (
   changes: WorkspaceChange[],
   activeEpoch: string,
 ) => invoke<string>("browser_sync_edit", { sessionId, operationId, changes, activeEpoch });
-export const saveNativeResume = (
-  sessionId: string,
-  operationId: string,
-  resume: Resume,
-  activeEpoch: string,
-) => invoke<string>("browser_sync_resume", { sessionId, operationId, resume, activeEpoch });
 export const activateNativeDevice = (sessionId: string) =>
   invoke<string>("browser_sync_activate", { sessionId });
 export const renameNativeDevice = (sessionId: string, deviceId: string, name: string) =>
   invoke<void>("browser_sync_rename_device", { sessionId, deviceId, name });
-/** Drive `treeId` on this device; whoever drove it is displaced. */
-export const claimNativeTree = (sessionId: string, treeId: string) =>
-  invoke<void>("browser_sync_claim", { sessionId, treeId });
+/** Open `workspaceId` on this machine. Other machines keep editing it too. */
+export const claimNativeWorkspace = (sessionId: string, workspaceId: string) =>
+  invoke<void>("browser_sync_claim", { sessionId, workspaceId });
 export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
   session.full_sync !== false && session.workspace.active_device?.device_id === session.device_id
     ? session.workspace.active_device.epoch
@@ -129,12 +134,12 @@ export const controlNativeDevice = (
   deviceId: string,
   fullSync: boolean | null,
   activate = false,
-  treeId: string | null = null,
+  workspaceId: string | null = null,
 ) =>
   invoke<string>("browser_sync_control_device", {
     sessionId,
     deviceId,
     fullSync,
     activate,
-    treeId,
+    workspaceId,
   });

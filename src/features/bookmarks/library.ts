@@ -19,16 +19,16 @@ export const unfiledFolderId = "group:bookmarks";
 
 // Keep the encrypted v1 wire names and IDs. They now represent bookmark folders
 // and bookmarks only; live tab grouping has a separate model and lifecycle.
-export function bookmarkFolders(records: SharedRecord<"group">[]): BookmarkFolder[] {
+export function bookmarkFolders(records: SharedRecord<"folder">[]): BookmarkFolder[] {
   return records
     .map(({ id, fields }) => ({ id, name: fields.label, order: fields.order }))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
-export function bookmarks(records: SharedRecord<"website">[]): Bookmark[] {
+export function bookmarks(records: SharedRecord<"bookmark">[]): Bookmark[] {
   return records
     .map(({ id, fields }) => ({
       id,
-      folderId: fields.group_id,
+      folderId: fields.folder_id,
       title: fields.title,
       url: fields.url,
       order: fields.order,
@@ -36,8 +36,8 @@ export function bookmarks(records: SharedRecord<"website">[]): Bookmark[] {
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 export function useBookmarkLibrary() {
-  const folders = useWorkspaceStore((s) => s.websiteGroups);
-  const items = useWorkspaceStore((s) => s.savedWebsites);
+  const folders = useWorkspaceStore((s) => s.bookmarkFolders);
+  const items = useWorkspaceStore((s) => s.bookmarks);
   return useMemo(
     () => ({ folders: bookmarkFolders(folders), bookmarks: bookmarks(items) }),
     [folders, items],
@@ -56,22 +56,22 @@ export function bookmarkUrl(value: string) {
     throw new Error("Use an http or https address without a username or password.");
   return url.href;
 }
-export function createBookmarkFolder(value: string, id = `group:${crypto.randomUUID()}`) {
+export function createBookmarkFolder(value: string, id = `folder:${crypto.randomUUID()}`) {
   const label = name(value),
     state = useWorkspaceStore.getState();
-  if (state.websiteGroups.some((folder) => folder.id === id)) return id;
+  if (state.bookmarkFolders.some((folder) => folder.id === id)) return id;
   useWorkspaceStore.setState({
     migratedTabGroupIds: [...state.migratedTabGroupIds, id],
-    websiteGroups: [
-      ...state.websiteGroups,
+    bookmarkFolders: [
+      ...state.bookmarkFolders,
       {
-        kind: "group",
+        kind: "folder",
         id,
         fields: {
           label,
           icon: "folder",
           hidden: false,
-          order: Math.max(-1, ...state.websiteGroups.map((f) => f.fields.order)) + 1,
+          order: Math.max(-1, ...state.bookmarkFolders.map((f) => f.fields.order)) + 1,
         },
       },
     ],
@@ -81,7 +81,7 @@ export function createBookmarkFolder(value: string, id = `group:${crypto.randomU
 export function renameBookmarkFolder(id: string, value: string) {
   const label = name(value);
   useWorkspaceStore.setState((s) => ({
-    websiteGroups: s.websiteGroups.map((f) =>
+    bookmarkFolders: s.bookmarkFolders.map((f) =>
       f.id === id ? { ...f, fields: { ...f.fields, label } } : f,
     ),
   }));
@@ -90,12 +90,12 @@ export function renameBookmarkFolder(id: string, value: string) {
 export function removeBookmarkFolder(id: string) {
   if (id === unfiledFolderId) return;
   const state = useWorkspaceStore.getState();
-  if (state.savedWebsites.some((b) => b.fields.group_id === id))
+  if (state.bookmarks.some((b) => b.fields.folder_id === id))
     createBookmarkFolder("Bookmarks", unfiledFolderId);
   useWorkspaceStore.setState((s) => ({
-    websiteGroups: s.websiteGroups.filter((f) => f.id !== id),
-    savedWebsites: s.savedWebsites.map((b) =>
-      b.fields.group_id === id ? { ...b, fields: { ...b.fields, group_id: unfiledFolderId } } : b,
+    bookmarkFolders: s.bookmarkFolders.filter((f) => f.id !== id),
+    bookmarks: s.bookmarks.map((b) =>
+      b.fields.folder_id === id ? { ...b, fields: { ...b.fields, folder_id: unfiledFolderId } } : b,
     ),
   }));
 }
@@ -110,40 +110,40 @@ export function saveBookmark(input: {
   const folderId = input.folderId || unfiledFolderId;
   if (folderId === unfiledFolderId) createBookmarkFolder("Bookmarks", folderId);
   const state = useWorkspaceStore.getState();
-  if (!state.websiteGroups.some((f) => f.id === folderId))
+  if (!state.bookmarkFolders.some((f) => f.id === folderId))
     throw new Error("Choose an existing folder.");
-  const existing = input.id ? state.savedWebsites.find((b) => b.id === input.id) : undefined;
+  const existing = input.id ? state.bookmarks.find((b) => b.id === input.id) : undefined;
   if (input.id && !existing)
     throw new Error("This bookmark was removed. Add it again to save a new copy.");
-  const id = existing?.id ?? `website:${crypto.randomUUID()}`;
-  const record: SharedRecord<"website"> = {
-    kind: "website",
+  const id = existing?.id ?? `bookmark:${crypto.randomUUID()}`;
+  const record: SharedRecord<"bookmark"> = {
+    kind: "bookmark",
     id,
     fields: {
-      group_id: folderId,
+      folder_id: folderId,
       title,
       url,
       pinned: true,
       order:
-        existing?.fields.group_id === folderId
+        existing?.fields.folder_id === folderId
           ? existing.fields.order
           : Math.max(
               -1,
-              ...state.savedWebsites
-                .filter((b) => b.fields.group_id === folderId)
+              ...state.bookmarks
+                .filter((b) => b.fields.folder_id === folderId)
                 .map((b) => b.fields.order),
             ) + 1,
     },
   };
   useWorkspaceStore.setState({
-    savedWebsites: existing
-      ? state.savedWebsites.map((b) => (b.id === id ? record : b))
-      : [...state.savedWebsites, record],
+    bookmarks: existing
+      ? state.bookmarks.map((b) => (b.id === id ? record : b))
+      : [...state.bookmarks, record],
   });
   return id;
 }
 export function removeBookmark(id: string) {
   useWorkspaceStore.setState((s) => ({
-    savedWebsites: s.savedWebsites.filter((b) => b.id !== id),
+    bookmarks: s.bookmarks.filter((b) => b.id !== id),
   }));
 }

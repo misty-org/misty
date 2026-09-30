@@ -24,7 +24,7 @@ function session(): NativeSyncView {
     account_id: "account",
     device_id: "here",
     deployment: "",
-    workspace_id: "",
+    vault_id: "",
     profile_id: "",
     status: {
       phase: "ready",
@@ -41,8 +41,8 @@ function session(): NativeSyncView {
       active_device: { device_id: "there", epoch: "old", sequence: 1 },
       records: [],
       resumes: {},
-      orphaned_tab_ids: [],
-      orphaned_website_ids: [],
+      orphaned_view_ids: [],
+      orphaned_bookmark_ids: [],
     },
   };
 }

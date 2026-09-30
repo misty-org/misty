@@ -24,7 +24,7 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
   const dockTabPath = useWorkspaceStore((state) => {
     if (!options.workspaceId) return null;
     const tab = dockLeaves(state.layout.root)
-      .flatMap((pane) => pane.tabs)
+      .flatMap((pane) => pane.views)
       .find((entry) => entry.id === options.workspaceId);
     if (!tab?.state || typeof tab.state !== "object") return null;
     const path = (tab.state as { path?: unknown }).path;
@@ -78,13 +78,13 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
       return;
     const workspace = useWorkspaceStore.getState();
     const tab = dockLeaves(workspace.layout.root)
-      .flatMap((pane) => pane.tabs)
+      .flatMap((pane) => pane.views)
       .find((entry) => entry.id === options.workspaceId);
     if (!tab) return;
     const storedPath =
       tab.state && typeof tab.state === "object" ? (tab.state as { path?: unknown }).path : null;
     if (storedPath === options.activePath) return;
-    workspace.updateTabState(
+    workspace.updateViewState(
       tab.id,
       { version: 1, path: options.activePath },
       fileTabTitle(options.activePath),
@@ -104,7 +104,7 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
         paneId: workspace.layout.focusedPaneId,
         state: { version: 1, path },
       });
-      workspace.focusTab(tab.id);
+      workspace.focusView(tab.id);
       navigate(tab.route);
     },
     [navigate],

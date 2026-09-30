@@ -1,25 +1,25 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useWorkspaceStore, workspaceSurfaceFromRoute, dockTabs } from "@/features/workspace";
+import { useWorkspaceStore, workspaceSurfaceFromRoute, dockTreeViews } from "@/features/workspace";
 import { useSpacesStore } from "@/features/spaces";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 
 vi.mock("./WorkspaceDockTree", () => ({
   WorkspaceDockTree: () => <div>Workspace contents</div>,
-  minimumForWorkspaceTabs: () => ({ width: 280, height: 180 }),
+  minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
-vi.mock("./WorkspaceLayoutTabs", () => ({
-  WorkspaceLayoutTabs: () => <nav aria-label="Window tabs" />,
+vi.mock("./WorkspaceTabStrip", () => ({
+  WorkspaceTabStrip: () => <nav aria-label="Window tabs" />,
 }));
 
 beforeEach(() => {
   useWorkspaceStore.persist.clearStorage();
   useWorkspaceStore.getState().reset();
   useSpacesStore.setState({ spaces: [], snapshotReady: false });
-  const initial = dockTabs(useWorkspaceStore.getState().layout.root);
+  const initial = dockTreeViews(useWorkspaceStore.getState().layout.root);
   useWorkspaceStore.getState().openSurface(workspaceSurfaceFromRoute("/agents")!);
-  for (const tab of initial) useWorkspaceStore.getState().closeTab(tab.id);
+  for (const tab of initial) useWorkspaceStore.getState().closeView(tab.id);
 });
 afterEach(cleanup);
 

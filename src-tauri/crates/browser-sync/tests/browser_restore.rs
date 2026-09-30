@@ -77,7 +77,7 @@ async fn fixture(
     let scope = VaultScope {
         deployment: base.clone(),
         account_id: "native-restore-test".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     };
     let grant = root
         .grant(&scope, &Uuid::new_v4().to_string(), 1, &device)

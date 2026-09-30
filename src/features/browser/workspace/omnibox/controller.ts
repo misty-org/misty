@@ -9,8 +9,8 @@ function dedupeKey(match: OmniboxMatch): string {
   return isPage ? `page:${urlKey(match.target.url)}` : match.id;
 }
 
-function tabIdOf(match: OmniboxMatch): string | undefined {
-  return match.target.type === "switch-tab" ? match.target.tabId : match.switchTabId;
+function viewIdOf(match: OmniboxMatch): string | undefined {
+  return match.target.type === "switch-tab" ? match.target.tabId : match.switchViewId;
 }
 
 /**
@@ -31,7 +31,7 @@ function merge(a: OmniboxMatch, b: OmniboxMatch): OmniboxMatch {
     inlineCompletion: completing?.inlineCompletion,
     removable: Boolean(a.removable || b.removable),
     bookmarked: [a, b].some((match) => match.bookmarked || match.kind === "bookmark"),
-    switchTabId: page ? (tabIdOf(a) ?? tabIdOf(b)) : undefined,
+    switchViewId: page ? (viewIdOf(a) ?? viewIdOf(b)) : undefined,
   };
 }
 

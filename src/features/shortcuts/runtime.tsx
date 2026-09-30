@@ -298,7 +298,7 @@ export function ShortcutHint(props: {
 function focusedShortcutScope(): ShortcutScope {
   const { layout } = useWorkspaceStore.getState();
   const pane = dockLeaves(layout.root).find((candidate) => candidate.id === layout.focusedPaneId);
-  const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId);
+  const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
   switch (tab?.surfaceId) {
     case "browser":
       return "tool:browser";

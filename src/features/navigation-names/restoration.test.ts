@@ -1,8 +1,8 @@
-import { dockTabs } from "@/features/workspace/dockTree";
+import { dockTreeViews } from "@/features/workspace/dockTree";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { normalizeWorkspaceLayout } from "@/features/workspace/virtualWindows";
+import { normalizeWorkspaceLayout } from "@/features/workspace/windows";
 import { clearNavigationRestoreHistory } from "./clearHistory";
 import {
   navigationName,
@@ -44,7 +44,7 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
       [groupNameKey(persisted.groupInstanceId!)]: "Research",
     },
   });
-  store.renameTab(tab.id, "Latest page");
+  store.renameView(tab.id, "Latest page");
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
   store.setScope("space:family");
   store.setScope("global");
@@ -52,11 +52,11 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
   const migrated = normalizeWorkspaceLayout(
     JSON.parse(JSON.stringify(useWorkspaceStore.getState().layout)),
   );
-  expect(dockTabs(migrated.root).find((t) => t.id === tab.id)?.groupInstanceId).toBe(
+  expect(dockTreeViews(migrated.root).find((t) => t.id === tab.id)?.groupInstanceId).toBe(
     persisted.groupInstanceId,
   );
-  store.closeTab(tab.id);
-  expect(store.reopenClosedTab()?.id).toBe(tab.id);
+  store.closeView(tab.id);
+  expect(store.reopenClosedView()?.id).toBe(tab.id);
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
   const fresh = store.addSurface({
     surfaceId: "browser",
@@ -94,20 +94,20 @@ it("only prunes discarded restore aliases and keeps open group and sidebar alias
       "section:browser": "Web",
     },
   });
-  store.closeTab(closed.id);
+  store.closeView(closed.id);
   await clearNavigationRestoreHistory();
   expect(useNavigationNames.getState().names).toEqual({
     [tabNameKey(open.id)]: "Open",
     [groupNameKey(group)]: "Research",
     "section:browser": "Web",
   });
-  expect(useWorkspaceStore.getState().closedTabs).toEqual([]);
+  expect(useWorkspaceStore.getState().closedItems).toEqual([]);
 });
 
 it("keeps window names on reopen and clears only discarded window history", async () => {
   const store = useWorkspaceStore.getState();
-  const openId = store.activeVirtualWindowId;
-  const closed = store.createVirtualWindow("Window 2");
+  const openId = store.activeWindowId;
+  const closed = store.createWindow("Window 2");
   useNavigationNames.setState({
     names: {
       [windowNameKey(openId)]: "Writing",
@@ -115,10 +115,10 @@ it("keeps window names on reopen and clears only discarded window history", asyn
       "window:expired": "Old window",
     },
   });
-  expect(store.closeVirtualWindow(closed.id)).toBe(true);
-  expect(store.reopenClosedVirtualWindow()?.id).toBe(closed.id);
+  expect(store.closeWindow(closed.id)).toBe(true);
+  expect(store.reopenClosedWindow()?.id).toBe(closed.id);
   expect(navigationName(windowNameKey(closed.id), closed.title)).toBe("Research");
-  expect(store.closeVirtualWindow(closed.id)).toBe(true);
+  expect(store.closeWindow(closed.id)).toBe(true);
   await clearNavigationRestoreHistory();
   expect(useNavigationNames.getState().names).toEqual({ [windowNameKey(openId)]: "Writing" });
 });

@@ -209,6 +209,7 @@ export default function NativeAgentsPage() {
         )}
         <header
           className="agent-conversation-heading"
+          data-window-toolbar
           data-tauri-drag-region
           data-misty-window-titlebar-region="true"
         >

@@ -9,7 +9,7 @@ import {
 } from "@/features/workspace";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceWorkspaceRail } from "./SpaceWorkspaceRail";
-import { WorkspaceTabRouteScope } from "@/features/workspace/WorkspaceTabRouteScope";
+import { WorkspaceViewRouteScope } from "@/features/workspace/WorkspaceViewRouteScope";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 
 const { preload } = vi.hoisted(() => ({ preload: vi.fn(async () => {}) }));
@@ -17,7 +17,12 @@ vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "one" } }) }))
 vi.mock("../SpaceSectionView", () => ({ preloadSpaceSection: preload }));
 vi.mock("./spacePanel/useSpaceLibraryUsage", () => ({ useSpaceLibraryUsage: () => undefined }));
 vi.mock("../chat/sidebar/useSpaceConversations", () => ({
-  useSpaceConversations: () => ({ conversations: [], loading: false, upsert: vi.fn(), remove: vi.fn() }),
+  useSpaceConversations: () => ({
+    conversations: [],
+    loading: false,
+    upsert: vi.fn(),
+    remove: vi.fn(),
+  }),
 }));
 
 const space = (id: string, name: string): Space => ({
@@ -48,9 +53,9 @@ function Rail() {
 function Harness() {
   const activeTab = useWorkspaceStore((state) => activeLayoutView(state.layout) ?? undefined);
   return activeTab ? (
-    <WorkspaceTabRouteScope tab={activeTab}>
+    <WorkspaceViewRouteScope tab={activeTab}>
       <Rail />
-    </WorkspaceTabRouteScope>
+    </WorkspaceViewRouteScope>
   ) : null;
 }
 function mount() {
@@ -123,7 +128,7 @@ it("names the Space without a switcher and exposes management directly", async (
   expect(screen.queryByRole("button", { name: /Switch Space/ })).toBeNull();
   const management = screen.getByRole("navigation", { name: "Space management" });
   expect(within(management).getByRole("button", { name: "Members" })).toBeTruthy();
-  expect(within(management).getByRole("link", { name: "Settings" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Family options" })).toBeTruthy();
   fireEvent.click(within(management).getByRole("button", { name: "Usage" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
   expect(screen.getByText("Storage")).toBeTruthy();
@@ -134,15 +139,6 @@ it("names the Space without a switcher and exposes management directly", async (
   expect(useSpacesStore.getState().loadMembers).toHaveBeenCalledWith("family");
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  await act(async () =>
-    fireEvent.click(within(management).getByRole("link", { name: "Settings" })),
-  );
-  await waitFor(() =>
-    expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe(
-      "/spaces/family/settings/general",
-    ),
-  );
-  expect(screen.getByTestId("settings-return").textContent).toBe("/spaces/family/notes");
   act(() => open("/spaces/work/social"));
   await waitFor(() => expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy());
 });

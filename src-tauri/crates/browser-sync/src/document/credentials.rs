@@ -11,7 +11,12 @@ use crate::{protocol::MAX_COUNTER, Error, Result};
 pub enum Area {
     Cookies,
     LocalStorage { origin: String },
-    SessionStorage { origin: String, tab_id: String },
+    SessionStorage {
+        origin: String,
+        // Stored name: this area is encrypted credential content.
+        #[serde(rename = "tab_id")]
+        view_id: String,
+    },
     IndexedDb { origin: String },
 }
 
@@ -65,8 +70,8 @@ impl Area {
                 return Err(Error::Invalid);
             }
         }
-        if let Self::SessionStorage { tab_id, .. } = self {
-            if !entities::valid_id(tab_id) {
+        if let Self::SessionStorage { view_id, .. } = self {
+            if !entities::valid_id(view_id) {
                 return Err(Error::Invalid);
             }
         }
