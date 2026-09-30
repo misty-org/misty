@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   generation: 0,
   apply: vi.fn(async (_values: unknown, _valid?: () => boolean) => {}),
   ensure: vi.fn(),
+  read: vi.fn(),
   patch: vi.fn(),
 }));
 vi.mock("@/api/client/session", () => ({ readApiSessionGeneration: () => mocks.generation }));
@@ -53,6 +54,7 @@ describe("durable settings profile controller", () => {
     vi.stubGlobal("BroadcastChannel", undefined);
     online(false);
     mocks.ensure.mockResolvedValue(a);
+    mocks.read.mockResolvedValue(undefined);
     mocks.patch.mockImplementation(async (edit) => ({ ...a, revision: 2, values: edit.set }));
   });
   afterEach(() => {
@@ -138,9 +140,27 @@ describe("durable settings profile controller", () => {
     });
   });
 
+  it("an idle refresh is one conditional read that changes and re-applies nothing", async () => {
+    await setup();
+    online(true);
+    mocks.apply.mockClear();
+    for (let i = 0; i < 3; i++) await store.getState().refresh();
+    expect(mocks.read).toHaveBeenCalledTimes(3);
+    expect(mocks.read).toHaveBeenCalledWith(a.revision);
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    expect(mocks.patch).not.toHaveBeenCalled();
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it("enrolls only when the account has no settings record", async () => {
+    await setup();
+    online(true);
+    mocks.read.mockResolvedValueOnce(null);
+    await store.getState().refresh();
+    expect(mocks.ensure).toHaveBeenCalledOnce();
+  });
   it("takes remote updates without a local override", async () => {
     await setup();
-    mocks.ensure.mockResolvedValue({
+    mocks.read.mockResolvedValue({
       ...a,
       revision: 3,
       values: { [key]: "remote", "app.zoom": 1.25 },

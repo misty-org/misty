@@ -157,5 +157,12 @@ func TestSettingsProfilesPostgres(t *testing.T) {
 	if err = database.DeleteSettingsProfile(ctx, "owner", shared.ID); err == nil {
 		t.Fatal("deleted shared account settings")
 	}
+	read, err := database.AccountPreferences(ctx, "owner")
+	if err != nil || read.Revision != updated.Revision || read.Values["app.zoom"] != 1.5 {
+		t.Fatal("read-only refresh did not return the account record", read, err)
+	}
+	if _, err = database.AccountPreferences(ctx, "nobody"); !errors.Is(err, ErrSettingsProfileNotFound) {
+		t.Fatal("missing account settings were not reported", err)
+	}
 
 }

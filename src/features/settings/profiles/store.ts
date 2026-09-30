@@ -23,6 +23,8 @@ interface Context {
   channel?: BroadcastChannel;
   refresh?: Promise<void>;
   refreshAgain?: boolean;
+  /** The effective values last projected into the settings document. */
+  projected?: string;
 }
 interface ProfileStore {
   state: DeviceProfileState | null;
@@ -55,17 +57,22 @@ async function publish(ctx: Context, next: DeviceProfileState) {
   const project = async () => {
     if (!fresh(ctx)) return;
     const current = useSettingsProfiles.getState().state;
-    if (current)
-      await useSettingsStore
-        .getState()
-        .applyProfileValues(effectiveValues(current), () => fresh(ctx))
-        .catch((error) => {
-          // A platform integration failure must not prevent the preference from syncing.
-          if (fresh(ctx))
-            useSettingsStore.setState({
-              error: `Could not apply settings: ${error instanceof Error ? error.message : String(error)}`,
-            });
-        });
+    // Re-applying identical values would rewrite the settings file and rerun
+    // every side effect (and used to re-save telemetry consent) for nothing.
+    const values = current ? JSON.stringify(effectiveValues(current)) : undefined;
+    if (!current || values === ctx.projected) return;
+    ctx.projected = values;
+    await useSettingsStore
+      .getState()
+      .applyProfileValues(effectiveValues(current), () => fresh(ctx))
+      .catch((error) => {
+        ctx.projected = undefined;
+        // A platform integration failure must not prevent the preference from syncing.
+        if (fresh(ctx))
+          useSettingsStore.setState({
+            error: `Could not apply settings: ${error instanceof Error ? error.message : String(error)}`,
+          });
+      });
   };
   projectionQueue = projectionQueue.catch(() => {}).then(project);
   await projectionQueue;
@@ -112,9 +119,16 @@ function cloud<T>(ctx: Context, work: () => Promise<T>): Promise<T> {
 async function synchronize(ctx: Context) {
   if (!fresh(ctx)) return;
   const saved = await readState<DeviceProfileState>(ctx.scope);
-  const profile = await api.ensure(saved.state?.seed ?? {});
+  const known = saved.state?.profile;
+  // A refresh is a read. Only an account without a record imports this
+  // device's seed, and an unchanged revision transfers no settings at all.
+  let profile = known ? await api.read(known.revision) : null;
+  if (profile === null) profile = await api.ensure(saved.state?.seed ?? {});
   if (!fresh(ctx)) return;
-  await mutate(ctx, (state) => reconcileProfile(state, profile));
+  if (profile) {
+    const next = profile;
+    await mutate(ctx, (state) => reconcileProfile(state, next));
+  }
   while (fresh(ctx)) {
     const saved = await readState<DeviceProfileState>(ctx.scope);
     const edit = saved.state?.outbox[0];

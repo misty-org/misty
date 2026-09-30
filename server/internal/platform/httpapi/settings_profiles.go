@@ -127,6 +127,10 @@ func (s *AIService) AccountPreferences() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if r.Method == http.MethodGet {
+			s.readAccountPreferences(w, r, user)
+			return
+		}
 		if r.Method == http.MethodPost {
 			var body struct {
 				Values map[string]any `json:"values"`
