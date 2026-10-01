@@ -206,28 +206,4 @@ describe("multi-account auth token storage", () => {
     expect(store.listSavedAccountSessions()).toEqual([graceSession]);
     expect(store.readActiveSavedAccountSession()).toEqual(graceSession);
   });
-  it("keeps Hosted and self-hosted credentials in separate deployment namespaces", async () => {
-    let store = await import("../store/useAuthTokenStore");
-    await store.saveAccountAuthToken("cookie-session:user-ada", ada);
-    localStorage.setItem("misty:deployment-scope", "self-hosted-studio");
-    vi.resetModules();
-    store = await import("../store/useAuthTokenStore");
-    expect(store.listSavedAccountSessions()).toEqual([]);
-    await store.saveAccountAuthToken("cookie-session:user-grace", grace);
-    await expect(store.readAccountAuthToken()).resolves.toBe("cookie-session:user-grace");
-    localStorage.setItem("misty:deployment-scope", "hosted");
-    vi.resetModules();
-    store = await import("../store/useAuthTokenStore");
-    await expect(store.readAccountAuthToken()).resolves.toBe("cookie-session:user-ada");
-    expect(store.listSavedAccountSessions()).toEqual([expect.objectContaining(ada)]);
-    const vault = JSON.parse(credentialFileValue ?? "{}") as {
-      sessions: Array<{
-        deploymentScope?: string;
-      }>;
-    };
-    expect(vault.sessions.map((session) => session.deploymentScope).sort()).toEqual([
-      "hosted",
-      "self-hosted-studio",
-    ]);
-  });
 });

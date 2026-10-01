@@ -291,7 +291,7 @@ mod tests {
         scope.account_id.push('2');
         assert_ne!(account(&scope).unwrap(), original);
         scope.account_id.pop();
-        scope.deployment.push_str("/self-hosted");
+        scope.deployment.push_str("/other");
         assert_ne!(account(&scope).unwrap(), original);
     }
 

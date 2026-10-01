@@ -7,7 +7,7 @@ different domain's request primitive.
 ## Layers
 
 - `client/` — neutral HTTP, authentication, account-session isolation, base URL, and error handling.
-- `deployment/` and `self-host/` — server selection and self-host entitlement exchange.
+- `deployment/` — the Hosted API base and the local storage namespace.
 - `account/`, `activity/`, `agents/`, `ai/`, `assistant/`, `cloud/`, `devices/`, `drawings/`,
   `extensions/`, `integrations/`, `journal/`, `notes/`, and `search/` — domain endpoint clients.
 - `spaces/` — Space endpoints plus Space-only reference-mode behavior and Library transfer policy.

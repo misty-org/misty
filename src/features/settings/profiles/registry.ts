@@ -66,14 +66,6 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     platforms: ["desktop", "web"],
     keywords: ["available", "capabilities", "provider"],
   },
-  {
-    id: "app.server.endpoint",
-    label: "Connect another server",
-    page: "server",
-    owner: "account",
-    platforms: ["desktop"],
-    keywords: ["deployment", "self-hosted", "URL", "hosted"],
-  },
 ];
 export const definitionById = new Map(settingDefinitions.map((d) => [d.id, d]));
 export function definitionForLegacy(section: string, key: string) {

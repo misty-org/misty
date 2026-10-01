@@ -20,8 +20,6 @@ type Config struct {
 	APIURL string
 	// MetricsToken is MISTY_METRICS_TOKEN; empty disables metrics scraping.
 	MetricsToken string
-	// Mode is the deployment mode: hosted or self_hosted.
-	Mode string
 	// Environment is MISTY_ENVIRONMENT, e.g. development or production.
 	Environment string
 	// HandoffPath is where the launch URL is written for `misty server up --gui`.
@@ -49,18 +47,12 @@ func (c Config) Development() bool {
 	return strings.EqualFold(c.Environment, "development")
 }
 
-// SelfHosted reports whether self-host operator pages are available.
-func (c Config) SelfHosted() bool {
-	return c.Mode == "self_hosted"
-}
-
-// ModeLabel is the short description shown under each page title.
-func (c Config) ModeLabel() string {
-	env := c.Environment
-	if env == "" {
-		env = "unknown environment"
+// EnvironmentLabel is the short description shown under each page title.
+func (c Config) EnvironmentLabel() string {
+	if c.Environment == "" {
+		return "unknown environment"
 	}
-	return strings.ReplaceAll(c.Mode, "_", "-") + " · " + env
+	return c.Environment
 }
 
 // ValidateLoopback rejects any listen address that is not a loopback

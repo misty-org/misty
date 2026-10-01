@@ -57,7 +57,7 @@ for table in sorted(set(re.findall(r'^CREATE TABLE public\.(\w+)',schema,re.M)))
     tables.append({'table':table,'domain':domain(table),'query_sources':users,'review':'direct-query-match' if users else 'review-functions-triggers-or-dynamic-sql'})
 run=(server/'internal/app/run.go').read_text()
 workers=re.findall(r'WorkerFunc\(func\(ctx context.Context\) \{ (.+?) \}\)',run)
-output={'schema_version':int(baseline.name.split('_')[0]),'caveat':'Static candidate inventory, not a proof of unused code. Unmatched callers require manual review before deletion.','routes':routes,'tables':tables,'workers':[{'call':w,'source':'server/internal/app/run.go','domain':domain(w)} for w in workers], 'services':{'Go API':['Accounts','Spaces','Agents','Sync'],'agent-runtime':['Agents'],'journal-collab':['Spaces'],'self-host-collab':['Spaces'],'external billing adapter':['Accounts','Agents','Spaces']}}
+output={'schema_version':int(baseline.name.split('_')[0]),'caveat':'Static candidate inventory, not a proof of unused code. Unmatched callers require manual review before deletion.','routes':routes,'tables':tables,'workers':[{'call':w,'source':'server/internal/app/run.go','domain':domain(w)} for w in workers], 'services':{'Go API':['Accounts','Spaces','Agents','Sync'],'agent-runtime':['Agents'],'journal-collab':['Spaces'],'external billing adapter':['Accounts','Agents','Spaces']}}
 (server/'migration').mkdir(exist_ok=True)
 (server/'migration/dependency-inventory.json').write_text(json.dumps(output,indent=2)+'\n')
 print(f'{len(routes)} route registrations; {len(tables)} tables; {len(workers)} workers')

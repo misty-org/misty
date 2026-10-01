@@ -39,7 +39,7 @@ use crate::infra::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
 #[cfg(not(target_os = "macos"))]
 use crate::infra::document_intelligence::PrepareAgentDocumentRequest;
 use crate::infra::document_intelligence::PreparedAgentDocument;
-use crate::infra::environment::{AppEnvironmentSnapshot, ServerMode};
+use crate::infra::environment::AppEnvironmentSnapshot;
 use crate::infra::explorer::SavePreviewRequest;
 use crate::infra::explorer_library::{
     ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest, SetTagsRequest,
@@ -131,20 +131,6 @@ pub async fn app_environment_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<AppEnvironmentSnapshot> {
     Ok(state.environment.snapshot())
-}
-
-#[tauri::command]
-pub async fn app_configure_server(
-    mode: ServerMode,
-    url: Option<String>,
-    deployment_id: Option<String>,
-    name: Option<String>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state
-        .environment
-        .configure_server(mode, url, deployment_id, name)
-        .map_err(ApiError::Message)
 }
 
 #[tauri::command]

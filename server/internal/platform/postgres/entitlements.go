@@ -39,10 +39,10 @@ func NormalizePlan(tier Tier) Tier {
 	}
 }
 
-// Resource ceilings are customer-visible adapter results. The public server
-// supplies no paid-plan defaults. Independent servers receive a finite storage
-// ceiling; hosted deployments always use their billing service.
-func selfHostedEntitlements() PlanEntitlements {
+// Resource ceilings are customer-visible billing results. Production always
+// asks the billing service; development and tests without one receive these
+// finite defaults.
+func defaultEntitlements() PlanEntitlements {
 	return PlanEntitlements{Plan: TierBasic, MaxOwnedSpaces: 2147483647, SpaceLimit: 2147483647, PersonalStorageLimitBytes: 2_000_000_000, SpaceStorageLimitBytes: 2_000_000_000, StorageLimitBytes: 2_000_000_000, UnlimitedSpaces: true, UnlimitedCollaborators: true, UnlimitedAgentDefinitions: true, BillingAvailable: true}
 }
 func entitlementsForUserTx(ctx context.Context, _ *sql.Tx, userID string, _ time.Time) (PlanEntitlements, error) {
@@ -50,7 +50,7 @@ func entitlementsForUserTx(ctx context.Context, _ *sql.Tx, userID string, _ time
 	if err != nil {
 		return PlanEntitlements{}, err
 	}
-	limits := selfHostedEntitlements()
+	limits := defaultEntitlements()
 	if !adapter.Enabled() {
 		return limits, nil
 	}

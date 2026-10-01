@@ -1,9 +1,12 @@
+mod provisioning;
+pub use provisioning::{setup, Options};
+
 use crate::{
     environment::{self, Target},
     workspace::Workspace,
 };
 use anyhow::{bail, Context, Result};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{
     collections::BTreeMap,
     io::Write,
@@ -166,199 +169,6 @@ pub fn public_health(workspace: &Workspace) -> Result<()> {
     Ok(())
 }
 
-pub fn setup(
-    workspace: &Workspace,
-    account: Option<String>,
-    zone: Option<String>,
-    host: Option<String>,
-    apply: bool,
-) -> Result<()> {
-    environment::init(workspace, Target::Dev)?;
-    crate::server::initialize_development_secrets(workspace)?;
-    let values = environment::read(workspace, Target::Dev)?;
-    let token = value(&values, "CLOUDFLARE_API_TOKEN")?;
-    let account = account
-        .map(Ok)
-        .unwrap_or_else(|| value(&values, "CLOUDFLARE_ACCOUNT_ID"))?;
-    let zone = zone
-        .map(Ok)
-        .unwrap_or_else(|| value(&values, "CLOUDFLARE_ZONE_ID"))?;
-    let host = host
-        .map(Ok)
-        .unwrap_or_else(|| value(&values, "MISTY_DEV_API_TUNNEL_HOSTNAME"))?
-        .to_ascii_lowercase();
-    id(&account)?;
-    id(&zone)?;
-    hostname(&host)?;
-    let zone_info = request(&token, "GET", &format!("zones/{zone}"), None)?;
-    let zone_name = zone_info["name"].as_str().context("zone has no name")?;
-    if zone_info["account"]["id"] != account
-        || !(host == zone_name || host.ends_with(&format!(".{zone_name}")))
-    {
-        bail!("hostname, zone, and account do not match");
-    }
-    let name = values
-        .get("MISTY_CLOUDFLARE_TUNNEL_NAME")
-        .filter(|v| !v.is_empty())
-        .cloned()
-        .unwrap_or_else(|| format!("misty-{}", host.replace('.', "-")));
-    let mut query = url::form_urlencoded::Serializer::new(String::new());
-    query
-        .append_pair("name", &name)
-        .append_pair("is_deleted", "false");
-    let tunnels = request(
-        &token,
-        "GET",
-        &format!("accounts/{account}/cfd_tunnel?{}", query.finish()),
-        None,
-    )?;
-    let matches: Vec<&Value> = tunnels
-        .as_array()
-        .context("invalid tunnel list")?
-        .iter()
-        .filter(|v| v["name"] == name)
-        .collect();
-    if matches.len() > 1 {
-        bail!("multiple tunnels have this name; choose a unique tunnel name");
-    }
-    let dns = request(
-        &token,
-        "GET",
-        &format!("zones/{zone}/dns_records?name={host}"),
-        None,
-    )?;
-    let records = dns.as_array().context("invalid DNS response")?;
-    if records.len() > 1 {
-        bail!("multiple DNS records exist for {host}; resolve the conflict first");
-    }
-    let existing_id = matches.first().and_then(|v| v["id"].as_str());
-    if let Some(record) = records.first() {
-        if existing_id.is_none_or(|tid| {
-            record["type"] != "CNAME" || record["content"] != format!("{tid}.cfargotunnel.com")
-        }) {
-            bail!("DNS hostname is already used by another resource; no changes made");
-        }
-    }
-    let subdomain = request(
-        &token,
-        "GET",
-        &format!("accounts/{account}/workers/subdomain"),
-        None,
-    )?;
-    let subdomain = subdomain["subdomain"]
-        .as_str()
-        .context("Enable a workers.dev subdomain for this Cloudflare account first")?;
-    let worker_name = values
-        .get("MISTY_CLOUDFLARE_WORKER_NAME")
-        .filter(|v| !v.is_empty())
-        .cloned()
-        .unwrap_or_else(|| format!("misty-{}", host.replace('.', "-")));
-    if worker_name.is_empty()
-        || worker_name.len() > 63
-        || !worker_name
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        bail!(
-            "set MISTY_CLOUDFLARE_WORKER_NAME to at most 63 lowercase letters, digits, or hyphens"
-        );
-    }
-    let worker_host = format!("{worker_name}.{subdomain}.workers.dev");
-    println!("Cloudflare plan: account {account}, zone {zone_name}\nTunnel: {name}\nRoute: https://{host} → http://misty-api:8080\nDNS: proxied CNAME to the tunnel\nWorker: deploy separately with misty server deploy");
-    if !apply {
-        println!(
-            "No remote changes made. Repeat with --apply to provision and save configuration."
-        );
-        return Ok(());
-    }
-    let tunnel = if let Some(tid) = existing_id {
-        tid.to_owned()
-    } else {
-        request(
-            &token,
-            "POST",
-            &format!("accounts/{account}/cfd_tunnel"),
-            Some(json!({"name":name,"config_src":"cloudflare"})),
-        )?["id"]
-            .as_str()
-            .context("created tunnel has no ID")?
-            .to_owned()
-    };
-    let path = format!("accounts/{account}/cfd_tunnel/{tunnel}/configurations");
-    let current = request(&token, "GET", &path, None)?;
-    let config = merge_ingress(&current, &host)?;
-    request(&token, "PUT", &path, Some(json!({"config":config})))?;
-    if records.is_empty() {
-        request(
-            &token,
-            "POST",
-            &format!("zones/{zone}/dns_records"),
-            Some(
-                json!({"type":"CNAME","name":host,"content":format!("{tunnel}.cfargotunnel.com"),"proxied":true}),
-            ),
-        )?;
-    }
-    if let Some(record) = records.first().filter(|r| r["proxied"] != true) {
-        let record_id = record["id"].as_str().context("DNS record has no ID")?;
-        request(
-            &token,
-            "PATCH",
-            &format!("zones/{zone}/dns_records/{record_id}"),
-            Some(json!({"proxied":true})),
-        )?;
-    }
-    let tunnel_token = request(
-        &token,
-        "GET",
-        &format!("accounts/{account}/cfd_tunnel/{tunnel}/token"),
-        None,
-    )?
-    .as_str()
-    .context("missing tunnel token")?
-    .to_owned();
-    let origin = format!("https://{host}");
-    for (key, val) in [
-        ("MISTY_CLOUDFLARE_WORKER_NAME", worker_name),
-        ("MISTY_CLOUDFLARE_WORKER_HOST", worker_host),
-        ("CLOUDFLARE_ACCOUNT_ID", account),
-        ("CLOUDFLARE_ZONE_ID", zone),
-        ("CLOUDFLARE_API_TOKEN", token),
-        ("CLOUDFLARE_TUNNEL_TOKEN", tunnel_token),
-        ("MISTY_CLOUDFLARE_TUNNEL_NAME", name),
-        ("MISTY_DEV_API_TUNNEL_HOSTNAME", host),
-        ("MISTY_DEV_API_ORIGIN", origin.clone()),
-    ] {
-        environment::set(workspace, Target::Dev, key, &val)?;
-    }
-    println!("Cloudflare configured. Next: misty server up; misty server deploy; misty doctor cloudflare");
-    Ok(())
-}
-fn merge_ingress(current: &Value, host: &str) -> Result<serde_json::Map<String, Value>> {
-    let mut config = current["config"].as_object().cloned().unwrap_or_default();
-    let ingress = config.entry("ingress").or_insert(json!([]));
-    let rules = ingress
-        .as_array_mut()
-        .context("invalid ingress configuration")?;
-    if let Some(rule) = rules.iter().find(|r| r["hostname"] == host) {
-        if rule["service"] != "http://misty-api:8080" {
-            bail!("existing tunnel route conflicts; other routes were preserved");
-        }
-    } else {
-        let position = rules
-            .iter()
-            .position(|r| r.get("hostname").is_none())
-            .unwrap_or(rules.len());
-        rules.insert(
-            position,
-            json!({"hostname":host,"service":"http://misty-api:8080"}),
-        );
-        if !rules.iter().any(|r| r.get("hostname").is_none()) {
-            rules.push(json!({"service":"http_status:404"}));
-        }
-    }
-    Ok(config)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,20 +206,6 @@ mod tests {
         server.join().unwrap();
         assert!(error.contains("10000"));
         assert!(!error.contains("fixture-token"));
-    }
-    #[test]
-    fn rerunning_setup_preserves_unrelated_routes() {
-        let before = json!({"config": {"originRequest": {"connectTimeout": 15}, "ingress": [
-            {"hostname":"other.example.com", "service":"http://other:80"},
-            {"service":"http_status:404"}
-        ]}});
-        let first = merge_ingress(&before, "api.example.com").unwrap();
-        assert_eq!(first["ingress"].as_array().unwrap().len(), 3);
-        assert_eq!(first["ingress"][0], before["config"]["ingress"][0]);
-        assert_eq!(first["originRequest"], before["config"]["originRequest"]);
-        let second = merge_ingress(&json!({"config":first}), "api.example.com").unwrap();
-        assert_eq!(first, second);
-        assert!(merge_ingress(&before, "other.example.com").is_err());
     }
     #[test]
     fn validates_resource_identifiers() {

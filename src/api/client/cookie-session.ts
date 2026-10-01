@@ -132,13 +132,11 @@ function assertGeneration(generation: number): void {
   if (readApiSessionGeneration() !== generation) throw new Error("The active account changed.");
 }
 
-// Routes that work without a session, used by sign-in, registration, enrollment
-// and password reset while no account is active.
+// Routes that work without a session, used by sign-in, registration and
+// password reset while no account is active.
 const signedOutPaths = new Set([
   "/login",
   "/register",
-  "/self-host/bootstrap",
-  "/self-host/enroll",
   "/auth/forgot",
   "/auth/google",
   "/auth/google/complete",
@@ -198,8 +196,6 @@ export async function cookieSessionFetch(
     "/login",
     "/register",
     "/logout",
-    "/self-host/enroll",
-    "/self-host/bootstrap",
   ].includes(path);
   const send = async () => {
     assertGeneration(generation);
@@ -220,8 +216,6 @@ export async function cookieSessionFetch(
       "/auth/refresh",
       "/auth/google",
       "/auth/google/complete",
-      "/self-host/enroll",
-      "/self-host/bootstrap",
     ].includes(path)
   )
     return response;

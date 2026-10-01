@@ -136,8 +136,6 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
       "Weekly hosted AI is unavailable. Review your personal and Space allowances before trying again.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
-    self_host_entitlement_required:
-      "Your self-host entitlement needs verification. Open Connection settings or switch to Misty Hosted.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
     dangerous_file_type: "This file type cannot be stored safely.",
     malware_detected: "This upload was rejected because it matched a malware signature.",

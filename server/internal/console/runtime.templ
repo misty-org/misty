@@ -100,9 +100,7 @@ templ aiPage(v aiView) {
 			@healthRow(v.Gateway.Label(), v.Gateway.OK(), checkDetail(*v.Gateway))
 		}
 	</ul>
-	if !v.Config.SelfHosted() {
-		@note("Hosted instances route every model through the AI gateway. Per-account budgets are enforced by the billing adapter.")
-	}
+	@note("Every model routes through the AI gateway. Per-account budgets are enforced by the billing adapter.")
 	if v.Err != "" {
 		@problem(v.Err)
 	}

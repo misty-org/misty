@@ -14,7 +14,7 @@ const launchToken = "launch-token"
 
 func newConsole(t *testing.T, apiURL string) http.Handler {
 	t.Helper()
-	return newConsoleWith(t, Config{Addr: "127.0.0.1:0", APIURL: apiURL, Mode: "hosted", Environment: "development"})
+	return newConsoleWith(t, Config{Addr: "127.0.0.1:0", APIURL: apiURL, Environment: "development"})
 }
 
 func newConsoleWith(t *testing.T, cfg Config) http.Handler {
@@ -132,35 +132,24 @@ func TestUnknownPagesRedirectToOverview(t *testing.T) {
 }
 
 func TestEveryPageRendersWithoutDatabase(t *testing.T) {
-	for _, mode := range []string{"hosted", "self_hosted"} {
-		handler := newConsoleWith(t, Config{APIURL: "http://127.0.0.1:1", Mode: mode, Environment: "development"})
-		cookie := signIn(t, handler)
-		for _, page := range []string{"overview", "services", "accounts", "sync", "jobs", "ai", "configuration", "database"} {
-			rec := request(t, handler, "/"+page, cookie)
-			if rec.Code != http.StatusOK {
-				t.Errorf("%s /%s: got %d", mode, page, rec.Code)
-			}
+	handler := newConsoleWith(t, Config{APIURL: "http://127.0.0.1:1", Environment: "development"})
+	cookie := signIn(t, handler)
+	for _, page := range []string{"overview", "services", "accounts", "sync", "jobs", "ai", "billing", "configuration", "database"} {
+		rec := request(t, handler, "/"+page, cookie)
+		if rec.Code != http.StatusOK {
+			t.Errorf("/%s: got %d", page, rec.Code)
 		}
 	}
 }
 
-func TestModeGating(t *testing.T) {
-	production := newConsoleWith(t, Config{APIURL: "http://127.0.0.1:1", Mode: "hosted", Environment: "production"})
+func TestEnvironmentGating(t *testing.T) {
+	production := newConsoleWith(t, Config{APIURL: "http://127.0.0.1:1", Environment: "production"})
 	cookie := signIn(t, production)
 	if rec := request(t, production, "/services/panel", cookie); rec.Code != http.StatusNotFound {
 		t.Errorf("services outside development: expected 404, got %d", rec.Code)
 	}
 	if rec := request(t, production, "/billing", cookie); rec.Code != http.StatusOK {
-		t.Errorf("billing when hosted: expected 200, got %d", rec.Code)
-	}
-
-	selfHosted := newConsoleWith(t, Config{APIURL: "http://127.0.0.1:1", Mode: "self_hosted", Environment: "production"})
-	cookie = signIn(t, selfHosted)
-	if rec := request(t, selfHosted, "/billing", cookie); rec.Code != http.StatusSeeOther {
-		t.Errorf("billing when self-hosted: expected redirect, got %d", rec.Code)
-	}
-	if rec := request(t, selfHosted, "/bootstrap", cookie); rec.Code != http.StatusOK {
-		t.Errorf("bootstrap when self-hosted: expected 200, got %d", rec.Code)
+		t.Errorf("billing in production: expected 200, got %d", rec.Code)
 	}
 }
 

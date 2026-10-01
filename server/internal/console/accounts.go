@@ -34,14 +34,10 @@ func (v accountDetailView) actionPath(action string) string {
 }
 
 func accountStatus(a db.ConsoleAccount) string {
-	switch {
-	case a.Disabled:
-		return "disabled"
-	case a.State != "active":
+	if a.State != "active" {
 		return a.State
-	default:
-		return "active"
 	}
+	return "active"
 }
 
 func (s *Server) accountsPage(r *http.Request) templ.Component {
@@ -117,62 +113,4 @@ func (s *Server) revokeSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "Revoked sessions for", email, plural(int(revoked), "session", "sessions"))
 	s.renderAccountAction(w, r, "Signed out of "+plural(int(revoked), "session", "sessions"), nil)
-}
-
-func (s *Server) setDisabled(disabled bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		email, err := s.accountEmail(r)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		if err := s.db.ConsoleSetSelfHostDisabled(r.Context(), chi.URLParam(r, "id"), disabled); err != nil {
-			s.renderAccountAction(w, r, "", errors.New("Couldn't update the account: "+err.Error()))
-			return
-		}
-		action, flash := "Enabled account", "Account enabled"
-		if disabled {
-			action, flash = "Disabled account", "Account disabled and signed out everywhere"
-		}
-		s.audit(r, action, email, "")
-		s.renderAccountAction(w, r, flash, nil)
-	}
-}
-
-func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
-	email, err := s.accountEmail(r)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	password := r.PostFormValue("password")
-	if len(password) < 8 {
-		s.renderAccountAction(w, r, "", errors.New("Passwords need at least 8 characters."))
-		return
-	}
-	if err := s.db.ResetSelfHostPassword(r.Context(), email, password); err != nil {
-		s.renderAccountAction(w, r, "", errors.New("Couldn't reset the password: "+err.Error()))
-		return
-	}
-	s.audit(r, "Reset password for", email, "sessions revoked")
-	s.renderAccountAction(w, r, "Password reset; existing sessions were signed out", nil)
-}
-
-type bootstrapView struct {
-	Bootstrapped bool
-	Token        string
-	Err          string
-}
-
-func (s *Server) bootstrapPage(r *http.Request) templ.Component {
-	if s.db == nil {
-		return databaseUnavailable("Bootstrap")
-	}
-	view := bootstrapView{}
-	bootstrapped, err := s.db.ConsoleInstanceBootstrapped(r.Context())
-	if err != nil {
-		view.Err = "Couldn't read bootstrap state: " + err.Error()
-	}
-	view.Bootstrapped = bootstrapped
-	return bootstrapPage(view)
 }

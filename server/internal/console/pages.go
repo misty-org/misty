@@ -21,8 +21,6 @@ type Page struct {
 
 func always(Config) bool            { return true }
 func developmentOnly(c Config) bool { return c.Development() }
-func selfHostedOnly(c Config) bool  { return c.SelfHosted() }
-func hostedOnly(c Config) bool      { return !c.SelfHosted() }
 
 // pages is the console's single navigation registry, in sidebar order. Each
 // page has a unique icon; groups are separated by small muted headers.
@@ -30,11 +28,10 @@ var pages = []Page{
 	{Slug: "overview", Title: "Overview", Icon: iconDashboard, Available: always, Render: (*Server).overviewPage},
 	{Slug: "services", Title: "Services", Icon: iconBox, Available: developmentOnly, Render: (*Server).servicesPage},
 	{Slug: "accounts", Title: "Accounts", Group: "People", Icon: iconUsers, Available: always, Render: (*Server).accountsPage},
-	{Slug: "bootstrap", Title: "Bootstrap", Group: "People", Icon: iconKey, Available: selfHostedOnly, Render: (*Server).bootstrapPage},
 	{Slug: "sync", Title: "Sync", Group: "People", Icon: iconRefresh, Available: always, Render: (*Server).syncPage},
 	{Slug: "jobs", Title: "Jobs", Group: "Runtime", Icon: iconClock, Available: always, Render: (*Server).jobsPage},
 	{Slug: "ai", Title: "AI", Group: "Runtime", Icon: iconSparkles, Available: always, Render: (*Server).aiPage},
-	{Slug: "billing", Title: "Billing", Group: "Runtime", Icon: iconCard, Available: hostedOnly, Render: (*Server).billingPage},
+	{Slug: "billing", Title: "Billing", Group: "Runtime", Icon: iconCard, Available: always, Render: (*Server).billingPage},
 	{Slug: "configuration", Title: "Configuration", Group: "System", Icon: iconSliders, Available: always, Render: (*Server).configurationPage},
 	{Slug: "database", Title: "Database", Group: "System", Icon: iconDatabase, Available: always, Render: (*Server).databasePage},
 }

@@ -49,9 +49,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_AGENT_RUNTIME_URL",
             "MISTY_ALLOWED_ORIGINS",
             "MISTY_API_IMAGE",
-            "MISTY_COLLAB_IMAGE",
-            "MISTY_COLLAB_PUBLIC_URL",
-            "MISTY_DEPLOYMENT_MODE",
             "MISTY_ENVIRONMENT",
             "MISTY_HOST_PORT",
             "MISTY_INSTANCE_NAME",
@@ -105,6 +102,8 @@ const FILES: &[FileSpec] = &[
             "R2_ENDPOINT",
             "R2_SECRET_KEY",
             "MISTY_R2_ALLOWED_ORIGINS",
+            "MISTY_BACKUP_BUCKET",
+            "MISTY_BACKUP_AGE_RECIPIENT",
         ],
     },
     FileSpec {
@@ -293,7 +292,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS",
             "MISTY_AUTH_SIGNING_KEY",
             "MISTY_AUTH_SIGNING_KEY_PREVIOUS",
-            "MISTY_COLLAB_INTERNAL_SECRET",
         ],
     },
 ];
@@ -316,6 +314,10 @@ const DEPRECATED_NAMES: &[&str] = &[
     "SLACK_CLIENT_ID",
     "SLACK_CLIENT_SECRET",
     "SLACK_SIGNING_SECRET",
+    "MISTY_DEPLOYMENT_MODE",
+    "MISTY_COLLAB_IMAGE",
+    "MISTY_COLLAB_PUBLIC_URL",
+    "MISTY_COLLAB_INTERNAL_SECRET",
 ];
 
 const DEPRECATED_CLI_NAMES: &[&str] = &[
@@ -326,12 +328,15 @@ const DEPRECATED_CLI_NAMES: &[&str] = &[
 ];
 
 const PROD_REQUIRED: &[&str] = &[
+    "AGENT_RUNTIME_DB_PASSWORD",
     "DB_HOST",
     "DB_MIGRATION_PASSWORD",
     "DB_MIGRATION_USER",
     "DB_NAME",
     "DB_PASSWORD",
     "DB_USER",
+    "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
+    "MISTY_AGENT_RUNTIME_IMAGE",
     "MISTY_API_IMAGE",
     "MISTY_AUTH_SIGNING_KEY",
     "MISTY_DEVICE_PAIRING_PEPPER",
@@ -432,16 +437,12 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
         );
     }
 
-    let deployment = values
-        .get("MISTY_DEPLOYMENT_MODE")
-        .map(|s| s.trim())
-        .unwrap_or("hosted");
     let billing = values
         .get("MISTY_BILLING_ADAPTER")
         .map(|s| s.trim())
         .unwrap_or("none");
-    if deployment == "hosted" && billing != "http" {
-        bail!("Hosted deployment requires MISTY_BILLING_ADAPTER=http");
+    if target == Target::Prod && billing != "http" {
+        bail!("Production requires MISTY_BILLING_ADAPTER=http");
     }
     if !matches!(billing, "" | "none" | "null" | "http") {
         bail!("Unknown MISTY_BILLING_ADAPTER mode");

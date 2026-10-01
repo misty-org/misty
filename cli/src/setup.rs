@@ -15,25 +15,17 @@ pub enum Component {
 pub struct Setup {
     #[arg(value_enum, default_value = "all")]
     pub component: Component,
-    /// Apply the displayed Cloudflare resource plan.
-    #[arg(long)]
-    apply: bool,
-    #[arg(long)]
-    account: Option<String>,
-    #[arg(long)]
-    zone: Option<String>,
-    #[arg(long)]
-    hostname: Option<String>,
+    #[command(flatten)]
+    cloudflare: crate::cloudflare::Options,
 }
 pub fn run(workspace: &Workspace, options: Setup) -> Result<()> {
+    if options.cloudflare.target != Target::Dev
+        && !matches!(options.component, Component::Cloudflare)
+    {
+        anyhow::bail!("--target prod is supported by misty setup cloudflare only");
+    }
     match options.component {
-        Component::Cloudflare => crate::cloudflare::setup(
-            workspace,
-            options.account,
-            options.zone,
-            options.hostname,
-            options.apply,
-        ),
+        Component::Cloudflare => crate::cloudflare::setup(workspace, options.cloudflare),
         Component::Desktop => desktop(workspace),
         Component::Server | Component::All => {
             environment::init(workspace, Target::Dev)?;
@@ -75,4 +67,44 @@ pub fn desktop(workspace: &Workspace) -> Result<()> {
         println!("Created desktop API configuration in .env");
     }
     crate::development::setup(workspace)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[derive(Parser)]
+    struct Command {
+        #[command(flatten)]
+        setup: Setup,
+    }
+
+    #[test]
+    fn cloudflare_target_defaults_to_dev_and_accepts_prod() {
+        let dev = Command::try_parse_from(["setup", "cloudflare"]).unwrap();
+        assert_eq!(dev.setup.cloudflare.target, Target::Dev);
+        let prod = Command::try_parse_from([
+            "setup",
+            "cloudflare",
+            "--target",
+            "prod",
+            "--tunnel-name",
+            "misty-prod",
+            "--hostname",
+            "api.mistysys.com",
+            "--apply",
+        ])
+        .unwrap();
+        assert_eq!(prod.setup.cloudflare.target, Target::Prod);
+    }
+
+    #[test]
+    fn production_target_does_not_initialize_development_for_other_components() {
+        let temporary = tempfile::tempdir().unwrap();
+        let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
+        let command = Command::try_parse_from(["setup", "server", "--target", "prod"]).unwrap();
+        assert!(run(&workspace, command.setup).is_err());
+        assert!(!workspace.server.exists());
+    }
 }

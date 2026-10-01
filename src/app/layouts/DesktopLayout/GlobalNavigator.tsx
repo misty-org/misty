@@ -12,7 +12,7 @@ import { useLocation } from "react-router-dom";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { WorkspaceSpaceNavigation } from "@/features/spaces";
 import { ActivityMenu } from "./ActivityMenu";
-import { NavigatorServerMenu } from "./NavigatorServerMenu";
+import mistyLogo from "@/assets/branding/misty-white.png";
 import { useRef } from "react";
 import { NavigatorEdgeMarkers } from "./NavigatorEdgeMarkers";
 import { navigatorHeaderRowClass, navigatorHierarchyActionClass } from "./styles";
@@ -59,7 +59,18 @@ export function GlobalNavigator(props: {
           data-misty-window-drag-block="true"
         >
           <div className={navigatorHeaderRowClass} data-navigator-server-row="true">
-            <NavigatorServerMenu onSettingsClick={props.onSettingsClick} />
+            <span
+              className="misty-navigator-icon-target misty-navigator-logo grid size-8 shrink-0 place-items-center"
+              role="img"
+              aria-label="Misty"
+            >
+              <img
+                src={mistyLogo}
+                alt=""
+                aria-hidden="true"
+                className="block size-[var(--misty-navigation-icon-size)] shrink-0 object-contain"
+              />
+            </span>
           </div>
         </div>
         <div aria-hidden="true" className="misty-navigator-divider" />

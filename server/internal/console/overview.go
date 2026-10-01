@@ -70,7 +70,7 @@ func (s *Server) loadOverview(ctx context.Context) overviewView {
 // subtitle is "hosted · development · v0.42.1 · up 3h 12m", dropping the
 // version when the server reports its environment name as its version.
 func (v overviewView) subtitle() string {
-	text := v.Config.ModeLabel()
+	text := v.Config.EnvironmentLabel()
 	if v.Health.Version != "" && v.Health.Version != v.Config.Environment {
 		text += " · " + v.Health.Version
 	}

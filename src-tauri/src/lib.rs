@@ -26,8 +26,8 @@ use app::commands::{
 };
 use app::commands::{
     agents_device_snapshot, agents_open_citation, agents_prepare_scoped_document,
-    agents_register_folder_scope, agents_revoke_folder_scope, app_configure_server,
-    app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
+    agents_register_folder_scope, agents_revoke_folder_scope, app_environment_snapshot,
+    app_snapshot, archive_create, archive_extract, archive_list,
     claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
@@ -355,7 +355,6 @@ pub fn run() {
                     mac_rounded_corners::set_native_wallpaper_video,
                     app_snapshot,
                     app_environment_snapshot,
-                    app_configure_server,
                     agents_device_snapshot,
                     agents_register_folder_scope,
                     agents_revoke_folder_scope,

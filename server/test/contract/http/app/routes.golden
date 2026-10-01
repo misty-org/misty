@@ -17,7 +17,6 @@ DELETE /api/misty/agent-execution/{taskID}
 DELETE /api/misty/agents/{agentID}
 DELETE /api/misty/attachments/{attachmentID}
 DELETE /api/misty/conversations/{conversationID}
-DELETE /api/self-host/invitations/{invitationID}
 DELETE /api/settings/profiles/{profileID}
 DELETE /api/spaces/{spaceID}
 DELETE /api/spaces/{spaceID}/calendar/events/{eventID}
@@ -59,14 +58,12 @@ DELETE /api/spaces/{spaceID}/tasks/{taskID}
 DELETE /cloud/connections/{connectionID}
 DELETE /connections/{connectionID}
 DELETE /integrations/{integrationID}
-DELETE /internal/self-host/collaboration/{resourceType}/{resourceID}
 DELETE /mcp/connections/{connectionID}
 DELETE /me/space-templates/{templateID}
 DELETE /misty/agent-execution/{taskID}
 DELETE /misty/agents/{agentID}
 DELETE /misty/attachments/{attachmentID}
 DELETE /misty/conversations/{conversationID}
-DELETE /self-host/invitations/{invitationID}
 DELETE /settings/profiles/{profileID}
 DELETE /spaces/{spaceID}
 DELETE /spaces/{spaceID}/calendar/events/{eventID}
@@ -119,7 +116,6 @@ DELETE /v1/misty/agent-execution/{taskID}
 DELETE /v1/misty/agents/{agentID}
 DELETE /v1/misty/attachments/{attachmentID}
 DELETE /v1/misty/conversations/{conversationID}
-DELETE /v1/self-host/invitations/{invitationID}
 DELETE /v1/settings/profiles/{profileID}
 DELETE /v1/spaces/{spaceID}
 DELETE /v1/spaces/{spaceID}/calendar/events/{eventID}
@@ -328,7 +324,6 @@ GET /figma/projects/{projectID}/files
 GET /figma/teams/{teamID}/projects
 GET /health
 GET /instance
-GET /internal/self-host/collaboration/{resourceType}/{resourceID}
 GET /mcp/connections
 GET /mcp/connections/{connectionID}
 GET /mcp/connections/{connectionID}/tools
@@ -756,9 +751,6 @@ POST /api/provider-callbacks/google/calendar
 POST /api/realtime/tickets
 POST /api/register
 POST /api/search/global/visual
-POST /api/self-host/bootstrap
-POST /api/self-host/enroll
-POST /api/self-host/invitations
 POST /api/settings/preferences
 POST /api/settings/profiles
 POST /api/space-invitations/{token}
@@ -893,9 +885,6 @@ POST /provider-callbacks/google/calendar
 POST /realtime/tickets
 POST /register
 POST /search/global/visual
-POST /self-host/bootstrap
-POST /self-host/enroll
-POST /self-host/invitations
 POST /settings/preferences
 POST /settings/profiles
 POST /space-invitations/{token}
@@ -1052,9 +1041,6 @@ POST /v1/provider-callbacks/google/calendar
 POST /v1/realtime/tickets
 POST /v1/register
 POST /v1/search/global/visual
-POST /v1/self-host/bootstrap
-POST /v1/self-host/enroll
-POST /v1/self-host/invitations
 POST /v1/settings/preferences
 POST /v1/settings/profiles
 POST /v1/space-invitations/{token}
@@ -1171,7 +1157,6 @@ PUT /api/spaces/{spaceID}/messages/{messageID}
 PUT /api/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /api/spaces/{spaceID}/nodes/{nodeID}
 PUT /api/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}/tasks
-PUT /internal/self-host/collaboration/{resourceType}/{resourceID}
 PUT /me/avatar
 PUT /me/device
 PUT /me/profile
