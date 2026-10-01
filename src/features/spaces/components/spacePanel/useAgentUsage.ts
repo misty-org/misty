@@ -1,20 +1,23 @@
+import { subscribeAccountEvents } from "@/api/accountEvents";
 import type { AgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import { useAuth } from "@/features/auth";
 import { useEffect, useState } from "react";
 import {
   fetchAgentUsage,
   getCachedAgentUsage,
   isAgentUsageStale,
   subscribeUsageCache,
-  USAGE_CACHE_TTL_MS,
 } from "../../store/usageCache";
 
 /**
  * The account's weekly hosted-AI allowance.
  *
- * It is cached and rechecked every 5 minutes or when an Agent run finishes.
+ * It is cached and rechecked when an Agent run finishes here, or when the server
+ * reports a billed transition from any device ("usage" account event).
  */
 export function useAgentUsage(ready: boolean): AgentUsage | null {
   const [usage, setUsage] = useState<AgentUsage | null>(() => getCachedAgentUsage());
+  const accountId = useAuth().user?.id ?? "";
 
   useEffect(() => {
     if (!ready) {
@@ -31,9 +34,9 @@ export function useAgentUsage(ready: boolean): AgentUsage | null {
       setUsage(getCachedAgentUsage());
     }
 
-    const interval = setInterval(() => {
-      void fetchAgentUsage(true);
-    }, USAGE_CACHE_TTL_MS);
+    const stopEvents = subscribeAccountEvents(accountId, (event) => {
+      if (event.topic === "usage" || event.topic === "reset") void fetchAgentUsage(true);
+    });
 
     const reloadWhenRunSettles = (event: Event) => {
       const type = (event as CustomEvent<{ type?: string }>).detail?.type ?? "";
@@ -51,10 +54,10 @@ export function useAgentUsage(ready: boolean): AgentUsage | null {
     window.addEventListener("misty:space-agent-run-event", reloadWhenRunSettles);
     return () => {
       unsubscribe();
-      clearInterval(interval);
+      stopEvents();
       window.removeEventListener("misty:space-agent-run-event", reloadWhenRunSettles);
     };
-  }, [ready]);
+  }, [accountId, ready]);
 
   return usage;
 }

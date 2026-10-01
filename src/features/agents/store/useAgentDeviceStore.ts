@@ -173,6 +173,16 @@ async function registerServerDevice(
   }
 }
 
+/** Records liveness the server confirmed through another call (Connected
+ * Devices presence), so this device sends no second heartbeat. */
+export function noteServerAgentDeviceSeen(deviceId: string): void {
+  lastHeartbeatByServerId.set(deviceId, Date.now());
+}
+
+export function serverAgentDeviceSeenWithin(deviceId: string, ms: number): boolean {
+  return Date.now() - (lastHeartbeatByServerId.get(deviceId) ?? 0) < ms;
+}
+
 export async function heartbeatServerAgentDevice(
   deviceId: string,
   localDeviceId = localDeviceByServerId.get(deviceId),
