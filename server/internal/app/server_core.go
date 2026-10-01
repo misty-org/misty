@@ -15,6 +15,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/email"
 	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	"github.com/kannachi323/misty/server/internal/platform/telemetry"
+	browsersync "github.com/kannachi323/misty/server/internal/sync"
 )
 
 type Server struct {
@@ -37,6 +38,7 @@ type Server struct {
 	AIAnalyzer               *serveragent.SmartLibraryAnalyzer
 	AI                       *api.AIService
 	AgentRuntime             api.AgentRuntimeConfig
+	BrowserSync              *browsersync.BrowserSyncService
 }
 
 func CreateServer() (*Server, error) {

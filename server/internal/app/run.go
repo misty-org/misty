@@ -54,6 +54,11 @@ func Run() {
 		}),
 		WorkerFunc(func(ctx context.Context) { runLifecycleQueues(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runRetention(ctx, server) }),
+		WorkerFunc(func(ctx context.Context) {
+			if server.BrowserSync != nil {
+				server.BrowserSync.RunLiveness(ctx)
+			}
+		}),
 		WorkerFunc(func(ctx context.Context) { runPersonalAgentTaskProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryPeopleProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryRenditionProcessing(ctx, server) }),
