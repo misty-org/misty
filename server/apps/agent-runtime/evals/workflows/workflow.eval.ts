@@ -48,15 +48,18 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
     answer: result.answer.slice(0, 4_000), ms: performance.now() - started, costUsd: 0,
     routing: routing(task, result.tools, result.screenRequests),
   };
-  if (!/completed$/.test(result.terminal)) run.error = `run ended: ${result.terminal}`;
+  // A run that ended incomplete but answered is graded on its answer; only a
+  // run with nothing to show is an error.
+  if (!/completed$/.test(result.terminal) && !result.answer.trim()) run.error = `run ended: ${result.terminal}`;
   // A run stopped at a screen hand-off has no answer to grade yet; its route still counts.
   const handedOff = result.screenRequests.length > 0 && !device;
   const textPassed = expectPassed(result.answer, task.expect);
   if (!handedOff && task.rubric?.length) {
     try {
       const verdict = await judge({
-        model: judgeModel, subject: "a personal assistant agent", prompt: task.prompt, rubric: task.rubric,
-        answer: result.answer, pageMarkdown: "", toolCalls: result.tools,
+        model: judgeModel, prompt: task.prompt, rubric: task.rubric,
+        subject: "a personal assistant agent. Its web_search and web_fetch tools read the web in the background: they never open a browser or touch the person's screen. Only screen_open, screen_look, browser_* and desktop tools do",
+        answer: result.answer, pageMarkdown: "", toolCalls: result.tools, pagesRead: result.pagesRead,
         // The judge sees the screen the agent saw, so claims about it can be checked.
         ...(task.start?.screen ? { screenshot: { data: displayCapture(task.start.screen).data_url.split(",")[1] ?? "", mediaType: "image/png" } } : {}),
       });

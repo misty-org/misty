@@ -81,7 +81,8 @@ async function readableLines(html: string): Promise<{ title: string; lines: stri
   let skipDepth = 0;
   let current: { prefix: string; text: string; cell: boolean } | null = null;
   const rewriter = new HTMLRewriter()
-    .on("title", { text: (chunk) => void (title += chunk.text) })
+    // The document's own title only: inline SVGs carry <title> elements too.
+    .on("head > title", { text: (chunk) => void (title += chunk.text) })
     .on(skipped, {
       element: (element) => {
         skipDepth++;

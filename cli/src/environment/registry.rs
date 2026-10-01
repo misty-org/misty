@@ -145,6 +145,10 @@ pub(super) const FILES: &[FileSpec] = &[
         names: &["MISTY_COMPOSIO_DEPLOYMENT", "MISTY_COMPOSIO_API_KEY"],
     },
     FileSpec {
+        path: "integrations/web-fetch.env",
+        names: &["MISTY_WEB_FETCH_URL", "MISTY_WEB_FETCH_SECRET"],
+    },
+    FileSpec {
         path: "integrations/dropbox.env",
         names: &["MISTY_DROPBOX_CLIENT_ID", "MISTY_DROPBOX_CLIENT_SECRET"],
     },

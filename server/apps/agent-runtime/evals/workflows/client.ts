@@ -20,6 +20,8 @@ export interface EvalRun {
   tools: string[];
   screenRequests: string[];
   events: string[];
+  /** What tools reported reading: titles and sites from tool.detail events. */
+  pagesRead: string[];
 }
 
 export class EvalClient {
@@ -71,7 +73,7 @@ export class EvalClient {
       headers: { "Idempotency-Key": key },
       body: JSON.stringify({ trigger: "message", context: [], execution_mode: "user", idempotency_key: key, timezone: "America/Los_Angeles", ...body }),
     });
-    const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [] };
+    const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [] };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -94,6 +96,10 @@ export class EvalClient {
           if (event.type === "assistant.message") run.answer = String(event.text ?? run.answer);
           // Started events carry catalog names (note.search); the model sees underscores.
           if (event.type === "tool.started") run.tools.push(String(event.toolName).replace(/\./g, "_"));
+          if (event.type === "tool.detail") {
+            const rows = (event.activity as { rows?: Array<{ title?: string; meta?: string }> } | undefined)?.rows ?? [];
+            run.pagesRead.push(`${String(event.toolName)}: ${rows.map((row) => [row.title, row.meta].filter(Boolean).join(" · ")).join("; ")}`.slice(0, 2_000));
+          }
           if (event.type === "screen.request") {
             const request = event.screenRequest as { kind?: string } | undefined;
             run.screenRequests.push(request?.kind ?? "screen");
