@@ -16,7 +16,7 @@ export type ActivityKind =
 
 export type ActivityTarget =
   | { kind: "space"; spaceId: string }
-  | { kind: "space-chat"; spaceId: string; messageId?: string }
+  | { kind: "space-chat"; spaceId: string; conversationId?: string; messageId?: string }
   | { kind: "space-task"; spaceId: string; taskId: string }
   | {
       kind: "workspace-tool";

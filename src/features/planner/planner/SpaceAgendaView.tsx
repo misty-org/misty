@@ -32,7 +32,7 @@ import {
   Plus,
   RotateCw,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loadAgendaConnections } from "./spaceAgenda/agendaConnections";
 import {
@@ -368,6 +368,18 @@ export function SpaceAgendaView({
       );
     }
   };
+  const linkedEntryRef = useRef("");
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get("entry");
+    if (!id || loading || linkedEntryRef.current === id) return;
+    const entry = entries.find((item) => item.id === id);
+    if (!entry) return;
+    linkedEntryRef.current = id;
+    params.delete("entry");
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    openEntry(entry);
+  });
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       {runtime.renderIntegration({

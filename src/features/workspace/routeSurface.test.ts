@@ -74,12 +74,17 @@ it("opens Home as a reusable workspace tab", () => {
   });
 });
 
-it("opens Scheduled directly and preserves legacy task links", () => {
-  for (const route of ["/scheduled?task=weekly", "/agents?view=scheduled&task=weekly"])
-    expect(workspaceSurfaceFromRoute(route)).toMatchObject({
-      surfaceId: "scheduled",
-      groupKey: "tool:scheduled",
-      route: "/scheduled?task=weekly",
+it("opens schedule links inside Agents and preserves the task", () => {
+  for (const route of ["/scheduled?task=weekly", "/agents?view=scheduled&task=weekly"]) {
+    const surface = workspaceSurfaceFromRoute(route)!;
+    expect(surface).toMatchObject({
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       scopeKey: "global",
     });
+    const url = new URL(surface.route!, "https://misty.local");
+    expect(url.pathname).toBe("/agents");
+    expect(url.searchParams.get("view")).toBe("scheduled");
+    expect(url.searchParams.get("task")).toBe("weekly");
+  }
 });

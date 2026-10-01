@@ -49,6 +49,8 @@ This document covers visible tab grouping and the global navigation icon rail. I
 
 Groups organize visible Misty layout tabs, including Browser, Files, Agents, and split layouts. Bookmarks have their own [library](../../../features/bookmarks/DESIGN.md). The compact global navigator and [named Space navigation](../../../features/spaces/components/DESIGN.md) have distinct roles.
 
+The tab pane picker marks the current pane with a persistent neutral active fill instead of a checkmark. Keyboard focus uses an inset outline, and `aria-current` exposes the current pane to assistive technology. This tab-navigation exception does not change selection indicators in other menus.
+
 Sources: [MistyTabGroups.tsx](MistyTabGroups.tsx), [WorkspaceLayoutTabs.tsx](WorkspaceLayoutTabs.tsx), [tabGroups.css](tabGroups.css), [GlobalNavigator.tsx](GlobalNavigator.tsx), [docking.css](docking.css), [navigatorMode.ts](../../../features/app-shell/navigatorMode.ts), and [tabGroups.ts](../../../features/workspace/tabGroups.ts).
 
 ## Colors
@@ -120,7 +122,7 @@ Custom titlebar and tab-strip icons share a 16px baseline, including tab icons. 
 
 Shared translucent interaction fills use `control-hover` (10% theme text) and `control-active` (16% theme text), increasing visibility while following both dark and light palettes. Buttons, icon buttons, menu triggers, navigation actions, toggles, segmented controls, and list rows use these shared fills where they previously used a faint text wash. Strong selected surfaces continue to use the existing active theme token.
 
-Home is a normal, reusable workspace tab at `/home`: it appears in the tab strip, supports selection and closing, and survives workspace migration. Scheduled remains its own standalone page in the navbar.
+Home is a normal, reusable workspace tab at `/home`: it appears in the tab strip, supports selection and closing, and survives workspace migration. Scheduled lives within Agents; legacy schedule links and saved tabs migrate to that section.
 
 The synthetic source-component preview in `.impeccable/review/topbar/` historically covered compact and labeled navigation, Home in the tab strip, the unclipped group submenu, group-editor focus handoff, and the virtual-window menu at 860px. Focused tests passed, including Home reuse/closing, compact-mode persistence, shell layout preservation, and portaled group creation. Typechecking remains blocked by two unrelated Settings errors. The detector reported only retained 10px count text and a pre-existing 10px radius; no new visual exceptions were introduced.
 
@@ -130,7 +132,7 @@ Navigation visibility correction: `NavigatorRail.tsx` owns edge hover, keyboard 
 
 ## Destination navigation and history
 
-Home, Browser, Files, Agents, Scheduled, and each Space reuse their most recently used established view in the current virtual window. Selection restores the exact route and state, including a view inside a split arrangement. A missing destination opens a new window tab. Navigation never replaces an occupied pane or adds cross-destination Back entries. Private browser views are excluded from ordinary Browser destination reuse.
+Home, Browser, Files, Agents (including Scheduled), and each Space reuse their most recently used established view in the current virtual window. Selection restores the exact route and state, including a view inside a split arrangement. A missing destination opens a new window tab. Navigation never replaces an occupied pane or adds cross-destination Back entries. Private browser views are excluded from ordinary Browser destination reuse.
 
 An unused New Tab or new split pane accepts the next destination, even if another instance already exists. Its starting page defaults to Home and is configurable under Settings → General → New tabs and splits (Home, Browser, Files, Agents). Interacting with its content or navigating commits that view. Settings, Search, Activity, and Sync remain utility overlays.
 

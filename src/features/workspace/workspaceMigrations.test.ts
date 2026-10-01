@@ -130,3 +130,19 @@ it("preserves Home as a supported workspace surface", () => {
   const home = legacyTab();
   expect(migrateRetiredWorkspaceView(home)).toEqual(home);
 });
+
+it("migrates a saved Scheduled tab into Agents without losing its selected task", () => {
+  const migrated = migrateRetiredWorkspaceView(
+    legacyTab({
+      surfaceId: "scheduled",
+      groupKey: "tool:scheduled",
+      route: "/scheduled?task=weekly",
+    }),
+  );
+  expect(migrated).toMatchObject({
+    id: "saved-tab",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
+    route: "/agents?task=weekly&view=scheduled",
+  });
+});

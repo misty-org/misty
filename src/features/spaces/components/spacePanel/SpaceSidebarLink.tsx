@@ -1,8 +1,7 @@
 import {
   appIconStrokeWidth,
   cn,
-  navigationMenuLinkClass,
-  navigationMenuPrimaryIconClass,
+  NavIslandItem,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -33,9 +32,11 @@ export function SpaceSidebarLink({
   onNavigate?: (path: string) => void;
 }) {
   const link = (
-    <Link
+    <NavIslandItem
+      asChild
+      active={active}
       className={cn(
-        navigationMenuLinkClass,
+        "grid h-8 min-w-0 grid-cols-[16px_minmax(0,1fr)] gap-2 px-2 text-left text-[13px] [@media(pointer:coarse)]:min-h-11",
         strip
           ? "relative h-8 w-full grid-cols-1 place-items-center gap-0 !px-0"
           : iconOnly
@@ -45,47 +46,55 @@ export function SpaceSidebarLink({
               : "w-full",
         active && "text-cream-bright",
       )}
-      to={to}
-      aria-label={iconOnly || strip ? label : undefined}
-      aria-current={active ? "page" : undefined}
-      onClick={(event) => {
-        if (
-          !onNavigate ||
-          event.button !== 0 ||
-          event.metaKey ||
-          event.ctrlKey ||
-          event.shiftKey ||
-          event.altKey
-        )
-          return;
-        event.preventDefault();
-        onNavigate(to);
-      }}
     >
-      <span className={navigationMenuPrimaryIconClass}>
-        <Icon size={18} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
-      </span>
-      <span className={iconOnly || strip ? "sr-only" : "flex min-w-0 items-center gap-2"}>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        {badgeCount > 0 ? (
+      <Link
+        to={to}
+        aria-label={iconOnly || strip ? label : undefined}
+        aria-current={active ? "page" : undefined}
+        onClick={(event) => {
+          if (
+            !onNavigate ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          )
+            return;
+          event.preventDefault();
+          onNavigate(to);
+        }}
+      >
+        <span className="grid size-4 shrink-0 place-items-center">
+          <Icon
+            className="block size-4"
+            size={16}
+            strokeWidth={appIconStrokeWidth}
+            aria-hidden="true"
+          />
+        </span>
+        <span className={iconOnly || strip ? "sr-only" : "flex min-w-0 items-center gap-2"}>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {badgeCount > 0 ? (
+            <span
+              className={cn(
+                "grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full",
+                "bg-charcoal-active px-1 text-[10px] font-bold leading-none text-cream-bright",
+              )}
+              aria-label={`${badgeCount} new`}
+            >
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </span>
+          ) : null}
+        </span>
+        {(iconOnly || strip) && badgeCount > 0 && (
           <span
-            className={cn(
-              "grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full",
-              "bg-notification-red px-1 text-[10px] font-bold leading-none text-white",
-            )}
-            aria-label={`${badgeCount} new`}
-          >
-            {badgeCount > 99 ? "99+" : badgeCount}
-          </span>
-        ) : null}
-      </span>
-      {(iconOnly || strip) && badgeCount > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute right-1 top-1 size-2 rounded-full bg-notification-red"
-        />
-      )}
-    </Link>
+            aria-hidden="true"
+            className="absolute right-1 top-1 size-2 rounded-full bg-cream-muted"
+          />
+        )}
+      </Link>
+    </NavIslandItem>
   );
   return iconOnly || strip ? (
     <Tooltip>

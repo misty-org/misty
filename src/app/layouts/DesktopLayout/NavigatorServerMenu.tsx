@@ -84,7 +84,7 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
         <DropdownMenuRadioGroup value={selfHosted ? currentUrl : "hosted"}>
           <DropdownMenuRadioItem
             value="hosted"
-            indicator="check"
+
             disabled={switching || !nativeAvailable}
             onSelect={(event) => {
               if (!selfHosted) return;
@@ -99,7 +99,7 @@ export function NavigatorServerMenu(props: { onSettingsClick: () => void }) {
             <DropdownMenuRadioItem
               key={server.url}
               value={server.url}
-              indicator="check"
+
               disabled={switching || !nativeAvailable}
               onSelect={(event) => {
                 if (selfHosted && currentUrl === server.url) return;

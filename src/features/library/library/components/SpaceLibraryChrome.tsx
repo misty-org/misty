@@ -1,7 +1,6 @@
 import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
 import {
   Button,
-  EmptyState,
   IconButton,
   Input,
   SegmentedControl,
@@ -24,7 +23,7 @@ const toolbarControlStyles = {
   group:
     "flex h-9 shrink-0 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1 shadow-xs",
 } as const;
-const mediaTypeOptions = [
+export const mediaTypeOptions = [
   {
     value: "",
     label: "All media",
@@ -90,7 +89,7 @@ const mediaTypeOptions = [
     label: "Spatial",
   },
 ];
-const sortOptions = [
+export const sortOptions = [
   {
     value: "recently-added:desc",
     label: "Newest added",
@@ -281,62 +280,16 @@ function SpaceLibraryScaleControls({
   );
 }
 export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
-  const label = collectionLabel(props.collection);
-  const title = props.searching
-    ? "No matching items"
-    : props.collection === "recent"
-      ? "Build your library"
-      : `No items in ${label}`;
-  const detail = props.searching
-    ? "Try a different search or clear your filters to see everything in this Space."
-    : props.collection === "recent"
-      ? props.uploadAvailable
-        ? "Upload photos, videos, audio, and documents."
-        : "Items shared with this Space will appear here."
-      : `Items added to ${label} will appear here.`;
+  if (!props.searching) return null;
   return (
-    <div className="grid h-full min-h-[300px] place-items-center px-4 py-8">
-      <div className="w-full max-w-lg">
-        <EmptyState
-          title={title}
-          description={detail}
-          action={
-            <>
-              {props.searching && props.onClearSearch ? (
-                <Button variant="outline" type="button" onClick={props.onClearSearch}>
-                  Clear search
-                </Button>
-              ) : null}
-              {props.uploadAvailable && (!props.searching || props.collection === "recent") ? (
-                <Button type="button" disabled={props.uploadDisabled} onClick={props.onUpload}>
-                  <Upload size={15} />
-                  {props.uploading ? "Uploading..." : "Upload files"}
-                </Button>
-              ) : null}
-            </>
-          }
-          aria-label={title}
-        />
-      </div>
+    <div className="flex items-center gap-3 text-xs text-cream-muted">
+      No matching items
+      {props.onClearSearch && (
+        <Button variant="ghost" size="sm" onClick={props.onClearSearch}>
+          Clear search
+        </Button>
+      )}
     </div>
-  );
-}
-function collectionLabel(collection: string): string {
-  return (
-    (
-      {
-        months: "Months",
-        years: "Years",
-        collections: "Collections",
-        favorites: "Favorites",
-        hidden: "Hidden",
-        deleted: "Recently Deleted",
-        albums: "Albums",
-        map: "Map",
-        shared: "Shared",
-        imports: "Imports",
-      } as Record<string, string>
-    )[collection] ?? "this collection"
   );
 }
 export interface SpaceLibraryHeaderProps {

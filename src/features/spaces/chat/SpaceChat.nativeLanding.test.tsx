@@ -1,4 +1,7 @@
-import { cleanup, render } from "@testing-library/react";
+vi.mock("./components/ConversationSwitcher", () => ({
+  ConversationSwitcher: () => <h1>Everyone</h1>,
+}));
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { create } from "zustand";
 import { afterEach, expect, it, vi } from "vitest";
@@ -9,8 +12,11 @@ import type { SpaceChatThreadProps } from "./components/SpaceChatThread";
 
 // Exercise the real landing branch and message scope without the message editor.
 vi.mock("./components/SpaceChatThread", () => ({
-  SpaceChatThread: ({ scope }: SpaceChatThreadProps) => (
+  SpaceChatThread: ({ scope, onDelete }: SpaceChatThreadProps) => (
     <section aria-label="Conversation messages">
+      {scope.messages[0] && (
+        <button onClick={() => onDelete(scope.messages[0])}>Request delete</button>
+      )}
       {scope.messages.map((message) => (
         <p key={message.id}>
           {message.content.map((span) => (span.type === "text" ? span.text : "")).join("")}
@@ -68,7 +74,11 @@ it("shows existing Everyone messages when opening Misty without a conversation s
   }));
   release = configureSocialRuntime({
     events: new EventTarget(),
-    api: { conversations, actionSuggestions: async () => ({ suggestions: [] }) },
+    api: {
+      conversations,
+      libraryItems: async () => ({ items: [] }),
+      actionSuggestions: async () => ({ suggestions: [] }),
+    },
     useSpacesStore: spaces,
     useAuth: () => ({ user: { id: "viewer" } }),
     useSetupStore: create(() => ({ status: null })),
@@ -93,4 +103,12 @@ it("shows existing Everyone messages when opening Misty without a conversation s
   expect(ui.getByText("Our earlier Space conversation")).toBeTruthy();
   expect(ui.queryByText("No Misty conversations yet")).toBeNull();
   expect(conversations).not.toHaveBeenCalled();
+  fireEvent.click(ui.getByRole("button", { name: "Request delete" }));
+  expect(ui.getByRole("alertdialog")).toBeTruthy();
+  ui.rerender(
+    <MemoryRouter initialEntries={["/apps/social?provider=misty"]}>
+      <SpaceSocial spaceId="space-b" spaceName="Other Space" provider="misty" />
+    </MemoryRouter>,
+  );
+  expect(ui.queryByRole("alertdialog")).toBeNull();
 });

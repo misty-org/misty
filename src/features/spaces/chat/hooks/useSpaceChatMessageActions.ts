@@ -7,6 +7,7 @@ import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft"
 import "../SocialRuntime";
 import { socialApi as spacesApi } from "../SocialRuntime";
 import { buildMessageSpans } from "../store/useSpaceMessageSpansStore";
+import { useRef } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
 import type { MessageEditingState } from "./useMessageEditing";
@@ -63,11 +64,11 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
   const reportConversationError = (error: unknown, fallback: string) => {
     if (conversationId) setGroupChatError(error instanceof Error ? error.message : fallback);
   };
+  const sending = useRef(new Set<string>());
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (draft.isEmpty) return;
     const value = draft.text.trim();
-    const attachmentIds = draft.pendingAttachments.map((item) => item.id);
     const content = buildMessageSpans(value, members);
     const clientNonce = createClientNonce();
     const optimisticMessage: SpaceMessage = {
@@ -88,62 +89,72 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
       reply_to_message_id: draft.replyToMessageId || undefined,
       created_at: new Date().toISOString(),
     };
-    // Everything the request needs, captured before the draft is cleared.
-    const snapshot = {
-      selectedFileIds: draft.selectedFileIds,
-      selectedLibraryIds: draft.selectedLibraryIds,
-      replyToMessageId: draft.replyToMessageId,
-    };
-
-    // The composer and message list update together. The server response or
-    // realtime event replaces this row by client_nonce; a failure keeps it in
-    // place with an explicit delivery error.
-    if (conversationId) {
-      setGroupMessages((current) => mergeSpaceMessages(current, [optimisticMessage]));
-    }
     draft.reset();
+    await deliver(optimisticMessage, value);
+  };
+  const deliver = async (message: SpaceMessage, value: string) => {
+    const nonce = message.client_nonce;
+    if (!nonce || sending.current.has(nonce)) return;
+    sending.current.add(nonce);
+    const optimistic = { ...message, local_delivery_state: "sending" as const };
+    if (conversationId) setGroupMessages((current) => mergeSpaceMessages(current, [optimistic]));
     try {
       if (conversationId) {
         const response = await spacesApi.sendConversationMessage(
           spaceId,
           conversationId,
-          content,
-          snapshot.selectedFileIds,
-          attachmentIds,
-          snapshot.selectedLibraryIds,
-          snapshot.replyToMessageId,
-          clientNonce,
+          message.content,
+          message.file_node_ids,
+          message.attachments?.map((item) => item.id) ?? [],
+          message.library_item_ids ?? [],
+          message.reply_to_message_id ?? "",
+          nonce,
         );
-        response.message.client_nonce ||= clientNonce;
+        response.message.client_nonce ||= nonce;
         setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
       } else {
         await options.storeSendMessage(
           spaceId,
           value,
-          snapshot.selectedFileIds,
-          attachmentIds,
-          snapshot.selectedLibraryIds,
-          snapshot.replyToMessageId,
-          optimisticMessage,
+          message.file_node_ids,
+          message.attachments?.map((item) => item.id) ?? [],
+          message.library_item_ids ?? [],
+          message.reply_to_message_id ?? "",
+          optimistic,
         );
       }
     } catch {
-      if (conversationId) {
+      if (conversationId)
         setGroupMessages((current) =>
-          current.map((message) =>
-            message.client_nonce === clientNonce && message.local_delivery_state === "sending"
-              ? {
-                  ...message,
-                  local_delivery_state: "failed",
-                }
-              : message,
+          current.map((item) =>
+            item.client_nonce === nonce && item.local_delivery_state
+              ? { ...item, local_delivery_state: "failed" }
+              : item,
           ),
         );
-      }
-      // Delivery failures belong to the optimistic row itself. Keeping them
-      // out of the conversation load error prevents a failed send from making
-      // the entire thread look unavailable.
+    } finally {
+      sending.current.delete(nonce);
     }
+  };
+  const retry = (message: SpaceMessage) => {
+    if (
+      message.local_delivery_state !== "failed" ||
+      message.sender_user_id !== options.currentUser?.id ||
+      (message.conversation_id ?? "") !== conversationId
+    )
+      return;
+    return deliver(
+      message,
+      message.content
+        .map((span) =>
+          span.type === "text"
+            ? span.text
+            : span.type === "mention"
+              ? `@${span.label}`
+              : span.label,
+        )
+        .join(""),
+    );
   };
   const saveEdited = async (event: FormEvent, message: SpaceMessage) => {
     event.preventDefault();
@@ -173,6 +184,8 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
 
   /** Resolves false when the delete failed, so the dialog can stay open. */
   const remove = async (message: SpaceMessage): Promise<boolean> => {
+    if (message.space_id !== spaceId || (message.conversation_id ?? "") !== conversationId)
+      return false;
     try {
       if (conversationId) {
         await spacesApi.deleteConversationMessage(spaceId, conversationId, message.id);
@@ -212,6 +225,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
   };
   return {
     submit,
+    retry,
     saveEdited,
     remove,
     toggleReaction,
