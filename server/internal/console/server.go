@@ -58,10 +58,6 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/services/{service}/logs", s.requirePage("services", s.serviceLogs))
 		r.Post("/services/{service}/{action}", s.requirePage("services", s.serviceAction))
 		r.Post("/accounts/{id}/revoke-sessions", s.revokeSessions)
-		r.Post("/accounts/{id}/disable", s.requirePage("bootstrap", s.setDisabled(true)))
-		r.Post("/accounts/{id}/enable", s.requirePage("bootstrap", s.setDisabled(false)))
-		r.Post("/accounts/{id}/reset-password", s.requirePage("bootstrap", s.resetPassword))
-		r.Post("/bootstrap/token", s.requirePage("bootstrap", s.mintBootstrapToken))
 		r.Get("/{page}", s.page)
 	})
 	return r

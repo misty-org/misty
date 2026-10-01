@@ -6,7 +6,6 @@ import type {
   AccountMeResponse,
   LoginResponse,
 } from "@/api/account/types";
-import { fetchCurrentInstanceDescriptor, resolveDeploymentTarget } from "@/api/deployment/api";
 import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
 import { analytics } from "@/telemetry/client";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
@@ -102,22 +101,9 @@ export async function accountRegister(
   username: string,
   email: string,
   password: string,
-  selfHostToken?: string,
 ): Promise<AccountAuthUser> {
-  let path: "/register" | "/self-host/bootstrap" | "/self-host/enroll" = "/register";
-  const body: Record<string, string> = { name, username, email, password };
-  if ((await resolveDeploymentTarget()).mode === "self_hosted") {
-    const descriptor = await fetchCurrentInstanceDescriptor();
-    if (!selfHostToken?.trim()) throw new Error("An enrollment token is required.");
-    if (descriptor.bootstrap_required) {
-      path = "/self-host/bootstrap";
-      body.bootstrap_token = selfHostToken.trim();
-    } else {
-      path = "/self-host/enroll";
-      body.invitation = selfHostToken.trim();
-    }
-  }
-  return persistLogin(await accountApi.register(path, body), "Registration");
+  const body = { name, username, email, password };
+  return persistLogin(await accountApi.register(body), "Registration");
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {

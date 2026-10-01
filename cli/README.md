@@ -190,6 +190,7 @@ The backend lives in `server/`. Run the CLI from any directory inside this check
 | --- | --- |
 | `misty setup server` | Create development defaults and required development keys. |
 | `misty setup cloudflare --account ID --zone ID --hostname api.example.com` | Validate access and preview tunnel/DNS setup; add `--apply` to provision. |
+| `misty setup cloudflare --target prod --account ID --zone ID --hostname api.example.com` | Preview a separate production tunnel to the VPS host; add `--apply` to provision. |
 | `misty setup desktop` | Create missing desktop API configuration and install frontend dependencies. |
 | `misty env describe` | List registered variables and their owning files. |
 | `misty env set dev NAME` | Read a value from stdin and save it to the correct private file. |
@@ -230,6 +231,58 @@ helper modules and tests are not commands.
 Doctor aggregates findings and exits nonzero if issues remain. `--json` produces structured findings for server, desktop, Cloudflare, and the default combined check. Release diagnostics retain their existing text output. Configuration checks and health checks do not exercise application workflows.
 
 `misty server up` returns after readiness checks. Build output is retained in bounded private logs under `server/.misty/logs/`; failed stages print their final diagnostic lines. `--verbose` displays captured output after the build. Direct service logs remain available on request. `misty server down` preserves database volumes unless `--volumes` is explicitly supplied.
+
+### Production Cloudflare Tunnel
+
+Run from the checkout on the VPS. The existing command defaults to `--target dev`.
+Production uses only `server/.env/prod/` for its saved routing and connector token;
+it does not initialize development secrets or configure/deploy a Worker.
+Cloudflare API credentials can come from the shell, `cli/.env/cloudflare.env`,
+or the selected target's `integrations/cloudflare.env`. Supply account and zone
+IDs explicitly on first use if they are not already configured. Save a production
+API token using `misty env set prod CLOUDFLARE_API_TOKEN` (value from stdin).
+
+```sh
+misty setup cloudflare --target prod \
+  --account ACCOUNT_ID --zone ZONE_ID \
+  --hostname api.mistysys.com --tunnel-name misty-prod
+```
+
+This previews the plan with read-only Cloudflare requests. Repeat with `--apply`
+to create/reuse the tunnel, configure its ingress, create a proxied DNS CNAME,
+and save the connector token and `MISTY_PUBLIC_API_URL=https://api.mistysys.com/v1`.
+Later runs can use `misty setup cloudflare --target prod` with the saved values.
+The default production name is `misty-prod-<hostname-with-hyphens>`; `--tunnel-name`
+overrides it. Existing conflicting DNS records or ingress routes cause an error,
+and a tunnel containing the development API origin cannot be reused for production.
+
+The origin is `http://127.0.0.1:8081`, matching production Compose's loopback-only
+API binding. To change it, save `MISTY_HOST_PORT` using `misty env set prod MISTY_HOST_PORT`
+before provisioning and use that same port when starting production. Routing uses
+the target's saved port, so avoid a different shell override when running Compose.
+The tunnel forwards paths unchanged: `/v1` belongs in the public API URL, not in
+the tunnel origin. No Nginx is required for this API route.
+
+Provisioning does not start the connector. Install `cloudflared` on the VPS host,
+then start the API with `misty server prod up`. For an initial connector check,
+run this from the checkout in a separate terminal:
+
+```sh
+(
+  . server/.env/prod/integrations/cloudflare.env
+  export TUNNEL_TOKEN="$CLOUDFLARE_TUNNEL_TOKEN"
+  exec cloudflared tunnel --no-autoupdate run
+)
+```
+
+[`TUNNEL_TOKEN`](https://developers.cloudflare.com/tunnel/reference/run-parameters/#token)
+keeps the connector token out of command arguments. Run the connector persistently
+under a service manager before relying on it in production; closing this terminal
+stops this foreground check. The connector must run on the VPS host to reach this
+loopback origin. An ordinary isolated Docker container cannot use this origin.
+Verify with `curl --fail https://api.mistysys.com/health`; `misty doctor cloudflare`
+currently checks development. Production collaboration Worker deployment remains
+separate from API tunnel provisioning.
 
 ## Project tool configuration
 

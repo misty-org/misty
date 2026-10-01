@@ -474,6 +474,34 @@ pub fn production_down(workspace: &Workspace, volumes: bool) -> Result<()> {
     command.arg("--remove-orphans").run(&workspace.server)
 }
 
+pub fn production_backup(workspace: &Workspace) -> Result<()> {
+    environment::check(workspace, Target::Prod)?;
+    CommandSpec::new("bash")
+        .arg("scripts/prod-backup.sh")
+        .run(&workspace.server)
+}
+
+pub fn production_restore(
+    workspace: &Workspace,
+    backup: &str,
+    identity: &Path,
+    confirmed: bool,
+) -> Result<()> {
+    if !confirmed {
+        bail!("restore replaces production data; rerun with --yes");
+    }
+    environment::check(workspace, Target::Prod)?;
+    let identity = identity
+        .canonicalize()
+        .with_context(|| format!("cannot read age identity {}", identity.display()))?;
+    CommandSpec::new("bash")
+        .arg("scripts/prod-restore.sh")
+        .arg(backup)
+        .arg(identity)
+        .env("MISTY_RESTORE_CONFIRMED", "yes")
+        .run(&workspace.server)
+}
+
 pub fn production_logs(workspace: &Workspace) -> Result<()> {
     environment::check(workspace, Target::Prod)?;
     production_compose()

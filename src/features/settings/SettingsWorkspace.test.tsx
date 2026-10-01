@@ -177,12 +177,13 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector("main")?.textContent).toContain("Available model");
   });
   it("keeps system pages individually addressable", () => {
-    for (const id of ["sync", "server", "devices", "privacy", "about", "updates", "diagnostics"])
+    for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])
       expect(settingsRegistry.find((e) => e.id === id)).toBeDefined();
     expect(settingsRegistry.find((e) => e.id === "diagnostics")?.area).toBe("about");
   });
   it("redirects browser handoff to the single Sync area", () => {
     expect(canonicalSettingsSection("advanced")).toBe("diagnostics");
+    expect(canonicalSettingsSection("server")).toBe("about");
     expect(canonicalSettingsSection("agents")).toBe("agents-defaults");
     expect(canonicalSettingsSection("profiles")).toBe("sync");
     expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("sync");

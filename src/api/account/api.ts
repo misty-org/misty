@@ -38,8 +38,7 @@ export const accountApi = {
       email,
       password,
     }),
-  register: (path: "/register" | "/self-host/bootstrap" | "/self-host/enroll", body: unknown) =>
-    requestJson<LoginResponse>("POST", path, body),
+  register: (body: unknown) => requestJson<LoginResponse>("POST", "/register", body),
   logout: () =>
     requestJson<{
       status?: string;
@@ -208,8 +207,6 @@ function shouldAttachAuthToken(path: string): boolean {
   return ![
     "/login",
     "/register",
-    "/self-host/bootstrap",
-    "/self-host/enroll",
     "/auth/forgot",
     "/auth/google",
     "/auth/google/complete",

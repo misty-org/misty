@@ -80,7 +80,7 @@
       "parent": "Frontend Architecture",
       "page_notes": [
         {
-          "content": "Use src/app/entry.ts, src/app/main.tsx, src/app/HostMain.tsx, src/app/cursorEntry.ts, src/app/routing/, src/features/auth/, src/features/deployment/, src/api/README.md, and src/api/client/. Follow current imports to locate bootstrap rather than assuming it still lives in main.tsx. Explain account/session generation guards, stale-response handling, native versus web authentication, and the different scopes of apiRequest, spaceRequest, and explicit external transfers."
+          "content": "Use src/app/entry.ts, src/app/main.tsx, src/app/HostMain.tsx, src/app/cursorEntry.ts, src/app/routing/, src/features/auth/, src/api/deployment/, src/api/README.md, and src/api/client/. Follow current imports to locate bootstrap rather than assuming it still lives in main.tsx. Explain account/session generation guards, stale-response handling, native versus web authentication, and the different scopes of apiRequest, spaceRequest, and explicit external transfers."
         }
       ]
     },
@@ -223,7 +223,7 @@
     },
     {
       "title": "Durable Agent Runtime & MCP",
-      "purpose": "Trace invocation activation, signed lifecycle calls, context/checkpoints, streaming, cancellation, approval resumption, completion, and run-scoped MCP discovery/execution. Explain local, self-hosted PostgreSQL, and managed Vercel workflow hosting.",
+      "purpose": "Trace invocation activation, signed lifecycle calls, context/checkpoints, streaming, cancellation, approval resumption, completion, and run-scoped MCP discovery/execution. Explain local and production PostgreSQL workflow hosting, and the optional Vercel world.",
       "parent": "AI & Agent System",
       "page_notes": [
         {
@@ -301,21 +301,21 @@
     },
     {
       "title": "Realtime & Collaboration Services",
-      "purpose": "Explain account/Space event delivery, Yjs document and drawing rooms, ticket authorization and control messages, persistence and recovery, and the Cloudflare and self-hosted collaboration topologies.",
+      "purpose": "Explain account/Space event delivery, Yjs document and drawing rooms, ticket authorization and control messages, persistence and recovery, and the Cloudflare collaboration topology.",
       "parent": "Server Architecture & Service Boundaries",
       "page_notes": [
         {
-          "content": "Use server/apps/journal-collab/src/, server/apps/journal-collab/wrangler.jsonc, server/apps/self-host-collab/index.ts, server/internal/platform/httpapi/realtime_connect.go, src/features/spaces/SpacesRealtimeBridge.tsx, and src/features/journal/notes/noteCollaboration.ts. Trace room policy, signed tickets, origin checks, membership changes, persistence acknowledgments, and reconnect behavior. Distinguish application event streams, collaborative document updates, browser vault sync, and voice media rather than calling them one realtime layer."
+          "content": "Use server/apps/journal-collab/src/, server/apps/journal-collab/wrangler.jsonc, server/internal/platform/httpapi/realtime_connect.go, src/features/spaces/SpacesRealtimeBridge.tsx, and src/features/journal/notes/noteCollaboration.ts. Trace room policy, signed tickets, origin checks, membership changes, persistence acknowledgments, and reconnect behavior. Distinguish application event streams, collaborative document updates, browser vault sync, and voice media rather than calling them one realtime layer."
         }
       ]
     },
     {
-      "title": "Deployment, Self-Hosting & Operations",
-      "purpose": "Document development, managed production, and self-hosted service topologies; environment provisioning; explicit deployments; instance-wide model BYOK; health and observability; backups, upgrades, and recovery constraints.",
+      "title": "Deployment and Operations",
+      "purpose": "Document development and hosted production topologies; environment provisioning; image releases and explicit deployments; the operator model provider; health and observability; encrypted backups, restores, and upgrades.",
       "parent": "Server Architecture & Service Boundaries",
       "page_notes": [
         {
-          "content": "Read server/deploy/README.md, server/self-host/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/self-host/compose.yml, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, static web app, and external website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
+          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, .github/workflows/server-release.yml, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, static web app, and external website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
         }
       ]
     }

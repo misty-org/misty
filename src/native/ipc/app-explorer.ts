@@ -31,10 +31,6 @@ export interface AppEnvironmentSnapshot {
   mistyConfigPath: string;
   workspacesPath: string;
   commandsPath: string;
-  serverUrl: string | null;
-  serverMode: "hosted" | "self_hosted";
-  serverDeploymentId?: string | null;
-  serverName?: string | null;
   grpcAddress: string;
   mountPath: string;
   configExists: boolean;

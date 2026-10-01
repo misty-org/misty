@@ -17,7 +17,6 @@ vi.mock("@/api/client/session", () => ({
 vi.mock("@/api/deployment/api", () => ({
   resolveApiBase: async () => "https://misty.example/v1",
   resolveHostedApiBase: () => "https://misty.example/v1",
-  resolveDeploymentTarget: async () => ({ mode: "hosted" }),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));

@@ -10,10 +10,6 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     -trimpath \
     -ldflags="-s -w" \
     -o /out/misty-server ./cmd/misty-server
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 \
-    -trimpath \
-    -ldflags="-s -w" \
-    -o /out/misty-admin ./cmd/misty-admin
 
 FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
 
@@ -25,7 +21,6 @@ RUN apt-get update \
     && chown -R 10001:10001 /var/lib/misty
 
 COPY --from=builder --chown=10001:10001 /out/misty-server /usr/local/bin/misty-server
-COPY --from=builder --chown=10001:10001 /out/misty-admin /usr/local/bin/misty-admin
 COPY --from=builder --chown=10001:10001 /out/goose /usr/local/bin/goose
 COPY --chown=10001:10001 internal/platform/postgres/migrations /app/migrations
 COPY --chmod=0555 scripts/docker/api-entrypoint.sh /usr/local/bin/misty-dev-api-entrypoint

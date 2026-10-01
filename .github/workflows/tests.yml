@@ -7,6 +7,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # server-release.yml gates image publishing on these same tests.
+  workflow_call:
 
 permissions:
   contents: read
@@ -40,7 +42,7 @@ jobs:
         working-directory: server
     services:
       postgres:
-        image: pgvector/pgvector:0.8.2-pg17
+        image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb # same image as compose.prod.yml
         env:
           POSTGRES_USER: misty
           POSTGRES_PASSWORD: misty-test-password
