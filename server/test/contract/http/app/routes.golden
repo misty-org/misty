@@ -206,10 +206,6 @@ GET /api/figma/projects/{projectID}/files
 GET /api/figma/teams/{teamID}/projects
 GET /api/health
 GET /api/instance
-GET /api/mail/accounts
-GET /api/mail/folders
-GET /api/mail/threads
-GET /api/mail/threads/{threadID}
 GET /api/mcp/connections
 GET /api/mcp/connections/{connectionID}
 GET /api/mcp/connections/{connectionID}/tools
@@ -332,10 +328,6 @@ GET /figma/teams/{teamID}/projects
 GET /health
 GET /instance
 GET /internal/self-host/collaboration/{resourceType}/{resourceID}
-GET /mail/accounts
-GET /mail/folders
-GET /mail/threads
-GET /mail/threads/{threadID}
 GET /mcp/connections
 GET /mcp/connections/{connectionID}
 GET /mcp/connections/{connectionID}/tools
@@ -472,10 +464,6 @@ GET /v1/figma/projects/{projectID}/files
 GET /v1/figma/teams/{teamID}/projects
 GET /v1/health
 GET /v1/instance
-GET /v1/mail/accounts
-GET /v1/mail/folders
-GET /v1/mail/threads
-GET /v1/mail/threads/{threadID}
 GET /v1/mcp/connections
 GET /v1/mcp/connections/{connectionID}
 GET /v1/mcp/connections/{connectionID}/tools
@@ -737,9 +725,6 @@ POST /api/connections/{provider}/authorize
 POST /api/internal/journal/note-projections
 POST /api/login
 POST /api/logout
-POST /api/mail/drafts
-POST /api/mail/drafts/{draftID}/send
-POST /api/mail/threads/{threadID}/actions
 POST /api/mcp/connections
 POST /api/mcp/connections/{connectionID}/discover
 POST /api/mcp/connections/{connectionID}/test
@@ -876,9 +861,6 @@ POST /internal/agent-runtime/runs/{runID}/tools
 POST /internal/journal/note-projections
 POST /login
 POST /logout
-POST /mail/drafts
-POST /mail/drafts/{draftID}/send
-POST /mail/threads/{threadID}/actions
 POST /mcp
 POST /mcp/connections
 POST /mcp/connections/{connectionID}/discover
@@ -1039,9 +1021,6 @@ POST /v1/connections/{provider}/authorize
 POST /v1/internal/journal/note-projections
 POST /v1/login
 POST /v1/logout
-POST /v1/mail/drafts
-POST /v1/mail/drafts/{draftID}/send
-POST /v1/mail/threads/{threadID}/actions
 POST /v1/mcp/connections
 POST /v1/mcp/connections/{connectionID}/discover
 POST /v1/mcp/connections/{connectionID}/test
@@ -1167,7 +1146,6 @@ PUT /api/ai/recaps/{surfaceID}
 PUT /api/ai/scheduled-tasks/{taskID}
 PUT /api/ai/settings
 PUT /api/ai/smart-library/folders/{folderID}/assets/{assetID}/tags
-PUT /api/mail/drafts/{draftID}
 PUT /api/me/avatar
 PUT /api/me/device
 PUT /api/me/profile
@@ -1188,7 +1166,6 @@ PUT /api/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /api/spaces/{spaceID}/nodes/{nodeID}
 PUT /api/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}/tasks
 PUT /internal/self-host/collaboration/{resourceType}/{resourceID}
-PUT /mail/drafts/{draftID}
 PUT /me/avatar
 PUT /me/device
 PUT /me/profile
@@ -1214,7 +1191,6 @@ PUT /v1/ai/recaps/{surfaceID}
 PUT /v1/ai/scheduled-tasks/{taskID}
 PUT /v1/ai/settings
 PUT /v1/ai/smart-library/folders/{folderID}/assets/{assetID}/tags
-PUT /v1/mail/drafts/{draftID}
 PUT /v1/me/avatar
 PUT /v1/me/device
 PUT /v1/me/profile

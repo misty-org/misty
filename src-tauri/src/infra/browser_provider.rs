@@ -18,14 +18,10 @@ mod tests {
     fn provider_boundaries_allow_login_and_block_escape() {
         for (provider, urls) in [
             ("instagram", vec!["https://www.instagram.com/direct/inbox/", "https://www.instagram.com/accounts/login/", "https://www.facebook.com/login.php", "https://www.facebook.com/dialog/oauth", "https://www.facebook.com/checkpoint/"]),
-            ("google", vec!["https://mail.google.com/mail/u/0/", "https://accounts.google.com/ServiceLogin"]),
-            ("microsoft", vec!["https://outlook.office.com/mail/", "https://outlook.cloud.microsoft/mail/", "https://login.microsoftonline.com/common/oauth2/authorize"]),
             ("x", vec!["https://x.com/i/jf/onboarding/web", "https://accounts.google.com/o/oauth2/auth", "https://appleid.apple.com/auth/authorize", "https://idmsa.apple.com/appleauth/auth/authorize"]),
             ("messenger", vec!["https://www.messenger.com/", "https://www.facebook.com/messages/", "https://www.facebook.com/login.php"]),
             ("slack", vec!["https://app.slack.com/client/", "https://example.slack.com/signin", "https://accounts.google.com/o/oauth2/auth"]),
             ("microsoft-teams", vec!["https://teams.microsoft.com/", "https://teams.cloud.microsoft/", "https://teams.live.com/", "https://login.microsoftonline.com/common/oauth2/authorize"]),
-            ("icloud", vec!["https://www.icloud.com/mail/", "https://idmsa.apple.com/appleauth/auth/authorize"]),
-            ("yahoo", vec!["https://mail.yahoo.com/", "https://login.yahoo.com/"]),
             ("discord", vec!["https://discord.com/channels/@me", "https://discord.com/login"]),
         ] { for url in urls { assert!(allows(provider, &Url::parse(url).unwrap())); } }
         for url in ["https://instagram.com.evil.test/", "https://facebook.com.evil.test/login.php", "https://evilfacebook.com/", "http://facebook.com/login.php", "https://evilinstagram.com/", "http://instagram.com/", "https://user:pass@instagram.com/", "https://example.com/"] {
@@ -125,8 +121,8 @@ mod authentication_tests {
     #[test]
     fn detects_known_login_locations_without_claiming_signed_in_state() {
         for (provider, raw) in [
-            ("google", "https://accounts.google.com/ServiceLogin?secret=not-exported"),
-            ("microsoft", "https://login.microsoftonline.com/common/oauth2/authorize"),
+            ("google-drive", "https://accounts.google.com/ServiceLogin?secret=not-exported"),
+            ("microsoft-teams", "https://login.microsoftonline.com/common/oauth2/authorize"),
             ("instagram", "https://www.instagram.com/accounts/login/"),
             ("discord", "https://discord.com/login"),
             ("x", "https://x.com/i/flow/login"),
@@ -141,9 +137,9 @@ mod authentication_tests {
             ("microsoft-onenote", "https://www.office.com/login?ru=%2Flaunch%2Fonenote"),
         ] { assert!(authentication_required(Some(provider), &Url::parse(raw).unwrap()), "{provider}"); }
         for (provider, raw) in [
-            (Some("google"), "https://mail.google.com/mail/u/0/"),
+            (Some("google-drive"), "https://drive.google.com/drive/u/0/my-drive"),
             (Some("messenger"), "https://www.facebook.com/messages/t/123"),
-            (Some("google"), "https://accounts.google.com.evil.invalid/login"),
+            (Some("google-drive"), "https://accounts.google.com.evil.invalid/login"),
             (Some("discord"), "https://discord.com/login-history"),
             (Some("notion"), "https://www.notion.so/login-history"),
             (Some("asana"), "https://example.org/-/login"),
@@ -173,7 +169,7 @@ mod popup_routing_tests {
         for raw in ["about:blank", "https://discord.com/login", "https://discord.com/oauth2/authorize"] {
             assert!(authentication_popup(Some("discord"), &Url::parse(raw).unwrap()));
         }
-        assert!(authentication_popup(Some("google"), &Url::parse("https://accounts.google.com/ServiceLogin").unwrap()));
-        assert!(!authentication_popup(Some("google"), &Url::parse("https://example.org/oauth2/authorize").unwrap()));
+        assert!(authentication_popup(Some("google-drive"), &Url::parse("https://accounts.google.com/ServiceLogin").unwrap()));
+        assert!(!authentication_popup(Some("google-drive"), &Url::parse("https://example.org/oauth2/authorize").unwrap()));
     }
 }

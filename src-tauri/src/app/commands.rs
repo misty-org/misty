@@ -148,31 +148,6 @@ pub async fn app_configure_server(
 }
 
 #[tauri::command]
-pub async fn mail_cache_read(
-    account_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Option<String>> {
-    crate::infra::mail_cache::read(&state.environment.cache_dir(), &account_id).await
-}
-
-#[tauri::command]
-pub async fn mail_cache_write(
-    account_id: String,
-    value: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mail_cache::write(&state.environment.cache_dir(), &account_id, &value).await
-}
-
-#[tauri::command]
-pub async fn mail_cache_remove(
-    account_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mail_cache::remove(&state.environment.cache_dir(), &account_id).await
-}
-
-#[tauri::command]
 pub async fn agents_device_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {

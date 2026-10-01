@@ -40,18 +40,6 @@ export function appEnvironmentSnapshot(): Promise<AppEnvironmentSnapshot> {
   return invoke("app_environment_snapshot");
 }
 
-export function mailCacheRead(accountId: string): Promise<string | null> {
-  return invoke("mail_cache_read", { accountId });
-}
-
-export function mailCacheWrite(accountId: string, value: string): Promise<void> {
-  return invoke("mail_cache_write", { accountId, value });
-}
-
-export function mailCacheRemove(accountId: string): Promise<void> {
-  return invoke("mail_cache_remove", { accountId });
-}
-
 export function appConfigureServer(
   mode: "hosted" | "self_hosted",
   url?: string | null,

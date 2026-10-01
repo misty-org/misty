@@ -12,7 +12,6 @@ export const desktopNavItems: DesktopNavItem[] = [
 
 const deepLinkPrefixes = [
   routes.home,
-  routes.inbox,
   routes.browser,
   routes.terminal,
   routes.invite,
@@ -37,7 +36,6 @@ const deepLinkPrefixes = [
 
 export function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname === routes.home) return "home";
-  if (pathname.startsWith(routes.inbox)) return "inbox";
   if (pathname.startsWith(routes.browser)) return "browser";
   if (pathname.startsWith(routes.terminal)) return "terminal";
   if (pathname.startsWith(routes.files)) return "files";

@@ -14,7 +14,7 @@ vi.mock("@/features/files/workspace/explorer", async (importOriginal) => {
 });
 
 function BootstrapProbe() {
-  useDesktopBootstrap({ getRouteId: () => "inbox" });
+  useDesktopBootstrap({ getRouteId: () => "files" });
   return null;
 }
 
@@ -52,7 +52,7 @@ describe("useDesktopBootstrap", () => {
     await expect(
       act(async () => {
         root.render(
-          <MemoryRouter initialEntries={["/inbox"]}>
+          <MemoryRouter initialEntries={["/files"]}>
             <BootstrapProbe />
           </MemoryRouter>,
         );

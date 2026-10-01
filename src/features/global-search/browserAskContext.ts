@@ -15,7 +15,7 @@ export interface BrowserAskSnapshot {
   providerId?: string | null;
   revision: string;
   contentHash: string;
-  intent?: "ask" | "create-task" | "prepare-reply" | "task-and-reply";
+  intent?: "ask";
   page: {
     url: string;
     title: string;
@@ -25,7 +25,6 @@ export interface BrowserAskSnapshot {
     link: string;
     image: string;
     documentRevision: string;
-    mail?: { account: string; threadReference: string } | null;
   };
 }
 
@@ -139,14 +138,6 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
       contentHash: snapshot.contentHash,
     },
   };
-  const prompts = {
-    ask: "",
-    "create-task":
-      "Create a task from this page. Ask which website to use if no destination is specified.",
-    "prepare-reply": "Prepare a reply to this email for my review.",
-    "task-and-reply":
-      "Create a task from this page and prepare a reply for my review. Ask which website to use if no destination is specified.",
-  };
   const { openMisty } = await import("@/features/misty/handoff");
   if (!stillCurrent()) return;
   await openMisty({
@@ -155,6 +146,6 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
     selection: request.selection,
     deviceContexts: request.deviceContexts,
     notice,
-    prompt: prompts[snapshot.intent ?? "ask"] ?? "",
+    prompt: "",
   });
 }

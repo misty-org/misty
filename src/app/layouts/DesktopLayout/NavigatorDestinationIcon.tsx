@@ -1,4 +1,4 @@
-import { BrandIcon, MailProviderIcon } from "@/shared/ui";
+import { BrandIcon } from "@/shared/ui";
 import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
 import { providerFromRoute } from "@/features/webviews/providers";
 import {
@@ -55,19 +55,13 @@ export function DestinationIcon({
   }
   if (
     item.id === "integrations" &&
-    (appId === "social" || appId === "inbox" || appId === "music" || appId === "media")
+    (appId === "social" || appId === "music" || appId === "media")
   )
     return <Plug aria-hidden />;
-  if (appId === "social" || appId === "inbox" || appId === "music" || appId === "media") {
+  if (appId === "social" || appId === "music" || appId === "media") {
     const family = appId === "social" ? "chat" : appId;
     const provider = providerFromRoute(item.route, family);
     if (provider) return <BrandIcon brand={provider} size={18} />;
-  }
-  if (appId === "inbox") {
-    const provider =
-      new URL(item.route, "https://misty.local").searchParams.get("provider") ?? item.id;
-    if (provider === "google" || provider === "microsoft")
-      return <MailProviderIcon provider={provider} />;
   }
   if (appId === "social" || appId === "music" || appId === "media") {
     const family = appId === "social" ? "chat" : appId;

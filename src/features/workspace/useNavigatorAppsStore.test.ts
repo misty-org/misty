@@ -22,11 +22,10 @@ describe("useNavigatorAppsStore", () => {
   it("adds and removes apps in the stable catalog order", () => {
     const store = useNavigatorAppsStore.getState();
     store.setAppVisible("account-1", "browser", true);
-    store.setAppVisible("account-1", "inbox", false);
+    store.setAppVisible("account-1", "journal", false);
 
     expect(navigatorAppIdsForAccount(useNavigatorAppsStore.getState(), "account-1")).toEqual([
       "social",
-      "journal",
       "files",
       "agents",
       "browser",
@@ -37,10 +36,10 @@ describe("useNavigatorAppsStore", () => {
 
   it("filters Home out of an older saved app selection", () => {
     const legacyState = {
-      appIdsByAccount: { "account-1": ["home", "inbox", "files"] },
+      appIdsByAccount: { "account-1": ["home", "inbox", "social", "files"] },
     } as unknown as Pick<ReturnType<typeof useNavigatorAppsStore.getState>, "appIdsByAccount">;
 
-    expect(navigatorAppIdsForAccount(legacyState, "account-1")).toEqual(["inbox", "files"]);
+    expect(navigatorAppIdsForAccount(legacyState, "account-1")).toEqual(["social", "files"]);
   });
 
   it("preserves an intentionally empty sidebar and keeps accounts separate", () => {

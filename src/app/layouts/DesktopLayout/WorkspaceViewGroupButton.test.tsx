@@ -3,7 +3,7 @@ import type { WorkspaceView } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Code2, Inbox } from "lucide-react";
+import { Code2, FolderOpen } from "lucide-react";
 import {
   workspaceTabDropIndex,
   workspaceViewDisplayTitle,
@@ -74,12 +74,12 @@ describe("WorkspaceTabGroupButton", () => {
 
   it("uses one responsive width contract for every top-level tab", () => {
     const tab: WorkspaceView = {
-      id: "tab:inbox",
-      surfaceId: "inbox",
-      groupKey: "tool:inbox",
-      instanceKey: "inbox",
-      title: "Inbox",
-      route: "/inbox",
+      id: "tab:files",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      instanceKey: "files",
+      title: "Files",
+      route: "/files",
       sidebarVisible: true,
       state: {},
       createdAt: 1,
@@ -88,7 +88,7 @@ describe("WorkspaceTabGroupButton", () => {
     const group: TabGroup = {
       key: tab.groupKey,
       surfaceId: tab.surfaceId,
-      label: "Inbox",
+      label: "Files",
       tabs: [tab],
       storeGroupKey: tab.groupKey,
     };
@@ -97,7 +97,7 @@ describe("WorkspaceTabGroupButton", () => {
       root.render(
         <WorkspaceTabGroupButton
           group={group}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={tab.id}
           canClose
           lastUsedTabByGroup={{}}
@@ -119,11 +119,11 @@ describe("WorkspaceTabGroupButton", () => {
       (id) =>
         ({
           id,
-          surfaceId: "inbox",
-          groupKey: "tool:inbox",
+          surfaceId: "files",
+          groupKey: "tool:files",
           instanceKey: id,
-          title: `Inbox ${id}`,
-          route: "/inbox",
+          title: `Files ${id}`,
+          route: "/files",
           sidebarVisible: true,
           state: {},
           createdAt: 1,
@@ -135,13 +135,13 @@ describe("WorkspaceTabGroupButton", () => {
       root.render(
         <WorkspaceTabGroupButton
           group={{
-            key: "tool:inbox",
-            surfaceId: "inbox",
-            label: "Inbox",
+            key: "tool:files",
+            surfaceId: "files",
+            label: "Files",
             tabs,
-            storeGroupKey: "tool:inbox",
+            storeGroupKey: "tool:files",
           }}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={tabs[0].id}
           canClose
           lastUsedTabByGroup={{}}
@@ -156,7 +156,7 @@ describe("WorkspaceTabGroupButton", () => {
       (element) => element.textContent === "(2)",
     );
     expect(badge?.closest("button")).toBe(container.querySelector("button"));
-    expect(container.querySelector('[aria-label="Show Inbox tabs"]')?.textContent).toBe("");
+    expect(container.querySelector('[aria-label="Show Files tabs"]')?.textContent).toBe("");
     expect(container.querySelector('[aria-label^="Close "]')).toBeNull();
     expect(badge?.className).toContain("text-[10px]");
     expect(badge?.className).toContain("leading-none");
@@ -165,12 +165,12 @@ describe("WorkspaceTabGroupButton", () => {
 
   it("does not offer a close control for the final tab in the final window", () => {
     const tab: WorkspaceView = {
-      id: "tab:inbox",
-      surfaceId: "inbox",
-      groupKey: "tool:inbox",
-      instanceKey: "inbox",
-      title: "Inbox",
-      route: "/inbox",
+      id: "tab:files",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      instanceKey: "files",
+      title: "Files",
+      route: "/files",
       sidebarVisible: false,
       state: {},
       createdAt: 1,
@@ -183,11 +183,11 @@ describe("WorkspaceTabGroupButton", () => {
           group={{
             key: tab.groupKey,
             surfaceId: tab.surfaceId,
-            label: "Inbox",
+            label: "Files",
             tabs: [tab],
             storeGroupKey: tab.groupKey,
           }}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={tab.id}
           canClose={false}
           lastUsedTabByGroup={{}}
@@ -198,7 +198,7 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.querySelector('[aria-label="Close Inbox"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Close Files"]')).toBeNull();
   });
 
   it("renders a close icon for Home when closing is allowed", () => {
@@ -225,7 +225,7 @@ describe("WorkspaceTabGroupButton", () => {
             tabs: [home],
             storeGroupKey: home.groupKey,
           }}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={home.id}
           canClose
           canCloseTab={() => true}
@@ -243,8 +243,8 @@ describe("WorkspaceTabGroupButton", () => {
   it("uses a fallback icon when persisted surface metadata is missing", () => {
     const tab: WorkspaceView = {
       id: "tab:retired",
-      surfaceId: "inbox",
-      groupKey: "tool:inbox",
+      surfaceId: "retired" as WorkspaceView["surfaceId"],
+      groupKey: "tool:retired" as WorkspaceView["groupKey"],
       instanceKey: "retired",
       title: "Retired tool",
       route: "/retired",
@@ -305,7 +305,7 @@ describe("WorkspaceTabGroupButton", () => {
             tabs: [browserTab, { ...browserTab, id: "second", title: "Second page" }],
             storeGroupKey: null,
           }}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={browserTab.id}
           canClose
           lastUsedTabByGroup={{}}
@@ -359,7 +359,7 @@ describe("WorkspaceTabGroupButton", () => {
             tabs: [browserTab],
             storeGroupKey: null,
           }}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={browserTab.id}
           canClose={false}
           lastUsedTabByGroup={{}}
@@ -420,7 +420,7 @@ describe("WorkspaceTabGroupButton", () => {
             tabs: [tab1, tab2],
             storeGroupKey: "tool:browser",
           }}
-          icon={Inbox}
+          icon={FolderOpen}
           activeTabId={tab1.id}
           canClose={true}
           lastUsedTabByGroup={{ "tool:browser": tab1.id }}
@@ -553,26 +553,26 @@ describe("WorkspaceTabGroupButton", () => {
   });
 
   it("displays the group label when tab title is default", () => {
-    const inboxTab = testTab({
-      id: "tab-inbox",
-      surfaceId: "inbox",
-      groupKey: "tool:inbox",
-      title: "Inbox",
-      route: "/inbox",
+    const plannerTab = testTab({
+      id: "tab-planner",
+      surfaceId: "official-app",
+      groupKey: "app:planner",
+      title: "Planner",
+      route: "/apps/planner",
     });
 
     act(() => {
       root.render(
         <WorkspaceTabGroupButton
           group={{
-            key: "tool:inbox",
-            surfaceId: "inbox",
-            label: "Inbox",
-            tabs: [inboxTab],
-            storeGroupKey: "tool:inbox",
+            key: "app:planner",
+            surfaceId: "official-app",
+            label: "Planner",
+            tabs: [plannerTab],
+            storeGroupKey: "app:planner",
           }}
           icon={null}
-          activeTabId={inboxTab.id}
+          activeTabId={plannerTab.id}
           canClose={true}
           lastUsedTabByGroup={{}}
           onOpen={vi.fn()}
@@ -582,29 +582,29 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.textContent).toContain("Inbox");
-    expect(container.querySelector("button")?.getAttribute("title")).toBe("Misty Inbox • Inbox");
+    expect(container.textContent).toContain("Planner");
+    expect(container.querySelector("button")?.getAttribute("title")).toBe("Tasks • Planner");
   });
 
   it("switches back to the last active tab within a group when group is clicked", () => {
-    const tab1 = testTab({ id: "tab-inbox-1", title: "Inbox" });
-    const tab2 = testTab({ id: "tab-inbox-2", title: "Inbox 2", createdAt: 2, lastFocusedAt: 2 });
+    const tab1 = testTab({ id: "tab-files-1", title: "Files" });
+    const tab2 = testTab({ id: "tab-files-2", title: "Files 2", createdAt: 2, lastFocusedAt: 2 });
     const onOpen = vi.fn();
 
     act(() => {
       root.render(
         <WorkspaceTabGroupButton
           group={{
-            key: "tool:inbox",
-            surfaceId: "inbox",
-            label: "Inbox",
+            key: "tool:files",
+            surfaceId: "files",
+            label: "Files",
             tabs: [tab1, tab2],
-            storeGroupKey: "tool:inbox",
+            storeGroupKey: "tool:files",
           }}
           icon={null}
           activeTabId="other-tab"
           canClose={true}
-          lastUsedTabByGroup={{ "tool:inbox": tab2.id }}
+          lastUsedTabByGroup={{ "tool:files": tab2.id }}
           onOpen={onOpen}
           onClose={vi.fn()}
           onMoveView={vi.fn()}
@@ -612,8 +612,8 @@ describe("WorkspaceTabGroupButton", () => {
       );
     });
 
-    expect(container.textContent).toContain("Inbox");
-    expect(container.querySelector("button")?.getAttribute("title")).toBe("Inbox 2 • Inbox");
+    expect(container.textContent).toContain("Files");
+    expect(container.querySelector("button")?.getAttribute("title")).toBe("Files 2 • Files");
 
     const mainButton = container.querySelector("button")!;
     act(() => {
@@ -628,7 +628,6 @@ it.each([
   ["/apps/planner?view=agenda", "Planner", "Agenda"],
   ["/apps/journal?view=drawings", "Journal", "Drawings"],
   ["/apps/files?view=transfers", "Files", "Files"],
-  ["/apps/inbox?provider=google", "Inbox", "Gmail"],
   ["/apps/journal?provider=notion", "Journal", "Notion"],
   ["/apps/journal?provider=notion", "Launch notes · Notion", "Launch notes · Notion"],
 ])("describes the destination in %s", (route, title, expected) => {

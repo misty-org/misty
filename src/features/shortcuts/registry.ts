@@ -304,7 +304,6 @@ const toolSlots = [
   ["journal", "Journal"],
   ["planner", "Planner"],
   ["social", "Social"],
-  ["inbox", "Inbox"],
   ["library", "Library"],
   ["browser", "Browser"],
   ["files", "Files"],

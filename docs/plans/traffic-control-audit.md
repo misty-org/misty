@@ -411,7 +411,9 @@ The app downloaded the Space inbox (`/activity/inbox`, unreads and mentions) at 
 
 Removed: the client store state, loads and actions, `src/api/activity`, the three `/activity/inbox` routes, the per-recipient message and mention rows, and the approval and workflow rows. `MarkSpaceRead` now only advances `read_message_seq`. The `notify_private` workflow node keeps its ownership check and result shape; its message had only ever reached this unread inbox.
 
-Left in place: the `space_inbox_items` table and the conversation-deletion cleanup of its old rows. Dropping the table (it still holds old message previews) is a one-line migration to apply once deployed clients no longer call the routes.
+The table is dropped by `20271002050000_drop_space_inbox.sql`.
+
+Mail went the same way. The server's Gmail/Outlook API (`/mail/*`, `internal/integrations/mail`, the `mail` OAuth capability and `mail_action_audit`), the agents' `inbox.*` browser capabilities and Gmail/Outlook pilots, the desktop mail cache, the mail suggestions in the browser context menu, and the Inbox app with its Gmail, Outlook, iCloud Mail and Yahoo Mail website providers are removed. `20271002060000_remove_mail.sql` drops the audit table, clears Inbox recent-use rows and strips `mail` from connected accounts. Provider grants users already gave Google or Microsoft for mail stay with those providers until revoked there.
 
 ## Deliberately not changed
 

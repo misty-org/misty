@@ -55,8 +55,6 @@ export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
       activeTab?.surfaceId === "browser" ||
       (activeTab?.surfaceId === "official-app" &&
         (activeTab.groupKey === "app:browser" ||
-          (activeTab.groupKey === "app:inbox" &&
-            !!providerWebsiteFromRoute(activeTab.route, "inbox")) ||
           (activeTab.groupKey === "app:chat" &&
             !!providerWebsiteFromRoute(activeTab.route, "chat")) ||
           (activeTab.groupKey === "app:journal" &&

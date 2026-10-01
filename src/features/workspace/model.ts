@@ -18,7 +18,6 @@ export {
 
 export type WorkspaceSurfaceId =
   | "home"
-  | "inbox"
   | "space"
   | "browser"
   | "terminal"

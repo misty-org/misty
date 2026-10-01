@@ -1,7 +1,6 @@
 import type { WorkspaceToolId } from "./useRecentToolsStore";
 
 export const NAVIGATOR_APP_IDS = [
-  "inbox",
   "social",
   "journal",
   "files",
@@ -18,7 +17,6 @@ export const NAVIGATOR_APP_IDS = [
 export type NavigatorAppId = (typeof NAVIGATOR_APP_IDS)[number];
 
 export const DEFAULT_NAVIGATOR_APP_IDS: readonly NavigatorAppId[] = [
-  "inbox",
   "social",
   "journal",
   "files",
@@ -26,7 +24,6 @@ export const DEFAULT_NAVIGATOR_APP_IDS: readonly NavigatorAppId[] = [
 ];
 
 export const NAVIGATOR_APP_DESCRIPTIONS: Record<NavigatorAppId, string> = {
-  inbox: "Messages and updates",
   social: "Connected conversations and communities",
   journal: "Notes and drawings for the current Space",
   files: "Browse local and connected files",

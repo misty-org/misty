@@ -3,10 +3,10 @@ export function testTab(
   partial: Partial<WorkspaceView> & { id: string; title: string },
 ): WorkspaceView {
   return {
-    surfaceId: "inbox",
-    groupKey: "tool:inbox",
+    surfaceId: "files",
+    groupKey: "tool:files",
     instanceKey: partial.id,
-    route: "/inbox",
+    route: "/files",
     sidebarVisible: true,
     state: {},
     createdAt: 1,

@@ -6,7 +6,6 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   ArrowLeft,
   ArrowRight,
-  CheckSquare,
   ClipboardPaste,
   Code,
   Columns2,
@@ -17,7 +16,6 @@ import {
   Link,
   MessageCircle,
   QrCode,
-  Reply,
   RotateCw,
   Scissors,
   Search,
@@ -47,9 +45,6 @@ export interface BrowserMenuPresentation {
 
 const entries = {
   ask: { label: "Ask Misty…", icon: MessageCircle },
-  "create-task": { label: "Create task…", icon: CheckSquare },
-  "prepare-reply": { label: "Prepare reply…", icon: Reply },
-  "task-and-reply": { label: "Create task and reply…", icon: CheckSquare },
   copy: { label: "Copy", icon: Copy },
   cut: { label: "Cut", icon: Scissors },
   paste: { label: "Paste", icon: ClipboardPaste },

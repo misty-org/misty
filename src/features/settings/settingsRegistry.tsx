@@ -179,7 +179,6 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
         account: "general",
         profiles: "sync",
         "browser-handoff": "sync",
-        inbox: "notifications",
         social: "spaces-defaults",
         journal: "spaces-defaults",
         planner: "spaces-agenda",

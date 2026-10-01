@@ -45,7 +45,6 @@ import { type TabGroup } from "./WorkspaceViewGroupButton";
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
-  inbox: "Inbox",
   space: "Space",
   browser: "Browser",
   terminal: "Terminal",
@@ -87,7 +86,6 @@ export function groupViews(tabs: WorkspaceView[]): TabGroup[] {
           {
             chat: "Social",
             social: "Social",
-            inbox: "Inbox",
             journal: "Journal",
             planner: "Planner",
             library: "Storage",
@@ -549,15 +547,13 @@ function aiContextForView(tab: WorkspaceView): AiContextReference {
       spaceId,
     };
   }
-  const privacy =
-    tab.surfaceId === "inbox"
-      ? "provider"
-      : (["browser", "terminal", "code", "files"] as WorkspaceSurfaceId[]).includes(tab.surfaceId)
-        ? "device"
-        : "private";
+  const privacy = (["browser", "terminal", "code", "files"] as WorkspaceSurfaceId[]).includes(
+    tab.surfaceId,
+  )
+    ? "device"
+    : "private";
   return {
-    kind:
-      privacy === "device" ? "device-scope" : privacy === "provider" ? "provider-scope" : "route",
+    kind: privacy === "device" ? "device-scope" : "route",
     id: tab.id,
     title: tab.title || surfaceLabels[tab.surfaceId] || "Tool",
     privacy,
@@ -575,14 +571,6 @@ const action = (id: string, label: string, prompt: string): AiSuggestedAction =>
 const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
   activity: [
     action("activity.catch-up", "Catch me up", "Summarize unread activity by outcome and Space."),
-  ],
-  inbox: [
-    action("inbox.summarize", "Summarize", "Summarize the visible inbox context."),
-    action(
-      "inbox.triage",
-      "Suggest triage",
-      "Suggest a triage plan without changing any messages.",
-    ),
   ],
   "space.chat": [
     action(

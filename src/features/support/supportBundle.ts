@@ -67,7 +67,6 @@ function routeFamily(): string {
     "code",
     "files",
     "home",
-    "inbox",
     "settings",
     "spaces",
     "terminal",

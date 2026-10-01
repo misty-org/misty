@@ -13,7 +13,6 @@ describe("first-class Agent navigation", () => {
   });
 
   it("maps global destinations to their own app pages", () => {
-    expect(desktopRouteIdFromPath("/inbox")).toBe("inbox");
     expect(desktopRouteIdFromPath("/files")).toBe("files");
     expect(desktopRouteIdFromPath("/agents")).toBe("agents");
     expect(desktopRouteIdFromPath("/assistant")).toBe("agents");
