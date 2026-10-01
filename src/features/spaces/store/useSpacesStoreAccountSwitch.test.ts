@@ -135,5 +135,4 @@ describe("useSpacesStore account-switch race safety", () => {
 
     expect(useSpacesStore.getState().membersBySpace["space-a"]).toBeUndefined();
   });
-
 });

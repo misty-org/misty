@@ -35,7 +35,6 @@ export type AgentMentionFailure = {
     | string;
 };
 
-
 export type BulkLibraryItemAction =
   | "favorite"
   | "unfavorite"

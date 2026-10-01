@@ -119,10 +119,9 @@ export const useRecentToolsStore = create<RecentToolsState>()(
       },
       hydrateRecentTools: (toolIds: WorkspaceToolId[]) =>
         set({
-          recentTools: [...new Set([...toolIds.filter(isWorkspaceToolId), ...DEFAULT_RECENT_TOOLS])].slice(
-            0,
-            10,
-          ),
+          recentTools: [
+            ...new Set([...toolIds.filter(isWorkspaceToolId), ...DEFAULT_RECENT_TOOLS]),
+          ].slice(0, 10),
         }),
       resetRecentTools: () => set({ recentTools: DEFAULT_RECENT_TOOLS }),
     }),
