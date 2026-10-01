@@ -12,11 +12,12 @@ import (
 
 const resourceLeasePrefix = "resource-lease:"
 
-func resourceLeaseTopic(topic string) bool {
-	if !strings.HasPrefix(topic, resourceLeasePrefix) || len(topic) != len(resourceLeasePrefix)+64 {
+func resourceLeaseTopic(topic string) bool { return validDigestTopic(topic, resourceLeasePrefix) }
+func validDigestTopic(topic, prefix string) bool {
+	if !strings.HasPrefix(topic, prefix) || len(topic) != len(prefix)+64 {
 		return false
 	}
-	_, err := hex.DecodeString(topic[len(resourceLeasePrefix):])
+	_, err := hex.DecodeString(topic[len(prefix):])
 	return err == nil
 }
 func (db *Database) SubscribeWorkflowResourceLeaseEvents(ctx context.Context, key string) (<-chan struct{}, func(), error) {

@@ -27,16 +27,20 @@ type Registry struct {
 	registry    *prometheus.Registry
 	workerWakes *prometheus.CounterVec
 
-	requests      *prometheus.CounterVec
-	duration      *prometheus.HistogramVec
-	inFlight      prometheus.Gauge
-	sampleAge     prometheus.GaugeFunc
-	lastSample    time.Time
-	traffic       *prometheus.CounterVec
-	sampleFail    prometheus.Counter
-	aiInvocations *prometheus.CounterVec
-	aiDuration    *prometheus.HistogramVec
-	aiFirstOutput *prometheus.HistogramVec
+	requests        *prometheus.CounterVec
+	duration        *prometheus.HistogramVec
+	inFlight        prometheus.Gauge
+	sampleAge       prometheus.GaugeFunc
+	lastSample      time.Time
+	traffic         *prometheus.CounterVec
+	aiStreamReads   *prometheus.CounterVec
+	aiStreamEvents  *prometheus.CounterVec
+	aiStreamBytes   *prometheus.CounterVec
+	aiStreamWindows prometheus.Gauge
+	sampleFail      prometheus.Counter
+	aiInvocations   *prometheus.CounterVec
+	aiDuration      *prometheus.HistogramVec
+	aiFirstOutput   *prometheus.HistogramVec
 
 	mu       sync.Mutex
 	samplers []sampler
@@ -104,6 +108,7 @@ func New() *Registry {
 	})
 	m.initWorkers()
 	m.initTraffic()
+	m.initAIStreams()
 	m.initSyncTraffic()
 	registry.MustRegister(m.requests, m.duration, m.inFlight, m.sampleAge, m.sampleFail, m.aiInvocations, m.aiDuration, m.aiFirstOutput)
 	return m

@@ -123,7 +123,7 @@ func (h *workerEventHub) listen() {
 	for notification := range h.listener.Notify {
 		if notification == nil {
 			h.publish("")
-		} else if workerQueue(notification.Extra) || resourceLeaseTopic(notification.Extra) {
+		} else if workerQueue(notification.Extra) || resourceLeaseTopic(notification.Extra) || invocationEventTopic(notification.Extra) {
 			h.publish(notification.Extra)
 		}
 	}
