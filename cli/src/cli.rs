@@ -285,7 +285,7 @@ struct DeployTarget {
     /// Misty checkout on the VPS, relative to the SSH user's home.
     #[arg(long, default_value = "misty")]
     dir: String,
-    /// misty-billing checkout on the VPS, relative to the SSH user's home.
+    /// Directory for billing's deploy files on the VPS, relative to the SSH user's home.
     #[arg(long, default_value = "misty-billing")]
     billing_dir: String,
 }

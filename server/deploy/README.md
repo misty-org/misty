@@ -120,9 +120,11 @@ misty server prod deploy   # push, then git pull and start billing and the serve
 
 `push` validates the environment first, streams it over SSH, and backs up the
 VPS's previous copy under `.env-backups/`; files that exist only on the VPS are
-kept. `deploy` expects both repositories cloned in the SSH user's home (`misty`
-and `misty-billing`; override with `--dir` and `--billing-dir`), `misty` on the
-VPS's PATH, and a read-only deploy key for the private billing repository.
+kept. `deploy` expects the public `misty` repository cloned in the SSH user's
+home (override with `--dir`) and `misty` on the VPS's PATH. Billing's private
+source never lives on the VPS: `deploy` sends only its committed deploy files
+(`compose.prod.yml` and `deploy/`) to `~/misty-billing` (`--billing-dir`), and
+the service runs from its GHCR image.
 
 ### Deploy
 
