@@ -109,6 +109,7 @@ func (db *Store) ConsumeBrowserSyncTicket(ctx context.Context, hash string) (*Sy
 	}
 	return &i, err
 }
+
 // syncConnectionLive is true for a connection whose socket is open on a live
 // API process. Rows from processes predating instance leases keep their own
 // expiry until they are swept.
