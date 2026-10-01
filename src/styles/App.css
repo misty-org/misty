@@ -55,15 +55,15 @@
    Portaled menus retain their own sizing. */
 .misty-navigation-icons {
   --misty-navigation-icon-size: 16px;
-  --misty-navigation-avatar-size: 20px;
+  --misty-navigation-avatar-size: 28px;
   --navigation-primary-icon-size: var(--misty-navigation-icon-size);
 }
 
-/* The global rail uses square 34px tiles around 18px glyphs and 20px avatars. */
+/* The global rail uses square 34px tiles around 18px glyphs and 28px avatars. */
 .misty-global-navigator {
   --misty-navigation-icon-size: 18px;
   --misty-navigation-tile-size: 34px;
-  --misty-navigation-identity-size: 20px;
+  --misty-navigation-identity-size: var(--misty-navigation-avatar-size);
 }
 
 .misty-navigation-icons :is(svg, img:not([data-slot="avatar-image"])) {

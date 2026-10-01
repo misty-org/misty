@@ -30,7 +30,10 @@ export type SettingSearchEntry = Pick<
 // Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
   // Retain stored preset data for compatibility, but no longer offer that control.
-  ...settingDefinitions.filter((definition) => definition.id !== "app.layout.presets"),
+  ...settingDefinitions.filter(
+    (definition) =>
+      definition.id !== "app.layout.presets" && !definition.id.startsWith("collections.tabs."),
+  ),
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -101,6 +104,12 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
           Object.values(parsed).every((path) => typeof path === "string" && path.length <= 4096),
         );
       if (!Array.isArray(parsed)) return false;
+      if (d.id.startsWith("collections.tabs."))
+        return (
+          parsed.length <= 40 &&
+          new Set(parsed).size === parsed.length &&
+          parsed.every((id) => typeof id === "string" && /^[a-z][a-z0-9-]{0,63}$/.test(id))
+        );
       if (d.id === "app.shortcuts.bindings")
         return parsed.every(
           (entry) =>

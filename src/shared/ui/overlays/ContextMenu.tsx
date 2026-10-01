@@ -13,7 +13,7 @@ import {
 } from "./popupStyles";
 
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
-import { Check, ChevronRight, Circle } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "../utils";
@@ -131,7 +131,7 @@ const ContextMenuRadioItem = React.forwardRef<
   >
     <span className={menuIndicatorClass}>
       <ContextMenuPrimitive.ItemIndicator>
-        <Circle className="size-2 fill-current" />
+        <Check />
       </ContextMenuPrimitive.ItemIndicator>
     </span>
     {children}

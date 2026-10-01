@@ -84,5 +84,13 @@ export * from "./icons/brandIcons";
 // patterns
 export * from "./patterns/ComingSoonSurface";
 export * from "./patterns/DiscoverCard";
+export * from "./patterns/CollectionWorkspace";
+export * from "./patterns/CollectionFilterMenu";
 
 export * from "./utils";
+
+export {
+  MessageComposer,
+  MessageComposerSend,
+  messageComposerTextClass,
+} from "./patterns/MessageComposer";

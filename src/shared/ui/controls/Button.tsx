@@ -13,7 +13,7 @@ const buttonVariants = cva(
   [
     "group/button inline-flex shrink-0 items-center rounded-md border",
     "border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap",
-    "transition-colors outline-none select-none",
+    "transition-none outline-none select-none",
     "focus-visible:border-charcoal-active focus-visible:ring-3",
     "focus-visible:ring-charcoal-active/50 disabled:pointer-events-none",
     "disabled:opacity-50 aria-invalid:border-charcoal-active",

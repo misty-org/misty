@@ -5,21 +5,21 @@ import { cn } from "../utils";
 
 const navIslandVariants = cva(
   [
-    "inline-flex max-w-full items-center shrink-0 border",
-    "border-charcoal-border bg-charcoal-card overflow-x-auto",
+    "inline-flex max-w-full items-center shrink-0",
+    "overflow-x-auto",
     "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   ],
   {
     variants: {
       variant: {
-        default: "border-charcoal-border bg-charcoal-card",
-        subtle: "border-charcoal-border/60 bg-charcoal-card/80",
-        ghost: "border-transparent bg-transparent",
+        default: "",
+        subtle: "",
+        ghost: "",
       },
       size: {
-        default: "p-0.5 gap-0.5 rounded-lg",
-        sm: "p-[1px] gap-[1px] rounded-md",
-        md: "p-1 gap-1 rounded-lg",
+        default: "gap-1",
+        sm: "gap-0.5",
+        md: "gap-1.5",
       },
     },
     defaultVariants: {
@@ -33,7 +33,7 @@ const navIslandItemVariants = cva(
   [
     "group/nav-island-item inline-flex shrink-0 items-center justify-center",
     "gap-1.5 rounded-md border border-transparent font-medium",
-    "whitespace-nowrap outline-none transition-colors select-none",
+    "whitespace-nowrap outline-none transition-none select-none",
     "focus-visible:outline-none focus-visible:ring-2",
     "focus-visible:ring-cream-muted disabled:pointer-events-none",
     "disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",

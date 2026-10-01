@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { NavIsland, NavIslandItem } from "./NavIsland";
 
 describe("NavIsland CVA component", () => {
-  it("renders nav island container and items with default styles", () => {
+  it("groups standalone buttons without outer surface chrome", () => {
     render(
       <NavIsland aria-label="Sections">
         <NavIslandItem active>All</NavIslandItem>
@@ -14,9 +14,9 @@ describe("NavIsland CVA component", () => {
     const nav = screen.getByRole("navigation", { name: "Sections" });
     expect(nav).toBeDefined();
     expect(nav.getAttribute("data-slot")).toBe("nav-island");
-    expect(nav.className).toContain("rounded-lg");
-    expect(nav.className).toContain("p-0.5");
-    expect(nav.className).toContain("bg-charcoal-card");
+    expect(nav.className).not.toContain("bg-charcoal-card");
+    expect(nav.className).not.toContain("border-charcoal-border");
+    expect(nav.className).toContain("gap-1");
 
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(2);
@@ -55,8 +55,7 @@ describe("NavIsland CVA component", () => {
     );
 
     const nav = screen.getByRole("navigation", { name: "Compact" });
-    expect(nav.className).toContain("p-[1px]");
-    expect(nav.className).toContain("rounded-md");
+    expect(nav.className).toContain("gap-0.5");
 
     const item = screen.getByRole("button", { name: "Small" });
     expect(item.className).toContain("h-5");
