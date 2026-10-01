@@ -301,3 +301,24 @@ Validation: syntax-checked with `node --check`. The package's `node --test` suit
 Remaining local timers, with no network unless state changed: the native sync worker's 250 ms queue tick, 2-second cookie capture, 60-second history capture, renderer page-state capture and native UI snapshot polling (T23, T24, T36). Replacing them needs WebKit and filesystem observers that must be verified on device.
 
 Validation: `cargo check --lib` passes with no warnings. Per the agreed scope, Rust and frontend tests were not run.
+
+
+## Measurement — idle sync connections (T34)
+
+The sync load harness (`internal/sync/load_test.go`) runs two server instances on one PostgreSQL with real protocol clients. A new `MISTY_SYNC_LOAD_SETTLE` knob lets connection setup finish before counters are sampled. The same run was made against the commit before the sync batch (`d5840240c`) and this branch, on one Apple M4 Pro with a local unix-socket PostgreSQL 14:
+
+`MISTY_SYNC_LOAD_CLIENTS=2000 MISTY_SYNC_LOAD_ACTIVE=0.001 MISTY_SYNC_LOAD_DURATION=120s MISTY_SYNC_LOAD_SETTLE=20s MISTY_SYNC_LOAD_POOL=40`
+
+That is 1,000 accounts with 2 devices each, on different instances, and about 0.1% of devices publishing an edit every 5 seconds.
+
+| | Before | After |
+|---|---:|---:|
+| Database commits per second (all, including reads) | 794.7 | 24.9 |
+| Edits published in the window | 48 | 144 |
+| Delta latency p50 / p99 | 8.3 / 15.7 ms | 10.2 / 14.9 ms |
+| Ack latency p50 / p99 | 5.6 / 16.2 ms | 8.5 / 15.2 ms |
+| Test process heap | 140 MB | 90 MB |
+
+Idle connection cost fell from about 0.40 database commits per connected device per second to effectively zero. The remaining commits come from edit-driven work, and this run had three times as many edits. At 10,000 devices that is roughly 4,000 commits per second of idle liveness and reconcile work removed. Edit latency is unchanged within noise.
+
+Limits: application database transactions only, not wire bytes. The harness clients send no heartbeat frames; real clients now send them only on change. This is one machine, not a capacity envelope: the 10k/20k/30k matrix, multi-window and outage-storm scenarios still need a staging environment. TLS, tunnel and proxy overhead are excluded.
