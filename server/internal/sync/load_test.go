@@ -38,7 +38,7 @@ import (
 //	MISTY_SYNC_LOAD_CLIENTS=10000 go test ./internal/sync -run TestBrowserSyncLoad -timeout 30m -v
 //
 // Knobs (env): MISTY_SYNC_LOAD_CLIENTS (10000), _ACTIVE (0.2), _INTERVAL (5s),
-// _DURATION (60s), _POOL (64 connections per instance), _ASSERT=1 to fail on
+// _DURATION (60s), _SETTLE (0s before measuring), _POOL (64 connections per instance), _ASSERT=1 to fail on
 // the targets (p99 delta latency 150ms, no errors), _REPORT=<path> for JSON.
 func TestBrowserSyncLoad(t *testing.T) {
 	clients := loadEnvInt("MISTY_SYNC_LOAD_CLIENTS", 0)
@@ -88,6 +88,9 @@ func TestBrowserSyncLoad(t *testing.T) {
 	})
 	t.Logf("connected %d clients in %s", clients, time.Since(setup).Round(time.Millisecond))
 
+	// Connection setup (replays, snapshots, presence) settles before the
+	// measured window, so the counters reflect steady-state cost.
+	time.Sleep(loadEnvDuration("MISTY_SYNC_LOAD_SETTLE", 0))
 	before := loadDatabaseCounters(t, database)
 	var wg sync.WaitGroup
 	deadline := time.Now().Add(duration)
