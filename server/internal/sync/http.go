@@ -2,17 +2,20 @@ package browsersync
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/kannachi323/misty/server/internal/accounts"
 	"github.com/kannachi323/misty/server/internal/platform/transport"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/kannachi323/misty/server/internal/platform/metrics"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
@@ -24,10 +27,28 @@ type BrowserSyncService struct {
 	store      *Store
 	workspaces workspaceCaches
 	restore    RestoreCompleter
+	// instanceID owns this process's connection rows; they stay live while
+	// RunLiveness renews its lease.
+	instanceID string
+	scopeMu    sync.Mutex
+	scope      context.Context
+	endScope   context.CancelFunc
+	// revalidateEvery bounds how long a socket outlives a revoked account
+	// session; zero means syncSessionRevalidation.
+	revalidateEvery time.Duration
+}
+
+const syncSessionRevalidation = 10 * time.Minute
+
+func (s *BrowserSyncService) sessionRevalidation() time.Duration {
+	if s.revalidateEvery > 0 {
+		return s.revalidateEvery
+	}
+	return syncSessionRevalidation
 }
 
 func NewBrowserSyncService(database *db.Database) *BrowserSyncService {
-	return &BrowserSyncService{database: database, store: NewStore(database.Conn), workspaces: newWorkspaceCaches(256 << 20)}
+	return &BrowserSyncService{database: database, store: NewStore(database.Conn), workspaces: newWorkspaceCaches(256 << 20), instanceID: uuid.NewString()}
 }
 
 func syncErrorCode(err error) (string, int) {
@@ -144,7 +165,6 @@ func (s *BrowserSyncService) Devices() http.HandlerFunc {
 			writeSyncError(w, err)
 			return
 		}
-		_ = s.store.NotifyBrowserSyncPresence(r.Context(), SyncConnectionIdentity{UserID: user, VaultID: body.VaultID})
 		transport.WriteJSON(w, 201, map[string]string{"device_id": body.DeviceID})
 	}
 }
@@ -179,7 +199,11 @@ func (s *BrowserSyncService) Ticket() http.HandlerFunc {
 			writeSyncError(w, err)
 			return
 		}
-		if err = s.store.CreateBrowserSyncTicket(r.Context(), user, body.VaultID, body.DeviceID, security.HashToken(token)); err != nil {
+		session := ""
+		if sid := accounts.SessionID(r); sid != "" {
+			session = security.HashToken(sid)
+		}
+		if err = s.store.CreateBrowserSyncTicket(r.Context(), user, body.VaultID, body.DeviceID, security.HashToken(token), session); err != nil {
 			writeSyncError(w, err)
 			return
 		}

@@ -214,3 +214,18 @@ T13 splits the minute-level maintenance loop by what each job needs:
 Validation: schema-isolated PostgreSQL tests cover idle silence, delivery retry deadlines, heartbeat-silent stale deadlines, device return hints, the approval-resume spin guard, agent exclusivity and lease deadlines, and migration down/reapply. Full-schema contracts cover dispatch planning against real invocations and deliveries, the account AI switch, cleanup hints, bounded purges and single retention ownership. A unit test covers drain and batch budgets. The full Go suite passes except `TestRouteInventory`, which already fails on the base commit.
 
 Apply both migrations before deploying. Both are additive; old polling processes keep working during a rolling update.
+
+
+## Implementation progress — sync liveness, reconcile and stream lifetimes
+
+T06, T08, T14 and the server half of T15 change how sync sockets stay live and current.
+
+- Liveness is the socket plus a per-process lease, not per-device writes. Each API process renews one `browser_sync_instances` row every 15 seconds (45-second lease). A connection is live while its process's lease is live. Pongs and unchanged client heartbeats touch no database. A changed applied cursor or readiness writes once and publishes presence only when "ready and caught up" flips. The unused `active_seen_at` and `driver_seen_at` refreshes are gone.
+- Connection rows exist only while their socket is open (T08). Disconnect deletes the row and keeps the device's `last_seen_at`. A live process sweeps connections of processes whose lease lapsed, plus expired rows from older processes, in bounded batches, and publishes presence per vault. A process that cannot renew within its lease closes its own sockets before renewing, so no open socket outlives its row. Clean shutdown releases the lease at once.
+- The per-socket 60-second reconcile is removed (T14). The account event hub already turns a lost LISTEN session or a slow consumer into a reset, which replays authoritatively. Presence hints from connect, disconnect, enrollment, controls and collection capability now commit with their writes, not after them. A client blocked on a checkpoint still follows device changes.
+- The 10-minute forced reconnect on sync sockets and the account event stream is replaced by in-band session revalidation (T15). Tickets record the account session that minted them. Every 10 minutes ±25%, the socket or stream checks that the session is still active (one indexed read) and closes only if it was revoked or expired. A database error retries within a minute instead of disconnecting everyone. Tickets minted before this change keep the old reconnect behaviour.
+- Transport keepalives remain: WebSocket pings every 15 seconds and SSE comments every 25 seconds, with no database access (T33).
+
+Validation: store tests cover change-only progress writes and readiness hints, row deletion with last-seen retention, lease-based liveness, sweeps of lapsed and legacy rows with presence hints, and shutdown release. Socket tests cover silent unchanged heartbeats, self-fencing, and in-band session revalidation that keeps an active session's socket open and closes a revoked one with a reconnect code. An HTTP contract covers the account stream staying open across revalidations and ending on revocation. Existing two-server socket, workspace and control suites pass.
+
+Apply `20271001090000_browser_sync_live_connections.sql` before deploying. Older processes keep their per-connection expiry semantics during a rolling update; their rows are swept once expired. The desktop client still sends heartbeat frames every 15 seconds; the server now ignores unchanged ones. Making the client send frames only on change is part of the native batch.

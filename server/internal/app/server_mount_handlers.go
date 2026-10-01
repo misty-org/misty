@@ -97,6 +97,7 @@ func (s *Server) MountHandlers() error {
 	healthHandler := s.HealthMonitor.Handler()
 	instanceHandler := api.Instance(s.Database)
 	browserSync := browsersync.NewBrowserSyncService(s.Database)
+	s.BrowserSync = browserSync
 	if s.AIAgent != nil {
 		browserSync.SetRestoreCompleter(func(ctx context.Context, userID, prompt string) (string, error) {
 			text, _, err := s.AIAgent.CompleteWithTierContext(ctx, userID, prompt, "assistant_ai", serveragent.TierLow)
