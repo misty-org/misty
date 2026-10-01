@@ -85,7 +85,7 @@ describe("SpaceDrawings list layout", () => {
     container.remove();
   });
 
-  it("puts creation and search in My Drawings, then removes section headers while searching", async () => {
+  it("searches the full-width Journal drawing list", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/drawings"]}>
@@ -94,14 +94,10 @@ describe("SpaceDrawings list layout", () => {
       );
     });
 
-    expect(container.querySelector("h1")?.textContent).toBe("My Drawings");
+    expect(container.querySelector("h1")?.textContent).toBe("Journal");
     expect(container.querySelector("h1")?.closest(".rounded-2xl")).toBeNull();
-    expect(container.querySelector('section[aria-label="Pinned"]')?.textContent).toContain(
-      "Pinned sketch",
-    );
-    expect(container.querySelector('section[aria-label="Recently edited"]')?.textContent).toContain(
-      "Recent sketch",
-    );
+    expect(container.textContent).toContain("Pinned sketch");
+    expect(container.textContent).toContain("Recent sketch");
 
     const search = container.querySelector<HTMLInputElement>('input[aria-label="Search drawings"]');
     await act(async () => {

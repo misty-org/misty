@@ -1,7 +1,14 @@
 import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useDropZone, usePointerDrag } from "@/features/dnd";
-import { Button, IconButton, Pressable } from "@/shared/ui";
-import { Check, EllipsisVertical, Star } from "lucide-react";
+import {
+  Button,
+  IconButton,
+  Pressable,
+  CollectionItems,
+  CollectionCardTitle,
+  CollectionCardMetadata,
+} from "@/shared/ui";
+import { Check, EllipsisVertical, Star, RotateCcw } from "lucide-react";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import {
   formatBytes,
@@ -9,12 +16,13 @@ import {
   libraryDateGroupLabel,
   normalizeLibraryItemScale,
 } from "../libraryFormat";
+import { FileNameIcon } from "@/features/file-ui";
+import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { libraryFileTypeLabel, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
 const ITEM_ACTION_MENU_WIDTH = 224;
 const ITEM_ACTION_MENU_HEIGHT = 336;
 const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
-const LIST_THUMBNAIL_WIDTHS = [96, 132, 176] as const;
 const LIBRARY_ITEM_DRAG_KIND = "library-item";
 function clampMenuPosition(left: number, top: number, anchor?: Element) {
   const pane = anchor?.closest<HTMLElement>("[data-workspace-pane]");
@@ -37,18 +45,26 @@ function assetStackLabel(assetStack: LibraryAssetStack) {
 export function SpaceLibraryItems() {
   const {
     data: {
+      spaceId,
+      canEditLibrary,
+      canCopyLibrary,
+      collection,
+      setSelectedItemId,
       displayItems,
       sort,
+      direction,
       stackByItemID,
       libraryViewMode,
       libraryItemScale,
       selectedItemIds,
       setItemMenu,
+      itemMenu,
       nextAfter,
       loadingMore,
     },
-    itemActions: { loadMore },
+    itemActions: { loadMore, restoreItem },
   } = useSpaceLibraryContext();
+  const creatorName = useSpaceItemCreator(spaceId);
   const showItemMenu = (itemId: string, left: number, top: number, anchor?: Element) => {
     setItemMenu({
       itemId,
@@ -62,6 +78,85 @@ export function SpaceLibraryItems() {
   };
   const itemScale = normalizeLibraryItemScale(libraryItemScale);
   const listLayout = libraryViewMode === "list";
+  if (listLayout)
+    return (
+      <>
+        <CollectionItems
+          columnSetId={`library:${collection === "deleted" ? "trash" : "items"}`}
+          fields={
+            collection === "deleted"
+              ? ["Size", "Tags", "Deleted", "Recover until"]
+              : ["Size", "Tags", "Added"]
+          }
+          sortResetKey={`${collection}:${sort}:${direction}`}
+          categoryLabel="Type"
+          creatorLabel="Added by"
+          items={displayItems.map((item) => ({
+            id: item.id,
+            title: item.display_name,
+            icon: <FileNameIcon name={item.file.original_filename} size={18} />,
+            category: libraryFileTypeLabel(item),
+            creator: creatorName(item.added_by_user_id),
+            metadata: {
+              Size:
+                item.file.intrinsic_metadata.byte_size == null
+                  ? "—"
+                  : formatBytes(Number(item.file.intrinsic_metadata.byte_size)),
+              Tags: item.tags?.join(", ") || "—",
+              Added: formatTime(item.added_at),
+              Deleted: item.trashed_at ? formatTime(item.trashed_at) : "—",
+              "Recover until": item.recover_until ? formatTime(item.recover_until) : "—",
+            },
+            sortValues: {
+              Size:
+                item.file.intrinsic_metadata.byte_size == null
+                  ? undefined
+                  : Number(item.file.intrinsic_metadata.byte_size),
+              Added: Date.parse(item.added_at),
+              Deleted: item.trashed_at ? Date.parse(item.trashed_at) : undefined,
+              "Recover until": item.recover_until ? Date.parse(item.recover_until) : undefined,
+            },
+            creatorDescription: `Added by ${creatorName(item.added_by_user_id)} · Contributed by ${creatorName(item.contributing_user_id)} · Uploaded by ${creatorName(item.file.uploader_user_id)}`,
+            updatedAt: item.updated_at || item.added_at,
+            updated: formatTime(item.updated_at || item.added_at),
+            onOpen: () => setSelectedItemId(item.id),
+            actions:
+              collection === "deleted" && canEditLibrary ? (
+                <Button variant="outline" size="sm" onClick={() => void restoreItem(item)}>
+                  <RotateCcw />
+                  Restore
+                </Button>
+              ) : canEditLibrary || canCopyLibrary ? (
+                <IconButton
+                  label={`More actions for ${item.display_name}`}
+                  data-state={itemMenu?.itemId === item.id ? "open" : "closed"}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    showItemMenu(
+                      item.id,
+                      rect.right - ITEM_ACTION_MENU_WIDTH,
+                      rect.bottom + 4,
+                      event.currentTarget,
+                    );
+                  }}
+                >
+                  <EllipsisVertical />
+                </IconButton>
+              ) : undefined,
+          }))}
+        />
+        {nextAfter && (
+          <Button
+            variant="outline"
+            className="mx-auto mt-4 flex"
+            disabled={loadingMore}
+            onClick={() => void loadMore()}
+          >
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
+        )}
+      </>
+    );
   return (
     <div
       className={listLayout ? "grid gap-2" : "grid gap-3.5"}
@@ -86,8 +181,7 @@ export function SpaceLibraryItems() {
             <LibraryItemCard
               assetStack={assetStack}
               item={item}
-              itemScale={itemScale}
-              listLayout={listLayout}
+              creator={creatorName(item.added_by_user_id)}
               onContextMenu={openItemContextMenu}
               onShowMenu={showItemMenu}
               selected={selectedItemIds.includes(item.id)}
@@ -114,16 +208,14 @@ export function SpaceLibraryItems() {
 function LibraryItemCard({
   assetStack,
   item,
-  itemScale,
-  listLayout,
+  creator,
   onContextMenu,
   onShowMenu,
   selected,
 }: {
   assetStack?: LibraryAssetStack;
   item: SpaceLibraryItem;
-  itemScale: number;
-  listLayout: boolean;
+  creator: string;
   onContextMenu: (event: ReactMouseEvent, itemId: string) => void;
   onShowMenu: (itemId: string, left: number, top: number, anchor?: Element) => void;
   selected: boolean;
@@ -164,9 +256,9 @@ function LibraryItemCard({
       data-misty-window-drag-block={reorderable ? "true" : undefined}
       data-pointer-drag-source={reorderable ? "true" : undefined}
       className={[
-        "group relative min-w-0 rounded-xl bg-charcoal-card p-2 shadow-xs",
+        "group relative min-w-0 rounded-xl bg-charcoal-card p-4",
         "transition-[background-color,box-shadow,opacity] hover:bg-charcoal-hover",
-        listLayout ? "flex items-center gap-3" : "flex flex-col",
+        "flex flex-col",
         reorderable ? "cursor-grab" : "",
         dragging ? "opacity-40" : "",
         dropZone.active ? "ring-2 ring-charcoal-active" : itemSelectionStyle,
@@ -186,36 +278,30 @@ function LibraryItemCard({
         );
       }}
     >
+      <div className="relative flex h-8 min-w-0 items-center gap-2">
+        <CollectionCardTitle title={item.display_name} />
+        {canEditLibrary || canCopyLibrary ? (
+          <LibraryItemActions
+            item={item}
+            menuOpen={itemMenu?.itemId === item.id}
+            onShowMenu={onShowMenu}
+            updateItem={updateItem}
+            canEdit={canEditLibrary}
+          />
+        ) : null}
+      </div>
       <LibraryItemPreview
         assetStack={assetStack}
         item={item}
         selected={selected}
         selectionAvailable={canEditLibrary || canCopyLibrary}
       />
-      <div className={listLayout ? "min-w-0 flex-1 py-1 pr-1" : "min-w-0 px-1 pb-1 pt-2.5"}>
-        <div className="flex min-w-0 items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="m-0 truncate text-xs font-semibold text-cream" title={item.display_name}>
-              {item.display_name}
-            </p>
-            <p className="m-0 mt-1 truncate text-[11px] leading-4 text-cream-muted">
-              {[
-                formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0)),
-                libraryFileTypeLabel(item),
-                formatTime(item.added_at),
-              ].join(" · ")}
-            </p>
-          </div>
-          {canEditLibrary || canCopyLibrary ? (
-            <LibraryItemActions
-              item={item}
-              menuOpen={itemMenu?.itemId === item.id}
-              onShowMenu={onShowMenu}
-              updateItem={updateItem}
-            />
-          ) : null}
-        </div>
-      </div>
+      <CollectionCardMetadata
+        category={`${libraryFileTypeLabel(item)} · ${formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))}`}
+        updated={formatTime(item.updated_at || item.added_at)}
+        creator={creator}
+        creatorLabel="Added by"
+      />
     </article>
   );
   function LibraryItemPreview({
@@ -230,18 +316,9 @@ function LibraryItemCard({
     selectionAvailable: boolean;
   }) {
     return (
-      <div
-        className={listLayout ? "relative shrink-0" : "relative w-full min-w-0"}
-        style={
-          listLayout
-            ? {
-                width: `${LIST_THUMBNAIL_WIDTHS[itemScale]}px`,
-              }
-            : undefined
-        }
-      >
+      <div className="relative mt-2 w-full min-w-0 flex-1">
         <Pressable
-          className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-lg bg-charcoal-card text-cream-muted"
+          className="relative grid aspect-[4/3] min-h-32 w-full place-items-center overflow-hidden rounded-lg text-cream-muted [&>svg]:size-10"
           onClick={(event) => {
             libraryViewerTriggerRef.current = event.currentTarget;
             setSelectedItemId(item.id);
@@ -282,9 +359,11 @@ function LibraryItemActions({
   menuOpen,
   onShowMenu,
   updateItem,
+  canEdit,
 }: {
   item: SpaceLibraryItem;
   menuOpen: boolean;
+  canEdit: boolean;
   onShowMenu: (itemId: string, left: number, top: number, anchor?: Element) => void;
   updateItem: (
     item: SpaceLibraryItem,
@@ -300,20 +379,22 @@ function LibraryItemActions({
       ].join(" ");
   return (
     <div
-      className={`flex shrink-0 items-center gap-0.5 transition-opacity ${actionVisibility}`}
+      className={`absolute right-0 top-0 flex shrink-0 items-center gap-0.5 rounded-md bg-charcoal-card group-hover:bg-charcoal-hover transition-opacity ${actionVisibility}`}
       aria-label={`Actions for ${item.display_name}`}
     >
-      <IconButton
-        label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}
-        tooltip={item.favorite ? "Remove favorite" : "Favorite"}
-        onClick={() =>
-          void updateItem(item, {
-            favorite: !item.favorite,
-          })
-        }
-      >
-        <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
-      </IconButton>
+      {canEdit && (
+        <IconButton
+          label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}
+          tooltip={item.favorite ? "Remove favorite" : "Favorite"}
+          onClick={() =>
+            void updateItem(item, {
+              favorite: !item.favorite,
+            })
+          }
+        >
+          <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
+        </IconButton>
+      )}
       <IconButton
         label={`More actions for ${item.display_name}`}
         tooltip={false}

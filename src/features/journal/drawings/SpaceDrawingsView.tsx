@@ -4,25 +4,9 @@ import {
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/types";
 import { JournalAttribution, JournalDeleteDialog } from "@/features/journal";
-import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
-import { personInitials } from "@/shared/lib/personInitials";
-import {
-  Avatar,
-  AvatarFallback,
-  Button,
-  cn,
-  ContextMenu,
-  ContextMenuAction,
-  ContextMenuContent,
-  ContextMenuTrigger,
-  EmptyState,
-  Input,
-  ListRowButton,
-  PermissionState,
-  Skeleton,
-  Spinner,
-} from "@/shared/ui";
-import { Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
+import { Button, EmptyState, PermissionState, Spinner } from "@/shared/ui";
+import { DrawingCollection } from "./components/DrawingCollection";
+import { CollectionItemDialog } from "@/shared/ui/patterns/CollectionItemDialog";
 import {
   Suspense,
   useCallback,
@@ -49,6 +33,7 @@ import type {
 import type { CollaborativeDrawingCanvasProps } from "./components/CollaborativeDrawingCanvasView";
 
 export interface DrawingsViewRuntime {
+  readOnly?: boolean;
   user: DrawingUser | null;
   members: readonly { user_id: string; name?: string | null }[];
   useList(space: string): ReturnType<typeof useSpaceDrawingsView>;
@@ -80,13 +65,7 @@ export function SpaceDrawingsView(props: {
   workspaceTabId?: string;
 }) {
   const { runtime } = props;
-  const {
-    user,
-    members,
-    PreviewHeader: DrawingPreviewHeader,
-    Preview: DrawingPreview,
-    NewDialog: NewDrawingDialog,
-  } = runtime;
+  const { user, NewDialog: NewDrawingDialog } = runtime;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const drawings = runtime.useList(props.spaceId);
@@ -96,6 +75,7 @@ export function SpaceDrawingsView(props: {
   const [newDrawingOpen, setNewDrawingOpen] = useState(false);
   const pendingCreation = useRef<string | true | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SpaceDrawing | null>(null);
+  const [renameTarget, setRenameTarget] = useState<SpaceDrawing | null>(null);
   const drawingPinsKey = `misty:drawing-pins:${user?.id ?? "anonymous"}:${props.spaceId}`;
   const { pinnedIds: pinnedDrawingIds, togglePinned: toggleDrawingPin } = runtime.usePins(
     drawingPinsKey,
@@ -154,17 +134,6 @@ export function SpaceDrawingsView(props: {
     return orderedDrawings.filter((drawing) => drawing.title.toLowerCase().includes(q));
   }, [orderedDrawings, query]);
   const pinnedDrawingIdSet = useMemo(() => new Set(pinnedDrawingIds), [pinnedDrawingIds]);
-  const pinnedDrawings = orderedDrawings.filter((drawing) => pinnedDrawingIdSet.has(drawing.id));
-  const recentDrawings = orderedDrawings.filter((drawing) => !pinnedDrawingIdSet.has(drawing.id));
-
-  const creatorNameForDrawing = (drawing: SpaceDrawing) => {
-    const creator = members.find((member) => member.user_id === drawing.creator_user_id);
-    return (
-      creator?.name ||
-      (drawing.creator_user_id === user?.id ? user.name || user.email || "You" : "Unknown creator")
-    );
-  };
-
   const removeDrawing = useCallback(async () => {
     if (!deleteTarget) return;
     await drawings.remove(deleteTarget.id);
@@ -213,132 +182,19 @@ export function SpaceDrawingsView(props: {
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
       {runtime.renderTitle(selected?.title?.trim() || "Drawings", props.workspaceTabId)}
       {view === "list" ? (
-        <div className="grid min-h-0 flex-1 gap-5 p-5 md:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
-          {drawings.loading ? (
-            <>
-              <Skeleton className="min-h-72 rounded-2xl" />
-              <Skeleton className="min-h-72 rounded-2xl" />
-            </>
-          ) : (
-            <>
-              <section className="flex min-h-0 flex-col">
-                <div className="mb-2 flex h-8 shrink-0 items-center gap-2">
-                  <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
-                    My Drawings
-                  </h1>
-                  <Button
-                    className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
-                    type="button"
-                    onClick={() => setNewDrawingOpen(true)}
-                  >
-                    <Plus className="size-3.5" aria-hidden="true" />
-                    New
-                  </Button>
-                </div>
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
-                  <div className="shrink-0 border-b border-charcoal-border p-3">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
-                      <Input
-                        className="h-8 bg-charcoal-bg pl-8 text-xs"
-                        aria-label="Search drawings"
-                        placeholder="Search drawings"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="misty-scrollbar min-h-0 flex-1 overflow-y-auto">
-                    {filteredDrawings.length === 0 ? (
-                      <EmptyState
-                        className="h-full min-h-48"
-                        title={query ? "No matching drawings" : "Sketch ideas together"}
-                        description={
-                          query
-                            ? `Nothing matches “${query}”.`
-                            : "Create a live canvas for diagrams, planning, and visual collaboration."
-                        }
-                        action={
-                          query ? (
-                            <Button variant="secondary" onClick={() => setQuery("")}>
-                              Clear search
-                            </Button>
-                          ) : (
-                            <Button onClick={() => setNewDrawingOpen(true)}>Create drawing</Button>
-                          )
-                        }
-                      />
-                    ) : query.trim() ? (
-                      <DrawingRows
-                        drawings={filteredDrawings}
-                        selectedId={selected?.id}
-                        pinnedIds={pinnedDrawingIdSet}
-                        onSelect={(drawing) => navigateToDrawing(drawing.id, "list")}
-                        onTogglePin={toggleDrawingPin}
-                        onDelete={setDeleteTarget}
-                      />
-                    ) : (
-                      <div className="pb-2">
-                        <DrawingSection
-                          title="Pinned"
-                          drawings={pinnedDrawings}
-                          emptyLabel="Pin a drawing from its menu for quick access."
-                          selectedId={selected?.id}
-                          pinnedIds={pinnedDrawingIdSet}
-                          onSelect={(drawing) => navigateToDrawing(drawing.id, "list")}
-                          onTogglePin={toggleDrawingPin}
-                          onDelete={setDeleteTarget}
-                        />
-                        <DrawingSection
-                          title="Recently edited"
-                          drawings={recentDrawings}
-                          emptyLabel="Your pinned drawings are shown above."
-                          selectedId={selected?.id}
-                          pinnedIds={pinnedDrawingIdSet}
-                          onSelect={(drawing) => navigateToDrawing(drawing.id, "list")}
-                          onTogglePin={toggleDrawingPin}
-                          onDelete={setDeleteTarget}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section className="flex min-h-0 flex-col">
-                {selected ? (
-                  <DrawingPreviewHeader
-                    drawing={selected}
-                    onRename={(title) => drawings.rename(selected.id, title).then(() => undefined)}
-                    onDelete={() => setDeleteTarget(selected)}
-                    onOpen={() => navigateToDrawing(selected.id, "canvas")}
-                  />
-                ) : (
-                  <div className="mb-2 flex h-8 shrink-0 items-center">
-                    <h2 className="m-0 text-sm font-semibold text-cream-bright">Drawing preview</h2>
-                  </div>
-                )}
-                <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
-                  {selected ? (
-                    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto]">
-                      <DrawingPreview key={selected.id} drawing={selected} user={user} />
-                      <DrawingMetadata
-                        drawing={selected}
-                        creatorName={creatorNameForDrawing(selected)}
-                      />
-                    </div>
-                  ) : (
-                    <EmptyState
-                      className="h-full"
-                      title="No drawing selected"
-                      description="Choose a drawing from the list to preview it."
-                    />
-                  )}
-                </div>
-              </section>
-            </>
-          )}
-        </div>
+        <DrawingCollection
+          readOnly={runtime.readOnly}
+          spaceId={props.spaceId}
+          drawings={filteredDrawings}
+          query={query}
+          onQuery={setQuery}
+          pinnedIds={pinnedDrawingIdSet}
+          onPin={toggleDrawingPin}
+          onOpen={(drawing) => navigateToDrawing(drawing.id, "canvas")}
+          onCreate={() => setNewDrawingOpen(true)}
+          onDelete={setDeleteTarget}
+          onRename={setRenameTarget}
+        />
       ) : (
         <div className="relative min-h-0 flex-1 overflow-hidden">
           {selected ? (
@@ -371,6 +227,23 @@ export function SpaceDrawingsView(props: {
           }
         }}
       />
+      {renameTarget && renameTarget.space_id === props.spaceId && (
+        <CollectionItemDialog
+          key={renameTarget.id}
+          title="Rename drawing"
+          initialName={renameTarget.title}
+          actionLabel="Save"
+          onConfirm={(title) => {
+            const current = drawings.drawings.find((drawing) => drawing.id === renameTarget.id);
+            if (runtime.readOnly || !current || current.role === "viewer")
+              return Promise.reject(
+                new Error("You no longer have permission to rename this drawing."),
+              );
+            return drawings.rename(current.id, title);
+          }}
+          onClose={() => setRenameTarget(null)}
+        />
+      )}
       <JournalDeleteDialog
         kind="drawing"
         title={deleteTarget?.title ?? ""}
@@ -380,129 +253,6 @@ export function SpaceDrawingsView(props: {
         }}
         onConfirm={removeDrawing}
       />
-    </div>
-  );
-}
-
-function DrawingSection(props: {
-  title: string;
-  drawings: SpaceDrawing[];
-  emptyLabel: string;
-  selectedId?: string;
-  pinnedIds: Set<string>;
-  onSelect: (drawing: SpaceDrawing) => void;
-  onTogglePin: (drawingId: string) => void;
-  onDelete: (drawing: SpaceDrawing) => void;
-}) {
-  return (
-    <section aria-label={props.title}>
-      <h2 className="m-0 px-3.5 pb-1.5 pt-3 text-xs font-semibold text-cream-muted">
-        {props.title}
-      </h2>
-      {props.drawings.length ? (
-        <DrawingRows {...props} />
-      ) : (
-        <p className="px-3.5 py-2 text-[11px] leading-4 text-cream-muted/75">{props.emptyLabel}</p>
-      )}
-    </section>
-  );
-}
-
-function DrawingRows(props: {
-  drawings: SpaceDrawing[];
-  selectedId?: string;
-  pinnedIds: Set<string>;
-  onSelect: (drawing: SpaceDrawing) => void;
-  onTogglePin: (drawingId: string) => void;
-  onDelete: (drawing: SpaceDrawing) => void;
-}) {
-  return props.drawings.map((drawing) => {
-    const isSelected = drawing.id === props.selectedId;
-    const isPinned = props.pinnedIds.has(drawing.id);
-    return (
-      <ContextMenu key={drawing.id}>
-        <ContextMenuTrigger asChild>
-          <div
-            className={cn(
-              "group/drawing flex h-10 items-center transition-colors",
-              isSelected
-                ? "bg-charcoal-hover hover:bg-charcoal-hover"
-                : "bg-transparent hover:bg-charcoal-border/65",
-            )}
-          >
-            <ListRowButton
-              aria-current={isSelected ? "true" : undefined}
-              className="self-stretch items-center rounded-none px-3.5"
-              onClick={() => props.onSelect(drawing)}
-            >
-              <h3 className="m-0 min-w-0 flex-1 truncate text-[13px] font-medium text-cream-bright">
-                {drawing.title || "Untitled drawing"}
-              </h3>
-              {isPinned ? (
-                <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
-              ) : null}
-            </ListRowButton>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-44">
-          <ContextMenuAction
-            icon={isPinned ? <PinOff /> : <Pin />}
-            label={isPinned ? "Unpin" : "Pin"}
-            onSelect={() => props.onTogglePin(drawing.id)}
-          />
-          {drawing.can_delete ? (
-            <ContextMenuAction
-              icon={<Trash2 />}
-              label="Delete"
-              destructive
-              onSelect={() => props.onDelete(drawing)}
-            />
-          ) : null}
-        </ContextMenuContent>
-      </ContextMenu>
-    );
-  });
-}
-
-function DrawingMetadata(props: { drawing: SpaceDrawing; creatorName: string }) {
-  return (
-    <section
-      className="shrink-0 border-t border-charcoal-border px-5 py-3.5"
-      aria-label="Drawing details"
-    >
-      <dl className="m-0 grid grid-cols-2 gap-x-8 gap-y-3 lg:grid-cols-4">
-        <div className="min-w-0">
-          <dt className="text-[11px] font-medium text-cream-muted">Created by</dt>
-          <dd className="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-cream-bright">
-            <Avatar className="size-5 shrink-0">
-              <AvatarFallback
-                className={cn(
-                  "text-[8px] font-semibold",
-                  avatarColorClass(props.drawing.creator_user_id),
-                  avatarInkClass,
-                )}
-              >
-                {personInitials(props.creatorName)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate">{props.creatorName}</span>
-          </dd>
-        </div>
-        <MetadataField label="Last edited" value={formatDrawingDate(props.drawing.updated_at)} />
-        <MetadataField label="Created" value={formatDrawingDate(props.drawing.created_at)} />
-        <MetadataField label="Access" value={drawingRoleLabel(props.drawing.role)} />
-      </dl>
-    </section>
-  );
-}
-
-function MetadataField(props: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-cream-muted">{props.label}</dt>
-      <dd className="m-0 mt-1.5 truncate text-xs text-cream-bright" title={props.value}>
-        {props.value}
-      </dd>
     </div>
   );
 }
@@ -674,22 +424,4 @@ function DrawingLoading({ label }: { label: string }) {
 
 function drawingPath(spaceId: string, drawingId: string): string {
   return `/spaces/${encodeURIComponent(spaceId)}/drawings/${encodeURIComponent(drawingId)}`;
-}
-
-function formatDrawingDate(value: string): string {
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return "Unknown";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
-}
-
-function drawingRoleLabel(role: SpaceDrawing["role"]): string {
-  if (role === "creator") return "Owner";
-  if (role === "editor") return "Can edit";
-  return "View only";
 }

@@ -24,11 +24,7 @@ export function AgentNavigationIsland(props: {
   const activeRef = useRef(props.activeSection);
   activeRef.current = props.activeSection;
   return (
-    <nav
-      id={props.id}
-      aria-label="Agent navigation"
-      className="agent-navigation-island rounded-lg border border-charcoal-border bg-charcoal-card"
-    >
+    <nav id={props.id} aria-label="Agent navigation" className="agent-navigation-island">
       {sections.map((section) => (
         <Popover
           key={section.id}

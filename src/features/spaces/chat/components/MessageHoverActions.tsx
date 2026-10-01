@@ -1,89 +1,106 @@
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import { IconButton } from "@/shared/ui";
-import { Pencil, Reply, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
+} from "@/shared/ui";
+import { Copy, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChatEmojiPicker } from "./ChatEmojiPicker";
 import { quickReactionEmojis } from "./messageHelpers";
 
 export interface MessageHoverActionsProps {
   message: SpaceMessage;
   currentUserId?: string;
   isOwner: boolean;
+  canWrite?: boolean;
+  onError?: (message: string) => void;
   onReply: (messageId: string) => void;
   onToggleReaction: (message: SpaceMessage, emoji: string, reacted: boolean) => void;
   onBeginEditing: (message: SpaceMessage) => void;
   onDelete: (message: SpaceMessage) => void;
 }
 
-/** The toolbar that appears on hover or focus: quick reactions, reply, edit, delete. */
-export function MessageHoverActions(props: MessageHoverActionsProps) {
+/** A single floating row, revealed by hover or focus (including tapping a message). */
+export function MessageHoverActions({ canWrite = true, ...props }: MessageHoverActionsProps) {
   const { message, currentUserId } = props;
-  const canEdit = message.sender_kind === "person" && message.sender_user_id === currentUserId;
-  const canDelete = message.sender_user_id === currentUserId || props.isOwner;
-
+  const [menuOpen, setMenuOpen] = useState(false);
+  const canEdit =
+    canWrite && message.sender_kind === "person" && message.sender_user_id === currentUserId;
+  const canDelete = canWrite && (message.sender_user_id === currentUserId || props.isOwner);
+  const react = (emoji: string) =>
+    props.onToggleReaction(
+      message,
+      emoji,
+      message.reactions?.some((r) => r.emoji === emoji && r.reacted_by_me) ?? false,
+    );
   return (
-    <div className="absolute right-3 top-1 z-10 flex max-w-[min(360px,calc(100%-72px))] items-center gap-0.5 rounded-md border border-charcoal-border/70 bg-charcoal-bg p-0.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-      {quickReactionEmojis.map((emoji) => {
-        const reacted =
-          message.reactions?.find((item) => item.emoji === emoji)?.reacted_by_me === true;
-        return (
-          <IconButton
-            label={`${reacted ? "Remove" : "Add"} ${emoji} reaction`}
-            className="text-sm leading-none"
-            key={emoji}
-            onClick={() => props.onToggleReaction(message, emoji, reacted)}
-            aria-pressed={reacted}
-            title={`${reacted ? "Remove" : "Add"} ${emoji}`}
-          >
-            {emoji}
-          </IconButton>
-        );
-      })}
-      <span className="mx-0.5 h-5 w-px bg-charcoal-border" aria-hidden="true" />
-
-      <ActionButton icon={<Reply />} label="Reply" onClick={() => props.onReply(message.id)} />
-      {canEdit ? (
-        <ActionButton
-          icon={<Pencil />}
-          label="Edit"
-          onClick={() => props.onBeginEditing(message)}
-        />
-      ) : null}
-      {canDelete ? (
-        <ActionButton
-          icon={<Trash2 />}
-          label="Delete message"
-          title="Delete"
-          className="text-cream-muted hover:bg-cream/[0.045] hover:text-cream-bright"
-          onClick={() => props.onDelete(message)}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ActionButton({
-  icon,
-  label,
-  title,
-  className,
-  disabled,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  title?: string;
-  className?: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <IconButton
-      label={label}
-      className={className}
-      disabled={disabled}
-      onClick={onClick}
-      title={title ?? label}
+    <div
+      className={`absolute right-2 -top-3 z-10 flex flex-nowrap items-center gap-0.5 rounded-md border border-charcoal-border bg-charcoal-bg p-0.5 shadow-sm transition-opacity ${menuOpen ? "opacity-100" : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"}`}
     >
-      {icon}
-    </IconButton>
+      {canWrite && (
+        <>
+          {quickReactionEmojis.slice(0, 2).map((emoji) => (
+            <IconButton
+              key={emoji}
+              label={`Toggle ${emoji} reaction`}
+              aria-pressed={
+                message.reactions?.some((r) => r.emoji === emoji && r.reacted_by_me) ?? false
+              }
+              onClick={() => react(emoji)}
+            >
+              {emoji}
+            </IconButton>
+          ))}
+          <ChatEmojiPicker onSelect={react}>
+            <IconButton label="Add reaction">
+              <SmilePlus />
+            </IconButton>
+          </ChatEmojiPicker>
+          <IconButton label="Reply" onClick={() => props.onReply(message.id)}>
+            <Reply />
+          </IconButton>
+        </>
+      )}
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <IconButton label="More message actions">
+            <MoreHorizontal />
+          </IconButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={() => {
+              void navigator.clipboard
+                .writeText(
+                  message.content.map((s) => (s.type === "text" ? s.text : s.label)).join(""),
+                )
+                .catch(() =>
+                  props.onError?.("Could not copy this message. Try selecting its text."),
+                );
+            }}
+          >
+            <Copy />
+            Copy text
+          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem
+              onSelect={() => requestAnimationFrame(() => props.onBeginEditing(message))}
+            >
+              <Pencil />
+              Edit
+            </DropdownMenuItem>
+          )}
+          {canDelete && (
+            <DropdownMenuItem onSelect={() => props.onDelete(message)}>
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

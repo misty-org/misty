@@ -166,51 +166,6 @@
   padding: 12px 24px 16px;
   flex-shrink: 0;
 }
-.agent-compose-area .misty-composer-body {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto auto;
-  align-items: end;
-  gap: 4px;
-  padding: 6px;
-}
-.agent-compose-area .misty-composer-controls {
-  display: contents;
-}
-.agent-compose-area textarea {
-  grid-column: 2;
-  grid-row: 1;
-  min-height: 38px;
-  max-height: 160px;
-  padding: 8px 4px;
-  font-size: 14px;
-  line-height: 22px;
-}
-.agent-compose-area .misty-composer-controls > button:first-of-type {
-  grid-column: 1;
-  grid-row: 1;
-  margin-bottom: 4px;
-}
-.agent-compose-area .misty-composer-spacer {
-  display: none;
-}
-.agent-compose-area .misty-composer-voice {
-  display: flex;
-  grid-column: 3;
-  grid-row: 1;
-  margin-bottom: 4px;
-}
-.agent-compose-area .misty-composer-trailing,
-.agent-compose-area .misty-composer-send {
-  grid-column: 4;
-  grid-row: 1;
-  margin-bottom: 4px;
-}
-.agent-compose-area .misty-composer-trailing {
-  display: flex;
-}
-.agent-compose-area .misty-composer-attachments {
-  padding: 8px 8px 0;
-}
 .agent-compose-error,
 .agents-notice {
   display: flex;
@@ -384,58 +339,6 @@
   gap: 16px;
   padding-top: 16px;
 }
-@container agents (max-width: 960px) {
-  .agents-workspace:has(> .agent-settings-panel[data-state="open"]) .agents-main {
-    margin-right: 0;
-    visibility: hidden;
-  }
-  .agents-workspace .agent-settings-panel {
-    width: calc(100% - 244px);
-  }
-}
-@container agents (max-width: 720px) {
-  .agents-workspace .agent-settings-panel {
-    width: calc(100% - 220px);
-  }
-  .agents-roster {
-    width: 220px;
-  }
-  .agent-compose-area {
-    padding-inline: 16px;
-  }
-  .agent-conversation .agent-transcript {
-    padding: 20px 16px;
-  }
-}
-@container agents (max-width: 600px) {
-  .agents-roster {
-    display: none;
-  }
-  .agents-workspace[data-roster-open="true"] > .agents-roster {
-    display: flex;
-    width: 100%;
-  }
-  .agents-workspace[data-roster-open="true"] > .agents-main {
-    display: none;
-  }
-  .agents-roster-back {
-    display: inline-flex;
-  }
-  .agent-compose-area {
-    padding: 8px 12px 12px;
-  }
-  .agent-conversation .agent-transcript {
-    padding-inline: 16px;
-  }
-  .agents-workspace .agent-settings-panel {
-    width: 100%;
-  }
-  .agent-recipient-results {
-    left: 12px;
-    width: calc(100% - 24px);
-  }
-}
-
 /* Navigation stays in the chat; shared popovers render above it without resizing the pane. */
 .agent-navigation-island {
   display: flex;
@@ -607,4 +510,64 @@
 }
 .agent-activity-scheduled {
   margin-top: 12px;
+}
+
+/* Dot-inspired context stays beside the conversation; controls inherit shared geometry. */
+.agent-overview-rail {
+  width: 340px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 16px 0;
+}
+.agent-overview-rail .agent-navigation-island,
+[data-slot="sheet-content"] .agent-navigation-island {
+  margin: 0;
+  max-width: 100%;
+  align-self: stretch;
+  justify-content: space-between;
+}
+.agent-overview-rail .agent-activity-row {
+  min-height: 52px;
+  padding: 8px 0;
+  gap: 8px;
+}
+.agent-overview-rail .agent-activity-row strong {
+  font-size: 13px;
+}
+.agent-overview-rail .agent-activity-row small {
+  font-size: 12px;
+}
+.agent-overview-rail .agent-activity-details {
+  padding: 0 0 12px;
+}
+.agent-overview-rail .agents-list-note {
+  padding: 4px 0;
+}
+.agent-overview-rail .agent-avatar--large {
+  width: 64px;
+  height: 64px;
+}
+.agent-welcome {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.agent-welcome .agent-avatar {
+  width: 80px;
+  height: 80px;
+}
+.agent-welcome h1 {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.agent-welcome p {
+  max-width: 36ch;
+  color: var(--color-cream-muted);
 }

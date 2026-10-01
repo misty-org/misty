@@ -22,7 +22,6 @@ import {
 } from "@/shared/ui";
 import {
   Blocks,
-  Check,
   ChevronDown,
   PanelBottomDashed,
   PanelRightDashed,
@@ -356,7 +355,12 @@ export function WorkspaceTabStrip(
                               return (
                                 <div key={item.id} className="flex items-center gap-1">
                                   <DropdownMenuItem
-                                    className="min-w-0 flex-1"
+                                    className={cn(
+                                      "min-w-0 flex-1 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted",
+                                      focused &&
+                                        "bg-charcoal-active text-cream-bright hover:bg-charcoal-active focus:bg-charcoal-active focus-visible:bg-charcoal-active data-highlighted:bg-charcoal-active",
+                                    )}
+                                    aria-current={focused ? "true" : undefined}
                                     aria-label={`${paneViewLabel(itemView)}${focused ? ", active pane" : ""}`}
                                     onSelect={() => {
                                       useWorkspaceStore.getState().focusView(itemView.id);
@@ -370,7 +374,6 @@ export function WorkspaceTabStrip(
                                     <span className="min-w-0 flex-1 truncate">
                                       {paneViewLabel(itemView)}
                                     </span>
-                                    {focused ? <Check size={14} aria-hidden /> : null}
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     aria-label={`Close pane ${paneViewLabel(itemView)}`}

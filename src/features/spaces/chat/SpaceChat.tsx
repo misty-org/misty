@@ -1,3 +1,4 @@
+import { readApiSessionGeneration } from "@/api/client/session";
 import type { SocialProviderId } from "@/api/social";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
@@ -24,6 +25,7 @@ import {
   socialProviderPath,
 } from "../social/socialRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
+import { ConversationSwitcher } from "./components/ConversationSwitcher";
 import { ChatPresencePill } from "./components/ChatPresencePill";
 import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./components/SpaceChatComposer";
@@ -54,6 +56,7 @@ export function SpaceSocial({
   const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
   const conversationId = searchParams.get("conversation") ?? "";
+  const chatRootRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastReadReceiptRef = useRef("");
   const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
@@ -145,8 +148,16 @@ export function SpaceSocial({
   });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
-  const [messageToDelete, setMessageToDelete] = useState<SpaceMessage | null>(null);
-  const resetDraft = draft.reset;
+  const deleteScope = JSON.stringify([
+    readApiSessionGeneration(),
+    user?.id,
+    spaceId,
+    conversationId,
+  ]);
+  const [deleteTarget, setDeleteTarget] = useState<{ scope: string; message: SpaceMessage } | null>(
+    null,
+  );
+  const messageToDelete = deleteTarget?.scope === deleteScope ? deleteTarget.message : null;
   const resetEditing = editing.reset;
   const closeSuggestions = suggestions.setOpen;
   const clearSpacesError = store.clearSpacesError;
@@ -313,18 +324,18 @@ export function SpaceSocial({
     targetMessageId: searchParams.get("message") ?? undefined,
   });
 
-  // Switching Space (or identity) abandons anything staged in the composer.
+  // Transient menus close on navigation; drafts remain scoped to their conversation.
   useEffect(() => {
-    resetDraft();
     resetEditing();
+    setDeleteTarget(null);
     closeSuggestions(false);
     setPickerOpen(false);
     clearSpacesError();
   }, [
     clearSpacesError,
     closeSuggestions,
-    resetDraft,
     resetEditing,
+    conversationId,
     spaceId,
     store.referenceOnly,
     user?.id,
@@ -484,19 +495,23 @@ export function SpaceSocial({
     );
   }
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
+    <div
+      ref={chatRootRef}
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream"
+    >
       <header
         className={
           "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5"
         }
       >
-        <h1 className="m-0 shrink-0 text-sm font-semibold">
-          {scope.activeConversation?.title || "Everyone"}
-        </h1>
-
-        <div className="ml-auto flex items-center gap-3">
-          <ChatPresencePill spaceId={spaceId} />
-        </div>
+        <ConversationSwitcher
+          spaceId={spaceId}
+          conversation={scope.activeConversation}
+          currentUserId={user?.id}
+          members={scope.allMembers}
+          canWrite={access.canWriteMessages}
+        />
+        <ChatPresencePill spaceId={spaceId} />
       </header>
 
       {!conversationId ? (
@@ -525,8 +540,11 @@ export function SpaceSocial({
         onScroll={chatScroll.onScroll}
         onOpenPicker={openPicker}
         onBeginMention={input.beginMention}
-        onReply={draft.setReplyToMessageId}
-        onDelete={setMessageToDelete}
+        onReply={(id) => {
+          draft.setReplyToMessageId(id);
+          requestAnimationFrame(() => chatRootRef.current?.querySelector("textarea")?.focus());
+        }}
+        onDelete={(message) => setDeleteTarget({ scope: deleteScope, message })}
         onReload={() => {
           if (conversationId) conversationChat.reload();
           else void store.loadMessages(spaceId);
@@ -570,12 +588,12 @@ export function SpaceSocial({
       <DeleteMessageDialog
         open={Boolean(messageToDelete)}
         onOpenChange={(open) => {
-          if (!open) setMessageToDelete(null);
+          if (!open) setDeleteTarget(null);
         }}
         onConfirm={() => {
           if (!messageToDelete) return;
           void actions.remove(messageToDelete).then((removed) => {
-            if (removed) setMessageToDelete(null);
+            if (removed) setDeleteTarget(null);
           });
         }}
       />

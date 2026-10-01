@@ -78,7 +78,7 @@ describe("GlobalNavigator disclosures", () => {
   it.each([
     ["agents", "/agents", "Agents"],
     ["files", "/files?view=transfers", "Files"],
-    ["scheduled", "/scheduled", "Scheduled"],
+    ["scheduled", "/scheduled", "Agents"],
     ["browser", "/browser", "Browser"],
   ] as const)(
     "highlights the focused %s view without nested destinations",

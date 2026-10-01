@@ -8,6 +8,7 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
   Button,
+  NavIsland,
 } from "@/shared/ui";
 import { CalendarClock, Pause, Pencil, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -67,7 +68,7 @@ export function ScheduledTaskDetails(props: {
         </p>
       </header>
       <p className="text-xs text-cream-muted">Runs with {props.agentName || "Misty"}</p>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           onClick={() => void act(() => store.runNow(task.id))}
@@ -76,29 +77,31 @@ export function ScheduledTaskDetails(props: {
           <Play className="size-3.5" aria-hidden="true" />
           Run now
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => void toggle()} disabled={busy}>
-          {task.enabled ? <Pause className="size-3.5" aria-hidden="true" /> : null}
-          {task.enabled ? "Pause" : "Resume"}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={busy}>
-          <Pencil className="size-3.5" aria-hidden="true" />
-          Edit
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-cream-muted"
-          onClick={() => setConfirmDelete(true)}
-          title={
-            props.deletionDisabled
-              ? "Send or clear your message before deleting this task."
-              : undefined
-          }
-          disabled={busy || props.deletionDisabled}
-        >
-          <Trash2 className="size-3.5" aria-hidden="true" />
-          Delete
-        </Button>
+        <NavIsland aria-label="Task actions">
+          <Button size="xs" variant="ghost" onClick={() => void toggle()} disabled={busy}>
+            {task.enabled ? <Pause className="size-3.5" aria-hidden="true" /> : null}
+            {task.enabled ? "Pause" : "Resume"}
+          </Button>
+          <Button size="xs" variant="ghost" onClick={() => setEditing(true)} disabled={busy}>
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Edit
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            className="text-cream-muted"
+            onClick={() => setConfirmDelete(true)}
+            title={
+              props.deletionDisabled
+                ? "Send or clear your message before deleting this task."
+                : undefined
+            }
+            disabled={busy || props.deletionDisabled}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Delete
+          </Button>
+        </NavIsland>
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">

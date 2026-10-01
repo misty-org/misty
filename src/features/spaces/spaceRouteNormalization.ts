@@ -36,6 +36,12 @@ export function canonicalSpaceRoute(route: string): string {
     return `${socialProviderPath(spaceId, provider, parsed.search)}${parsed.hash}`;
   }
   if (section === "social") {
+    if (
+      !parts[3] &&
+      !parsed.searchParams.has("conversation") &&
+      !parsed.searchParams.has("provider")
+    )
+      return path("social");
     const provider = socialProviderFromRoute(route);
     return `${socialProviderPath(spaceId, provider, parsed.search)}${parsed.hash}`;
   }
@@ -45,7 +51,7 @@ export function canonicalSpaceRoute(route: string): string {
   }
   if (section === "planner") {
     const subsection = parts[3] ?? "";
-    if (!subsection) return path("planner/tasks/board");
+    if (!subsection) return path("planner");
     if (subsection === "board" || subsection === "list") return path(`planner/tasks/${subsection}`);
     if (subsection === "calendar") return path("planner/agenda/month");
     if (subsection === "tasks") {

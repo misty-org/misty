@@ -1,17 +1,18 @@
 import { appIcons, TooltipProvider } from "@/shared/ui";
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { BookOpenText, MessagesSquare, Notebook } from "lucide-react";
-import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
+import { Images, Layers, MessagesSquare, Notebook } from "lucide-react";
+import { rememberedJournalRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
 // Work surfaces only. Management controls live at the bottom of the Space rail.
 const sections = [
+  { id: "home", label: "All", icon: Layers },
   { id: "social", label: "Chat", icon: MessagesSquare },
   { id: "planner", label: "Planner", icon: appIcons.planner },
   { id: "journal", label: "Journal", icon: Notebook },
-  { id: "library", label: "Library", icon: BookOpenText },
+  { id: "library", label: "Library", icon: Images },
 ] as const;
 
 export function SpaceSectionNavigation({
@@ -63,13 +64,13 @@ export function SpaceSectionNavigation({
             }
             icon={Icon}
             label={label}
-            badgeCount={unreadActivityCountForSpaceSection(activityItems, spaceId, id)}
+            badgeCount={
+              id === "home" ? 0 : unreadActivityCountForSpaceSection(activityItems, spaceId, id)
+            }
             to={
               id === "journal"
                 ? rememberedJournalRoute(accountId, spaceId)
-                : id === "planner"
-                  ? rememberedPlannerRoute(accountId, spaceId)
-                  : `/spaces/${encodeURIComponent(spaceId)}/${id}`
+                : `/spaces/${encodeURIComponent(spaceId)}/${id}`
             }
             onNavigate={onNavigate}
           />

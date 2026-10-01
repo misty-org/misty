@@ -45,9 +45,18 @@ it("does not seed a title before sync or let a viewer edit it", () => {
     body: "",
     bodyFormat: "markdown",
   } as UnifiedNote;
+  const onRenameHandled = vi.fn();
   const view = render(
-    <NoteReadingPaneView runtime={runtime} note={note} loading={false} onNewNote={vi.fn()} />,
+    <NoteReadingPaneView
+      runtime={runtime}
+      note={note}
+      loading={false}
+      onNewNote={vi.fn()}
+      renameRequested
+      onRenameHandled={onRenameHandled}
+    />,
   );
+  expect(onRenameHandled).not.toHaveBeenCalled();
   expect(session.title.toString()).toBe("");
   act(() => {
     session.title.insert(0, "Remote title");
@@ -55,6 +64,8 @@ it("does not seed a title before sync or let a viewer edit it", () => {
     listeners.forEach((listener) => listener());
   });
   expect(session.title.toString()).toBe("Remote title");
+  expect(document.activeElement).toBe(screen.getByLabelText("Note title"));
+  expect(onRenameHandled).toHaveBeenCalledTimes(1);
   expect((screen.getByLabelText("Note title") as HTMLInputElement).value).toBe("Remote title");
   session.role = "viewer";
   view.rerender(

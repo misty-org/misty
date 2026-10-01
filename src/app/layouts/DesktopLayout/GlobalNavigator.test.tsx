@@ -34,12 +34,12 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("browser workspace navigator", () => {
-  it("shows the primary destinations including Scheduled", () => {
+  it("shows Agents as the home for schedules", () => {
     const folder = createBookmarkFolder("Reading");
     saveBookmark({ title: "Example", url: "example.com", folderId: folder });
     renderNavigator();
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["Home", "Browser", "Agents", "Scheduled", "Files"])
+    for (const name of ["Home", "Browser", "Agents", "Files"])
       expect(within(nav).getByRole("link", { name })).toBeTruthy();
     expect(within(nav).getByRole("button", { name: "Spaces" })).toBeTruthy();
     expect(within(nav).queryByRole("heading", { name: "Groups" })).toBeNull();
@@ -47,15 +47,14 @@ describe("browser workspace navigator", () => {
     expect(within(nav).queryByText("Reading")).toBeNull();
     expect(workspace().bookmarks).toHaveLength(1);
     const pages = within(nav).getAllByRole("link");
-    expect(pages.slice(0, 5).map((page) => page.getAttribute("aria-label"))).toEqual([
+    expect(pages.slice(0, 4).map((page) => page.getAttribute("aria-label"))).toEqual([
       "Home",
       "Browser",
       "Agents",
-      "Scheduled",
       "Files",
     ]);
     expect(pages[0].closest(".misty-navigator-items")).toBeTruthy();
-    for (const name of ["Home", "Browser", "Agents", "Scheduled", "Files"])
+    for (const name of ["Home", "Browser", "Agents", "Files"])
       expect(
         within(nav).getByRole("link", { name }).hasAttribute("data-navigation-destination"),
       ).toBe(true);
@@ -65,17 +64,14 @@ describe("browser workspace navigator", () => {
         .hasAttribute("data-navigation-destination"),
     ).toBe(false);
   });
-  it("opens Scheduled as its own reusable destination", () => {
+  it("keeps schedules inside Agents rather than a separate global destination", () => {
     renderNavigator();
-    fireEvent.click(screen.getByRole("link", { name: "Scheduled" }));
-    const scheduled = activeLayoutView(workspace().layout)!;
-    expect(scheduled).toMatchObject({ surfaceId: "scheduled", route: "/scheduled" });
-    expect(screen.getByRole("link", { name: "Scheduled" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
+    expect(screen.queryByRole("link", { name: "Scheduled" })).toBeNull();
     fireEvent.click(screen.getByRole("link", { name: "Agents" }));
-    fireEvent.click(screen.getByRole("link", { name: "Scheduled" }));
-    expect(activeLayoutView(workspace().layout)?.id).toBe(scheduled.id);
+    expect(activeLayoutView(workspace().layout)).toMatchObject({
+      surfaceId: "agents",
+      route: "/agents",
+    });
   });
   it("opens Files directly as a global tool", () => {
     renderNavigator();
