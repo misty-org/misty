@@ -115,6 +115,18 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn unsynced_records_reach_the_renderer_with_renderer_kinds() {
+        let mut state = json!({"unsynced": [
+            {"workspace_id": "w", "kind": "tab", "id": "v1", "deleted": false, "title": "Docs"},
+            {"workspace_id": "w", "kind": "layout", "id": "t1", "deleted": true, "title": null}
+        ]});
+        to_renderer(&mut state);
+        assert_eq!(state["unsynced"][0]["kind"], "view");
+        assert_eq!(state["unsynced"][1]["kind"], "tab");
+        assert_eq!(state["unsynced"][0]["workspace_id"], "w");
+    }
+
+    #[test]
     fn records_round_trip_between_stored_and_renderer_names() {
         let stored = json!({
             "records": [

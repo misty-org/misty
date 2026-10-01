@@ -28,7 +28,7 @@ describe("native workspace recovery", () => {
     await f.storage.flush();
     expect(f.port.write).toHaveBeenCalledTimes(1);
   });
-  it("retries the exact write after a lost reply before saving newer changes", async () => {
+  it("resolves a lost reply by reading native instead of repeating a stale write", async () => {
     const f = fixture();
     const write = f.port.write;
     let lost = true;
@@ -41,15 +41,53 @@ describe("native workspace recovery", () => {
       return result;
     });
     f.storage.setItem("workspace", "first");
-    await expect(f.storage.flush()).rejects.toThrow("lost reply");
+    // Native committed "first"; reading it back resolves the lost reply.
+    await f.storage.flush();
     f.storage.setItem("workspace", "latest");
     await f.storage.flush();
     expect(vi.mocked(f.port.write).mock.calls).toEqual([
       ["workspace", 0, "first"],
-      ["workspace", 0, "first"],
       ["workspace", 1, "latest"],
     ]);
     expect(f.records.get("workspace")).toEqual({ revision: 2, value: "latest" });
+    expect(f.storage.status()).toEqual({ pending: [], failed: [] });
+  });
+  it("keeps one refused save per key without blocking other keys or retrying it", async () => {
+    const f = fixture();
+    const write = f.port.write;
+    f.port.write = vi.fn<RecoveryPort["write"]>(async (key, revision, value) => {
+      if (key === "workspace") throw new Error("too large");
+      return write(key, revision, value);
+    });
+    for (const value of ["a", "b", "c"]) {
+      f.storage.setItem("workspace", value);
+      f.storage.setItem("edits", value);
+      await expect(f.storage.flush()).rejects.toThrow("1 workspace save could not be stored");
+    }
+    expect(f.records.get("edits")?.value).toBe("c");
+    expect(f.storage.status().failed).toEqual([{ key: "workspace", error: "too large" }]);
+    const calls = vi.mocked(f.port.write).mock.calls.filter(([key]) => key === "workspace");
+    // One attempt per distinct value; an unchanged refused value is not hammered.
+    await expect(f.storage.flush()).rejects.toThrow();
+    expect(vi.mocked(f.port.write).mock.calls.filter(([key]) => key === "workspace")).toEqual(
+      calls,
+    );
+    f.port.write = write;
+    await f.storage.retry();
+    expect(f.records.get("workspace")?.value).toBe("c");
+    expect(f.storage.status()).toEqual({ pending: [], failed: [] });
+  });
+  it("reports saves native is holding in its pending slot", async () => {
+    const f = fixture();
+    const changed = vi.fn();
+    const storage = new NativeRecoveryStorage(
+      { ...f.port, write: async (_key, revision, value) => ({ revision, value, pending: true }) },
+      changed,
+    );
+    storage.setItem("workspace", "waiting");
+    await storage.flush();
+    expect(storage.status()).toEqual({ pending: ["workspace"], failed: [] });
+    expect(changed).toHaveBeenLastCalledWith({ pending: ["workspace"], failed: [] });
   });
   it("preserves the exact legacy source until native archive and import commit", async () => {
     const f = fixture();

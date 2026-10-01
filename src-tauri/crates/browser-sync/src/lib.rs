@@ -5,6 +5,7 @@ pub mod document;
 pub mod protocol;
 pub mod collections;
 pub mod recovery;
+mod recovery_pending;
 pub mod restore;
 pub mod secure_store;
 pub mod store;

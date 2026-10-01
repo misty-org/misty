@@ -151,6 +151,18 @@ export function SyncDeviceList({
       requesting.current = false;
     }
   };
+  const shownWorkspace = onWorkspace(session);
+  const nameOf = (id: string) => rows.find((row) => row.device_id === id)?.name ?? "another device";
+  /** The other device's workspace this device is on, judged by the lease it
+   * holds: a machine takes the lease of the workspace it is using. */
+  const showingOther = (deviceId: string) =>
+    deviceId === session.device_id
+      ? shownWorkspace && shownWorkspace !== deviceId
+        ? shownWorkspace
+        : null
+      : (session.sync?.workspaces.find(
+          (w) => !w.shared && w.driver_device_id === deviceId && w.workspace_id !== deviceId,
+        )?.workspace_id ?? null);
   return (
     <div>
       <ul className={compact ? "" : "divide-y divide-charcoal-border"}>
@@ -161,17 +173,19 @@ export function SyncDeviceList({
             : device.connection === "Offline"
               ? "Offline"
               : "Connection unknown";
-          const opened = onWorkspace(session) === device.device_id;
-          const reason = !online
-            ? "Connect this device to open its tabs."
-            : !device.full_sync || session.full_sync === false
-              ? "Enable Full sync on both devices to open tabs here."
-              : !session.sync
-                ? "Update Misty on both devices before opening this workspace's tabs here."
-                : null;
+          const opened = shownWorkspace === device.device_id;
+          const showing = showingOther(device.device_id);
+          const reason =
+            !online && !device.local
+              ? "Connect this device to open its tabs."
+              : !device.full_sync || session.full_sync === false
+                ? "Enable Full sync on both devices to open tabs here."
+                : !session.sync
+                  ? "Update Misty on both devices before opening this workspace's tabs here."
+                  : null;
           const busy = pending?.deviceId === device.device_id;
           const open =
-            (compact || !device.local) &&
+            (compact || !device.local || !opened) &&
             (opened && !compact ? (
               <span className="text-xs text-cream-muted">Open here</span>
             ) : (
@@ -179,7 +193,11 @@ export function SyncDeviceList({
                 size="sm"
                 variant="outline"
                 className={compact ? "shrink-0 px-2 text-xs" : undefined}
-                aria-label={`Open tabs from ${device.name} here`}
+                aria-label={
+                  device.local && !opened
+                    ? "Show this device’s tabs"
+                    : `Open tabs from ${device.name} here`
+                }
                 title={opened ? "This workspace is already open here." : (reason ?? undefined)}
                 disabled={opened || !!pending || !!reason}
                 onClick={() => void change({ deviceId: device.device_id })}
@@ -188,7 +206,9 @@ export function SyncDeviceList({
                   ? "Open"
                   : busy && pending?.mode === undefined && pending?.name === undefined
                     ? "Opening…"
-                    : "Open its tabs here"}
+                    : device.local
+                      ? "Show this device’s tabs"
+                      : "Open its tabs here"}
               </Button>
             ));
           if (compact)
@@ -206,7 +226,9 @@ export function SyncDeviceList({
                     {busy
                       ? "Opening…"
                       : device.local
-                        ? "This device"
+                        ? showing
+                          ? `This device · Viewing ${nameOf(showing)}`
+                          : "This device"
                         : opened
                           ? "Open here"
                           : connection}
@@ -248,6 +270,7 @@ export function SyncDeviceList({
                   <p className="mt-1 text-xs text-cream-muted">
                     {connection}
                     {device.local ? " · This device" : ""}
+                    {showing ? ` · Showing ${nameOf(showing)}’s tabs` : ""}
                   </p>
                 </div>
                 {open}

@@ -7,14 +7,15 @@ export interface SyncStatus {
   tone: "healthy" | "attention" | "neutral";
   title: string;
   detail: string;
-  action: { kind: SyncActionKind; label: string } | null;
+  /** `short` is the one-word label compact surfaces show. */
+  action: { kind: SyncActionKind; label: string; short: string } | null;
 }
 const actions: Record<SyncActionKind, NonNullable<SyncStatus["action"]>> = {
-  retry: { kind: "retry", label: "Retry sync" },
-  unlock: { kind: "unlock", label: "Unlock sync" },
-  reenroll: { kind: "reenroll", label: "Reconnect device" },
-  setup: { kind: "setup", label: "Set up sync" },
-  "sign-in": { kind: "sign-in", label: "Sign in" },
+  retry: { kind: "retry", label: "Retry sync", short: "Retry" },
+  unlock: { kind: "unlock", label: "Unlock sync", short: "Unlock" },
+  reenroll: { kind: "reenroll", label: "Reconnect device", short: "Reconnect" },
+  setup: { kind: "setup", label: "Set up sync", short: "Create" },
+  "sign-in": { kind: "sign-in", label: "Sign in", short: "Sign in" },
 };
 const attention = (title: string, detail: string, kind: SyncActionKind = "retry"): SyncStatus => ({
   tone: "attention",
@@ -79,7 +80,14 @@ export interface SyncStatusInput {
   reenroll?: boolean;
   desktop?: boolean;
   online?: boolean;
-  recovery?: { accountId: string | null; ready: boolean; issue: string | null };
+  recovery?: {
+    accountId: string | null;
+    ready: boolean;
+    issue: string | null;
+    /** Per-item local saving; the popup lists each one. */
+    saves?: { pending: string[]; failed: unknown[] };
+    notRestored?: unknown[];
+  };
   vault?: { local: boolean; remote: boolean | null } | null;
   preferences?: {
     accountId: string;
@@ -103,7 +111,17 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
   const settingsOnly = input.scope === "settings" || input.desktop === false;
   const recovery =
     !settingsOnly && input.recovery?.accountId === input.accountId ? input.recovery : null;
-  if (recovery?.issue) return syncIssues.local_storage_unavailable;
+  // Local saving reports per item (the popup lists them), never one blanket failure.
+  if (recovery?.issue)
+    return attention(
+      "Saving on this device is paused",
+      "Your open tabs stay here. Misty keeps trying and lists what is not saved yet.",
+    );
+  if (recovery?.saves?.failed.length)
+    return attention(
+      "Some changes are not saved on this device",
+      "They stay open here and are listed below. Misty tries again when they change.",
+    );
   if (input.operationError) return attention("Sync needs attention", input.operationError);
   const session = input.session?.account_id === input.accountId ? input.session : null;
   if (!settingsOnly) {
@@ -116,6 +134,11 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
         "Misty could not finish syncing website sign-ins. Your workspace remains available.",
       );
   }
+  if (recovery?.notRestored?.length)
+    return neutral(
+      "Some tabs were not restored",
+      "Everything else is back. Their saved copies are kept and listed below.",
+    );
   if (prefs?.error)
     return attention(
       "Settings need attention",
@@ -203,6 +226,11 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
       session.status.pending_changes
         ? `${session.status.pending_changes} workspace changes are waiting to sync.`
         : "Receiving workspace changes from the server.",
+    );
+  if (!settingsOnly && recovery?.saves?.pending.length)
+    return neutral(
+      "Saving on this device",
+      "Some changes are kept in an encrypted pending file until local storage accepts them.",
     );
   if (session?.supports_cookie_handoff !== false && session?.browser_profile_ready === false)
     return neutral(
