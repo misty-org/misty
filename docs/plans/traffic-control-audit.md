@@ -130,7 +130,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T19 | Done: HTTP, invocation stream, Space socket, Connected Devices and native control advertisement back off with jitter; the account event stream and Space socket also wait out the HTTP client's outage cooldown |
 | T20, T21 | Done |
 | T22 | Instrumented: the op builder already suppresses unchanged records and empty ops; counters now show which layer churns |
-| T23, T24, T36 | Partly done (sync heartbeat); remaining timers are local-only, see the timer inventory |
+| T23, T24, T36 | Done where an event source exists (sync heartbeat, device views, agent worker window, navigation names); the rest are local-only timers with no event source, listed with reasons in the timer inventory |
 | T25 | Done: local–local pairs compare on FSEvents notifications plus a 10-minute safety pass; remote pairs keep 5 s with failure backoff; peer rescans adapt |
 | T26, T27 | Done |
 | T30, T31 | Done |
@@ -382,3 +382,10 @@ To confirm that rather than assume it, the native sync client counts edit batche
 ## Implementation progress — file sync notifications
 
 T25: a watched pair whose sides are both local folders now compares when the filesystem reports a change (FSEvents on macOS, via the existing `notify` dependency). Changes are debounced by a second, and a 10-minute safety pass runs regardless. If either folder cannot be watched, the pair keeps the 5-second compare. Pairs with a remote side keep the 5-second compare because providers offer no change feed; failures still back off to 5 minutes. `FileSyncWatcher` and `FileSyncRemotePoller` in `domain/file_sync` are never instantiated. They are dead code, not live pollers.
+
+
+## Implementation progress — native UI snapshots
+
+T24: the sync device list (2 s) and device controls (1 s) re-read on `misty:browser-sync-changed`, which the native session emits on every status, presence, device and workspace change. A 15-second pass remains for time-based activation-request expiry. The agent worker window takes tasks on `misty://agent-task-queued`; its poll moved from 1.5 seconds to a 30-second recovery pass. Navigation names drop their 2-second file read: in-app renames return the new snapshot, and hand edits to `navigation.json` are picked up on focus.
+
+Kept, all local IPC with no server traffic: search status while the search panel is open or a scan runs (0.5 s scanning, 5 s idle-open), the native sync queue tick (250 ms), cookie capture (2 s), history capture (60 s) and renderer page-state capture. Replacing the captures needs WKWebView cookie-store and page observers verified on device; they publish only on change.

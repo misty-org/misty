@@ -53,6 +53,7 @@ vi.mock("@/features/workspace/workspaceRecoveryPlatform", () => ({
 }));
 vi.mock("./native", () => ({
   readNativeSync: mocks.read,
+  watchNativeSync: async () => () => {},
   unlockNativeSync: mocks.unlock,
   lockNativeSync: mocks.lock,
   forgetNativeSyncKey: mocks.forget,

@@ -7,6 +7,7 @@ import {
   claimNativeWorkspace,
   controlNativeDevice,
   readNativeSync,
+  watchNativeSync,
   type NativeSyncView,
 } from "./native";
 import { useBrowserSyncStore } from "./store";
@@ -60,11 +61,14 @@ export function DeviceControlContent({
       }
     };
     void read();
-    const timer = window.setInterval(() => void read(), 1000);
+    // Native change events drive refreshes; the slow pass covers request expiry.
+    const stopWatching = watchNativeSync(() => void read());
+    const timer = window.setInterval(() => void read(), 15_000);
     return () => {
       stopped = true;
       mounted.current = false;
       window.clearInterval(timer);
+      void stopWatching.then((stop) => stop());
     };
   }, [session.session_id, session.account_id]);
   useEffect(() => {
