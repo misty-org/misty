@@ -79,12 +79,7 @@ export async function httpRequest(
       if ([502, 503, 504].includes(response.status)) {
         const waitMs = retryAfterMs(response);
         // A server asking for more than a short pause is not retried here.
-        if (
-          isIdempotent &&
-          attempt < maxAttempts &&
-          waitMs <= 2_000 &&
-          !init.signal?.aborted
-        ) {
+        if (isIdempotent && attempt < maxAttempts && waitMs <= 2_000 && !init.signal?.aborted) {
           await response.body?.cancel();
           await backoffDelay(attempt, init.signal, waitMs);
           continue;

@@ -53,10 +53,7 @@ export function DestinationIcon({
     const Icon = nativeIcon;
     return <Icon aria-hidden />;
   }
-  if (
-    item.id === "integrations" &&
-    (appId === "social" || appId === "music" || appId === "media")
-  )
+  if (item.id === "integrations" && (appId === "social" || appId === "music" || appId === "media"))
     return <Plug aria-hidden />;
   if (appId === "social" || appId === "music" || appId === "media") {
     const family = appId === "social" ? "chat" : appId;
