@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, desktop, environment, home, release, server, website};
+use crate::{checks, config::Settings, deploy, desktop, environment, home, release, server, website};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty", version, about)]
@@ -105,6 +105,7 @@ enum EnvCommand {
     /// Split legacy private files into the scoped layout.
     Migrate,
     /// Create missing private files without overwriting configured values.
+    /// For prod, also generate any missing production secrets locally.
     Init {
         #[arg(value_enum)]
         target: environment::Target,
@@ -259,6 +260,10 @@ enum ProdCommand {
     Logs,
     /// Encrypt both databases with age and upload them to the backup bucket.
     Backup,
+    /// Copy this computer's server/.env/prod (and misty-billing/.env/prod) to the VPS.
+    Push(DeployTarget),
+    /// Push the production environment, then update and start both stacks on the VPS.
+    Deploy(DeployTarget),
     /// Replace both databases with a backup from the bucket.
     Restore {
         /// Backup timestamp such as 20271003T020000Z, or `latest`.
@@ -270,6 +275,31 @@ enum ProdCommand {
         #[arg(long)]
         yes: bool,
     },
+}
+
+#[derive(Debug, Args)]
+struct DeployTarget {
+    /// SSH destination such as misty@203.0.113.10; defaults to MISTY_DEPLOY_HOST.
+    #[arg(long)]
+    host: Option<String>,
+    /// Misty checkout on the VPS, relative to the SSH user's home.
+    #[arg(long, default_value = "misty")]
+    dir: String,
+    /// misty-billing checkout on the VPS, relative to the SSH user's home.
+    #[arg(long, default_value = "misty-billing")]
+    billing_dir: String,
+}
+
+impl DeployTarget {
+    fn remote(&self) -> Result<deploy::Remote> {
+        let host = match &self.host {
+            Some(host) => host.clone(),
+            None => std::env::var("MISTY_DEPLOY_HOST").map_err(|_| {
+                anyhow::anyhow!("pass --host or set MISTY_DEPLOY_HOST in misty/cli/.env/common.env")
+            })?,
+        };
+        deploy::Remote::new(&host, &self.dir, &self.billing_dir)
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -406,10 +436,14 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             EnvCommand::Migrate => environment::migrate(&settings.workspace),
             EnvCommand::Init { target } => {
                 environment::init(&settings.workspace, target)?;
-                if target == environment::Target::Dev {
-                    server::initialize_development_secrets(&settings.workspace)?;
+                match target {
+                    environment::Target::Dev => {
+                        server::initialize_development_secrets(&settings.workspace)
+                    }
+                    environment::Target::Prod => {
+                        deploy::initialize_production_secrets(&settings.workspace)
+                    }
                 }
-                Ok(())
             }
             EnvCommand::Check { target } => environment::check(&settings.workspace, target),
             EnvCommand::Status { target } => environment::status(&settings.workspace, target),
@@ -496,6 +530,12 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 }
                 ProdCommand::Logs => server::production_logs(&settings.workspace),
                 ProdCommand::Backup => server::production_backup(&settings.workspace),
+                ProdCommand::Push(target) => {
+                    deploy::push(&settings.workspace, &target.remote()?)
+                }
+                ProdCommand::Deploy(target) => {
+                    deploy::deploy(&settings.workspace, &target.remote()?)
+                }
                 ProdCommand::Restore {
                     backup,
                     identity,
