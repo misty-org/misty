@@ -1,5 +1,9 @@
 import { apiRequest, ApiRequestError } from "@/api/client";
 
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+
+export type HomeAgendaResponseEntry = SpaceAgendaEntry & { space_id: string; space_name: string };
+
 export interface HomeDashboardSnapshot {
   activity: Record<string, number>;
   recent_apps: string[];
@@ -30,6 +34,12 @@ export const homeApi = {
     requestHome(spaceId, undefined, fallbackSpaceId),
   recordVisit: (spaceId: string | undefined, date: string, fallbackSpaceId?: string) =>
     requestHome(spaceId, date, fallbackSpaceId),
+  /** Earliest open agenda entries across the account's Spaces, merged
+   * server-side. Older servers answer 404; callers fall back per Space. */
+  agenda: (from: string, to: string, limit: number) =>
+    apiRequest<{ entries: HomeAgendaResponseEntry[] }>(
+      `/me/home/agenda?${new URLSearchParams({ from, to, limit: String(limit) })}`,
+    ),
   recordAppActivity: (appId: string) =>
     apiRequest<void>("/me/home/apps", {
       method: "POST",
