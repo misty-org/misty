@@ -24,16 +24,6 @@ type aiSystemPromptInput struct {
 
 func aiInvocationSystem(input aiSystemPromptInput) string {
 	var system strings.Builder
-	if companionTeaches(input.body) {
-		// A teaching turn shows rather than does: the general "do the work with
-		// your tools" guidance and the tool catalog notes would pull against it.
-		system.WriteString(strings.TrimSpace(companionSystemPrompt(input.body, input.tools)))
-		if input.agent != nil {
-			system.WriteString("\n\nPersonal agent: " + input.agent.Name)
-		}
-		system.WriteString("\n\nCurrent time: " + input.now.Format(time.RFC3339) + "; timezone: " + input.body.Timezone + ".")
-		return system.String()
-	}
 	system.WriteString(aiInvocationSystemPrompt(input.body.SurfaceID))
 	system.WriteString(input.methodGuidance)
 	if input.body.Mode == "companion" {

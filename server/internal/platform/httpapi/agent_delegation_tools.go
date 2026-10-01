@@ -118,7 +118,7 @@ func delegatedPrompt(task delegatedTask) string {
 
 func (s *SpacesService) delegationToolRegistrations(record *db.AIInvocationRecord, body aiInvocationInput) []agenttools.Registration {
 	// Sub-agents never start sub-agents of their own.
-	if record == nil || body.DelegatedFrom != "" || companionTeaches(body) {
+	if record == nil || body.DelegatedFrom != "" {
 		return nil
 	}
 	descriptors := delegationToolDescriptors()

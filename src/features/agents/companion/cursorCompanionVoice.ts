@@ -64,14 +64,15 @@ export class CursorCompanionVoice {
     if (!origin || origin.conversationId !== conversationId || !s.originIsCurrent(origin))
       throw new Error("The voice conversation changed.");
     const current = useMistyStore.getState();
-    if (tool.name === "start_task" || tool.name === "show_on_screen") {
+    if (tool.name === "start_task") {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
-      const show = tool.name === "show_on_screen";
-      // A screen question is answered from the screens as they are now. A task
-      // opens a screen or looks at the user's screen itself when it needs one.
+      // Every spoken request carries every display, the cursor's first; the
+      // run decides what matters (docs/plans/agent-harness.md, phase 4).
       s.captures = [];
-      const screens = show ? await s.capture(generation, new AbortController().signal) : [];
+      const screens = s.nativeReady
+        ? await s.capture(generation, new AbortController().signal).catch(() => [])
+        : [];
       if (!s.originIsCurrent(origin) || !s.active(generation)) return undefined;
       if (useMistyStore.getState().working)
         throw new Error("A task is already running; use steering.");
@@ -89,7 +90,7 @@ export class CursorCompanionVoice {
           interactionMode: s.state.mode,
           model: s.state.model,
           idempotencyKey: tool.key,
-          ...(show ? { displayCaptures: screens, intent: "teach" as const } : {}),
+          ...(screens.length ? { displayCaptures: screens } : {}),
         },
       );
       const admitted = useMistyStore.getState();

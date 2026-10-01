@@ -23,7 +23,6 @@ type aiInvocationInput struct {
 	SkillVersionIDs []string       `json:"skill_version_ids,omitempty"`
 	CompanionMode   string         `json:"companion_mode,omitempty"`
 	CompanionModel  string         `json:"companion_model,omitempty"`
-	CompanionIntent string         `json:"companion_intent,omitempty"` // "teach": explain and point at the screens, no tools
 	// ModelOverride pins a new conversation's Thinking model with its first
 	// message; an existing conversation sets it with PATCH instead.
 	ModelOverride     string             `json:"model_override,omitempty"`

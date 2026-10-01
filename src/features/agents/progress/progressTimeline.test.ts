@@ -106,3 +106,12 @@ describe("progress timeline", () => {
     expect(toolLabel("agent.finish", false)).toBe("Wrapped up");
   });
 });
+
+describe("progress notes", () => {
+  it("leaves pointing tags out of narration", () => {
+    expect(
+      groupProgress([{ type: "note", text: "i'm checking the member list. [POINT:none]" }]),
+    ).toEqual([{ type: "note", key: "note:0", text: "i'm checking the member list." }]);
+    expect(groupProgress([{ type: "note", text: "[POINT:none]" }])).toEqual([]);
+  });
+});
