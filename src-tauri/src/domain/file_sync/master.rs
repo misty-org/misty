@@ -58,14 +58,25 @@ impl FileSyncMaster {
 
         let master = self.clone();
         tokio::spawn(async move {
+            // A failing pair (an unreachable provider or peer) backs off
+            // exponentially to five minutes instead of retrying every interval.
+            let mut failures = 0u32;
             loop {
-                match executor(pair_id).await {
-                    Ok(true) => {}
+                let delay = match executor(pair_id).await {
+                    Ok(true) => {
+                        failures = 0;
+                        interval
+                    }
                     Ok(false) => break,
-                    Err(_) => {}
-                }
+                    Err(_) => {
+                        failures = failures.saturating_add(1);
+                        interval
+                            .saturating_mul(1u32 << failures.min(10))
+                            .min(Duration::from_secs(300).max(interval))
+                    }
+                };
                 tokio::select! {
-                    _ = tokio::time::sleep(interval) => {}
+                    _ = tokio::time::sleep(delay) => {}
                     changed = stop_rx.changed() => {
                         if changed.is_err() || *stop_rx.borrow() { break; }
                     }

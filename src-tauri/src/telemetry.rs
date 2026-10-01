@@ -1,12 +1,17 @@
 use serde_json::json;
 use std::{
+    collections::HashMap,
     error::Error,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc, OnceLock,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
+
+const BATCH_WINDOW: Duration = Duration::from_secs(5);
+const BATCH_LIMIT: usize = 20;
+const DUPLICATE_SUPPRESSION: Duration = Duration::from_secs(600);
 
 static ERROR_REPORTING_ENABLED: AtomicBool = AtomicBool::new(false);
 static REPORTER: OnceLock<mpsc::SyncSender<Message>> = OnceLock::new();
@@ -83,24 +88,62 @@ pub fn initialize() {
         let Ok(client) = reqwest::blocking::Client::builder().timeout(Duration::from_secs(2)).build() else { return; };
         // A random process identity cannot associate reports with an account.
         let distinct_id = uuid::Uuid::new_v4().to_string();
-        while let Ok(message) = receiver.recv() {
+        // Errors are coalesced into one batch per window, and the same error
+        // from the same operation is reported once per suppression period, so
+        // a failing loop cannot turn into one request per occurrence.
+        let mut pending: Vec<serde_json::Value> = Vec::new();
+        let mut window_started: Option<Instant> = None;
+        let mut recent: HashMap<(String, &'static str), Instant> = HashMap::new();
+        let send = |events: &mut Vec<serde_json::Value>| {
+            if events.is_empty() { return; }
+            let payload = json!({ "api_key":token, "batch":std::mem::take(events) });
+            let _ = client.post(endpoint.clone()).json(&payload).send();
+        };
+        loop {
+            let message = match window_started {
+                Some(started) => {
+                    let remaining = BATCH_WINDOW.saturating_sub(started.elapsed());
+                    match receiver.recv_timeout(remaining) {
+                        Ok(message) => message,
+                        Err(mpsc::RecvTimeoutError::Timeout) => {
+                            send(&mut pending);
+                            window_started = None;
+                            continue;
+                        }
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    }
+                }
+                None => match receiver.recv() { Ok(message) => message, Err(_) => break },
+            };
             match message {
                 Message::Error { value, operation, handled } => {
                     if !ERROR_REPORTING_ENABLED.load(Ordering::Relaxed) { continue; }
-                    let payload = json!({ "api_key":token, "batch":[{
+                    let now = Instant::now();
+                    recent.retain(|_, at| now.duration_since(*at) < DUPLICATE_SUPPRESSION);
+                    let key = (value.clone(), operation);
+                    if recent.contains_key(&key) || recent.len() >= 256 { continue; }
+                    recent.insert(key, now);
+                    pending.push(json!({
                         "event":"$exception", "timestamp":chrono::Utc::now().to_rfc3339(),
                         "properties":{ "distinct_id":distinct_id, "$process_person_profile":false,
                             "$geoip_disable":true, "runtime_layer":"rust", "environment":"production",
                             "app_version":env!("CARGO_PKG_VERSION"), "release_channel":release_channel(),
                             "operation":operation, "$exception_list":[{"type":"MistyError", "value":value,
                                 "mechanism":{"type":"generic", "handled":handled}}] }
-                    }] });
-                    let _ = client.post(endpoint.clone()).json(&payload).send();
+                    }));
+                    // A panic may end the process before the window closes.
+                    if pending.len() >= BATCH_LIMIT || !handled {
+                        send(&mut pending);
+                        window_started = None;
+                    } else if window_started.is_none() {
+                        window_started = Some(now);
+                    }
                 }
-                Message::Flush(done) => { let _ = done.send(()); }
-                Message::Stop(done) => { let _ = done.send(()); break; }
+                Message::Flush(done) => { send(&mut pending); window_started = None; let _ = done.send(()); }
+                Message::Stop(done) => { send(&mut pending); let _ = done.send(()); break; }
             }
         }
+        send(&mut pending);
     });
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {

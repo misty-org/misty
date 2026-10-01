@@ -1153,6 +1153,10 @@ where
         heartbeat.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let mut in_flight: Option<(String, Instant)> = None;
         let mut gap_retries = 0u8;
+        // Liveness is the transport: the server pings and this socket answers.
+        // A heartbeat frame only reports a changed cursor, readiness or active
+        // epoch, so an idle, caught-up device sends nothing.
+        let mut reported: Option<(u64, bool, Option<String>)> = None;
         loop {
             tokio::select! {
                 biased;
@@ -1239,8 +1243,12 @@ where
                     let status = self.status.borrow().clone();
                     let document = serde_json::from_slice::<crate::document::Document>(&self.store.committed_snapshot(&self.root)?).ok();
                     let active_epoch = document.as_ref().filter(|v| !v.workspace_mode && v.is_active(&self.store.grant().device_id))
-                        .and_then(|v| v.active_device.as_ref()).map(|v| v.epoch.as_str());
-                    socket.send(&ClientFrame::Heartbeat { applied_sequence: status.applied_sequence, ready: status.phase == Phase::Ready, active_epoch, activation: None }).await?;
+                        .and_then(|v| v.active_device.as_ref()).map(|v| v.epoch.clone());
+                    let current = (status.applied_sequence, status.phase == Phase::Ready, active_epoch);
+                    if reported.as_ref() != Some(&current) {
+                        socket.send(&ClientFrame::Heartbeat { applied_sequence: current.0, ready: current.1, active_epoch: current.2.as_deref(), activation: None }).await?;
+                        reported = Some(current);
+                    }
                 },
                 _ = tick.tick() => {
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
