@@ -358,16 +358,18 @@ fn a_machine_without_the_lease_keeps_editing_the_workspace_it_is_on() {
         .sync
         .on_roster(&mut h.store, &h.root, roster_at(Some(OTHER), "epoch-2", 1))
         .unwrap();
-    assert!(!frames
-        .iter()
-        .any(|frame| matches!(frame, Outgoing::Unwatch { workspace_id } if workspace_id == DEVICE)));
+    assert!(!frames.iter().any(
+        |frame| matches!(frame, Outgoing::Unwatch { workspace_id } if workspace_id == DEVICE)
+    ));
     let view = h.sync.view(&h.store).unwrap();
     assert_eq!(view.driving_workspace, None);
     assert_eq!(view.on_workspace.as_deref(), Some(DEVICE));
     assert!(view.writable);
     assert!(!view.displaced_with_edits);
     // Its edits publish; the server orders them against the lease holder's.
-    h.sync.apply_changes(&mut h.store, &h.root, window()).unwrap();
+    h.sync
+        .apply_changes(&mut h.store, &h.root, window())
+        .unwrap();
     assert_eq!(h.tick().len(), 1);
     // But the device's sign-ins belong to the lease holder.
     assert!(!h.status().writer);
@@ -384,7 +386,9 @@ fn losing_and_regaining_the_lease_keeps_queued_edits() {
     let mut h = harness();
     publish_one(&mut h, 1);
     // An edit queued but not yet published when another machine takes the lease.
-    h.sync.apply_changes(&mut h.store, &h.root, window()).unwrap();
+    h.sync
+        .apply_changes(&mut h.store, &h.root, window())
+        .unwrap();
     h.sync
         .on_roster(&mut h.store, &h.root, roster_at(Some(OTHER), "epoch-2", 1))
         .unwrap();
@@ -394,7 +398,11 @@ fn losing_and_regaining_the_lease_keeps_queued_edits() {
         .on_roster(&mut h.store, &h.root, roster_at(Some(DEVICE), "epoch-3", 4))
         .unwrap();
     // The edit is still queued: it rebases onto the server's copy once fetched.
-    assert!(h.store.workspace_desired(&h.root, DEVICE).unwrap().is_some());
+    assert!(h
+        .store
+        .workspace_desired(&h.root, DEVICE)
+        .unwrap()
+        .is_some());
     assert!(h
         .store
         .retired_workspace_desired(&h.root, DEVICE)
@@ -419,7 +427,9 @@ fn a_followed_workspace_that_is_current_is_writable_as_soon_as_the_lock_returns(
         .unwrap();
     assert!(h.sync.writable());
     assert!(h.status().writer);
-    h.sync.apply_changes(&mut h.store, &h.root, window()).unwrap();
+    h.sync
+        .apply_changes(&mut h.store, &h.root, window())
+        .unwrap();
     let ops = h.tick();
     assert_eq!(ops.len(), 1);
     assert_eq!(ops[0].base_workspace_version, 1);
@@ -447,5 +457,9 @@ fn a_seat_kept_across_a_restart_stays_writable_offline() {
     restarted
         .on_roster(&mut h.store, &h.root, roster_at(Some(DEVICE), "epoch-1", 1))
         .unwrap();
-    assert!(h.store.workspace_desired(&h.root, DEVICE).unwrap().is_some());
+    assert!(h
+        .store
+        .workspace_desired(&h.root, DEVICE)
+        .unwrap()
+        .is_some());
 }
