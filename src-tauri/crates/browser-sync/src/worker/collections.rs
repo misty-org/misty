@@ -13,8 +13,10 @@ use crate::{
 /// A hinted change is pulled after this quiet period, so a burst of edits on
 /// another device costs one pull.
 const HINT_DEBOUNCE: Duration = Duration::from_secs(2);
-/// Pull anyway this often, in case a hint was lost.
-const SAFETY_PULL: Duration = Duration::from_secs(300);
+/// Pull anyway this often. Hints commit with their writes and a lost server
+/// listener arrives as a reset, which re-pulls everything, so this is defense
+/// in depth rather than the delivery path.
+const SAFETY_PULL: Duration = Duration::from_secs(3600);
 const MAX_PUSH: usize = 200;
 
 /// Per-connection collections state.
@@ -46,6 +48,13 @@ impl CollectionSync {
             let at = Instant::now() + HINT_DEBOUNCE;
             let due = self.due.entry(collection).or_insert(at);
             *due = (*due).min(at);
+        }
+    }
+
+    /// The server lost hints (listener reconnect or slow consumer): pull all.
+    pub(super) fn reset(&mut self) {
+        for collection in COLLECTIONS {
+            self.hinted(collection);
         }
     }
 
