@@ -63,11 +63,14 @@ func TestRealtimeFanoutPreservesAccountAndResourceBoundaries(t *testing.T) {
 	}
 	defer conn.Exec("DROP SCHEMA " + pq.QuoteIdentifier(schema) + " CASCADE")
 	_, err = conn.Exec(`
- CREATE TABLE space_members (space_id text, user_id text);
+ CREATE TABLE space_members (space_id text, user_id text, role text DEFAULT 'member');
+ CREATE TABLE space_member_permission_overrides (space_id text, user_id text, permission text, effect text);
+ CREATE TABLE spaces (id text, lifecycle_state text DEFAULT 'active');
+ INSERT INTO spaces(id) VALUES ('s'), ('elsewhere');
  CREATE TABLE space_events (id bigint, space_id text, event_type text, actor_user_id text, entity_id text, payload jsonb, created_at timestamptz);
  CREATE TABLE space_conversations (id text, space_id text);
  CREATE TABLE space_conversation_members (conversation_id text, user_id text);
- INSERT INTO space_members VALUES ('s','member'), ('elsewhere','outsider');
+ INSERT INTO space_members(space_id,user_id) VALUES ('s','member'), ('elsewhere','outsider');
  INSERT INTO space_events VALUES (1,'s','space.updated',NULL,NULL,'{}',now()),
   (2,'s','message.created',NULL,NULL,'{"conversation_id":"private"}',now());
  INSERT INTO space_conversations VALUES ('private','s');`)
@@ -90,11 +93,19 @@ func TestRealtimeFanoutPreservesAccountAndResourceBoundaries(t *testing.T) {
 	if json.Unmarshal(one, &envelope) != nil || envelope.Type != "event" {
 		t.Fatalf("not an event: %s", one)
 	}
+	if _, err := conn.Exec(`INSERT INTO space_members(space_id,user_id) VALUES ('s','participant'); INSERT INTO space_conversation_members VALUES ('private','participant')`); err != nil {
+		t.Fatal(err)
+	}
+	participant := testRealtimeClient(s, "participant", 4)
 	s.BroadcastEvent(2) // Space membership does not grant access to a private conversation.
 	if len(first.TestingSend) != 0 || len(second.TestingSend) != 0 || len(outsider.TestingSend) != 0 {
 		t.Fatal("unauthorized event delivered")
 	}
-	if _, err := conn.Exec(`DELETE FROM space_members WHERE user_id='member'`); err != nil {
+	// One authorization pass resolves each recipient separately.
+	if got := <-participant.TestingSend; !strings.Contains(string(got), `"type":"event"`) {
+		t.Fatalf("participant did not receive the private event: %s", got)
+	}
+	if _, err := conn.Exec(`DELETE FROM space_members WHERE user_id IN ('member','participant')`); err != nil {
 		t.Fatal(err)
 	}
 	candidates, err := database.SpaceEventCandidateUsers(context.Background(), 1)
@@ -102,7 +113,7 @@ func TestRealtimeFanoutPreservesAccountAndResourceBoundaries(t *testing.T) {
 		t.Fatal("candidate membership was cached", candidates, err)
 	}
 	s.BroadcastEvent(1)
-	if len(first.TestingSend) != 0 || len(second.TestingSend) != 0 {
+	if len(first.TestingSend) != 0 || len(second.TestingSend) != 0 || len(participant.TestingSend) != 0 {
 		t.Fatal("revoked member received event")
 	}
 }

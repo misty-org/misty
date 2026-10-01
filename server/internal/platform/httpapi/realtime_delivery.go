@@ -63,10 +63,44 @@ func (s *RealtimeService) BroadcastEvent(eventID int64) {
 		}
 	}
 	s.TestingMu.RUnlock()
+	if len(targets) == 0 {
+		return
+	}
+	users := make([]string, 0, len(targets))
+	for user := range targets {
+		users = append(users, user)
+	}
+	// One transaction loads the event and resolves current authorization for
+	// every connected candidate; the payload is serialized once. There is no
+	// cross-event permission cache, so revocation applies to the next event.
+	event, visible, err := s.database.SpaceEventForUsers(ctx, eventID, users)
+	if errors.Is(err, db.ErrSpaceNotFound) {
+		return
+	}
+	if err != nil {
+		// One failed check aborts the shared transaction; resolve recipients
+		// separately so a failure resets only the accounts it affects.
+		s.broadcastEventPerUser(ctx, eventID, targets)
+		return
+	}
+	if len(visible) == 0 {
+		return
+	}
+	payload, err := json.Marshal(map[string]any{"type": "event", "event": event})
+	if err != nil {
+		s.broadcastReset()
+		return
+	}
+	for _, user := range visible {
+		for _, client := range targets[user] {
+			s.deliver(client, payload)
+		}
+	}
+}
+
+func (s *RealtimeService) broadcastEventPerUser(ctx context.Context, eventID int64, targets map[string][]*TestingRealtimeClient) {
 	var payload []byte
 	for user, clients := range targets {
-		// Resolve current authorization once per account, never once per device.
-		// No cross-event permission cache: revocation takes effect on the next event.
 		event, err := s.database.EventByIDForUser(ctx, user, eventID)
 		if errors.Is(err, db.ErrSpaceNotFound) {
 			continue
@@ -78,8 +112,7 @@ func (s *RealtimeService) BroadcastEvent(eventID int64) {
 			continue
 		}
 		if payload == nil {
-			payload, err = json.Marshal(map[string]any{"type": "event", "event": event})
-			if err != nil {
+			if payload, err = json.Marshal(map[string]any{"type": "event", "event": event}); err != nil {
 				s.broadcastReset()
 				return
 			}
