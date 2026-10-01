@@ -93,6 +93,11 @@ function validEvent(value: unknown): value is AccountEvent {
       "agents",
       "approvals",
       "interventions",
+      "scheduled-tasks",
+      "usage",
+      "library-renditions",
+      "device-pairing",
+      "devices",
     ].includes(event.topic) &&
     (event.id === undefined || (typeof event.id === "string" && event.id.length <= 200))
   );
