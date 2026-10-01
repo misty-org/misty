@@ -64,6 +64,19 @@ Misty is hosted only: one VPS runs the whole stack from `compose.prod.yml`.
 
 The collaboration Worker stays on Cloudflare and deploys separately.
 
+### Billing
+
+The private billing service (`misty-org/misty-billing`) runs on the same VPS as
+its own Compose project with its own PostgreSQL, listening on `127.0.0.1:8091`.
+Publish it as `billing.mistysys.com` through the same production tunnel: in the
+Cloudflare dashboard open the tunnel's public hostnames and add
+`billing.mistysys.com` → `http://127.0.0.1:8091`. Later
+`misty setup cloudflare --target prod` runs keep that extra route. Stripe sends
+webhooks to `https://billing.mistysys.com/stripe/webhook`; the API calls
+`MISTY_BILLING_URL=https://billing.mistysys.com/adapter`, signed with the
+`MISTY_BILLING_SECRET` both services share. See that repository's README for
+its variables and first-time setup.
+
 ### Releases
 
 Push a `server-vX.Y.Z` tag. The `Server release` workflow runs the tests,
@@ -101,7 +114,8 @@ the first boot; a missing security setting logs a warning instead of failing.
 
 ### Backups
 
-`misty server prod backup` dumps both databases with `pg_dump`, streams each
+`misty server prod backup` dumps Misty's and the workflow database with
+`pg_dump` (and billing's, when the misty-billing stack runs on the same host), streams each
 dump straight into `age` (plaintext never touches the disk), and uploads the
 ciphertext to the R2 bucket named by `MISTY_BACKUP_BUCKET` using the `R2_*`
 credentials. Set `MISTY_BACKUP_AGE_RECIPIENT` to an age public key and keep the
