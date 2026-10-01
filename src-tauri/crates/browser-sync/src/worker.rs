@@ -1210,6 +1210,8 @@ where
                         ServerFrame::AccountEvent { event } => {
                             if event.topic == "browser-records" {
                                 if let Some(collection) = event.id.as_deref() { self.collections.hinted(collection); }
+                            } else if event.topic == "reset" {
+                                self.collections.reset();
                             }
                             let _ = self.events.send(event);
                         },
