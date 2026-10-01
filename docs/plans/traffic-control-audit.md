@@ -254,3 +254,13 @@ Validation: the server changes build and the full Go suite passes; the triggers 
 ## Implementation progress — Home agenda
 
 T21: `GET /me/home/agenda` merges today's earliest open entries across the account's active Spaces in one request and one transaction. It applies each Space's task permission and audience rules, skips Spaces without permission, reads at most 200 Spaces and returns at most 50 entries. Home uses it and falls back to per-Space agendas on servers without it (404). The effect now depends on Space IDs, not array identity. Home visits are recorded once per day across the app's windows (shared local storage) instead of once per window. A full-schema contract covers merge order, the limit, closed-entry filtering and isolation from other accounts' Spaces. `TestRouteInventory` already fails on the base commit and still needs its golden regenerated together with the new route.
+
+
+## Implementation progress — event-driven reload amplification
+
+T17, client part:
+
+- Space realtime events no longer issue one snapshot read each. Inbox, per-Space messages and nodes, the Space list and per-Space members reload through a coalescer: events before a reload starts share it, and events during a reload get one trailing reload. A burst of N events for one target costs at most two reads.
+- Activity re-reads each source only on its own topic (`approvals` or `interventions`). An `invocations` event can only remove pending items, because new items publish their own topic. So it re-reads only sources that currently hold items, which for most accounts is none.
+
+Not done: applying included payloads instead of re-reading, or batching missing entities. Both change UI data flow and need the frontend suite.

@@ -1,3 +1,4 @@
+import { coalescedReload, resetCoalescedReloads } from "./coalescedReload";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
 import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/store/useSpaceMessageSpansStore";
@@ -184,6 +185,7 @@ export function createSpacesRealtimeActions(
 
 export function resetSpacesRealtimeRuntime(): void {
   stopRealtimeConnection();
+  resetCoalescedReloads();
   reconnectAttempt = 0;
   realtimeConnectPromise = null;
   realtimeTicketCooldownUntil = 0;
@@ -214,7 +216,8 @@ export async function applyRealtimeEvent(
         detail: { spaceId: event.space_id, conversationId, event },
       }),
     );
-    if (conversationId) await get().loadInbox();
+    const reloadInbox = () => coalescedReload("inbox", () => get().loadInbox());
+    if (conversationId) await reloadInbox();
     else if (includedMessage) {
       set((state) => ({
         messagesBySpace: {
@@ -224,22 +227,26 @@ export async function applyRealtimeEvent(
           ]),
         },
       }));
-      await get().loadInbox();
-    } else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
+      await reloadInbox();
+    } else
+      await Promise.all([
+        coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id)),
+        reloadInbox(),
+      ]);
   } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)
-    await get().loadNodes(event.space_id);
+    await coalescedReload(`nodes:${event.space_id}`, () => get().loadNodes(event.space_id));
   else if (
     event.type.startsWith("member.") ||
     event.type.startsWith("owner.") ||
     event.type.startsWith("space.")
   ) {
-    await get().load({ force: true });
+    await coalescedReload("spaces", () => get().load({ force: true }));
     if (accountId !== realtimeAccountId || generation !== readAccountGeneration()) return;
     if (!get().spaces.some((space) => space.id === event.space_id)) return;
     try {
-      await get().loadMembers(event.space_id);
+      await coalescedReload(`members:${event.space_id}`, () => get().loadMembers(event.space_id));
     } catch (error) {
       if (!accessErrors.isInaccessibleSpaceError(error)) throw error;
     }
