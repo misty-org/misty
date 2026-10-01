@@ -3,6 +3,8 @@ import { ChevronRight, RefreshCw } from "lucide-react";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { Button, cn, Popover, PopoverContent, PopoverTrigger, IconButton } from "@/shared/ui";
 import { RestoreStatusList } from "./restore/RestoreStatusList";
+import { LocalSaveStatusList } from "./restore/LocalSaveStatusList";
+import { SyncedTabsStatusList } from "./restore/SyncedTabsStatusList";
 import { SyncDeviceList } from "./SyncDeviceList";
 import { SyncStatusView } from "./SyncStatusView";
 import { SyncUnlockForm } from "./SyncAccountSettings";
@@ -72,10 +74,13 @@ export function BrowserSyncBadge({
         )}
         <div className="px-3">
           <RestoreStatusList />
+          <LocalSaveStatusList />
+          {session && <SyncedTabsStatusList session={session} />}
         </div>
         <div className="mt-1 border-t border-charcoal-border pt-1">
           <Button
             variant="ghost"
+            aria-label="Sync settings"
             className="h-9 w-full justify-between px-3 text-sm font-normal text-cream-muted"
             onClick={() => {
               setOpen(false);

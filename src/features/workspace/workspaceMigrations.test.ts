@@ -146,3 +146,31 @@ it("migrates a saved Scheduled tab into Agents without losing its selected task"
     route: "/agents?task=weekly&view=scheduled",
   });
 });
+
+it("restores saved views that lost their route instead of failing the whole workspace", () => {
+  const home = legacyTab({ route: undefined as unknown as string });
+  expect(migrateRetiredWorkspaceView(home)).toMatchObject({ surfaceId: "home", route: "/home" });
+  const files = legacyTab({
+    surfaceId: "files",
+    groupKey: "tool:files",
+    title: "Files",
+    route: undefined as unknown as string,
+  });
+  expect(migrateRetiredWorkspaceView(files)).toMatchObject({ surfaceId: "files", route: "/files" });
+});
+
+it("restores a route-less Scheduled view into the current Agents collection", () => {
+  expect(
+    migrateRetiredWorkspaceView(
+      legacyTab({
+        surfaceId: "scheduled",
+        groupKey: "tool:scheduled",
+        route: undefined as unknown as string,
+      }),
+    ),
+  ).toMatchObject({
+    surfaceId: "agents",
+    groupKey: "tool:agents",
+    route: "/agents?view=scheduled",
+  });
+});

@@ -50,6 +50,18 @@ export interface SyncState {
   collections?: Record<string, SharedRecord[]>;
   /** Every device runs a version that syncs tab groups; until then they stay local. */
   all_upgraded?: boolean;
+  /** Records with changes the server has not confirmed yet, one per record. */
+  unsynced?: UnsyncedRecord[];
+  /** Edits an older version set aside unsent: kept on this device, never synced. */
+  retired_edits?: number;
+}
+export interface UnsyncedRecord {
+  workspace_id: string;
+  kind: string;
+  id: string;
+  /** The newest waiting change removes it (a closed tab). */
+  deleted: boolean;
+  title: string | null;
 }
 export interface NativeSyncView {
   session_id: string;

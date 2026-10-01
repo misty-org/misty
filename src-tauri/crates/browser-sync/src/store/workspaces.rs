@@ -324,6 +324,16 @@ impl Store {
         Ok(true)
     }
 
+    /// How many set-aside desired states are kept for recovery.
+    pub fn retired_workspace_count(&self) -> Result<usize> {
+        let count: i64 =
+            self.connection
+                .query_row("SELECT count(*) FROM sync_workspace_retired", [], |r| {
+                    r.get(0)
+                })?;
+        Ok(count.max(0) as usize)
+    }
+
     #[cfg(test)]
     pub(crate) fn retired_workspace_desired(
         &self,

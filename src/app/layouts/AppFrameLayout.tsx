@@ -15,6 +15,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { desktopNavItems, desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
+import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
 
 const PlatformLayout = lazy(() => import("@/app/PlatformLayout"));
 
@@ -73,6 +74,7 @@ export function AppFrameLayout() {
       <AgentExecutionSurface />
       <ActivityPanel />
       <UpdateNotices accountId={user?.id ?? ""} />
+      <UnsavedQuitGuard />
       <BrowserSyncSleepOverlay
         key={`sync-sleep:${user?.id ?? "anonymous"}`}
         accountId={syncAllowed ? (user?.id ?? "") : ""}
