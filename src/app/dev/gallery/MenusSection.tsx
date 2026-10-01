@@ -83,12 +83,8 @@ export function MenusSection() {
           />
           <DropdownMenuContent width="sm">
             <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
-              <DropdownMenuRadioItem value="fast" indicator="check">
-                Fast
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="deep" indicator="check">
-                Deep
-              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="fast">Fast</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="deep">Deep</DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
             <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem checked={showHidden} onCheckedChange={setShowHidden}>
