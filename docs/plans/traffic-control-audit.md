@@ -119,9 +119,9 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 |---|---|
 | T01 | Done: HTTP bytes per route, sync message bytes, invocation stream read metrics |
 | T02, T16 | Done: account-indexed fanout, one authorization transaction per event for all connected members, reset on reconnect |
-| T03, T04, T05 | Done (settings, consent, terminal auth); native producer trace under rejected sign-in remains |
+| T03, T04, T05 | Done (settings, consent, terminal auth). The remaining T05 item is an on-device trace of native producers during a rejected sign-in, not a code change |
 | T06, T08, T14, T15, T33 | Done: process lease liveness, bounded connection rows, no per-socket reconcile, in-band session revalidation, change-only heartbeats |
-| T07 | Mostly done: setup once, presence as the single liveness call, peers by topic; liveness over the sync socket remains |
+| T07 | Done except one design item: setup once, presence as the single liveness call, peers by topic. Carrying desktop liveness on the sync socket needs a signed trusted-device binding (see below) |
 | T09, T28, T29, T37 | Done (Codex batches) |
 | T10 | Done: shared bounded invocation streams |
 | T11, T12, T13 | Done: all API worker scans are deadline queues; retention is a budgeted single-owner pass |
@@ -135,7 +135,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T26, T27 | Done |
 | T30, T31 | Done |
 | T32 | Retained by design: active-work leases carry fencing and cancellation and run only during work |
-| T34 | Partly done: idle sync measurement recorded; staging matrix (10k/20k/30k, outages) remains |
+| T34 | Measured locally at 2,000 and 10,000 devices; the 20k/30k, multi-window and outage-storm matrix needs a staging environment |
 | T35 | Done: conditional reads on Space snapshot routes. In-app compression deliberately not added (see below) |
 
 ## Implementation progress — first batch
@@ -349,6 +349,8 @@ That is 1,000 accounts with 2 devices each, on different instances, and about 0.
 
 Idle connection cost fell from about 0.40 database commits per connected device per second to effectively zero. The remaining commits come from edit-driven work, and this run had three times as many edits. At 10,000 devices that is roughly 4,000 commits per second of idle liveness and reconcile work removed. Edit latency is unchanged within noise.
 
+The same harness at the audit's 10,000-device scale (5,000 accounts, 0.1% editing, 120 seconds after a 30-second settle): **28.5 commits per second**, 168 edits, no errors, delta p50/p99 11.9/21.9 ms, ack p99 24.8 ms, test-process heap 437 MB. Idle cost stays flat from 2,000 to 10,000 devices; the remainder tracks edit activity.
+
 Limits: application database transactions only, not wire bytes. The harness clients send no heartbeat frames; real clients now send them only on change. This is one machine, not a capacity envelope: the 10k/20k/30k matrix, multi-window and outage-storm scenarios still need a staging environment. TLS, tunnel and proxy overhead are excluded.
 
 
@@ -389,3 +391,10 @@ T25: a watched pair whose sides are both local folders now compares when the fil
 T24: the sync device list (2 s) and device controls (1 s) re-read on `misty:browser-sync-changed`, which the native session emits on every status, presence, device and workspace change. A 15-second pass remains for time-based activation-request expiry. The agent worker window takes tasks on `misty://agent-task-queued`; its poll moved from 1.5 seconds to a 30-second recovery pass. Navigation names drop their 2-second file read: in-app renames return the new snapshot, and hand edits to `navigation.json` are picked up on focus.
 
 Kept, all local IPC with no server traffic: search status while the search panel is open or a scan runs (0.5 s scanning, 5 s idle-open), the native sync queue tick (250 ms), cookie capture (2 s), history capture (60 s) and renderer page-state capture. Replacing the captures needs WKWebView cookie-store and page observers verified on device; they publish only on change.
+
+
+## Deliberately not changed
+
+- **Desktop liveness on the sync socket (T07/T33).** The sync socket authenticates a sync device; agent eligibility and P2P peers use the separate trusted-device identity. To let a live sync connection stand in for the 30-second Connected Devices presence call, the socket must present a signature from the trusted device's key. Otherwise a compromised sync identity could make another machine look online for agent work. Every eligibility query (agent device waits, dispatcher due-time planning, peer listings) would then accept "has a live sync connection" as online, and an offline→online trigger would be needed. The saving is one 30-second HTTP call per online desktop, so this is a protocol design item, not a mechanical change.
+- **T05 native trace.** Reproducing which native or background producers still issue account requests after a rejected sign-in needs the running app; the request paths in code already share the rejection gate.
+- **In-app compression (T35)** and **inbox payload synthesis (T17)**: reasons above.
