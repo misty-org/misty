@@ -12,19 +12,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActivityItem } from "@/features/activity";
 import type * as SharedUI from "@/shared/ui";
 
-const mocks = vi.hoisted(() => ({
-  markInboxSeen: vi.fn(async () => undefined),
-}));
-
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({
-      markInboxSeen: mocks.markInboxSeen,
-      loadInbox: vi.fn(async () => undefined),
-    }),
-  },
-}));
-
 vi.mock("@/features/activity/nativeNotifications", () => ({
   publishNativeActivity: vi.fn(async () => true),
   syncNativeBadge: vi.fn(async () => undefined),
@@ -65,7 +52,6 @@ describe("ActivityMenu", () => {
       offline: false,
       error: null,
     });
-    mocks.markInboxSeen.mockClear();
   });
 
   it("retains updates in the unified feed when marked read", async () => {
@@ -106,7 +92,6 @@ describe("ActivityMenu", () => {
     expect(host.textContent).toContain("Needs attention");
     expect(useActivityStore.getState().attentionCount).toBe(0);
     expect(useActivityStore.getState().allItems.every((item) => item.readAt)).toBe(true);
-    expect(mocks.markInboxSeen).not.toHaveBeenCalled();
 
     await act(async () => root.unmount());
   });

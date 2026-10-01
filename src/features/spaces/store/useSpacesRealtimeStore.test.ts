@@ -297,7 +297,6 @@ describe("Spaces realtime account lifecycle", () => {
   });
 
   it("applies an included message without refetching the thread", async () => {
-    const loadInbox = vi.fn().mockResolvedValue(undefined);
     const optimistic = messageFixture({
       id: "optimistic-client-1",
       client_nonce: "client-1",
@@ -312,7 +311,6 @@ describe("Spaces realtime account lifecycle", () => {
     useSpacesStore.setState({
       spaces: [spaceFixture({ id: "space", permissions: { "messages.read": true } })],
       messagesBySpace: { space: [optimistic] },
-      loadInbox,
     });
 
     await useSpacesStore.getState().connectRealtime("active-account");
@@ -328,7 +326,6 @@ describe("Spaces realtime account lifecycle", () => {
     await Promise.resolve();
 
     expect(apiMocks.messages).not.toHaveBeenCalled();
-    expect(loadInbox).toHaveBeenCalledOnce();
     expect(useSpacesStore.getState().messagesBySpace.space).toEqual([confirmed]);
   });
 });

@@ -7,11 +7,6 @@ vi.mock("./nativeNotifications", () => ({
   publishNativeActivity: vi.fn(),
   syncNativeBadge: vi.fn(),
 }));
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({ loadInbox: async () => {}, markInboxSeen: async () => {} }),
-  },
-}));
 import { ActivityPanel } from "./ActivityPanel";
 import { ActivityMenu } from "@/app/layouts/DesktopLayout/ActivityMenu";
 import { openActivityPanel, closeActivityPanel, useActivityPanel } from "./activityPanelState";

@@ -5,7 +5,6 @@ import { resetSpacesAccountState, useSpacesStore } from "../store/useSpacesStore
 const apiMocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
   members: vi.fn(),
-  inbox: vi.fn(),
 }));
 
 vi.mock("@/api/spaces/api", () => ({
@@ -14,10 +13,6 @@ vi.mock("@/api/spaces/api", () => ({
     snapshot: apiMocks.snapshot,
     members: apiMocks.members,
   },
-}));
-
-vi.mock("@/api/activity/api", () => ({
-  activityApi: { inbox: apiMocks.inbox },
 }));
 
 function deferred<T>() {
@@ -76,7 +71,6 @@ describe("useSpacesStore account-switch race safety", () => {
   beforeEach(() => {
     apiMocks.snapshot.mockReset();
     apiMocks.members.mockReset();
-    apiMocks.inbox.mockReset();
     resetSpacesAccountState();
   });
 
@@ -142,15 +136,4 @@ describe("useSpacesStore account-switch race safety", () => {
     expect(useSpacesStore.getState().membersBySpace["space-a"]).toBeUndefined();
   });
 
-  it("does not surface a stale inbox error after the account changes", async () => {
-    const first = deferred<{ items: never[] }>();
-    apiMocks.inbox.mockReturnValue(first.promise);
-
-    const staleLoad = useSpacesStore.getState().loadInbox();
-    resetSpacesAccountState();
-    first.reject(new Error("account A inbox failed"));
-    await staleLoad;
-
-    expect(useSpacesStore.getState().error).toBeNull();
-  });
 });

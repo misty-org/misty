@@ -158,7 +158,6 @@ DELETE /v1/spaces/{spaceID}/social/bindings/{bindingID}
 DELETE /v1/spaces/{spaceID}/social/scheduled-messages/{scheduledID}
 DELETE /v1/spaces/{spaceID}/studio/workflows/{resourceID}
 DELETE /v1/spaces/{spaceID}/tasks/{taskID}
-GET /activity/inbox
 GET /agent-runs/{runID}
 GET /agent-voice/realtime
 GET /ai/activity
@@ -175,7 +174,6 @@ GET /ai/smart-library/folders/{folderID}/progress
 GET /ai/smart-library/folders/{folderID}/results
 GET /ai/smart-library/index-status
 GET /ai/status
-GET /api/activity/inbox
 GET /api/agent-runs/{runID}
 GET /api/agent-voice/realtime
 GET /api/ai/activity
@@ -221,6 +219,7 @@ GET /api/me/agent-approvals/{approvalID}
 GET /api/me/agent-interventions
 GET /api/me/avatar
 GET /api/me/home
+GET /api/me/home/agenda
 GET /api/me/library-lock
 GET /api/me/settings
 GET /api/me/space-templates
@@ -236,6 +235,7 @@ GET /api/realtime
 GET /api/runs/{runID}
 GET /api/search/global
 GET /api/search/spaces
+GET /api/settings/preferences
 GET /api/settings/profiles
 GET /api/settings/profiles/{profileID}
 GET /api/space-invitations/{token}
@@ -345,6 +345,7 @@ GET /me/agent-approvals/{approvalID}
 GET /me/agent-interventions
 GET /me/avatar
 GET /me/home
+GET /me/home/agenda
 GET /me/library-lock
 GET /me/settings
 GET /me/space-templates
@@ -360,6 +361,7 @@ GET /realtime
 GET /runs/{runID}
 GET /search/global
 GET /search/spaces
+GET /settings/preferences
 GET /settings/profiles
 GET /settings/profiles/{profileID}
 GET /space-invitations/{token}
@@ -438,7 +440,6 @@ GET /spaces/{spaceID}/tasks/{taskID}/activity
 GET /sync/devices
 GET /sync/vault
 GET /sync/ws
-GET /v1/activity/inbox
 GET /v1/agent-runs/{runID}
 GET /v1/agent-voice/realtime
 GET /v1/ai/activity
@@ -484,6 +485,7 @@ GET /v1/me/agent-approvals/{approvalID}
 GET /v1/me/agent-interventions
 GET /v1/me/avatar
 GET /v1/me/home
+GET /v1/me/home/agenda
 GET /v1/me/library-lock
 GET /v1/me/settings
 GET /v1/me/space-templates
@@ -499,6 +501,7 @@ GET /v1/realtime
 GET /v1/runs/{runID}
 GET /v1/search/global
 GET /v1/search/spaces
+GET /v1/settings/preferences
 GET /v1/settings/profiles
 GET /v1/settings/profiles/{profileID}
 GET /v1/space-invitations/{token}
@@ -655,8 +658,6 @@ PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 PATCH /v1/spaces/{spaceID}/setup
 PATCH /v1/spaces/{spaceID}/tasks/{taskID}
 POST /account/deletion/status
-POST /activity/inbox/clear
-POST /activity/inbox/seen
 POST /agent-runs/{runID}/approvals/{approvalID}
 POST /agent-runs/{runID}/cancel
 POST /agent-runs/{runID}/contexts
@@ -689,8 +690,6 @@ POST /ai/smart-library/reindex
 POST /ai/smart-library/reindex/{jobID}/complete
 POST /ai/smart-library/search
 POST /api/account/deletion/status
-POST /api/activity/inbox/clear
-POST /api/activity/inbox/seen
 POST /api/agent-runs/{runID}/approvals/{approvalID}
 POST /api/agent-runs/{runID}/cancel
 POST /api/agent-runs/{runID}/contexts
@@ -993,8 +992,6 @@ POST /sync/restore/step
 POST /sync/ticket
 POST /sync/vault
 POST /v1/account/deletion/status
-POST /v1/activity/inbox/clear
-POST /v1/activity/inbox/seen
 POST /v1/agent-runs/{runID}/approvals/{approvalID}
 POST /v1/agent-runs/{runID}/cancel
 POST /v1/agent-runs/{runID}/contexts

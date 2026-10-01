@@ -4,14 +4,8 @@ vi.mock("./nativeNotifications", () => ({
   publishNativeActivity: native.publish,
   syncNativeBadge: native.badge,
 }));
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({ loadInbox: async () => {}, markInboxSeen: async () => {} }),
-  },
-}));
 import { useActivityStore } from "./useActivityStore";
 import { reportSystemError } from "./systemActivity";
-import { activityItemFromSpaceInbox } from "./activityModel";
 import type { ActivityItem } from "./types";
 const store = () => useActivityStore.getState();
 const mention = (id = "mention"): ActivityItem => ({
@@ -221,16 +215,5 @@ describe("Activity lifecycle", () => {
     store().setAccount("one");
     store().ingestLocal({ id: "later-job", kind: "completion", title: "New result" });
     expect(store().allItems).toHaveLength(2);
-  });
-  it("does not treat words in a conversation as operation status", () => {
-    const item = activityItemFromSpaceInbox("one", {
-      id: 1,
-      kind: "unread",
-      space_id: "space",
-      space_name: "Space",
-      created_at: "2026-09-09T12:00:00Z",
-      payload: { preview: "I fixed the error that blocked us" },
-    } as Parameters<typeof activityItemFromSpaceInbox>[1]);
-    expect(item.kind).toBe("message");
   });
 });

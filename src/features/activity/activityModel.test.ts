@@ -1,7 +1,7 @@
-import type { SpaceInboxItem, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import { describe, expect, it } from "vitest";
 import {
-  activityItemsFromSpaces,
+  activityItemFromInvitation,
   activityKindNeedsAttention,
   activityTargetMatchesLocation,
   formatActivityBadge,
@@ -12,46 +12,14 @@ import {
 import type { ActivityItem } from "./types";
 
 describe("activityModel", () => {
-  it("normalizes, deduplicates, and sorts Spaces activity", () => {
-    const older = inboxItem({ id: 1, kind: "unread", created_at: "2026-08-07T10:00:00Z" });
-    const mention = inboxItem({
-      id: 2,
-      kind: "mention",
-      created_at: "2026-08-08T10:00:00Z",
-      payload: { sender_name: "Alex", preview: "Can you review this?" },
-    });
-    const items = activityItemsFromSpaces(
-      "account-1",
-      { unreads: [older, mention], mentions: [mention] },
-      [invitationFixture()],
-    );
-
-    expect(items.map((item) => item.id)).toEqual(["invitation:invite-1", "spaces:2", "spaces:1"]);
-    expect(items[1]).toMatchObject({
-      kind: "mention",
+  it("maps invitations into attention items", () => {
+    expect(activityItemFromInvitation("account-1", invitationFixture())).toMatchObject({
+      id: "invitation:invite-1",
+      kind: "invitation",
       attention: true,
-      title: "Alex mentioned you in Studio",
-      target: { kind: "space-chat", spaceId: "space-1", messageId: "message-2" },
+      title: "Sam invited you to Home",
+      target: { kind: "space", spaceId: "space-2" },
     });
-    expect(items[2].attention).toBe(false);
-  });
-
-  it("maps replies, approvals, and failures into attention categories", () => {
-    const items = activityItemsFromSpaces(
-      "account-1",
-      {
-        unreads: [
-          inboxItem({ id: 1, payload: { is_reply: true } }),
-          inboxItem({ id: 2, kind: "approval" }),
-          inboxItem({ id: 3, kind: "workflow", payload: { status: "failed" } }),
-        ],
-        mentions: [],
-      },
-      [],
-    );
-
-    expect(items.map((item) => item.kind).sort()).toEqual(["approval", "failure", "reply"]);
-    expect(items.every((item) => item.attention)).toBe(true);
     expect(activityKindNeedsAttention("message")).toBe(false);
     expect(activityKindNeedsAttention("reminder")).toBe(true);
   });
@@ -116,20 +84,6 @@ function activityFixture(
     attention: false,
     target,
     ...(readAt ? { readAt } : {}),
-  };
-}
-
-function inboxItem(overrides: Partial<SpaceInboxItem> = {}): SpaceInboxItem {
-  const id = overrides.id ?? 1;
-  return {
-    id,
-    space_id: "space-1",
-    space_name: "Studio",
-    kind: "unread",
-    message_id: `message-${id}`,
-    payload: {},
-    created_at: "2026-08-08T09:00:00Z",
-    ...overrides,
   };
 }
 

@@ -80,9 +80,5 @@ func insertRunApprovalTx(ctx context.Context, tx *sql.Tx, runID, userID string, 
 		return err
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO space_run_actions(id,run_id,action_kind,summary,details,destructive,state) VALUES($1,$2,$3,$4,$5,$6,'proposed')`, "runaction_"+uuid.NewString(), runID, capability.ID, capability.Description, mustJSON(map[string]any{"capability_id": capability.ID, "workflow_version_id": workflowVersionID}), capability.Destructive)
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO space_inbox_items(user_id,space_id,kind,payload) SELECT $1,space_id,'approval',$2 FROM space_runs WHERE id=$3`, userID, mustJSON(map[string]any{"run_id": runID, "capability_id": capability.ID, "workflow_version_id": workflowVersionID}), runID)
 	return err
 }
