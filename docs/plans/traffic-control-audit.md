@@ -118,7 +118,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | Group | Status |
 |---|---|
 | T01 | Done: HTTP bytes per route, sync message bytes, invocation stream read metrics |
-| T02, T16 | Done for account-indexed fanout and reset on reconnect; large shared-Space fanout is still serial |
+| T02, T16 | Done: account-indexed fanout, one authorization transaction per event for all connected members, reset on reconnect |
 | T03, T04, T05 | Done (settings, consent, terminal auth); native producer trace under rejected sign-in remains |
 | T06, T08, T14, T15, T33 | Done: process lease liveness, bounded connection rows, no per-socket reconcile, in-band session revalidation, change-only heartbeats |
 | T07 | Mostly done: setup once, presence as the single liveness call, peers by topic; liveness over the sync socket remains |
@@ -136,7 +136,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T30, T31 | Done |
 | T32 | Retained by design: active-work leases carry fencing and cancellation and run only during work |
 | T34 | Partly done: idle sync measurement recorded; staging matrix (10k/20k/30k, outages) remains |
-| T35 | Deferred: response bytes per route (T01) should first be compared with the edge's compression. In-app compression of secret-bearing JSON needs a BREACH review |
+| T35 | Done: conditional reads on Space snapshot routes. In-app compression deliberately not added (see below) |
 
 ## Implementation progress — first batch
 
@@ -350,3 +350,12 @@ That is 1,000 accounts with 2 devices each, on different instances, and about 0.
 Idle connection cost fell from about 0.40 database commits per connected device per second to effectively zero. The remaining commits come from edit-driven work, and this run had three times as many edits. At 10,000 devices that is roughly 4,000 commits per second of idle liveness and reconcile work removed. Edit latency is unchanged within noise.
 
 Limits: application database transactions only, not wire bytes. The harness clients send no heartbeat frames; real clients now send them only on change. This is one machine, not a capacity envelope: the 10k/20k/30k matrix, multi-window and outage-storm scenarios still need a staging environment. TLS, tunnel and proxy overhead are excluded.
+
+
+## Implementation progress — fanout authorization and conditional reads
+
+T02: a Space event used to load the event and check visibility in one transaction per connected member, serially, on the listener goroutine. One transaction now loads the event once, narrows to connected members of the Space and applies each member's visibility rules. The payload is encoded once. If that pass fails, the event falls back to per-member checks, so one member's failure resets only that member's sockets. The fanout test now also covers a conversation participant receiving a private message event that other members in the same pass do not.
+
+T35: `ConditionalGET` wraps the large Space read routes: the Space list, messages, tasks, nodes, roadmaps, Space agenda and Home agenda. A successful GET carries a content ETag with `private, no-cache`, so the WebView's HTTP cache revalidates each read, and an unchanged snapshot answers an empty 304. The handler still runs, so authorization is unchanged, and a different account's snapshot hashes differently. Writes, errors and `no-store` responses pass through.
+
+In-app compression was deliberately not added. The edge already compresses responses to clients, so it would only save the tunnel hop. Some of these responses mix member-supplied text with semi-secret values such as meeting links, which is the BREACH pattern. Revisit only if `misty_http_response_bytes` shows the tunnel hop matters, and then only for routes reviewed for that pattern.
