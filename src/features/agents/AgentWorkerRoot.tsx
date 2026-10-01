@@ -135,7 +135,9 @@ function Worker() {
       }
     };
     void take();
-    const timer = setInterval(() => void take(), 1500);
+    // Queued tasks announce themselves; the slow pass recovers a missed event
+    // or a failed acknowledgement.
+    const timer = setInterval(() => void take(), 30_000);
     const remove = getCurrentWindow().listen("misty://agent-task-queued", () => {
       failed = false;
       void take();

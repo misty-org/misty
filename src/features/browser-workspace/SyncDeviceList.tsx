@@ -9,6 +9,7 @@ import {
   claimNativeWorkspace,
   controlNativeDevice,
   readNativeSync,
+  watchNativeSync,
   renameNativeDevice,
   type NativeSyncView,
 } from "./native";
@@ -64,11 +65,15 @@ export function SyncDeviceList({
       }
     };
     void read();
-    const timer = setInterval(() => void read(), 2000);
+    // The native session announces status, presence, device and workspace
+    // changes; the slow pass only covers time-based expiry of activation requests.
+    const stopWatching = watchNativeSync(() => void read());
+    const timer = setInterval(() => void read(), 15_000);
     return () => {
       stopped = true;
       mounted.current = false;
       clearInterval(timer);
+      void stopWatching.then((stop) => stop());
     };
   }, [session.session_id, session.account_id]);
   useEffect(() => {

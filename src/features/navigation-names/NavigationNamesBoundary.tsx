@@ -74,12 +74,12 @@ function AccountNavigationNamesBoundary({
         busy = false;
       }
     };
+    // In-app renames return the new snapshot; hand edits to navigation.json
+    // are picked up when the window regains focus.
     void refresh();
-    const timer = setInterval(() => void refresh(), 2000);
     window.addEventListener("focus", refresh);
     return () => {
       active = false;
-      clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
   }, [scope]);
