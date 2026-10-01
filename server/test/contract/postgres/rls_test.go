@@ -83,7 +83,6 @@ func TestTablesHaveRowLevelSecurityEnabled(t *testing.T) {
 		"mcp_tool_execution_audit",
 		"workflow_device_node_jobs",
 		"space_events",
-		"space_inbox_items",
 		"space_tasks",
 		"space_calendar_sources",
 		"space_discord_links",
