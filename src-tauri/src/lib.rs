@@ -306,6 +306,7 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_setup,
                     crate::infra::browser_sync::browser_sync_connect,
                     crate::infra::browser_sync::browser_sync_state,
+                    crate::infra::browser_sync::browser_sync_account_feed,
                     crate::infra::browser_sync::browser_sync_edit,
                     crate::infra::browser_sync::browser_sync_activate,
                     crate::infra::browser_sync::browser_sync_claim,

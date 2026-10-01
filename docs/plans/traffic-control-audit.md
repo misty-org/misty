@@ -126,7 +126,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T10 | Done: shared bounded invocation streams |
 | T11, T12, T13 | Done: all API worker scans are deadline queues; retention is a budgeted single-owner pass |
 | T17 | Partly done: coalesced realtime reloads, topic-routed activity sources; included-payload application remains |
-| T18 | Not done: the native sync socket already forwards account events and nothing consumes them. Routing desktop invalidations through it, with SSE fallback and reset on source switch, needs on-device testing |
+| T18 | Done: the desktop main window follows the sync socket's account events while it is connected and falls back to the event stream otherwise; needs on-device verification |
 | T19 | Done for HTTP, invocation stream, Space socket, Connected Devices and native control advertisement; an account-wide cooldown shared across transports remains |
 | T20, T21 | Done |
 | T22 | Not done: needs client-side instrumentation of unchanged workspace publications before any fix |
@@ -359,3 +359,14 @@ T02: a Space event used to load the event and check visibility in one transactio
 T35: `ConditionalGET` wraps the large Space read routes: the Space list, messages, tasks, nodes, roadmaps, Space agenda and Home agenda. A successful GET carries a content ETag with `private, no-cache`, so the WebView's HTTP cache revalidates each read, and an unchanged snapshot answers an empty 304. The handler still runs, so authorization is unchanged, and a different account's snapshot hashes differently. Writes, errors and `no-store` responses pass through.
 
 In-app compression was deliberately not added. The edge already compresses responses to clients, so it would only save the tunnel hop. Some of these responses mix member-supplied text with semi-secret values such as meeting links, which is the BREACH pattern. Revisit only if `misty_http_response_bytes` shows the tunnel hop matters, and then only for routes reviewed for that pattern.
+
+
+## Implementation progress — one account event transport on the desktop
+
+T18: the sync socket already received every account invalidation for its account and nothing used them. The native session now forwards them to the main window as `misty:account-event`; if its bounded channel lags, it sends a reset. `browser_sync_account_feed` reports whether that socket is connected for the account (main window only, like every `browser_sync_` command).
+
+The shared account-event stream follows the native feed while it is connected for the same account. It hands over from an open SSE connection as soon as the feed comes up, and falls back to SSE when the feed drops. Each switch delivers a reset, so nothing missed between sources is lost. Leader election across windows is unchanged. A non-main leader keeps using SSE, as does the web app.
+
+A desktop with sync running therefore holds one connection for account invalidations instead of two. Unverified: this path needs an on-device check with sync connected (Network panel shows no `/misty/events` while sync is up, and one reappears when sync is locked).
+
+Also fixed: the account-event stream only passes known topics, and the topics added for client polling (`scheduled-tasks`, `usage`, `library-renditions`, `device-pairing`, `devices`) were missing from that list.
