@@ -1,12 +1,12 @@
 /**
- * Coalesces snapshot reloads triggered by realtime events. Events that arrive
- * before a reload starts share it; events during a reload get exactly one
- * trailing reload, which waits for the first so reads never overlap. A burst
- * of N events for one target therefore costs at most two reads, not N.
+ * Coalesces snapshot reloads triggered by realtime events. The first event
+ * reloads at once; events that arrive while that read is in flight share one
+ * trailing reload, which starts after it so reads never overlap. A burst of N
+ * events for one target therefore costs at most two reads, not N.
  */
 interface Slot {
-  queued: Promise<void> | null;
-  inFlight: Promise<unknown> | null;
+  inFlight: Promise<void> | null;
+  trailing: Promise<void> | null;
 }
 
 const slots = new Map<string, Slot>();
@@ -14,28 +14,35 @@ const slots = new Map<string, Slot>();
 export function coalescedReload(key: string, run: () => Promise<unknown>): Promise<void> {
   let slot = slots.get(key);
   if (!slot) {
-    slot = { queued: null, inFlight: null };
+    slot = { inFlight: null, trailing: null };
     slots.set(key, slot);
   }
   const current = slot;
-  if (current.queued) return current.queued;
-  const queued = (async () => {
-    // A microtask boundary lets events dispatched together share this read.
-    await Promise.resolve();
-    await current.inFlight?.catch(() => undefined);
-    // From here on, new events need a later reload.
-    if (current.queued === queued) current.queued = null;
-    const read = run();
-    current.inFlight = read;
+  const start = (): Promise<void> => {
+    let read: Promise<void>;
     try {
-      await read;
-    } finally {
-      if (current.inFlight === read) current.inFlight = null;
-      if (!current.queued && !current.inFlight) slots.delete(key);
+      read = Promise.resolve(run()).then(() => undefined);
+    } catch (error) {
+      read = Promise.reject(error);
     }
-  })();
-  current.queued = queued;
-  return queued;
+    current.inFlight = read;
+    const settle = () => {
+      if (current.inFlight === read) current.inFlight = null;
+      if (!current.inFlight && !current.trailing && slots.get(key) === current) slots.delete(key);
+    };
+    read.then(settle, settle);
+    return read;
+  };
+  if (!current.inFlight) return start();
+  if (!current.trailing) {
+    current.trailing = current.inFlight
+      .catch(() => undefined)
+      .then(() => {
+        current.trailing = null;
+        return start();
+      });
+  }
+  return current.trailing;
 }
 
 /** Drops queued state, for account switches and tests. */

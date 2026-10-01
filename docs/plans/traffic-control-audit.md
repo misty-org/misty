@@ -264,3 +264,15 @@ T17, client part:
 - Activity re-reads each source only on its own topic (`approvals` or `interventions`). An `invocations` event can only remove pending items, because new items publish their own topic. So it re-reads only sources that currently hold items, which for most accounts is none.
 
 Not done: applying included payloads instead of re-reading, or batching missing entities. Both change UI data flow and need the frontend suite.
+
+
+## Implementation progress — retry policies
+
+T19, client part:
+
+- HTTP: idempotent retries use exponential backoff with equal jitter (125–250 ms, then 250–500 ms) instead of fixed 150/350 ms. A 502/503/504 asking for more than two seconds (`Retry-After`) is returned without retry. After a request exhausts its retries on an unavailable server or a network failure, later requests make one attempt until a success or a cooling period (1 s doubling to 60 s, at least the server's `Retry-After`). Nested caller retry loops no longer multiply during an outage.
+- AI invocation stream reconnects are exponential with jitter instead of linear.
+- The Space socket resets its backoff only after a connection stays open 30 seconds. A socket that opens and drops at once keeps backing off. Resync reloads go through the coalescer.
+- Connected Devices service restarts back off from 30 seconds to 5 minutes, jittered, and reset when the service starts.
+
+Remaining: native control-advertisement retries (Rust, native batch) and an account-wide cooldown shared by all client transports.
