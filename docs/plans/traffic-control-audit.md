@@ -127,7 +127,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T11, T12, T13 | Done: all API worker scans are deadline queues; retention is a budgeted single-owner pass |
 | T17 | Partly done: coalesced realtime reloads, topic-routed activity sources; included-payload application remains |
 | T18 | Done: the desktop main window follows the sync socket's account events while it is connected and falls back to the event stream otherwise; needs on-device verification |
-| T19 | Done for HTTP, invocation stream, Space socket, Connected Devices and native control advertisement; an account-wide cooldown shared across transports remains |
+| T19 | Done: HTTP, invocation stream, Space socket, Connected Devices and native control advertisement back off with jitter; the account event stream and Space socket also wait out the HTTP client's outage cooldown |
 | T20, T21 | Done |
 | T22 | Instrumented: the op builder already suppresses unchanged records and empty ops; counters now show which layer churns |
 | T23, T24, T36 | Partly done (sync heartbeat); remaining timers are local-only, see the timer inventory |

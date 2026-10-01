@@ -1,3 +1,4 @@
+import { httpOutageRemainingMs } from "@/api/client/http";
 import { coalescedReload, resetCoalescedReloads } from "./coalescedReload";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
@@ -301,7 +302,11 @@ export function scheduleReconnect(get: () => SpacesStore, accountId: string, gen
     reconnectTimer != null
   )
     return;
-  const delay = Math.min(60_000, 2_000 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 750);
+  // Never reconnect sooner than the client's shared outage cooldown.
+  const delay = Math.max(
+    httpOutageRemainingMs(),
+    Math.min(60_000, 2_000 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 750),
+  );
   reconnectAttempt += 1;
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null;
