@@ -125,7 +125,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T09, T28, T29, T37 | Done (Codex batches) |
 | T10 | Done: shared bounded invocation streams |
 | T11, T12, T13 | Done: all API worker scans are deadline queues; retention is a budgeted single-owner pass |
-| T17 | Done within limits: coalesced realtime reloads and topic-routed activity sources. Inbox entries are server-derived per-recipient rows (unread/mention state), so they are re-read, not synthesized from payloads |
+| T17 | Done: coalesced realtime reloads and topic-routed activity sources. The Space inbox had no reader since Activity replaced it, so it is removed end to end (see "Space inbox removal") |
 | T18 | Done: the desktop main window follows the sync socket's account events while it is connected and falls back to the event stream otherwise; needs on-device verification |
 | T19 | Done: HTTP, invocation stream, Space socket, Connected Devices and native control advertisement back off with jitter; the account event stream and Space socket also wait out the HTTP client's outage cooldown |
 | T20, T21 | Done |
@@ -287,7 +287,7 @@ T21: `GET /me/home/agenda` merges today's earliest open entries across the accou
 
 T17, client part:
 
-- Space realtime events no longer issue one snapshot read each. Inbox, per-Space messages and nodes, the Space list and per-Space members reload through a coalescer: events before a reload starts share it, and events during a reload get one trailing reload. A burst of N events for one target costs at most two reads.
+- Space realtime events no longer issue one snapshot read each. Per-Space messages and nodes, the Space list and per-Space members reload through a coalescer: events before a reload starts share it, and events during a reload get one trailing reload. A burst of N events for one target costs at most two reads.
 - Activity re-reads each source only on its own topic (`approvals` or `interventions`). An `invocations` event can only remove pending items, because new items publish their own topic. So it re-reads only sources that currently hold items, which for most accounts is none.
 
 Not done: applying included payloads instead of re-reading, or batching missing entities. Both change UI data flow and need the frontend suite.
@@ -393,8 +393,16 @@ T24: the sync device list (2 s) and device controls (1 s) re-read on `misty:brow
 Kept, all local IPC with no server traffic: search status while the search panel is open or a scan runs (0.5 s scanning, 5 s idle-open), the native sync queue tick (250 ms), cookie capture (2 s), history capture (60 s) and renderer page-state capture. Replacing the captures needs WKWebView cookie-store and page observers verified on device; they publish only on change.
 
 
+## Space inbox removal (T17)
+
+The app downloaded the Space inbox (`/activity/inbox`, unreads and mentions) at sign-in, on every resync, after every mark-read and on every Space message event, but nothing rendered it: Activity is built from approvals, interventions and local items, and the "mark seen" and "clear" actions had no caller. Every message also cost the server one permission query and one insert per recipient to fill it.
+
+Removed: the client store state, loads and actions, `src/api/activity`, the three `/activity/inbox` routes, the per-recipient message and mention rows, and the approval and workflow rows. `MarkSpaceRead` now only advances `read_message_seq`. The `notify_private` workflow node keeps its ownership check and result shape; its message had only ever reached this unread inbox.
+
+Left in place: the `space_inbox_items` table and the conversation-deletion cleanup of its old rows. Dropping the table (it still holds old message previews) is a one-line migration to apply once deployed clients no longer call the routes.
+
 ## Deliberately not changed
 
 - **Desktop liveness on the sync socket (T07/T33).** The sync socket authenticates a sync device; agent eligibility and P2P peers use the separate trusted-device identity. To let a live sync connection stand in for the 30-second Connected Devices presence call, the socket must present a signature from the trusted device's key. Otherwise a compromised sync identity could make another machine look online for agent work. Every eligibility query (agent device waits, dispatcher due-time planning, peer listings) would then accept "has a live sync connection" as online, and an offline→online trigger would be needed. The saving is one 30-second HTTP call per online desktop, so this is a protocol design item, not a mechanical change.
 - **T05 native trace.** Reproducing which native or background producers still issue account requests after a rejected sign-in needs the running app; the request paths in code already share the rejection gate.
-- **In-app compression (T35)** and **inbox payload synthesis (T17)**: reasons above.
+- **In-app compression (T35)**: reasons above.

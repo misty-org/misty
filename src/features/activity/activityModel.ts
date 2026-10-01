@@ -1,45 +1,5 @@
-import type { SpaceInboxItem, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import type { ActivityItem, ActivityKind, ActivityTarget } from "./types";
-
-export function activityItemsFromSpaces(
-  accountId: string,
-  inbox: { unreads: SpaceInboxItem[]; mentions: SpaceInboxItem[] },
-  invitations: SpaceInvitation[],
-): ActivityItem[] {
-  if (!accountId) return [];
-  const items = new Map<string, ActivityItem>();
-  for (const item of [...inbox.unreads, ...inbox.mentions]) {
-    const mapped = activityItemFromSpaceInbox(accountId, item);
-    items.set(mapped.id, mapped);
-  }
-  for (const invitation of invitations) {
-    const mapped = activityItemFromInvitation(accountId, invitation);
-    items.set(mapped.id, mapped);
-  }
-  return [...items.values()].sort(compareActivityNewestFirst);
-}
-
-export function activityItemFromSpaceInbox(accountId: string, item: SpaceInboxItem): ActivityItem {
-  const actor = stringPayload(item.payload, "sender_name") || "Someone";
-  const preview = stringPayload(item.payload, "preview");
-  const kind = spaceInboxActivityKind(item);
-  const attention = activityKindNeedsAttention(kind);
-  return {
-    id: `spaces:${item.id}`,
-    accountId,
-    source: "spaces",
-    sourceId: String(item.id),
-    sourceLabel: item.space_name,
-    spaceId: item.space_id,
-    kind,
-    title: activityTitle(kind, actor, item.space_name),
-    body: preview,
-    createdAt: validIsoDate(item.created_at),
-    ...(item.seen_at ? { readAt: validIsoDate(item.seen_at) } : {}),
-    attention,
-    target: activityTarget(item, kind),
-  };
-}
 
 export function activityItemFromInvitation(
   accountId: string,
@@ -126,77 +86,6 @@ export function activityTargetMatchesLocation(target: ActivityTarget, pathname: 
   if (target.kind === "space-chat") return parts[2] === "social" || parts[2] === "chat";
   if (target.kind === "space-task") return parts[2] === "planner";
   return parts[2] === "invitation";
-}
-
-function spaceInboxActivityKind(item: SpaceInboxItem): ActivityKind {
-  if (item.kind === "mention") return "mention";
-  if (item.kind === "approval") return "approval";
-  if (item.kind === "agent" || item.kind === "workflow") {
-    if (payloadNeedsApproval(item.payload)) return "approval";
-    if (payloadFailed(item.payload)) return "failure";
-    if (stringPayload(item.payload, "status") === "completed") return "completion";
-    return item.kind;
-  }
-  if (payloadIsReply(item.payload)) return "reply";
-  return "message";
-}
-
-function activityTarget(item: SpaceInboxItem, kind: ActivityKind): ActivityTarget {
-  const taskId = stringPayload(item.payload, "task_id");
-  if (taskId) return { kind: "space-task", spaceId: item.space_id, taskId };
-  if (kind === "approval" && item.kind === "agent") {
-    return { kind: "workspace-tool", tool: "agents" };
-  }
-  return {
-    kind: "space-chat",
-    spaceId: item.space_id,
-    ...(item.message_id ? { messageId: item.message_id } : {}),
-  };
-}
-
-function payloadIsReply(payload: Record<string, unknown>): boolean {
-  return Boolean(
-    payload.reply_to_message_id ||
-    payload.reply_to_me ||
-    payload.is_reply ||
-    stringPayload(payload, "kind").toLowerCase() === "reply",
-  );
-}
-
-function payloadNeedsApproval(payload: Record<string, unknown>): boolean {
-  return Boolean(
-    payload.requires_approval || payload.approval_required || payload.awaiting_approval,
-  );
-}
-
-function payloadFailed(payload: Record<string, unknown>): boolean {
-  return ["failed", "blocked", "awaiting_input"].includes(stringPayload(payload, "status"));
-}
-
-function activityTitle(kind: ActivityKind, actor: string, spaceName: string): string {
-  switch (kind) {
-    case "mention":
-      return `${actor} mentioned you in ${spaceName}`;
-    case "reply":
-      return `${actor} replied to you in ${spaceName}`;
-    case "approval":
-      return `${spaceName} needs your approval`;
-    case "failure":
-      return `${spaceName} needs attention`;
-    case "completion":
-      return `Background work completed in ${spaceName}`;
-    case "agent":
-      return `Agent activity in ${spaceName}`;
-    case "workflow":
-      return `Workflow activity in ${spaceName}`;
-    default:
-      return `${actor} posted in ${spaceName}`;
-  }
-}
-
-function stringPayload(payload: Record<string, unknown>, key: string): string {
-  const value = payload[key];
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function validIsoDate(value: string | undefined): string {

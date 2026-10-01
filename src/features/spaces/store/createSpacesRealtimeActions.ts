@@ -191,10 +191,7 @@ export function createSpacesRealtimeActions(
 }
 
 function resyncSpaces(get: () => SpacesStore) {
-  return Promise.all([
-    coalescedReload("spaces", () => get().load({ force: true })),
-    coalescedReload("inbox", () => get().loadInbox()),
-  ]);
+  return coalescedReload("spaces", () => get().load({ force: true }));
 }
 
 export function resetSpacesRealtimeRuntime(): void {
@@ -230,9 +227,8 @@ export async function applyRealtimeEvent(
         detail: { spaceId: event.space_id, conversationId, event },
       }),
     );
-    const reloadInbox = () => coalescedReload("inbox", () => get().loadInbox());
-    if (conversationId) await reloadInbox();
-    else if (includedMessage) {
+    // Conversation threads load their own messages from the window event.
+    if (!conversationId && includedMessage)
       set((state) => ({
         messagesBySpace: {
           ...state.messagesBySpace,
@@ -241,12 +237,10 @@ export async function applyRealtimeEvent(
           ]),
         },
       }));
-      await reloadInbox();
-    } else
-      await Promise.all([
-        coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id)),
-        reloadInbox(),
-      ]);
+    else if (!conversationId)
+      await coalescedReload(`messages:${event.space_id}`, () =>
+        get().loadMessages(event.space_id),
+      );
   } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)

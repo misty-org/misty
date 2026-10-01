@@ -35,7 +35,6 @@ export type AgentMentionFailure = {
     | string;
 };
 
-export type InboxKind = "unread" | "mention" | "agent" | "approval" | "workflow";
 
 export type BulkLibraryItemAction =
   | "favorite"

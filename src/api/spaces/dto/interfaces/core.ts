@@ -1,7 +1,6 @@
 import type { WorkflowVersion } from "./agentArchitectureTypes";
 
 import type {
-  InboxKind,
   MessageSpan,
   SpaceRole,
   SpaceTaskPriority,
@@ -229,18 +228,6 @@ export interface SpaceNode {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
-}
-
-export interface SpaceInboxItem {
-  id: number;
-  space_id: string;
-  space_name: string;
-  kind: InboxKind;
-  message_id?: string;
-  event_id?: number;
-  payload: Record<string, unknown>;
-  seen_at?: string;
-  created_at: string;
 }
 
 export interface SpaceEvent {

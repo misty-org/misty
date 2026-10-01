@@ -9,7 +9,6 @@ export function SpacesRealtimeBridge() {
   const { user, transitioning } = useAuth();
   const accountId = user?.id ?? "";
   const load = useSpacesStore((state) => state.load);
-  const loadInbox = useSpacesStore((state) => state.loadInbox);
   const connectRealtime = useSpacesStore((state) => state.connectRealtime);
   const disconnectRealtime = useSpacesStore((state) => state.disconnectRealtime);
   const loading = useSpacesStore((state) => state.loading);
@@ -28,14 +27,14 @@ export function SpacesRealtimeBridge() {
       return;
     }
     void connectRealtime(accountId);
-    void Promise.all([load(), loadInbox()]);
+    void load();
     return () => {
       pendingRealtimeDisconnectTimer = window.setTimeout(() => {
         pendingRealtimeDisconnectTimer = null;
         disconnectRealtime();
       }, 0);
     };
-  }, [accountId, connectRealtime, disconnectRealtime, load, loadInbox, transitioning]);
+  }, [accountId, connectRealtime, disconnectRealtime, load, transitioning]);
 
   useEffect(() => {
     if (!error) {

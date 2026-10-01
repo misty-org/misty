@@ -1,4 +1,3 @@
-import { activityApi } from "@/api/activity/api";
 import { notifyAccountScopeReset } from "@/features/auth/accountStore";
 import { mergeSpaceMessages } from "../chat/store/useSpaceMessageSpansStore";
 import * as referenceMode from "./reference-mode";
@@ -43,10 +42,8 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   messageErrorsBySpace: {},
   nodesBySpace: {},
   workflowsBySpace: {},
-  inbox: { unreads: [], mentions: [] },
   presenceBySpace: {},
   snapshotReady: false,
-  inboxError: null,
   referenceOnly: false,
   lastSyncedAt: null,
   loading: false,
@@ -247,21 +244,6 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
-  loadInbox: async () => {
-    const generation = spacesAccountGeneration;
-    try {
-      const [unreads, mentions] = await Promise.all([
-        activityApi.inbox("unreads"),
-        activityApi.inbox("mentions"),
-      ]);
-      if (generation !== spacesAccountGeneration) return;
-      set({ inbox: { unreads: unreads.items, mentions: mentions.items }, inboxError: null });
-    } catch (error) {
-      if (generation !== spacesAccountGeneration) return;
-      set({ inboxError: errorText(error) });
-    }
-  },
-
   createSpace: async (request) => {
     set({ error: null });
     try {
@@ -396,10 +378,8 @@ export function resetSpacesAccountState(): void {
     messageErrorsBySpace: {},
     nodesBySpace: {},
     workflowsBySpace: {},
-    inbox: { unreads: [], mentions: [] },
     presenceBySpace: {},
     snapshotReady: false,
-    inboxError: null,
     referenceOnly: false,
     lastSyncedAt: null,
     // Stay in a loading state rather than flashing an empty "no Spaces yet"
@@ -440,5 +420,3 @@ async function recoverInaccessibleSpace(
   await get().load({ force: true });
   return true;
 }
-
-export type ActivityTab = "unreads" | "mentions";
