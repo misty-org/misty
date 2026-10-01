@@ -245,9 +245,20 @@ impl FileSyncService {
             let service = service.clone();
             Box::pin(async move { service.sync_saved_pair(pair_id).await })
         });
+        // Two local folders change by filesystem notification, so they compare
+        // when something changes plus a slow safety pass. A remote side has no
+        // change feed and keeps the short compare interval.
+        let (interval, trigger, guard) = match local_pair_watcher(&pair) {
+            Some((watcher, trigger)) => (
+                Duration::from_secs(600),
+                Some(trigger),
+                Some(Box::new(watcher) as Box<dyn Send>),
+            ),
+            None => (Duration::from_secs(5), None, None),
+        };
         let _ = self
             .master
-            .start(pair.id, Duration::from_secs(5), executor)
+            .start_triggered(pair.id, interval, executor, trigger, guard)
             .await;
     }
 
@@ -623,4 +634,32 @@ mod tests {
         assert!(terminal_operation_status(OperationStatus::Canceled));
         assert!(terminal_operation_status(OperationStatus::Skipped));
     }
+}
+
+/// Watches both folders of an all-local pair. Returns `None` for a pair with a
+/// remote side, or when a folder cannot be watched (the caller then polls).
+fn local_pair_watcher(
+    pair: &FileSyncPair,
+) -> Option<(notify::RecommendedWatcher, tokio::sync::mpsc::Receiver<()>)> {
+    use notify::{RecursiveMode, Watcher};
+    let local = |endpoint: &crate::domain::file_sync::FileSyncEndpoint| {
+        (endpoint.kind == crate::domain::file_sync::FileSyncEndpointKind::Local
+            && !endpoint.local_path.is_empty())
+        .then(|| PathBuf::from(&endpoint.local_path))
+    };
+    let (left, right) = (local(&pair.left)?, local(&pair.right)?);
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
+    // FSEvents on macOS (see Cargo features): no per-file descriptors.
+    let mut watcher =
+        notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+            if matches!(&event, Ok(event) if matches!(event.kind, notify::EventKind::Access(_))) {
+                return;
+            }
+            // A full channel already holds a pending run; errors also re-run.
+            let _ = sender.try_send(());
+        })
+        .ok()?;
+    watcher.watch(&left, RecursiveMode::Recursive).ok()?;
+    watcher.watch(&right, RecursiveMode::Recursive).ok()?;
+    Some((watcher, receiver))
 }

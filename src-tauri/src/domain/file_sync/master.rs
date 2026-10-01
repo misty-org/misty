@@ -9,7 +9,9 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{watch, Mutex};
+use tokio::sync::{mpsc, watch, Mutex};
+
+const TRIGGER_DEBOUNCE: Duration = Duration::from_secs(1);
 
 use crate::error::ApiResult;
 
@@ -38,6 +40,22 @@ impl FileSyncMaster {
         interval: Duration,
         executor: FileSyncMasterExecutor,
     ) -> bool {
+        self.start_triggered(pair_id, interval, executor, None, None)
+            .await
+    }
+
+    /// Like `start`, but `trigger` also runs the pair early (for example from
+    /// filesystem notifications). Triggers arriving within a short window are
+    /// coalesced into one run. `guard` lives as long as the job, so a watcher
+    /// that feeds `trigger` stops with it.
+    pub async fn start_triggered(
+        &self,
+        pair_id: i64,
+        interval: Duration,
+        executor: FileSyncMasterExecutor,
+        trigger: Option<mpsc::Receiver<()>>,
+        guard: Option<Box<dyn Send>>,
+    ) -> bool {
         if pair_id <= 0 || interval.is_zero() {
             return false;
         }
@@ -57,7 +75,9 @@ impl FileSyncMaster {
         drop(jobs);
 
         let master = self.clone();
+        let mut trigger = trigger;
         tokio::spawn(async move {
+            let _guard = guard;
             // A failing pair (an unreachable provider or peer) backs off
             // exponentially to five minutes instead of retrying every interval.
             let mut failures = 0u32;
@@ -75,8 +95,22 @@ impl FileSyncMaster {
                             .min(Duration::from_secs(300).max(interval))
                     }
                 };
+                let triggered = async {
+                    match trigger.as_mut() {
+                        Some(trigger) if failures == 0 => {
+                            if trigger.recv().await.is_none() {
+                                std::future::pending::<()>().await;
+                            }
+                            // Let a burst of filesystem changes settle into one run.
+                            tokio::time::sleep(TRIGGER_DEBOUNCE).await;
+                            while trigger.try_recv().is_ok() {}
+                        }
+                        _ => std::future::pending::<()>().await,
+                    }
+                };
                 tokio::select! {
                     _ = tokio::time::sleep(delay) => {}
+                    _ = triggered => {}
                     changed = stop_rx.changed() => {
                         if changed.is_err() || *stop_rx.borrow() { break; }
                     }

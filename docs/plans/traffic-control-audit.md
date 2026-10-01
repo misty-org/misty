@@ -125,13 +125,13 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T09, T28, T29, T37 | Done (Codex batches) |
 | T10 | Done: shared bounded invocation streams |
 | T11, T12, T13 | Done: all API worker scans are deadline queues; retention is a budgeted single-owner pass |
-| T17 | Partly done: coalesced realtime reloads, topic-routed activity sources; included-payload application remains |
+| T17 | Done within limits: coalesced realtime reloads and topic-routed activity sources. Inbox entries are server-derived per-recipient rows (unread/mention state), so they are re-read, not synthesized from payloads |
 | T18 | Done: the desktop main window follows the sync socket's account events while it is connected and falls back to the event stream otherwise; needs on-device verification |
 | T19 | Done: HTTP, invocation stream, Space socket, Connected Devices and native control advertisement back off with jitter; the account event stream and Space socket also wait out the HTTP client's outage cooldown |
 | T20, T21 | Done |
 | T22 | Instrumented: the op builder already suppresses unchanged records and empty ops; counters now show which layer churns |
 | T23, T24, T36 | Partly done (sync heartbeat); remaining timers are local-only, see the timer inventory |
-| T25 | Partly done: failure backoff and adaptive peer rescans; OS file notifications remain |
+| T25 | Done: local–local pairs compare on FSEvents notifications plus a 10-minute safety pass; remote pairs keep 5 s with failure backoff; peer rescans adapt |
 | T26, T27 | Done |
 | T30, T31 | Done |
 | T32 | Retained by design: active-work leases carry fencing and cancellation and run only during work |
@@ -377,3 +377,8 @@ Also fixed: the account-event stream only passes known topics, and the topics ad
 T22: reading the publish path shows the op builder already skips records whose fields and placement are unchanged, and returns no op when nothing changed. An unchanged workspace therefore cannot reach the wire as node writes. The historical "resent once a second" observation is more likely renderer-to-native edit churn, which is local IPC.
 
 To confirm that rather than assume it, the native sync client counts edit batches received from the renderer, records skipped as unchanged, records written, ops suppressed as empty and ops built. The counts appear in the sync view's `traffic` snapshot, next to uploaded and downloaded bytes. A steadily rising edit-batch count with flat built ops would confirm local churn; built ops rising while idle would point at a real wire-level resend. No fix is applied until the counters show which.
+
+
+## Implementation progress — file sync notifications
+
+T25: a watched pair whose sides are both local folders now compares when the filesystem reports a change (FSEvents on macOS, via the existing `notify` dependency). Changes are debounced by a second, and a 10-minute safety pass runs regardless. If either folder cannot be watched, the pair keeps the 5-second compare. Pairs with a remote side keep the 5-second compare because providers offer no change feed; failures still back off to 5 minutes. `FileSyncWatcher` and `FileSyncRemotePoller` in `domain/file_sync` are never instantiated. They are dead code, not live pollers.
