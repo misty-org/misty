@@ -1,4 +1,4 @@
-import { httpRequest } from "./client/http";
+import { httpOutageRemainingMs, httpRequest } from "./client/http";
 import { onRateLimitRecovery } from "./client/rateLimit";
 import { parseRetryAfter } from "./client/errors";
 import {
@@ -190,7 +190,8 @@ async function stream(
     }
     // A handover to the native feed retries at once.
     if (!signal.aborted && attempt.signal.aborted) continue;
-    await waitForEventRetry(delay, signal);
+    // Share the client's outage cooldown instead of reconnecting into it.
+    await waitForEventRetry(Math.max(delay, httpOutageRemainingMs()), signal);
   }
 }
 
