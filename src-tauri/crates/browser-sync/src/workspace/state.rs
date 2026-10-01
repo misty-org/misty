@@ -316,8 +316,10 @@ impl WorkspaceState {
                 .is_some_and(|c| c.fields == record.fields)
                 && nodes.get(id).is_some_and(|n| n.parent_id == *parent);
             if unchanged {
+                super::stats::add(&super::stats::RECORDS_UNCHANGED, 1);
                 continue;
             }
+            super::stats::add(&super::stats::RECORDS_WRITTEN, 1);
             let body = serde_json::to_vec(&NodeBody::Record {
                 kind: record.kind,
                 id: record.id.clone(),
@@ -420,8 +422,10 @@ impl WorkspaceState {
             && same_resume
             && self.version > 0
         {
+            super::stats::add(&super::stats::OPS_SUPPRESSED, 1);
             return Ok(None);
         }
+        super::stats::add(&super::stats::OPS_BUILT, 1);
         let merkle_root = merkle::root(leaves(&self.workspace_id, &nodes, &next_slots)?).to_vec();
         let body = serde_json::to_vec(&NodeBody::Root {
             workspace_version: version,
