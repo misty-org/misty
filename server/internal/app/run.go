@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
@@ -51,7 +52,8 @@ func Run() {
 		WorkerFunc(func(ctx context.Context) {
 			runDatabaseQueue(ctx, server, "abuse-retention", func(ctx context.Context) (int, error) { return server.Database.PurgeExpiredAbuseBlocks(ctx, 250) })
 		}),
-		WorkerFunc(func(ctx context.Context) { runAgentRetention(ctx, server) }),
+		WorkerFunc(func(ctx context.Context) { runLifecycleQueues(ctx, server) }),
+		WorkerFunc(func(ctx context.Context) { runRetention(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runPersonalAgentTaskProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryPeopleProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryRenditionProcessing(ctx, server) }),
@@ -110,104 +112,25 @@ func runAIEmbeddingProcessing(ctx context.Context, server *Server) {
 	})
 }
 
+// The agent dispatcher runs as two durable queues woken by committed hints and
+// their earliest real deadline: invocation runtime deliveries and Space runs.
 func runPersonalAgentTaskProcessing(ctx context.Context, server *Server) {
 	if server.Spaces == nil {
 		return
 	}
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
 	workerID := "personal-agent-task-worker-" + uuid.NewString()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Spaces.ProcessAssignedPersonalAgentRuns(ctx, workerID, 2); err != nil {
-				log.Printf("Personal Agent Task processing failed: %v", err)
-			}
-		}
+	var workers sync.WaitGroup
+	if server.Spaces.AgentRuntimeDeliveriesEnabled() {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			runDatabaseQueue(ctx, server, "agent-runtime", func(ctx context.Context) (int, error) {
+				return server.Spaces.ProcessAgentRuntimeDeliveries(ctx, 2)
+			})
+		}()
 	}
-}
-
-func runAgentRetention(ctx context.Context, server *Server) {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	retentionCounter := 0
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := server.Database.ProcessAICleanupJobs(ctx, 25); err != nil {
-				log.Printf("AI privacy cleanup failed: %v", err)
-			}
-			if _, err := server.Database.PurgeExpiredAITransients(ctx, 250); err != nil {
-				log.Printf("AI transient retention cleanup failed: %v", err)
-			}
-			if server.Spaces != nil {
-				if _, err := server.Spaces.ProcessAccountDeletions(ctx, 10); err != nil {
-					log.Printf("Account deletion cleanup failed: %v", err)
-				}
-			}
-			if server.AI != nil {
-				if _, err := server.AI.ProcessDueAIRecaps(ctx, time.Now().UTC(), 25); err != nil {
-					log.Printf("AI recurring briefing processing failed: %v", err)
-				}
-				if _, err := server.AI.ProcessDueScheduledTasks(ctx, time.Now().UTC(), 25); err != nil {
-					log.Printf("Scheduled task processing failed: %v", err)
-				}
-			}
-			if _, err := server.CleanupExpiredLibraryData(ctx, 100); err != nil {
-				log.Printf("Library reservation cleanup failed: %v", err)
-			}
-			if _, err := server.CleanupExpiredJournalAssets(
-				ctx, 24*time.Hour, 100,
-			); err != nil {
-				log.Printf("Journal asset cleanup failed: %v", err)
-			}
-			if server.Library != nil {
-				if _, err := server.Database.ReleaseExpiredLibraryRenditionReservations(ctx, 100); err != nil {
-					log.Printf("Library rendition reservation cleanup failed: %v", err)
-				}
-				if _, err := server.Library.PurgeExpiredRenditions(ctx, 20); err != nil {
-					log.Printf("Library rendition purge failed: %v", err)
-				}
-			}
-			if _, err := server.Database.PurgeExpiredNotes(ctx, 100); err != nil {
-				log.Printf("Note retention purge failed: %v", err)
-			}
-			retentionCounter++
-			if retentionCounter%10 == 0 {
-				if server.Spaces != nil {
-					if _, err := server.Spaces.PurgeDueAccountDeletions(ctx, 25); err != nil {
-						log.Printf("Account deletion retention purge failed: %v", err)
-					}
-				}
-				if server.Library != nil {
-					report, reconcileErr := server.Library.ReconcileLibraryObjects(
-						ctx, 24*time.Hour, 250,
-					)
-					if reconcileErr != nil {
-						log.Printf("Library R2 reconciliation failed: %v", reconcileErr)
-					} else if report.OrphanObjectsDeleted > 0 ||
-						report.MissingPermanentObjects > 0 ||
-						report.MismatchedObjects > 0 ||
-						report.InterruptedFinalizations > 0 {
-						log.Printf(
-							"Library R2 reconciliation: checked=%d expired=%d orphan_deleted=%d missing=%d mismatched=%d retryable_finalizations=%d",
-							report.InventoryObjectsChecked,
-							report.ExpiredUploads,
-							report.OrphanObjectsDeleted,
-							report.MissingPermanentObjects,
-							report.MismatchedObjects,
-							report.InterruptedFinalizations,
-						)
-					}
-				}
-				if _, err := server.Database.PurgeExpiredSpaceData(ctx); err != nil {
-					log.Printf("Space retention purge failed: %v", err)
-				}
-			}
-		}
-	}
+	runDatabaseQueue(ctx, server, "agent-tasks", func(ctx context.Context) (int, error) {
+		return server.Spaces.ProcessPersonalAgentTasks(ctx, workerID, 2)
+	})
+	workers.Wait()
 }

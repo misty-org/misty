@@ -59,6 +59,18 @@ func (db *Database) NextWorkerDelay(ctx context.Context, queue string) (time.Dur
 		deadline = socialWorkerDeadline
 	case "billing":
 		deadline = billingWorkerDeadline
+	case "agent-runtime":
+		deadline = agentRuntimeWorkerDeadline
+	case "agent-tasks":
+		deadline = agentTaskWorkerDeadline
+	case "scheduled":
+		deadline = scheduledWorkerDeadline
+	case "ai-cleanup":
+		deadline = aiCleanupWorkerDeadline
+	case "account-deletion":
+		deadline = accountDeletionWorkerDeadline
+	case "rendition-reservations":
+		deadline = renditionReservationWorkerDeadline
 	case "embedding":
 		deadline = `SELECT min(due) FROM (
    (SELECT clock_timestamp() AS due FROM ai_retrieval_chunks c JOIN ai_retrieval_documents d ON d.id=c.document_id

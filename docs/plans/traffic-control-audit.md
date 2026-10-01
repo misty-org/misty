@@ -195,3 +195,22 @@ T10 replaces the per-viewer SSE loop that reloaded the invocation and decoded it
 Validation: unit tests cover shared incremental reads and last-viewer eviction, hints during reads and listener reset, window bounds with slow-reader replay, oversized events, owner isolation, keepalives without reads, complete terminal replay, cursor resume, expiry without polling, failed-stream replacement, and read cost independent of viewer count. A disposable PostgreSQL contract covers paging, hint commit/rollback, unrelated-invocation isolation and a second database instance. These tests have not been run since the final edits in this batch.
 
 Apply the migration before deploying notification-driven streams. It is additive; old servers keep their polling loop during a rolling update. One-shot full-history reads remain for voice speech and realtime input, which are single requests rather than loops. Remaining: the agent dispatcher (T11), retention (T13), presence/control protocol (T06–T08, T33), client/native timers and the load-test matrix.
+
+
+## Implementation progress — agent dispatcher and lifecycle sweeps
+
+T11 replaces the two-second dispatcher scan with two queues on the shared PostgreSQL listener. `agent-runtime` delivers invocation runtime deliveries and expires interventions, SDK approvals, invocation device waits and stale runtime observations. `agent-tasks` resumes Space run approvals and device waits, reconciles stale personal runs and claims jobs. Each queue plans its next database-clock deadline from the same predicates its scans clear. An empty queue performs no timed reads.
+
+- `20271001070000_agent_dispatch_notifications.sql` publishes hints only for changes that can make work due sooner. Heartbeats and observed-at stamps only move deadlines later, so they are silent. A trusted device publishes only when it returns from the 90-second offline window; heartbeats from an online device publish nothing.
+- Approval resumes are due only until their idempotent delivery row exists. The recovery scan now selects only unqueued approvals (`CreatorToolApprovalResumesUnqueued`); the existing pending listing keeps its meaning.
+- The invocation queue starts only when an agent runtime is configured, so a process without one cannot hold due work it can never clear. Work counts include wait transitions, so progress is not mistaken for contention.
+
+T13 splits the minute-level maintenance loop by what each job needs:
+
+- `scheduled` (recaps and scheduled tasks), `ai-cleanup`, `account-deletion` and `rendition-reservations` are deadline-driven queues with hints (`20271001080000_scheduled_lifecycle_notifications.sql`). The schedule planner respects the account-level AI switch, so a disabled account's schedule never keeps the queue due; re-enabling publishes a hint. Reservation expiry gained an index for its deadline.
+- Retention purges (expired AI transients, Library reservations and journal assets, renditions, notes, Space data) and the object-storage inventory comparison run as one pass every 10 minutes ±50%, owned by a single replica through a PostgreSQL session advisory lock. Each task drains bounded batches up to a fixed budget. These tables have high insert churn (messages, tickets, events), so they deliberately publish no hints. Expired rows are already excluded by their readers. Space data purges are now bounded per table, and seven-day event retention has an index.
+- `misty_worker_wakes_total` gains the new queues and a `retention` series (`deadline`, `contention` when another replica owns the pass, `error`).
+
+Validation: schema-isolated PostgreSQL tests cover idle silence, delivery retry deadlines, heartbeat-silent stale deadlines, device return hints, the approval-resume spin guard, agent exclusivity and lease deadlines, and migration down/reapply. Full-schema contracts cover dispatch planning against real invocations and deliveries, the account AI switch, cleanup hints, bounded purges and single retention ownership. A unit test covers drain and batch budgets. The full Go suite passes except `TestRouteInventory`, which already fails on the base commit.
+
+Apply both migrations before deploying. Both are additive; old polling processes keep working during a rolling update.
