@@ -39,7 +39,8 @@ interface ActivityStore extends ActivityData {
   ): void;
   resolveSourceRequest(accountId: string, source: Source, sourceId: string): void;
   load(): Promise<void>;
-  refresh(): Promise<void>;
+  /** Re-reads the named sources, or both when none are named. */
+  refresh(only?: ActivityRefreshSource[]): Promise<void>;
   ingestLocal(input: LocalActivityInput): string | null;
   markRead(id: string): void;
   markAllRead(ids?: string[]): Promise<void>;
@@ -53,6 +54,8 @@ interface ActivityStore extends ActivityData {
   setOffline(offline: boolean): void;
   clearError(): void;
 }
+
+export type ActivityRefreshSource = "approvals" | "interventions";
 
 export const useActivityStore = create<ActivityStore>()(
   persist(
@@ -76,9 +79,9 @@ export const useActivityStore = create<ActivityStore>()(
             void publishNativeActivity(item);
         }
       };
-      const refresh = async () => {
+      const refresh = async (only?: ActivityRefreshSource[]) => {
         const account = activityAccountKey(get());
-        if (!get().accountId) return;
+        if (!get().accountId || only?.length === 0) return;
         if (typeof navigator !== "undefined" && !navigator.onLine) {
           set({ loading: false, offline: true });
           return;
@@ -87,8 +90,13 @@ export const useActivityStore = create<ActivityStore>()(
         try {
           const accountId = get().accountId;
           const sources = [useCapabilityApprovals, useAgentInterventions];
+          const selected = only
+            ? sources.filter((_, index) =>
+                only.includes(index === 0 ? "approvals" : "interventions"),
+              )
+            : sources;
           await Promise.all(
-            sources.map((source) => {
+            selected.map((source) => {
               const current = source.getState();
               return current.accountId === accountId ? current.refresh() : undefined;
             }),
