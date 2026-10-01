@@ -738,6 +738,7 @@ impl WorkspaceSync {
         if changes.is_empty() || changes.len() > 256 {
             return Err(Error::Invalid);
         }
+        super::stats::add(&super::stats::EDIT_BATCHES, 1);
         let (shared, own): (Vec<_>, Vec<_>) = changes
             .into_iter()
             .partition(|c| belongs_to_shared(model::change_kind(c)));

@@ -44,12 +44,24 @@ pub struct TrafficCounters {
 pub struct TrafficSnapshot {
     pub uploaded_bytes: u64,
     pub downloaded_bytes: u64,
+    /// Workspace publication counters for this process (see `workspace::stats`).
+    pub workspace_edit_batches: u64,
+    pub workspace_records_unchanged: u64,
+    pub workspace_records_written: u64,
+    pub workspace_ops_suppressed: u64,
+    pub workspace_ops_built: u64,
 }
 impl TrafficCounters {
     pub fn snapshot(&self) -> TrafficSnapshot {
+        use crate::workspace::stats;
         TrafficSnapshot {
             uploaded_bytes: self.uploaded.load(Ordering::Relaxed),
             downloaded_bytes: self.downloaded.load(Ordering::Relaxed),
+            workspace_edit_batches: stats::read(&stats::EDIT_BATCHES),
+            workspace_records_unchanged: stats::read(&stats::RECORDS_UNCHANGED),
+            workspace_records_written: stats::read(&stats::RECORDS_WRITTEN),
+            workspace_ops_suppressed: stats::read(&stats::OPS_SUPPRESSED),
+            workspace_ops_built: stats::read(&stats::OPS_BUILT),
         }
     }
 }

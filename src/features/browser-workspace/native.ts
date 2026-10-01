@@ -72,7 +72,16 @@ export interface NativeSyncView {
   };
   devices?: SyncDeviceInfo[];
   full_sync?: boolean;
-  traffic?: { uploaded_bytes: number; downloaded_bytes: number };
+  traffic?: {
+    uploaded_bytes: number;
+    downloaded_bytes: number;
+    /** Workspace publication counters, for tracing unchanged resends. */
+    workspace_edit_batches?: number;
+    workspace_records_unchanged?: number;
+    workspace_records_written?: number;
+    workspace_ops_suppressed?: number;
+    workspace_ops_built?: number;
+  };
   presence: { device_id: string; online: boolean; ready: boolean; applied_sequence: number }[];
   workspace: WorkspaceRecords;
   pending_operation_ids: string[];

@@ -129,7 +129,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T18 | Done: the desktop main window follows the sync socket's account events while it is connected and falls back to the event stream otherwise; needs on-device verification |
 | T19 | Done for HTTP, invocation stream, Space socket, Connected Devices and native control advertisement; an account-wide cooldown shared across transports remains |
 | T20, T21 | Done |
-| T22 | Not done: needs client-side instrumentation of unchanged workspace publications before any fix |
+| T22 | Instrumented: the op builder already suppresses unchanged records and empty ops; counters now show which layer churns |
 | T23, T24, T36 | Partly done (sync heartbeat); remaining timers are local-only, see the timer inventory |
 | T25 | Partly done: failure backoff and adaptive peer rescans; OS file notifications remain |
 | T26, T27 | Done |
@@ -370,3 +370,10 @@ The shared account-event stream follows the native feed while it is connected fo
 A desktop with sync running therefore holds one connection for account invalidations instead of two. Unverified: this path needs an on-device check with sync connected (Network panel shows no `/misty/events` while sync is up, and one reappears when sync is locked).
 
 Also fixed: the account-event stream only passes known topics, and the topics added for client polling (`scheduled-tasks`, `usage`, `library-renditions`, `device-pairing`, `devices`) were missing from that list.
+
+
+## Implementation progress — workspace resend instrumentation
+
+T22: reading the publish path shows the op builder already skips records whose fields and placement are unchanged, and returns no op when nothing changed. An unchanged workspace therefore cannot reach the wire as node writes. The historical "resent once a second" observation is more likely renderer-to-native edit churn, which is local IPC.
+
+To confirm that rather than assume it, the native sync client counts edit batches received from the renderer, records skipped as unchanged, records written, ops suppressed as empty and ops built. The counts appear in the sync view's `traffic` snapshot, next to uploaded and downloaded bytes. A steadily rising edit-batch count with flat built ops would confirm local churn; built ops rising while idle would point at a real wire-level resend. No fix is applied until the counters show which.
