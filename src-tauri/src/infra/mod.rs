@@ -42,7 +42,6 @@ pub mod explorer;
 pub mod explorer_library;
 pub mod file_sync;
 mod macos_privacy;
-pub mod mail_cache;
 #[cfg(desktop)]
 pub mod media_search;
 pub mod metadata;

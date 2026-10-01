@@ -8,7 +8,6 @@ import {
   FolderOpen,
   Globe2,
   House,
-  Inbox,
   MessagesSquare,
   Notebook,
   SquareTerminal,
@@ -21,7 +20,6 @@ import {
 /** App identity shared by navigation, tabs, launchers, and Discover. */
 export const appIcons = {
   home: House,
-  inbox: Inbox,
   social: MessagesSquare,
   journal: Notebook,
   files: FolderOpen,

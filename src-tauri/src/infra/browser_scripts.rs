@@ -177,7 +177,6 @@ pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bo
         )
         .replace("__MISTY_BACKGROUND_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_background.js") } else { "" })
         .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_context_menu.js") } else { "" })
-        .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", include_str!("browser_semantic_snapshot.js"))
         .replace(
             "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),

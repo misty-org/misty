@@ -12,49 +12,6 @@ struct PageContext {
     editable: bool,
     link: String,
     image: String,
-    mail: Option<MailContext>,
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct MailContext {
-    account: String,
-    thread_reference: String,
-}
-
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct AvailabilityRequest {
-    id: String,
-    scope_id: String,
-    profile_id: String,
-    space_id: String,
-    provider_id: String,
-    account: String,
-    capabilities: Vec<String>,
-    origins: Vec<String>,
-}
-
-pub(super) struct AvailabilityReceipt {
-    request: AvailabilityRequest,
-    observed: std::time::Instant,
-}
-
-pub(super) fn publish_availability(webview: Webview, state: State<'_, BrowserSessionState>, request: AvailabilityRequest) -> Result<(), String> {
-    if webview.label() != "main" && !webview.label().starts_with("misty-agent-") { return Err("Only Misty's trusted shell can publish action availability.".into()); }
-    if browser_owner_label(webview.app_handle(),&request.id)!=webview.window().label(){return Err("Browser belongs to another window".into())}
-    if request.account.len() > 320 || request.account.is_empty() || request.capabilities.len() > 4 || request.origins.is_empty() || request.origins.len() > 32 ||
-        request.capabilities.iter().any(|c| !["inbox.read", "inbox.draft", "inbox.send", "tasks.create"].contains(&c.as_str())) {
-        return Err("Invalid browser action availability.".into());
-    }
-    let mut sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?;
-    let session = sessions.get_mut(&request.id).ok_or("Browser view is closed.")?;
-    if session.scope_id != request.scope_id || session.context_profile_id() != Some(&request.profile_id) ||
-        session.origin_space_id.as_deref() != Some(&request.space_id) || session.profile_provider.as_deref() != Some(&request.provider_id) {
-        return Err("Browser context changed.".into());
-    }
-    session.context_capabilities = Some(AvailabilityReceipt { request, observed: std::time::Instant::now() });
-    Ok(())
 }
 
 #[derive(Clone, Serialize)]
@@ -124,13 +81,9 @@ struct MenuPresentation {
 /// Commands the owning browser workspace runs itself; the menu only names the page they target.
 const WORKSPACE_COMMANDS: [&str; 7] = ["back", "forward", "reload", "bookmark", "qr-code", "annotate", "open-link-split"];
 
-fn menu_actions(context: &AskContext, task: bool, reply: bool) -> Vec<String> {
+fn menu_actions(context: &AskContext) -> Vec<String> {
     let page = &context.page;
-    let mut actions = vec!["ask"];
-    if task { actions.push("create-task"); }
-    if reply { actions.push("prepare-reply"); }
-    if task && reply { actions.push("task-and-reply"); }
-    actions.push("separator");
+    let mut actions = vec!["ask", "separator"];
     if !page.link.is_empty() { actions.extend(["open-link", "open-link-split", "copy-link", "separator"]); }
     if !page.image.is_empty() { actions.extend(["open-image", "copy-image-link", "separator"]); }
     if page.selection { actions.extend(["copy", "search-web"]); }
@@ -155,13 +108,7 @@ fn menu_actions(context: &AskContext, task: bool, reply: bool) -> Vec<String> {
 
 fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
     let key = uuid::Uuid::new_v4().to_string();
-    let (task, reply) = {
-        let state = app.state::<BrowserSessionState>();
-        let sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?;
-        let receipt = sessions.get(&context.id).and_then(|s| s.context_capabilities.as_ref());
-        available_suggestions(receipt, &context)
-    };
-    let actions = menu_actions(&context, task, reply);
+    let actions = menu_actions(&context);
     let owner=browser_owner_label(app,&context.id);
     let window = app.get_window(&owner).ok_or("Misty window is unavailable")?;
     let cursor = window.cursor_position().map_err(|e| e.to_string())?;
@@ -206,7 +153,7 @@ pub(super) fn select(app: &AppHandle, webview: &Webview, key: &str, action: &str
         "dismiss" => {},
         #[cfg(debug_assertions)]
         "inspect" => view.open_devtools(),
-        "ask" | "create-task" | "prepare-reply" | "task-and-reply" => {
+        "ask" => {
             context.intent = action.into();
             app.emit_to(webview.window().label(), "misty://browser-ask-context", context).map_err(|e| e.to_string())?;
         }
@@ -243,36 +190,19 @@ pub(super) fn select(app: &AppHandle, webview: &Webview, key: &str, action: &str
     Ok(())
 }
 
-fn available_suggestions(receipt: Option<&AvailabilityReceipt>, context: &AskContext) -> (bool, bool) {
-    let (Some(receipt), Some(mail)) = (receipt, &context.page.mail) else { return (false, false) };
-    let r = &receipt.request;
-    let origin = Url::parse(&context.page.url).ok().map(|u| u.origin().ascii_serialization());
-    if receipt.observed.elapsed() > Duration::from_secs(300) || r.id != context.id || r.scope_id != context.scope_id ||
-        Some(r.profile_id.as_str()) != context.profile_id.as_deref() || Some(r.space_id.as_str()) != context.space_id.as_deref() ||
-        Some(r.provider_id.as_str()) != context.provider_id.as_deref() || !r.account.eq_ignore_ascii_case(&mail.account) ||
-        mail.thread_reference != context.page.url || !origin.as_ref().is_some_and(|o| r.origins.contains(o)) || context.page.editable || context.page.content.trim().is_empty() {
-        return (false, false);
-    }
-    let has = |name: &str| r.capabilities.iter().any(|c| c == name);
-    (has("tasks.create"), has("inbox.read") && has("inbox.draft"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn fixture() -> (AvailabilityReceipt, AskContext) {
+    fn fixture() -> AskContext {
         let page: PageContext = serde_json::from_value(json!({
-            "url": "https://mail.google.com/mail/u/0/#inbox/pilot", "documentRevision": "1:2", "title": "Pilot", "content": "Please reply", "selection": false, "editable": false, "link": "", "image": "",
-            "mail": {"account": "pilot@example.com", "threadReference": "https://mail.google.com/mail/u/0/#inbox/pilot"}
+            "url": "https://example.com/article", "documentRevision": "1:2", "title": "Pilot", "content": "Please reply", "selection": false, "editable": false, "link": "", "image": ""
         })).unwrap();
-        let context = AskContext { id: "view".into(), scope_id: "scope".into(), space_id: Some("family".into()), profile_id: Some("profile".into()), provider_id: Some("google".into()), revision: "1:2".into(), content_hash: "hash".into(), page, intent: "ask".into() };
-        let receipt = AvailabilityReceipt { request: AvailabilityRequest { id: "view".into(), scope_id: "scope".into(), profile_id: "profile".into(), space_id: "family".into(), provider_id: "google".into(), account: "pilot@example.com".into(), capabilities: vec!["inbox.read".into(), "inbox.draft".into(), "tasks.create".into()], origins: vec!["https://mail.google.com".into()] }, observed: std::time::Instant::now() };
-        (receipt, context)
+        AskContext { id: "view".into(), scope_id: "scope".into(), space_id: Some("family".into()), profile_id: Some("profile".into()), provider_id: None, revision: "1:2".into(), content_hash: "hash".into(), page, intent: "ask".into() }
     }
     #[test]
     fn custom_menu_only_dispatches_presented_actions_for_its_live_key() {
-        let (_, context) = fixture();
-        let mut menu = PendingMenu { key: "current".into(), created: std::time::Instant::now(), actions: menu_actions(&context, false, false), context };
+        let context = fixture();
+        let mut menu = PendingMenu { key: "current".into(), created: std::time::Instant::now(), actions: menu_actions(&context), context };
         assert!(menu_action_allowed(&menu, "current", "ask"));
         assert!(menu_action_allowed(&menu, "current", "dismiss"));
         assert!(!menu_action_allowed(&menu, "old", "ask"));
@@ -284,12 +214,12 @@ mod tests {
     }
     #[test]
     fn custom_menu_preserves_context_appropriate_browser_commands() {
-        let (_, mut context) = fixture();
+        let mut context = fixture();
         context.page.selection = true;
         context.page.editable = true;
         context.page.link = "https://example.com/link".into();
         context.page.image = "https://example.com/image.png".into();
-        let actions = menu_actions(&context, false, false);
+        let actions = menu_actions(&context);
         assert_eq!(actions.first().map(String::as_str), Some("ask"));
         for action in ["copy", "cut", "paste", "search-web", "open-link", "open-link-split", "copy-link", "open-image", "copy-image-link"] {
             assert!(actions.iter().any(|a| a == action));
@@ -297,61 +227,17 @@ mod tests {
         assert!(!actions.iter().any(|a| a == "reload"), "page commands stay off link, image, and selection menus");
         context.page.editable = false;
         context.page.selection = false;
-        let actions = menu_actions(&context, true, true);
-        assert!(actions.iter().any(|a| a == "task-and-reply"));
+        let actions = menu_actions(&context);
         assert!(!actions.iter().any(|a| ["copy", "cut", "paste"].contains(&a.as_str())));
     }
     #[test]
     fn page_menu_offers_page_commands_without_stray_separators() {
-        let (_, mut context) = fixture();
-        context.page.mail = None;
-        let actions = menu_actions(&context, false, false);
+        let context = fixture();
+        let actions = menu_actions(&context);
         for action in ["back", "forward", "reload", "bookmark", "copy-page-link", "qr-code", "annotate"] {
             assert!(actions.iter().any(|a| a == action), "{action}");
         }
         assert!(actions.windows(2).all(|pair| !(pair[0] == "separator" && pair[1] == "separator")));
         assert_ne!(actions.last().map(String::as_str), Some("separator"));
-    }
-    #[test]
-    fn suggestions_require_host_receipt_and_fresh_matching_mail_identity() {
-        let (receipt, mut context) = fixture();
-        assert_eq!(available_suggestions(Some(&receipt), &context), (true, true));
-        assert_eq!(available_suggestions(None, &context), (false, false));
-        context.page.mail.as_mut().unwrap().account = "other@example.com".into();
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-    }
-    #[test]
-    fn stale_or_retargeted_context_never_inherits_suggestions() {
-        let (mut receipt, mut context) = fixture();
-        receipt.observed -= Duration::from_secs(301);
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-        receipt.observed = std::time::Instant::now();
-        context.space_id = Some("work".into());
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-        context.space_id = Some("family".into());
-        context.page.url = "https://mail.google.com/mail/u/0/#inbox/another".into();
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-        context.page.url = "https://unrelated.example/".into();
-        context.page.mail.as_mut().unwrap().thread_reference = context.page.url.clone();
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-    }
-    #[test]
-    fn unrelated_controls_and_editors_do_not_offer_reply_actions() {
-        let (receipt, mut context) = fixture();
-        context.page.editable = true;
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-        context.page.editable = false;
-        context.page.mail = None;
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
-    }
-    #[test]
-    fn suggestions_follow_independently_available_capabilities() {
-        let (mut receipt, context) = fixture();
-        receipt.request.capabilities = vec!["inbox.read".into(), "inbox.draft".into()];
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, true));
-        receipt.request.capabilities = vec!["tasks.create".into()];
-        assert_eq!(available_suggestions(Some(&receipt), &context), (true, false));
-        receipt.request.capabilities.clear();
-        assert_eq!(available_suggestions(Some(&receipt), &context), (false, false));
     }
 }

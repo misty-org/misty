@@ -1,5 +1,4 @@
 export type IntegrationCapability =
-  | "mail"
   | "chat"
   | "notes"
   | "calendar"

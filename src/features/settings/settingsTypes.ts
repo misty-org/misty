@@ -35,7 +35,6 @@ export type SettingsSection =
   | "layout"
   | "notifications"
   | "shortcuts"
-  | "inbox"
   | "social"
   | "journal"
   | "files"

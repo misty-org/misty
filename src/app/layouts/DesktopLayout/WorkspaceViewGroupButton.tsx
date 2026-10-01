@@ -137,9 +137,7 @@ export function ViewIcon({
   const appId = getViewAppId(tab);
   if (brandIconAsset(appId)) return <BrandIcon brand={appId} size={size} />;
   const provider =
-    tab && (appId === "inbox" || appId === "social" || appId === "chat")
-      ? providerFromRoute(tab.route, appId === "inbox" ? "inbox" : "chat")
-      : null;
+    tab && (appId === "social" || appId === "chat") ? providerFromRoute(tab.route, "chat") : null;
   if (provider)
     return (
       <span className="inline-flex shrink-0">
@@ -456,7 +454,6 @@ export function workspaceViewAutomaticTitle(
     const view = route.searchParams.get("view") ?? "";
     const provider = route.searchParams.get("provider") ?? "";
     const generic = new Set([
-      "Inbox",
       "Social",
       "Chat",
       "Browser",
@@ -472,8 +469,8 @@ export function workspaceViewAutomaticTitle(
       return `${group.label} integrations`;
     if (Object.prototype.hasOwnProperty.call(websiteIntegrations, provider))
       return websiteIntegrations[provider as WebsiteIntegrationId].label;
-    const service = providerFromRoute(tab.route, appId === "inbox" ? "inbox" : "chat");
-    if (service && ["inbox", "social", "chat"].includes(appId)) return providers[service].label;
+    const service = providerFromRoute(tab.route, "chat");
+    if (service && ["social", "chat"].includes(appId)) return providers[service].label;
     const sections: Record<string, Record<string, string>> = {
       planner: {
         "": "Tasks",
@@ -488,10 +485,6 @@ export function workspaceViewAutomaticTitle(
       },
       files: {
         "": "Explorer",
-      },
-      inbox: {
-        "": "Misty Inbox",
-        misty: "Misty Inbox",
       },
       social: {
         "": "Misty Social",

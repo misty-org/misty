@@ -115,8 +115,8 @@ it("keeps captured-page assistance available when a local device is unavailable"
   });
   expect(fixture.register).not.toHaveBeenCalled();
 });
-it("prepares suggestions without assuming a built-in Planner or sending a task", async () => {
-  await openBrowserAsk({ ...snapshot(), intent: "task-and-reply" });
-  expect(fixture.open.mock.calls[0][0].prompt).toContain("Ask which website to use");
+it("opens Misty with the page attached and no prepared prompt", async () => {
+  await openBrowserAsk(snapshot());
+  expect(fixture.open.mock.calls[0][0].prompt).toBe("");
   expect(fixture.state.submitAnswer).not.toHaveBeenCalled();
 });

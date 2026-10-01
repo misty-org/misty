@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MistyTaskCreateInputSchema,
   mistyTaskCapabilities,
-  mistyInboxCapabilities,
+  mistySocialCapabilities,
 } from "../index.ts";
 const uuid = "10000000-0000-4000-8000-000000000001";
 describe("versioned semantic browser actions", () => {
@@ -15,7 +15,7 @@ describe("versioned semantic browser actions", () => {
         containerReference: "https://app.todoist.com/app/project/1",
         label: "Work",
       },
-      source: { reference: "https://mail.google.com/#inbox/1", label: "Email" },
+      source: { reference: "https://app.todoist.com/app/task/1", label: "Request" },
       dueDate: "2026-09-10",
     };
     expect(MistyTaskCreateInputSchema.parse(input)).toEqual(input);
@@ -34,8 +34,8 @@ describe("versioned semantic browser actions", () => {
       approval: "interactive",
       retry: "reconcile",
     });
-    expect(mistyInboxCapabilities.find((c) => c.name === "inbox.send")?.effects.retry).toBe(
-      "reconcile",
-    );
+    expect(
+      mistySocialCapabilities.find((c) => c.name === "social.send_message")?.effects.retry,
+    ).toBe("reconcile");
   });
 });

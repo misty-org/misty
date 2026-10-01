@@ -138,7 +138,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         let location = eval(&app, "oauth-other-account", "return JSON.stringify({url:location.href});").await?;
         if location["url"] != source.as_str() { return Err("Pointer message changed page navigation".into()); }
         app.unlisten(pointer_listener);
-        for provider in ["x", "messenger", "google", "microsoft", "notion", "google-calendar", "google-drive"] {
+        for provider in ["x", "messenger", "microsoft-teams", "notion", "google-calendar", "google-drive"] {
             let id = format!("oauth-{provider}");
             create_source(&app, &id, &source, Some(provider), provider).await?;
             // Reproduces the screenshot: main is now a window containing multiple webviews.
@@ -168,7 +168,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         let previous_count = count.load(Ordering::SeqCst);
         eval(&app, "oauth-browser", "window.open('about:blank', '_blank'); return '{}';").await?;
         wait_for("ordinary Browser popup", || async { count.load(Ordering::SeqCst) > previous_count }).await?;
-        Ok("PASS: Native focus and authenticated pointer messages preserve navigation. Social, Inbox, Journal, Planner, Library and Browser popups preserve opener, isolated cookies/storage, cross-origin authentication, callback postMessage, window.close, and source draft.".to_owned())
+        Ok("PASS: Native focus and authenticated pointer messages preserve navigation. Social, Journal, Planner, Library and Browser popups preserve opener, isolated cookies/storage, cross-origin authentication, callback postMessage, window.close, and source draft.".to_owned())
     }.await;
     app.unlisten(listener);
     auth_server.abort();

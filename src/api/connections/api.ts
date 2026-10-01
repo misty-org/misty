@@ -7,7 +7,7 @@ const part = encodeURIComponent;
 /** Account-level provider connections. Tokens never enter the renderer. */
 export const connectionsApi = {
   list: () => apiRequest<AccountConnectionsResponse>("/connections"),
-  authorize: (provider: string, capabilities: IntegrationCapability[], returnTo = "/inbox") =>
+  authorize: (provider: string, capabilities: IntegrationCapability[], returnTo = "/home") =>
     apiRequest<AccountConnectionAuthorizationStart>(`/connections/${part(provider)}/authorize`, {
       method: "POST",
       body: JSON.stringify({ capabilities, return_to: returnTo }),

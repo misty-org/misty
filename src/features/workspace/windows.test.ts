@@ -202,11 +202,11 @@ describe("workspace virtual windows", () => {
   it("migrates oversized saved layouts into four panels without dropping real tabs", () => {
     const createTestTab = (id: string) => ({
       id,
-      surfaceId: "inbox" as const,
-      groupKey: "tool:inbox" as const,
-      instanceKey: "inbox",
-      title: "Inbox",
-      route: "/inbox",
+      surfaceId: "agents" as const,
+      groupKey: "tool:agents" as const,
+      instanceKey: "agents",
+      title: "Agents",
+      route: "/agents",
       sidebarVisible: false,
       state: {},
       createdAt: 1,

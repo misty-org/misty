@@ -59,7 +59,6 @@ func TestTablesHaveRowLevelSecurityEnabled(t *testing.T) {
 		"cloud_connections",
 		"cloud_oauth_states",
 		"cloud_credential_handoffs",
-		"mail_action_audit",
 		"github_app_setup_states",
 		"github_app_installations",
 		"github_code_workspaces",

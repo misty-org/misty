@@ -46,8 +46,7 @@ use app::commands::{
     explorer_save_preview_item, explorer_set_open_association, file_metadata_snapshot,
     file_sync_apply, file_sync_compare, file_sync_pair_remove, file_sync_pair_save,
     file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod, file_tools_create_symlink,
-    file_tools_read_symlink, file_tools_set_readonly, mail_cache_read, mail_cache_remove,
-    mail_cache_write, navigation_names_snapshot, navigation_names_update, notes_store_asset,
+    file_tools_read_symlink, file_tools_set_readonly, navigation_names_snapshot, navigation_names_update, notes_store_asset,
     open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
     operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
     operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
@@ -355,9 +354,6 @@ pub fn run() {
                     app_snapshot,
                     app_environment_snapshot,
                     app_configure_server,
-                    mail_cache_read,
-                    mail_cache_write,
-                    mail_cache_remove,
                     agents_device_snapshot,
                     agents_register_folder_scope,
                     agents_revoke_folder_scope,
@@ -486,8 +482,6 @@ pub fn run() {
                     #[cfg(desktop)]
                     infra::browser::browser_agent_set_locked,
                     infra::agent_workspace::agent_browser_session_id,
-                    #[cfg(target_os = "macos")]
-                    crate::infra::browser::browser_context_menu_availability,
                     #[cfg(target_os = "macos")]
                     crate::infra::browser::browser_context_menu_select,
                     #[cfg(desktop)]

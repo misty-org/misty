@@ -59,15 +59,6 @@ pub fn browser_context_menu_select(app: AppHandle, webview: Webview, key: String
     context_menu::select(&app, &webview, &key, &action)
 }
 
-#[cfg(target_os = "macos")]
-pub use context_menu::AvailabilityRequest as BrowserMenuAvailabilityRequest;
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub fn browser_context_menu_availability(webview: Webview, state: State<'_, BrowserSessionState>, request: BrowserMenuAvailabilityRequest) -> Result<(), String> {
-    context_menu::publish_availability(webview, state, request)
-}
-
 #[cfg(windows)]
 use std::sync::atomic::{AtomicIsize, AtomicU32};
 
@@ -120,8 +111,6 @@ struct BrowserSession {
     workspace_tab_id: Option<String>,
     // Native auxiliary windows stay attached to this live integration view.
     popup_parent: Option<String>,
-    #[cfg(target_os = "macos")]
-    context_capabilities: Option<context_menu::AvailabilityReceipt>,
     origin_space_id: Option<String>,
     zoom_factor: Option<f64>,
     profile_id: Option<String>,

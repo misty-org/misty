@@ -116,54 +116,7 @@ function definition(
   });
 }
 
-/** Semantic contracts, shared unchanged by Gmail, Outlook and other validated providers. */
-export const mistyInboxCapabilities = [
-  definition(
-    "inbox.read",
-    "Read visible messages or an identified thread on the bound mailbox. Report observed coverage and truncation.",
-    readInput,
-    MistyCommunicationReadResultSchema,
-    "read",
-  ),
-  definition(
-    "inbox.search",
-    "Search the bound mailbox and return only observed results, with a continuation cursor when more pages remain.",
-    searchInput,
-    MistyCommunicationReadResultSchema,
-    "read",
-  ),
-  definition(
-    "inbox.draft",
-    "Prepare and verify an unsent draft on the bound mailbox. Return its content hash and actual recipients.",
-    draftInput,
-    MistyCommunicationDraftResultSchema,
-    "write",
-  ),
-  definition(
-    "inbox.send",
-    "Send the reviewed draft only if its content hash, recipients and account still match. Reconcile uncertainty; never infer delivery from a click.",
-    MistyCommunicationSendInputSchema,
-    MistyCommunicationSendResultSchema,
-    "send",
-  ),
-  definition(
-    "inbox.manage",
-    "Apply one supported mailbox operation to explicitly identified messages and verify the resulting state.",
-    z.strictObject({
-      messages: z.array(reference).min(1).max(100),
-      action: z.enum(["archive", "mark_read", "mark_unread", "move_to_trash", "label"]),
-      label: z.string().min(1).max(200).optional(),
-    }),
-    z.strictObject({
-      sourceTargetId: z.uuid(),
-      changed: z.array(reference).max(100),
-      partial: z.boolean(),
-      evidence: z.array(MistyCapabilityEvidenceSchema).min(1).max(100),
-    }),
-    "write",
-  ),
-];
-
+/** Semantic contracts, shared unchanged by every validated social provider. */
 export const mistySocialCapabilities = [
   definition(
     "social.read_thread",

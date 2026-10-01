@@ -68,20 +68,20 @@ describe("legacy workspace scope restoration", () => {
     ]);
   });
 
-  it("preserves an Inbox tab in a space when switching back and forth", () => {
+  it("preserves an Agents tab in a space when switching back and forth", () => {
     const store = useWorkspaceStore.getState();
 
-    // 1. Space A has only an Inbox tab
+    // 1. Space A has only an Agents tab
     store.setScope("space:space-a");
-    const inboxTab = store.addSurface({
-      surfaceId: "inbox",
-      groupKey: "tool:inbox",
-      title: "Inbox",
-      route: "/inbox",
+    const agentsTab = store.addSurface({
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
     });
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.surfaceId)).toEqual([
       "home",
-      "inbox",
+      "agents",
     ]);
 
     // 2. Switch to Space B and open Journal
@@ -97,7 +97,7 @@ describe("legacy workspace scope restoration", () => {
     // 3. Switch back to Space A
     useWorkspaceStore.getState().setScope("space:space-a");
     const tabsInA = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["home", "inbox"]);
-    expect(tabsInA.find((tab) => tab.surfaceId === "inbox")?.id).toBe(inboxTab.id);
+    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["home", "agents"]);
+    expect(tabsInA.find((tab) => tab.surfaceId === "agents")?.id).toBe(agentsTab.id);
   });
 });

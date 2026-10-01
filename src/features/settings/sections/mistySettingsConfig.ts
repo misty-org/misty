@@ -7,7 +7,6 @@ export const managedSurfaces: Array<{ id: AiSurfaceId; label: string }> = [
   { id: "planner.tasks", label: "Planner" },
   { id: "planner.agenda", label: "Agenda" },
   { id: "browser", label: "Browser" },
-  { id: "inbox", label: "Inbox" },
   { id: "space.chat", label: "Space Social" },
   { id: "drawings", label: "Drawings" },
   { id: "library", label: "Library" },
