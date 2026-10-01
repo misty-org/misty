@@ -19,6 +19,10 @@ let realtimeOpenTimer: number | null = null;
 let realtimeConnectPromise: Promise<void> | null = null;
 let realtimeTicketCooldownUntil = 0;
 let reconnectAttempt = 0;
+// Backoff resets only after a connection proves stable, so a socket that
+// opens and immediately drops keeps backing off instead of retrying at 2s.
+const stableConnectionMs = 30_000;
+let realtimeOpenedAt = 0;
 let realtimeWanted = false;
 let realtimeAccountId = "";
 let realtimeGeneration = 0;
@@ -91,7 +95,7 @@ export function createSpacesRealtimeActions(
               return;
             }
             clearRealtimeOpenTimer();
-            reconnectAttempt = 0;
+            realtimeOpenedAt = Date.now();
             set((state) => ({
               realtimeConnected: true,
               error: state.snapshotReady ? null : state.error,
@@ -113,8 +117,7 @@ export function createSpacesRealtimeActions(
               if (envelope.type === "replay") {
                 for (const event of envelope.events)
                   applyRealtimeEventSafely(event, accountId, get, set);
-                if (envelope.resync_required)
-                  void Promise.all([get().load({ force: true }), get().loadInbox()]);
+                if (envelope.resync_required) void resyncSpaces(get);
               } else if (envelope.type === "event") {
                 applyRealtimeEventSafely(envelope.event, accountId, get, set);
               } else if (envelope.type === "presence") {
@@ -125,7 +128,7 @@ export function createSpacesRealtimeActions(
                   },
                 }));
               } else {
-                void Promise.all([get().load({ force: true }), get().loadInbox()]);
+                void resyncSpaces(get);
               }
             } catch {
               /* malformed server frames are ignored and recovered on reconnect */
@@ -140,6 +143,9 @@ export function createSpacesRealtimeActions(
               return;
             clearRealtimeOpenTimer();
             realtimeSocket = null;
+            if (realtimeOpenedAt && Date.now() - realtimeOpenedAt >= stableConnectionMs)
+              reconnectAttempt = 0;
+            realtimeOpenedAt = 0;
             set({ realtimeConnected: false });
             scheduleReconnect(get, accountId, generation);
           };
@@ -181,6 +187,13 @@ export function createSpacesRealtimeActions(
       sendViewingMessage(spaceId, currentViewingActive);
     },
   };
+}
+
+function resyncSpaces(get: () => SpacesStore) {
+  return Promise.all([
+    coalescedReload("spaces", () => get().load({ force: true })),
+    coalescedReload("inbox", () => get().loadInbox()),
+  ]);
 }
 
 export function resetSpacesRealtimeRuntime(): void {
