@@ -48,38 +48,35 @@ export function BrowserSyncBadge({
         sideOffset={8}
         collisionPadding={12}
         aria-label="Sync"
-        className="layer-blocking-popup max-h-[calc(100dvh-64px)] w-96 max-w-[calc(100vw-24px)] overflow-y-auto"
+        className="layer-blocking-popup max-h-[calc(100dvh-64px)] w-88 max-w-[calc(100vw-24px)] overflow-y-auto p-1.5"
         data-misty-window-drag-block="true"
       >
-        <SyncStatusView
-          status={status}
-          busy={controller.busy}
-          hideAction={controller.form}
-          onAction={() => void controller.retry()}
-        />
+        {(status.action || status.tone === "attention") && (
+          <SyncStatusView
+            compact
+            status={status}
+            busy={controller.busy}
+            hideAction={controller.form}
+            onAction={() => void controller.retry()}
+          />
+        )}
         {controller.form && (
-          <div className="mt-4">
+          <div className="px-3 py-2">
             <SyncUnlockForm controller={controller} compact />
           </div>
         )}
-        <section
-          aria-label="Devices in this workspace"
-          className="mt-4 border-t border-charcoal-border pt-3"
-        >
-          <h2 className="text-xs font-medium text-cream-muted">Devices in this workspace</h2>
-          {session ? (
+        {session && (
+          <section aria-label="Devices in this workspace">
             <SyncDeviceList key={session.session_id} session={session} compact />
-          ) : (
-            <p className="py-3 text-sm text-cream-muted">
-              Connect sync to see your workspace’s devices.
-            </p>
-          )}
-        </section>
-        <RestoreStatusList />
-        <div className="mt-2 border-t border-charcoal-border pt-3">
+          </section>
+        )}
+        <div className="px-3">
+          <RestoreStatusList />
+        </div>
+        <div className="mt-1 border-t border-charcoal-border pt-1">
           <Button
             variant="ghost"
-            className="w-full justify-between"
+            className="h-9 w-full justify-between px-3 text-sm font-normal text-cream-muted"
             onClick={() => {
               setOpen(false);
               onOpenSettings();

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserStore } from "@/features/auth/core";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
+import { Monitor } from "lucide-react";
 import { Button } from "@/shared/ui";
 import { DesktopSettingsRow as Row } from "@/features/settings/desktop";
 import { SwitchControl, TextControl } from "@/features/settings/SettingsControls";
@@ -152,7 +153,7 @@ export function SyncDeviceList({
   };
   return (
     <div>
-      <ul className="divide-y divide-charcoal-border">
+      <ul className={compact ? "" : "divide-y divide-charcoal-border"}>
         {rows.map((device) => {
           const online = device.connection === "Connected";
           const connection = online
@@ -170,25 +171,50 @@ export function SyncDeviceList({
                 : null;
           const busy = pending?.deviceId === device.device_id;
           const open =
-            !device.local &&
-            (opened ? (
+            (compact || !device.local) &&
+            (opened && !compact ? (
               <span className="text-xs text-cream-muted">Open here</span>
             ) : (
               <Button
                 size="sm"
                 variant="outline"
+                className={compact ? "shrink-0 px-2 text-xs" : undefined}
                 aria-label={`Open tabs from ${device.name} here`}
-                title={reason ?? undefined}
-                disabled={!!pending || !!reason}
+                title={opened ? "This workspace is already open here." : (reason ?? undefined)}
+                disabled={opened || !!pending || !!reason}
                 onClick={() => void change({ deviceId: device.device_id })}
               >
-                {busy && pending?.mode === undefined && pending?.name === undefined
-                  ? "Opening…"
-                  : compact
-                    ? "Open tabs here"
+                {compact
+                  ? "Open"
+                  : busy && pending?.mode === undefined && pending?.name === undefined
+                    ? "Opening…"
                     : "Open its tabs here"}
               </Button>
             ));
+          if (compact)
+            return (
+              <li key={device.device_id} className="flex items-center gap-3 px-3 py-2.5">
+                <Monitor aria-hidden className="size-4 shrink-0 text-cream-muted" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-cream" title={device.name}>
+                    {device.name}
+                  </p>
+                  <p
+                    className="mt-0.5 text-xs leading-4 text-cream-muted"
+                    role={busy ? "status" : undefined}
+                  >
+                    {busy
+                      ? "Opening…"
+                      : device.local
+                        ? "This device"
+                        : opened
+                          ? "Open here"
+                          : connection}
+                  </p>
+                </div>
+                {open}
+              </li>
+            );
           return (
             <li key={device.device_id} className={compact ? "py-3" : "py-1"}>
               <div
