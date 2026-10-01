@@ -4,6 +4,18 @@ compose() {
   docker compose --file compose.prod.yml "$@"
 }
 
+# The billing stack (misty-billing's compose.prod.yml) runs as its own Compose
+# project on the same VPS. Find its PostgreSQL container by project label.
+billing_postgres() {
+  docker ps --quiet --filter label=com.docker.compose.project=misty-billing-production \
+    --filter label=com.docker.compose.service=postgres
+}
+
+billing_service() {
+  docker ps --all --quiet --filter label=com.docker.compose.project=misty-billing-production \
+    --filter label=com.docker.compose.service=billing
+}
+
 # rclone runs in a container so the VPS needs only Docker. Credentials are
 # passed by name from this process environment, never on the command line.
 rclone() {
