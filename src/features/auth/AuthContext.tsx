@@ -13,16 +13,7 @@ import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRe
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
 import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   assertAccountIdentity,
@@ -53,18 +44,9 @@ import {
 } from "./store/useAuthTokenStore";
 import { useUserStore } from "./store/useUserStore";
 export type { AuthContextValue, AuthUser } from "./authSession";
-const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  setUser: async () => {},
-  accounts: [],
-  transitioning: false,
-  refreshUser: async () => null,
-  authenticateAccount: async (request) => request(),
-  switchAccount: async () => {},
-  resumeAccount: async () => {},
-  removeAccount: async () => {},
-  logout: async () => {},
-});
+import { AuthContext } from "./authState";
+// Preserve the public import path without recreating the context during provider refreshes.
+export { useAuth } from "./authState";
 
 /**
  * Restricted identity provider used by a separately packaged official app.
@@ -533,7 +515,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-export function useAuth() {
-  return useContext(AuthContext);
 }
