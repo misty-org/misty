@@ -974,6 +974,23 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
 }
 
 /// The environment registry is shared by init, validation, setup and Compose.
+/// Settings registry as JSON for the operator console's Configuration page.
+pub fn schema_json() -> serde_json::Value {
+    let entries = FILES
+        .iter()
+        .flat_map(|spec| {
+            spec.names.iter().map(move |name| {
+                serde_json::json!({
+                    "file": spec.path,
+                    "name": name,
+                    "required": DEV_REQUIRED.contains(name),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::Value::Array(entries)
+}
+
 pub fn describe() -> Result<()> {
     for spec in FILES {
         println!("{}", spec.path);

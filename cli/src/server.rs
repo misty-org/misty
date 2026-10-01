@@ -432,7 +432,7 @@ pub fn deploy_development(workspace: &Workspace) -> Result<()> {
         )
 }
 
-fn development_compose() -> CommandSpec {
+pub(crate) fn development_compose() -> CommandSpec {
     compose("compose.dev.yml")
 }
 
