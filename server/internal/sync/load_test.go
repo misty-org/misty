@@ -146,6 +146,8 @@ func TestBrowserSyncLoad(t *testing.T) {
 		}
 	}
 	wg.Wait()
+	// The window is the full duration even when nobody publishes.
+	time.Sleep(time.Until(deadline))
 	// Let the last deltas arrive.
 	time.Sleep(2 * time.Second)
 	after := loadDatabaseCounters(t, database)

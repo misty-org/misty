@@ -135,7 +135,7 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T26, T27 | Done |
 | T30, T31 | Done |
 | T32 | Retained by design: active-work leases carry fencing and cancellation and run only during work |
-| T34 | Measured locally at 2,000 and 10,000 devices; the 20k/30k, multi-window and outage-storm matrix needs a staging environment |
+| T34 | Measured locally at 2k, 10k, 20k and 30k devices: idle cost flat, edit latency unchanged. Multi-window and outage-storm scenarios need a staging environment |
 | T35 | Done: conditional reads on Space snapshot routes. In-app compression deliberately not added (see below) |
 
 ## Implementation progress — first batch
@@ -351,7 +351,19 @@ Idle connection cost fell from about 0.40 database commits per connected device 
 
 The same harness at the audit's 10,000-device scale (5,000 accounts, 0.1% editing, 120 seconds after a 30-second settle): **28.5 commits per second**, 168 edits, no errors, delta p50/p99 11.9/21.9 ms, ack p99 24.8 ms, test-process heap 437 MB. Idle cost stays flat from 2,000 to 10,000 devices; the remainder tracks edit activity.
 
-Limits: application database transactions only, not wire bytes. The harness clients send no heartbeat frames; real clients now send them only on change. This is one machine, not a capacity envelope: the 10k/20k/30k matrix, multi-window and outage-storm scenarios still need a staging environment. TLS, tunnel and proxy overhead are excluded.
+The 10k/20k/30k device matrix, same machine and settings, with `MISTY_SYNC_LOAD_UNIX=1` (one loopback address runs out of ephemeral ports near 16k connections). "Idle" means no device edits; earlier idle runs measured only the 2-second tail because the window ended when no editor was running, so the harness now always waits out the full duration.
+
+| Devices | Editing | Commits/s | Edits | Delta p50 / p99 | Ack p99 | Errors | Heap |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 10,000 | none | 2.2 | 0 | — | — | 0 | 426 MB |
+| 20,000 | none | 0.4 | 0 | — | — | 0 | 853 MB |
+| 30,000 | none | 0.2 | 0 | — | — | 0 | 1.3 GB |
+| 20,000 | 0.1% | 79.3 | 528 | 8.2 / 17.9 ms | 18.2 ms | 0 | 874 MB |
+| 30,000 | 0.1% | 103.1 | 696 | 7.0 / 15.5 ms | 15.2 ms | 0 | 1.3 GB |
+
+Idle database work does not grow with connected devices; it is instance lease renewal and sweeps, a fraction of a commit per second. Edit work is about 18 commits per published edit (publish, fanout delivery and acks for the peer), independent of fleet size, and delivery latency does not degrade from 10k to 30k. Heap is about 45 KB per connection, both client and server side, in one process.
+
+Limits: application database transactions only, not wire bytes. The harness clients send no heartbeat frames; real clients now send them only on change. One machine and one process for both ends: multi-window clients, outage/reconnect storms and network overhead (TLS, tunnel, proxy) need a staging environment. Do not run a synthetic storm against production.
 
 
 ## Implementation progress — fanout authorization and conditional reads
