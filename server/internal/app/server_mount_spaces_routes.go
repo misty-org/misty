@@ -50,6 +50,8 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}", spaces.Space())
 	s.Router.Get(prefix+"/spaces/{spaceID}/home", api.HomeDashboard(s.Database))
+	s.Router.Get(prefix+"/spaces/{spaceID}/item-state", api.SpacePersonalItems(s.Database))
+	s.Router.Patch(prefix+"/spaces/{spaceID}/item-state", api.SpacePersonalItems(s.Database))
 	s.Router.Post(prefix+"/spaces/{spaceID}/home/visits", api.RecordHomeVisit(s.Database))
 	s.Router.Get(prefix+"/spaces/{spaceID}/agenda", api.ConditionalGET(spaces.SpaceAgenda()))
 	s.Router.Get(prefix+"/me/home/agenda", api.ConditionalGET(spaces.HomeAgenda()))
