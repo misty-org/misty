@@ -229,3 +229,23 @@ T06, T08, T14 and the server half of T15 change how sync sockets stay live and c
 Validation: store tests cover change-only progress writes and readiness hints, row deletion with last-seen retention, lease-based liveness, sweeps of lapsed and legacy rows with presence hints, and shutdown release. Socket tests cover silent unchanged heartbeats, self-fencing, and in-band session revalidation that keeps an active session's socket open and closes a revoked one with a reconnect code. An HTTP contract covers the account stream staying open across revalidations and ending on revocation. Existing two-server socket, workspace and control suites pass.
 
 Apply `20271001090000_browser_sync_live_connections.sql` before deploying. Older processes keep their per-connection expiry semantics during a rolling update; their rows are swept once expired. The desktop client still sends heartbeat frames every 15 seconds; the server now ignores unchanged ones. Making the client send frames only on change is part of the native batch.
+
+
+## Implementation progress — client polling replaced by account topics
+
+T20 and most of T07 replace client timers with content-free account events from `20271001100000_account_change_topics.sql`. Each surface re-reads its own authorized snapshot on its topic and on stream reset.
+
+| Surface | Before | Now |
+|---|---|---|
+| Scheduled tasks | 60-second list poll plus focus | `scheduled-tasks` topic from task changes (claims, runs, edits), via `observeAccountChanges` |
+| Hosted-AI allowance | 5-minute poll | Local run-settle events plus a `usage` topic published when a billing transition is delivered for the account |
+| Space storage usage | 5-minute poll | Existing Space Library events (all members' uploads) and mount |
+| Pending rendition | 1.5-second poll | `library-renditions` topic to the edit's author plus Space Library events; one read on subscribe closes the race |
+| Pairing dialog | 1.5-second poll | `device-pairing` topic on state changes plus one timer at the session's expiry |
+| Connected Devices | Every 30 seconds: ticket keys, native init, registration, presence, peers, plus focus | Setup once per identity and endpoint; presence only every 30 seconds; peers on the `devices` topic (pairs, identity, addressing, return from offline); peers age offline locally |
+
+Presence now also refreshes the trusted device's agent eligibility and says so (`deviceSeen`). The agent worker skips its own 30-second heartbeat while that is recent, so a desktop running both sends one liveness call instead of two. Against servers without `deviceSeen`, the worker keeps heartbeating.
+
+Remaining for T07/T33: device liveness is still one 30-second HTTP call per online desktop. Moving it onto the native sync socket's process lease needs the agent and sync device identities linked. Without verifying against old servers, ticket keys are still fetched once per setup rather than cached by version.
+
+Validation: the server changes build and the full Go suite passes; the triggers were applied to the disposable schema. Per the agreed scope, frontend changes have not had Vitest or TypeScript runs.

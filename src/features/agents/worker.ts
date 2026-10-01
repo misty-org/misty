@@ -6,6 +6,7 @@ import type { AgentDevice } from "./model/interfaces/types";
 import {
   ensureServerAgentDevice,
   heartbeatServerAgentDevice,
+  serverAgentDeviceSeenWithin,
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
@@ -77,7 +78,12 @@ export class DesktopAgentJobWorker {
       if (!current()) return;
       const serverDevice = await ensureServerAgentDevice(localDevice);
       if (!current()) return;
-      this.refreshPresence = () => heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
+      // Connected Devices presence also refreshes this device's liveness on
+      // servers that report it; skip the heartbeat while that is recent.
+      this.refreshPresence = () =>
+        serverAgentDeviceSeenWithin(serverDevice.id, 25_000)
+          ? Promise.resolve()
+          : heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
       while (current() && this.active.size < 8) {
         const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id);
         if (!current()) return;

@@ -12,6 +12,7 @@ export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgents
 export {
   browserDeviceSessionId,
   ensureServerAgentDevice,
+  noteServerAgentDeviceSeen,
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
 export * from "./store/useAiServerStore";

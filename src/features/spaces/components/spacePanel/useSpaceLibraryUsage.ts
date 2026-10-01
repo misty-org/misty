@@ -10,12 +10,11 @@ import {
   getCachedSpaceStorageUsage,
   isSpaceStorageUsageStale,
   subscribeUsageCache,
-  USAGE_CACHE_TTL_MS,
 } from "../../store/usageCache";
 
 /**
- * Storage quota for the active Space, cached and rechecked every 5 minutes
- * or when the Library changes.
+ * Storage quota for the active Space, cached and rechecked when the Space's
+ * Library changes (its realtime events cover every member's uploads).
  */
 export function useSpaceLibraryUsage(options: {
   activeSpaceId: string;
@@ -45,10 +44,6 @@ export function useSpaceLibraryUsage(options: {
       setUsage(getCachedSpaceStorageUsage(activeSpaceId));
     }
 
-    const interval = setInterval(() => {
-      void fetchSpaceStorageUsage(activeSpaceId, true);
-    }, USAGE_CACHE_TTL_MS);
-
     const reloadOnLibraryEvent = (event: Event) => {
       const detail = (event as CustomEvent<{ space_id?: string }>).detail;
       if (detail?.space_id === activeSpaceId) {
@@ -59,7 +54,6 @@ export function useSpaceLibraryUsage(options: {
     window.addEventListener("misty:space-library-event", reloadOnLibraryEvent);
     return () => {
       unsubscribe();
-      clearInterval(interval);
       window.removeEventListener("misty:space-library-event", reloadOnLibraryEvent);
     };
   }, [activeSpace, activeSpaceId, enabled, snapshotReady]);
