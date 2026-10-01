@@ -6,6 +6,8 @@ import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /** Checks only. Downloads and installation always follow an explicit user action. */
+const minCheckIntervalMs = 6 * 60 * 60_000;
+
 export function UpdateNotices({ accountId }: { accountId: string }) {
   const [hostVersion, setHostVersion] = useState("");
   const [notice, setNotice] = useState("");
@@ -26,13 +28,18 @@ export function UpdateNotices({ accountId }: { accountId: string }) {
     if (!accountId || !enabled || !hasTauriInternals()) return;
     let closed = false,
       checking = false,
+      found = false,
       last = 0;
+    // Background checks are a slow fallback: one at start, then at most one per
+    // 6 hours, jittered, and none once an update is found. Settings still
+    // checks on demand.
     const refresh = async () => {
-      if (closed || checking || Date.now() - last < 5 * 60_000) return;
+      if (closed || checking || found || Date.now() - last < minCheckIntervalMs) return;
       checking = true;
       last = Date.now();
       try {
         const update = await check({ timeout: 30_000 });
+        found = Boolean(update?.version);
         try {
           if (!closed) setHostVersion(update?.version ?? "");
         } finally {
@@ -47,12 +54,19 @@ export function UpdateNotices({ accountId }: { accountId: string }) {
     const run = () => {
       void refresh();
     };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = (delay: number) => {
+      timer = setTimeout(() => {
+        run();
+        schedule(minCheckIntervalMs * (0.75 + Math.random() * 0.5));
+      }, delay);
+    };
     run();
-    const timer = window.setInterval(run, 30 * 60_000);
+    schedule(minCheckIntervalMs * (0.75 + Math.random() * 0.5));
     window.addEventListener("focus", run);
     return () => {
       closed = true;
-      clearInterval(timer);
+      clearTimeout(timer);
       window.removeEventListener("focus", run);
     };
   }, [accountId, enabled]);
