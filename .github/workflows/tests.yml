@@ -9,6 +9,11 @@ on:
     branches: [main]
   # server-release.yml gates image publishing on these same tests.
   workflow_call:
+    inputs:
+      server-only:
+        description: Run only the server job (server releases do not ship the frontend).
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,6 +25,7 @@ concurrency:
 jobs:
   frontend:
     name: Frontend tests
+    if: ${{ !inputs.server-only }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
