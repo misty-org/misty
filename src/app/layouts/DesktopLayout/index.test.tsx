@@ -107,9 +107,6 @@ vi.mock("@/features/tour", () => ({
 
 vi.mock("./ProfileMenu", () => ({ ProfileMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
-vi.mock("./WorkStatusPopup", () => ({
-  WorkStatusPopup: () => null,
-}));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
 vi.mock("@/features/global-search", () => ({
   GlobalMisty: () => null,
@@ -186,7 +183,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<SignIn />} />
             </Route>
           </Routes>
@@ -221,7 +218,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<SignIn />} />
             </Route>
             <Route path="/browser" element={<div>Account workspace</div>} />
@@ -251,7 +248,7 @@ describe("DesktopLayout on Auth Routes", () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={[route]}>
-          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+          <DesktopLayout getRouteId={() => "browser"} />
         </MemoryRouter>,
       );
     });
@@ -267,7 +264,7 @@ describe("DesktopLayout on Auth Routes", () => {
     await act(async () =>
       root.render(
         <MemoryRouter initialEntries={["/browser"]}>
-          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+          <DesktopLayout getRouteId={() => "browser"} />
         </MemoryRouter>,
       ),
     );
@@ -293,7 +290,7 @@ describe("DesktopLayout on Auth Routes", () => {
     await act(async () =>
       root.render(
         <MemoryRouter initialEntries={["/browser"]}>
-          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+          <DesktopLayout getRouteId={() => "browser"} />
         </MemoryRouter>,
       ),
     );
@@ -320,7 +317,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<div data-testid="auth-outlet">Sign In Screen</div>} />
             </Route>
           </Routes>
@@ -343,7 +340,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/register"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "register" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "register" as any} />}>
               <Route
                 path="/register"
                 element={<div data-testid="auth-outlet">Register Screen</div>}

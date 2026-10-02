@@ -10,7 +10,7 @@ import {
   useSocialAi as useAiSurfaceAdapter,
   useSocialAuth as useAuth,
   useSocialConnections as useConnectionsStore,
-  useSocialSetup as useSetupStore,
+  useSocialSetup as useNativeSessionStore,
   useSocialDraft as useSpaceChatDraft,
   useSocialTitle as useWorkspaceViewTitle,
 } from "./SocialRuntime";
@@ -38,6 +38,7 @@ import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
+import { spaceChatSuggestedActions } from "./spaceChatAiActions";
 export type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
 export function SpaceSocial({
   spaceId,
@@ -53,7 +54,7 @@ export function SpaceSocial({
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
-  const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
+  const setupUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
   const conversationId = searchParams.get("conversation") ?? "";
   const chatRootRef = useRef<HTMLDivElement>(null);
@@ -256,38 +257,7 @@ export function SpaceSocial({
           revision: scope.messages[scope.messages.length - 1]?.seq ?? 0,
         },
       ],
-      getSuggestedActions: () => [
-        {
-          id: "recap",
-          label: "Recap",
-          prompt:
-            "Recap the recent conversation with decisions, open questions, and important context. Cite the conversation.",
-        },
-        {
-          id: "decisions",
-          label: "Decisions",
-          prompt: "Extract decisions and explain the evidence for each one.",
-        },
-        {
-          id: "action-items",
-          label: "Action items",
-          prompt:
-            "Extract a reviewed set of actionable Space tasks from this conversation. Do not invent owners or due dates.",
-          requestedArtifactKind: "task_set",
-        },
-        {
-          id: "draft-message",
-          label: "Draft message",
-          prompt: "Draft a concise message for this exact Space conversation. Do not post it.",
-          requestedArtifactKind: "message_draft",
-        },
-        {
-          id: "explain-thread",
-          label: "Explain thread",
-          prompt:
-            "Explain this conversation to someone joining now, distinguishing facts from inference.",
-        },
-      ],
+      getSuggestedActions: () => spaceChatSuggestedActions,
       canApply: (artifact) => Boolean(messageDraft(artifact)),
       applyArtifact: async (artifact) => {
         const operations = messageDraft(artifact);

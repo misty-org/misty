@@ -41,7 +41,16 @@ fn main() {
             .flag("-fblocks")
             .compile("misty_context");
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
-        for framework in ["AppKit", "Carbon", "CoreGraphics", "Security", "ApplicationServices", "CoreImage", "CoreMedia", "CoreVideo"] {
+        for framework in [
+            "AppKit",
+            "Carbon",
+            "CoreGraphics",
+            "Security",
+            "ApplicationServices",
+            "CoreImage",
+            "CoreMedia",
+            "CoreVideo",
+        ] {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
     }

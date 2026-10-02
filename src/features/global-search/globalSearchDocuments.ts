@@ -1,11 +1,9 @@
 import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
-import type { SearchResult } from "@/native/ipc";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
-export { globalSearchContext } from "./globalSearchContext";
 export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
   const state = useSpacesStore.getState();
   const spacesById = new Map(state.spaces.map((space) => [space.id, space]));
@@ -174,28 +172,6 @@ export async function searchServerTasks(
   );
 }
 
-export function mapFileResults(results: SearchResult[], accountId: string): GlobalSearchDocument[] {
-  return results.map((result) => {
-    const remotePath =
-      result.entry.location.kind === "remote" ? result.entry.location.remotePath : "";
-    const isSpaceLibrary =
-      result.entry.location.kind === "remote" &&
-      result.entry.location.providerType === "misty-space";
-    return {
-      id: `file:${result.entry.path}`,
-      accountId,
-      kind: isSpaceLibrary ? "library" : result.entry.kind === "folder" ? "folder" : "file",
-      title: result.entry.name,
-      body: result.match?.description || result.match?.extractedText || result.entry.path,
-      keywords: [result.match?.assetKind ?? result.entry.kind, ...(result.match?.tags ?? [])],
-      href: isSpaceLibrary && remotePath ? remotePath : "/files",
-      ...(result.entry.remoteModified ? { updatedAt: result.entry.remoteModified } : {}),
-      source: isSpaceLibrary ? "server" : result.sourceKind === "local" ? "device" : "server",
-      fileResult: result,
-    };
-  });
-}
-
 export function searchDocuments(
   documents: GlobalSearchDocument[],
   query: string,
@@ -232,20 +208,6 @@ function scoreDocument(document: GlobalSearchDocument, terms: string[]): number 
     else score += bodyFuzzy;
   }
   return score + Math.max(0, 1 - (Date.now() - recency(document.updatedAt)) / 2.592e9);
-}
-
-export function mergeResults(
-  local: GlobalSearchResult[],
-  remote: GlobalSearchResult[],
-  limit: number,
-) {
-  const merged = new Map<string, GlobalSearchResult>();
-  for (const result of [...local, ...remote]) {
-    const key = `${result.kind}:${result.id.replace(/^(activity|file|task|space|message|library):/, "")}`;
-    const existing = merged.get(key);
-    if (!existing || result.score > existing.score) merged.set(key, result);
-  }
-  return [...merged.values()].sort((left, right) => right.score - left.score).slice(0, limit);
 }
 
 /**

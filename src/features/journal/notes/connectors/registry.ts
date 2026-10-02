@@ -1,6 +1,6 @@
 import { NotesConnectorRegistry } from "./NotesConnectorRegistry";
 import { createMistyNativeNotesConnector } from "./mistyNativeNotes";
-export { NotesConnectorRegistry, adjacentIntegrations } from "./NotesConnectorRegistry";
+export { NotesConnectorRegistry } from "./NotesConnectorRegistry";
 
 export function createDefaultNotesRegistry(
   accountId = "",

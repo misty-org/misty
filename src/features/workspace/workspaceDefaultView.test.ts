@@ -1,21 +1,6 @@
 import { afterEach, expect, it } from "vitest";
-import {
-  configureWorkspaceDefaultView,
-  createDefaultWorkspaceView,
-  createHomeWorkspaceView,
-} from "./workspaceDefaultView";
+import { configureWorkspaceDefaultView, createDefaultWorkspaceView } from "./workspaceDefaultView";
 afterEach(() => configureWorkspaceDefaultView(0));
-it("starts on replaceable Home by default, with a distinct established Home factory", () => {
-  expect(createDefaultWorkspaceView("global")).toMatchObject({
-    surfaceId: "home",
-    route: "/home",
-    placeholder: true,
-  });
-  expect(createHomeWorkspaceView("global")).toMatchObject({
-    surfaceId: "home",
-    placeholder: false,
-  });
-});
 it.each([
   [0, "home"],
   [1, "browser"],

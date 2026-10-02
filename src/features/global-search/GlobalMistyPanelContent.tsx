@@ -11,109 +11,26 @@ import {
   Input,
   MenuItem,
   MenuTrigger,
-  Spinner,
 } from "@/shared/ui";
 import {
-  Bell,
-  Bot,
-  CalendarDays,
   Check,
-  CheckSquare2,
   ChevronDown,
-  File,
-  Folder,
-  FolderKanban,
   History,
   Library,
-  Map as MapIcon,
   MessageCircle,
-  NotebookPen,
-  Paintbrush,
   Pencil,
   Plus,
   Search,
   Trash2,
-  Workflow,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
-import type {
-  GlobalAiActionProposal,
-  GlobalAiConversation,
-  GlobalAiMode,
-  GlobalSearchKind,
-  GlobalSearchResult,
-} from "./types";
+import type { GlobalAiActionProposal, GlobalAiConversation } from "./types";
 import { MistyActivityStatus } from "./MistyActivityStatus";
 import { MistyMessageAttachments } from "./MistyMessageAttachments";
-
-export function SearchResults(props: {
-  results: GlobalSearchResult[];
-  query: string;
-  searching: boolean;
-  onOpen: (result: GlobalSearchResult) => void;
-  onAddContext: (result: GlobalSearchResult) => void;
-}) {
-  if (!props.query.trim())
-    return (
-      <QuietState
-        icon={Search}
-        title="Search all of Misty"
-        text="Files, Spaces, tasks, messages, agents, workflows, and more."
-      />
-    );
-  if (!props.results.length && !props.searching)
-    return (
-      <QuietState icon={Search} title="No results" text={`Nothing matched “${props.query}”.`} />
-    );
-  return (
-    <div className="p-2">
-      <div className="flex h-7 items-center px-2 text-[11px] text-cream-muted">
-        {props.searching ? <Spinner size="sm" label={false} className="size-3 mr-1.5" /> : null}
-        Showing {props.results.length} {props.results.length === 1 ? "result" : "results"}
-      </div>
-      {props.results.map((result) => {
-        const Icon = resultIcons[result.kind];
-        return (
-          <div
-            key={`${result.kind}:${result.id}`}
-            className="group/result grid min-h-[58px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 hover:bg-charcoal-hover"
-          >
-            <Button
-              variant="ghost"
-              className="contents text-left"
-              onClick={() => props.onOpen(result)}
-            >
-              <span className="grid size-9 place-items-center rounded-lg bg-charcoal-bg text-cream-muted">
-                <Icon className="size-4" strokeWidth={1.8} />
-              </span>
-              <span className="min-w-0 text-left">
-                <span className="block truncate text-sm font-medium text-cream">
-                  {result.title}
-                </span>
-                <span className="block truncate text-xs text-cream-muted">
-                  {result.body || result.spaceName || kindLabel(result.kind)}
-                </span>
-              </span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 opacity-0 group-hover/result:opacity-100 focus:opacity-100"
-              onClick={() => props.onAddContext(result)}
-            >
-              <Plus className="size-3.5" /> Context
-            </Button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function ConversationView(props: {
   approvalControlsInFooter?: boolean;
@@ -465,31 +382,4 @@ function QuietState(props: { icon: LucideIcon; title: string; text: string }) {
       </div>
     </div>
   );
-}
-
-export function ModeIcon({ mode, className }: { mode: GlobalAiMode; className?: string }) {
-  const Icon = mode === "search" ? Search : mode === "ask" ? MessageCircle : CheckSquare2;
-  return <Icon className={cn("size-4 shrink-0 text-cream-muted", className)} />;
-}
-
-const resultIcons: Record<GlobalSearchKind, LucideIcon> = {
-  space: FolderKanban,
-  task: CheckSquare2,
-  note: NotebookPen,
-  message: MessageCircle,
-  conversation: MessageCircle,
-  calendar: CalendarDays,
-  roadmap: MapIcon,
-  drawing: Paintbrush,
-  activity: Bell,
-  library: Library,
-  folder: Folder,
-  file: File,
-  agent: Bot,
-  workflow: Workflow,
-  action: CheckSquare2,
-};
-
-function kindLabel(kind: GlobalSearchKind): string {
-  return kind.charAt(0).toUpperCase() + kind.slice(1);
 }

@@ -1,7 +1,4 @@
-import type {
-  GlobalImageEditDefinition,
-  GlobalImageMarkupElement,
-} from "@/api/spaces/dto/types/imageEditor";
+import type { GlobalImageEditDefinition } from "@/api/spaces/dto/types/imageEditor";
 
 export type SpaceRole = "owner" | "member";
 
@@ -14,26 +11,6 @@ export type MessageSpan =
   | { type: "mention"; user_id: string; label: string }
   | { type: "mention"; agent_id: string; label: string }
   | { type: "link"; label: string; url: string };
-
-export type AgentMentionFailure = {
-  agent_id: string;
-  code:
-    | "run_failed"
-    | "request_canceled"
-    | "hosted_ai_limit_reached"
-    | "integration_required"
-    | "forbidden"
-    | "resource_unavailable"
-    | "invalid_request"
-    | string;
-  message: string;
-  reason?:
-    | "personal_storage_limit_reached"
-    | "space_storage_limit_reached"
-    | "personal_ai_limit_reached"
-    | "space_ai_limit_reached"
-    | string;
-};
 
 export type BulkLibraryItemAction =
   | "favorite"
@@ -52,5 +29,3 @@ export type BulkLibraryItemAction =
   | "clear_location";
 
 export type LibraryEditDefinition = GlobalImageEditDefinition;
-
-export type LibraryMarkupElement = GlobalImageMarkupElement;

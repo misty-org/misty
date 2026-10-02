@@ -9,7 +9,7 @@ import {
   navigationMenuLinkClass,
   TooltipHint,
 } from "@/shared/ui";
-import { PanelsTopLeft, Search } from "lucide-react";
+import { Search } from "lucide-react";
 const { browser: BrowserIcon, agents: AgentIcon, files: FilesIcon, home: HomeIcon } = appIcons;
 import { Link, useNavigate } from "react-router-dom";
 import { navigatorFocusRingClass } from "./styles";
@@ -64,17 +64,6 @@ export function NavigatorHeaderAgentsButton(props: { path: string; active: boole
   return <NavigatorPrimaryLink {...props} label="Agents" icon={AgentIcon} />;
 }
 
-export function NavigatorScheduledLink({ active }: { active: boolean }) {
-  return (
-    <NavigatorPrimaryLink
-      path="/scheduled"
-      active={active}
-      label="Scheduled"
-      icon={appIcons.scheduled}
-    />
-  );
-}
-
 export function NavigatorHeaderFilesButton(props: { path: string; active: boolean }) {
   return <NavigatorPrimaryLink {...props} label="Files" icon={FilesIcon} />;
 }
@@ -105,33 +94,5 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
         aria-hidden="true"
       />
     </IconButton>
-  );
-}
-
-export function NavigatorHeaderSpacesButton({ active }: { active: boolean }) {
-  const navigate = useNavigate();
-  return (
-    <Link
-      to="/spaces"
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        const surface = workspaceSurfaceFromRoute("/spaces");
-        if (!surface) return;
-        event.preventDefault();
-        navigate(useWorkspaceStore.getState().openDestination(surface).route, { replace: true });
-      }}
-      aria-label="Spaces"
-      data-navigation-destination="true"
-      aria-current={active ? "page" : undefined}
-      className={cn(navigatorHeaderActionClass, active && "text-cream-bright")}
-      data-misty-window-drag-block="true"
-    >
-      <PanelsTopLeft
-        className="shrink-0 justify-self-center"
-        strokeWidth={appIconStrokeWidth}
-        aria-hidden="true"
-      />
-      <span>Spaces</span>
-    </Link>
   );
 }

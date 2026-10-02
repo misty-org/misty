@@ -18,20 +18,12 @@ export const settingsControlButtonClass = `w-[220px] max-w-full gap-1.5 ${settin
 
 export const settingsControlButtonCompactClass = `min-w-24 gap-1.5 ${settingsDisabledControlClass}`;
 
-export const settingsPrimaryButtonClass = `min-w-32 ${settingsDisabledControlClass}`;
-
 export const settingsReferenceListClass = "grid min-w-0";
-
-export const settingsReferenceRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center " +
-  "gap-[18px] border-b border-charcoal-border/60 px-5 py-2 text-sm text-cream";
 
 export const settingsReferenceHeaderClass =
   "min-h-10 bg-charcoal-card text-xs font-medium text-cream-muted";
 
 export const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
-
-export const settingsInlineActionsClass = "flex items-center gap-3 px-5 py-4";
 
 export const settingsEmptyClass = "px-5 py-4 text-sm text-cream-muted";
 

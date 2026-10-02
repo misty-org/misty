@@ -1,6 +1,7 @@
 use super::*;
 use crate::infra::environment::AppEnvironmentService;
 use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
 pub(super) fn minimal_rgb_psd() -> Vec<u8> {
     let mut bytes = Vec::new();

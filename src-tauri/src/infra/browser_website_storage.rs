@@ -120,7 +120,8 @@ impl WebsiteStorage {
         self.origin(origin, None).await
     }
     async fn origin(&mut self, origin: &str, view_id: Option<&str>) -> Result<&Webview, String> {
-        let key = serde_json::to_string(&(origin, view_id)).map_err(|_| "Invalid website origin")?;
+        let key =
+            serde_json::to_string(&(origin, view_id)).map_err(|_| "Invalid website origin")?;
         if self.origins.get(&key).is_some_and(|view| {
             self.owner
                 .app_handle()

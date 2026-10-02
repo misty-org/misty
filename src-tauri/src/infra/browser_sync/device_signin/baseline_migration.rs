@@ -4,7 +4,10 @@ use super::*;
 /// workspace-wide sign-in log, and its import receipt records exactly what it
 /// received. This machine's own device starts from that receipt, so synced
 /// storage of sites without an open page carries over instead of vanishing.
-pub(super) async fn migrated_baseline(active: &Session, workspace: &str) -> Result<Vec<CredentialRecord>, String> {
+pub(super) async fn migrated_baseline(
+    active: &Session,
+    workspace: &str,
+) -> Result<Vec<CredentialRecord>, String> {
     if workspace != active.device_id {
         return Ok(Vec::new());
     }

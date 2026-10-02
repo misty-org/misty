@@ -11,8 +11,6 @@ export const managedSurfaces: Array<{ id: AiSurfaceId; label: string }> = [
   { id: "drawings", label: "Drawings" },
   { id: "library", label: "Library" },
   { id: "photo-editor", label: "Photo editor" },
-  { id: "code", label: "Code" },
-  { id: "terminal", label: "Terminal" },
   { id: "files", label: "Files" },
   { id: "home", label: "Home" },
   { id: "activity", label: "Activity" },

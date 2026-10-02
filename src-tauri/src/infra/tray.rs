@@ -7,7 +7,7 @@ use tauri::{
     AppHandle, Manager, Runtime, Wry,
 };
 
-use crate::{app::runtime::MistyRuntime, infra::misty};
+use crate::infra::misty;
 
 const TRAY_SHOW_MISTY: &str = "tray_show_misty";
 const TRAY_REFRESH_STATUS: &str = "tray_refresh_status";

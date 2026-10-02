@@ -159,10 +159,6 @@ export const useMcpConnectionsStore = create<McpConnectionsState>((set, get) => 
   reset: () => set(empty),
 }));
 
-export function resetMcpConnectionsAccountState(): void {
-  useMcpConnectionsStore.getState().reset();
-}
-
 function normalizeTools(tools: McpToolWire[]): McpToolDescriptor[] {
   return tools.flatMap((tool) => {
     const normalized = normalizeMcpTool(tool);

@@ -338,19 +338,6 @@ func publicAIInvocationError(err error) string {
 	return "Misty could not complete this request."
 }
 
-func aiTextDeltas(value string, size int) []string {
-	if size <= 0 || len(value) <= size {
-		return []string{value}
-	}
-	parts := []string{}
-	for len(value) > 0 {
-		end := min(size, len(value))
-		parts = append(parts, value[:end])
-		value = value[end:]
-	}
-	return parts
-}
-
 func aiInvocationTerminal(state string) bool {
 	return state == "completed" || state == "failed" || state == "canceled"
 }

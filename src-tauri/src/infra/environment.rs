@@ -1,12 +1,9 @@
 use std::{
-    collections::BTreeMap,
-    env, fs,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use serde::Serialize;
-use serde_json::Value;
 
 use crate::infra::paths;
 
@@ -23,15 +20,10 @@ pub struct AppEnvironment {
     pub db_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub tmp_dir: PathBuf,
-    pub notes_dir: PathBuf,
-    pub plugins_public_dir: PathBuf,
-    pub plugins_private_dir: PathBuf,
     pub settings_path: PathBuf,
     pub misty_config_path: PathBuf,
     pub workspaces_path: PathBuf,
     pub commands_path: PathBuf,
-    pub grpc_address: String,
-    pub mount_path: String,
     pub config_exists: bool,
 }
 
@@ -44,17 +36,13 @@ pub struct AppEnvironmentSnapshot {
     pub db_dir: String,
     pub cache_dir: String,
     pub tmp_dir: String,
-    pub notes_dir: String,
-    pub plugins_public_dir: String,
-    pub plugins_private_dir: String,
     pub settings_path: String,
     pub misty_config_path: String,
     pub workspaces_path: String,
     pub commands_path: String,
-    pub grpc_address: String,
+    /// Retired remote-mount prefix, relative to the home directory.
     pub mount_path: String,
     pub config_exists: bool,
-    pub derived_env: BTreeMap<String, String>,
 }
 
 impl AppEnvironmentService {
@@ -92,33 +80,17 @@ impl AppEnvironmentService {
         self.inner.config_dir.clone()
     }
 
-    pub fn plugins_public_dir(&self) -> PathBuf {
-        self.inner.plugins_public_dir.clone()
-    }
-
-    pub fn plugins_private_dir(&self) -> PathBuf {
-        self.inner.plugins_private_dir.clone()
-    }
-
     pub fn home_dir(&self) -> PathBuf {
         self.inner.home_dir.clone()
     }
 
+    /// Legacy remote-mount prefix; paths under it are treated as remote, never indexed.
     pub fn mount_root(&self) -> PathBuf {
-        let configured = PathBuf::from(&self.inner.mount_path);
-        if configured.is_absolute() {
-            configured
-        } else {
-            self.inner.home_dir.join(configured)
-        }
+        self.inner.misty_dir.join("mnt")
     }
 
     pub fn cache_dir(&self) -> PathBuf {
         self.inner.cache_dir.clone()
-    }
-
-    pub fn notes_dir(&self) -> PathBuf {
-        self.inner.notes_dir.clone()
     }
 
     pub fn workspaces_path(&self) -> PathBuf {
@@ -141,17 +113,10 @@ impl AppEnvironment {
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let notes_dir = misty_dir.join("notes");
-        let plugins_public_dir = misty_dir.join("plugins").join("public");
-        let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
-        let grpc_address = settings_advanced_string(&settings_path, "server_address")
-            .unwrap_or_else(|| "localhost:50051".to_owned());
-        let mount_path = settings_advanced_string(&settings_path, "mount_path")
-            .unwrap_or_else(|| ".misty/mnt".to_owned());
 
         Self {
             home_dir,
@@ -160,15 +125,10 @@ impl AppEnvironment {
             db_dir,
             cache_dir,
             tmp_dir,
-            notes_dir,
-            plugins_public_dir,
-            plugins_private_dir,
             settings_path,
             misty_config_path: misty_config_path.clone(),
             workspaces_path,
             commands_path,
-            grpc_address,
-            mount_path,
             config_exists: misty_config_path.exists(),
         }
     }
@@ -180,17 +140,10 @@ impl AppEnvironment {
         let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join(".cache");
         let tmp_dir = misty_dir.join("tmp");
-        let notes_dir = misty_dir.join("notes");
-        let plugins_public_dir = misty_dir.join("plugins").join("public");
-        let plugins_private_dir = misty_dir.join("plugins").join("private");
         let settings_path = config_dir.join("settings.json");
         let misty_config_path = config_dir.join("misty.json");
         let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
-        let grpc_address = settings_advanced_string(&settings_path, "server_address")
-            .unwrap_or_else(|| "localhost:50051".to_owned());
-        let mount_path = settings_advanced_string(&settings_path, "mount_path")
-            .unwrap_or_else(|| ".misty/mnt".to_owned());
 
         Self {
             home_dir,
@@ -199,24 +152,15 @@ impl AppEnvironment {
             db_dir,
             cache_dir,
             tmp_dir,
-            notes_dir,
-            plugins_public_dir,
-            plugins_private_dir,
             settings_path,
             misty_config_path,
             workspaces_path,
             commands_path,
-            grpc_address,
-            mount_path,
             config_exists: false,
         }
     }
 
     fn snapshot(&self) -> AppEnvironmentSnapshot {
-        let mut derived_env = BTreeMap::new();
-        derived_env.insert("MISTY_GRPC_ADDRESS".to_owned(), self.grpc_address.clone());
-        derived_env.insert("MISTY_MOUNT_PATH".to_owned(), self.mount_path.clone());
-
         AppEnvironmentSnapshot {
             home_dir: display_path(&self.home_dir),
             misty_dir: display_path(&self.misty_dir),
@@ -224,35 +168,13 @@ impl AppEnvironment {
             db_dir: display_path(&self.db_dir),
             cache_dir: display_path(&self.cache_dir),
             tmp_dir: display_path(&self.tmp_dir),
-            notes_dir: display_path(&self.notes_dir),
-            plugins_public_dir: display_path(&self.plugins_public_dir),
-            plugins_private_dir: display_path(&self.plugins_private_dir),
             settings_path: display_path(&self.settings_path),
             misty_config_path: display_path(&self.misty_config_path),
             workspaces_path: display_path(&self.workspaces_path),
             commands_path: display_path(&self.commands_path),
-            grpc_address: self.grpc_address.clone(),
-            mount_path: self.mount_path.clone(),
+            mount_path: ".misty/mnt".to_owned(),
             config_exists: self.config_exists,
-            derived_env,
         }
-    }
-}
-
-fn settings_advanced_string(path: &Path, key: &str) -> Option<String> {
-    let raw = fs::read_to_string(path).ok()?;
-    let document: Value = serde_json::from_str(&raw).ok()?;
-    let value = document
-        .get("advanced")
-        .and_then(Value::as_object)
-        .and_then(|advanced| advanced.get(key))
-        .and_then(Value::as_str)?
-        .trim()
-        .to_owned();
-    if value.is_empty() {
-        None
-    } else {
-        Some(value)
     }
 }
 
@@ -283,6 +205,7 @@ fn clean_display_path(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
 
     fn unique_test_home(label: &str) -> PathBuf {
         let nanos = std::time::SystemTime::now()
@@ -303,56 +226,15 @@ mod tests {
                 db_dir: root.join(".misty/db"),
                 cache_dir: root.join(".misty/.cache"),
                 tmp_dir: root.join(".misty/tmp"),
-                notes_dir: root.join(".misty/notes"),
-                plugins_public_dir: root.join(".misty/plugins/public"),
-                plugins_private_dir: root.join(".misty/plugins/private"),
                 settings_path: root.join(".misty/config/settings.json"),
                 misty_config_path: root.join(".misty/config/misty.json"),
                 workspaces_path: root.join(".misty/config/workspaces.json"),
                 commands_path: root.join(".misty/config/commands.msy"),
-                grpc_address: "localhost:50051".to_owned(),
-                mount_path: ".misty/mnt".to_owned(),
                 config_exists: false,
             }),
         };
 
         assert_eq!(service.misty_db_path(), root.join(".misty/db/data.db"));
         assert_eq!(service.misty_db_path(), root.join(".misty/db/data.db"));
-    }
-
-    #[test]
-    fn environment_uses_saved_advanced_connection_settings() {
-        let root = unique_test_home("advanced-settings");
-        let settings_path = root.join(".misty/config/settings.json");
-        fs::create_dir_all(settings_path.parent().expect("settings parent"))
-            .expect("create settings parent");
-        fs::write(
-            &settings_path,
-            r#"{
-              "advanced": {
-                "server_address": "127.0.0.1:60051",
-                "mount_path": "/Volumes/Misty"
-              }
-            }"#,
-        )
-        .expect("write settings");
-
-        let environment = AppEnvironment::for_home(root.clone());
-        let snapshot = environment.snapshot();
-
-        assert_eq!(
-            snapshot.notes_dir,
-            display_path(&root.join(".misty").join("notes"))
-        );
-        assert_eq!(snapshot.grpc_address, "127.0.0.1:60051");
-        assert_eq!(snapshot.mount_path, "/Volumes/Misty");
-        assert_eq!(
-            snapshot.derived_env.get("MISTY_GRPC_ADDRESS"),
-            Some(&"127.0.0.1:60051".to_owned()),
-        );
-        assert_eq!(
-            snapshot.derived_env.get("MISTY_MOUNT_PATH"),
-            Some(&"/Volumes/Misty".to_owned()),
-        );
     }
 }

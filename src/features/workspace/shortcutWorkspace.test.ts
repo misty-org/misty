@@ -19,8 +19,8 @@ describe("workspace shortcut actions", () => {
       instancePolicy: "single",
     });
     store.addSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code",
       route: "/code",
       instancePolicy: "multiple",
@@ -53,8 +53,8 @@ describe("workspace shortcut actions", () => {
   it("reopens the most recently closed tab in the focused pane", () => {
     const store = useWorkspaceStore.getState();
     const tab = store.addSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code",
       route: "/code",
       forceNew: true,
@@ -133,8 +133,8 @@ describe("workspace shortcut actions", () => {
       pane.views.some((tab) => tab.id === browser.id),
     )!;
     store.addSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code",
       route: "/code",
       forceNew: true,

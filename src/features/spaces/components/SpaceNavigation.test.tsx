@@ -5,7 +5,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpaceSectionNavigation } from "../components/SpaceSectionNavigation";
-import { spaceSectionPath } from "../components/spacePanel/spacePanelRoute";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 describe("SpaceSectionNavigation", () => {
@@ -227,10 +226,6 @@ describe("SpaceSectionNavigation", () => {
     const active = container.querySelector('a[aria-current="page"]');
     expect(active?.textContent).toContain("Journal");
     expect(active?.getAttribute("href")).toBe("/spaces/space-1/notes");
-  });
-
-  it("builds the settings destination when switching Spaces", () => {
-    expect(spaceSectionPath("space-2", "settings", "chat")).toBe("/spaces/space-2/settings/chat");
   });
 });
 

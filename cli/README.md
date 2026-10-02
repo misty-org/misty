@@ -142,6 +142,7 @@ misty server prod logs
 misty server prod down
 
 misty release start 0.2.0
+misty release check
 misty release build 0.2.0
 misty release upload 0.2.0
 misty release verify 0.2.0
@@ -150,6 +151,90 @@ misty release publish 0.2.0
 
 Run `misty --help` or add `--help` after any command group for the complete
 option reference.
+
+## Local checks and artifact releases
+
+Checks and builds run on your computer. GitHub stores source, GHCR images and
+release assets; GitHub Actions and GitHub signing secrets are not used.
+
+Install the current CLI after changing it (`cargo install --path cli --locked`),
+or use `npm run release -- ...` to run this checkout's release code directly.
+Enable hooks in both repositories with `git config core.hooksPath .githooks`.
+
+Before commits, staged paths select frontend typecheck/lint/tests, tooling tests,
+Rust CLI/desktop/helper tests, or server/database tests. Stage or stash remaining
+edits first so tests see the staged snapshot. Each failed command stops its suite.
+Push checks run the complete suite on a clean tracked working tree.
+
+Server and billing checks also connect the real server HTTP adapter to a real
+billing executable and temporary PostgreSQL database with separate migration and
+runtime roles. Both checkouts are needed; locations can be overridden with
+`MISTY_BILLING_REPO` and `MISTY_SERVER_REPO`. Run only that boundary test with
+`bash server/scripts/test-billing-contract.sh`. It creates its own credentials,
+loads no deployment `.env` files and removes its database/process on exit.
+Live Stripe checkout/webhook acceptance remains a separate staging check using
+sandbox credentials; ordinary commits do not need Stripe credentials.
+
+### Configure the release computer once
+
+Save private settings in `cli/.env/release.env` (mode `600`). The CLI loads this
+file automatically; shell values take precedence. Restore the existing updater
+key from your secure backup. `npm run release:keys` validates it against committed
+trust and saves the local key path/public key. It never sends secrets to GitHub.
+
+| Setting | Purpose |
+| --- | --- |
+| `MISTY_RELEASE_API_URL` | Public HTTPS API URL compiled into the app, including `/v1` |
+| `MISTY_RELEASE_WEB_URL` | Public HTTPS website URL compiled into the app |
+| `TAURI_UPDATER_PUBLIC_KEY` | Public key matching the existing updater key |
+| `TAURI_CSP_CONNECT_SOURCES` | Approved HTTPS/WSS origins, including the API origin |
+| `TAURI_CSP_IMAGE_SOURCES` | Approved HTTPS image origins |
+| `TAURI_SIGNING_PRIVATE_KEY` | Absolute path to the local updater private key |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for an encrypted key; optional otherwise |
+| `APPLE_SIGNING_IDENTITY` | Installed Developer ID Application certificate, on macOS |
+| `MISTY_NOTARY_KEYCHAIN_PROFILE` | Configured `notarytool` Keychain profile, on macOS |
+| `WINDOWS_CERTIFICATE_THUMBPRINT` / `WINDOWS_TIMESTAMP_URL` | Local certificate and HTTPS timestamp service, on Windows |
+
+Authenticate `gh`, install release Rust targets and `cargo-cyclonedx`, then run
+`misty release check`. It reports missing names together before compilation,
+without printing values. Apple validates notarization credentials at submission.
+The release manifest pins the API/website URLs; these override development
+`.env` URLs, and changing them during a release is rejected. Database passwords,
+Stripe keys and server credentials stay on the deployment host.
+
+### Build locally and upload a draft
+
+Once version files match and tested commits are pushed to `main`:
+
+```sh
+misty release check
+misty release start 0.2.0
+misty release build 0.2.0 --upload
+misty release verify 0.2.0
+# Install the candidate; check login, sync, billing and an updater upgrade.
+misty release publish 0.2.0
+```
+
+`start` runs all local checks and creates a source tag and draft release.
+`build --upload` compiles, signs and notarizes locally, then uploads verified
+assets to the draft in `misty-org/misty`. Omit `--upload` to build only;
+`misty release upload VERSION` can upload later. `verify` downloads and checks
+the hosted files and updater signatures. `publish` makes the finished artifacts
+public after confirmation and marks them the latest release, which is where installed apps look for `latest.json`. Published assets cannot be replaced; use a new version.
+
+`start` defaults to the current OS. Select platforms explicitly with `--os macos`,
+`--os windows`, or `--os macos,windows`. For a release covering both platforms,
+build/upload the same source commit on each respective OS, then verify/publish
+after both are ready. `build` detects the current OS; `--os` selects the release's
+required artifacts, not a cross-compilation target. macOS builds are universal
+and require Apple Silicon and Intel Rust targets.
+
+Keep one integrated staging deployment with separate API/billing databases and
+Stripe sandbox credentials. Promote tested container digests to production.
+The desktop API URL is compiled in: staging-targeted and production-targeted
+desktop builds are distinct artifacts, so verify the final production package
+as well. Uploading never rewrites its environment. Old `beta:prepare` and
+`beta:promote` Actions commands are retired in favor of the local release CLI.
 
 ## Misty home
 

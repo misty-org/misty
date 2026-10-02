@@ -5,7 +5,7 @@ use std::{
 };
 
 use chrono::Utc;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -50,33 +50,12 @@ impl AgentService {
         run_db(self.database_path.clone(), device_snapshot_sync).await
     }
 
-    pub async fn register_folder_scope(
-        &self,
-        request: RegisterFolderScopeRequest,
-    ) -> ApiResult<Value> {
-        run_db(self.database_path.clone(), move |connection| {
-            register_scope_sync(connection, &request.path)
-        })
-        .await
-    }
-
     pub async fn revoke_folder_scope(&self, scope_id: String) -> ApiResult<()> {
         run_db(self.database_path.clone(), move |connection| {
             connection.execute("DELETE FROM local_agent_scopes WHERE id=?1", [scope_id])?;
             Ok(())
-        }).await
-    }
-
-    pub async fn open_citation(&self, request: OpenAgentCitationRequest) -> ApiResult<()> {
-        let citation = request.citation;
-        let page = (citation.get("kind").and_then(Value::as_str) == Some("pdf_page"))
-            .then(|| citation.get("page").and_then(Value::as_u64))
-            .flatten();
-        let target = run_db(self.database_path.clone(), move |connection| {
-            citation_path_sync(connection, &citation)
         })
-        .await?;
-        open_path(&target, page)
+        .await
     }
 
     pub async fn scoped_document_path(
@@ -176,67 +155,6 @@ fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Result<Value> 
     }))
 }
 
-fn register_scope_sync(connection: &mut Connection, raw_path: &str) -> rusqlite::Result<Value> {
-    let canonical = fs::canonicalize(raw_path).map_err(io_error)?;
-    if !canonical.is_dir() {
-        return Err(validation_error("Device scope must be a local folder."));
-    }
-    let canonical_text = canonical.to_string_lossy().to_string();
-    if let Some((id, device, display_name)) = connection
-        .query_row(
-            "SELECT id,device_id,display_name FROM local_agent_scopes WHERE local_path=?1",
-            [&canonical_text],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                ))
-            },
-        )
-        .optional()?
-    {
-        return Ok(scope_json(id, device, display_name));
-    }
-    let id = format!("scope_{}", Uuid::new_v4().simple());
-    let device = device_id(connection)?;
-    let display_name = canonical
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("Folder")
-        .to_owned();
-    connection.execute(
-        "INSERT INTO local_agent_scopes(id,device_id,display_name,local_path,created_at) VALUES(?1,?2,?3,?4,?5)",
-        params![id, device, display_name, canonical_text, Utc::now().to_rfc3339()],
-    )?;
-    Ok(scope_json(id, device, display_name))
-}
-
-fn scope_json(id: String, device_id: String, display_name: String) -> Value {
-    json!({
-        "id": id,
-        "deviceId": device_id,
-        "displayName": display_name,
-        "kind": "local_folder",
-        "relativePath": Value::Null,
-        "available": true,
-    })
-}
-
-fn citation_path_sync(connection: &mut Connection, citation: &Value) -> rusqlite::Result<PathBuf> {
-    let scope_id = citation
-        .get("scopeId")
-        .and_then(Value::as_str)
-        .ok_or_else(|| validation_error("Citation scope is required."))?;
-    let relative = citation
-        .get("relativePath")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .or_else(|| citation.get("fileName").and_then(Value::as_str))
-        .ok_or_else(|| validation_error("Citation file is required."))?;
-    scoped_file_path_sync(connection, scope_id, relative)
-}
-
 fn scoped_file_path_sync(
     connection: &mut Connection,
     scope_id: &str,
@@ -327,66 +245,4 @@ fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn snapshot_exposes_only_device_scopes() {
-        let root = std::env::temp_dir().join(format!("misty-device-scopes-{}", Uuid::new_v4()));
-        let folder = root.join("folder");
-        fs::create_dir_all(&folder).unwrap();
-        let service = AgentService::new(AppEnvironmentService::new_with_data_root(Some(
-            root.clone(),
-        )));
-        service
-            .register_folder_scope(RegisterFolderScopeRequest {
-                path: folder.to_string_lossy().into_owned(),
-            })
-            .await
-            .unwrap();
-        let snapshot = service.device_snapshot().await.unwrap();
-        assert_eq!(snapshot["version"], 2);
-        assert_eq!(snapshot["scopes"].as_array().unwrap().len(), 1);
-        assert!(snapshot.get("definitions").is_none());
-        assert!(!snapshot
-            .to_string()
-            .contains(folder.to_string_lossy().as_ref()));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[tokio::test]
-    async fn scoped_reads_reject_parent_traversal() {
-        let root = std::env::temp_dir().join(format!("misty-device-scope-read-{}", Uuid::new_v4()));
-        let folder = root.join("folder");
-        fs::create_dir_all(&folder).unwrap();
-        fs::write(folder.join("inside.txt"), "hello").unwrap();
-        let service = AgentService::new(AppEnvironmentService::new_with_data_root(Some(
-            root.clone(),
-        )));
-        let scope = service
-            .register_folder_scope(RegisterFolderScopeRequest {
-                path: folder.to_string_lossy().into_owned(),
-            })
-            .await
-            .unwrap();
-        let scope_id = scope["id"].as_str().unwrap().to_owned();
-        assert!(service
-            .scoped_document_path(PrepareScopedAgentDocumentRequest {
-                scope_id: scope_id.clone(),
-                relative_path: "inside.txt".to_owned()
-            })
-            .await
-            .is_ok());
-        assert!(service
-            .scoped_document_path(PrepareScopedAgentDocumentRequest {
-                scope_id: scope_id.clone(),
-                relative_path: "../outside.txt".to_owned()
-            })
-            .await
-            .is_err());
-        service.revoke_folder_scope(scope_id.clone()).await.unwrap();
-        assert!(service.scoped_document_path(PrepareScopedAgentDocumentRequest {
-            scope_id, relative_path: "inside.txt".to_owned()
-        }).await.is_err());
-        assert_eq!(fs::read_to_string(folder.join("inside.txt")).unwrap(), "hello");
-        let _ = fs::remove_dir_all(root);
-    }
 }

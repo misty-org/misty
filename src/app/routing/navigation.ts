@@ -1,35 +1,17 @@
-import type { DesktopNavItem } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { routes } from "@/features/app-shell";
-import { appIcons } from "@/shared/ui";
-
-export const desktopNavItems: DesktopNavItem[] = [
-  { id: "home", label: "Home", path: routes.home, icon: appIcons.home, exact: true },
-  { id: "files", label: "Files", path: routes.files, icon: appIcons.files },
-  { id: "agents", label: "Agents", path: routes.agents, icon: appIcons.agents },
-  { id: "marketplace", label: "Discover", path: routes.discover, icon: appIcons.marketplace },
-];
 
 const deepLinkPrefixes = [
   routes.home,
   routes.browser,
-  routes.terminal,
   routes.invite,
   routes.files,
-  routes.code,
   routes.providers,
-  routes.assistant,
-  routes.automations,
   routes.agents,
   routes.activity,
   routes.scheduled,
   routes.spaces,
-  routes.studio,
-  routes.account,
   routes.settings,
-  routes.library,
-  routes.discover,
-  routes.changelog,
   routes.signIn,
   routes.register,
 ];
@@ -37,25 +19,11 @@ const deepLinkPrefixes = [
 export function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname === routes.home) return "home";
   if (pathname.startsWith(routes.browser)) return "browser";
-  if (pathname.startsWith(routes.terminal)) return "terminal";
   if (pathname.startsWith(routes.files)) return "files";
-  if (pathname.startsWith(routes.code)) return "code";
-  if (pathname.startsWith(routes.discover)) return "marketplace";
-  // Assistant remains an accepted legacy deep link that redirects into Agents.
-  if (pathname.startsWith(routes.assistant) || pathname.startsWith(routes.agents)) return "agents";
-  if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
-  if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.automations))
-    return "spaces";
+  if (pathname.startsWith(routes.agents)) return "agents";
+  if (pathname.startsWith(routes.spaces)) return "spaces";
   if (pathname.startsWith(routes.providers)) return "providers";
-  if (pathname.startsWith(routes.account)) return "account";
-  if (
-    pathname.startsWith(routes.changelog) ||
-    pathname.startsWith(routes.signIn) ||
-    pathname.startsWith(routes.register)
-  )
-    return "files";
   if (pathname.startsWith(routes.settings)) return "settings";
-  if (pathname.startsWith(routes.diagnostics)) return "diagnostics";
   return "files";
 }
 
@@ -64,5 +32,5 @@ export function isDeepLinkRouteAllowed(route: string): boolean {
 }
 
 export function resolveAuthDeepLinkRoute(target: "account" | "providers"): string {
-  return target === "providers" ? routes.providers : routes.account;
+  return target === "providers" ? routes.providers : routes.home;
 }

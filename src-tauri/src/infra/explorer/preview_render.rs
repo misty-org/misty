@@ -243,65 +243,6 @@ pub(super) fn psd_pixels_to_rgba8(
     Some(rgba)
 }
 
-pub(super) async fn render_pdf_preview_png(
-    path: &Path,
-    metadata: &std::fs::Metadata,
-) -> ApiResult<Option<Vec<u8>>> {
-    let Some(mutool) = find_mutool() else {
-        return Ok(None);
-    };
-    let out_path = pdf_preview_path(path, metadata);
-    if let Some(parent) = out_path.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to create PDF preview directory {}: {error}",
-                parent.display()
-            ))
-        })?;
-    }
-    let status = Command::new(mutool)
-        .arg("draw")
-        .arg("-o")
-        .arg(&out_path)
-        .arg("-F")
-        .arg("png")
-        .arg("-r")
-        .arg("140")
-        .arg(path)
-        .arg("1")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    if !status.is_ok_and(|status| status.success()) {
-        return Ok(None);
-    }
-    match tokio::fs::read(&out_path).await {
-        Ok(bytes) if !bytes.is_empty() => Ok(Some(bytes)),
-        _ => Ok(None),
-    }
-}
-
-pub(super) fn find_mutool() -> Option<&'static str> {
-    if Command::new("sh")
-        .arg("-c")
-        .arg("command -v mutool >/dev/null 2>&1")
-        .status()
-        .is_ok_and(|status| status.success())
-    {
-        return Some("mutool");
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if Path::new("/opt/homebrew/bin/mutool").is_file() {
-            return Some("/opt/homebrew/bin/mutool");
-        }
-        if Path::new("/usr/local/bin/mutool").is_file() {
-            return Some("/usr/local/bin/mutool");
-        }
-    }
-    None
-}
-
 pub(super) fn pdf_preview_path(path: &Path, metadata: &std::fs::Metadata) -> PathBuf {
     let mut hasher = Sha256::new();
     hasher.update(path.to_string_lossy().as_bytes());
@@ -316,17 +257,35 @@ pub(super) fn pdf_preview_path(path: &Path, metadata: &std::fs::Metadata) -> Pat
 }
 
 #[cfg(target_os = "macos")]
-pub(super) fn render_packaged_image_thumbnail(path:&Path,output:&Path,dimension:u32,service:&crate::infra::document_intelligence::ServiceLease)->ApiResult<GeneratedImageThumbnail> {
-    let bytes=service.process_explorer_image(path,dimension).map_err(ApiError::Message)?;
-    if service.cancelled() {return Err(ApiError::Message("Files preview access changed.".into()));}
-    let temp=temporary_image_thumbnail_path(output);
-    std::fs::write(&temp,bytes).map_err(|e|ApiError::Message(e.to_string()))?;
-    let result=(|| {
-        let _lock=IMAGE_THUMBNAIL_CACHE_FILE_LOCK.lock().map_err(|e|ApiError::Message(e.to_string()))?;
-        if service.cancelled() {return Err(ApiError::Message("Files preview access changed.".into()));}
-        if !output.exists() {std::fs::rename(&temp,output).map_err(|e|ApiError::Message(e.to_string()))?;}
-        Ok(GeneratedImageThumbnail{path:display_path(output),mime_type:"image/png".into()})
+pub(super) fn render_packaged_image_thumbnail(
+    path: &Path,
+    output: &Path,
+    dimension: u32,
+    service: &crate::infra::document_intelligence::ServiceLease,
+) -> ApiResult<GeneratedImageThumbnail> {
+    let bytes = service
+        .process_explorer_image(path, dimension)
+        .map_err(ApiError::Message)?;
+    if service.cancelled() {
+        return Err(ApiError::Message("Files preview access changed.".into()));
+    }
+    let temp = temporary_image_thumbnail_path(output);
+    std::fs::write(&temp, bytes).map_err(|e| ApiError::Message(e.to_string()))?;
+    let result = (|| {
+        let _lock = IMAGE_THUMBNAIL_CACHE_FILE_LOCK
+            .lock()
+            .map_err(|e| ApiError::Message(e.to_string()))?;
+        if service.cancelled() {
+            return Err(ApiError::Message("Files preview access changed.".into()));
+        }
+        if !output.exists() {
+            std::fs::rename(&temp, output).map_err(|e| ApiError::Message(e.to_string()))?;
+        }
+        Ok(GeneratedImageThumbnail {
+            path: display_path(output),
+            mime_type: "image/png".into(),
+        })
     })();
-    let _=std::fs::remove_file(temp);
+    let _ = std::fs::remove_file(temp);
     result
 }

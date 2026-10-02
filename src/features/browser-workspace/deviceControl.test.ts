@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { deviceRows, transferRate } from "./deviceControl";
+import { deviceRows } from "./deviceControl";
 import type { NativeSyncView } from "./native";
 it("lists offline devices, excludes revoked devices, and does not claim stale presence is connected", () => {
   const view = {
@@ -22,10 +22,4 @@ it("lists offline devices, excludes revoked devices, and does not claim stale pr
   ]);
   view.status.phase = "offline";
   expect(deviceRows(view).every((d) => d.connection === "Unknown")).toBe(true);
-});
-it("measures bytes over elapsed time and discards first samples and session counter resets", () => {
-  expect(transferRate(null, 3000, 2000)).toBeNull();
-  expect(transferRate({ bytes: 1000, at: 1000 }, 3000, 2000)).toBe(2000);
-  expect(transferRate({ bytes: 3000, at: 2000 }, 10, 3000)).toBeNull();
-  expect(transferRate({ bytes: 3000, at: 2000 }, 3000, 3000)).toBe(0);
 });

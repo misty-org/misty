@@ -1,13 +1,11 @@
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { cn } from "@/shared/ui";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import {
   bindingPairMatchesEvent,
   detectShortcutPlatform,
-  formatShortcut,
   formatShortcutLabel,
   isEditableShortcutTarget,
 } from "./bindings";
@@ -257,44 +255,6 @@ export function ShortcutText(props: { commandId: string; className?: string }) {
   return <span className={props.className}>{label}</span>;
 }
 
-export function ShortcutHint(props: {
-  commandId: string;
-  className?: string;
-  includeAlternate?: boolean;
-  fallback?: ReactNode;
-}) {
-  const hintsEnabled = useSettingsStore((state) =>
-    settingsBoolean(state.settings?.document ?? {}, "shortcuts", "shortcut_hints_enabled", true),
-  );
-  const binding = useEffectiveShortcut(props.commandId);
-  const platform =
-    useSettingsStore((state) => state.shortcuts?.detectedPlatform) ?? detectShortcutPlatform();
-  const shortcuts = [binding.primary, props.includeAlternate ? binding.alternate : null].filter(
-    (value): value is string => Boolean(value),
-  );
-  if (!hintsEnabled || !shortcuts.length) return <>{props.fallback ?? null}</>;
-  return (
-    <span className={props.className} aria-label={shortcuts.join(" or ")}>
-      {shortcuts.map((shortcut, shortcutIndex) => (
-        <span key={shortcut} className="inline-flex items-center gap-0.5">
-          {shortcutIndex > 0 ? <span className="px-1 text-mist-gray">or</span> : null}
-          {formatShortcut(shortcut, platform).map((keycap) => (
-            <kbd
-              key={`${shortcut}:${keycap}`}
-              className={cn(
-                "inline-flex min-w-5 items-center justify-center rounded border border-white/15",
-                "bg-white/5 px-1 py-0.5 font-sans text-[10px] leading-none text-mist-gray",
-              )}
-            >
-              {keycap}
-            </kbd>
-          ))}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function focusedShortcutScope(): ShortcutScope {
   const { layout } = useWorkspaceStore.getState();
   const pane = dockLeaves(layout.root).find((candidate) => candidate.id === layout.focusedPaneId);
@@ -302,12 +262,8 @@ function focusedShortcutScope(): ShortcutScope {
   switch (tab?.surfaceId) {
     case "browser":
       return "tool:browser";
-    case "code":
-      return "tool:code";
     case "files":
       return "tool:files";
-    case "terminal":
-      return "tool:terminal";
     case "space": {
       const route = tab.route.toLowerCase();
       if (route.includes("/tasks/roadmaps") || route.includes("/roadmap")) return "tool:roadmap";

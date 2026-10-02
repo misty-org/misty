@@ -36,26 +36,26 @@ describe("shortcut dispatcher", () => {
 
   it("prefers the focused tool over broader scopes", () => {
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
-      title: "Terminal",
-      route: "/terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      title: "Files",
+      route: "/files",
       instancePolicy: "single",
     });
-    const globalHandler = vi.fn();
-    const terminalHandler = vi.fn();
-    const removeGlobal = registerShortcutHandler("search.toggle", globalHandler);
-    const removeTerminal = registerShortcutHandler("terminal.clear", terminalHandler);
+    const workspaceHandler = vi.fn();
+    const filesHandler = vi.fn();
+    const removeWorkspace = registerShortcutHandler("navigation.refresh", workspaceHandler);
+    const removeFiles = registerShortcutHandler("explorer.refresh", filesHandler);
 
     expect(
       dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
+        new KeyboardEvent("keydown", { key: "r", code: "KeyR", ctrlKey: true }),
       ),
     ).toBe(true);
-    expect(terminalHandler).toHaveBeenCalledOnce();
-    expect(globalHandler).not.toHaveBeenCalled();
-    removeGlobal();
-    removeTerminal();
+    expect(filesHandler).toHaveBeenCalledOnce();
+    expect(workspaceHandler).not.toHaveBeenCalled();
+    removeWorkspace();
+    removeFiles();
   });
 
   it("uses explicit handler priority and falls through when a handler declines", () => {

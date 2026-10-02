@@ -121,9 +121,7 @@ export function formatShortcutLabel(
 export function isEditableShortcutTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   return Boolean(
-    target.closest(
-      "input, textarea, select, [contenteditable='true'], [role='textbox'], .cm-editor, .xterm",
-    ),
+    target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']"),
   );
 }
 

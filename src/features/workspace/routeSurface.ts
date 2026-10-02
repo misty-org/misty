@@ -2,7 +2,6 @@ import {
   createBrowserViewState,
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
-  type WorkspaceView,
 } from "./model";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
@@ -107,17 +106,6 @@ export type SpaceWorkspaceTool = "journal" | "planner" | "social" | "library" | 
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
-}
-
-/** Whether a tab owns the route even when a nested route or redirect changed its exact URL. */
-export function workspaceViewMatchesRoute(
-  tab: Pick<WorkspaceView, "surfaceId" | "groupKey">,
-  pathname: string,
-): boolean {
-  const surface = workspaceSurfaceFromRoute(pathname);
-  return Boolean(
-    surface && surface.surfaceId === tab.surfaceId && surface.groupKey === tab.groupKey,
-  );
 }
 
 function request(

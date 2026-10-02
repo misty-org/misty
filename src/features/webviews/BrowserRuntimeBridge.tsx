@@ -30,7 +30,6 @@ import {
   useBrowserRuntimeStore,
 } from "./browserRuntime";
 import { openBrowserPopup } from "./openBrowserPopup";
-import { providerWebsiteFromRoute } from "./providers";
 const browserBlockingOverlaySelector = [
   // Rail hints extend over native pages, above the renderer's own DOM layers.
   '[data-navigation-tooltip="true"]:not([data-state="closed"])',
@@ -51,23 +50,7 @@ export function browserBlockingOverlayOpen(root: ParentNode = document): boolean
 export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
     const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId);
-    return (
-      activeTab?.surfaceId === "browser" ||
-      (activeTab?.surfaceId === "official-app" &&
-        (activeTab.groupKey === "app:browser" ||
-          (activeTab.groupKey === "app:chat" &&
-            !!providerWebsiteFromRoute(activeTab.route, "chat")) ||
-          (activeTab.groupKey === "app:journal" &&
-            !!providerWebsiteFromRoute(activeTab.route, "journal")) ||
-          (activeTab.groupKey === "app:planner" &&
-            !!providerWebsiteFromRoute(activeTab.route, "planner")) ||
-          (activeTab.groupKey === "app:library" &&
-            !!providerWebsiteFromRoute(activeTab.route, "library")) ||
-          (activeTab.groupKey === "app:music" &&
-            !!providerWebsiteFromRoute(activeTab.route, "music")) ||
-          (activeTab.groupKey === "app:media" &&
-            !!providerWebsiteFromRoute(activeTab.route, "media"))))
-    );
+    return activeTab?.surfaceId === "browser";
   });
 }
 interface BrowserPageEvent {

@@ -1,10 +1,11 @@
+import type * as ClientModule from "./client";
 import { MockTelemetryClient } from "@/telemetry/client";
 import { ANALYTICS_SESSION_TIMEOUT_MS, AnalyticsLifecycleManager } from "@/telemetry/lifecycle";
 import type { CommonClientProperties } from "@/telemetry/model/interfaces/types";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./client")>();
+  const actual = await importOriginal<typeof ClientModule>();
   return { ...actual, analytics: new actual.MockTelemetryClient() };
 });
 

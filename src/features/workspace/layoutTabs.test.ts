@@ -1,8 +1,6 @@
-import { createHomeWorkspaceView } from "./workspaceDefaultView";
-import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDockLeaf, dockLeaves, dockTreeViews, insertDockSplit } from "./dockTree";
-import { activeLayoutView, allLayoutViews, layoutTabs, tabLabel } from "./layoutTabs";
+import { activeLayoutView, allLayoutViews, layoutTabs } from "./layoutTabs";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 import { normalizeWorkspaceLayout } from "./windows";
@@ -159,11 +157,11 @@ describe("window → tabs → panes", () => {
   it("migrates old splits without losing hidden tabs, view identities, state, or proportions", () => {
     const view = (id: string): WorkspaceView => ({
       id,
-      surfaceId: "official-app",
-      groupKey: "app:browser",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       instanceKey: id,
       title: id,
-      route: "/apps/browser",
+      route: "/browser",
       state: { text: id },
       sidebarVisible: true,
       createdAt: 1,
@@ -188,41 +186,6 @@ describe("window → tabs → panes", () => {
   });
 });
 
-it("keeps destination histories separate while preserving route state", () => {
-  state().newTab();
-  const initial = state().openSurface(createHomeWorkspaceView("global"));
-  const paneId = state().layout.focusedPaneId;
-  const first = state().openSurface({
-    surfaceId: "official-app",
-    groupKey: "app:planner",
-    title: "Planner",
-    route: "/apps/planner",
-    state: { viewport: 3 },
-  });
-  state().updateViewRoute(first.id, "/apps/planner?view=agenda");
-  state().updateViewState(first.id, { viewport: 9 });
-  const second = state().openSurface({
-    surfaceId: "marketplace",
-    groupKey: "tool:marketplace",
-    title: "Discover",
-    route: "/discover",
-  });
-  expect(state().layout.focusedPaneId).not.toBe(paneId);
-  expect(allLayoutViews(state().layout).some((view) => view.id === first.id)).toBe(true);
-  expect(state().navigatePane(-1)).toBeNull();
-  state().focusView(first.id);
-  expect(activeLayoutView(state().layout)).toMatchObject({
-    id: first.id,
-    route: "/apps/planner?view=agenda",
-    state: { viewport: 9 },
-  });
-  expect(state().navigatePane(-1)).toMatchObject({ id: first.id, route: "/apps/planner" });
-  expect(state().navigatePane(-1)).toBeNull();
-  expect(allLayoutViews(state().layout).map((view) => view.id)).toEqual(
-    expect.arrayContaining([initial.id, first.id, second.id]),
-  );
-});
-
 it("opens replaceable Home in new tabs and splits and navigates inside the selected split", () => {
   expect(state().newTab()).toMatchObject({
     title: "Home",
@@ -242,21 +205,6 @@ it("opens replaceable Home in new tabs and splits and navigates inside the selec
   expect(activeLayoutView(state().layout)?.id).toBe(view.id);
 });
 
-it("updates automatic titles live while preserving custom names through history and reload", () => {
-  const view = state().openSurface(createHomeWorkspaceView("global")),
-    id = state().layout.activeTabId!;
-  state().renameView(view.id, "Updated content");
-  expect(tabLabel(owner(view.id))).toBe("Updated content");
-  state().renameTab(id, "Research");
-  state().renameView(view.id, "Later content");
-  expect(tabLabel(owner(view.id))).toBe("Research");
-  const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(state())));
-  const restored = migrateWorkspaceStore(saved, 11);
-  expect(tabLabel(layoutTabs(restored.layout).find((tab) => tab.id === id)!)).toBe("Research");
-  state().renameTab(id, "");
-  expect(tabLabel(owner(view.id))).toBe("Later content");
-});
-
 it("restores a closed pane's own history and split proportions", () => {
   state().newTab();
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
@@ -273,33 +221,4 @@ it("restores a closed pane's own history and split proportions", () => {
   expect(state().layout.focusedPaneId).toBe(paneId);
   expect(activeLayoutView(state().layout)?.route).toBe("/files?path=Downloads");
   expect(state().navigatePane(-1)).toMatchObject({ id: one.id, route: "/files" });
-});
-
-it("allows destination switching while preserving unsaved work and blocking its closure", () => {
-  state().newTab();
-  const first = state().openSurface(createHomeWorkspaceView("global"));
-  const code = state().openSurface({
-    surfaceId: "official-app",
-    groupKey: "app:code",
-    title: "Code",
-    route: "/apps/code",
-  });
-  setWorkspaceUnsaved(code.id, true);
-  try {
-    expect(
-      state().openSurface({
-        surfaceId: "marketplace",
-        groupKey: "tool:marketplace",
-        title: "Discover",
-        route: "/discover",
-      }).id,
-    ).not.toBe(code.id);
-    state().focusView(code.id);
-    expect(state().navigatePane(-1)).toBeNull();
-    expect(state().closeTab(state().layout.activeTabId!)).toBe(false);
-  } finally {
-    setWorkspaceUnsaved(code.id, false);
-  }
-  expect(state().navigatePane(-1)).toBeNull();
-  expect(allLayoutViews(state().layout).some((view) => view.id === first.id)).toBe(true);
 });

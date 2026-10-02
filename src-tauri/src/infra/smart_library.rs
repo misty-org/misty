@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
@@ -15,7 +15,7 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 use crate::{
-    domain::explorer::{ExplorerLocationKind, FileKind, ListDirectoryRequest},
+    domain::explorer::{ExplorerLocationKind, ListDirectoryRequest},
     error::{ApiError, ApiResult},
     infra::{
         environment::AppEnvironmentService,

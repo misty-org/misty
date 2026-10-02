@@ -3,11 +3,9 @@ package browsersync
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"time"
 
-	"github.com/kannachi323/misty/server/internal/platform/transport"
 	"github.com/lib/pq"
 )
 
@@ -354,9 +352,4 @@ func sweepSyncConnections(ctx context.Context, tx *sql.Tx, deletion string, args
 		}
 	}
 	return removed, nil
-}
-func (db *Store) NotifyBrowserSyncPresence(ctx context.Context, i SyncConnectionIdentity) error {
-	event, _ := json.Marshal(transport.AccountEvent{UserID: i.UserID, Topic: "browser-presence", ID: i.VaultID})
-	_, err := db.Conn.ExecContext(ctx, `SELECT pg_notify('misty_account_events',$1)`, string(event))
-	return err
 }

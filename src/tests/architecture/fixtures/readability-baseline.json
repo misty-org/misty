@@ -1,10 +1,4 @@
 {
-  "src/features/files/workspace/explorer/components/MediaSearchViewer.tsx": [
-    {
-      "length": 168,
-      "hash": "346027b027925317"
-    }
-  ],
   "src/features/files/workspace/explorer/workspace/ExplorerDesktopDialogStyles.ts": [
     {
       "length": 177,
@@ -17,38 +11,6 @@
       "hash": "ce8b49a0e0b4191d"
     }
   ],
-  "src/features/files/workspace/explorer/workspace/ExplorerSmartLibraryDialog.tsx": [
-    {
-      "length": 196,
-      "hash": "218f209fa74ac0aa"
-    },
-    {
-      "length": 169,
-      "hash": "e14c04fbf402a87e"
-    },
-    {
-      "length": 197,
-      "hash": "2557855985f15a9f"
-    },
-    {
-      "length": 214,
-      "hash": "8188dee7f6fe2905"
-    },
-    {
-      "length": 175,
-      "hash": "14edc727a51e276c"
-    },
-    {
-      "length": 344,
-      "hash": "4eb6b129628c27e7"
-    }
-  ],
-  "src/features/files/workspace/explorer/workspace/ExplorerSmartLibraryViews.tsx": [
-    {
-      "length": 206,
-      "hash": "927a2c3f702b9865"
-    }
-  ],
   "src/features/journal/components/JournalAttribution.tsx": [
     {
       "length": 307,
@@ -56,10 +18,6 @@
     }
   ],
   "src/features/settings/SettingsControls.tsx": [
-    {
-      "length": 173,
-      "hash": "a31d88740c6ecdc9"
-    },
     {
       "length": 184,
       "hash": "de5f715a25619ef0"
@@ -69,12 +27,6 @@
     {
       "length": 164,
       "hash": "07c67054587410af"
-    }
-  ],
-  "src/features/spaces/chat/components/MessageHoverActions.tsx": [
-    {
-      "length": 269,
-      "hash": "97552c91ea127eaf"
     }
   ],
   "src/features/library/library/SpaceLibraryPlayback.tsx": [
@@ -107,12 +59,6 @@
     {
       "length": 165,
       "hash": "80b68ed6b80d10b1"
-    }
-  ],
-  "src/features/planner/planner/SpaceTaskCalendarGrid.tsx": [
-    {
-      "length": 172,
-      "hash": "47c6597f6ef6c873"
     }
   ],
   "src/features/workspace/ChromeTabStrip.tsx": [
@@ -217,12 +163,6 @@
     {
       "length": 174,
       "hash": "67c111461cb5f1b5"
-    }
-  ],
-  "src/features/webviews/websiteIntegrations.ts": [
-    {
-      "length": 180,
-      "hash": "14da9d1749c3d36a"
     }
   ]
 }

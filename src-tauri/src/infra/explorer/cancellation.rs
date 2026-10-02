@@ -11,20 +11,6 @@ pub(super) async fn cleanup_partial_destination_on_cancel<T>(
     result
 }
 
-pub(super) async fn downloaded_file_exists(destination: &Path) -> bool {
-    tokio::fs::metadata(destination)
-        .await
-        .map(|metadata| metadata.is_file())
-        .unwrap_or(false)
-}
-
-pub(super) async fn downloaded_directory_exists(destination: &Path) -> bool {
-    tokio::fs::metadata(destination)
-        .await
-        .map(|metadata| metadata.is_dir())
-        .unwrap_or(false)
-}
-
 pub(super) async fn delete_local_path_cancellable(
     path: &Path,
     cancellation: Option<&AtomicBool>,
@@ -93,29 +79,6 @@ pub(super) async fn remove_local_path(path: &Path, is_directory: bool) -> ApiRes
     };
     result
         .map_err(|error| ApiError::Message(format!("Failed to remove {}: {error}", path.display())))
-}
-
-pub(super) fn virtual_folder_entry(
-    path: PathBuf,
-    name: String,
-    location: ExplorerLocation,
-) -> FileEntry {
-    FileEntry {
-        id: display_path(&path),
-        name: name.clone(),
-        path: display_path(&path),
-        extension: String::new(),
-        mime_type: None,
-        remote_modified: None,
-        kind: FileKind::Folder,
-        size_bytes: None,
-        modified_ms: None,
-        created_ms: None,
-        readonly: false,
-        hidden: name.starts_with('.'),
-        is_deleted: false,
-        location,
-    }
 }
 
 pub(super) fn trash_virtual_entries(trash_dir: &Path) -> ApiResult<Vec<FileEntry>> {

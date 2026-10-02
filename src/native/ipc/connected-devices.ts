@@ -8,9 +8,3 @@ export interface OpenWorkspaceRouteRequest {
   sourceDeviceId: string;
   sourceDeviceName: string;
 }
-
-export interface OpenWorkspaceRouteResult {
-  requestId: string;
-  status: "opened" | "rejected" | "expired";
-  reason: string;
-}

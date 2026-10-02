@@ -8,8 +8,18 @@ use serde_json::{json, Value};
 /// Lowercase fragments of localStorage keys that hold sign-in state, e.g.
 /// Discord `token`, Supabase `sb-*-auth-token`, `msal.*`, `@@auth0spajs@@`.
 const KEY_MARKERS: &[&str] = &[
-    "token", "auth", "session", "msal", "sb-", "oidc", "oauth", "jwt", "credential", "login",
-    "sso", "refresh",
+    "token",
+    "auth",
+    "session",
+    "msal",
+    "sb-",
+    "oidc",
+    "oauth",
+    "jwt",
+    "credential",
+    "login",
+    "sso",
+    "refresh",
 ];
 /// IndexedDB databases that hold sign-in state (Firebase Auth).
 const DATABASES: &[&str] = &["firebaseLocalStorageDb"];
@@ -43,7 +53,11 @@ pub(crate) fn scoped(area: &Area, payload: &Value) -> Option<Value> {
         Area::IndexedDb { .. } => {
             let mut payload = payload.clone();
             let databases = payload["databases"].as_array_mut()?;
-            databases.retain(|db| db["name"].as_str().is_some_and(|name| DATABASES.contains(&name)));
+            databases.retain(|db| {
+                db["name"]
+                    .as_str()
+                    .is_some_and(|name| DATABASES.contains(&name))
+            });
             (!databases.is_empty()).then_some(payload)
         }
     }
@@ -84,7 +98,11 @@ pub(crate) fn with_unsynced(area: &Area, observed: Value, target: &Value) -> Val
                         .as_array()
                         .into_iter()
                         .flatten()
-                        .filter(|db| !db["name"].as_str().is_some_and(|name| DATABASES.contains(&name)))
+                        .filter(|db| {
+                            !db["name"]
+                                .as_str()
+                                .is_some_and(|name| DATABASES.contains(&name))
+                        })
                         .cloned(),
                 );
                 databases.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
@@ -108,7 +126,9 @@ mod tests {
 
     #[test]
     fn local_storage_keeps_only_small_signin_keys() {
-        let area = Area::LocalStorage { origin: ORIGIN.into() };
+        let area = Area::LocalStorage {
+            origin: ORIGIN.into(),
+        };
         let payload = json!({
             "token": "discord",
             "sb-abc-auth-token": "supabase",
@@ -119,14 +139,18 @@ mod tests {
         });
         assert_eq!(
             scoped(&area, &payload),
-            Some(json!({"token": "discord", "sb-abc-auth-token": "supabase", "msal.account.keys": "[]"}))
+            Some(
+                json!({"token": "discord", "sb-abc-auth-token": "supabase", "msal.account.keys": "[]"})
+            )
         );
         assert_eq!(scoped(&area, &json!({"theme": "dark"})), None);
     }
 
     #[test]
     fn indexed_db_keeps_only_signin_databases_and_session_storage_is_dropped() {
-        let area = Area::IndexedDb { origin: ORIGIN.into() };
+        let area = Area::IndexedDb {
+            origin: ORIGIN.into(),
+        };
         let payload = json!({"codec_version": 1, "databases": [
             {"name": "firebaseLocalStorageDb", "version": 1, "stores": []},
             {"name": "message-cache", "version": 3, "stores": []},
@@ -137,13 +161,18 @@ mod tests {
                 {"name": "firebaseLocalStorageDb", "version": 1, "stores": []},
             ]}))
         );
-        let session = Area::SessionStorage { origin: ORIGIN.into(), view_id: "tab".into() };
+        let session = Area::SessionStorage {
+            origin: ORIGIN.into(),
+            view_id: "tab".into(),
+        };
         assert_eq!(scoped(&session, &json!({"token": "t"})), None);
     }
 
     #[test]
     fn readback_reports_unsynced_data_as_requested() {
-        let area = Area::LocalStorage { origin: ORIGIN.into() };
+        let area = Area::LocalStorage {
+            origin: ORIGIN.into(),
+        };
         let target = json!({"token": "t", "theme": "dark"});
         let merged = with_unsynced(&area, json!({"token": "t"}), &target);
         assert_eq!(merged, target);

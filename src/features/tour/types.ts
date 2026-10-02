@@ -21,10 +21,3 @@ export const TOUR_TARGET_SELECTORS = {
   canvasTabs: '[data-tour-target="workspace-tab-bar"]',
   virtualWindows: '[data-tour-target="workspace-window-menu"]',
 } as const;
-
-export const TOUR_ACTIVE_STEPS: TourStep[] = [
-  "navigation",
-  "website-groups",
-  "canvas-tabs",
-  "virtual-windows",
-];

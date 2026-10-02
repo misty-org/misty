@@ -48,7 +48,9 @@ pub fn browser_history_record(
     app: AppHandle,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
-    let Some(url) = history_url(&request.url) else { return Ok(()) };
+    let Some(url) = history_url(&request.url) else {
+        return Ok(());
+    };
     let profile = profile_key(request.profile_id);
     let title = text(&request.title, 500);
     let now = now_ms();
@@ -79,7 +81,9 @@ pub fn browser_history_set_title(
     app: AppHandle,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
-    let Some(url) = history_url(&request.url) else { return Ok(()) };
+    let Some(url) = history_url(&request.url) else {
+        return Ok(());
+    };
     let title = text(&request.title, 500);
     if title.is_empty() {
         return Ok(());
@@ -115,7 +119,10 @@ pub struct BrowserHistoryVisit {
 }
 
 fn like_pattern(value: &str) -> String {
-    let escaped = value.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
     format!("%{escaped}%")
 }
 
@@ -180,7 +187,11 @@ pub fn browser_history_suggest(
 ) -> Result<Vec<BrowserHistorySuggestion>, String> {
     let search = text(&request.text, 200);
     let now = now_ms();
-    let since = if search.is_empty() { now - TOP_PAGES_WINDOW_MS } else { 0 };
+    let since = if search.is_empty() {
+        now - TOP_PAGES_WINDOW_MS
+    } else {
+        0
+    };
     let connection = library(&app)?;
     let mut statement = connection
         .prepare(
@@ -255,10 +266,16 @@ pub fn browser_history_forget(
     app: AppHandle,
     request: BrowserHistoryForgetRequest,
 ) -> Result<(), String> {
-    let Some(url) = history_url(&request.url) else { return Ok(()) };
+    let Some(url) = history_url(&request.url) else {
+        return Ok(());
+    };
     let connection = library(&app)?;
     let profile = profile_key(request.profile_id);
-    mark_dirty(&connection, "profile_id = ?1 AND url = ?2", params![profile, url])?;
+    mark_dirty(
+        &connection,
+        "profile_id = ?1 AND url = ?2",
+        params![profile, url],
+    )?;
     connection
         .execute(
             "DELETE FROM visits WHERE profile_id = ?1 AND url = ?2",

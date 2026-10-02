@@ -2,8 +2,8 @@
 //! origin's sign-in storage. Items that cannot sync are skipped and reported, while
 //! items synced by devices that can hold them are carried, never deleted.
 use super::super::browser_data_budget::{fit, Candidate, Held, Limit};
-use super::super::browser_signin_scope::scoped;
 use super::super::browser_data_coverage::{identity, Coverage};
+use super::super::browser_signin_scope::scoped;
 use super::super::{browser_cookie_store, browser_website_capture};
 use misty_browser_sync::{
     document::{
@@ -82,13 +82,7 @@ pub(super) async fn collect(
             })
         })
         .collect();
-    let mut fitted = fit(
-        cookies.cookies,
-        &carried,
-        candidates,
-        &mut coverage,
-        limit,
-    )?;
+    let mut fitted = fit(cookies.cookies, &carried, candidates, &mut coverage, limit)?;
     fitted.held.databases = storage.held_databases;
     Ok(Collected {
         observations: fitted.observations,

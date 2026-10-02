@@ -11,7 +11,7 @@ import (
 
 func TestAccountsCreateTheirOwnDefaultAndSpacesBecomeSharedOnlyByInvite(t *testing.T) {
 	database := openTestDatabase(t)
- useResourceAdapterFixture(t,database)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 
 	owner, err := database.CreateUser("Owner", "space-owner@example.com", "password123")
@@ -140,7 +140,7 @@ func TestAccountsCreateTheirOwnDefaultAndSpacesBecomeSharedOnlyByInvite(t *testi
 
 func TestOwnershipTransferAllowsSpaceToBecomeOverQuota(t *testing.T) {
 	database := openTestDatabase(t)
- useResourceAdapterFixture(t,database)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Transfer Owner", "transfer-owner@example.com", "password123")
 	if err != nil {

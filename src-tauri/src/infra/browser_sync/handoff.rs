@@ -294,11 +294,7 @@ pub(super) async fn capture_current(
         .invalidate_browser_readiness()
         .await
         .map_err(issue)?;
-    let _ = app.emit_to(
-        "main",
-        "misty:browser-sync-changed",
-        &active.scope.vault_id,
-    );
+    let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
     Ok(())
 }
 
@@ -507,11 +503,7 @@ pub(super) async fn restore_current(
         let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
     }
     active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
-    let _ = app.emit_to(
-        "main",
-        "misty:browser-sync-changed",
-        &active.scope.vault_id,
-    );
+    let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
     result?;
     Ok(())
 }

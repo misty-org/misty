@@ -22,7 +22,13 @@ const configPath = resolve(root,'src-tauri/tauri.conf.json');
 const config = JSON.parse(readFileSync(configPath,'utf8'));
 config.plugins.updater.pubkey = updaterPublicKey;
 writeFileSync(configPath,JSON.stringify(config,null,2)+'\n');
-for (const [name,value] of Object.entries({TAURI_SIGNING_PRIVATE_KEY:readFileSync(updaterPath,'utf8')})) {
-  execFileSync('gh',['secret','set',name,'--repo','misty-org/misty'],{input:value,stdio:['pipe','ignore','pipe']});
-}
-console.log(`Release keys match committed trust; private backups are in ${directory}. GitHub signing secrets are configured.`);
+const envDirectory = resolve(root, 'cli/.env');
+mkdirSync(envDirectory, {recursive:true, mode:0o700});
+const envPath = resolve(envDirectory, 'release.env');
+const existing = existsSync(envPath) ? readFileSync(envPath, 'utf8') : '';
+const retained = existing.split('\n').filter(line => !/^TAURI_(SIGNING_PRIVATE_KEY|UPDATER_PUBLIC_KEY)=/.test(line));
+retained.push(`TAURI_SIGNING_PRIVATE_KEY=${JSON.stringify(updaterPath)}`);
+retained.push(`TAURI_UPDATER_PUBLIC_KEY=${JSON.stringify(updaterPublicKey)}`);
+writeFileSync(envPath, retained.filter(Boolean).join('\n') + '\n', {mode:0o600});
+chmodSync(envPath, 0o600);
+console.log(`Release keys match committed trust. Local configuration saved to ${envPath}; no GitHub secrets are needed.`);

@@ -1,15 +1,4 @@
-import type { SavedSearchRule, SearchResult, SmartLibraryAsset } from "@/native/ipc";
-
-export function aggregateTags(assets: SmartLibraryAsset[]) {
-  const counts = new Map<string, { name: string; count: number }>();
-  for (const asset of assets)
-    for (const tag of new Set(asset.tags)) {
-      const key = tag.toLocaleLowerCase();
-      const current = counts.get(key);
-      counts.set(key, { name: current?.name ?? tag, count: (current?.count ?? 0) + 1 });
-    }
-  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-}
+import type { SavedSearchRule, SearchResult } from "@/native/ipc";
 export function joinPath(root: string, relative: string) {
   if (/^(?:[A-Za-z]:[\\/]|[\\/]{2}|\/)/.test(relative)) return relative;
   return `${root.replace(/[\\/]+$/, "")}/${relative.replace(/^[\\/]+/, "")}`;

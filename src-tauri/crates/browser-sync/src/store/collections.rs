@@ -2,7 +2,7 @@
 use rusqlite::{params, OptionalExtension};
 
 use super::Store;
-use crate::{crypto::VaultRoot, collections::Collection, Result};
+use crate::{collections::Collection, crypto::VaultRoot, Result};
 
 impl Store {
     pub fn collection(&self, root: &VaultRoot, collection: &str) -> Result<Collection> {
@@ -20,7 +20,12 @@ impl Store {
             .map(Option::unwrap_or_default)
     }
 
-    pub fn set_collection(&mut self, root: &VaultRoot, collection: &str, state: &Collection) -> Result<()> {
+    pub fn set_collection(
+        &mut self,
+        root: &VaultRoot,
+        collection: &str,
+        state: &Collection,
+    ) -> Result<()> {
         let sealed = self.seal_workspace(root, &format!("records:{collection}"), state)?;
         self.connection.execute(
             "INSERT INTO sync_collections VALUES(?1,?2) ON CONFLICT(collection) DO UPDATE SET state=excluded.state",

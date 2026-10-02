@@ -17,20 +17,6 @@ export function searchMedia(
 ): Promise<MediaSearchResponse> {
   return mediaSearchApi.search(deviceId, query, limit);
 }
-export function fetchMediaSearchStatus(deviceId: string): Promise<{
-  assets: Array<{
-    deviceId: string;
-    assetId: string;
-    fingerprint: string;
-    status: string;
-    durationMs: number;
-    indexedThroughMs: number;
-  }>;
-  maxDurationMinutes: number;
-  totalDurationLimitMinutes: null;
-}> {
-  return mediaSearchApi.status(deviceId);
-}
 export function deleteMediaSearchAsset(
   deviceId: string,
   assetId: string,

@@ -4,7 +4,6 @@ import { createGlobalSearchPanelState } from "./globalSearchPanelState";
 import { executeGlobalSearch, executeGlobalVisualSearch } from "./globalSearchExecution";
 import type { GlobalSearchState } from "./globalSearchState";
 
-export { globalSearchContext } from "./globalSearchContext";
 export type { GlobalSearchState, MistySubmissionPresentation } from "./globalSearchState";
 
 // Search owns retrieval and launcher state only. Compatibility methods hand off

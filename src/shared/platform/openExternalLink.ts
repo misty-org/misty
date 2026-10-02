@@ -1,7 +1,6 @@
 import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
@@ -9,11 +8,6 @@ export function configureMistyBrowserLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
 ): void {
   openInMistyBrowser = opener;
-}
-export function configureProviderAuthorizationLinkOpener(
-  opener: ((url: string) => void | Promise<void>) | null,
-): void {
-  configureMistyBrowserLinkOpener(opener);
 }
 export async function openExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
@@ -61,14 +55,6 @@ export async function openProviderAuthorizationLink(
     strategy: openInMistyBrowser ? "misty-browser" : "window-open",
     platform: currentPlatform,
     attemptedAt,
-  };
-}
-export function handleExternalLinkClick(
-  url: string,
-): (event: ReactMouseEvent<HTMLAnchorElement>) => void {
-  return (event) => {
-    event.preventDefault();
-    void openExternalLink(url);
   };
 }
 export function installExternalLinkRouting(root: Document = document): () => void {

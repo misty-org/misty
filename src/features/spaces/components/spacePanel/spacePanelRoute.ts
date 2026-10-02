@@ -1,10 +1,7 @@
 import type { SocialProviderId } from "@/api/social";
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import {
-  socialConversationPath as providerConversationPath,
-  socialProviderFromRoute,
-} from "../../social/socialRoute";
+import { socialProviderFromRoute } from "../../social/socialRoute";
 
 const validSections = new Set([
   "home",
@@ -88,19 +85,6 @@ export function useSpacePanelRoute(): SpacePanelRoute {
     conversationId: search.get("conversation"),
     drawingId: routeSection === "drawings" ? decodeRouteSegment(routeParts[3] ?? "") : "",
   };
-}
-
-export function spaceSectionPath(spaceId: string, section: string, settingsSection: string) {
-  const destination = section === "settings" ? `settings/${settingsSection}` : section;
-  return `/spaces/${encodeURIComponent(spaceId)}/${destination}`;
-}
-
-export function spaceConversationPath(
-  spaceId: string,
-  conversationId: string,
-  provider: SocialProviderId = "misty",
-) {
-  return providerConversationPath(spaceId, provider, conversationId);
 }
 
 function decodeRouteSegment(value: string): string {

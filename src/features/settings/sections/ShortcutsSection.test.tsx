@@ -20,7 +20,7 @@ const definitions = [
   command("test.terminal", "Terminal action", {
     description: "A scoped terminal test action.",
     category: "Terminal",
-    scope: "tool:terminal",
+    scope: "tool:files",
     mac: "Cmd+J",
     windows: "Ctrl+J",
   }),

@@ -17,8 +17,8 @@ import {
   DropdownMenuTrigger,
   IconButton,
   MenuItem,
+  CollectionItemDialog,
 } from "@/shared/ui";
-import { CollectionItemDialog } from "@/shared/ui/patterns/CollectionItemDialog";
 import { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
 import { notifyDrawingListChanged, closeDrawingCollaborationSession } from "@/features/journal";
 import { useSpacesStore } from "./store/useSpacesStore";

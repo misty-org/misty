@@ -1,7 +1,7 @@
 import { apiSessionInvalidEvent, readApiAuthToken } from "@/api/client/session";
 import { reportSystemError } from "@/features/activity";
 import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import { removeSpaceReferenceCache } from "@/features/spaces";
 import {
   removeAccountWorkspace,
@@ -13,7 +13,7 @@ import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRe
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
 import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   assertAccountIdentity,
@@ -25,7 +25,6 @@ import {
   resetAccountScopedState,
   shouldPersistAuthUser,
   writeStoredUser,
-  type AuthContextValue,
   type AuthUser,
 } from "./authSession";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
@@ -47,34 +46,10 @@ export type { AuthContextValue, AuthUser } from "./authSession";
 import { AuthContext } from "./authState";
 // Preserve the public import path without recreating the context during provider refreshes.
 export { useAuth } from "./authState";
-
-/**
- * Restricted identity provider used by a separately packaged official app.
- * The package receives display identity from the host, while every network
- * request continues to use its short-lived, app-scoped runtime credential.
- */
-export function OfficialAppAuthProvider(props: { user: AuthUser; children: ReactNode }) {
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user: props.user,
-      setUser: async () => undefined,
-      accounts: [],
-      transitioning: false,
-      refreshUser: async () => props.user,
-      authenticateAccount: async (request) => request(),
-      switchAccount: async () => undefined,
-      resumeAccount: async () => undefined,
-      removeAccount: async () => undefined,
-      logout: async () => undefined,
-    }),
-    [props.user],
-  );
-  return <AuthContext.Provider value={value}>{props.children}</AuthContext.Provider>;
-}
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const signOut = useSetupStore((state) => state.signOut);
-  const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
-  const nativeUser = useSetupStore((state) => state.status?.current_user ?? null);
+  const signOut = useNativeSessionStore((state) => state.signOut);
+  const saveAuthenticatedUser = useNativeSessionStore((state) => state.saveAuthenticatedUser);
+  const nativeUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const verifiedAccountId = useUserStore((state) => state.me?.id);
   const navigate = useNavigate();
   const [user, setUserState] = useState<AuthUser | null>(() => readInitialUser());
@@ -212,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousUser = activeUser;
       const previousAccountId = previousUser?.id ?? "";
       const previousMe = useUserStore.getState().me;
-      const previousLicense = useSetupStore.getState().status?.current_license ?? null;
+      const previousLicense = useNativeSessionStore.getState().status?.current_license ?? null;
       let authenticated: AuthUser | null = null;
       beginAccountOperation();
       try {

@@ -77,18 +77,6 @@ impl ListingCache {
     pub async fn clear(&self, remote: &str, remote_path: &str) -> ApiResult<()> {
         remove_if_exists(&self.file_for(remote, remote_path)).await
     }
-
-    pub async fn clear_remote(&self, remote: &str) -> ApiResult<()> {
-        if remote.is_empty() {
-            return Ok(());
-        }
-        let path = self.root.join(remote);
-        match tokio::fs::remove_dir_all(&path).await {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(error) => Err(io_error("clear remote listing cache", &path, error)),
-        }
-    }
 }
 
 pub fn encode_path(path: &str) -> String {

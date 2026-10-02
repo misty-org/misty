@@ -86,6 +86,7 @@ export * from "./patterns/ComingSoonSurface";
 export * from "./patterns/DiscoverCard";
 export * from "./patterns/CollectionWorkspace";
 export * from "./patterns/CollectionFilterMenu";
+export * from "./patterns/CollectionItemDialog";
 
 export * from "./utils";
 

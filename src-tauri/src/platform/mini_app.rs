@@ -122,14 +122,7 @@ pub fn builtin_service_open(
         .0
         .lock()
         .map_err(|_| "Service registry unavailable.")?
-        .insert(
-            label.clone(),
-            Instance {
-                root,
-                permissions,
-
-            },
-        );
+        .insert(label.clone(), Instance { root, permissions });
     Ok(label)
 }
 
@@ -184,14 +177,11 @@ mod builtin_integration_tests {
         permissions.owner_namespace = Some(owner.namespace(&root).unwrap());
         permissions.native_owner = Some(owner);
         permissions.account_owned = true;
-        state.0.lock().unwrap().insert(
-            "test".into(),
-            Instance {
-                root,
-                permissions,
-
-            },
-        );
+        state
+            .0
+            .lock()
+            .unwrap()
+            .insert("test".into(), Instance { root, permissions });
         let lease = ServiceLease::acquire(&state, "test", "files")
             .await
             .unwrap();
@@ -200,7 +190,10 @@ mod builtin_integration_tests {
         let document = input.path().join("sample.txt");
         std::fs::write(&document, "Built-in document processing works.").unwrap();
         let result = lease.process(&document, "semanticText").unwrap();
-        assert!(result["semantic"]["text"].as_str().unwrap().contains("Built-in document processing"));
+        assert!(result["semantic"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("Built-in document processing"));
         assert!(ServiceLease::acquire(&state, "test", "library")
             .await
             .is_err());

@@ -31,17 +31,20 @@ pub(super) fn provider_popup(
         )
     };
     // Do not fall back to a fresh view: it would discard the opener and profile.
-    Some(create_popup(
-        app,
-        source_id,
-        url,
-        features,
-        provider,
-        profile,
-        logical_profile,
-        oauth_callback,
-        origin_space_id,
-    ).unwrap_or(NewWindowResponse::Deny))
+    Some(
+        create_popup(
+            app,
+            source_id,
+            url,
+            features,
+            provider,
+            profile,
+            logical_profile,
+            oauth_callback,
+            origin_space_id,
+        )
+        .unwrap_or(NewWindowResponse::Deny),
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -81,7 +84,8 @@ fn create_popup(
         let mut sessions = state.sessions.lock().ok()?;
         let source = sessions.get_mut(source_id)?;
         let pending = source.pending_agent_download.as_mut();
-        pending.filter(|pending| pending.expires_at > Utc::now() && pending.popup_id.is_none())
+        pending
+            .filter(|pending| pending.expires_at > Utc::now() && pending.popup_id.is_none())
             .map(|pending| {
                 pending.popup_id = Some(id.clone());
                 source_id.to_owned()
@@ -186,9 +190,18 @@ fn create_popup(
                         let source = sessions.get(source_id)?;
                         popup_download_authority(source, &download_id)
                     });
-                    let Some((scope, agent, task)) = authority else { return false; };
-                    if super::super::agent_workspace::authorize_scope(&download_app, &scope, &agent, &task).is_err()
-                        || download_started.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    let Some((scope, agent, task)) = authority else {
+                        return false;
+                    };
+                    if super::super::agent_workspace::authorize_scope(
+                        &download_app,
+                        &scope,
+                        &agent,
+                        &task,
+                    )
+                    .is_err()
+                        || download_started.swap(true, std::sync::atomic::Ordering::SeqCst)
+                    {
                         return false;
                     }
                 } else if !download_started.load(std::sync::atomic::Ordering::SeqCst) {
@@ -231,10 +244,11 @@ fn create_popup(
             return None;
         }
     };
-    if super::super::browser_site_permissions::install(window.as_ref()).is_err() ||
-        attachment_download::install(window.as_ref()).is_err() ||
-        focus_messages::install(app, window.as_ref(), &id).is_err() ||
-        install_close_handler(app, window.as_ref(), &id).is_err() {
+    if super::super::browser_site_permissions::install(window.as_ref()).is_err()
+        || attachment_download::install(window.as_ref()).is_err()
+        || focus_messages::install(app, window.as_ref(), &id).is_err()
+        || install_close_handler(app, window.as_ref(), &id).is_err()
+    {
         let _ = window.destroy();
         return Some(NewWindowResponse::Deny);
     }
@@ -253,7 +267,12 @@ fn create_popup(
     tauri::async_runtime::spawn(async move {
         // Export popups may spend time generating a file before it downloads.
         // Keep the view alive through the source's bounded download wait.
-        tokio::time::sleep(Duration::from_secs(if agent_download_source.is_some() { 100 } else { 30 })).await;
+        tokio::time::sleep(Duration::from_secs(if agent_download_source.is_some() {
+            100
+        } else {
+            30
+        }))
+        .await;
         let state = cleanup_app.state::<BrowserSessionState>();
         let pending = state
             .pending_popups
@@ -345,7 +364,8 @@ fn install_close_handler(app: &AppHandle, webview: &Webview, id: &str) -> Result
             object_setClass(delegate, subclass);
             // WebKit caches optional delegate selectors when the delegate is set.
             // Reassign it after adding webViewDidClose so the new method is observed.
-            let _: () = msg_send![view, setUIDelegate: std::ptr::null_mut::<objc::runtime::Object>()];
+            let _: () =
+                msg_send![view, setUIDelegate: std::ptr::null_mut::<objc::runtime::Object>()];
             let _: () = msg_send![view, setUIDelegate: delegate];
             if let Ok(mut targets) = close_targets().lock() {
                 targets.insert(view as usize, (app, id));

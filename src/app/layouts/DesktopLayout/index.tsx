@@ -1,4 +1,3 @@
-import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { ScheduledTasksBridge } from "@/features/scheduled";
@@ -48,7 +47,6 @@ import { RestoreGlyph } from "./RestoreGlyph";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { SettingsOverlay } from "./SettingsOverlays";
 import * as styles from "./styles";
-import { WorkStatusPopup } from "./WorkStatusPopup";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
@@ -58,17 +56,13 @@ export type {
   AppNoticeEntry,
   AppNoticeKind,
   AppNoticeSource,
-  DesktopNavItem,
   DesktopPlatform,
   FramePacingState,
   WindowBounds,
   WindowRect,
 } from "@/app/layouts/model/types";
 
-export function DesktopLayout(props: {
-  getRouteId: (pathname: string) => AppTab;
-  navItems: DesktopNavItem[];
-}) {
+export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   const { user, refreshUser, transitioning } = useAuth();
   const {
     location,
@@ -469,11 +463,7 @@ export function DesktopLayout(props: {
           </>
         </section>
 
-        {!isAuthRoute ? (
-          <>
-            <WorkStatusPopup />
-          </>
-        ) : null}
+        {!isAuthRoute ? <></> : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
         {!isAuthRoute ? (
           <>

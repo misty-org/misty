@@ -5,7 +5,6 @@ import { activeLayoutView, allLayoutViews, layoutTabs } from "./layoutTabs";
 import { migrateSavedLinkGroups } from "./tabGroups";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
-import { setWorkspaceUnsaved } from "./unsavedChanges";
 import { retainDeviceState } from "@/features/browser-workspace/deviceState";
 const state = () => useWorkspaceStore.getState();
 const tabs = () => layoutTabs(state().layout);
@@ -40,20 +39,6 @@ it("collapses the only group without closing its views and expands a focused mem
   expect(tabs().find((t) => t.id === state().layout.activeTabId)?.tabGroupId).toBeUndefined();
   state().focusView(before[0]);
   expect(state().tabGroups.find((g) => g.id === group)?.collapsed).toBe(false);
-});
-it("refuses an entire group close when any member has unsaved changes", () => {
-  const a = tabs()[0].id,
-    b = add("B"),
-    group = state().createTabGroup([a, b])!;
-  const view = activeLayoutView(tabs()[0])!;
-  setWorkspaceUnsaved(view.id, true);
-  const before = state().layout;
-  try {
-    expect(state().closeTabGroup(group)).toBe(false);
-    expect(state().layout).toBe(before);
-  } finally {
-    setWorkspaceUnsaved(view.id, false);
-  }
 });
 it("saves and restores mixed surfaces and split trees with fresh identities only once", () => {
   const first = tabs()[0].id;

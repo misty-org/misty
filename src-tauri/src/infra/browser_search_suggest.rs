@@ -40,7 +40,11 @@ fn client() -> Option<&'static reqwest::Client> {
 }
 
 fn suggest_url(engine_id: &str, text: &str) -> Option<String> {
-    let template = engines().iter().find(|engine| engine.id == engine_id)?.suggest.as_deref()?;
+    let template = engines()
+        .iter()
+        .find(|engine| engine.id == engine_id)?
+        .suggest
+        .as_deref()?;
     let query: String = url::form_urlencoded::byte_serialize(text.as_bytes()).collect();
     Some(template.replace("%s", &query))
 }
@@ -50,12 +54,20 @@ fn parse_open_search(body: &[u8], text: &str) -> Vec<String> {
     let Ok(serde_json::Value::Array(parts)) = serde_json::from_slice(body) else {
         return Vec::new();
     };
-    let Some(serde_json::Value::Array(values)) = parts.get(1) else { return Vec::new() };
+    let Some(serde_json::Value::Array(values)) = parts.get(1) else {
+        return Vec::new();
+    };
     let mut seen = std::collections::HashSet::new();
     values
         .iter()
         .filter_map(|value| value.as_str())
-        .map(|value| value.trim().chars().take(MAX_TEXT_CHARS).collect::<String>())
+        .map(|value| {
+            value
+                .trim()
+                .chars()
+                .take(MAX_TEXT_CHARS)
+                .collect::<String>()
+        })
         .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case(text))
         .filter(|value| seen.insert(value.to_lowercase()))
         .take(MAX_SUGGESTIONS)
@@ -78,10 +90,18 @@ pub async fn browser_search_suggest(request: BrowserSearchSuggestRequest) -> Vec
     let (Some(url), Some(client)) = (suggest_url(&request.engine, text), client()) else {
         return Vec::new();
     };
-    let Ok(response) = client.get(url).send().await.and_then(|r| r.error_for_status()) else {
+    let Ok(response) = client
+        .get(url)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+    else {
         return Vec::new();
     };
-    if response.content_length().is_some_and(|length| length as usize > MAX_RESPONSE_BYTES) {
+    if response
+        .content_length()
+        .is_some_and(|length| length as usize > MAX_RESPONSE_BYTES)
+    {
         return Vec::new();
     }
     match response.bytes().await {

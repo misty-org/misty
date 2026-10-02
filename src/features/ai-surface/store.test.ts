@@ -1,7 +1,7 @@
 const handoff = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/features/misty/handoff", () => ({ openMisty: handoff }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { testingConciseSpeech, useAiSurfaceStore } from "./store";
+import { useAiSurfaceStore } from "./store";
 import { consumeInvocationEvent } from "./storeRuntime";
 import type { AiSurfaceAdapter } from "./types";
 
@@ -198,11 +198,6 @@ describe("embodied Misty state", () => {
     useAiSurfaceStore.getState().setCapture("account-a", "pane-a", capture);
 
     expect(useAiSurfaceStore.getState().sessions["account-a:pane-a"]?.capture).toEqual(capture);
-  });
-
-  it("keeps spoken summaries compact", () => {
-    expect(testingConciseSpeech("x".repeat(300))).toHaveLength(240);
-    expect(testingConciseSpeech("**Done**\n\n- first\n- `second`")).toBe("Done first second");
   });
 
   it("keeps the durable personal-agent run link", () => {

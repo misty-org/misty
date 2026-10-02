@@ -64,24 +64,8 @@ export function workspaceRows(
   });
 }
 
-export function seatText(row: WorkspaceRow) {
-  if (row.current) return row.local ? "In use here" : "Open on this device";
-  if (row.seat === "other") return row.seatName ? `In use on ${row.seatName}` : "In use";
-  return row.connection === "Offline" ? "Offline" : "Not in use";
-}
-
 /** The workspace this machine shows and edits. */
 export function onWorkspace(session: NativeSyncView): string | null {
   const state = session.sync;
   return state ? (state.on_workspace ?? state.driving_workspace) : null;
-}
-
-/** Name of the other device whose workspace this device is showing, if any. */
-export function viewingName(session: NativeSyncView, ownerName?: string | null): string | null {
-  const state = session.sync;
-  const shown = onWorkspace(session);
-  if (!state || !shown || shown === session.device_id) return null;
-  return (
-    workspaceRows(session, state, ownerName).find((row) => row.deviceId === shown)?.name ?? null
-  );
 }

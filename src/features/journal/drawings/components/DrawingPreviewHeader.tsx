@@ -158,6 +158,3 @@ export function DrawingPreviewHeader({
     </div>
   );
 }
-
-/** @deprecated Use DrawingPreviewHeader directly */
-export const DrawingPreviewHeaderView = DrawingPreviewHeader;

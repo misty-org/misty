@@ -15,4 +15,3 @@ fn resolve_desktop_home_dir() -> Option<PathBuf> {
         .or_else(|| env::var_os("USERPROFILE"))
         .map(PathBuf::from)
 }
-

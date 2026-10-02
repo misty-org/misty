@@ -4,11 +4,7 @@ import type {
   ExplorerStore,
   PaneExplorerState,
 } from "../../model/interfaces/store/types";
-import type {
-  ExplorerSortColumn,
-  ExplorerSortDirection,
-  ExplorerViewMode,
-} from "../../model/types/store/types";
+import type { ExplorerViewMode } from "../../model/types/store/types";
 import { explorerRuntime, getExplorerStore } from "../runtime";
 import * as H from "./index";
 
@@ -16,15 +12,6 @@ export function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
-}
-
-export function parseSortState(column: unknown, direction: unknown): ExplorerSortState {
-  const parsedColumn: ExplorerSortColumn =
-    column === "modified" || column === "size" || column === "type" || column === "name"
-      ? column
-      : "name";
-  const parsedDirection: ExplorerSortDirection = direction === "desc" ? "desc" : "asc";
-  return { column: parsedColumn, direction: parsedDirection };
 }
 
 export function sortForPane(
@@ -53,18 +40,8 @@ export function tabIndex(id: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function workspaceIndex(id: string): number {
-  const parsed = Number(id.match(/(\d+)$/)?.[1]);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-export function clampRatio(value: number): number {
-  if (!Number.isFinite(value)) return 0.5;
-  return Math.min(0.9, Math.max(0.1, value));
 }
 
 export function titleFromPath(path: string): string {

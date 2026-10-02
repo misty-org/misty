@@ -262,6 +262,7 @@ mod tests {
             config_sha256: "hash".to_owned(),
             created_at: Utc::now(),
             platforms: vec![],
+            build_environment: Default::default(),
         };
         let platform = |name: &str, updater: &str, signature: &str| PlatformManifest {
             version: release.version.clone(),
@@ -300,6 +301,7 @@ mod tests {
             config_sha256: "hash".to_owned(),
             created_at: Utc::now(),
             platforms: vec![MACOS_PLATFORM.to_owned()],
+            build_environment: Default::default(),
         };
         let mac = PlatformManifest {
             version: release.version.clone(),
@@ -327,6 +329,7 @@ mod tests {
             config_sha256: "hash".to_owned(),
             created_at: Utc::now(),
             platforms: vec![MACOS_PLATFORM.to_owned()],
+            build_environment: Default::default(),
         };
         let manifest = PlatformManifest {
             version: release.version.clone(),

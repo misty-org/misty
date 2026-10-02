@@ -112,7 +112,9 @@ pub struct Bookmark {
 }
 
 /// Tab group colors, as named by the renderer.
-const TAB_GROUP_COLORS: &[&str] = &["gray", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+const TAB_GROUP_COLORS: &[&str] = &[
+    "gray", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange",
+];
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

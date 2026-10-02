@@ -1,13 +1,6 @@
 export { default as AgentsPage } from "./AgentsPage";
-export * from "./agentWorkState";
 export * from "./flags";
-export type {
-  GatewayModel,
-  GlobalSpaceLibraryHit,
-  ReasoningEffort,
-} from "./model/interfaces/personal";
-export * from "./modelSelection";
-export * from "./store/agentAccountLifecycle";
+export type { GlobalSpaceLibraryHit } from "./model/interfaces/personal";
 export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgentsStore";
 export {
   browserDeviceSessionId,

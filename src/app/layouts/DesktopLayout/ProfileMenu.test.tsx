@@ -23,8 +23,9 @@ vi.mock("@/features/auth", () => ({
   useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
 }));
 
-vi.mock("@/features/installer", () => ({
-  useSetupStore: (selector: (state: { status: null }) => unknown) => selector({ status: null }),
+vi.mock("@/features/native-session", () => ({
+  useNativeSessionStore: (selector: (state: { status: null }) => unknown) =>
+    selector({ status: null }),
 }));
 
 function renderMenu() {

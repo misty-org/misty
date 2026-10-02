@@ -383,9 +383,9 @@ impl Document {
             }
         };
         match payload {
-            Payload::ActiveDevice { .. } | Payload::Published { .. } | Payload::WorkspaceMode { .. } => {
-                return Err(Error::Invalid)
-            }
+            Payload::ActiveDevice { .. }
+            | Payload::Published { .. }
+            | Payload::WorkspaceMode { .. } => return Err(Error::Invalid),
             Payload::Workspace { changes, .. } => {
                 for change in changes {
                     match change {
@@ -496,7 +496,10 @@ impl Document {
 
     pub fn can_publish(&self, device_id: &str, payload: &Payload) -> bool {
         if self.workspace_mode {
-            return matches!(payload, Payload::Credentials { .. } | Payload::WorkspaceMode { .. });
+            return matches!(
+                payload,
+                Payload::Credentials { .. } | Payload::WorkspaceMode { .. }
+            );
         }
         match payload {
             Payload::WorkspaceMode { .. } => true,

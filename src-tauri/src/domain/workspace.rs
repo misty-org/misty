@@ -161,40 +161,6 @@ impl Workspace {
             ..Self::default()
         }
     }
-
-    pub fn load_from_document(&mut self, document: &WorkspaceDocument) {
-        if let Some(saved) = document
-            .workspaces
-            .iter()
-            .find(|workspace| workspace.id == self.id)
-        {
-            *self = saved.clone();
-        }
-    }
-
-    pub fn save_into_document(&self, document: &mut WorkspaceDocument) {
-        if self.id.is_empty() {
-            return;
-        }
-        match document
-            .workspaces
-            .iter_mut()
-            .find(|workspace| workspace.id == self.id)
-        {
-            Some(saved) => *saved = self.clone(),
-            None => document.workspaces.push(self.clone()),
-        }
-        if document.active_workspace_id.is_empty() {
-            document.active_workspace_id = self.id.clone();
-        }
-        if let Some(index) = self
-            .id
-            .strip_prefix("workspace_")
-            .and_then(|value| value.parse::<i16>().ok())
-        {
-            document.next_workspace_idx = document.next_workspace_idx.max(index.saturating_add(1));
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -315,13 +281,5 @@ mod tests {
         assert_eq!(document.active_workspace_id, "workspace_2");
         assert_eq!(document.workspaces[0].explorer.grid_pane_ids[0].len(), 2);
         assert!(document.workspaces[0].sidebar_visible);
-    }
-
-    #[test]
-    fn updates_workspace_indices_on_save() {
-        let mut document = WorkspaceDocument::default();
-        Workspace::new("workspace_7").save_into_document(&mut document);
-        assert_eq!(document.next_workspace_idx, 8);
-        assert_eq!(document.active_workspace_id, "workspace_7");
     }
 }

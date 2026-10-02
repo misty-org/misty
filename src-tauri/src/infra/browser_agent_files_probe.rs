@@ -82,7 +82,12 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         }
     }
     let mut receipts = Vec::new();
-    for name in ["Download test image", "Download test catalog", "Download popup catalog", "Download attachment catalog"] {
+    for name in [
+        "Download test image",
+        "Download test catalog",
+        "Download popup catalog",
+        "Download attachment catalog",
+    ] {
         let mut input = element(&app, "fixture-source", "fixture-task", name).await?;
         input["expectDownload"] = json!(true);
         let output = act(
@@ -92,7 +97,8 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
             "browser.click",
             input,
         )
-        .await.map_err(|error| format!("{name}: {error}"))?;
+        .await
+        .map_err(|error| format!("{name}: {error}"))?;
         if output["download"]["file"]["sha256"].as_str().is_none() {
             return Err(format!("missing verified download: {output}"));
         }

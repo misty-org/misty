@@ -4,9 +4,8 @@ import {
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/types";
 import { JournalAttribution, JournalDeleteDialog } from "@/features/journal";
-import { Button, EmptyState, PermissionState, Spinner } from "@/shared/ui";
+import { Button, CollectionItemDialog, EmptyState, PermissionState, Spinner } from "@/shared/ui";
 import { DrawingCollection } from "./components/DrawingCollection";
-import { CollectionItemDialog } from "@/shared/ui/patterns/CollectionItemDialog";
 import {
   Suspense,
   useCallback,

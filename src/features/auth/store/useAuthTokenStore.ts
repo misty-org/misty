@@ -5,7 +5,6 @@ import {
   readDeploymentScope,
   readDeploymentStorageItem,
   resolveApiBase,
-  resolveHostedApiBase,
 } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
@@ -132,21 +131,6 @@ async function loadAccountAuthToken(): Promise<string | null> {
     });
   }
   return cachedToken ?? null;
-}
-
-/** Reads a preserved Misty Hosted session specifically for entitlement minting.
- * It never changes the active deployment or exposes that token to the custom
- * server request path. */
-export async function readHostedAccountAuthToken(): Promise<string | null> {
-  if (!hasTauriInternals()) return null;
-  if (readDeploymentScope() === "hosted") return readAccountAuthToken();
-  const vault = await loadSecureVault();
-  const hosted = vault.sessions
-    .filter((session) => sessionDeploymentScope(session) === "hosted")
-    .sort((left, right) => right.account.lastUsedAt.localeCompare(left.account.lastUsedAt))[0];
-  if (!hosted) return null;
-  if (!(await restoreAccountCookies(resolveHostedApiBase(), hosted.account.id))) return null;
-  return hosted.token;
 }
 export function listSavedAccountSessions(): SavedAccountSession[] {
   try {

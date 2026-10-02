@@ -52,13 +52,6 @@ export function syncWorkspaceViewRouteHistory(tabId: string, route: string): voi
   current.index = current.entries.length - 1;
 }
 
-export function canNavigateWorkspaceViewRoute(tabId: string, delta: number): boolean {
-  const history = routeHistories.get(tabId);
-  if (!history) return false;
-  const nextIndex = history.index + delta;
-  return nextIndex >= 0 && nextIndex < history.entries.length;
-}
-
 export function navigateWorkspaceViewRoute(tabId: string, delta: number): string | null {
   const history = routeHistories.get(tabId);
   if (!history) return null;

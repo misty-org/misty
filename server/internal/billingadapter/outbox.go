@@ -50,10 +50,6 @@ func (r Reliable) Submit(ctx context.Context, action string, req Request) error 
 	}
 	return r.Store.Delivered(ctx, entry.ID)
 }
-func (r Reliable) Flush(ctx context.Context, limit int) error {
-	_, err := r.FlushBatch(ctx, limit)
-	return err
-}
 
 // FlushBatch reports delivered or rescheduled entries, including partial batches.
 func (r Reliable) FlushBatch(ctx context.Context, limit int) (int, error) {

@@ -1,17 +1,17 @@
 //! Native-only browser synchronization. Secret types deliberately cannot be
 //! serialized or formatted; the web renderer only receives projected UI state.
+pub mod collections;
 pub mod crypto;
 pub mod document;
 pub mod protocol;
-pub mod collections;
 pub mod recovery;
 mod recovery_pending;
 pub mod restore;
 pub mod secure_store;
 pub mod store;
 pub mod transport;
-pub mod workspace;
 pub mod worker;
+pub mod workspace;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

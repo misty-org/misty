@@ -1,6 +1,5 @@
 import {
   createMultiPanelStore,
-  destroyMultiPanelStore,
   useMultiPanelStore,
   type MultiPanelStoreHook,
 } from "@/features/workspace";
@@ -17,11 +16,4 @@ export function filesMultiPanelStore(workspaceId?: string): MultiPanelStoreHook 
   });
   storesByWorkspaceId.set(workspaceId, store);
   return store;
-}
-
-export function releaseFilesMultiPanelStore(workspaceId: string): void {
-  const store = storesByWorkspaceId.get(workspaceId);
-  if (!store) return;
-  storesByWorkspaceId.delete(workspaceId);
-  destroyMultiPanelStore(store);
 }

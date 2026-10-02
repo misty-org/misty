@@ -196,7 +196,6 @@ func (s *Server) mountMediaSearchRoutes(prefix string, service *api.MediaSearchS
 
 func (s *Server) mountSmartLibraryRoutes(prefix string, service *api.SmartLibraryService) {
 	s.Router.Post(prefix+"/search", service.GlobalSearch())
-	s.Router.Get(prefix+"/index-status", service.IndexStatus())
 	s.Router.Post(prefix+"/reindex", service.PlanReindex())
 	s.Router.Post(prefix+"/reindex/{jobID}/complete", service.CompleteReindex())
 	s.Router.Post(prefix+"/folders", service.RegisterFolder())
@@ -304,11 +303,6 @@ func (s *Server) mountMistyRoutes(prefix string, aiService *api.AIService) {
 	s.Router.Get(prefix+"/settings/preferences", aiService.AccountPreferences())
 	s.Router.Post(prefix+"/settings/preferences", aiService.AccountPreferences())
 	s.Router.Patch(prefix+"/settings/preferences", aiService.AccountPreferences())
-	s.Router.Get(prefix+"/settings/profiles", aiService.SettingsProfiles())
-	s.Router.Post(prefix+"/settings/profiles", aiService.SettingsProfiles())
-	s.Router.Get(prefix+"/settings/profiles/{profileID}", aiService.SettingsProfiles())
-	s.Router.Patch(prefix+"/settings/profiles/{profileID}", aiService.SettingsProfiles())
-	s.Router.Delete(prefix+"/settings/profiles/{profileID}", aiService.SettingsProfiles())
 	s.Router.Get(prefix+"/misty/events", aiService.AccountEvents())
 	s.Router.Post(prefix+"/misty/agent-followup", aiService.AgentFollowup())
 	s.Router.Post(prefix+"/misty/agent-execution", aiService.AgentExecutionLease())

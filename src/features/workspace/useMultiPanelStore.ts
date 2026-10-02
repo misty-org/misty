@@ -212,12 +212,6 @@ export const useMultiPanelStore = createMultiPanelStore({
   defaultTitle: "Home",
 });
 
-/** Remove a scoped store from pane ownership lookup once its outer tab closes. */
-export function destroyMultiPanelStore(store: MultiPanelStoreHook): void {
-  if (store === useMultiPanelStore) return;
-  registeredMultiPanelStores.delete(store);
-}
-
 /** Resolve the inner workspace that owns a concrete pane. */
 export function multiPanelStoreForPane(paneId: string): MultiPanelStoreHook {
   for (const store of registeredMultiPanelStores) {

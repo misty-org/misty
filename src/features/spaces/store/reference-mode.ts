@@ -2,13 +2,12 @@ import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesSto
 import { SpaceRequestError } from "@/api/spaces/api";
 import { setSpaceReferenceOnly, subscribeSpaceReferenceOnly } from "@/api/spaces/connectivity";
 import type { SpacesSnapshot } from "@/api/spaces/dto/interfaces/types";
-import { removeSpaceReferenceCache, setSpaceReferenceAccount } from "./reference-cache";
+import { removeSpaceReferenceCache } from "./reference-cache";
 
 let clearedReferenceCacheAccount = "";
 
 export function setSpaceReferenceModeAccount(accountId: string): void {
   const normalizedAccountId = accountId.trim();
-  setSpaceReferenceAccount(normalizedAccountId);
   // Saved-copy mode has been retired. Remove any encrypted reference cache
   // left by an earlier build so it cannot become a fallback again.
   if (normalizedAccountId && normalizedAccountId !== clearedReferenceCacheAccount) {
@@ -62,7 +61,6 @@ export function canUseSpaceReferenceFallback(error: unknown): boolean {
 
 export function resetSpaceReferenceMode(): void {
   setSpaceReferenceOnly(false);
-  setSpaceReferenceAccount("");
   clearedReferenceCacheAccount = "";
 }
 

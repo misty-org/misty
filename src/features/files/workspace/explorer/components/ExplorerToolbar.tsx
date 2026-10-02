@@ -4,7 +4,6 @@ import { ExplorerToolbarView } from "./ExplorerToolbarView";
 import type { ExplorerToolbarProps } from "../model/interfaces/components/ExplorerToolbarModel";
 export { ExplorerPaneToolbarActions } from "./ExplorerPaneToolbarActions";
 export type {
-  ExplorerCommandId,
   ExplorerLocationResult,
   ExplorerPaneToolbarActionsProps,
 } from "./ExplorerToolbarModel";

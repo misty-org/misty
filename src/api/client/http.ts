@@ -149,11 +149,6 @@ export function httpOutageRemainingMs(): number {
   return Math.max(0, outageUntil - Date.now());
 }
 
-/** Clears outage memory, for tests. */
-export function resetHttpOutageForTests(): void {
-  noteAvailable();
-}
-
 export class HttpRequestError extends Error {
   constructor(url: string, cause: unknown) {
     super(`Could not reach ${url}: ${errorText(cause)}`);
@@ -174,4 +169,9 @@ export class HttpStatusError extends Error {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Clears outage memory, for tests. */
+export function resetHttpOutageForTests(): void {
+  noteAvailable();
 }

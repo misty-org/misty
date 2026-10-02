@@ -53,19 +53,11 @@ export function DestinationIcon({
     const Icon = nativeIcon;
     return <Icon aria-hidden />;
   }
-  if (item.id === "integrations" && (appId === "social" || appId === "music" || appId === "media"))
-    return <Plug aria-hidden />;
-  if (appId === "social" || appId === "music" || appId === "media") {
-    const family = appId === "social" ? "chat" : appId;
-    const provider = providerFromRoute(item.route, family);
-    if (provider) return <BrandIcon brand={provider} size={18} />;
-  }
-  if (appId === "social" || appId === "music" || appId === "media") {
-    const family = appId === "social" ? "chat" : appId;
-    const provider = providerFromRoute(
-      `/apps/${appId}?provider=${encodeURIComponent(item.id)}`,
-      family,
-    );
+  if (item.id === "integrations" && appId === "social") return <Plug aria-hidden />;
+  if (appId === "social") {
+    const provider =
+      providerFromRoute(item.route, "chat") ??
+      providerFromRoute(`/apps/social?provider=${encodeURIComponent(item.id)}`, "chat");
     if (provider) return <BrandIcon brand={provider} size={18} />;
   }
   if (appId === "library") {

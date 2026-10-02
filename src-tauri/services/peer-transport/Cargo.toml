@@ -13,6 +13,11 @@ serde_json = "1"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 
+# This helper is a separate Cargo project and does not inherit the desktop profile.
+[profile.dev]
+debug = 1
+incremental = false
+
 [profile.release]
 codegen-units = 1
 lto = "fat"

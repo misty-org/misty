@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 
 use anyhow::{bail, Context, Result};
@@ -5,12 +6,27 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
 use url::Url;
 
+pub(super) fn public_environment() -> Result<BTreeMap<String, String>> {
+    let api = validate_https_url("MISTY_RELEASE_API_URL", &required("MISTY_RELEASE_API_URL")?)?;
+    let web = validate_https_url("MISTY_RELEASE_WEB_URL", &required("MISTY_RELEASE_WEB_URL")?)?;
+    let origins = csp_origins(
+        "TAURI_CSP_CONNECT_SOURCES",
+        &required("TAURI_CSP_CONNECT_SOURCES")?,
+        &["https", "wss"],
+    )?;
+    if !origins.contains(&Url::parse(&api)?.origin().ascii_serialization()) {
+        bail!("TAURI_CSP_CONNECT_SOURCES must include the release API origin");
+    }
+    Ok(BTreeMap::from([
+        ("MISTY_PUBLIC_API_URL".into(), api),
+        ("MISTY_PUBLIC_URL".into(), web),
+    ]))
+}
+
 pub fn build() -> Result<Value> {
     let public_key = normalize_public_key(&required("TAURI_UPDATER_PUBLIC_KEY")?)?;
-    let endpoint = validate_https_url(
-        "TAURI_UPDATER_ENDPOINT",
-        &required("TAURI_UPDATER_ENDPOINT")?,
-    )?;
+    // The feed always lives on the public repository's latest release.
+    let endpoint = super::model::updater_endpoint();
     let connect = csp_origins(
         "TAURI_CSP_CONNECT_SOURCES",
         &required("TAURI_CSP_CONNECT_SOURCES")?,

@@ -214,7 +214,17 @@ func TestStalePageReinspectsBeforeSingleCommit(t *testing.T) {
 }
 
 func TestPreparedDigestSurvivesDurableJSONRoundTrip(t *testing.T) {
- s,_,e:=setup(t,"todoist");original,err:=s.Prepare(t.Context(),e);if err!=nil{t.Fatal(err)}
- raw,_:=json.Marshal(original);var restored Prepared;if err:=json.Unmarshal(raw,&restored);err!=nil{t.Fatal(err)}
- if original.Hash()!=restored.Hash(){t.Fatal("durable review changed without a content change")}
+	s, _, e := setup(t, "todoist")
+	original, err := s.Prepare(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(original)
+	var restored Prepared
+	if err := json.Unmarshal(raw, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if original.Hash() != restored.Hash() {
+		t.Fatal("durable review changed without a content change")
+	}
 }

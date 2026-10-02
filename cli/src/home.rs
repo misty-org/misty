@@ -1,76 +1,34 @@
 use std::{
     env, fs,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
 
 use crate::artifacts::write_private;
 
-const LAYOUT_VERSION: u32 = 1;
+/// Shared with the desktop app, which applies the same layout on every launch.
+const LAYOUT_JSON: &str = include_str!("../../src-tauri/misty-home-layout.json");
 
-const REQUIRED_DIRECTORIES: &[&str] = &[
-    ".cache",
-    ".cache/remotes",
-    ".cache/sessions",
-    ".cache/trash",
-    ".local/bin",
-    "cloud",
-    "config",
-    "config/automations/v1",
-    "config/sessions",
-    "db",
-    "mnt",
-    "notes",
-    "plugins/private",
-    "plugins/public",
-    "restic/passwords",
-    "tmp/downloads",
-    "tmp/transfers",
-];
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Layout {
+    layout_version: u32,
+    directories: Vec<String>,
+    private_files: Vec<String>,
+    retired: Vec<String>,
+}
 
-const LEGACY_PATHS: &[&str] = &[
-    ".local/bin/misty-proxy",
-    ".profiles",
-    ".release",
-    ".template",
-    "assets",
-    "config/file_sidebar.json",
-    "config/imgui.ini",
-    "db/misty.db",
-    "forms",
-    "local",
-    "logs",
-    "public",
-    "rclone",
-    "scripts",
-    "workflows",
-];
-
-const PRIVATE_FILES: &[&str] = &[
-    "cloud/connections.json",
-    "config/jwt.secret",
-    "config/misty.json",
-    "config/settings.json",
-    "config/workspaces.json",
-    "db/data.db",
-    "db/token.key",
-    "home.json",
-];
+fn layout() -> Layout {
+    serde_json::from_str(LAYOUT_JSON).expect("misty-home-layout.json is valid")
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 struct HomeManifest {
     format: String,
     layout_version: u32,
-}
-
-#[derive(Debug, Default)]
-struct CopyReport {
-    copied: usize,
-    preserved: usize,
 }
 
 pub fn default_root() -> Result<PathBuf> {
@@ -82,18 +40,15 @@ pub fn default_root() -> Result<PathBuf> {
     Ok(data_root.join(".misty"))
 }
 
-pub fn generate(destination: Option<&Path>, source: Option<&Path>) -> Result<()> {
+pub fn generate(destination: Option<&Path>) -> Result<()> {
     let destination = absolute(
         destination
             .map(Path::to_path_buf)
             .unwrap_or(default_root()?),
     )?;
-    let source = source
-        .map(|path| absolute(path.to_path_buf()))
-        .transpose()?;
 
     secure_directory(&destination)?;
-    for relative in REQUIRED_DIRECTORIES {
+    for relative in &layout().directories {
         secure_directory(&destination.join(relative))?;
     }
 
@@ -102,23 +57,9 @@ pub fn generate(destination: Option<&Path>, source: Option<&Path>) -> Result<()>
         &destination.join("config/misty.json"),
         b"{\n  \"server\": {\n    \"mode\": \"hosted\"\n  }\n}\n",
     )?;
-
-    let mut report = CopyReport::default();
-    if let Some(source) = source.as_deref() {
-        if !same_path(source, &destination) {
-            copy_portable_payload(source, &destination, &mut report)?;
-        }
-    }
     secure_known_files(&destination)?;
 
     println!("Misty home is ready at {}.", destination.display());
-    if source.is_some() {
-        println!(
-            "Copied {} portable file(s); preserved {} existing file(s).",
-            report.copied, report.preserved
-        );
-    }
-    println!("Device state, credentials, notes, mounts, caches, and binaries were not copied.");
     Ok(())
 }
 
@@ -129,13 +70,13 @@ pub fn check(path: Option<&Path>) -> Result<()> {
     if !root.is_dir() {
         bail!("Misty home does not exist at {}", root.display());
     }
-    for relative in REQUIRED_DIRECTORIES {
+    for relative in &layout().directories {
         if !root.join(relative).is_dir() {
             problems.push(format!("missing directory: {relative}"));
         }
     }
     check_manifest(&root, &mut problems);
-    for relative in LEGACY_PATHS {
+    for relative in &layout().retired {
         if root.join(relative).exists() {
             problems.push(format!("legacy path: {relative}"));
         }
@@ -144,7 +85,8 @@ pub fn check(path: Option<&Path>) -> Result<()> {
 
     if problems.is_empty() {
         println!(
-            "Misty home layout v{LAYOUT_VERSION} is ready at {}.",
+            "Misty home layout v{} is ready at {}.",
+            layout().layout_version,
             root.display()
         );
         return Ok(());
@@ -155,89 +97,6 @@ pub fn check(path: Option<&Path>) -> Result<()> {
     bail!("Misty home has {} issue(s)", problems.len())
 }
 
-fn copy_portable_payload(source: &Path, destination: &Path, report: &mut CopyReport) -> Result<()> {
-    if !source.is_dir() {
-        bail!("Misty home source does not exist: {}", source.display());
-    }
-    for tree in ["plugins/public", "plugins/private"] {
-        let source_tree = source.join(tree);
-        if source_tree.is_dir() {
-            copy_missing_tree(&source_tree, &destination.join(tree), true, report)?;
-        }
-    }
-    Ok(())
-}
-
-fn copy_missing_tree(
-    source: &Path,
-    destination: &Path,
-    portable_plugins_only: bool,
-    report: &mut CopyReport,
-) -> Result<()> {
-    for entry in WalkDir::new(source).follow_links(false) {
-        let entry = entry?;
-        let relative = entry.path().strip_prefix(source)?;
-        if ignored_relative(relative, portable_plugins_only, entry.file_type().is_file()) {
-            continue;
-        }
-        let target = destination.join(relative);
-        if entry.file_type().is_dir() {
-            secure_directory(&target)?;
-        } else if entry.file_type().is_file() {
-            if target.exists() {
-                report.preserved += 1;
-                continue;
-            }
-            if let Some(parent) = target.parent() {
-                secure_directory(parent)?;
-            }
-            fs::copy(entry.path(), &target).with_context(|| {
-                format!(
-                    "could not copy portable file {} to {}",
-                    entry.path().display(),
-                    target.display()
-                )
-            })?;
-            report.copied += 1;
-        }
-    }
-    Ok(())
-}
-
-fn ignored_relative(path: &Path, portable_plugins_only: bool, is_file: bool) -> bool {
-    if path.components().any(|component| {
-        matches!(component, Component::Normal(name) if matches!(name.to_str(), Some(".DS_Store" | "Thumbs.db" | "desktop.ini" | "old" | "variants")))
-    }) {
-        return true;
-    }
-    if !portable_plugins_only || !is_file {
-        return false;
-    }
-    !matches!(
-        path.extension()
-            .and_then(|extension| extension.to_str())
-            .map(str::to_ascii_lowercase)
-            .as_deref(),
-        Some(
-            "css"
-                | "gif"
-                | "html"
-                | "jpeg"
-                | "jpg"
-                | "js"
-                | "json"
-                | "map"
-                | "md"
-                | "png"
-                | "svg"
-                | "ttf"
-                | "webp"
-                | "woff"
-                | "woff2"
-        )
-    )
-}
-
 fn check_manifest(root: &Path, problems: &mut Vec<String>) {
     let path = root.join("home.json");
     let Ok(contents) = fs::read_to_string(&path) else {
@@ -246,7 +105,8 @@ fn check_manifest(root: &Path, problems: &mut Vec<String>) {
     };
     match serde_json::from_str::<HomeManifest>(&contents) {
         Ok(manifest)
-            if manifest.format == "misty-home" && manifest.layout_version == LAYOUT_VERSION => {}
+            if manifest.format == "misty-home"
+                && manifest.layout_version == layout().layout_version => {}
         Ok(manifest) => problems.push(format!(
             "unsupported home manifest: format={}, layoutVersion={}",
             manifest.format, manifest.layout_version
@@ -258,7 +118,7 @@ fn check_manifest(root: &Path, problems: &mut Vec<String>) {
 fn manifest_bytes() -> Result<Vec<u8>> {
     let mut bytes = serde_json::to_vec_pretty(&HomeManifest {
         format: "misty-home".to_owned(),
-        layout_version: LAYOUT_VERSION,
+        layout_version: layout().layout_version,
     })?;
     bytes.push(b'\n');
     Ok(bytes)
@@ -273,7 +133,7 @@ fn write_if_missing(path: &Path, contents: &[u8]) -> Result<()> {
 
 fn secure_known_files(root: &Path) -> Result<()> {
     #[cfg(unix)]
-    for relative in PRIVATE_FILES {
+    for relative in &layout().private_files {
         let path = root.join(relative);
         if path.is_file() {
             use std::os::unix::fs::PermissionsExt;
@@ -292,7 +152,7 @@ fn check_permissions(root: &Path, problems: &mut Vec<String>) -> Result<()> {
         if root_mode != 0 {
             problems.push("home directory is accessible by group or others".to_owned());
         }
-        for relative in PRIVATE_FILES {
+        for relative in &layout().private_files {
             let path = root.join(relative);
             if !path.is_file() {
                 continue;
@@ -328,49 +188,18 @@ fn absolute(path: PathBuf) -> Result<PathBuf> {
         .map(|current| current.join(path))
 }
 
-fn same_path(left: &Path, right: &Path) -> bool {
-    let left = left.to_string_lossy();
-    let right = right.to_string_lossy();
-    if cfg!(windows) {
-        left.eq_ignore_ascii_case(&right)
-    } else {
-        left == right
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn generation_is_idempotent_and_excludes_device_state() {
+    fn generation_is_idempotent() {
         let temporary = tempfile::tempdir().unwrap();
-        let source = temporary.path().join("source/.misty");
         let destination = temporary.path().join("output/.misty");
-        for (path, contents) in [
-            ("assets/icons/cloud.svg", "legacy"),
-            ("assets/notes/account/note/private.png", "private"),
-            ("plugins/private/themes/plugin.json", "{}"),
-            ("plugins/private/themes/variants/plugin.dylib", "native"),
-            ("db/data.db", "state"),
-            ("config/jwt.secret", "secret"),
-        ] {
-            let path = source.join(path);
-            fs::create_dir_all(path.parent().unwrap()).unwrap();
-            fs::write(path, contents).unwrap();
-        }
-
-        generate(Some(&destination), Some(&source)).unwrap();
-        generate(Some(&destination), Some(&source)).unwrap();
-
-        assert!(destination
-            .join("plugins/private/themes/plugin.json")
-            .is_file());
-        assert!(!destination.join("assets").exists());
-        assert!(destination.join("notes").is_dir());
-        assert!(!destination.join("plugins/private/themes/variants").exists());
-        assert!(!destination.join("db/data.db").exists());
-        assert!(!destination.join("config/jwt.secret").exists());
+        generate(Some(&destination)).unwrap();
+        generate(Some(&destination)).unwrap();
+        assert!(destination.join("config").is_dir());
+        assert!(!destination.join("plugins").exists());
         check(Some(&destination)).unwrap();
     }
 
@@ -378,7 +207,7 @@ mod tests {
     fn check_rejects_legacy_layout_entries() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join(".misty");
-        generate(Some(&root), None).unwrap();
+        generate(Some(&root)).unwrap();
         fs::create_dir_all(root.join("rclone")).unwrap();
         assert!(check(Some(&root)).is_err());
     }

@@ -254,16 +254,6 @@ export interface FileToolsChecksumResult {
   sizeBytes: number;
 }
 
-export interface FileToolsReadonlyRequest {
-  path: string;
-  readonly: boolean;
-}
-
-export interface FileToolsChmodRequest {
-  path: string;
-  mode: number;
-}
-
 export interface FileToolsSymlinkRequest {
   targetPath: string;
   linkPath: string;

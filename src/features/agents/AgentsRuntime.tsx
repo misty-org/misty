@@ -66,7 +66,6 @@ function service<K extends keyof AgentsRuntime>(name: K): AgentsRuntime[K] {
     },
   ) as AgentsRuntime[K];
 }
-export const openAgentsMisty = service("openMisty");
 export const runtimeAgentsApi = service("agentsApi"),
   runtimeAssistantApi = service("assistantApi"),
   runtimeAiApi = service("aiSurfaceApi"),

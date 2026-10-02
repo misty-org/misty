@@ -1,3 +1,4 @@
+import type * as AgentsRuntimeModule from "./AgentsRuntime";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -9,6 +10,12 @@ vi.mock("./components/MistyDashboard", () => ({
 
 vi.mock("./mcp/McpConnectionsSheet", () => ({
   McpConnectionsSheet: () => null,
+}));
+
+vi.mock("./AgentsRuntime", async (original) => ({
+  ...(await original<typeof AgentsRuntimeModule>()),
+  useAgentsAuth: () => ({ user: { id: "owner" } }),
+  runtimeAiApi: { activity: async () => ({ entries: [] }) },
 }));
 
 import AgentsPage from "./AgentsPage";

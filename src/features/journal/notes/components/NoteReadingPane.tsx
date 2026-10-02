@@ -7,11 +7,7 @@ import {
   type NoteReadingRuntime,
   type NoteReadingPaneProps,
 } from "./NoteReadingPaneView";
-export type {
-  NoteReadingPaneProps,
-  NoteContentDraft,
-  NoteConflictNoticeProps,
-} from "./NoteReadingPaneView";
+export type { NoteReadingPaneProps, NoteContentDraft } from "./NoteReadingPaneView";
 const runtime: NoteReadingRuntime = {
   useCollaborationRoom(spaceId, noteId) {
     const room = useNoteCollaborationRoom(spaceId, noteId);

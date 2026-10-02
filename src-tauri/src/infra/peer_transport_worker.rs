@@ -291,7 +291,9 @@ pub(crate) struct SendStream {
     finished: bool,
 }
 impl SendStream {
-    pub(crate) fn is_closed(&self) -> bool { self.stream.connection.is_closed() }
+    pub(crate) fn is_closed(&self) -> bool {
+        self.stream.connection.is_closed()
+    }
     pub(crate) async fn write_all(&mut self, bytes: &[u8]) -> Result<(), String> {
         if self.finished {
             return Err("Peer send stream is finished.".into());

@@ -6,8 +6,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use misty_browser_sync::{
-    document::{entities::Kind, ViewRecord},
     collections::HISTORY,
+    document::{entities::Kind, ViewRecord},
 };
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -108,7 +108,9 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                 if !full_sync_enabled(active) {
                     continue;
                 }
-                let Ok(profile) = default_profile_id(&active.scope) else { continue };
+                let Ok(profile) = default_profile_id(&active.scope) else {
+                    continue;
+                };
                 (active.handle.clone(), active.device_id.clone(), profile)
             };
             // A failed pass leaves everything marked and is retried next pass.
@@ -176,7 +178,10 @@ fn uploads(
     let mut parts_held: BTreeMap<(String, i64), BTreeSet<String>> = BTreeMap::new();
     for record in existing {
         if let Some(batch) = batch_of(record) {
-            parts_held.entry(batch).or_default().insert(record.id.clone());
+            parts_held
+                .entry(batch)
+                .or_default()
+                .insert(record.id.clone());
         }
     }
     let mut writes = Vec::new();
@@ -195,7 +200,11 @@ fn uploads(
             .map_err(error)?
             .collect::<Result<_, _>>()
             .map_err(error)?;
-        let batch_origin = if origin.is_empty() { device } else { origin.as_str() };
+        let batch_origin = if origin.is_empty() {
+            device
+        } else {
+            origin.as_str()
+        };
         let written = parts(batch_origin, hour, &visits);
         let kept: BTreeSet<String> = written.iter().map(|r| r.id.clone()).collect();
         // Parts the hour no longer needs (it shrank, or was emptied) go.
@@ -278,7 +287,11 @@ fn merge(
         .collect::<Result<_, _>>()
         .map_err(error)?;
     for (origin, hour) in local {
-        let batch_origin = if origin.is_empty() { device.to_owned() } else { origin };
+        let batch_origin = if origin.is_empty() {
+            device.to_owned()
+        } else {
+            origin
+        };
         hours.entry((batch_origin, hour)).or_default();
     }
     connection.execute_batch("BEGIN").map_err(error)?;
@@ -288,9 +301,15 @@ fn merge(
                 continue;
             }
             // This device's own visits are stored with an empty origin.
-            let local_origin = if origin == device { "" } else { origin.as_str() };
-            let keep: BTreeSet<(&str, i64)> =
-                visits.iter().map(|(url, _, at, _)| (url.as_str(), *at)).collect();
+            let local_origin = if origin == device {
+                ""
+            } else {
+                origin.as_str()
+            };
+            let keep: BTreeSet<(&str, i64)> = visits
+                .iter()
+                .map(|(url, _, at, _)| (url.as_str(), *at))
+                .collect();
             let mut statement = connection.prepare(
                 "SELECT id, url, visited_at FROM visits
                  WHERE profile_id = ?1 AND origin = ?2 AND visited_at / 3600000 = ?3 AND changed = 0",
@@ -406,7 +425,8 @@ mod tests {
             [],
         )
         .unwrap();
-        b.execute("DELETE FROM visits WHERE url = 'https://one.test/'", []).unwrap();
+        b.execute("DELETE FROM visits WHERE url = 'https://one.test/'", [])
+            .unwrap();
         let (rewrite, _) = uploads(&b, "device-b", "p", &batches).unwrap();
         let rewritten: Vec<ViewRecord> = rewrite.into_iter().filter_map(|(_, r)| r).collect();
         assert_eq!(rewritten.len(), 1);
@@ -429,7 +449,14 @@ mod tests {
     #[test]
     fn a_busy_hour_splits_into_parts() {
         let visits: Vec<Visit> = (0..3000)
-            .map(|i| (format!("https://site.test/{i}"), "Title".into(), 7 * HOUR_MS + i, false))
+            .map(|i| {
+                (
+                    format!("https://site.test/{i}"),
+                    "Title".into(),
+                    7 * HOUR_MS + i,
+                    false,
+                )
+            })
             .collect();
         let written = parts("device-a", 7, &visits);
         assert!(written.len() > 1);

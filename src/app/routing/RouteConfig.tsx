@@ -1,9 +1,8 @@
 import { ActivityPage } from "@/features/activity";
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
-import { SettingsPage } from "@/features/settings";
 import { SpaceInvitationRedemption } from "@/features/spaces";
-import { createBrowserRouter, Navigate, useLocation } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";
@@ -22,10 +21,6 @@ function StartupRedirect() {
   }
   const fallback = routes.home;
   return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
-}
-function LegacyToolRedirect({ to }: { to: string }) {
-  const { search, hash } = useLocation();
-  return <Navigate to={`${to}${search}${hash}`} replace />;
 }
 export const router = createBrowserRouter([
   {
@@ -60,10 +55,6 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
-                path: "apps",
-                element: <Navigate to={routes.home} replace />,
-              },
-              {
                 path: "activity",
                 element: <ActivityPage />,
               },
@@ -84,28 +75,8 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
-                path: "apps/files",
-                element: <LegacyToolRedirect to="/files" />,
-              },
-              {
-                path: "apps/agents",
-                element: <LegacyToolRedirect to="/agents" />,
-              },
-              {
-                path: "apps/*",
-                element: <Navigate to="/browser" replace />,
-              },
-              {
-                path: "discover",
-                element: <Navigate to="/browser" replace />,
-              },
-              {
                 path: "spaces/*",
                 element: null,
-              },
-              {
-                path: "changelog",
-                element: <Navigate to={routes.home} replace />,
               },
               {
                 path: "signin",
@@ -116,29 +87,8 @@ export const router = createBrowserRouter([
                 element: <RegisterPage />,
               },
               {
-                path: "profile",
-                element: <Navigate to={routes.account} replace />,
-              },
-              {
                 path: "invite/:token",
                 element: <SpaceInvitationRedemption />,
-              },
-              // Account management lives on the website now.
-              {
-                path: "account",
-                element: <Navigate to={routes.home} replace />,
-              },
-              {
-                path: "account/signin",
-                element: <Navigate to={routes.signIn} replace />,
-              },
-              {
-                path: "account/register",
-                element: <Navigate to={routes.register} replace />,
-              },
-              {
-                path: "account/settings",
-                element: <SettingsPage />,
               },
               ...(import.meta.env.DEV
                 ? [
@@ -153,10 +103,6 @@ export const router = createBrowserRouter([
           {
             path: "settings",
             element: null,
-          },
-          {
-            path: "diagnostics",
-            element: <Navigate to={routes.home} replace />,
           },
           {
             path: "*",

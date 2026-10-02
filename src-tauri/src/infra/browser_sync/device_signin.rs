@@ -79,9 +79,10 @@ fn set_state(active: &mut Session, workspace: &str, state: DeviceDataState) {
         .get(workspace)
         .map(|data| data.sites.clone())
         .unwrap_or_default();
-    active
-        .website_data
-        .insert(workspace.into(), DeviceWebsiteData::new(workspace, state, sites));
+    active.website_data.insert(
+        workspace.into(),
+        DeviceWebsiteData::new(workspace, state, sites),
+    );
 }
 
 /// What one periodic pass has to do for the device this session writes.
@@ -284,7 +285,9 @@ pub(super) async fn reconcile(
         let holder = workspace.is_some() && view.driving_workspace == workspace;
         (workspace, holder)
     };
-    let Some(workspace) = workspace else { return Ok(None) };
+    let Some(workspace) = workspace else {
+        return Ok(None);
+    };
     let status = active
         .handle
         .signin_status(workspace.clone())
@@ -404,13 +407,15 @@ async fn read_shards(
     let mut shards = Vec::new();
     let mut written = BTreeMap::new();
     for kind in server.keys() {
-        let plaintext =
-            tokio::time::timeout(READ_TIMEOUT, active.handle.read_signin(workspace.into(), *kind))
-                .await
-                .map_err(|_| "Reading this device's sign-ins timed out. Retrying automatically.")?
-                .map_err(issue)?
-                // The slot moved on since this pass started; the next pass retries.
-                .ok_or("This device's sign-ins changed while loading. Retrying automatically.")?;
+        let plaintext = tokio::time::timeout(
+            READ_TIMEOUT,
+            active.handle.read_signin(workspace.into(), *kind),
+        )
+        .await
+        .map_err(|_| "Reading this device's sign-ins timed out. Retrying automatically.")?
+        .map_err(issue)?
+        // The slot moved on since this pass started; the next pass retries.
+        .ok_or("This device's sign-ins changed while loading. Retrying automatically.")?;
         written.insert(*kind, signin_digest_hex(&signin::digest(&plaintext)));
         shards.push(plaintext);
     }
@@ -439,7 +444,10 @@ async fn load(
     active.device_browser = None;
     super::super::browser::close_account_views_except(app, None)?;
     let physical = binding.physical_id.clone();
-    let result = replace(app, active, workspace, logical, binding, server, written, target).await;
+    let result = replace(
+        app, active, workspace, logical, binding, server, written, target,
+    )
+    .await;
     // Pages open in this device's store either way. After a failed load it is
     // not captured from: its binding still differs from the published slots,
     // so the next pass loads again before anything is published.
@@ -653,9 +661,10 @@ async fn publish(
             .get(workspace)
             .map(|data| data.sites.clone())
             .unwrap_or_default();
-        active
-            .website_data
-            .insert(workspace.into(), DeviceWebsiteData::new(workspace, state, sites));
+        active.website_data.insert(
+            workspace.into(),
+            DeviceWebsiteData::new(workspace, state, sites),
+        );
         return Ok(None);
     }
     let mut coverage = collected.coverage;

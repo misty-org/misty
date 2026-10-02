@@ -1,6 +1,5 @@
 import { useSettingsStore } from "@/features/settings";
 import { runtimeAssistantApi as assistantApi } from "@/features/agents/AgentsRuntime";
-import { safeAssistantTurnInput } from "@/api/assistant/api-core";
 import type {
   GlobalAiActionProposal,
   GlobalAiCitation,
@@ -52,14 +51,6 @@ export const globalMistyApi = {
   decideProposal: (proposalId: string, approved: boolean) =>
     assistantApi.decideProposal<GlobalAiActionProposal>(proposalId, approved),
 };
-
-export function aiSafeTurnInput(input: {
-  mode: Exclude<GlobalAiMode, "search">;
-  prompt: string;
-  context: GlobalAiContextRef[];
-}) {
-  return safeAssistantTurnInput(input);
-}
 
 function newConversationDefaults(): { model_id?: string; reasoning_effort?: string } {
   const agent = useSettingsStore.getState().settings?.document.agent as

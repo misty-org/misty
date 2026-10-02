@@ -40,7 +40,12 @@ fn known(collection: &str) -> Result<()> {
 }
 
 /// The opaque id the server stores for a record: hex HMAC of its real id.
-pub fn record_key(root: &VaultRoot, scope: &VaultScope, collection: &str, id: &str) -> Result<String> {
+pub fn record_key(
+    root: &VaultRoot,
+    scope: &VaultScope,
+    collection: &str,
+    id: &str,
+) -> Result<String> {
     use hkdf::hmac::{Hmac, Mac};
     known(collection)?;
     let key = root.derive("misty.sync.record-id.v1", &(&scope.vault_id, collection))?;
@@ -193,7 +198,11 @@ impl Collection {
 
     /// A pulled row. A full re-read (`reset`) starts from nothing confirmed.
     pub fn pulled(&mut self, key: String, version: u64, record: Option<ViewRecord>) {
-        if self.confirmed.get(&key).is_some_and(|c| c.version >= version) {
+        if self
+            .confirmed
+            .get(&key)
+            .is_some_and(|c| c.version >= version)
+        {
             return;
         }
         self.settle(&key, record.as_ref());
@@ -204,7 +213,8 @@ impl Collection {
     pub fn answered(&mut self, key: &str, applied: bool, version: u64, current: Option<Confirmed>) {
         if applied {
             if let Some(record) = self.pending.remove(key) {
-                self.confirmed.insert(key.to_owned(), Confirmed { version, record });
+                self.confirmed
+                    .insert(key.to_owned(), Confirmed { version, record });
             }
             return;
         }
@@ -224,7 +234,9 @@ impl Collection {
     /// holds the same record, or it deleted what the write would edit.
     fn settle(&mut self, key: &str, server: Option<&ViewRecord>) {
         let moot = match (self.pending.get(key), server) {
-            (Some(Some(mine)), Some(theirs)) => mine.fields == theirs.fields && mine.kind == theirs.kind,
+            (Some(Some(mine)), Some(theirs)) => {
+                mine.fields == theirs.fields && mine.kind == theirs.kind
+            }
             (Some(Some(_)), None) => self.confirmed.get(key).is_some_and(|c| c.record.is_some()),
             (Some(None), None) => true,
             _ => false,

@@ -3,8 +3,10 @@ use std::collections::{BTreeMap, HashMap};
 use serde_json::json;
 
 use super::{
-    protocol::{Manifest, WorkspaceChange, WorkspaceClaim, WorkspaceNode, WorkspaceSnapshot, PAGE_STATE},
-    state::{WorkspaceState, Verifier},
+    protocol::{
+        Manifest, WorkspaceChange, WorkspaceClaim, WorkspaceNode, WorkspaceSnapshot, PAGE_STATE,
+    },
+    state::{Verifier, WorkspaceState},
 };
 use crate::{
     crypto::{DeviceKey, VaultRoot, VaultScope},
@@ -128,11 +130,7 @@ fn builds_verifies_and_restores_a_workspace() {
             1,
             &workspace(),
             Some(&resume()),
-            vec![(
-                tab.clone(),
-                PAGE_STATE,
-                Some(b"{\"scroll\":10}".to_vec()),
-            )],
+            vec![(tab.clone(), PAGE_STATE, Some(b"{\"scroll\":10}".to_vec()))],
             vec![],
         )
         .unwrap()
@@ -412,12 +410,20 @@ fn the_ui_view_shows_unacknowledged_edits_and_the_verified_view_does_not() {
     sync.on_current(&mut store, DEVICE, 0).unwrap();
     let changes = workspace()
         .into_iter()
-        .map(|r| crate::document::Change::Create { kind: r.kind, id: r.id, fields: r.fields })
+        .map(|r| crate::document::Change::Create {
+            kind: r.kind,
+            id: r.id,
+            fields: r.fields,
+        })
         .collect();
     sync.apply_changes(&mut store, &f.root, changes).unwrap();
 
     let ids = |view: super::sync::SyncState| -> Vec<String> {
-        view.contents[DEVICE].records.iter().map(|r| r.id.clone()).collect()
+        view.contents[DEVICE]
+            .records
+            .iter()
+            .map(|r| r.id.clone())
+            .collect()
     };
     assert!(ids(sync.view(&store).unwrap()).is_empty());
     let mut shown = ids(sync.optimistic_view(&store, &f.root).unwrap());
@@ -426,30 +432,47 @@ fn the_ui_view_shows_unacknowledged_edits_and_the_verified_view_does_not() {
 
     // Each waiting record is listed once for the renderer to name per tab.
     let unsynced = |view: super::sync::SyncState| -> Vec<(String, bool)> {
-        let mut records: Vec<_> =
-            view.unsynced.into_iter().map(|r| (r.id, r.deleted)).collect();
+        let mut records: Vec<_> = view
+            .unsynced
+            .into_iter()
+            .map(|r| (r.id, r.deleted))
+            .collect();
         records.sort();
         records
     };
     let waiting = |id: &str, deleted| (id.to_owned(), deleted);
     assert_eq!(
         unsynced(sync.optimistic_view(&store, &f.root).unwrap()),
-        [waiting("l1", false), waiting("t1", false), waiting("w1", false)]
+        [
+            waiting("l1", false),
+            waiting("t1", false),
+            waiting("w1", false)
+        ]
     );
     let view = workspace().into_iter().find(|r| r.id == "t1").unwrap();
     sync.apply_changes(
         &mut store,
         &f.root,
-        vec![crate::document::Change::Delete { kind: view.kind, id: view.id }],
+        vec![crate::document::Change::Delete {
+            kind: view.kind,
+            id: view.id,
+        }],
     )
     .unwrap();
     // A later close replaces the entry instead of adding a second one.
     assert_eq!(
         unsynced(sync.optimistic_view(&store, &f.root).unwrap()),
-        [waiting("l1", false), waiting("t1", true), waiting("w1", false)]
+        [
+            waiting("l1", false),
+            waiting("t1", true),
+            waiting("w1", false)
+        ]
     );
     assert!(sync.view(&store).unwrap().unsynced.is_empty());
-    assert_eq!(sync.optimistic_view(&store, &f.root).unwrap().retired_edits, 0);
+    assert_eq!(
+        sync.optimistic_view(&store, &f.root).unwrap().retired_edits,
+        0
+    );
 }
 
 mod multi_writer_rebase {
@@ -466,7 +489,11 @@ mod multi_writer_rebase {
 
     fn create(kind: Kind, id: &str) -> Change {
         let source = workspace().into_iter().find(|r| r.kind == kind).unwrap();
-        Change::Create { kind, id: id.into(), fields: source.fields }
+        Change::Create {
+            kind,
+            id: id.into(),
+            fields: source.fields,
+        }
     }
     fn ids(records: &[crate::document::ViewRecord]) -> Vec<String> {
         let mut ids: Vec<_> = records.iter().map(|r| r.id.clone()).collect();
@@ -513,17 +540,29 @@ mod multi_writer_rebase {
         desired.changes.push(create(Kind::Window, "w9"));
         desired.push_batch(vec![create(Kind::View, "a"), create(Kind::View, "b")], 3);
         desired.push_batch(vec![create(Kind::View, "c")], 4);
-        let bases: Vec<_> = desired.batches().iter().map(|(b, c)| (*b, c.len())).collect();
+        let bases: Vec<_> = desired
+            .batches()
+            .iter()
+            .map(|(b, c)| (*b, c.len()))
+            .collect();
         assert_eq!(bases, [(0, 1), (3, 2), (4, 1)]);
 
         // A rejected op drops only the oldest edit.
         desired.drop_first_batch();
-        let bases: Vec<_> = desired.batches().iter().map(|(b, c)| (*b, c.len())).collect();
+        let bases: Vec<_> = desired
+            .batches()
+            .iter()
+            .map(|(b, c)| (*b, c.len()))
+            .collect();
         assert_eq!(bases, [(3, 2), (4, 1)]);
 
         // An accepted op carried the first edit; the rest stays aligned.
         desired.drain_changes(2);
-        let bases: Vec<_> = desired.batches().iter().map(|(b, c)| (*b, c.len())).collect();
+        let bases: Vec<_> = desired
+            .batches()
+            .iter()
+            .map(|(b, c)| (*b, c.len()))
+            .collect();
         assert_eq!(bases, [(4, 1)]);
     }
 }

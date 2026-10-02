@@ -42,7 +42,3 @@ export function spaceLandingRoute(
 
   return `${base}/home`;
 }
-
-export function spaceDestination(pathname: string, spaceId: string, accountId?: string): string {
-  return spaceLandingRoute(spaceId, accountId, pathname);
-}

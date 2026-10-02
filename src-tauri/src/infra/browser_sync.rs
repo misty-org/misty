@@ -33,10 +33,10 @@ mod capture;
 mod collect;
 mod control_advertisement;
 mod device_data;
-mod history;
 #[cfg(any(target_os = "macos", windows))]
 mod device_signin;
 pub mod handoff;
+mod history;
 mod workspaces;
 
 struct Session {
@@ -195,11 +195,7 @@ pub(super) async fn browser_profile_lease(
     }
     if let (Some(app), Some(active)) = (app, current.as_ref()) {
         if active.credential_issue != previous_issue {
-            let _ = app.emit_to(
-                "main",
-                "misty:browser-sync-changed",
-                &active.scope.vault_id,
-            );
+            let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
         }
     }
     Ok(BrowserProfileLease {
@@ -539,8 +535,11 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
     let sync_state = active.handle.workspaces.borrow().clone();
     let workspace_mode = workspaces::workspace_mode(&sync_state);
     if workspace_mode {
-        active.cached_workspace =
-            workspaces::synthesize(&mut active.workspace_projection, &active.device_id, &sync_state);
+        active.cached_workspace = workspaces::synthesize(
+            &mut active.workspace_projection,
+            &active.device_id,
+            &sync_state,
+        );
         active.cached_pending = Vec::new();
     }
     // A local website-storage failure does not stop workspace transport.
@@ -1049,14 +1048,17 @@ pub struct AccountFeed {
 }
 
 #[tauri::command]
-pub async fn browser_sync_account_feed(webview: tauri::Webview) -> Result<Option<AccountFeed>, String> {
+pub async fn browser_sync_account_feed(
+    webview: tauri::Webview,
+) -> Result<Option<AccountFeed>, String> {
     require_main(&webview)?;
     let current = session().lock().await;
     Ok(current.as_ref().map(|active| AccountFeed {
         account_id: active.scope.account_id.clone(),
         connected: matches!(
             active.handle.status.borrow().phase,
-            misty_browser_sync::worker::Phase::CatchingUp | misty_browser_sync::worker::Phase::Ready
+            misty_browser_sync::worker::Phase::CatchingUp
+                | misty_browser_sync::worker::Phase::Ready
         ),
     }))
 }
@@ -1117,7 +1119,11 @@ enum WorkspaceEdit {
 /// workspace is not in workspace mode yet and the legacy path applies. An edit
 /// captured on a workspace this machine has since left is refused, never applied
 /// to a different workspace.
-async fn workspace_edit(session_id: &str, epoch: &str, edit: WorkspaceEdit) -> Option<Result<(), String>> {
+async fn workspace_edit(
+    session_id: &str,
+    epoch: &str,
+    edit: WorkspaceEdit,
+) -> Option<Result<(), String>> {
     let current = session().lock().await;
     let active = match current.as_ref() {
         Some(active) => active,
@@ -1162,7 +1168,11 @@ pub async fn browser_sync_claim(
             return Err("Enable Full sync before switching devices.".into());
         }
         let view = active.handle.workspaces.borrow().clone();
-        if !view.workspaces.iter().any(|t| t.workspace_id == workspace_id && !t.shared) {
+        if !view
+            .workspaces
+            .iter()
+            .any(|t| t.workspace_id == workspace_id && !t.shared)
+        {
             return Err("That device's workspace is not available.".into());
         }
         active.handle.clone()
@@ -1187,7 +1197,10 @@ pub async fn browser_sync_activate(
         let handle = session.handle.clone();
         let workspace = session.device_id.clone();
         drop(current);
-        handle.open_workspace(workspace.clone()).await.map_err(issue)?;
+        handle
+            .open_workspace(workspace.clone())
+            .await
+            .map_err(issue)?;
         // Offline, the lease is claimed on reconnect by the capture pass.
         let _ = handle.claim_workspace(workspace).await;
         return Ok(uuid::Uuid::new_v4().to_string());

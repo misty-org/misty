@@ -10,10 +10,6 @@ const AVATAR_PALETTE = [
 
 export const avatarInkClass = "text-avatar-ink";
 
-// Reserved for AI/agent identity, kept out of the hashed person palette so a
-// human never randomly lands on the same color as "the AI".
-export const robotAvatarClass = "bg-avatar-aqua";
-
 /** Deterministic pastel background for a person's avatar, keyed by a stable id. */
 export function avatarColorClass(seed: string): string {
   let hash = 0;

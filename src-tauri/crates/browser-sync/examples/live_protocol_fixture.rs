@@ -186,10 +186,7 @@ async fn main() {
         .await,
         Err(Error::Identity)
     ));
-    assert_eq!(
-        api.vault().await.unwrap().unwrap().root_public_key,
-        public
-    );
+    assert_eq!(api.vault().await.unwrap().unwrap().root_public_key, public);
     let cached_b = CachedVault {
         vault: api.vault().await.unwrap().unwrap(),
         bootstrap_pending: false,

@@ -3,7 +3,6 @@ import { parseBrowserViewState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { ActiveBrowserAgentGrant } from "./browserAgentAccess";
-import { revokeBrowserAgentGrant } from "./browserAgentAccess";
 import type { BrowserBounds, BrowserTheme } from "./types";
 export type {
   BrowserCompatibilityIssue,
@@ -266,19 +265,6 @@ export function browserRuntimeIdForScope(scopeId: string): string | null {
     if (runtimeTabIds.has(id)) return id;
   }
   return null;
-}
-
-export function setNativeBrowserCompanionState(request: {
-  targetId: string;
-  visible: boolean;
-  phase: string;
-  name: string;
-  label: string;
-  speech?: string;
-  captureAttached?: boolean;
-  suggestions: Array<{ id: string; label: string }>;
-}): Promise<void> {
-  return invoke<void>("browser_webviews_set_companion", { request }).catch(() => undefined);
 }
 
 export function captureNativeBrowserRegion(
@@ -693,50 +679,6 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
   return enqueue(id, async () => {
     await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
   });
-}
-
-export async function closeBrowserRuntime(tab: WorkspaceView): Promise<void> {
-  const id = registerBrowserRuntime(tab);
-  desiredVisibleRuntimeIds.delete(id);
-  const grants = useBrowserRuntimeStore.getState().grants[tab.id] ?? [];
-  await Promise.allSettled(grants.map((grant) => revokeBrowserAgentGrant(id, grant)));
-  await enqueue(id, async () => {
-    // Reopening a just-closed tab can request this same stable runtime while
-    // grant cleanup is still in flight. The new request owns the child now;
-    // do not let the stale close tear it down or delete its id mapping.
-    if (desiredVisibleRuntimeIds.has(id)) return;
-    if (createdRuntimeIds.has(id)) {
-      await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
-    }
-    createdRuntimeIds.delete(id);
-    visibleRuntimeIds.delete(id);
-    deferredNavigations.delete(id);
-    lastBounds.delete(id);
-    browserSyncStates.delete(id);
-    runtimeTabIds.delete(id);
-    if (![...runtimeTabIds.values()].includes(tab.id))
-      useBrowserRuntimeStore.getState().removeTab(tab.id);
-  });
-}
-
-export function hideAllBrowserWebviews(): Promise<void[]> {
-  desiredVisibleRuntimeIds.clear();
-  [...deferredNavigations.keys()].forEach(releaseDeferredNavigation);
-  const trackedHides = Promise.all(
-    [...visibleRuntimeIds].map((id) => {
-      visibleRuntimeIds.delete(id);
-      return enqueue(id, async () => {
-        await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
-      });
-    }),
-  );
-  // A native child can outlive frontend module state after a renderer
-  // refresh. Always hide every native browser child so overlays do not depend
-  // on visibleRuntimeIds being current.
-  return Promise.all([
-    trackedHides.then(() => undefined),
-    invoke<void>("browser_webviews_hide_all").catch(() => undefined),
-  ]);
 }
 
 export async function parkAllBrowserWebviews(): Promise<void> {

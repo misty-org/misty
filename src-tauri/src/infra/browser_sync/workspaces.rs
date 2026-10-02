@@ -120,7 +120,10 @@ pub(super) fn synthesize(
     device_id: &str,
     view: &SyncState,
 ) -> WorkspaceView {
-    let shown = view.on_workspace.as_deref().and_then(|t| view.contents.get(t));
+    let shown = view
+        .on_workspace
+        .as_deref()
+        .and_then(|t| view.contents.get(t));
     // Offline start: the cached own workspace until the roster is known.
     let cached = view
         .workspaces
@@ -137,7 +140,10 @@ pub(super) fn synthesize(
     let mut records = own_records;
     // Bookmarks come from the cold collection once this machine has it (it
     // already folds in any the shared workspace alone still holds).
-    match view.collections.get(misty_browser_sync::collections::BOOKMARKS) {
+    match view
+        .collections
+        .get(misty_browser_sync::collections::BOOKMARKS)
+    {
         Some(bookmarks) => records.extend(bookmarks.iter().cloned()),
         None => {
             if let Some(shared) = view.contents.get(&view.shared_workspace_id) {
@@ -146,7 +152,10 @@ pub(super) fn synthesize(
         }
     }
     // Closed tab groups, kept account-wide to reopen on any device.
-    if let Some(saved) = view.collections.get(misty_browser_sync::collections::TAB_GROUPS) {
+    if let Some(saved) = view
+        .collections
+        .get(misty_browser_sync::collections::TAB_GROUPS)
+    {
         records.extend(saved.iter().cloned());
     }
     // Focus is local to each machine and never projected from another.

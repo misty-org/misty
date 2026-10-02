@@ -1,4 +1,3 @@
-
 #[cfg(target_os = "macos")]
 extern "C" {
     fn misty_context_main_focused();
@@ -40,9 +39,7 @@ pub async fn misty_screen_status(
     }
 }
 #[tauri::command]
-pub async fn misty_screen_capture(
-    window: tauri::Webview,
-) -> Result<serde_json::Value, String> {
+pub async fn misty_screen_capture(window: tauri::Webview) -> Result<serde_json::Value, String> {
     trusted(&window)?;
     #[cfg(target_os = "macos")]
     {

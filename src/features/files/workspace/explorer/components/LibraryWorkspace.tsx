@@ -28,9 +28,10 @@ import { SearchResultThumbnail } from "./SearchResultThumbnail";
 export const libraryWorkspacePath = "misty://library";
 
 export function LibraryWorkspace(props: {
-  paneId: string;
-  workingDirectory: string;
+  paneId?: string;
   onOpenResult?: (result: SearchResult) => void | Promise<void>;
+  /** Rendered as a section inside another page, which owns the title and scrolling. */
+  embedded?: boolean;
 }) {
   const {
     loaded,
@@ -111,11 +112,29 @@ export function LibraryWorkspace(props: {
   };
 
   return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg text-cream">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-charcoal-border/60 px-6 py-5">
+    <section
+      className={
+        props.embedded
+          ? "grid min-h-0 text-cream"
+          : "grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg text-cream"
+      }
+    >
+      <header
+        className={
+          props.embedded
+            ? "flex flex-wrap items-center justify-between gap-4 pb-4"
+            : "flex flex-wrap items-center justify-between gap-4 border-b border-charcoal-border/60 px-6 py-5"
+        }
+      >
         <div>
-          <h1 className="m-0 text-2xl font-bold tracking-[-0.03em]">Library</h1>
-          <p className="m-0 mt-1 text-sm text-cream-muted">
+          {props.embedded ? null : (
+            <h1 className="m-0 text-2xl font-bold tracking-[-0.03em]">Library</h1>
+          )}
+          <p
+            className={
+              props.embedded ? "m-0 text-sm text-cream-muted" : "m-0 mt-1 text-sm text-cream-muted"
+            }
+          >
             Private, on-device files organized with AI tags, collections, and search.
           </p>
         </div>
@@ -139,10 +158,16 @@ export function LibraryWorkspace(props: {
           </Button>
         </div>
       </header>
-      <div className="flex flex-wrap items-center gap-2 border-b border-charcoal-border/60 px-6 py-3">
+      <div
+        className={
+          props.embedded
+            ? "flex flex-wrap items-center gap-2 pb-4"
+            : "flex flex-wrap items-center gap-2 border-b border-charcoal-border/60 px-6 py-3"
+        }
+      >
         {(
           [
-            ["library", Images, "Library"],
+            ["library", Images, "Files"],
             ["collections", FolderSearch, "Collections"],
             ["tags", Tag, "Tags"],
             ["media", Film, "Media"],
@@ -162,7 +187,7 @@ export function LibraryWorkspace(props: {
           </Button>
         ))}
       </div>
-      <div className="min-h-0 overflow-auto p-6">
+      <div className={props.embedded ? "min-h-0" : "min-h-0 overflow-auto p-6"}>
         {tab !== "media" &&
           (!loaded ? (
             <LibraryEmpty
@@ -365,10 +390,12 @@ export function LibraryWorkspace(props: {
                     onClick={() =>
                       void (props.onOpenResult
                         ? props.onOpenResult(result)
-                        : revealSearchResultInPane(
-                            props.paneId,
-                            searchResultNavigationTarget(result),
-                          ))
+                        : props.paneId
+                          ? revealSearchResultInPane(
+                              props.paneId,
+                              searchResultNavigationTarget(result),
+                            )
+                          : undefined)
                     }
                   >
                     <SearchResultThumbnail

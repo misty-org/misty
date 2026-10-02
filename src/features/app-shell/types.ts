@@ -1,14 +1,1 @@
-export type AppTab =
-  | "home"
-  | "browser"
-  | "terminal"
-  | "code"
-  | "files"
-  | "spaces"
-  | "assistant"
-  | "agents"
-  | "marketplace"
-  | "providers"
-  | "settings"
-  | "account"
-  | "diagnostics";
+export type AppTab = "home" | "browser" | "files" | "spaces" | "agents" | "providers" | "settings";

@@ -37,7 +37,8 @@ pub enum NodeBody {
 /// deterministically so every client names a record's node identically.
 pub fn node_id(workspace_id: &str, kind: Kind, record_id: &str) -> String {
     let digest = Sha256::digest(
-        serde_json::to_vec(&("misty.sync.node-id.v2", workspace_id, kind, record_id)).expect("static encoding"),
+        serde_json::to_vec(&("misty.sync.node-id.v2", workspace_id, kind, record_id))
+            .expect("static encoding"),
     );
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&digest[..16]);
@@ -55,10 +56,17 @@ fn parent_record(record: &ViewRecord) -> Option<(Kind, String)> {
         Kind::Tab => Some((Kind::Window, field(record, "window_id")?.to_owned())),
         Kind::View => Some((
             Kind::Tab,
-            record.fields.get("placement")?.get("layout_id")?.as_str()?.to_owned(),
+            record
+                .fields
+                .get("placement")?
+                .get("layout_id")?
+                .as_str()?
+                .to_owned(),
         )),
         Kind::Bookmark => Some((Kind::Folder, field(record, "group_id")?.to_owned())),
-        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch => None,
+        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch => {
+            None
+        }
     }
 }
 
@@ -77,10 +85,18 @@ pub fn collection_of(kind: Kind) -> Option<&'static str> {
 }
 
 /// Assigns each record its node ID and parent node ID within one workspace.
-pub fn place(workspace_id: &str, records: &[ViewRecord]) -> BTreeMap<String, (Option<String>, ViewRecord)> {
+pub fn place(
+    workspace_id: &str,
+    records: &[ViewRecord],
+) -> BTreeMap<String, (Option<String>, ViewRecord)> {
     let present: BTreeMap<(Kind, &str), String> = records
         .iter()
-        .map(|r| ((r.kind, r.id.as_str()), node_id(workspace_id, r.kind, &r.id)))
+        .map(|r| {
+            (
+                (r.kind, r.id.as_str()),
+                node_id(workspace_id, r.kind, &r.id),
+            )
+        })
         .collect();
     records
         .iter()
@@ -88,7 +104,10 @@ pub fn place(workspace_id: &str, records: &[ViewRecord]) -> BTreeMap<String, (Op
             let parent = parent_record(r)
                 .and_then(|(kind, id)| present.get(&(kind, id.as_str())).cloned())
                 .unwrap_or_else(|| workspace_id.to_owned());
-            (node_id(workspace_id, r.kind, &r.id), (Some(parent), r.clone()))
+            (
+                node_id(workspace_id, r.kind, &r.id),
+                (Some(parent), r.clone()),
+            )
         })
         .collect()
 }
@@ -97,15 +116,21 @@ pub fn place(workspace_id: &str, records: &[ViewRecord]) -> BTreeMap<String, (Op
 /// idempotent: a create never overwrites, a patch of a missing record and a
 /// delete of a missing record are no-ops.
 pub fn rebase(records: &[ViewRecord], changes: &[Change]) -> crate::Result<Vec<ViewRecord>> {
-    let mut by_key: BTreeMap<(Kind, String), ViewRecord> =
-        records.iter().map(|r| ((r.kind, r.id.clone()), r.clone())).collect();
+    let mut by_key: BTreeMap<(Kind, String), ViewRecord> = records
+        .iter()
+        .map(|r| ((r.kind, r.id.clone()), r.clone()))
+        .collect();
     for change in changes {
         match change {
             Change::Create { kind, id, fields } => {
                 entities::validate(*kind, fields)?;
                 by_key
                     .entry((*kind, id.clone()))
-                    .or_insert_with(|| ViewRecord { kind: *kind, id: id.clone(), fields: fields.clone() });
+                    .or_insert_with(|| ViewRecord {
+                        kind: *kind,
+                        id: id.clone(),
+                        fields: fields.clone(),
+                    });
             }
             Change::Patch { kind, id, fields } => {
                 if let Some(record) = by_key.get_mut(&(*kind, id.clone())) {
@@ -163,7 +188,11 @@ pub fn rebase_batches(
                         }
                     }
                     if !fields.is_empty() {
-                        kept.push(Change::Patch { kind: *kind, id: id.clone(), fields });
+                        kept.push(Change::Patch {
+                            kind: *kind,
+                            id: id.clone(),
+                            fields,
+                        });
                     }
                 }
                 other => kept.push(other.clone()),
@@ -175,7 +204,9 @@ pub fn rebase_batches(
 
 pub fn change_kind(change: &Change) -> Kind {
     match change {
-        Change::Create { kind, .. } | Change::Patch { kind, .. } | Change::Delete { kind, .. } => *kind,
+        Change::Create { kind, .. } | Change::Patch { kind, .. } | Change::Delete { kind, .. } => {
+            *kind
+        }
     }
 }
 
@@ -185,7 +216,11 @@ mod tests {
     use serde_json::json;
 
     fn record(kind: Kind, id: &str, fields: serde_json::Value) -> ViewRecord {
-        ViewRecord { kind, id: id.into(), fields: serde_json::from_value(fields).unwrap() }
+        ViewRecord {
+            kind,
+            id: id.into(),
+            fields: serde_json::from_value(fields).unwrap(),
+        }
     }
 
     #[test]
@@ -194,16 +229,30 @@ mod tests {
         let records = vec![
             record(Kind::Window, "w", json!({"title": "", "order": 0})),
             record(Kind::Tab, "l", json!({"window_id": "w"})),
-            record(Kind::View, "t", json!({"placement": {"layout_id": "l", "pane_id": "p", "order": 0}})),
-            record(Kind::View, "orphan", json!({"placement": {"layout_id": "gone", "pane_id": "p", "order": 0}})),
+            record(
+                Kind::View,
+                "t",
+                json!({"placement": {"layout_id": "l", "pane_id": "p", "order": 0}}),
+            ),
+            record(
+                Kind::View,
+                "orphan",
+                json!({"placement": {"layout_id": "gone", "pane_id": "p", "order": 0}}),
+            ),
         ];
         let placed = place(workspace, &records);
         let id = |k, r| node_id(workspace, k, r);
         assert_eq!(placed[&id(Kind::Window, "w")].0.as_deref(), Some(workspace));
         assert_eq!(placed[&id(Kind::Tab, "l")].0, Some(id(Kind::Window, "w")));
         assert_eq!(placed[&id(Kind::View, "t")].0, Some(id(Kind::Tab, "l")));
-        assert_eq!(placed[&id(Kind::View, "orphan")].0.as_deref(), Some(workspace));
+        assert_eq!(
+            placed[&id(Kind::View, "orphan")].0.as_deref(),
+            Some(workspace)
+        );
         assert!(uuid::Uuid::parse_str(&id(Kind::View, "t")).is_ok());
-        assert_ne!(id(Kind::View, "t"), node_id("01951d32-40ac-7000-8000-000000000009", Kind::View, "t"));
+        assert_ne!(
+            id(Kind::View, "t"),
+            node_id("01951d32-40ac-7000-8000-000000000009", Kind::View, "t")
+        );
     }
 }

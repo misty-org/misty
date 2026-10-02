@@ -1,5 +1,4 @@
 import { act, lazy, Suspense } from "react";
-import { OfficialAppAuthProvider } from "@/features/auth/AuthContext";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,6 +40,11 @@ vi.mock("./components/DrawingPreview", () => ({
   DrawingPreview: () => <div data-testid="drawing-preview" />,
 }));
 
+vi.mock("@/features/auth", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuth: () => ({ user: { id: "account-1", name: "Alex", email: "alex@example.com" } }),
+}));
+
 const SpaceDrawings = lazy(() =>
   import("./SpaceDrawings").then((module) => ({ default: module.SpaceDrawings })),
 );
@@ -53,14 +57,12 @@ function LocationProbe() {
 function drawingSurface(entry: string) {
   return (
     <MemoryRouter key={entry} initialEntries={[entry]}>
-      <OfficialAppAuthProvider user={{ id: "account-1", name: "Alex", email: "alex@example.com" }}>
-        <Suspense fallback={<div>Loading drawing route</div>}>
-          <SpaceDrawings
-            spaceId="space-product"
-            drawingId={entry.includes("drawing-1") ? "drawing-1" : ""}
-          />
-        </Suspense>
-      </OfficialAppAuthProvider>
+      <Suspense fallback={<div>Loading drawing route</div>}>
+        <SpaceDrawings
+          spaceId="space-product"
+          drawingId={entry.includes("drawing-1") ? "drawing-1" : ""}
+        />
+      </Suspense>
       <LocationProbe />
     </MemoryRouter>
   );

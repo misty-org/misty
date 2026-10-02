@@ -116,7 +116,11 @@ export function SpaceLibraryItems() {
               Deleted: item.trashed_at ? Date.parse(item.trashed_at) : undefined,
               "Recover until": item.recover_until ? Date.parse(item.recover_until) : undefined,
             },
-            creatorDescription: `Added by ${creatorName(item.added_by_user_id)} · Contributed by ${creatorName(item.contributing_user_id)} · Uploaded by ${creatorName(item.file.uploader_user_id)}`,
+            creatorDescription: [
+              `Added by ${creatorName(item.added_by_user_id)}`,
+              `Contributed by ${creatorName(item.contributing_user_id)}`,
+              `Uploaded by ${creatorName(item.file.uploader_user_id)}`,
+            ].join(" · "),
             updatedAt: item.updated_at || item.added_at,
             updated: formatTime(item.updated_at || item.added_at),
             onOpen: () => setSelectedItemId(item.id),
@@ -379,7 +383,11 @@ function LibraryItemActions({
       ].join(" ");
   return (
     <div
-      className={`absolute right-0 top-0 flex shrink-0 items-center gap-0.5 rounded-md bg-charcoal-card group-hover:bg-charcoal-hover transition-opacity ${actionVisibility}`}
+      className={[
+        "absolute right-0 top-0 flex shrink-0 items-center gap-0.5 rounded-md",
+        "bg-charcoal-card group-hover:bg-charcoal-hover transition-opacity",
+        actionVisibility,
+      ].join(" ")}
       aria-label={`Actions for ${item.display_name}`}
     >
       {canEdit && (

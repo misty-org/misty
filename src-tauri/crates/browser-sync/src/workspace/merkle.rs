@@ -7,19 +7,35 @@ use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Leaf {
-    Node { node_id: String, parent_id: String, version: u64, hash: [u8; 32] },
-    Slot { view_node_id: String, slot: i16, version: u64, hash: [u8; 32] },
+    Node {
+        node_id: String,
+        parent_id: String,
+        version: u64,
+        hash: [u8; 32],
+    },
+    Slot {
+        view_node_id: String,
+        slot: i16,
+        version: u64,
+        hash: [u8; 32],
+    },
 }
 
 impl Leaf {
     fn digest(&self) -> [u8; 32] {
         let encoded = match self {
-            Leaf::Node { node_id, parent_id, version, hash } => {
-                serde_json::to_vec(&("n", node_id, parent_id, version, STANDARD.encode(hash)))
-            }
-            Leaf::Slot { view_node_id, slot, version, hash } => {
-                serde_json::to_vec(&("s", view_node_id, slot, version, STANDARD.encode(hash)))
-            }
+            Leaf::Node {
+                node_id,
+                parent_id,
+                version,
+                hash,
+            } => serde_json::to_vec(&("n", node_id, parent_id, version, STANDARD.encode(hash))),
+            Leaf::Slot {
+                view_node_id,
+                slot,
+                version,
+                hash,
+            } => serde_json::to_vec(&("s", view_node_id, slot, version, STANDARD.encode(hash))),
         }
         .expect("leaf encoding is infallible");
         let mut h = Sha256::new();
@@ -61,7 +77,12 @@ mod tests {
     use super::*;
 
     fn node(id: &str, version: u64) -> Leaf {
-        Leaf::Node { node_id: id.into(), parent_id: "p".into(), version, hash: [7; 32] }
+        Leaf::Node {
+            node_id: id.into(),
+            parent_id: "p".into(),
+            version,
+            hash: [7; 32],
+        }
     }
 
     #[test]
@@ -69,8 +90,20 @@ mod tests {
         let a = root(vec![node("a", 1), node("b", 1), node("c", 1)]);
         assert_eq!(a, root(vec![node("c", 1), node("a", 1), node("b", 1)]));
         assert_ne!(a, root(vec![node("a", 1), node("b", 1)]), "hidden node");
-        assert_ne!(a, root(vec![node("a", 1), node("b", 1), node("c", 2)]), "rolled-back version");
-        let slot = Leaf::Slot { view_node_id: "a".into(), slot: 2, version: 1, hash: [7; 32] };
-        assert_ne!(a, root(vec![node("a", 1), node("b", 1), node("c", 1), slot]));
+        assert_ne!(
+            a,
+            root(vec![node("a", 1), node("b", 1), node("c", 2)]),
+            "rolled-back version"
+        );
+        let slot = Leaf::Slot {
+            view_node_id: "a".into(),
+            slot: 2,
+            version: 1,
+            hash: [7; 32],
+        };
+        assert_ne!(
+            a,
+            root(vec![node("a", 1), node("b", 1), node("c", 1), slot])
+        );
     }
 }

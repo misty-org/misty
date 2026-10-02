@@ -39,9 +39,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await authenticateAccount(() =>
-        accountRegister(name, normalizedUsername, email, password),
-      );
+      await authenticateAccount(() => accountRegister(name, normalizedUsername, email, password));
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(

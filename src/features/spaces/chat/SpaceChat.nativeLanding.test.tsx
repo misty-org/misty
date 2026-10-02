@@ -81,7 +81,7 @@ it("shows existing Everyone messages when opening Misty without a conversation s
     },
     useSpacesStore: spaces,
     useAuth: () => ({ user: { id: "viewer" } }),
-    useSetupStore: create(() => ({ status: null })),
+    useNativeSessionStore: create(() => ({ status: null })),
     useConnectionsStore: create(() => ({
       connections: [],
       loading: false,

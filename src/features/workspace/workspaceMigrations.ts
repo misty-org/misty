@@ -5,20 +5,8 @@ import {
   parseBrowserViewState,
   type WorkspaceLayout,
   type WorkspaceScopeKey,
-  type WorkspaceSurfaceId,
   type WorkspaceView,
 } from "./model";
-
-export function isSupportedWorkspaceSurface(value: unknown): value is WorkspaceSurfaceId {
-  return (
-    value === "home" ||
-    value === "browser" ||
-    value === "agents" ||
-    value === "scheduled" ||
-    value === "files" ||
-    value === "space"
-  );
-}
 /** Saved views synced from records without a route; restore them at their tool's root. */
 const missingRouteFallback: Partial<Record<string, string>> = {
   home: "/home",
@@ -112,14 +100,17 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
     };
   }
   const agents = tab.surfaceId === "agents" || tab.groupKey === "app:agents";
-  if (agents)
+  if (agents) {
+    // Legacy Scheduled routes keep their section inside Agents.
+    if (route.pathname === "/scheduled") route.searchParams.set("view", "scheduled");
     return {
       ...tab,
       surfaceId: "agents",
       groupKey: "tool:agents",
-      route: `/agents${new URL(tab.route, "https://misty.local").search}`,
+      route: `/agents${route.search}`,
       placeholder: tab.placeholder,
     };
+  }
   const wasBrowser = tab.surfaceId === "browser" || tab.groupKey === "app:browser";
   const state = wasBrowser ? parseBrowserViewState(tab.state) : createBrowserViewState();
   return {

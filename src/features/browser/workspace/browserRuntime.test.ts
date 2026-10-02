@@ -1,14 +1,9 @@
 import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  browserTabIdForRuntime,
-  browserRuntimeId,
-  closeBrowserRuntime,
-  hideAllBrowserWebviews,
   hideBrowserWebview,
   parkAllBrowserWebviews,
   setBrowserPointerTrackingEnabled,
-  setNativeBrowserCompanionState,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
   reconcileBrowserOverlayState,
@@ -81,21 +76,6 @@ describe("browser native view synchronization", () => {
         enabled: false,
       }),
     );
-  });
-
-  it("targets the companion at one native Browser child", async () => {
-    await setNativeBrowserCompanionState({
-      targetId: "tab-native",
-      visible: true,
-      phase: "following",
-      name: "Misty",
-      label: "Browser",
-      suggestions: [{ id: "summarize", label: "Summarize" }],
-    });
-
-    expect(invoke).toHaveBeenCalledWith("browser_webviews_set_companion", {
-      request: expect.objectContaining({ targetId: "tab-native", visible: true }),
-    });
   });
 
   it("forces a native layout pass immediately after creating the child", async () => {
@@ -243,29 +223,6 @@ describe("browser native view synchronization", () => {
     expect(commands.filter((command) => command === "browser_webview_hide")).toHaveLength(2);
   });
 
-  it("does not let a stale close destroy a tab reopened with the same runtime", async () => {
-    const tab = browserTab("close-reopen-race");
-    await syncBrowserWebview({
-      tab,
-      url: "https://example.com",
-      bounds: { x: 10, y: 20, width: 800, height: 600 },
-      theme: "dark",
-    });
-    invoke.mockClear();
-
-    const closing = closeBrowserRuntime(tab);
-    const reopening = syncBrowserWebview({
-      tab,
-      url: "https://example.com",
-      bounds: { x: 10, y: 20, width: 800, height: 600 },
-      theme: "dark",
-    });
-    await Promise.all([closing, reopening]);
-
-    expect(invoke.mock.calls.some(([command]) => command === "browser_webview_close")).toBe(false);
-    expect(browserTabIdForRuntime(browserRuntimeId(tab))).toBe(tab.id);
-  });
-
   it("recreates a native child when frontend state is stale", async () => {
     const tab = browserTab("native-recovery");
     await syncBrowserWebview({
@@ -292,12 +249,6 @@ describe("browser native view synchronization", () => {
       "browser_webview_create",
       "browser_webview_reconcile",
     ]);
-  });
-
-  it("hides native children even when frontend visibility state is stale", async () => {
-    await hideAllBrowserWebviews();
-
-    expect(invoke).toHaveBeenCalledWith("browser_webviews_hide_all");
   });
 
   it("restores a parked browser at unchanged bounds without recreating its page or history", async () => {

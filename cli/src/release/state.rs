@@ -140,11 +140,11 @@ pub(super) fn create_or_update_draft(
                 "--target",
                 "main",
                 "--draft",
-                "--prerelease",
+                &format!("--prerelease={}", manifest.version.contains('-')),
                 "--title",
-                &format!("Misty {} beta", manifest.version),
+                &format!("Misty {}", manifest.version),
                 "--notes",
-                "Public-beta desktop build. Add customer-facing release notes before publishing.",
+                "Locally built desktop release. Add customer-facing release notes before publishing.",
             ])
             .arg(manifest_path.as_os_str())
             .run(&workspace.misty)
@@ -226,6 +226,7 @@ pub(super) fn gh_upload(workspace: &Workspace, tag: &str, files: &[PathBuf]) -> 
     if files.is_empty() {
         bail!("no release files were selected for upload");
     }
+    require_draft(workspace, tag)?;
     let mut command = CommandSpec::new("gh").args([
         "release",
         "upload",
@@ -240,7 +241,30 @@ pub(super) fn gh_upload(workspace: &Workspace, tag: &str, files: &[PathBuf]) -> 
     command.run(&workspace.misty)
 }
 
+fn require_draft(workspace: &Workspace, tag: &str) -> Result<()> {
+    let metadata = CommandSpec::new("gh")
+        .args([
+            "release",
+            "view",
+            tag,
+            "--repo",
+            PUBLIC_REPOSITORY,
+            "--json",
+            "isDraft",
+        ])
+        .capture(&workspace.misty)?;
+    validate_draft_metadata(&serde_json::from_str::<Value>(&metadata)?)
+}
+
+fn validate_draft_metadata(metadata: &Value) -> Result<()> {
+    if metadata["isDraft"] != true {
+        bail!("refusing to replace assets on a published release; create a new version");
+    }
+    Ok(())
+}
+
 pub(super) fn gh_delete_asset(workspace: &Workspace, tag: &str, name: &str) -> Result<()> {
+    require_draft(workspace, tag)?;
     CommandSpec::new("gh")
         .args([
             "release",
@@ -272,6 +296,13 @@ pub(super) fn git<const N: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn asset_mutation_requires_an_explicit_draft() {
+        assert!(validate_draft_metadata(&serde_json::json!({"isDraft": true})).is_ok());
+        assert!(validate_draft_metadata(&serde_json::json!({"isDraft": false})).is_err());
+        assert!(validate_draft_metadata(&serde_json::json!({})).is_err());
+    }
     use chrono::Utc;
 
     #[test]
@@ -290,6 +321,7 @@ mod tests {
             config_sha256: "config".to_owned(),
             created_at: Utc::now(),
             platforms: vec!["windows-x86_64".to_owned()],
+            build_environment: Default::default(),
         };
         let mut platform = PlatformManifest {
             version: release.version.clone(),
@@ -315,6 +347,7 @@ mod tests {
             config_sha256: "config".to_owned(),
             created_at: Utc::now(),
             platforms: platforms.into_iter().map(str::to_owned).collect(),
+            build_environment: Default::default(),
         };
 
         assert!(validate_release_platforms(&release(vec![MACOS_PLATFORM])).is_ok());

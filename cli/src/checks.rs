@@ -5,6 +5,12 @@ use crate::{
     workspace::Workspace,
 };
 
+pub fn release(workspace: &Workspace) -> Result<()> {
+    CommandSpec::new("bash")
+        .args([".githooks/checks.sh", "all"])
+        .run(&workspace.misty)
+}
+
 pub fn app(workspace: &Workspace) -> Result<()> {
     workspace.validate()?;
     CommandSpec::new(npm())
@@ -35,7 +41,27 @@ pub fn app(workspace: &Workspace) -> Result<()> {
             "src-tauri/Cargo.toml",
             "--locked",
         ])
-        .run(&workspace.misty)
+        .run(&workspace.misty)?;
+    CommandSpec::new(npm())
+        .args(["run", "test:tasks"])
+        .run(&workspace.misty)?;
+    let mut manifests = vec![workspace
+        .misty
+        .join("src-tauri/crates/browser-sync/Cargo.toml")];
+    for entry in std::fs::read_dir(workspace.misty.join("src-tauri/services"))? {
+        let manifest = entry?.path().join("Cargo.toml");
+        if manifest.is_file() {
+            manifests.push(manifest);
+        }
+    }
+    manifests.sort();
+    for manifest in manifests {
+        CommandSpec::new("cargo")
+            .args(["test", "--locked", "--manifest-path"])
+            .arg(manifest.as_os_str())
+            .run(&workspace.misty)?;
+    }
+    Ok(())
 }
 
 pub fn server(workspace: &Workspace) -> Result<()> {
@@ -68,6 +94,9 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     if container_contract.is_file() {
         CommandSpec::new("./scripts/check-container-contract.sh").run(&workspace.server)?;
     }
+    CommandSpec::new("bash")
+        .arg("scripts/test-billing-contract.sh")
+        .run(&workspace.server)?;
 
     let worker = workspace.server.join("apps/journal-collab");
     CommandSpec::new(npm()).args(["ci"]).run(&worker)?;

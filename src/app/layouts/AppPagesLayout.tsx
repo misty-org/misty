@@ -1,5 +1,5 @@
 import { routes } from "@/features/app-shell";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
@@ -7,22 +7,17 @@ import { Outlet, useLocation } from "react-router";
 const appPageTitles = new Map<string, string>([
   [routes.home, "Misty - Home"],
   [routes.files, "Misty - Files"],
-  [routes.code, "Misty - Code"],
   [routes.spaces, "Misty - Spaces"],
   [routes.agents, "Misty - Agents"],
   [routes.activity, "Misty - Activity"],
   [routes.scheduled, "Misty - Scheduled"],
-  [routes.discover, "Misty - Discover"],
-  [routes.changelog, "Misty - Changelog"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
-  [routes.profile, "Misty - Profile"],
-  [routes.account, "Misty - Account"],
 ]);
 
 export function AppPagesLayout() {
   const location = useLocation();
-  const refreshLocalAccessToken = useSetupStore((state) => state.refreshLocalAccessToken);
+  const refreshLocalAccessToken = useNativeSessionStore((state) => state.refreshLocalAccessToken);
 
   useEffect(() => {
     const match = [...appPageTitles.keys()]

@@ -1,9 +1,8 @@
 import { useState, type Ref } from "react";
-import { Check, ChevronDown, LayoutGrid, MessageSquare, Plus } from "lucide-react";
+import { Check, LayoutGrid, MessageSquare, Plus } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
-  Button,
   Command,
   CommandEmpty,
   CommandGroup,
@@ -11,9 +10,9 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
+  MenuTrigger,
   Popover,
   PopoverContent,
-  PopoverTrigger,
 } from "@/shared/ui";
 import { AgentAvatar } from "./AgentAvatar";
 
@@ -62,20 +61,15 @@ export function AgentSwitcher({
         if (next) setQuery("");
       }}
     >
-      <PopoverTrigger asChild>
-        <Button
-          ref={triggerRef}
-          variant="ghost"
-          size="sm"
-          className="agent-heading-identity"
-          aria-label={`Switch agent: ${selectedAgent?.name || "Agents"}`}
-          data-agent-navigation-control
-        >
-          <AgentAvatar agent={selectedAgent} />
-          <span className="truncate">{selectedAgent?.name || "Agents"}</span>
-          <ChevronDown size={14} />
-        </Button>
-      </PopoverTrigger>
+      <MenuTrigger
+        ref={triggerRef}
+        kind="popover"
+        className="agent-heading-identity"
+        label={`Switch agent: ${selectedAgent?.name || "Agents"}`}
+        value={selectedAgent?.name || "Agents"}
+        icon={<AgentAvatar agent={selectedAgent} />}
+        data-agent-navigation-control
+      />
       <PopoverContent
         align="start"
         className="w-80 p-0"

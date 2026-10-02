@@ -26,17 +26,3 @@ func OfficialBrowserProvider(id string, version int) (Provider, bool) {
 	}
 	return p, true
 }
-
-func OfficialBrowserScopes(providerID, capability string) ([]string, bool) {
-	p, ok := OfficialBrowserProvider(providerID, 1)
-	if !ok {
-		return nil, false
-	}
-	for _, d := range p.Capabilities {
-		if d.Name != capability {
-			continue
-		}
-		return []string{"tasks.write", "browser.inspect", "browser.interact"}, true
-	}
-	return nil, false
-}

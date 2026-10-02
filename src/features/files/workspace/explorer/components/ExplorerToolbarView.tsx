@@ -33,7 +33,6 @@ import { ExplorerToolbarDragNavigationView } from "./ExplorerToolbarDragNavigati
 
 export { ExplorerPaneToolbarActions } from "./ExplorerPaneToolbarActions";
 export type {
-  ExplorerCommandId,
   ExplorerLocationResult,
   ExplorerPaneToolbarActionsProps,
 } from "./ExplorerToolbarModel";

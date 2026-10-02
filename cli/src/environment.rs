@@ -324,7 +324,6 @@ const DEPRECATED_CLI_NAMES: &[&str] = &[
     "MISTY_SOURCE_DIR",
     "MISTY_PROXY_SOURCE_DIR",
     "MISTY_HUB_SOURCE_DIR",
-    "MISTY_RCLONE_SOURCE",
 ];
 
 const PROD_REQUIRED: &[&str] = &[
@@ -453,7 +452,10 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
             .context("MISTY_BILLING_URL is required")?;
         let url = url::Url::parse(raw).context("Invalid MISTY_BILLING_URL")?;
         let local = target == Target::Dev
-            && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]" | "host.docker.internal"));
+            && matches!(
+                url.host_str(),
+                Some("127.0.0.1" | "localhost" | "[::1]" | "host.docker.internal")
+            );
         if (url.scheme() != "https" && !(url.scheme() == "http" && local))
             || url.host_str().is_none()
             || !url.username().is_empty()
@@ -845,6 +847,7 @@ fn cli_owner(name: &str) -> Result<&'static str> {
         || name.starts_with("WINDOWS_")
         || name.starts_with("MISTY_CODESIGN_")
         || name.starts_with("MISTY_NOTARY_")
+        || matches!(name, "MISTY_RELEASE_API_URL" | "MISTY_RELEASE_WEB_URL")
     {
         return Ok("release.env");
     }
@@ -1297,7 +1300,10 @@ mod tests {
             ("MISTY_DEV_API_TUNNEL_HOSTNAME", "api.example.com"),
             ("MISTY_BILLING_ADAPTER", "http"),
             ("MISTY_BILLING_URL", "https://billing.example.com/adapter"),
-            ("MISTY_BILLING_SECRET", "fixture-billing-secret-32-bytes-long"), // gitleaks:allow -- synthetic test fixture
+            (
+                "MISTY_BILLING_SECRET",
+                "fixture-billing-secret-32-bytes-long", // gitleaks:allow -- synthetic test fixture
+            ),
         ] {
             set(&workspace, Target::Dev, key, val).unwrap();
         }

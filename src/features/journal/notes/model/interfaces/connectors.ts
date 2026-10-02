@@ -121,21 +121,3 @@ export interface NotesConnector {
   openInSource?(sourceId: string): Promise<void>;
   sync?(): Promise<SyncResult>;
 }
-
-/**
- * Catalog entry for the integrations surface. Connectors that cannot yet supply
- * notes ("available", "planned") still appear here so the broader Misty
- * integration system stays discoverable from the Notes area.
- */
-export interface NotesIntegrationCard {
-  providerId: string;
-  name: string;
-  description: string;
-  availability: "connected" | "available" | "planned";
-  status?: NoteProviderStatus;
-  lastSyncedAt?: string;
-  /** Set when the provider is already connected elsewhere in Misty. */
-  connectedElsewhere?: boolean;
-  noteCount?: number;
-  error?: string;
-}

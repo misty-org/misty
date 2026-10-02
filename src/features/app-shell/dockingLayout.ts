@@ -12,12 +12,6 @@ export interface SavedDockingLayout extends DockingLayout {
   id: string;
   name: string;
 }
-export const dockingPresets: SavedDockingLayout[] = [
-  { id: "classic", name: "Classic", navigation: "left", tabs: "top" },
-  { id: "top-bar", name: "Top bar", navigation: "top", tabs: "left" },
-  { id: "bottom-dock", name: "Bottom dock", navigation: "bottom", tabs: "left" },
-  { id: "right-rail", name: "Right rail", navigation: "right", tabs: "bottom" },
-];
 export const defaultDockingLayout: DockingLayout = { navigation: "left", tabs: "top" };
 export const isSideDock = (position: DockPosition) => position === "left" || position === "right";
 const isPosition = (value: unknown): value is DockPosition =>

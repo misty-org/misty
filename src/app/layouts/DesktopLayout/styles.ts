@@ -1,66 +1,7 @@
 import type { FramePacingState } from "@/app/layouts/model/types";
-import { cn, navigationMenuLinkClass, navigationMenuPrimaryLayoutClass } from "@/shared/ui";
-
-export const desktopFrameClass = [
-  "relative isolate grid h-full min-h-0",
-  "grid-rows-[36px_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace text-cream",
-].join(" ");
-
-export const desktopNavbarClass =
-  "relative z-10 col-start-1 row-span-2 row-start-1 min-h-0 overflow-hidden";
-
-// An auto-hiding navigator floats over the workspace instead of taking a grid
-// column, so revealing it never reflows the surfaces underneath.
-export const desktopFloatingNavbarClass =
-  "absolute bottom-0 left-0 top-0 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
-export const tabletFloatingNavbarClass =
-  "absolute bottom-6 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
-export const navigatorRevealStripClass = "absolute inset-y-0 left-0 z-30 w-3 cursor-pointer";
 
 // The drawer, tab inset, and titlebar controls must move on the same timeline.
 export const navigatorMotionClass = "misty-shell-motion motion-reduce:transition-none";
-
-export const desktopRouteShellClass =
-  "relative z-10 col-start-2 row-span-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
-export const tabletRouteShellClass =
-  "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
-
-export const navbarGroupClass = [
-  "flex w-full shrink-0 flex-col items-center gap-0.5 overflow-hidden px-1 pt-0",
-].join(" ");
-
-export const navbarSpacesClass = [
-  "flex min-h-0 w-full flex-1 flex-col items-center overflow-x-hidden overflow-y-auto",
-  "overscroll-contain px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-].join(" ");
-
-export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-0.5 px-1";
-
-export const navItemBaseClass = [
-  "misty-navbar-marker-side grid h-[66px] w-16 shrink-0 grid-rows-[44px_18px] place-items-center rounded-lg border-0 bg-transparent p-0",
-  "text-cream-muted no-underline shadow-none transition-colors hover:text-cream-bright",
-].join(" ");
-export const navLinkBaseClass = navItemBaseClass;
-// The current destination is marked by a line on the rail's edge rather than a
-// filled tile, so the navbar reads as a rail with a pointer on it.
-export const navLinkActiveClass = "text-cream-bright";
-export const navButtonActiveClass = navLinkActiveClass;
-
-export const navIconTileBaseClass =
-  "relative grid h-11 w-12 place-items-center rounded-md text-current transition-colors";
-export const navIconTileActiveClass = "text-cream-bright";
-export const navIconClass = "size-6";
-
-export const navItemLabelBaseClass =
-  "block max-w-[60px] truncate text-center text-[10px] font-medium leading-tight text-current";
-export const navItemLabelActiveClass = "text-cream-bright";
-
-// Icon-only nav buttons keep a compact, consistent rail slot. The marker class
-// lives on every item so hover and selection share the same edge animation.
-export const navIconOnlyItemBaseClass = [
-  "misty-navbar-marker-side grid h-[52px] w-14 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
-  "text-cream-muted no-underline shadow-none transition-colors hover:text-cream-bright",
-].join(" ");
 
 export const profileDockClass = [
   "group/profile relative grid size-[50px] shrink-0 place-items-center rounded-full border-0 bg-transparent p-0",
@@ -72,14 +13,6 @@ export const navigatorFocusRingClass = [
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted",
   "focus-visible:ring-offset-1 focus-visible:ring-offset-charcoal-workspace",
 ].join(" ");
-
-export const navigatorPrimaryRowLayoutClass = navigationMenuPrimaryLayoutClass;
-
-export const navigatorSubsectionIconClass = cn(
-  "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0",
-  "place-items-center text-cream-bright [contain:layout_paint]",
-  "[&_img]:!size-5 [&_svg]:!size-5",
-);
 
 export const navigatorIslandActionClass = [
   "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
@@ -93,22 +26,7 @@ export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
 
 export const navigatorHierarchyActionClass = navigatorIslandActionClass;
 
-export function navigatorRowClass(active: boolean): string {
-  return cn(
-    navigationMenuLinkClass,
-    "relative w-full",
-    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted",
-    active && "text-cream-bright",
-  );
-}
-
 export const workStatusToastDurationMs = 3500;
-
-// Where the top band's controls stop: traffic lights plus the shell's own
-// buttons, with a gap. The dock header keeps its tabs to the right of this,
-// minus whatever width the navigator rail already covers.
-export const desktopTitlebarControlsEnd = 272;
-export const windowsTitlebarControlsEnd = 336;
 export const desktopTitlebarNavigationInset = 84;
 export const windowsTitlebarNavigationInset = 8;
 
@@ -125,18 +43,6 @@ export function desktopTitlebarNavigationGeometry(
     scale: 1 / zoom,
   };
 }
-
-// Breathing room around the dock header's tab row, on every edge that is not
-// already spoken for by the titlebar controls.
-export const dockHeaderPadding = 8;
-
-// The window's top band is 38px: tall enough that the strip above the dock
-// tabs is a comfortable drag target. It stays click-through so the tabs
-// underneath keep working; the rail strip and the dock header do the dragging.
-export const desktopTitlebarClass =
-  "group/titlebar pointer-events-none absolute inset-x-0 top-0 z-50 h-[38px] select-none";
-
-export const desktopWallpaperLayerClass = "hidden";
 
 export const windowsTitlebarControlsClass =
   "pointer-events-auto absolute right-0 top-0 z-[3] flex h-full w-max flex-nowrap items-center";

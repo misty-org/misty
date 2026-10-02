@@ -12,7 +12,6 @@ import {
   dockLeaves,
   dockWidgetRegistry,
   maxWorkspacePanels,
-  spaceWorkspaceToolFromRoute,
   useWorkspaceStore,
   WorkspaceViewTitleProvider,
   type DockSplitDirection,
@@ -40,109 +39,16 @@ import {
   type AiSurfaceAdapter,
   type AiSurfaceId,
 } from "@/features/ai-surface/AiPaneHost";
-import { useSpacesStore } from "@/features/spaces";
-import { type TabGroup } from "./WorkspaceViewGroupButton";
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
   space: "Space",
   browser: "Browser",
-  terminal: "Terminal",
-  code: "Code",
   files: "Files",
-
   agents: "Agents",
   scheduled: "Scheduled",
-  "official-app": "App",
-  extension: "App",
-  marketplace: "Discover",
 };
 const viewDragType = "application/x-misty-workspace-tab";
-
-export function groupViews(tabs: WorkspaceView[]): TabGroup[] {
-  const map = new Map<string, TabGroup>();
-  const spaces = useSpacesStore.getState().spaces;
-  for (const tab of tabs) {
-    let key = tab.groupKey;
-    let label = surfaceLabels[tab.surfaceId] ?? tab.title ?? "Tool";
-    let contextLabel = label;
-    if (tab.surfaceId === "space") {
-      const routeParts = tab.route.split("?")[0].split("/").filter(Boolean);
-      const groupParts = tab.groupKey.split(":");
-      const spaceId = safeRouteDecode(routeParts[1] ?? groupParts[1] ?? "");
-      const tool = spaceWorkspaceToolFromRoute(tab.route);
-      key = (
-        tool === "space" ? `space:${spaceId}` : `space:${spaceId}:${tool}`
-      ) as WorkspaceGroupKey;
-      const space = spaces.find((s) => s.id === spaceId);
-      const spaceName = space?.name || "Space";
-      const isHome = routeParts[2] === "home";
-      label = tool === "space" ? (isHome ? "Home" : "Space") : spaceToolLabel(tool);
-      contextLabel = `${spaceName} · ${label}`;
-    } else if (tab.surfaceId === "official-app") {
-      const id = tab.groupKey.replace(/^app:/, "").split(":")[0];
-      label =
-        (
-          {
-            chat: "Social",
-            social: "Social",
-            journal: "Journal",
-            planner: "Planner",
-            library: "Storage",
-            browser: "Browser",
-            files: "Files",
-            code: "Code",
-            terminal: "Terminal",
-            agents: "Agents",
-            scheduled: "Scheduled",
-          } as Record<string, string>
-        )[id] ?? "Tool";
-      contextLabel = label;
-    }
-    const existing = map.get(key);
-    if (existing) {
-      existing.tabs.push(tab);
-    } else {
-      map.set(key, {
-        key,
-        instanceId: tab.groupInstanceId ?? `group:${tab.id}`,
-        surfaceId: tab.surfaceId,
-        label,
-        contextLabel,
-        tabs: [tab],
-        storeGroupKey: key as WorkspaceGroupKey,
-      });
-    }
-  }
-  return [...map.values()];
-}
-
-export function viewForGroupedShortcut(
-  tabs: WorkspaceView[],
-  index: number | "last",
-  lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>,
-): WorkspaceView | null {
-  const groups = groupViews(tabs);
-  const group = index === "last" ? groups[groups.length - 1] : groups[index];
-  if (!group) return null;
-  const preferredId = group.storeGroupKey
-    ? (lastUsedTabByGroup[group.storeGroupKey] ??
-      lastUsedTabByGroup[`tool:${group.surfaceId}` as WorkspaceGroupKey])
-    : undefined;
-  return (
-    (preferredId ? group.tabs.find((tab) => tab.id === preferredId) : undefined) ??
-    [...group.tabs].sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)[0] ??
-    null
-  );
-}
-
-function spaceToolLabel(tool: ReturnType<typeof spaceWorkspaceToolFromRoute>): string {
-  if (tool === "journal") return "Journal";
-  if (tool === "planner") return "Planner";
-  if (tool === "social") return "Social";
-  if (tool === "library") return "Library";
-  return "Space";
-}
 
 export interface WorkspaceDockTreeProps {
   workspaceActive?: boolean;
@@ -517,7 +423,6 @@ function workspaceAiAdapter(tab: WorkspaceView | undefined): AiSurfaceAdapter | 
 }
 
 function aiSurfaceForView(tab: WorkspaceView): AiSurfaceId {
-  if (tab.surfaceId === "official-app") return "extension";
   if (tab.surfaceId !== "space") return tab.surfaceId;
   const parts = tab.route.split("?")[0].split("/").filter(Boolean);
   const section = parts[2] ?? "";
@@ -547,9 +452,7 @@ function aiContextForView(tab: WorkspaceView): AiContextReference {
       spaceId,
     };
   }
-  const privacy = (["browser", "terminal", "code", "files"] as WorkspaceSurfaceId[]).includes(
-    tab.surfaceId,
-  )
+  const privacy = (["browser", "files"] as WorkspaceSurfaceId[]).includes(tab.surfaceId)
     ? "device"
     : "private";
   return {
@@ -622,21 +525,6 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
       "Explain the attached browser page in plain language.",
     ),
   ],
-  code: [
-    action(
-      "code.explain",
-      "Explain code",
-      "Explain the visible code and its important dependencies.",
-    ),
-    action("code.review", "Review", "Review the visible code for correctness and maintainability."),
-  ],
-  terminal: [
-    action(
-      "terminal.explain",
-      "Explain output",
-      "Explain the visible terminal block and suggest a safe next step.",
-    ),
-  ],
   files: [
     action(
       "files.organize",
@@ -656,13 +544,6 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
       "library.synthesize",
       "Synthesize",
       "Synthesize the visible Library sources with citations.",
-    ),
-  ],
-  marketplace: [
-    action(
-      "marketplace.explain",
-      "Explain",
-      "Explain the visible Discover item and what access it needs.",
     ),
   ],
 };

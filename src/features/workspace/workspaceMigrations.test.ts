@@ -4,7 +4,10 @@ import { createBrowserViewState, type WorkspaceView } from "./model";
 import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
 import { migrateWorkspaceStore } from "./workspaceStorePersistence";
 
-function legacyTab(overrides: Partial<WorkspaceView> = {}): WorkspaceView {
+/** Saved views may still carry surfaces this build no longer renders. */
+type LegacyViewOverrides = Omit<Partial<WorkspaceView>, "surfaceId"> & { surfaceId?: string };
+
+function legacyTab(overrides: LegacyViewOverrides = {}): WorkspaceView {
   return {
     id: "saved-tab",
     instanceKey: "saved-tab",
@@ -17,7 +20,7 @@ function legacyTab(overrides: Partial<WorkspaceView> = {}): WorkspaceView {
     createdAt: 1,
     lastFocusedAt: 2,
     ...overrides,
-  };
+  } as WorkspaceView;
 }
 
 describe("browser workspace migration", () => {

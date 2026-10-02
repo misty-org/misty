@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  activeSpacesTab,
-  spacesTabsSessionKey,
-  useSpacesTabsStore,
-} from "../store/useSpacesTabsStore";
+import { spacesTabsSessionKey, useSpacesTabsStore } from "../store/useSpacesTabsStore";
 
 describe("per-Space workspace tabs", () => {
   beforeEach(() => useSpacesTabsStore.setState({ sessions: {} }));
@@ -36,20 +32,6 @@ describe("per-Space workspace tabs", () => {
     ]);
   });
 
-  it("selects a different Space tab", () => {
-    const store = useSpacesTabsStore.getState();
-    store.ensureSession("account-1", "space-a");
-    const nextId = store.addTab("account-1", "space-a", "space", "/spaces/space-a/chat");
-    const first =
-      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")].tabs[0];
-    store.selectTab("account-1", "space-a", first.id);
-
-    const session =
-      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
-    expect(nextId).not.toBe(first.id);
-    expect(activeSpacesTab(session)?.id).toBe(first.id);
-  });
-
   it("updates only the active Space tab route", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a", "/spaces/space-a/notes");
@@ -62,18 +44,6 @@ describe("per-Space workspace tabs", () => {
       "/spaces/space-a/notes",
       "/spaces/space-a/library",
     ]);
-  });
-
-  it("replaces the final closed tab with a fresh Space tab", () => {
-    const store = useSpacesTabsStore.getState();
-    store.ensureSession("account-1", "space-a");
-    const key = spacesTabsSessionKey("account-1", "space-a");
-    const initial = activeSpacesTab(useSpacesTabsStore.getState().sessions[key]);
-    store.closeTab("account-1", "space-a", initial?.id ?? "");
-
-    const next = activeSpacesTab(useSpacesTabsStore.getState().sessions[key]);
-    expect(next?.kind).toBe("space");
-    expect(next?.id).not.toBe(initial?.id);
   });
 
   it("caps each Space at sixteen tabs", () => {

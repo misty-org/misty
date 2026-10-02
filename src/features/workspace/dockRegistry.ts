@@ -1,10 +1,5 @@
 import type { DockWidgetDescriptor, WorkspaceSurfaceId } from "./model";
-import {
-  createBrowserViewState,
-  createCodeViewState,
-  parseBrowserViewState,
-  parseCodeViewState,
-} from "./model";
+import { createBrowserViewState, parseBrowserViewState } from "./model";
 
 const identityState = {
   create: () => ({}),
@@ -21,19 +16,9 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
     serialize: parseBrowserViewState,
     restore: parseBrowserViewState,
   },
-  terminal: descriptor("terminal", "multiple", "keep-alive", 320, 180),
-  code: {
-    ...descriptor("code", "multiple", "keep-alive", 480, 280),
-    create: createCodeViewState,
-    serialize: parseCodeViewState,
-    restore: parseCodeViewState,
-  },
   files: descriptor("files", "multiple", "suspend", 360, 240),
   scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
-  "official-app": descriptor("official-app", "multiple", "keep-alive", 420, 280),
-  extension: descriptor("extension", "multiple", "keep-alive", 420, 280),
-  marketplace: descriptor("marketplace", "singleton", "suspend", 360, 240),
 };
 
 function descriptor(
