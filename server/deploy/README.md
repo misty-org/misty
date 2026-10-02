@@ -79,15 +79,18 @@ its variables and first-time setup.
 
 ### Releases
 
-Push a `server-vX.Y.Z` tag. The `Server release` workflow runs the tests,
-builds the API and agent runtime images for `linux/amd64`, pushes them to GHCR,
-boots the production databases and agent runtime with them, and writes both
-digests to the run summary. Paste them into `.env/prod/runtime.env`:
+Images build on this computer; nothing builds on GitHub. From a clean,
+pushed commit:
 
-```dotenv
-MISTY_API_IMAGE=ghcr.io/misty-org/misty-api@sha256:…
-MISTY_AGENT_RUNTIME_IMAGE=ghcr.io/misty-org/misty-agent-runtime@sha256:…
+```sh
+misty server release 0.1.0
 ```
+
+It runs the secret scan and the server suites, builds the API and agent
+runtime images for `linux/amd64` (Go cross-compiles natively; the agent runtime
+builds under emulation), pushes them to GHCR, tags the commit `server-v0.1.0`,
+and saves both digests in `.env/prod/runtime.env`. This computer needs
+`docker login ghcr.io` with a token that can write packages.
 
 The packages are private. Log the VPS in once with a classic personal access
 token that has only `read:packages`: `docker login ghcr.io`. Roll back by
