@@ -61,7 +61,7 @@
       "parent": "Misty — Project Overview",
       "page_notes": [
         {
-          "content": "Start with package.json, cli/src/checks.rs, cli/src/release/, cli/tasks/release/, .github/workflows/, src/tests/architecture/, server/test/, server/scripts/contracts/, and src/features/updater/. Explain npm run check versus misty check all and the narrower shared CI test jobs. Browser-sync live/native probes and OS credential-store tests have explicit prerequisites; report those separately from routine tests. Derive release gates from the current workflows and CLI, not an old readiness audit."
+          "content": "Start with package.json, cli/src/checks.rs, cli/src/release/, cli/tasks/release/, .githooks/, src/tests/architecture/, server/test/, server/scripts/contracts/, and src/features/updater/. Explain npm run check versus misty check all and the per-commit and per-push git hook suites (there is no GitHub CI). Browser-sync live/native probes and OS credential-store tests have explicit prerequisites; report those separately from routine tests. Derive release gates from the current hooks and CLI, not an old readiness audit."
         }
       ]
     },
@@ -315,7 +315,7 @@
       "parent": "Server Architecture & Service Boundaries",
       "page_notes": [
         {
-          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, .github/workflows/server-release.yml, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, static web app, and external website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
+          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, server/scripts/release.sh, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, static web app, and external website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
         }
       ]
     }
