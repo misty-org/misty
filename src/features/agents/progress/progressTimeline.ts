@@ -171,7 +171,6 @@ const uiSubjects: Record<string, string> = {
   space: "Spaces",
   agent: "agents",
   device: "devices",
-  method: "methods",
 };
 
 /** A tool name split into its verb and what it acts on, such as "Searched" and "web". */

@@ -236,13 +236,13 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 	for _, registration := range methodToolRegistrations(database) {
 		methods[registration.Descriptor.Name] = registration.Handler
 	}
-	if raw, err := call(methods["method.list"], `{}`); err != nil || !strings.Contains(string(raw), "Weekly brief") {
-		t.Fatalf("method.list = %s, %v", raw, err)
+	if raw, err := call(methods["memory.workflow.list"], `{}`); err != nil || !strings.Contains(string(raw), "Weekly brief") {
+		t.Fatalf("memory.workflow.list = %s, %v", raw, err)
 	}
-	if raw, err := call(methods["method.use"], `{"method":"Weekly brief","inputs":{"team":"Launch"}}`); err != nil || !strings.Contains(string(raw), "Summarize the week") || !strings.Contains(string(raw), "Launch") {
-		t.Fatalf("method.use = %s, %v", raw, err)
+	if raw, err := call(methods["memory.workflow.use"], `{"method":"Weekly brief","inputs":{"team":"Launch"}}`); err != nil || !strings.Contains(string(raw), "Summarize the week") || !strings.Contains(string(raw), "Launch") {
+		t.Fatalf("memory.workflow.use = %s, %v", raw, err)
 	}
-	if _, err := call(methods["method.use"], `{"method":"Weekly brief","inputs":{}}`); !errors.As(err, &invalid) {
+	if _, err := call(methods["memory.workflow.use"], `{"method":"Weekly brief","inputs":{}}`); !errors.As(err, &invalid) {
 		t.Fatalf("missing required input = %v", err)
 	}
 

@@ -146,15 +146,15 @@ func TestAgentItemToolsPostgres(t *testing.T) {
 	var saved struct {
 		Method struct{ ID string } `json:"method"`
 	}
-	_ = json.Unmarshal(call(methods["method.save"], invocation, `{"title":"Standup","instructions":"Summarize yesterday for the team.","inputs":[{"key":"team","label":"Team","type":"text","required":true}]}`), &saved)
-	if raw := call(methods["method.save"], invocation, `{"id":"`+saved.Method.ID+`","title":"Daily standup","instructions":"Summarize yesterday."}`); !strings.Contains(string(raw), `"version":2`) {
-		t.Fatalf("method.save update = %s", raw)
+	_ = json.Unmarshal(call(methods["memory.workflow.save"], invocation, `{"title":"Standup","instructions":"Summarize yesterday for the team.","inputs":[{"key":"team","label":"Team","type":"text","required":true}]}`), &saved)
+	if raw := call(methods["memory.workflow.save"], invocation, `{"id":"`+saved.Method.ID+`","title":"Daily standup","instructions":"Summarize yesterday."}`); !strings.Contains(string(raw), `"version":2`) {
+		t.Fatalf("memory.workflow.save update = %s", raw)
 	}
-	if raw := call(methods["method.use"], invocation, `{"method":"Daily standup"}`); !strings.Contains(string(raw), "Summarize yesterday") {
-		t.Fatalf("method.use after save = %s", raw)
+	if raw := call(methods["memory.workflow.use"], invocation, `{"method":"Daily standup"}`); !strings.Contains(string(raw), "Summarize yesterday") {
+		t.Fatalf("memory.workflow.use after save = %s", raw)
 	}
 	var invalid agent.ErrInvalidRequest
-	if _, err := methods["method.save"](ctx, invocation, agent.ToolRequest{ID: "bad", Arguments: json.RawMessage(`{"id":"missing","title":"x","instructions":"y"}`)}); !errors.As(err, &invalid) {
+	if _, err := methods["memory.workflow.save"](ctx, invocation, agent.ToolRequest{ID: "bad", Arguments: json.RawMessage(`{"id":"missing","title":"x","instructions":"y"}`)}); !errors.As(err, &invalid) {
 		t.Fatalf("saving an unknown method = %v", err)
 	}
 }
