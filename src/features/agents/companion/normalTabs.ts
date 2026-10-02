@@ -10,6 +10,7 @@ import type { Execution } from "../localExecution";
 export async function companionBrowserContext(
   assertCurrent: () => void,
   openWhenMissing = false,
+  url?: string,
 ): Promise<Pick<Execution, "context" | "deviceContexts">> {
   assertCurrent();
   const workspace = useWorkspaceStore.getState();
@@ -23,7 +24,7 @@ export async function companionBrowserContext(
   // A question must never open a tab as a side effect of assembling context.
   if (!tab && openWhenMissing) {
     assertCurrent();
-    tab = workspace.openBrowserView({ url: browserHomeUrl() });
+    tab = workspace.openBrowserView({ url: url || browserHomeUrl() });
     const deadline = Date.now() + 8000;
     while (!browserRuntimeCreated(tab)) {
       assertCurrent();

@@ -1041,6 +1041,7 @@ PUT /ai/recaps/{surfaceID}
 PUT /ai/scheduled-tasks/{taskID}
 PUT /ai/settings
 PUT /ai/settings/app-actions
+PUT /ai/settings/screen-location
 PUT /ai/smart-library/folders/{folderID}/assets/{assetID}/tags
 PUT /api/ai/agent-methods/{methodID}
 PUT /api/ai/memories/{memoryID}
@@ -1051,6 +1052,7 @@ PUT /api/ai/recaps/{surfaceID}
 PUT /api/ai/scheduled-tasks/{taskID}
 PUT /api/ai/settings
 PUT /api/ai/settings/app-actions
+PUT /api/ai/settings/screen-location
 PUT /api/ai/smart-library/folders/{folderID}/assets/{assetID}/tags
 PUT /api/me/avatar
 PUT /api/me/device
@@ -1099,6 +1101,7 @@ PUT /v1/ai/recaps/{surfaceID}
 PUT /v1/ai/scheduled-tasks/{taskID}
 PUT /v1/ai/settings
 PUT /v1/ai/settings/app-actions
+PUT /v1/ai/settings/screen-location
 PUT /v1/ai/smart-library/folders/{folderID}/assets/{assetID}/tags
 PUT /v1/me/avatar
 PUT /v1/me/device

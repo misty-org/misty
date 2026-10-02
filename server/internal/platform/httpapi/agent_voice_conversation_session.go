@@ -33,7 +33,6 @@ type conversationClientEvent struct {
 }
 type conversationTool struct {
 	ID, Name, Instruction, Key string
-	NeedsScreen, NeedsBrowser  bool
 }
 
 func voiceBoundText(s string, n int) string {
@@ -53,9 +52,7 @@ func parseConversationTool(e agent.VoiceRealtimeEvent) (conversationTool, error)
 		return t, errors.New("invalid voice tool")
 	}
 	var args struct {
-		Instruction  string `json:"instruction"`
-		NeedsScreen  bool   `json:"needs_screen"`
-		NeedsBrowser *bool  `json:"needs_browser"`
+		Instruction string `json:"instruction"`
 	}
 	d := json.NewDecoder(strings.NewReader(e.Arguments))
 	d.DisallowUnknownFields()
@@ -63,19 +60,6 @@ func parseConversationTool(e agent.VoiceRealtimeEvent) (conversationTool, error)
 		return t, errors.New("invalid voice tool arguments")
 	}
 	t.Instruction = strings.TrimSpace(args.Instruction)
-	t.NeedsScreen = args.NeedsScreen
-	if args.NeedsBrowser != nil {
-		if t.Name != "start_task" {
-			return t, errors.New("unexpected browser request")
-		}
-		t.NeedsBrowser = *args.NeedsBrowser
-	}
-	if t.NeedsScreen && t.NeedsBrowser {
-		return t, errors.New("ambiguous screen and browser request")
-	}
-	if t.Name != "start_task" && t.NeedsScreen {
-		return t, errors.New("unexpected screen request")
-	}
 	switch t.Name {
 	case "get_context", "get_task_status", "cancel_task":
 		if t.Instruction != "" {

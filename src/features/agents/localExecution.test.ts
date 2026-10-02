@@ -274,31 +274,16 @@ describe("native task authority", () => {
 });
 
 describe("model-led follow-ups", () => {
-  it("routes a screen follow-up through fresh companion capture after pausing", async () => {
+  it("sends a screen follow-up to the task, which looks at the screen if it needs to", async () => {
     await startLocalExecution("owner", "agent", "", "agent");
-    const submit = vi.fn(async () => {
-      expect(useLocalExecution.getState().execution?.state).toBe("paused");
-    });
+    const submit = vi.fn();
     useCompanionState.setState({ accountId: "owner", submit });
     mocks.request.mockImplementation(async (path: string) =>
       path === "/misty/agent-followup" ? { route: "steer" } : undefined,
     );
     await routeLocalFollowup("Explain this problem on my screen");
-    expect(submit).toHaveBeenCalledWith({
-      prompt: "Explain this problem on my screen",
-      conversationId: "conversation",
-    });
-    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
-  });
-  it("explains missing desktop context in a worker without guessing or continuing", async () => {
-    await startLocalExecution("owner", "agent", "", "agent");
-    mocks.request.mockImplementation(async (path: string) =>
-      path === "/misty/agent-followup" ? { route: "steer" } : undefined,
-    );
-    await expect(routeLocalFollowup("What is on my screen?")).rejects.toThrow(
-      "Fresh desktop context is unavailable",
-    );
-    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    expect(mocks.state.submitAnswer).toHaveBeenCalledWith("Explain this problem on my screen");
     expect(useLocalExecution.getState().execution?.state).toBe("paused");
   });
   it("quiesces execution before interpreting a correction", async () => {

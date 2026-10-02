@@ -169,14 +169,14 @@ func TestVoiceConversationToolsWaitForDurableInputAndVerifyBinding(t *testing.T)
 	voiceSent(t, f, "input-audio-append")
 	voiceSent(t, f, "input-audio-commit")
 	voiceSent(t, f, "response-create")
-	f.provider.events <- agent.VoiceRealtimeEvent{Type: "function-call-arguments-done", CallID: "call-1", Name: "start_task", Arguments: `{"instruction":"Describe my screen without changes","needs_screen":true}`}
+	f.provider.events <- agent.VoiceRealtimeEvent{Type: "function-call-arguments-done", CallID: "call-1", Name: "start_task", Arguments: `{"instruction":"Describe my screen without changes"}`}
 	f.responseDone("completed")
 	f.transcript()
 	if e := f.read(t); e["type"] != "transcript" {
 		t.Fatal(e)
 	}
 	e := f.read(t)
-	if e["type"] != "tool.call" || e["key"] != "voice-fixture-1:call-1" || e["needsScreen"] != true {
+	if e["type"] != "tool.call" || e["key"] != "voice-fixture-1:call-1" || e["instruction"] != "Describe my screen without changes" {
 		t.Fatal(e)
 	}
 	select {
@@ -215,17 +215,18 @@ func TestVoiceConversationDelegatesCompleteBrowserTask(t *testing.T) {
 	f := conversationFixture(t, nil)
 	conversationText(t, f)
 	instruction := "Find GothamChess beginner videos on YouTube and create a private playlist with five videos."
-	args, err := json.Marshal(map[string]any{"instruction": instruction, "needs_browser": true})
+	args, err := json.Marshal(map[string]any{"instruction": instruction})
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.provider.events <- agent.VoiceRealtimeEvent{Type: "function-call-arguments-done", CallID: "browser", Name: "start_task", Arguments: string(args)}
 	f.responseDone("completed")
 	e := f.read(t)
-	if e["type"] != "tool.call" || e["name"] != "start_task" || e["needsBrowser"] != true || e["needsScreen"] != false || e["instruction"] != instruction {
+	// The task decides whether it needs a browser; voice passes the whole request.
+	if e["type"] != "tool.call" || e["name"] != "start_task" || e["needsBrowser"] != nil || e["instruction"] != instruction {
 		t.Fatal(e)
 	}
-	// Browser routing must still use the existing durable task-binding check.
+	// The task must still use the existing durable task-binding check.
 	conversationSend(t, f, map[string]string{"type": "tool.result", "callId": "browser", "invocationId": "foreign"})
 	if e := f.read(t); e["type"] != "error" {
 		t.Fatal(e)
@@ -233,28 +234,25 @@ func TestVoiceConversationDelegatesCompleteBrowserTask(t *testing.T) {
 	voiceFinished(t, f)
 }
 
-func TestVoiceConversationBrowserRoutingArguments(t *testing.T) {
+func TestVoiceConversationRejectsRoutingFlags(t *testing.T) {
+	// Screens open on demand inside the task, so voice tools carry no routing hints.
 	for _, tc := range []struct {
 		name, arguments string
 	}{
-		{"start_task", `{"instruction":"Browse","needs_browser":"true"}`},
-		{"start_task", `{"instruction":"Browse","needs_browser":true,"needs_screen":true}`},
-		{"get_context", `{"needs_browser":true}`},
-		{"get_task_status", `{"needs_browser":false}`},
-		{"cancel_task", `{"needs_browser":true}`},
+		{"start_task", `{"instruction":"Browse","needs_browser":true}`},
+		{"start_task", `{"instruction":"Look","needs_screen":true}`},
+		{"get_context", `{"instruction":"Read"}`},
 		{"steer_task", `{"instruction":"Continue","needs_browser":true}`},
 	} {
 		t.Run(tc.name+tc.arguments, func(t *testing.T) {
 			if _, err := parseConversationTool(agent.VoiceRealtimeEvent{CallID: "browser", Name: tc.name, Arguments: tc.arguments}); err == nil {
-				t.Fatal("accepted invalid browser routing arguments")
+				t.Fatal("accepted unexpected voice tool arguments")
 			}
 		})
 	}
-	for _, args := range []string{`{"instruction":"Organize files"}`, `{"instruction":"Organize files","needs_browser":false}`} {
-		tool, err := parseConversationTool(agent.VoiceRealtimeEvent{CallID: "ordinary", Name: "start_task", Arguments: args})
-		if err != nil || tool.NeedsBrowser || tool.NeedsScreen {
-			t.Fatalf("ordinary task routing changed: %+v %v", tool, err)
-		}
+	tool, err := parseConversationTool(agent.VoiceRealtimeEvent{CallID: "ordinary", Name: "start_task", Arguments: `{"instruction":"Organize files"}`})
+	if err != nil || tool.Instruction != "Organize files" {
+		t.Fatalf("ordinary task changed: %+v %v", tool, err)
 	}
 }
 

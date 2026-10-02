@@ -1,5 +1,5 @@
 import type { AppRequest } from "@/features/agents";
-import type { AiArtifact } from "@/features/ai-surface/types";
+import type { AiArtifact, ScreenRequest } from "@/features/ai-surface/types";
 import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask" | "action";
@@ -135,6 +135,8 @@ export interface GlobalAiMessage {
   action?: GlobalAiActionProposal;
   /** Something the agent needs from the user: connect an app or approve an action. */
   appRequest?: AppRequest;
+  /** A screen the agent asked for; Misty continues once it opens. */
+  screenRequest?: ScreenRequest;
   /** Set on turns Misty started itself rather than the person typing them. */
   source?: "scheduled_task";
 }

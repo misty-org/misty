@@ -294,7 +294,6 @@ describe("Clicky capture ordering and shared entry points", () => {
           callId: "screen",
           key: "voice-screen:call",
           instruction: "What is on my screen?",
-          needsScreen: true,
           invocationId: "",
         },
         "conversation",
@@ -309,11 +308,12 @@ describe("Clicky capture ordering and shared entry points", () => {
     await waitFor(() =>
       expect(useCompanionState.getState().presentation.error).toContain("answer is saved"),
     );
+    // Voice delegation captures nothing up front, so there is no point to show.
     expect(useCompanionState.getState().presentation).toMatchObject({
       visible: true,
       phase: "idle",
-      point: { x: -1280, y: 720, displayId: 1 },
     });
+    expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
     await act(async () => companionControl({ kind: "retry" }));
     expect(mocks.speech).toHaveBeenCalledTimes(2);
     expect(mocks.speech.mock.calls.every(([id]) => id === "completed-invocation")).toBe(true);
@@ -334,9 +334,10 @@ describe("Clicky capture ordering and shared entry points", () => {
     );
     const view = await mounted();
     const request = useCompanionState.getState().submit!({
-      prompt: "Explain this screen",
-      attachments: [attachment],
+      prompt: "Continue the request above.",
       conversationId: "conversation",
+      look: true,
+      continuation: true,
     }).catch((error) => error);
     await waitFor(() => expect(finish).toBeTypeOf("function"));
     await act(async () => companionControl({ kind: "stop" }));
@@ -354,7 +355,7 @@ describe("Clicky capture ordering and shared entry points", () => {
     view.unmount();
   });
 
-  it("attachment follow-ups acquire a new capture in the same controller", async () => {
+  it("captures displays only when the task asks to look", async () => {
     mocks.submit.mockImplementation(async () => {
       mocks.state.invocationId = "typed";
       mocks.state.working = true;
@@ -367,15 +368,25 @@ describe("Clicky capture ordering and shared entry points", () => {
         conversationId: "conversation",
       }),
     );
-    expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 2 });
-    expect(mocks.submit).toHaveBeenCalledWith(
-      "Explain my screen",
-      [attachment],
+    expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
+    mocks.state.working = false;
+    await act(async () =>
+      useCompanionState.getState().submit!({
+        prompt: "Continue the request above.",
+        conversationId: "conversation",
+        look: true,
+        continuation: true,
+      }),
+    );
+    expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 3 });
+    expect(mocks.submit).toHaveBeenLastCalledWith(
+      "Continue the request above.",
+      [],
       undefined,
       "workspace",
       [],
       { conversationId: "conversation", context: [] },
-      expect.objectContaining({ turn: 2, displayCaptures: [] }),
+      expect.objectContaining({ turn: 3, continuation: true, executionMode: "user" }),
     );
     expect(useCompanionState.getState().presentation.phase).toBe("processing");
     view.unmount();
@@ -430,7 +441,7 @@ it("sends and completes plain text while the realtime provider is unavailable", 
     "workspace",
     [],
     { conversationId: "conversation", context: [] },
-    expect.objectContaining({ executionMode: "user", displayCaptures: [] }),
+    expect.objectContaining({ executionMode: "user" }),
   );
   expect(mocks.conversationOpen).not.toHaveBeenCalled();
   expect(mocks.conversationCommit).not.toHaveBeenCalled();
@@ -458,38 +469,40 @@ it("sends and completes plain text while the realtime provider is unavailable", 
   view.unmount();
 });
 
-it.each([
-  ["user", "team"],
-  ["agent", "agent"],
-  ["team", "team"],
-] as const)("routes typed web work from %s to %s without realtime", async (selected, expected) => {
-  mocks.state.executionMode = selected;
-  mocks.submit.mockImplementation(async () => {
-    mocks.state.invocationId = "browser-task";
-    mocks.state.working = true;
-  });
-  const view = await mounted();
-  await act(async () =>
-    useCompanionState.getState().submit!({
-      prompt: "can you open instagram on the browser, find a person called Stone",
-      conversationId: "conversation",
-    }),
-  );
-  expect(mocks.submit).toHaveBeenCalledWith(
-    expect.stringContaining("open instagram"),
-    [],
-    undefined,
-    "workspace",
-    [],
-    { conversationId: "conversation", context: [] },
-    expect.objectContaining({ executionMode: expected, displayCaptures: [] }),
-  );
-  expect(mocks.conversationOpen).not.toHaveBeenCalled();
-  expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(false);
-  view.unmount();
-});
+it.each(["user", "agent", "team"] as const)(
+  "sends typed web work unchanged in user mode after a %s task",
+  async (previous) => {
+    mocks.state.executionMode = previous;
+    mocks.submit.mockImplementation(async () => {
+      mocks.state.invocationId = "browser-task";
+      mocks.state.working = true;
+    });
+    const view = await mounted();
+    await act(async () =>
+      useCompanionState.getState().submit!({
+        prompt: "can you open instagram on the browser, find a person called Stone",
+        conversationId: "conversation",
+      }),
+    );
+    // The task opens a screen itself (screen_open) if it needs one.
+    expect(mocks.submit).toHaveBeenCalledWith(
+      expect.stringContaining("open instagram"),
+      [],
+      undefined,
+      "workspace",
+      [],
+      { conversationId: "conversation", context: [] },
+      expect.objectContaining({ executionMode: "user" }),
+    );
+    expect(mocks.conversationOpen).not.toHaveBeenCalled();
+    expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(
+      false,
+    );
+    view.unmount();
+  },
+);
 
-it("submits a typed screen question through the text runtime without realtime", async () => {
+it("sends a typed screen question without capturing the screen up front", async () => {
   mocks.submit.mockImplementation(async () => {
     mocks.state.invocationId = "screen-task";
     mocks.state.working = true;
@@ -501,7 +514,7 @@ it("submits a typed screen question through the text runtime without realtime", 
       conversationId: "conversation",
     }),
   );
-  expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 2 });
+  expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
   expect(mocks.submit).toHaveBeenCalledOnce();
   expect(mocks.conversationOpen).not.toHaveBeenCalled();
   view.unmount();

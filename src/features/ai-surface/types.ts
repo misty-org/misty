@@ -1,5 +1,19 @@
 import type { DisplayCapture } from "@/features/agents";
 import type { AppRequest } from "@/features/agents";
+
+/**
+ * A run that needs a screen asks for one and ends its response. The desktop
+ * opens it where the account setting says, then continues the conversation.
+ */
+export interface ScreenRequest {
+  kind: "open" | "look";
+  url?: string;
+  reason: string;
+  location: "separate" | "window" | "ask";
+  /** Client progress: waiting for a choice, opening, or done. */
+  state?: "pending" | "opening" | "opened" | "declined" | "failed";
+  error?: string;
+}
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
@@ -276,6 +290,11 @@ export type AiInvocationEvent =
       id: string;
       type: "app.request";
       appRequest: AppRequest;
+    }
+  | {
+      id: string;
+      type: "screen.request";
+      screenRequest: ScreenRequest;
     }
   | {
       id: string;

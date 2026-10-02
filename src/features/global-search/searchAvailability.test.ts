@@ -7,17 +7,17 @@ const reset = () => {
   useMistyStore.setState({
     panel: "closed",
     executionMode: "user",
+    working: false,
     selectedAgentId: "",
-    executionModeByAgent: {},
   });
   useGlobalSearchStore.getState().closePanel();
 };
 beforeEach(reset);
 afterEach(reset);
 it.each(["openPanel", "activateLauncher", "togglePanel"] as const)(
-  "blocks %s in agent mode",
+  "blocks %s while a screen task runs",
   (entry) => {
-    useMistyStore.setState({ panel: "answer", executionMode: "agent" });
+    useMistyStore.setState({ panel: "answer", executionMode: "agent", working: true });
     useGlobalSearchStore.getState()[entry]();
     expect(useGlobalSearchStore.getState().panel).toBe("closed");
   },
@@ -40,7 +40,12 @@ it("blocks search while an agent task is paused even if chat is closed", () => {
   expect(useGlobalSearchStore.getState().panel).toBe("closed");
 });
 it("allows search again after leaving the agent overlay", () => {
-  useMistyStore.setState({ panel: "closed", executionMode: "agent" });
+  useMistyStore.setState({ panel: "closed", executionMode: "agent", working: true });
+  useGlobalSearchStore.getState().openPanel();
+  expect(useGlobalSearchStore.getState().panel).toBe("results");
+});
+it("keeps search available once a screen task finishes", () => {
+  useMistyStore.setState({ panel: "answer", executionMode: "agent", working: false });
   useGlobalSearchStore.getState().openPanel();
   expect(useGlobalSearchStore.getState().panel).toBe("results");
 });

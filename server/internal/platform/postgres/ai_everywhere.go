@@ -54,11 +54,13 @@ type AIUserSettings struct {
 	MemoryEnabled          bool `json:"memory_enabled"`
 	// AppActionsAsk pauses sends, shares, deletes and payments in connected
 	// apps until the user approves them in chat.
-	AppActionsAsk bool      `json:"app_actions_ask"`
-	RetentionDays int       `json:"retention_days"`
-	PurgeState    string    `json:"purge_state"`
-	DisabledAt    time.Time `json:"disabled_at,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	AppActionsAsk bool `json:"app_actions_ask"`
+	// ScreenLocation is where agents open a screen: separate, window or ask.
+	ScreenLocation string    `json:"screen_location"`
+	RetentionDays  int       `json:"retention_days"`
+	PurgeState     string    `json:"purge_state"`
+	DisabledAt     time.Time `json:"disabled_at,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type AISurfacePreference struct {
@@ -73,13 +75,13 @@ type AISurfacePreference struct {
 }
 
 func (db *Database) AISettings(ctx context.Context, userID string) (AIUserSettings, []AISurfacePreference, error) {
-	settings := AIUserSettings{Enabled: true, CursorCompanionEnabled: true, MemoryEnabled: true, AppActionsAsk: true, RetentionDays: 30, PurgeState: "none"}
+	settings := AIUserSettings{Enabled: true, CursorCompanionEnabled: true, MemoryEnabled: true, AppActionsAsk: true, ScreenLocation: "separate", RetentionDays: 30, PurgeState: "none"}
 	preferences := []AISurfacePreference{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		var disabledAt sql.NullTime
 		err := tx.QueryRowContext(ctx, `
-			SELECT enabled,cursor_companion_enabled,memory_enabled,app_actions_ask,retention_days,purge_state,disabled_at,updated_at FROM ai_user_settings WHERE user_id=$1
-		`, userID).Scan(&settings.Enabled, &settings.CursorCompanionEnabled, &settings.MemoryEnabled, &settings.AppActionsAsk, &settings.RetentionDays, &settings.PurgeState, &disabledAt, &settings.UpdatedAt)
+			SELECT enabled,cursor_companion_enabled,memory_enabled,app_actions_ask,screen_location,retention_days,purge_state,disabled_at,updated_at FROM ai_user_settings WHERE user_id=$1
+		`, userID).Scan(&settings.Enabled, &settings.CursorCompanionEnabled, &settings.MemoryEnabled, &settings.AppActionsAsk, &settings.ScreenLocation, &settings.RetentionDays, &settings.PurgeState, &disabledAt, &settings.UpdatedAt)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
@@ -114,6 +116,18 @@ func (db *Database) SetAIAppActionsAsk(ctx context.Context, userID string, ask b
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO ai_user_settings(user_id,app_actions_ask) VALUES($1,$2)
 			ON CONFLICT(user_id) DO UPDATE SET app_actions_ask=EXCLUDED.app_actions_ask,updated_at=NOW()`, userID, ask)
+		return err
+	})
+}
+
+// SetAIScreenLocation changes only where agents open a screen.
+func (db *Database) SetAIScreenLocation(ctx context.Context, userID, location string) error {
+	if location != "separate" && location != "window" && location != "ask" {
+		return ErrSpaceInvalid
+	}
+	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO ai_user_settings(user_id,screen_location) VALUES($1,$2)
+			ON CONFLICT(user_id) DO UPDATE SET screen_location=EXCLUDED.screen_location,updated_at=NOW()`, userID, location)
 		return err
 	})
 }

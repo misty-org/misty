@@ -23,7 +23,7 @@ func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIIn
 // aiInvocationConnectedTools are the user's connected apps, plus an agent's
 // MCP connectors.
 func (s *SpacesService) aiInvocationConnectedTools(ctx context.Context, record *db.AIInvocationRecord, agentID string) []agenttools.Registration {
-	registrations := s.appsToolRegistrations()
+	registrations := append(s.appsToolRegistrations(), s.screenToolRegistrations(record)...)
 	if agentID == "" {
 		return registrations
 	}
