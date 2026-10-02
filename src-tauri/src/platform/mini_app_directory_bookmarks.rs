@@ -27,7 +27,8 @@ impl Vault for OsVault {
         crate::infra::credential_store::load(SERVICE, key).map_err(|error| error.to_string())
     }
     fn store(&self, key: &str, value: &str) -> Result<(), String> {
-        crate::infra::credential_store::store(SERVICE, key, value).map_err(|error| error.to_string())
+        crate::infra::credential_store::store(SERVICE, key, value)
+            .map_err(|error| error.to_string())
     }
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -690,7 +691,9 @@ mod tests {
         );
         assert!(!root.path().join("project/restored-by-child.txt").exists());
         crate::infra::credential_store::delete(SERVICE, &owner).unwrap();
-        assert!(crate::infra::credential_store::load(SERVICE, &owner).unwrap().is_none());
+        assert!(crate::infra::credential_store::load(SERVICE, &owner)
+            .unwrap()
+            .is_none());
     }
     #[test]
     fn bookmark_child_process() {

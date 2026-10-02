@@ -40,7 +40,13 @@ async fn create_source(
         "scopeId": id, "x": 0, "y": 60, "width": 800, "height": 550,
     }))
     .map_err(|error| error.to_string())?;
-    browser_webview_create(app.get_webview("main").ok_or("Missing main view")?,app.clone(), app.state::<BrowserSessionState>(), request).await?;
+    browser_webview_create(
+        app.get_webview("main").ok_or("Missing main view")?,
+        app.clone(),
+        app.state::<BrowserSessionState>(),
+        request,
+    )
+    .await?;
     wait_for("source fixture load", || async {
         eval(
             app,
@@ -66,14 +72,44 @@ fn children(app: &AppHandle, id: &str) -> Vec<String> {
         .collect()
 }
 async fn open_popup(app: &AppHandle, id: &str, url: &str) -> Result<String, String> {
-    let before = app.state::<BrowserSessionState>().pending_popups.lock().unwrap().clone();
-    eval(app, id, &format!("window.fixturePopup=window.open({url:?}, '_blank'); return '{{}}';")).await?;
+    let before = app
+        .state::<BrowserSessionState>()
+        .pending_popups
+        .lock()
+        .unwrap()
+        .clone();
+    eval(
+        app,
+        id,
+        &format!("window.fixturePopup=window.open({url:?}, '_blank'); return '{{}}';"),
+    )
+    .await?;
     wait_for("Browser popup handoff", || async {
-        app.state::<BrowserSessionState>().pending_popups.lock().unwrap().iter().any(|key| !before.contains(key))
-    }).await?;
-    let popup = app.state::<BrowserSessionState>().pending_popups.lock().unwrap().iter().find(|key| !before.contains(*key)).cloned().unwrap();
+        app.state::<BrowserSessionState>()
+            .pending_popups
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|key| !before.contains(key))
+    })
+    .await?;
+    let popup = app
+        .state::<BrowserSessionState>()
+        .pending_popups
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|key| !before.contains(*key))
+        .cloned()
+        .unwrap();
     let request = serde_json::from_value(json!({"id":popup,"url":"about:blank","scopeId":popup,"x":0,"y":60,"width":800,"height":550})).map_err(|e| e.to_string())?;
-    browser_webview_create(app.get_webview("main").ok_or("Missing main view")?,app.clone(), app.state::<BrowserSessionState>(), request).await?;
+    browser_webview_create(
+        app.get_webview("main").ok_or("Missing main view")?,
+        app.clone(),
+        app.state::<BrowserSessionState>(),
+        request,
+    )
+    .await?;
     Ok(popup)
 }
 fn close(app: &AppHandle, id: &str) -> Result<(), String> {
@@ -96,13 +132,23 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         .unwrap();
     // A second loopback port is a real different origin without relying on
     // localhost DNS/IPv6 or a third-party login page's changing behavior.
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| e.to_string())?;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .map_err(|e| e.to_string())?;
     let mut auth = source.clone();
-    auth.set_port(Some(listener.local_addr().map_err(|e| e.to_string())?.port())).unwrap();
+    auth.set_port(Some(
+        listener.local_addr().map_err(|e| e.to_string())?.port(),
+    ))
+    .unwrap();
     let auth_server = tokio::spawn(async move {
-        let router = axum::Router::new().route("/cli/tasks/browser-oauth-popup-fixture.html", axum::routing::get(|| async {
-            axum::response::Html(include_str!("../../../cli/tasks/browser-oauth-popup-fixture.html"))
-        }));
+        let router = axum::Router::new().route(
+            "/cli/tasks/browser-oauth-popup-fixture.html",
+            axum::routing::get(|| async {
+                axum::response::Html(include_str!(
+                    "../../../cli/tasks/browser-oauth-popup-fixture.html"
+                ))
+            }),
+        );
         let _ = axum::serve(listener, router).await;
     });
     let count = Arc::new(AtomicUsize::new(0));
@@ -187,11 +233,20 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
 }
 
 /// The signed provider harness uses the same popup lifecycle without creating a Browser tab.
-pub(crate) async fn provider_popup_state(app: &AppHandle, id: &str, dismiss: bool) -> Result<Value, String> {
-    let Some(popup) = children(app, id).first().cloned() else { return Ok(Value::Null); };
+pub(crate) async fn provider_popup_state(
+    app: &AppHandle,
+    id: &str,
+    dismiss: bool,
+) -> Result<Value, String> {
+    let Some(popup) = children(app, id).first().cloned() else {
+        return Ok(Value::Null);
+    };
     if dismiss {
         eval(app, &popup, "window.close(); return '{}';").await?;
-        wait_for("provider popup dismissal", || async { children(app, id).is_empty() }).await?;
+        wait_for("provider popup dismissal", || async {
+            children(app, id).is_empty()
+        })
+        .await?;
         return Ok(json!({"closed": true}));
     }
     eval(app, &popup, "return JSON.stringify({marker:localStorage.getItem('misty-provider-probe'),opener:!!window.opener,origin:location.origin});").await

@@ -113,7 +113,6 @@ impl SettingsService {
     }
 }
 
-
 /// Sites whose page state is never captured by default (banking, payment,
 /// health). Users edit this list in Settings → Privacy.
 const DEFAULT_PAGE_STATE_EXCLUSIONS: &str = "paypal.com\nstripe.com\nchase.com\nbankofamerica.com\nwellsfargo.com\nciti.com\ncapitalone.com\namex.com\nschwab.com\nfidelity.com\nvanguard.com\ncoinbase.com\nmychart.org\nkp.org\nirs.gov\nssa.gov";
@@ -281,7 +280,10 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("anonymous_error_reporting_enabled", json!(false)),
             ("page_state_restore", json!(true)),
             ("page_state_agent_restore", json!(true)),
-            ("page_state_excluded_sites", json!(DEFAULT_PAGE_STATE_EXCLUSIONS)),
+            (
+                "page_state_excluded_sites",
+                json!(DEFAULT_PAGE_STATE_EXCLUSIONS),
+            ),
         ],
     );
     changed |= ensure_section_defaults(

@@ -2,6 +2,7 @@ mod build;
 mod config;
 mod metadata;
 mod model;
+mod preflight;
 mod state;
 mod verification;
 
@@ -12,6 +13,7 @@ use std::{
 
 use anyhow::{bail, Result};
 use chrono::Utc;
+use sha2::{Digest, Sha256};
 
 use crate::{
     artifacts, checks,
@@ -23,20 +25,30 @@ use model::{
     WINDOWS_PLATFORM,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ReleaseOs {
+    Macos,
+    Windows,
+}
+
+pub fn check(workspace: &Workspace) -> Result<()> {
+    preflight::check(workspace)
+}
+
 pub fn start(
     workspace: &Workspace,
     raw_version: &str,
     dry_run: bool,
-    no_macos: bool,
-    no_windows: bool,
+    os: &[ReleaseOs],
 ) -> Result<()> {
     workspace.validate()?;
     let version = state::normalize_version(raw_version)?;
-    let platforms = selected_platforms(no_macos, no_windows)?;
+    let platforms = selected_platforms(os)?;
     state::verify_versions(workspace, &version)?;
+    preflight::check(workspace)?;
     state::require_release_checkout(workspace, !dry_run)?;
     if !dry_run {
-        checks::app(workspace)?;
+        checks::release(workspace)?;
     }
     let config = config::build()?;
     let config_bytes = serde_json::to_vec_pretty(&config)?;
@@ -54,6 +66,7 @@ pub fn start(
         config_sha256: artifacts::sha256(&config_path)?,
         created_at: Utc::now(),
         platforms,
+        build_environment: config::public_environment()?,
     };
     let manifest_path = root.join(RELEASE_MANIFEST_NAME);
     manifest.write(&manifest_path)?;
@@ -70,26 +83,33 @@ pub fn start(
 }
 
 pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<()> {
+    preflight::check(workspace)?;
     let version = state::normalize_version(raw_version)?;
     let manifest = state::load_manifest(workspace, &version, !dry_run)?;
     state::verify_build_identity(workspace, &manifest)?;
     let platform = build::current_platform()?;
     require_selected_platform(&manifest, platform)?;
+    let public_environment = config::public_environment()?;
+    if manifest.build_environment != public_environment {
+        bail!("release API/website configuration differs from the release-start manifest");
+    }
     let config_path = state::release_root(workspace, &version).join("tauri.release.conf.json");
     let config = config::build()?;
-    fs::write(
-        &config_path,
-        format!("{}\n", serde_json::to_string_pretty(&config)?),
-    )?;
-    if artifacts::sha256(&config_path)? != manifest.config_sha256 {
+    let bytes = format!("{}\n", serde_json::to_string_pretty(&config)?);
+    if format!("{:x}", Sha256::digest(bytes.as_bytes())) != manifest.config_sha256 {
         bail!("release configuration differs from the release-start manifest");
     }
     if dry_run {
         println!("Dry run: release identity and {platform} configuration are valid.");
         return Ok(());
     }
+    fs::write(&config_path, bytes)?;
 
     CommandSpec::new(npm()).args(["ci"]).run(&workspace.misty)?;
+    checks::app(workspace)?;
+    for (name, value) in public_environment {
+        std::env::set_var(name, value);
+    }
     CommandSpec::new(npm())
         .args(["run", "build:desktop"])
         .run(&workspace.misty)?;
@@ -114,6 +134,7 @@ pub fn upload(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result
     }
     let parsed = PlatformManifest::read(&platform_manifest)?;
     state::verify_platform_identity(&manifest, &parsed)?;
+    verification::downloaded_files(&platform_root, &parsed)?;
     let mut files = artifacts::files_under(&platform_root)?;
     let shared = state::release_root(workspace, &version).join("shared");
     if shared.is_dir() {
@@ -195,7 +216,7 @@ pub fn publish(workspace: &Workspace, raw_version: &str, yes: bool, dry_run: boo
         return Ok(());
     }
     if !yes {
-        print!("Type `publish {version}` to make this prerelease public: ");
+        print!("Type `publish {version}` to make this release public: ");
         io::stdout().flush()?;
         let mut response = String::new();
         io::stdin().read_line(&mut response)?;
@@ -212,7 +233,11 @@ pub fn publish(workspace: &Workspace, raw_version: &str, yes: bool, dry_run: boo
             "--repo",
             PUBLIC_REPOSITORY,
             "--draft=false",
-            "--prerelease",
+            // Installed apps poll releases/latest/download/latest.json, and
+            // GitHub's "latest" skips prereleases. Every published build,
+            // betas included, must become the latest release to reach users.
+            "--prerelease=false",
+            "--latest",
         ])
         .run(&workspace.misty)?;
     println!("Published Misty {version}.");
@@ -275,16 +300,16 @@ fn finalize_public_release(workspace: &Workspace, version: &str) -> Result<()> {
     Ok(())
 }
 
-fn selected_platforms(no_macos: bool, no_windows: bool) -> Result<Vec<String>> {
+fn selected_platforms(os: &[ReleaseOs]) -> Result<Vec<String>> {
+    if os.is_empty() {
+        return Ok(vec![build::current_platform()?.to_owned()]);
+    }
     let mut platforms = Vec::new();
-    if !no_macos {
+    if os.contains(&ReleaseOs::Macos) {
         platforms.push(MACOS_PLATFORM.to_owned());
     }
-    if !no_windows {
+    if os.contains(&ReleaseOs::Windows) {
         platforms.push(WINDOWS_PLATFORM.to_owned());
-    }
-    if platforms.is_empty() {
-        bail!("release start cannot exclude both macOS and Windows");
     }
     Ok(platforms)
 }
@@ -305,17 +330,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn platform_selection_defaults_to_both() {
-        assert_eq!(
-            selected_platforms(false, false).unwrap(),
-            [MACOS_PLATFORM, WINDOWS_PLATFORM]
-        );
+    fn platform_selection_defaults_to_host() {
+        let selected = selected_platforms(&[]);
+        if cfg!(target_os = "macos") {
+            assert_eq!(selected.unwrap(), [MACOS_PLATFORM]);
+        } else if cfg!(windows) {
+            assert_eq!(selected.unwrap(), [WINDOWS_PLATFORM]);
+        } else {
+            assert!(selected.is_err());
+        }
     }
 
     #[test]
-    fn platform_selection_can_exclude_either_platform() {
-        assert_eq!(selected_platforms(false, true).unwrap(), [MACOS_PLATFORM]);
-        assert_eq!(selected_platforms(true, false).unwrap(), [WINDOWS_PLATFORM]);
-        assert!(selected_platforms(true, true).is_err());
+    fn platform_selection_accepts_explicit_platforms_without_duplicates() {
+        assert_eq!(
+            selected_platforms(&[ReleaseOs::Macos]).unwrap(),
+            [MACOS_PLATFORM]
+        );
+        assert_eq!(
+            selected_platforms(&[ReleaseOs::Windows]).unwrap(),
+            [WINDOWS_PLATFORM]
+        );
+        assert_eq!(
+            selected_platforms(&[ReleaseOs::Windows, ReleaseOs::Macos, ReleaseOs::Windows])
+                .unwrap(),
+            [MACOS_PLATFORM, WINDOWS_PLATFORM]
+        );
     }
 }

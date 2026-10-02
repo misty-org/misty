@@ -28,28 +28,11 @@ function historyTarget(tabId: string): { profileId?: string } | null {
   if (state.agentOwned || state.private || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
-
-/** A typed navigation is claimed by the tab's next recorded visit, after any redirects. */
-const TYPED_NAVIGATION_WINDOW_MS = 30_000;
 const typedNavigations = new Map<string, number>();
 
 /** Marks the tab's next visit as typed by the person, which ranks it higher in the address bar. */
 export function markBrowserNavigationTyped(tabId: string): void {
   typedNavigations.set(tabId, Date.now());
-}
-
-function claimTypedNavigation(tabId: string): boolean {
-  const markedAt = typedNavigations.get(tabId);
-  typedNavigations.delete(tabId);
-  return markedAt !== undefined && Date.now() - markedAt <= TYPED_NAVIGATION_WINDOW_MS;
-}
-
-export function recordBrowserVisit(tabId: string, url: string, title: string): void {
-  if (!/^https?:\/\//i.test(url)) return;
-  const typed = claimTypedNavigation(tabId);
-  const target = historyTarget(tabId);
-  if (!target) return;
-  void browserLibrary.recordVisit({ ...target, url, title, typed }).catch(() => undefined);
 }
 
 /** Removes a page from the tab's profile history. Private and agent tabs have none. */

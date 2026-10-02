@@ -51,21 +51,6 @@ export function deviceRows(session: NativeSyncView, ownerName?: string | null) {
     .sort((a, b) => Number(b.local) - Number(a.local) || a.name.localeCompare(b.name));
 }
 
-export function transferRate(
-  previous: { bytes: number; at: number } | null,
-  bytes: number,
-  at: number,
-) {
-  if (!previous || bytes < previous.bytes || at <= previous.at) return null;
-  return Math.max(0, ((bytes - previous.bytes) * 1000) / (at - previous.at));
-}
-export function formatRate(value: number | null) {
-  if (value === null) return "—";
-  if (value < 1024) return `${Math.round(value)} B/s`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB/s`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB/s`;
-}
-
 /** Use authoritative publisher identity, never presence or a viewed workspace’s name. */
 export function publishingDeviceId(session: NativeSyncView): string | null {
   if (session.sync)

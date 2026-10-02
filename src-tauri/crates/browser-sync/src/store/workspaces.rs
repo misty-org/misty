@@ -94,7 +94,9 @@ impl Desired {
         let mut remove = n.saturating_sub(self.changes.len().saturating_sub(tracked));
         self.changes.drain(..n);
         while remove > 0 {
-            let Some(first) = self.batches.first_mut() else { break };
+            let Some(first) = self.batches.first_mut() else {
+                break;
+            };
             if first.len <= remove {
                 remove -= first.len;
                 self.batches.remove(0);
@@ -108,7 +110,10 @@ impl Desired {
     /// Drops the oldest edit. A rejected op is retried without it, so one
     /// bad edit costs only itself, never the edits queued behind it.
     pub fn drop_first_batch(&mut self) {
-        let first = self.batches().first().map_or(0, |(_, changes)| changes.len());
+        let first = self
+            .batches()
+            .first()
+            .map_or(0, |(_, changes)| changes.len());
         self.drain_changes(first);
     }
 }
@@ -129,7 +134,12 @@ pub struct WorkspaceLocal {
 const RETIRED_KEPT: i64 = 16;
 
 impl Store {
-    pub(super) fn seal_workspace(&self, root: &VaultRoot, record: &str, value: &impl Serialize) -> Result<String> {
+    pub(super) fn seal_workspace(
+        &self,
+        root: &VaultRoot,
+        record: &str,
+        value: &impl Serialize,
+    ) -> Result<String> {
         let plain = zeroize::Zeroizing::new(serde_json::to_vec(value)?);
         Ok(serde_json::to_string(&root.seal_local(
             &self.scope,
@@ -208,7 +218,11 @@ impl Store {
             .unwrap_or(0))
     }
 
-    pub fn workspace_desired(&self, root: &VaultRoot, workspace_id: &str) -> Result<Option<Desired>> {
+    pub fn workspace_desired(
+        &self,
+        root: &VaultRoot,
+        workspace_id: &str,
+    ) -> Result<Option<Desired>> {
         let sealed: Option<String> = self
             .connection
             .query_row(
@@ -303,11 +317,16 @@ impl Store {
 
     /// Moves a workspace's unpublished desired state out of the publishing path,
     /// sealed as before, so it is kept for recovery but never replayed.
-    pub fn retire_workspace_desired(&mut self, root: &VaultRoot, workspace_id: &str) -> Result<bool> {
+    pub fn retire_workspace_desired(
+        &mut self,
+        root: &VaultRoot,
+        workspace_id: &str,
+    ) -> Result<bool> {
         let Some(desired) = self.workspace_desired(root, workspace_id)? else {
             return Ok(false);
         };
-        let sealed = self.seal_workspace(root, &format!("tree-desired:{workspace_id}"), &desired)?;
+        let sealed =
+            self.seal_workspace(root, &format!("tree-desired:{workspace_id}"), &desired)?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_millis() as i64);
@@ -319,7 +338,10 @@ impl Store {
             params![workspace_id, now, sealed],
         )?;
         tx.execute("DELETE FROM sync_workspace_retired WHERE id NOT IN (SELECT id FROM sync_workspace_retired ORDER BY id DESC LIMIT ?1)", [RETIRED_KEPT])?;
-        tx.execute("DELETE FROM sync_workspace_desired WHERE workspace_id=?1", [workspace_id])?;
+        tx.execute(
+            "DELETE FROM sync_workspace_desired WHERE workspace_id=?1",
+            [workspace_id],
+        )?;
         tx.commit()?;
         Ok(true)
     }
@@ -340,9 +362,9 @@ impl Store {
         root: &VaultRoot,
         workspace_id: &str,
     ) -> Result<Vec<Desired>> {
-        let mut query = self
-            .connection
-            .prepare("SELECT desired FROM sync_workspace_retired WHERE workspace_id=?1 ORDER BY id")?;
+        let mut query = self.connection.prepare(
+            "SELECT desired FROM sync_workspace_retired WHERE workspace_id=?1 ORDER BY id",
+        )?;
         let rows = query.query_map([workspace_id], |r| r.get::<_, String>(0))?;
         rows.map(|row| self.open_workspace(root, &format!("tree-desired:{workspace_id}"), &row?))
             .collect()
@@ -361,8 +383,10 @@ impl Store {
     }
 
     pub fn clear_workspace_desired(&mut self, workspace_id: &str) -> Result<()> {
-        self.connection
-            .execute("DELETE FROM sync_workspace_desired WHERE workspace_id=?1", [workspace_id])?;
+        self.connection.execute(
+            "DELETE FROM sync_workspace_desired WHERE workspace_id=?1",
+            [workspace_id],
+        )?;
         Ok(())
     }
 

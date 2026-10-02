@@ -344,12 +344,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       updateBrowserView: (tabId, patch) => {
         set((current) =>
           mapAllWorkspaceWindowViews(current, (tab) => {
-            if (
-              tab.id !== tabId ||
-              (tab.surfaceId !== "browser" &&
-                !(tab.surfaceId === "official-app" && tab.groupKey === "app:browser"))
-            )
-              return tab;
+            if (tab.id !== tabId || tab.surfaceId !== "browser") return tab;
             const { title, ...statePatch } = patch;
             const existing = parseBrowserViewState(tab.state);
             const nextUrl = statePatch.url ?? existing.url;

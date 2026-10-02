@@ -1,14 +1,4 @@
 import type { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
-import type { Folder } from "lucide-react";
-
-export type DesktopNavItem = {
-  id: string;
-  label: string;
-  path: string;
-  icon: typeof Folder;
-  exact?: boolean;
-  active?: (pathname: string) => boolean;
-};
 
 export type WindowBounds = {
   position: PhysicalPosition;

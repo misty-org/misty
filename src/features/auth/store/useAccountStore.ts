@@ -1,11 +1,6 @@
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
-import type {
-  AccountAuthUser,
-  AccountHandoffPath,
-  AccountMeResponse,
-  LoginResponse,
-} from "@/api/account/types";
+import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
 import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
 import { analytics } from "@/telemetry/client";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
@@ -110,10 +105,6 @@ export function accountFetchMe(): Promise<AccountMeResponse> {
   return accountApi.me();
 }
 
-export function accountCreateHandoffUrl(path?: AccountHandoffPath): Promise<{ url: string }> {
-  return accountApi.handoff(path);
-}
-
 export function accountFetchAvatar(): Promise<Blob> {
   return accountApi.avatar();
 }
@@ -123,10 +114,6 @@ export function accountUpdateTelemetryPreferences(
   errorReportingEnabled: boolean,
 ): Promise<void> {
   return accountApi.updateTelemetry(analyticsEnabled, errorReportingEnabled);
-}
-
-export function resolveAccountApiBase(): Promise<string> {
-  return accountApi.resolveBase();
 }
 
 configureTelemetryPreferencesSync(accountUpdateTelemetryPreferences);

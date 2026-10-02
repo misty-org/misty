@@ -49,14 +49,20 @@ fn pending_writes_show_immediately_and_settle_on_the_servers_answer() {
     let titles: Vec<_> = c.view().iter().map(|r| r.fields["title"].clone()).collect();
     assert_eq!(titles, [json!("Renamed"), json!("New")]);
     let out = c.outgoing();
-    assert_eq!(out.iter().map(|w| w.base_version).collect::<Vec<_>>(), [1, 0]);
+    assert_eq!(
+        out.iter().map(|w| w.base_version).collect::<Vec<_>>(),
+        [1, 0]
+    );
 
     // k1 lost to another device's edit at version 2: retried on it.
     c.answered(
         "k1",
         false,
         2,
-        Some(Confirmed { version: 2, record: Some(bookmark("b1", "Theirs")) }),
+        Some(Confirmed {
+            version: 2,
+            record: Some(bookmark("b1", "Theirs")),
+        }),
     );
     assert_eq!(c.outgoing()[0].base_version, 2);
     // k2 applied.

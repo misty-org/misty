@@ -8,7 +8,6 @@ use std::{
 };
 
 use percent_encoding::percent_decode_str;
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{

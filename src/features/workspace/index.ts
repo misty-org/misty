@@ -11,7 +11,6 @@ export * from "./routeSurface";
 export {
   activeMultiPanelTab,
   createMultiPanelStore,
-  destroyMultiPanelStore,
   multiPanelStoreForPane,
   useMultiPanelStore,
 } from "./useMultiPanelStore";

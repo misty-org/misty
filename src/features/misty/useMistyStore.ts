@@ -43,7 +43,7 @@ import {
 import { create } from "zustand";
 import { assertMistyAvailable } from "./availability";
 import { requestHostContext } from "./contextBridge";
-export { globalSearchContext } from "@/features/global-search/globalSearchContext";
+
 export type {
   GlobalSearchState,
   MistySubmissionPresentation,

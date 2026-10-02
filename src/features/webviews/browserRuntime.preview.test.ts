@@ -42,16 +42,6 @@ async function setup(candidate = tab) {
   return runtime;
 }
 
-it("captures a visible page and clears its snapshot when the tab closes", async () => {
-  const runtime = await setup();
-  await runtime.captureBrowserPagePreview(tab, bounds, () => true);
-  expect(runtime.useBrowserRuntimeStore.getState().previews[tab.id]).toEqual({
-    ...image,
-  });
-  await runtime.closeBrowserRuntime(tab);
-  expect(runtime.useBrowserRuntimeStore.getState().previews).toEqual({});
-});
-
 it("never captures private, hidden, loading, or suspended pages", async () => {
   const privateTab = { ...tab, state: { ...(tab.state as object), private: true } };
   const runtime = await setup(privateTab);

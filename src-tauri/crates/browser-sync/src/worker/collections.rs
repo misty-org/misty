@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::*;
 use crate::{
-    document::{Change, ViewRecord},
     collections::{self, wire, Collection, Confirmed, BOOKMARKS, COLLECTIONS},
+    document::{Change, ViewRecord},
     workspace::model::collection_of,
 };
 
@@ -59,7 +59,10 @@ impl CollectionSync {
     }
 
     fn busy(&self, collection: &str) -> bool {
-        self.pulling.values().chain(self.pushing.values()).any(|c| *c == collection)
+        self.pulling
+            .values()
+            .chain(self.pushing.values())
+            .any(|c| *c == collection)
     }
 }
 
@@ -74,12 +77,18 @@ where
             if self.collections.busy(collection) {
                 continue;
             }
-            let due = self.collections.due.get(collection).is_some_and(|at| *at <= now);
+            let due = self
+                .collections
+                .due
+                .get(collection)
+                .is_some_and(|at| *at <= now);
             let state = self.store.collection(&self.root, collection)?;
             if due {
                 self.collections.due.insert(collection, now + SAFETY_PULL);
                 let request_id = uuid::Uuid::new_v4().to_string();
-                self.collections.pulling.insert(request_id.clone(), collection);
+                self.collections
+                    .pulling
+                    .insert(request_id.clone(), collection);
                 socket
                     .send(&ClientFrame::RecordsPull {
                         request_id: &request_id,
@@ -111,7 +120,9 @@ where
                 });
             }
             let request_id = uuid::Uuid::new_v4().to_string();
-            self.collections.pushing.insert(request_id.clone(), collection);
+            self.collections
+                .pushing
+                .insert(request_id.clone(), collection);
             socket
                 .send(&ClientFrame::RecordsPush {
                     request_id: &request_id,
@@ -127,8 +138,15 @@ where
         let record = match &row.ciphertext {
             // A row that fails to open is skipped, never trusted.
             Some(sealed) => Some(
-                collections::open(&self.root, &self.scope, collection, &row.key, row.version, sealed)
-                    .ok()?,
+                collections::open(
+                    &self.root,
+                    &self.scope,
+                    collection,
+                    &row.key,
+                    row.version,
+                    sealed,
+                )
+                .ok()?,
             ),
             None => None,
         };
@@ -138,7 +156,11 @@ where
         })
     }
 
-    pub(super) fn records_listing(&mut self, request: Option<&str>, listing: wire::Listing) -> Result<()> {
+    pub(super) fn records_listing(
+        &mut self,
+        request: Option<&str>,
+        listing: wire::Listing,
+    ) -> Result<()> {
         let Some(collection) = request.and_then(|r| self.collections.pulling.remove(r)) else {
             return Ok(());
         };
@@ -196,7 +218,9 @@ where
     pub(super) fn records_failed(&mut self, request: Option<&str>) -> bool {
         let Some(request) = request else { return false };
         if let Some(collection) = self.collections.pulling.remove(request) {
-            self.collections.due.insert(collection, Instant::now() + HINT_DEBOUNCE);
+            self.collections
+                .due
+                .insert(collection, Instant::now() + HINT_DEBOUNCE);
             return true;
         }
         self.collections.pushing.remove(request).is_some()
@@ -244,7 +268,11 @@ where
         for change in changes {
             let (kind, id, record) = match change {
                 Change::Create { kind, id, fields } => {
-                    let record = ViewRecord { kind, id: id.clone(), fields };
+                    let record = ViewRecord {
+                        kind,
+                        id: id.clone(),
+                        fields,
+                    };
                     (kind, id, Some(record))
                 }
                 Change::Patch { kind, id, fields } => {
@@ -340,8 +368,14 @@ where
         let mut changes = Vec::with_capacity(writes.len());
         for (id, record) in writes {
             match record {
-                Some(record) if record.id == id && collection_of(record.kind) == Some(collection) => {
-                    changes.push(Change::Create { kind: record.kind, id, fields: record.fields });
+                Some(record)
+                    if record.id == id && collection_of(record.kind) == Some(collection) =>
+                {
+                    changes.push(Change::Create {
+                        kind: record.kind,
+                        id,
+                        fields: record.fields,
+                    });
                 }
                 Some(_) => return Err(Error::Invalid),
                 // Deleting what is not there is a no-op.
@@ -359,10 +393,16 @@ where
     /// on demand (`records_list`): too large to copy into every view.
     pub(super) fn collections_view(&self) -> Result<BTreeMap<String, Vec<ViewRecord>>> {
         let mut out = BTreeMap::new();
-        for collection in COLLECTIONS.into_iter().filter(|c| *c != collections::HISTORY) {
+        for collection in COLLECTIONS
+            .into_iter()
+            .filter(|c| *c != collections::HISTORY)
+        {
             let state = self.store.collection(&self.root, collection)?;
             if state.loaded || !state.pending.is_empty() {
-                out.insert(collection.to_owned(), self.collection_view(collection, &state)?);
+                out.insert(
+                    collection.to_owned(),
+                    self.collection_view(collection, &state)?,
+                );
             }
         }
         Ok(out)

@@ -5,8 +5,9 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   MenuItem,
+  MenuTrigger,
 } from "@/shared/ui";
-import { CheckSquare, ChevronDown, Notebook, Plus, Upload } from "lucide-react";
+import { CheckSquare, Notebook, Plus, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSpacesStore } from "../store/useSpacesStore";
 
@@ -26,18 +27,16 @@ export function SpaceCreateMenu({
   const base = `/spaces/${encodeURIComponent(space.id)}`;
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant={sidebar ? "outline" : "primary"}
-          size="sm"
-          justify={sidebar ? "start" : "center"}
-          className={sidebar ? "w-full" : "px-4"}
-        >
-          {sidebar ? <Plus /> : null}
-          {sidebar ? "New item" : "New"}
-          {!sidebar && <ChevronDown />}
-        </Button>
-      </DropdownMenuTrigger>
+      {sidebar ? (
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" justify="start" className="w-full">
+            <Plus />
+            New item
+          </Button>
+        </DropdownMenuTrigger>
+      ) : (
+        <MenuTrigger label="New" variant="primary" className="px-4" />
+      )}
       <DropdownMenuContent align={sidebar ? "start" : "end"}>
         <MenuItem
           icon={<Notebook />}

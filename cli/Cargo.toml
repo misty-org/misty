@@ -23,3 +23,8 @@ tempfile = "3.20.0"
 toml = "0.8.23"
 url = "2.5.4"
 walkdir = "2.5.0"
+
+# Match the desktop's development storage policy for this standalone tool.
+[profile.dev]
+debug = 1
+incremental = false

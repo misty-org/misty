@@ -13,10 +13,13 @@ use uuid::Uuid;
 use super::{
     codec::{self, Padding},
     model::{self, belongs_to_shared},
-    protocol::{content_hash, Slot, Workspace, WorkspaceClaim, WorkspaceDelta, WorkspaceOp, WorkspaceReceipt, WorkspaceSnapshot},
+    protocol::{
+        content_hash, Slot, Workspace, WorkspaceClaim, WorkspaceDelta, WorkspaceOp,
+        WorkspaceReceipt, WorkspaceSnapshot,
+    },
     seal::{self, Position},
     signin::is_signin_slot,
-    state::{WorkspaceState, Verifier},
+    state::{Verifier, WorkspaceState},
 };
 use crate::{
     crypto::{DeviceKey, VaultRoot, VaultScope},
@@ -219,7 +222,11 @@ impl WorkspaceSync {
         self.local
             .following
             .as_deref()
-            .filter(|workspace| self.roster.iter().any(|t| !t.shared && t.workspace_id == *workspace))
+            .filter(|workspace| {
+                self.roster
+                    .iter()
+                    .any(|t| !t.shared && t.workspace_id == *workspace)
+            })
             .or_else(|| self.driving())
     }
 
@@ -235,7 +242,11 @@ impl WorkspaceSync {
     /// Shows and edits `workspace` on this machine, without taking its lease (that
     /// follows activity). Returns the watch changes for the connection.
     pub fn open(&mut self, store: &mut Store, workspace: &str) -> Result<Vec<Outgoing>> {
-        if !self.roster.iter().any(|t| !t.shared && t.workspace_id == workspace) {
+        if !self
+            .roster
+            .iter()
+            .any(|t| !t.shared && t.workspace_id == workspace)
+        {
             return Err(Error::Invalid);
         }
         self.follow(store, Some(workspace.to_owned()))?;
@@ -263,7 +274,8 @@ impl WorkspaceSync {
     /// verified copy (current or cached) to replay them against. Publishing
     /// still waits until the copy is current on this connection.
     pub fn writable(&self) -> bool {
-        self.on_workspace().is_some_and(|workspace| self.states.contains_key(workspace))
+        self.on_workspace()
+            .is_some_and(|workspace| self.states.contains_key(workspace))
     }
 
     /// Whether this machine may write the device's sign-in data: it holds the
@@ -473,12 +485,12 @@ impl WorkspaceSync {
                 self.follow(store, Some(workspace))?;
             }
         }
-        if self
-            .local
-            .following
-            .as_ref()
-            .is_some_and(|workspace| !self.roster.iter().any(|t| !t.shared && &t.workspace_id == workspace))
-        {
+        if self.local.following.as_ref().is_some_and(|workspace| {
+            !self
+                .roster
+                .iter()
+                .any(|t| !t.shared && &t.workspace_id == workspace)
+        }) {
             self.follow(store, None)?;
         }
         self.refresh_ready(store)?;
@@ -728,7 +740,9 @@ impl WorkspaceSync {
         workspace: &str,
         edit: impl FnOnce(&mut Desired),
     ) -> Result<()> {
-        let mut desired = store.workspace_desired(root, workspace)?.unwrap_or_default();
+        let mut desired = store
+            .workspace_desired(root, workspace)?
+            .unwrap_or_default();
         edit(&mut desired);
         store.set_workspace_desired(root, workspace, &desired)
     }
@@ -785,9 +799,15 @@ impl WorkspaceSync {
         plaintext: Option<Vec<u8>>,
     ) -> Result<()> {
         let workspace = self.writable_workspace()?;
-        let tab = model::node_id(&workspace, crate::document::entities::Kind::View, tab_record);
+        let tab = model::node_id(
+            &workspace,
+            crate::document::entities::Kind::View,
+            tab_record,
+        );
         // Keep write order: an in-flight op may already carry an older value.
-        self.queue(store, root, &workspace, |d| d.slots.push((tab, slot, plaintext)))
+        self.queue(store, root, &workspace, |d| {
+            d.slots.push((tab, slot, plaintext))
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -825,7 +845,11 @@ impl WorkspaceSync {
         slot: i16,
         reply: Reply<Option<Vec<u8>>>,
     ) -> Outgoing {
-        let tab = model::node_id(workspace_id, crate::document::entities::Kind::View, tab_record);
+        let tab = model::node_id(
+            workspace_id,
+            crate::document::entities::Kind::View,
+            tab_record,
+        );
         let request_id = Uuid::new_v4().to_string();
         self.slots.insert(
             request_id.clone(),
@@ -914,7 +938,9 @@ impl WorkspaceSync {
         for workspace in writable {
             // Sign-in writes need the lease; without it they would get the
             // whole op rejected. The holder publishes its own.
-            if workspace != self.shared_id && !(self.driving() == Some(workspace.as_str()) && self.lease_ready()) {
+            if workspace != self.shared_id
+                && !(self.driving() == Some(workspace.as_str()) && self.lease_ready())
+            {
                 self.drop_signin_writes(store, root, &workspace)?;
             }
             let Some(desired) = store.workspace_desired(root, &workspace)? else {
@@ -1070,7 +1096,9 @@ impl WorkspaceSync {
         }
         let mut pending = BTreeSet::new();
         for workspace in self.watch_targets() {
-            if self.inflight.contains_key(&workspace) || store.workspace_desired_exists(&workspace)? {
+            if self.inflight.contains_key(&workspace)
+                || store.workspace_desired_exists(&workspace)?
+            {
                 pending.insert(workspace);
             }
         }
@@ -1153,7 +1181,11 @@ fn tombstones(
 ) -> BTreeMap<(crate::document::entities::Kind, String), u64> {
     let mut out = previous.tombstones.clone();
     if remote {
-        let live: BTreeSet<_> = next.records.iter().map(|r| (r.kind, r.id.as_str())).collect();
+        let live: BTreeSet<_> = next
+            .records
+            .iter()
+            .map(|r| (r.kind, r.id.as_str()))
+            .collect();
         for r in &previous.records {
             if !live.contains(&(r.kind, r.id.as_str())) {
                 out.insert((r.kind, r.id.clone()), next.version);

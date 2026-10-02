@@ -15,11 +15,6 @@ export function fileStem(path: string) {
   );
 }
 
-export function primaryShortcutLabel(): string {
-  if (typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)) return "Cmd";
-  return "Ctrl";
-}
-
 export function selectedActionableEntryCount(
   pane: ReturnType<typeof useExplorerStore.getState>["panes"][string] | undefined,
 ): number {

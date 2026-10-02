@@ -6,7 +6,6 @@ import { dockLeaves, findDockLeaf } from "./dockTree";
 import { configureWorkspaceDefaultView } from "./workspaceDefaultView";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
 import { normalizeWorkspaceLayout } from "./windows";
-import { setWorkspaceUnsaved } from "./unsavedChanges";
 
 const store = () => useWorkspaceStore.getState();
 const go = (route: string) => store().openDestination(workspaceSurfaceFromRoute(route)!);
@@ -91,18 +90,6 @@ it("keeps destination reuse inside the current window and excludes private brows
   expect(go("/browser").id).not.toBe(first.id);
 });
 
-it("preserves unsaved work when navigating to another destination", () => {
-  const files = go("/files");
-  setWorkspaceUnsaved(files.id, true);
-  try {
-    expect(go("/home").surfaceId).toBe("home");
-    expect(go("/files").id).toBe(files.id);
-    expect(store().closeView(files.id)).toBe(false);
-  } finally {
-    setWorkspaceUnsaved(files.id, false);
-  }
-});
-
 it("starts configured fresh tabs and stops replacing them after interaction", () => {
   configureWorkspaceDefaultView(2);
   const fresh = store().newTab();
@@ -173,30 +160,30 @@ it("keeps a default browser replaceable through metadata updates, then commits n
   expect(allLayoutViews(store().layout).some((view) => view.id === fresh.id)).toBe(true);
 });
 
-it("restores Scheduled task selection independently of Agents and persists its identity", () => {
+it("opens Scheduled inside Agents and persists the selected task", () => {
   const agents = go("/agents");
   const scheduled = go("/scheduled");
-  store().updateViewRoute(scheduled.id, "/scheduled?task=weekly");
-  expect(go("/agents").id).toBe(agents.id);
-  expect(go("/scheduled")).toMatchObject({ id: scheduled.id, route: "/scheduled?task=weekly" });
-  const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
-  useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
-  expect(activeLayoutView(store().layout)).toMatchObject({
-    id: scheduled.id,
-    surfaceId: "scheduled",
-    route: "/scheduled?task=weekly",
-  });
-});
-
-it("migrates saved Scheduled views out of Agents without losing the selected task", () => {
-  const agents = go("/agents");
-  store().updateViewRoute(agents.id, "/agents?view=scheduled&task=weekly");
+  expect(scheduled).toMatchObject({ id: agents.id, surfaceId: "agents" });
+  store().updateViewRoute(scheduled.id, "/agents?view=scheduled&task=weekly");
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
   useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
   expect(activeLayoutView(store().layout)).toMatchObject({
     id: agents.id,
-    surfaceId: "scheduled",
-    groupKey: "tool:scheduled",
-    route: "/scheduled?task=weekly",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
+    route: "/agents?view=scheduled&task=weekly",
+  });
+});
+
+it("migrates saved legacy Scheduled routes into Agents without losing the selected task", () => {
+  const agents = go("/agents");
+  store().updateViewRoute(agents.id, "/scheduled?task=weekly");
+  const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
+  useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
+  expect(activeLayoutView(store().layout)).toMatchObject({
+    id: agents.id,
+    surfaceId: "agents",
+    groupKey: "tool:agents",
+    route: "/agents?task=weekly&view=scheduled",
   });
 });

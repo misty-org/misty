@@ -2,12 +2,12 @@
 #[cfg(not(target_os = "macos"))]
 #[path = "document_intelligence_platform.rs"]
 mod bundled;
+#[cfg(target_os = "macos")]
+pub(crate) use crate::platform::mini_app::permissions::document_processing::ServiceLease;
 #[cfg(not(target_os = "macos"))]
 pub use bundled::*;
 #[cfg(target_os = "macos")]
 use serde::{Deserialize, Serialize};
-#[cfg(target_os = "macos")]
-pub(crate) use crate::platform::mini_app::permissions::document_processing::ServiceLease;
 #[cfg(target_os = "macos")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

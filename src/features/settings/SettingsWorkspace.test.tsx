@@ -95,7 +95,7 @@ vi.mock("@/features/files/workspace/search", async (importOriginal) => {
     useSearchStore,
   };
 });
-vi.mock("@/features/installer", () => ({
+vi.mock("@/features/native-session", () => ({
   InstallerCard: () => <div data-testid="installer-card" />,
 }));
 vi.mock("@/api/assistant/api", () => ({

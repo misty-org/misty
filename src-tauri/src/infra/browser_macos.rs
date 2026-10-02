@@ -131,8 +131,10 @@ pub(crate) async fn evaluate_isolated_javascript(
             };
             let view: &WKWebView = &*platform_webview.inner().cast();
             let world = WORLD.with(|cell| {
-                cell.get_or_init(|| WKContentWorld::worldWithName(&NSString::from_str("misty-page-state"), mtm))
-                    .clone()
+                cell.get_or_init(|| {
+                    WKContentWorld::worldWithName(&NSString::from_str("misty-page-state"), mtm)
+                })
+                .clone()
             });
             let done = finish.clone();
             let handler = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
@@ -410,7 +412,8 @@ pub(super) fn ask_download_destination(suggested: &std::path::Path) -> Option<st
         let panel: *mut AnyObject = objc2::msg_send![objc2::class!(NSSavePanel), savePanel];
         let panel = panel.as_ref()?;
         if let Some(name) = suggested.file_name().and_then(|name| name.to_str()) {
-            let _: () = objc2::msg_send![panel, setNameFieldStringValue: &*NSString::from_str(name)];
+            let _: () =
+                objc2::msg_send![panel, setNameFieldStringValue: &*NSString::from_str(name)];
         }
         if let Some(directory) = suggested.parent() {
             let url = NSURL::fileURLWithPath_isDirectory(
@@ -446,14 +449,20 @@ pub(super) async fn clear_browser_website_data(
     use std::sync::Mutex;
     let (sender, receiver) = tokio::sync::oneshot::channel::<()>();
     app.run_on_main_thread(move || {
-        let Some(mtm) = MainThreadMarker::new() else { return };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
         let sender = Mutex::new(Some(sender));
         unsafe {
             let store =
                 WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(identifier), mtm);
-            let names = data_types.iter().map(|name| NSString::from_str(name)).collect::<Vec<_>>();
+            let names = data_types
+                .iter()
+                .map(|name| NSString::from_str(name))
+                .collect::<Vec<_>>();
             let array = NSArray::from_retained_slice(&names);
-            let types: *mut AnyObject = objc2::msg_send![objc2::class!(NSSet), setWithArray: &*array];
+            let types: *mut AnyObject =
+                objc2::msg_send![objc2::class!(NSSet), setWithArray: &*array];
             let since = NSDate::dateWithTimeIntervalSince1970(since_ms.max(0) as f64 / 1000.0);
             let retained_store = store.clone();
             let handler = RcBlock::new(move || {
@@ -580,5 +589,13 @@ pub async fn host_webview_capture_region(
     if webview.label() != "main" {
         return Err("Only the Host can capture its view.".into());
     }
-    capture_webview_region_sized(webview, x, y, width, height, max_dimension.unwrap_or(640.0).clamp(640.0, 3840.0)).await
+    capture_webview_region_sized(
+        webview,
+        x,
+        y,
+        width,
+        height,
+        max_dimension.unwrap_or(640.0).clamp(640.0, 3840.0),
+    )
+    .await
 }

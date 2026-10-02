@@ -391,7 +391,6 @@ mod tests {
                 super::super::super::Instance {
                     root: std::path::PathBuf::new(),
                     permissions: app(owner, serde_json::json!(["files.read"])),
-
                 },
             );
         }
@@ -516,7 +515,6 @@ mod tests {
             super::super::super::Instance {
                 root: std::path::PathBuf::new(),
                 permissions: app("alice", serde_json::json!(["files.read"])),
-
             },
         );
         let (entered, waiting) = tokio::sync::oneshot::channel();

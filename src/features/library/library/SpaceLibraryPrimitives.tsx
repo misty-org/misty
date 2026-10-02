@@ -12,7 +12,7 @@ export {
   detectUploadedAssetStacks,
 } from "./libraryPrimitives/libraryAssetStackInput";
 export { LibraryCanEditContext } from "./libraryPrimitives/LibraryCanEditContext";
-export { LibraryCollectionCard } from "./libraryPrimitives/LibraryCollectionCard";
+
 export { LibraryDiscoveryCard } from "./libraryPrimitives/LibraryDiscoveryCard";
 export { LibraryFacetGroup } from "./libraryPrimitives/LibraryFacetGroup";
 export { LibraryItemThumbnail } from "./libraryPrimitives/LibraryItemThumbnail";

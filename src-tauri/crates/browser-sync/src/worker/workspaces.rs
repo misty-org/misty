@@ -22,7 +22,10 @@ const WORKSPACE_REFETCH_LIMIT: u8 = 3;
 
 async fn send_workspace(socket: &mut SyncSocket, frame: Outgoing) -> Result<()> {
     match frame {
-        Outgoing::Watch { workspace_id, after } => {
+        Outgoing::Watch {
+            workspace_id,
+            after,
+        } => {
             socket
                 .send(&ClientFrame::WatchWorkspace {
                     workspace_id: &workspace_id,
@@ -32,7 +35,9 @@ async fn send_workspace(socket: &mut SyncSocket, frame: Outgoing) -> Result<()> 
         }
         Outgoing::Unwatch { workspace_id } => {
             socket
-                .send(&ClientFrame::UnwatchWorkspace { workspace_id: &workspace_id })
+                .send(&ClientFrame::UnwatchWorkspace {
+                    workspace_id: &workspace_id,
+                })
                 .await
         }
         Outgoing::Publish { request_id, op } => {
@@ -105,7 +110,8 @@ where
         let document: crate::document::Document =
             serde_json::from_slice(&self.store.committed_snapshot(&self.root)?)?;
         if !document.workspace_mode {
-            let payload = serde_json::to_vec(&crate::document::Payload::WorkspaceMode { version: 1 })?;
+            let payload =
+                serde_json::to_vec(&crate::document::Payload::WorkspaceMode { version: 1 })?;
             let operation = workspace_mode_operation(&self.store.grant().device_id);
             self.store
                 .enqueue_identified(&self.root, &self.device, &operation, &payload)?;
@@ -132,7 +138,9 @@ where
         socket: &mut SyncSocket,
         workspaces: Vec<Workspace>,
     ) -> Result<()> {
-        let frames = self.workspaces.on_roster(&mut self.store, &self.root, workspaces)?;
+        let frames = self
+            .workspaces
+            .on_roster(&mut self.store, &self.root, workspaces)?;
         send_all(socket, frames).await?;
         self.publish_sync_state()
     }
@@ -162,7 +170,9 @@ where
             scope: &self.scope,
             grants: &self.roster,
         };
-        let frames = self.workspaces.on_delta(&mut self.store, &verifier, delta)?;
+        let frames = self
+            .workspaces
+            .on_delta(&mut self.store, &verifier, delta)?;
         send_all(socket, frames).await?;
         self.publish_sync_state()
     }
@@ -212,12 +222,18 @@ where
         workspace_id: &str,
         version: u64,
     ) -> Result<()> {
-        let frames = self.workspaces.on_current(&mut self.store, workspace_id, version)?;
+        let frames = self
+            .workspaces
+            .on_current(&mut self.store, workspace_id, version)?;
         send_all(socket, frames).await?;
         self.publish_sync_state()
     }
 
-    pub(super) fn workspace_ack(&mut self, request: Option<&str>, receipt: WorkspaceReceipt) -> Result<()> {
+    pub(super) fn workspace_ack(
+        &mut self,
+        request: Option<&str>,
+        receipt: WorkspaceReceipt,
+    ) -> Result<()> {
         let verifier = Verifier {
             root: &self.root,
             scope: &self.scope,

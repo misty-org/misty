@@ -24,8 +24,8 @@ pub(crate) mod browser_import;
 pub use browser_import::{BrowserImportJournal, BrowserImportReceipt};
 mod workspaces;
 pub use workspaces::{Batch, Desired, WorkspaceLocal};
-mod device_signin;
 mod collections;
+mod device_signin;
 pub use device_signin::{hex as signin_digest_hex, DeviceSignin};
 
 /// Whether two sets of credential records hold the same data, ignoring engine
@@ -201,7 +201,9 @@ fn migrate_names(connection: &Connection) -> Result<()> {
         "sync_device_signin",
     ] {
         if exists(table)? && has_column(table, "tree_id")? {
-            tx.execute_batch(&format!("ALTER TABLE {table} RENAME COLUMN tree_id TO workspace_id"))?;
+            tx.execute_batch(&format!(
+                "ALTER TABLE {table} RENAME COLUMN tree_id TO workspace_id"
+            ))?;
         }
     }
     if exists("sync_vault")? && has_column("sync_vault", "workspace")? {
@@ -327,11 +329,10 @@ impl Store {
                 "INSERT OR IGNORE INTO sync_vault VALUES(1,?1,?2,?3)",
                 params![encoded, vault.bootstrap_pending, vault.enrollment_pending],
             )?;
-            let saved: String = tx.query_row(
-                "SELECT vault FROM sync_vault WHERE singleton=1",
-                [],
-                |r| r.get(0),
-            )?;
+            let saved: String =
+                tx.query_row("SELECT vault FROM sync_vault WHERE singleton=1", [], |r| {
+                    r.get(0)
+                })?;
             vault.check_remote(&serde_json::from_str(&saved)?)?;
             tx.execute("UPDATE sync_high_watermark SET observed_head=max(observed_head,?1) WHERE singleton=1", [vault.vault.head_sequence])?;
         }

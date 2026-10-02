@@ -119,6 +119,3 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
     </header>
   );
 }
-
-/** @deprecated Use DrawingHeader directly */
-export const DrawingHeaderView = DrawingHeader;

@@ -357,8 +357,11 @@ export function WorkspaceTabStrip(
                                   <DropdownMenuItem
                                     className={cn(
                                       "min-w-0 flex-1 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted",
-                                      focused &&
-                                        "bg-charcoal-active text-cream-bright hover:bg-charcoal-active focus:bg-charcoal-active focus-visible:bg-charcoal-active data-highlighted:bg-charcoal-active",
+                                      focused && [
+                                        "bg-charcoal-active text-cream-bright hover:bg-charcoal-active",
+                                        "focus:bg-charcoal-active focus-visible:bg-charcoal-active",
+                                        "data-highlighted:bg-charcoal-active",
+                                      ],
                                     )}
                                     aria-current={focused ? "true" : undefined}
                                     aria-label={`${paneViewLabel(itemView)}${focused ? ", active pane" : ""}`}

@@ -1,21 +1,3 @@
-import type { AgentCitationKind } from "../types/types";
-
-export interface AgentCitation {
-  id: string;
-  artifactId?: string | null;
-  scopeId: string;
-  fileName: string;
-  relativePath?: string | null;
-  kind: AgentCitationKind;
-  label: string;
-  page?: number | null;
-  slide?: number | null;
-  sheet?: string | null;
-  range?: string | null;
-  section?: string | null;
-  excerpt?: string | null;
-}
-
 export interface AgentScope {
   id: string;
   deviceId: string;

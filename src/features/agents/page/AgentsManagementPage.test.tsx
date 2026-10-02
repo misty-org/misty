@@ -1,3 +1,4 @@
+import type * as AgentsRuntimeModule from "../AgentsRuntime";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,12 @@ vi.mock("../mcp/McpConnectionsSheet", () => ({
   McpConnectionsView: () => <aside aria-label="Tool connections sheet">Connections</aside>,
 }));
 
+vi.mock("../AgentsRuntime", async (original) => ({
+  ...(await original<typeof AgentsRuntimeModule>()),
+  useAgentsAuth: () => ({ user: { id: "owner" } }),
+  runtimeAiApi: { activity: async () => ({ entries: [] }) },
+}));
+
 vi.mock("../components/MistyDashboard", () => ({
   MistyDashboard: () => <section aria-label="Agent work">Independent task activity</section>,
 }));
@@ -19,7 +26,7 @@ describe("Agents conversation page", () => {
     document.body.innerHTML = "";
   });
 
-  it("presents a conversation composer beside the native agent roster", async () => {
+  it("opens on the agent collection without a page tab strip", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -31,9 +38,9 @@ describe("Agents conversation page", () => {
       ),
     );
 
-    expect(container.textContent).toContain("Misty");
-    expect(container.querySelector('[aria-label="Message Misty"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Your agents"]')).not.toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("Agents");
+    expect(container.querySelector('[aria-label="Search all"]')).not.toBeNull();
+    expect(container.textContent).toContain("New agent");
     expect(container.textContent).not.toContain("Definitions");
     expect(container.textContent).not.toContain("Edit Scout");
     expect(container.querySelector('[role="tablist"]')).toBeNull();

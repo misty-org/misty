@@ -82,7 +82,7 @@ func authorizeAppContextReference(ctx context.Context, database *db.Database, us
 		"task": {"tasks.read"}, "planner.task": {"tasks.read"}, "planner.query": {"tasks.read"},
 		"agenda.range": {"tasks.read", "calendar.read"}, "space.chat": {"messages.read"},
 		"roadmap": {"roadmaps.read"}, "planner.roadmap": {"roadmaps.read"},
-		"library.item": {"library.read"},
+		"library.item":   {"library.read"},
 		"agent.artifact": {"ai.read"}, "route": {"navigation.write"}, "space": {"spaces.read"},
 	}[strings.ToLower(strings.TrimSpace(reference.Kind))]
 	if len(scopes) == 0 {

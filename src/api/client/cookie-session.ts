@@ -191,12 +191,7 @@ export async function cookieSessionFetch(
       headers: { "Content-Type": "application/json" },
     });
   }
-  const changesSession = [
-    "/auth/google/complete",
-    "/login",
-    "/register",
-    "/logout",
-  ].includes(path);
+  const changesSession = ["/auth/google/complete", "/login", "/register", "/logout"].includes(path);
   const send = async () => {
     assertGeneration(generation);
     const response = await accountFetch(input instanceof Request ? input.clone() : input, options);

@@ -11,8 +11,8 @@ use misty_browser_sync::{
     protocol::Vault,
     store::{signin_digest_hex, BrowserObservation, CachedVault, DeviceSignin, Store},
     transport::SyncApi,
-    workspace::{signin, sync::SyncState},
     worker::{Phase, Worker, WorkerHandle},
+    workspace::{signin, sync::SyncState},
     Error, Result,
 };
 use serde_json::json;
@@ -30,7 +30,11 @@ fn peer(
     (handle, tokio::spawn(worker.run()))
 }
 
-async fn wait_workspaces(label: &str, handle: &WorkerHandle, predicate: impl Fn(&SyncState) -> bool) {
+async fn wait_workspaces(
+    label: &str,
+    handle: &WorkerHandle,
+    predicate: impl Fn(&SyncState) -> bool,
+) {
     let mut workspaces = handle.workspaces.clone();
     let status = handle.status.clone();
     let result = timeout(Duration::from_secs(20), async {

@@ -18,6 +18,7 @@ vi.mock("./store/useAgentsStore", () => ({
 vi.mock("./store/useAgentDeviceStore", () => ({
   ensureServerAgentDevice: async () => ({ id: "server" }),
   heartbeatServerAgentDevice: mocks.heartbeat,
+  serverAgentDeviceSeenWithin: () => false,
   signedAgentDeviceRequest: vi.fn(),
 }));
 import { DesktopAgentJobWorker } from "./worker";

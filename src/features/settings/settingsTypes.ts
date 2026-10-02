@@ -7,7 +7,6 @@ import type {
   ShortcutsSnapshot,
   UpdateShortcutRequest,
 } from "@/native/ipc";
-import { type LucideIcon } from "lucide-react";
 
 export type SettingsSection =
   | "profiles"
@@ -55,14 +54,6 @@ export type SettingsSection =
 
 export type SettingValue =
   string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
-
-export interface NavItem {
-  id: SettingsSection;
-  label: string;
-  icon: LucideIcon;
-  group?: string;
-  groupLabel?: string;
-}
 
 export interface SettingsContentProps {
   document: Record<string, unknown>;

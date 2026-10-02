@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_RECENT_TOOLS,
-  toolIdFromSurfaceId,
-  toolIdFromView,
-  useRecentToolsStore,
-} from "./useRecentToolsStore";
+import { DEFAULT_RECENT_TOOLS, useRecentToolsStore } from "./useRecentToolsStore";
 
 const mocks = vi.hoisted(() => ({ recordAppActivity: vi.fn(async () => undefined) }));
 
@@ -24,13 +19,13 @@ describe("useRecentToolsStore", () => {
   });
 
   it("records tool usage and moves it to the front", () => {
-    useRecentToolsStore.getState().recordToolUsage("terminal");
-    expect(useRecentToolsStore.getState().recentTools[0]).toBe("terminal");
+    useRecentToolsStore.getState().recordToolUsage("files");
+    expect(useRecentToolsStore.getState().recentTools[0]).toBe("files");
 
     useRecentToolsStore.getState().recordToolUsage("agents");
     expect(useRecentToolsStore.getState().recentTools[0]).toBe("agents");
-    expect(useRecentToolsStore.getState().recentTools[1]).toBe("terminal");
-    expect(mocks.recordAppActivity).toHaveBeenNthCalledWith(1, "terminal");
+    expect(useRecentToolsStore.getState().recentTools[1]).toBe("files");
+    expect(mocks.recordAppActivity).toHaveBeenNthCalledWith(1, "files");
     expect(mocks.recordAppActivity).toHaveBeenNthCalledWith(2, "agents");
   });
 
@@ -40,24 +35,11 @@ describe("useRecentToolsStore", () => {
   });
 
   it("deduplicates recent tools and caps at 10 items", () => {
-    useRecentToolsStore.getState().recordToolUsage("code");
-    useRecentToolsStore.getState().recordToolUsage("code");
+    useRecentToolsStore.getState().recordToolUsage("browser");
+    useRecentToolsStore.getState().recordToolUsage("browser");
     const occurrences = useRecentToolsStore
       .getState()
-      .recentTools.filter((tool) => tool === "code");
+      .recentTools.filter((tool) => tool === "browser");
     expect(occurrences).toHaveLength(1);
-  });
-
-  it("correctly identifies tool IDs from tabs and surface IDs", () => {
-    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/notes" })).toBe("journal");
-    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/planner" })).toBe("planner");
-    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/chat" })).toBe("social");
-    expect(toolIdFromView({ surfaceId: "space", route: "/spaces/1/library" })).toBe("library");
-    expect(toolIdFromView({ surfaceId: "code", route: "/code" })).toBe("code");
-    expect(toolIdFromView({ surfaceId: "terminal", route: "/terminal" })).toBe("terminal");
-
-    expect(toolIdFromSurfaceId("space", "Journal")).toBe("journal");
-    expect(toolIdFromSurfaceId("space", "Planner")).toBe("planner");
-    expect(toolIdFromSurfaceId("browser", "Browser")).toBe("browser");
   });
 });

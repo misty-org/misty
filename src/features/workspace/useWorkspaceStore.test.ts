@@ -121,14 +121,14 @@ describe("desktop dock store", () => {
 
   it("lets a tool be opened in an empty workspace", () => {
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
-      title: "Terminal",
-      route: "/terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      title: "Files",
+      route: "/files",
       instancePolicy: "single",
     });
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((tab) => tab.surfaceId)).toEqual(
-      ["terminal"],
+      ["files"],
     );
   });
 
@@ -225,10 +225,10 @@ describe("desktop dock store", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
     store.openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
-      title: "Terminal",
-      route: "/terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      title: "Files",
+      route: "/files",
       instancePolicy: "single",
     });
 
@@ -240,16 +240,16 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().setScope("space:family");
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("terminal");
+    ).toContain("files");
   });
 
   it("adopts the default Space once, then leaves the user's choice alone", () => {
     const store = useWorkspaceStore.getState();
     store.openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
-      title: "Terminal",
-      route: "/terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      title: "Files",
+      route: "/files",
       instancePolicy: "single",
     });
 
@@ -258,7 +258,7 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:misty");
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("terminal");
+    ).toContain("files");
 
     useWorkspaceStore.getState().setScope("space:family");
     useWorkspaceStore.getState().adoptDefaultScope("space:misty");
@@ -368,10 +368,10 @@ describe("desktop dock store", () => {
 
   it("can keep an embedded dock widget on its owning tool route", () => {
     const terminal = useWorkspaceStore.getState().openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
-      title: "Terminal",
-      route: "/terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
+      title: "Files",
+      route: "/files",
       instancePolicy: "multiple",
     });
 
@@ -566,13 +566,7 @@ describe("desktop dock store", () => {
     const remaining = dockLeaves(useWorkspaceStore.getState().layout.root);
     expect(remaining).toHaveLength(1);
     expect(
-      remaining[0].views
-        .filter(
-          (tab) =>
-            tab.surfaceId === "browser" ||
-            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
-        )
-        .map((tab) => tab.id),
+      remaining[0].views.filter((tab) => tab.surfaceId === "browser").map((tab) => tab.id),
     ).toEqual([first.id]);
   });
 
@@ -629,15 +623,10 @@ describe("desktop dock store", () => {
       sourceViewId: first.id,
     });
     const tabs = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(
-      tabs
-        .filter(
-          (tab) =>
-            tab.surfaceId === "browser" ||
-            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
-        )
-        .map((tab) => tab.id),
-    ).toEqual([first.id, second.id]);
+    expect(tabs.filter((tab) => tab.surfaceId === "browser").map((tab) => tab.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
     useWorkspaceStore
       .getState()
       .updateBrowserView(second.id, { url: "https://misty.com", title: "Misty" });

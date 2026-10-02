@@ -48,11 +48,4 @@ export type UnifiedNote = {
  */
 export type NoteGroupId = "space";
 
-export type NoteGroup = {
-  id: NoteGroupId;
-  label: string;
-  /** Restricts the group to one connector source; omitted for cross-source views. */
-  source?: NoteSource;
-};
-
 export type NotesLoadPhase = "idle" | "loading" | "ready" | "error";

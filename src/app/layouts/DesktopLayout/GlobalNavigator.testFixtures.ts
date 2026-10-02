@@ -17,11 +17,11 @@ export const spaceFixture = {
 
 export const spaceTab: WorkspaceView = {
   id: "tab-1",
-  surfaceId: "official-app",
-  groupKey: "app:journal",
+  surfaceId: "space",
+  groupKey: "space:space-1:journal",
   instanceKey: "journal",
   title: "Journal",
-  route: "/apps/journal?space=space-1&view=notes",
+  route: "/spaces/space-1/notes",
   sidebarVisible: true,
   state: {},
   createdAt: 1,
@@ -30,11 +30,11 @@ export const spaceTab: WorkspaceView = {
 
 export const browserTab: WorkspaceView = {
   id: "browser-tab",
-  surfaceId: "official-app",
-  groupKey: "app:browser",
+  surfaceId: "browser",
+  groupKey: "tool:browser",
   instanceKey: "browser",
   title: "Browser",
-  route: "/apps/browser",
+  route: "/browser",
   sidebarVisible: true,
   state: { version: 1, url: "https://www.google.com", faviconUrl: null },
   createdAt: 2,

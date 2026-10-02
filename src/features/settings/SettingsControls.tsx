@@ -268,45 +268,6 @@ export function SliderControl(props: {
   );
 }
 
-export function NumberControl(props: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  suffix?: string;
-  disabled: boolean;
-  onCommit: (value: number) => void;
-}) {
-  const ariaLabel = useSettingsControlLabel("Setting");
-  const commit = (raw: string) => {
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed)) return;
-    const clamped = Math.min(props.max, Math.max(props.min, parsed));
-    if (clamped !== props.value) props.onCommit(clamped);
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        aria-label={ariaLabel}
-        key={props.value}
-        type="number"
-        className={cn("w-[110px]", settingsDisabledControlClass)}
-        defaultValue={props.value}
-        min={props.min}
-        max={props.max}
-        step={props.step ?? 1}
-        disabled={props.disabled}
-        onBlur={(event) => commit(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-        }}
-      />
-      {props.suffix ? <span className="text-sm text-cream-muted">{props.suffix}</span> : null}
-    </div>
-  );
-}
-
 /** Multi-line free text, committed on blur like {@link TextControl}. */
 export function TextAreaControl(props: {
   value: string;
@@ -396,16 +357,6 @@ export function FilePathControl(props: {
         </Button>
       </div>
     </div>
-  );
-}
-
-export function ValueText(props: { value: string; muted?: boolean }) {
-  return (
-    <span
-      className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.muted ? "text-cream-muted" : "text-cream"}`}
-    >
-      {props.value}
-    </span>
   );
 }
 

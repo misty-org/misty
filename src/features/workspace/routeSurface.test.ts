@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceSurfaceFromRoute, workspaceViewMatchesRoute } from "./routeSurface";
+import { workspaceSurfaceFromRoute } from "./routeSurface";
 
 describe("browser workspace deep links", () => {
   it.each(["/settings", "/account", "/signin", "/register", "/activity"])(
@@ -46,11 +46,6 @@ describe("browser workspace deep links", () => {
       route: "/agents?run=task-1",
       scopeKey: "global",
     });
-  });
-  it("matches tools independently of their selected subsection", () => {
-    const tab = { surfaceId: "files" as const, groupKey: "tool:files" as const };
-    expect(workspaceViewMatchesRoute(tab, "/files?view=recent")).toBe(true);
-    expect(workspaceViewMatchesRoute(tab, "/agents")).toBe(false);
   });
 });
 

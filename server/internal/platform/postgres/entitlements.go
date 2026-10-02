@@ -28,17 +28,6 @@ type PlanEntitlements struct {
 	UnlimitedAgentDefinitions bool  `json:"unlimited_agent_definitions"`
 }
 
-func NormalizePlan(tier Tier) Tier {
-	switch tier {
-	case TierPersonal, TierPro:
-		return TierPro
-	case TierMax:
-		return TierMax
-	default:
-		return TierBasic
-	}
-}
-
 // Resource ceilings are customer-visible billing results. Production always
 // asks the billing service; development and tests without one receive these
 // finite defaults.
