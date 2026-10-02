@@ -231,7 +231,8 @@ fn acquire_lease(
 ) -> Result<LeaseResult, String> {
     // A task belongs to an account, agent and window, independent of content.
     if [&request.account_id, &request.agent_id, &request.task_id]
-        .iter().any(|s| s.is_empty() || s.len() > 256)
+        .iter()
+        .any(|s| s.is_empty() || s.len() > 256)
         || request.space_id.len() > 256
     {
         return Err("invalid_agent_task".into());
@@ -314,8 +315,11 @@ pub fn agent_workspace_bind_scope(
     };
     if let Some(previous) = previous_task_id {
         let old = inner.scopes.get(&scope_id).ok_or("agent_task_mismatch")?;
-        if old.task != previous || old.agent != scope.agent || old.account != scope.account ||
-            old.window != scope.window {
+        if old.task != previous
+            || old.agent != scope.agent
+            || old.account != scope.account
+            || old.window != scope.window
+        {
             return Err("agent_task_mismatch".into());
         }
         // Resume rotates execution authority, but verified files from the
@@ -411,8 +415,13 @@ mod tests {
         state
     }
     fn personal_request(task: &str, renew: bool) -> LeaseRequest {
-        LeaseRequest { account_id: "owner".into(), agent_id: "one".into(),
-            space_id: String::new(), task_id: task.into(), renew }
+        LeaseRequest {
+            account_id: "owner".into(),
+            agent_id: "one".into(),
+            space_id: String::new(),
+            task_id: task.into(),
+            renew,
+        }
     }
     #[test]
     fn personal_tasks_acquire_and_renew_without_space() {
@@ -508,19 +517,33 @@ fn invalidate_account_leases(inner: &mut WorkspaceState) -> Vec<String> {
 pub(super) fn stop_account_tasks(app: &AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "macos", windows))]
     super::cursor_companion::stop(app);
-    let Some(state) = app.try_state::<AgentWorkspaceState>() else { return Ok(()); };
+    let Some(state) = app.try_state::<AgentWorkspaceState>() else {
+        return Ok(());
+    };
     let tasks = {
         let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
         invalidate_account_leases(&mut inner)
     };
-    for task in tasks { super::workspace_autopilot::stop(&task); }
+    for task in tasks {
+        super::workspace_autopilot::stop(&task);
+    }
     Ok(())
 }
 
 /// Full-window control always requires a live foreground lease; no legacy fallback.
-pub fn authorize_window_task(app:&AppHandle, task:&str, account:&str, _legacy_space:&str)->Result<(),String> {
-    let state=app.state::<AgentWorkspaceState>();
-    let inner=state.0.lock().map_err(|_|"agent_workspace_unavailable")?;
-    if inner.leases.get(task).is_some_and(|lease|lease.window=="main" && lease.account==account && lease.expires>Instant::now()) { Ok(()) }
-    else { Err("agent_task_paused".into()) }
+pub fn authorize_window_task(
+    app: &AppHandle,
+    task: &str,
+    account: &str,
+    _legacy_space: &str,
+) -> Result<(), String> {
+    let state = app.state::<AgentWorkspaceState>();
+    let inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
+    if inner.leases.get(task).is_some_and(|lease| {
+        lease.window == "main" && lease.account == account && lease.expires > Instant::now()
+    }) {
+        Ok(())
+    } else {
+        Err("agent_task_paused".into())
+    }
 }

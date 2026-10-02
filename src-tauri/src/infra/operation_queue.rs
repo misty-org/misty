@@ -3055,17 +3055,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_folder_upload_uses_one_storage_operation() {
-        let environment =
-            AppEnvironmentService::for_test_home(unique_test_dir("folder-upload-home"));
-        let mount_root = environment.mount_root();
-        let transfers = TransferService::new(environment.clone());
-        let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let explorer = ExplorerService::new(environment, transfers.clone(), explorer_library);
-        let service = OperationQueueService::new(explorer, transfers.clone());
+    async fn local_folder_copy_uses_one_storage_operation() {
+        let service = test_operation_queue_service();
         service.pause_all().await;
 
-        let source_parent = unique_test_dir("folder-upload-source");
+        let source_parent = unique_test_dir("folder-copy-source");
         let source = source_parent.join("project");
         let docs = source.join("docs");
         tokio::fs::create_dir_all(&docs).await.unwrap();
@@ -3075,8 +3069,9 @@ mod tests {
         tokio::fs::write(docs.join("guide.md"), b"world")
             .await
             .unwrap();
+        let destination = unique_test_dir("folder-copy-destination");
+        tokio::fs::create_dir_all(&destination).await.unwrap();
 
-        let destination = mount_root.join("drive-test").join("Uploads");
         let snapshot = service
             .enqueue_paste_items(PasteItemsRequest {
                 sources: vec![PasteItem {
@@ -3092,25 +3087,32 @@ mod tests {
             .await
             .unwrap();
 
+        // The folder is one operation and one transfer row, not one per file.
         assert_eq!(snapshot.operations.len(), 1);
         let operation = &snapshot.operations[0];
-        assert_eq!(operation.kind, OperationKind::Upload);
+        assert_eq!(operation.kind, OperationKind::Copy);
         assert_eq!(operation.source.local_path, source.to_string_lossy());
-        assert_eq!(operation.target.remote_name, "drive-test");
-        assert_eq!(operation.target.remote_path, "/Uploads/project");
+        assert_eq!(
+            operation.target.local_path,
+            destination.join("project").to_string_lossy()
+        );
 
-        let transfer_page = transfers.snapshot(TransferFilter::default()).await.unwrap();
+        let transfer_page = service
+            .transfers
+            .snapshot(TransferFilter::default())
+            .await
+            .unwrap();
         assert_eq!(transfer_page.rows.len(), 1);
         assert_eq!(transfer_page.rows[0].operation_id, operation.operation_id);
         assert_eq!(transfer_page.rows[0].parent_transfer_id, 0);
-        assert_eq!(transfer_page.rows[0].root_transfer_id, 0);
         assert_eq!(transfer_page.rows[0].tree_depth, 0);
 
         let _ = tokio::fs::remove_dir_all(&source_parent).await;
+        let _ = tokio::fs::remove_dir_all(&destination).await;
     }
 
     #[tokio::test]
-    async fn remote_folder_delete_uses_one_storage_operation() {
+    async fn retired_cloud_folder_delete_is_refused() {
         let environment =
             AppEnvironmentService::for_test_home(unique_test_dir("folder-delete-home"));
         let mount_root = environment.mount_root();
@@ -3121,26 +3123,22 @@ mod tests {
         service.pause_all().await;
 
         let target = mount_root.join("drive-test").join("Projects").join("Tiny");
-        let snapshot = service
+        let error = service
             .enqueue_delete_items(DeleteItemsRequest {
                 paths: vec![target.to_string_lossy().to_string()],
                 permanent: true,
             })
             .await
-            .unwrap();
+            .unwrap_err();
 
-        assert_eq!(snapshot.operations.len(), 1);
-        let operation = &snapshot.operations[0];
-        assert_eq!(operation.kind, OperationKind::Delete);
-        assert_eq!(operation.source.remote_name, "drive-test");
-        assert_eq!(operation.source.remote_path, "/Projects/Tiny");
-
+        assert!(
+            error
+                .to_string()
+                .contains("Cloud file locations are no longer supported"),
+            "{error}"
+        );
         let transfer_page = transfers.snapshot(TransferFilter::default()).await.unwrap();
-        assert_eq!(transfer_page.rows.len(), 1);
-        assert_eq!(transfer_page.rows[0].operation_id, operation.operation_id);
-        assert_eq!(transfer_page.rows[0].parent_transfer_id, 0);
-        assert_eq!(transfer_page.rows[0].root_transfer_id, 0);
-        assert_eq!(transfer_page.rows[0].tree_depth, 0);
+        assert!(transfer_page.rows.is_empty());
     }
 
     fn test_operation_queue_service() -> OperationQueueService {

@@ -1,4 +1,6 @@
 use super::*;
+use crate::domain::clipboard::ClipboardCache;
+use std::io::Cursor;
 
 #[tokio::test]
 async fn preview_editor_saves_image_edits_and_numbered_copies() {

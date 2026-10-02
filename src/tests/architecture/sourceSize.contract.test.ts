@@ -6,6 +6,8 @@ import { lineCount, repositoryPath, repositoryRoot, walk } from "./repositoryPol
 
 const defaultLimit = 500;
 const extensions = new Set([".js", ".jsx", ".rs", ".sh", ".ts", ".tsx"]);
+// Reconciled to committed main 0ca6ae865 when the sync rename exposed stale limits.
+// Renamed files carry their prior ceiling; uncommitted growth is not grandfathered.
 const baseline = JSON.parse(
   readFileSync(
     resolve(repositoryRoot, "src/tests/architecture/fixtures/file-size-baseline.json"),

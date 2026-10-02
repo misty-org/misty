@@ -1,5 +1,6 @@
 import type { NativeSyncView, SyncDeviceInfo } from "./native";
 import { deviceLabels } from "./deviceNames";
+import { currentDeviceId } from "./websiteData";
 
 export function deviceRows(session: NativeSyncView, ownerName?: string | null) {
   const revoked = new Set(
@@ -37,24 +38,26 @@ export function deviceRows(session: NativeSyncView, ownerName?: string | null) {
         ...device,
         local,
         name: labels.get(device.device_id) ?? "Device",
-        connection: !connected ? "Unknown" : local || presence?.online ? "Connected" : "Offline",
+        connection: !connected
+          ? "Unknown"
+          : local || presence?.online
+            ? "Connected"
+            : presence
+              ? "Offline"
+              : "Unknown",
         active: device.full_sync && session.workspace.active_device?.device_id === device.device_id,
       };
     })
     .sort((a, b) => Number(b.local) - Number(a.local) || a.name.localeCompare(b.name));
 }
 
-export function transferRate(
-  previous: { bytes: number; at: number } | null,
-  bytes: number,
-  at: number,
-) {
-  if (!previous || bytes < previous.bytes || at <= previous.at) return null;
-  return Math.max(0, ((bytes - previous.bytes) * 1000) / (at - previous.at));
-}
-export function formatRate(value: number | null) {
-  if (value === null) return "—";
-  if (value < 1024) return `${Math.round(value)} B/s`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB/s`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB/s`;
+/** Use authoritative publisher identity, never presence or a viewed workspace’s name. */
+export function publishingDeviceId(session: NativeSyncView): string | null {
+  if (session.sync)
+    return (
+      session.sync.workspaces.find(
+        (workspace) => workspace.workspace_id === currentDeviceId(session),
+      )?.driver_device_id ?? null
+    );
+  return session.workspace.active_device?.device_id ?? null;
 }

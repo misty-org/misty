@@ -1,4 +1,4 @@
-import { workspaceDefaultTabOptions } from "@/features/workspace/workspaceDefaultTab";
+import { workspaceDefaultViewOptions } from "@/features/workspace/workspaceDefaultView";
 import { startupViewOptions } from "@/features/app-shell";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -8,9 +8,7 @@ import { booleanSetting, numberSetting, SelectControl, SwitchControl } from "../
 import type { SettingsContentProps } from "../settingsTypes";
 export function GeneralSection(props: SettingsContentProps) {
   const launchOnLoginUnsupported = props.launchOnLogin?.supported === false;
-  const launchOnLoginEnabled = props.launchOnLogin
-    ? props.launchOnLogin.enabled
-    : booleanSetting(props.document, "general", "launch_on_login", false);
+  const launchOnLoginEnabled = booleanSetting(props.document, "general", "launch_on_login", false);
   const reopenLastSession = booleanSetting(props.document, "general", "reopen_last_session", true);
   return (
     <>
@@ -64,7 +62,7 @@ export function GeneralSection(props: SettingsContentProps) {
         >
           <SelectControl
             value={numberSetting(props.document, "general", "workspace_default_tab_index", 0)}
-            options={[...workspaceDefaultTabOptions]}
+            options={[...workspaceDefaultViewOptions]}
             disabled={props.working}
             onChange={(value) =>
               props.onSettingChange("general", "workspace_default_tab_index", value)

@@ -1,14 +1,15 @@
 import type { AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import {
   useLibraryAi as useAiSurfaceAdapter,
-  useLibraryTitle as useWorkspaceTabTitle,
+  useLibraryTitle as useWorkspaceViewTitle,
 } from "./LibraryRuntime";
-import { ComingSoonSurface } from "@/shared/ui";
+import { CollectionPage, ComingSoonSurface } from "@/shared/ui";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
-import { SpaceLibraryTopChrome } from "./components/SpaceLibraryStatus";
+import { SpaceLibraryInlineStatus } from "./components/SpaceLibraryStatus";
+import { LibraryEntryHeader } from "./components/LibraryEntryHeader";
 import { AlbumsIndex } from "./librarySurfaces/AlbumsIndex";
 import { DateGroupIndex } from "./librarySurfaces/DateGroupIndex";
 import { DuplicatesIndex } from "./librarySurfaces/DuplicatesIndex";
@@ -17,11 +18,13 @@ import { LibraryCollectionHeader } from "./librarySurfaces/LibraryCollectionHead
 import { LibraryItemsRegion } from "./librarySurfaces/LibraryItemsRegion";
 import { MemoryControls } from "./librarySurfaces/MemoryControls";
 import { SharedReferencesIndex } from "./librarySurfaces/SharedReferencesIndex";
+import { SmartLibrarySection } from "./librarySurfaces/SmartLibrarySection";
 import { SpaceLibraryProvider } from "./SpaceLibraryContext";
 import { LibraryCanEditContext } from "./SpaceLibraryPrimitives";
 import { useSpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionActions";
 import { useSpaceLibraryData } from "./useSpaceLibraryData";
 import { useSpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
+import { useLibraryItemLink } from "./libraryData/useLibraryItemLink";
 
 /**
  * The Library surface for one Space.
@@ -43,7 +46,7 @@ export function SpaceLibrary({
   const itemActions = useSpaceLibraryItemActions(data);
   const collectionActions = useSpaceLibraryCollectionActions(data, itemActions);
   const { canUploadLibrary, setFilePickerOpen } = data;
-  useWorkspaceTabTitle(workspaceTabId, libraryWorkspaceTitle(data));
+  useWorkspaceViewTitle(workspaceTabId, libraryWorkspaceTitle(data));
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const selectedItems = data.selectedItems ?? [];
     return {
@@ -90,6 +93,7 @@ export function SpaceLibrary({
     };
   }, [data.selectedItems, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
+  useLibraryItemLink(data, itemActions.loadMore);
   useEffect(() => {
     if (searchParams.get("upload") !== "1") {
       uploadQueryConsumedRef.current = false;
@@ -116,27 +120,30 @@ export function SpaceLibrary({
       }}
     >
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
-        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-transparent">
-          <SpaceLibraryTopChrome />
-          <div className={`min-h-0 overflow-auto bg-transparent pb-6 ${"px-5 pt-5"}`}>
+        <CollectionPage>
+          <LibraryEntryHeader />
+          <SpaceLibraryInlineStatus />
+          <div className="min-h-0">
             <DateGroupIndex />
             {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
             <AlbumsIndex />
             <ImportHistoryIndex />
             <SharedReferencesIndex />
             <DuplicatesIndex />
+            <SmartLibrarySection />
             <LibraryCollectionHeader />
             <MemoryControls />
             <LibraryItemsRegion />
           </div>
           <SpaceLibraryOverlays />
-        </div>
+        </CollectionPage>
       </LibraryCanEditContext.Provider>
     </SpaceLibraryProvider>
   );
 }
 const collectionTitles: Partial<Record<string, string>> = {
   recent: "Library",
+  smart: "Smart",
   months: "Months",
   years: "Years",
   "recent-days": "Recent days",

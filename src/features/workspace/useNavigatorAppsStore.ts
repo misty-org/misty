@@ -33,13 +33,6 @@ export function navigatorAppIdsForAccount(
   return filtered.length === saved.length ? saved : filtered;
 }
 
-export function navigatorAppsCollapsedForAccount(
-  state: Pick<NavigatorAppsState, "collapsedByAccount">,
-  accountId: string,
-): boolean {
-  return state.collapsedByAccount[accountKey(accountId)] ?? false;
-}
-
 function normalizedAppIdsByAccount(value: unknown): Record<string, NavigatorAppId[]> {
   if (!value || typeof value !== "object") return {};
   const normalized: Record<string, NavigatorAppId[]> = {};

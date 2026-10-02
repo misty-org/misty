@@ -78,10 +78,6 @@ export function fuzzyIncludes(haystack: string, needle: string): boolean {
   return true;
 }
 
-export function searchResultSubtitle(result: SearchResult): string {
-  return [searchResultSummary(result), searchResultContext(result)].filter(Boolean).join(" · ");
-}
-
 export function searchResultSummary(result: SearchResult): string {
   const reasons = (result.match?.reasons ?? []).filter(
     (reason) => reason && !["semantic", "metadata", "hybrid"].includes(reason.toLocaleLowerCase()),

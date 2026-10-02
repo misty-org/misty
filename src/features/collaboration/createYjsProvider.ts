@@ -8,7 +8,7 @@ export interface CollaborationProviderTicket {
 }
 
 /**
- * Both Misty Hosted and Self-hosted speak the same authenticated Yjs protocol.
+ * The collaboration Worker speaks an authenticated Yjs protocol.
  * Keeping construction behind this boundary lets deployment selection happen
  * in the ticket API without leaking provider details into Notes or Drawings.
  */

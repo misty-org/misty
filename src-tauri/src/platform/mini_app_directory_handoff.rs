@@ -195,7 +195,6 @@ mod tests {
                 Instance {
                     root: root.path().into(),
                     permissions,
-
                 },
             );
         }

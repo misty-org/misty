@@ -2,7 +2,7 @@ import { useAppRouteMemoryStore } from "@/features/app-shell";
 import { useWorkspaceStore } from "@/features/workspace";
 
 export function recoverLastClosedWorkspaceTab(): boolean {
-  return Boolean(useWorkspaceStore.getState().reopenClosedTab());
+  return Boolean(useWorkspaceStore.getState().reopenClosedView());
 }
 
 export function resetWorkspaceLayout(): void {

@@ -1,6 +1,6 @@
 import {
   Package,
-  BookOpenText,
+  Images,
   Bot,
   CalendarClock,
   ListTodo,
@@ -8,7 +8,6 @@ import {
   FolderOpen,
   Globe2,
   House,
-  Inbox,
   MessagesSquare,
   Notebook,
   SquareTerminal,
@@ -21,7 +20,6 @@ import {
 /** App identity shared by navigation, tabs, launchers, and Discover. */
 export const appIcons = {
   home: House,
-  inbox: Inbox,
   social: MessagesSquare,
   journal: Notebook,
   files: FolderOpen,
@@ -42,7 +40,7 @@ export const appIconStrokeWidth = 2;
 /** Catalog IDs retain `chat`; workspace routes and navigation use `social`. */
 export function appIcon(appId: string, context: "app" | "space" = "app"): LucideIcon | undefined {
   // Storage retains the legacy catalog ID `library`; Space Library is a native tool.
-  if (appId === "library" && context === "space") return BookOpenText;
+  if (appId === "library" && context === "space") return Images;
   const id = appId === "chat" ? "social" : appId;
   return Object.prototype.hasOwnProperty.call(appIcons, id)
     ? appIcons[id as keyof typeof appIcons]

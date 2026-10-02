@@ -38,7 +38,7 @@ it("uses the shared menu with Ask first and only host-admitted actions", () => {
   expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual([
     "Ask Misty…",
     "Copy Link Address",
-    "Open Link in Misty Browser",
+    "Open Link in New Tab",
   ]);
   expect(screen.queryByText("Create task…")).toBeNull();
   fireEvent.click(screen.getByText("Ask Misty…"));

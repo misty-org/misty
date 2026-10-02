@@ -1,4 +1,5 @@
-export const browserWorkspaceStoreVersion = 16;
+/** 17: Window → Tab → Pane → View field names (see workspaceShapeUpgrade). */
+export const browserWorkspaceStoreVersion = 17;
 export const workspaceRecoveryKey = (name: string) => `${name}:before-browser-workspace:v14`;
 
 /** Preserve the exact pre-migration record before Zustand can replace retired views. */

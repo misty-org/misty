@@ -77,6 +77,7 @@ export async function mutateState<T>(
   for (let attempt = 0; attempt < 20; attempt++) {
     const current = await readState<T>(scope);
     const next = reducer(current.state ?? seed());
+    if (current.state !== null && next === current.state) return next;
     try {
       await commitState(scope, current.revision, next);
       return next;

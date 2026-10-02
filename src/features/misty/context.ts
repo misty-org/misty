@@ -1,5 +1,5 @@
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { currentVirtualWindows } from "@/features/workspace/virtualWindows";
+import { currentWindows } from "@/features/workspace/windows";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
@@ -30,7 +30,7 @@ export function contextOptions(
   const result: Array<{ label: string; target: MistyContextTarget }> = [
     { label: "Entire workspace", target: { kind: "workspace", spaceId: "" } },
   ];
-  for (const window of currentVirtualWindows(state)) {
+  for (const window of currentWindows(state)) {
     const base = { spaceId, windowId: window.id };
     result.push({ label: window.title, target: { ...base, kind: "window" } });
     for (const tab of layoutTabs(window.layout)) {
@@ -39,7 +39,7 @@ export function contextOptions(
         target: { ...base, kind: "tab", tabId: tab.id },
       });
       for (const pane of dockLeaves(tab.root)) {
-        const view = pane.tabs.find((view) => view.id === pane.activeTabId) ?? pane.tabs[0];
+        const view = pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0];
         if (view)
           result.push({
             label: `${window.title} / ${tab.title || "Tab"} / ${view.title}`,
@@ -61,14 +61,14 @@ export function resolveMistyContext(
     targets.some((target) => !["workspace", "window", "tab", "pane", "view"].includes(target.kind))
   )
     throw new Error("Attach context from the current browser workspace.");
-  const windows = currentVirtualWindows(state);
+  const windows = currentWindows(state);
   const requested = targets.length
     ? targets
     : [
         {
           kind: "pane" as const,
           spaceId,
-          windowId: state.activeVirtualWindowId,
+          windowId: state.activeWindowId,
           paneId: state.layout.focusedPaneId,
         },
       ];
@@ -84,7 +84,7 @@ export function resolveMistyContext(
       for (const tab of layoutTabs(window.layout)) {
         if (target.kind === "tab" && target.tabId && target.tabId !== tab.id) continue;
         for (const pane of dockLeaves(tab.root)) {
-          const view = pane.tabs.find((view) => view.id === pane.activeTabId) ?? pane.tabs[0]; // History snapshots are deliberately excluded.
+          const view = pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0]; // History snapshots are deliberately excluded.
           if (
             !view ||
             (target.paneId && target.paneId !== pane.id) ||

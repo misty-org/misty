@@ -1,26 +1,13 @@
 import { supportsBundledDocumentWorkers } from "@/shared/platform/nativeServices";
 import { invoke } from "@tauri-apps/api/core";
-import type {
-  AgentCitation,
-  AgentDeviceSnapshot,
-  AgentScope,
-  PreparedAgentDocument,
-} from "../model/interfaces/types";
+import type { AgentDeviceSnapshot, PreparedAgentDocument } from "../model/interfaces/types";
 
 export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
   return invoke<AgentDeviceSnapshot>("agents_device_snapshot");
 }
 
-export async function agentsRegisterFolderScope(request: { path: string }): Promise<AgentScope> {
-  return invoke<AgentScope>("agents_register_folder_scope", { request });
-}
-
 export async function agentsRevokeFolderScope(scopeId: string): Promise<void> {
   await invoke("agents_revoke_folder_scope", { scopeId });
-}
-
-export async function agentsOpenCitation(request: { citation: AgentCitation }): Promise<void> {
-  await invoke("agents_open_citation", { request });
 }
 
 export async function agentsPrepareScopedDocument(

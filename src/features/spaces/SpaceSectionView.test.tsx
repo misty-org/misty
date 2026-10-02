@@ -53,12 +53,15 @@ vi.mock("./chat/SpaceChat", async () => {
   };
 });
 vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
-vi.mock("@/features/home", () => ({ HomeDashboard: () => null }));
+vi.mock("./SpaceOverview", () => ({
+  SpaceOverview: ({ space }: { space: { id: string } }) => <div>All in {space.id}</div>,
+}));
 afterEach(() => {
   cleanup();
   state.spaces[0].permissions = {};
 });
 it.each([
+  ["home", "All"],
   ["notes", "Notes"],
   ["drawings", "Drawings"],
   ["planner", "Planner"],
@@ -66,7 +69,9 @@ it.each([
   ["social", "Chat"],
 ])("opens %s directly without an installed app", async (section, label) => {
   render(
-    <MemoryRouter>
+    <MemoryRouter
+      initialEntries={[`/spaces/family/${section === "social" ? "social/misty" : section}`]}
+    >
       <SpaceSectionView spaceId="family" section={section} />
     </MemoryRouter>,
   );

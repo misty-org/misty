@@ -1,7 +1,7 @@
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
 import {
-  browserTabUrl,
+  browserViewUrl,
   recordBrowserVisitTitle,
   useBrowserDownloadsStore,
   useBrowserMediaStore,
@@ -30,7 +30,6 @@ import {
   useBrowserRuntimeStore,
 } from "./browserRuntime";
 import { openBrowserPopup } from "./openBrowserPopup";
-import { providerWebsiteFromRoute } from "./providers";
 const browserBlockingOverlaySelector = [
   // Rail hints extend over native pages, above the renderer's own DOM layers.
   '[data-navigation-tooltip="true"]:not([data-state="closed"])',
@@ -50,26 +49,8 @@ export function browserBlockingOverlayOpen(root: ParentNode = document): boolean
 }
 export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
-    const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId);
-    return (
-      activeTab?.surfaceId === "browser" ||
-      (activeTab?.surfaceId === "official-app" &&
-        (activeTab.groupKey === "app:browser" ||
-          (activeTab.groupKey === "app:inbox" &&
-            !!providerWebsiteFromRoute(activeTab.route, "inbox")) ||
-          (activeTab.groupKey === "app:chat" &&
-            !!providerWebsiteFromRoute(activeTab.route, "chat")) ||
-          (activeTab.groupKey === "app:journal" &&
-            !!providerWebsiteFromRoute(activeTab.route, "journal")) ||
-          (activeTab.groupKey === "app:planner" &&
-            !!providerWebsiteFromRoute(activeTab.route, "planner")) ||
-          (activeTab.groupKey === "app:library" &&
-            !!providerWebsiteFromRoute(activeTab.route, "library")) ||
-          (activeTab.groupKey === "app:music" &&
-            !!providerWebsiteFromRoute(activeTab.route, "music")) ||
-          (activeTab.groupKey === "app:media" &&
-            !!providerWebsiteFromRoute(activeTab.route, "media"))))
-    );
+    const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId);
+    return activeTab?.surfaceId === "browser";
   });
 }
 interface BrowserPageEvent {
@@ -106,7 +87,7 @@ interface BrowserFocusEvent {
 }
 export function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
-  if (!tabId || !useWorkspaceStore.getState().focusTab(tabId)) return false;
+  if (!tabId || !useWorkspaceStore.getState().focusView(tabId)) return false;
   window.dispatchEvent(
     new CustomEvent("misty:focus-workspace-tab", {
       detail: {
@@ -148,9 +129,9 @@ export function BrowserRuntimeBridge() {
   );
   useLayoutEffect(() => {
     if (browserSurfaceActive) return;
-    // Commit the opaque workspace surface first. On the next frame Windows
-    // can keep each live browser child parked beneath it, ready for an
-    // immediate reveal when the user returns.
+    // Commit the replacement workspace surface, then hide its native browser
+    // siblings. Their pages stay loaded without participating in overlay
+    // stacking until Browser becomes active again.
     const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
     return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);
@@ -268,7 +249,7 @@ export function BrowserRuntimeBridge() {
           useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
           useBrowserRuntimeStore.getState().setLoading(tabId, true);
         }
-        useWorkspaceStore.getState().updateBrowserTab(tabId, {
+        useWorkspaceStore.getState().updateBrowserView(tabId, {
           url: payload.url,
         });
         if (payload.phase === "finished") {
@@ -298,10 +279,10 @@ export function BrowserRuntimeBridge() {
         if (disposed || !payload.title.trim()) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (tabId && !browserTabShowsInternalPage(tabId)) {
-          useWorkspaceStore.getState().updateBrowserTab(tabId, {
+          useWorkspaceStore.getState().updateBrowserView(tabId, {
             title: payload.title.trim(),
           });
-          const url = browserTabUrl(tabId);
+          const url = browserViewUrl(tabId);
           if (url) recordBrowserVisitTitle(tabId, url, payload.title.trim());
         }
       }),
@@ -309,7 +290,7 @@ export function BrowserRuntimeBridge() {
         if (disposed || !/^https?:\/\//i.test(payload.url)) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (tabId && !browserTabShowsInternalPage(tabId)) {
-          useWorkspaceStore.getState().updateBrowserTab(tabId, {
+          useWorkspaceStore.getState().updateBrowserView(tabId, {
             faviconUrl: payload.url,
           });
         }
@@ -342,7 +323,7 @@ export function BrowserRuntimeBridge() {
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
         const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-          (candidate) => candidate.activeTabId === tabId,
+          (candidate) => candidate.activeViewId === tabId,
         );
         if (!pane) return;
         const workspace = document.querySelector<HTMLElement>(
@@ -387,7 +368,7 @@ export function BrowserRuntimeBridge() {
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
         const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-          (candidate) => candidate.activeTabId === tabId,
+          (candidate) => candidate.activeViewId === tabId,
         );
         if (!pane) return;
         const ai = useAiSurfaceStore.getState();
@@ -444,7 +425,7 @@ export function BrowserRuntimeBridge() {
       }),
       listen<string>("misty://open-web-url", ({ payload }) => {
         if (disposed || !/^https?:\/\//i.test(payload)) return;
-        const tab = useWorkspaceStore.getState().openBrowserTab({
+        const tab = useWorkspaceStore.getState().openBrowserView({
           url: payload,
         });
         if (tab) navigate(tab.route);

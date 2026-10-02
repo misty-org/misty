@@ -11,7 +11,7 @@ import { ConnectedDevicePairingDialog } from "@/features/files/workspace";
 import { useSpacesStore } from "@/features/spaces";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input, OptionSelect } from "@/shared/ui";
+import { Button, Input } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -20,7 +20,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { SwitchControl, TextControl } from "../SettingsControls";
+import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 export function PreferenceRow({ id }: { id: string }) {
@@ -44,9 +44,7 @@ export function PreferenceRow({ id }: { id: string }) {
           onChange={update}
         />
       ) : d.enum ? (
-        <OptionSelect
-          className="w-[220px] max-w-full"
-          aria-label={d.label}
+        <ChoiceControl
           disabled={store.working || !ready}
           value={String(value)}
           onValueChange={update}
@@ -196,9 +194,7 @@ export function AgentDefaultsSection(props: SettingsContentProps) {
       description="Individual agent and conversation choices take precedence. Existing conversations stay unchanged."
     >
       <Row label="Default model">
-        <OptionSelect
-          className="w-[220px] max-w-full"
-          aria-label="Default model"
+        <ChoiceControl
           value={model}
           disabled={loading || !!error || props.working}
           onValueChange={(value) => {
@@ -220,9 +216,7 @@ export function AgentDefaultsSection(props: SettingsContentProps) {
         label="Default reasoning"
         description={!levels.length ? "This model uses its own reasoning defaults." : undefined}
       >
-        <OptionSelect
-          className="w-[220px] max-w-full"
-          aria-label="Default reasoning"
+        <ChoiceControl
           value={levels.some((level) => level === reasoning) ? reasoning : ""}
           disabled={!levels.length || props.working}
           onValueChange={(value) =>
@@ -249,8 +243,8 @@ export function NativeAvailability({ feature }: { feature: string }) {
   return (
     <Section title={feature}>
       <p className="p-5 text-sm text-cream-muted">
-        Open Misty on a supported device to configure {feature.toLowerCase()}. Your profile
-        preferences remain available here.
+        Open Misty on a supported device to configure {feature.toLowerCase()}. Your settings remain
+        available here.
       </p>
     </Section>
   );
@@ -266,17 +260,17 @@ export function CompanionSection() {
   );
 }
 export function DevicesSection() {
-  return hasTauriInternals() ? <DeviceControls /> : <NativeAvailability feature="Devices" />;
+  return hasTauriInternals() ? <DeviceControls /> : <NativeAvailability feature="File sharing" />;
 }
 function DeviceControls() {
   const devices = useConnectedDevices();
   const [pairing, setPairing] = useState(false);
   const [error, setError] = useState("");
   return (
-    <Section title="Connected devices">
+    <Section title="Paired devices" description="Pair devices to send files between them.">
       <div className="flex gap-2 p-4">
         <Button variant="outline" onClick={() => setPairing(true)}>
-          Connect device
+          Pair device
         </Button>
         <Button
           variant="ghost"
@@ -300,7 +294,7 @@ function DeviceControls() {
         </Row>
       ))}
       {!devices.peers.length && (
-        <p className="p-5 text-sm text-cream-muted">No connected devices.</p>
+        <p className="p-5 text-sm text-cream-muted">No devices paired for file sharing.</p>
       )}
       {(error || devices.error) && (
         <p role="alert" className="p-5">

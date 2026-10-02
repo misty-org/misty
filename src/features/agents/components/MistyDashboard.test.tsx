@@ -98,7 +98,7 @@ it("discards a previous account's pending activity response", async () => {
       },
     ],
   });
-  await waitFor(() => expect(screen.getByText(/No activity yet/)).toBeTruthy());
+  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
   expect(screen.queryByText("Other account secret")).toBeNull();
 });
 it("opens task details without any conversation navigation", async () => {
@@ -134,7 +134,8 @@ it("shows a recoverable error when activity cannot be loaded", async () => {
     expect.stringContaining("Could not load activity"),
   );
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-  expect(await screen.findByText("No activity yet.")).toBeTruthy();
+  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  expect(screen.queryByText("No activity yet.")).toBeNull();
 });
 
 it("uses an explicit historical filter only when requested", async () => {
@@ -151,7 +152,8 @@ it("loads personal activity without a Space", async () => {
   fixture.activity.mockResolvedValue({ entries: [] });
   render(<MistyDashboard />);
   await waitFor(() => expect(fixture.activity).toHaveBeenCalledWith("", undefined));
-  expect(await screen.findByText("No activity yet.")).toBeTruthy();
+  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  expect(screen.queryByText("No activity yet.")).toBeNull();
 });
 
 it("keeps approvals attached to their task run", async () => {
@@ -180,4 +182,36 @@ it("keeps approvals attached to their task run", async () => {
   await waitFor(() =>
     expect(fixture.decideApproval).toHaveBeenCalledWith("approval-run", "approval-1", "approve"),
   );
+});
+
+it.each([
+  ["running", "working"],
+  ["awaiting_device", "waiting_for_device"],
+  ["awaiting_approval", "needs_input"],
+  ["queued", "queued"],
+  ["completed", "idle"],
+])("reports %s background activity to the overview as %s", async (state, expected) => {
+  fixture.activity.mockResolvedValue({
+    entries: [
+      {
+        id: "background",
+        kind: "invocation",
+        title: "Background task",
+        state,
+        events: [],
+        updated_at: new Date().toISOString(),
+      },
+    ],
+  });
+  const report = vi.fn();
+  render(<MistyDashboard agentId="misty" onActivityStateChange={report} />);
+  await waitFor(() => expect(report).toHaveBeenLastCalledWith(expected));
+});
+
+it("renders the empty activity collection without an extra information block", async () => {
+  fixture.activity.mockResolvedValue({ entries: [] });
+  render(<MistyDashboard collection={{ query: "", view: "list" }} />);
+  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  expect(screen.queryByText("No activity yet.")).toBeNull();
+  expect(screen.getAllByRole("row")).toHaveLength(1);
 });

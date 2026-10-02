@@ -46,7 +46,7 @@ export const menuItemClass = cn(
   "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 );
 
-/** A row with a check/dot indicator pinned to the right edge. */
+/** A row with a checkmark indicator pinned to the right edge. */
 export const menuIndicatorItemClass = `${menuItemClass} pr-8`;
 export const menuIndicatorClass =
   "pointer-events-none absolute right-2 flex size-4 items-center justify-center";

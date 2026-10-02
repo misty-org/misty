@@ -1,10 +1,4 @@
-import type {
-  ConnectedDevicesSnapshot,
-  OpenWorkspaceRouteRequest,
-  OpenWorkspaceRouteResult,
-  PeerResponse,
-  PeerRoot,
-} from "@/native/ipc";
+import type { ConnectedDevicesSnapshot, PeerRoot } from "@/native/ipc";
 import { invoke } from "./invoke";
 
 export function connectedDevicesInitialize(request: {
@@ -34,33 +28,8 @@ export function connectedDevicesConnect(request: {
   return invoke("connected_devices_connect", { request });
 }
 
-export function connectedDevicesOpenWorkspaceRoute(
-  deviceId: string,
-  request: OpenWorkspaceRouteRequest,
-): Promise<OpenWorkspaceRouteResult> {
-  return invoke("connected_devices_open_workspace_route", { deviceId, request });
-}
-
 export function connectedDevicesRoots(deviceId: string): Promise<PeerRoot[]> {
   return invoke("connected_devices_roots", { deviceId });
-}
-
-export function connectedDevicesListDirectory(request: {
-  deviceId: string;
-  path: string;
-  showHidden?: boolean;
-}): Promise<PeerResponse> {
-  return invoke("connected_devices_list_directory", { request });
-}
-
-export function connectedDevicesReadFile(request: {
-  deviceId: string;
-  path: string;
-  offset: number;
-  length?: number | null;
-  expectedSnapshot?: string | null;
-}): Promise<number[]> {
-  return invoke("connected_devices_read_file", { request });
 }
 
 export function connectedDevicesMediaUrl(path: string): Promise<string> {

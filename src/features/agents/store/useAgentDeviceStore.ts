@@ -6,6 +6,7 @@ import {
 } from "@/api/deployment/api";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { devicesApi } from "@/api/devices/api";
+import { secureId } from "@/shared/platform/secureId";
 import type { AgentDevice } from "../model/interfaces/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
 
@@ -19,10 +20,7 @@ const heartbeatIntervalMs = 30_000;
 // failures only for this deployment/account generation and exact identity.
 const registrationAttempts = new Map<string, Promise<ServerTrustedDevice>>();
 const registrationConflicts = new Map<string, ManagedAiRequestError>();
-export let browserDeviceSessionId =
-  typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `browser-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+export let browserDeviceSessionId = secureId();
 
 export const agentDeviceCapabilities = {
   document_intelligence: true,
@@ -173,6 +171,16 @@ async function registerServerDevice(
     if (registrationAttempts.get(registrationKey) === attempt)
       registrationAttempts.delete(registrationKey);
   }
+}
+
+/** Records liveness the server confirmed through another call (Connected
+ * Devices presence), so this device sends no second heartbeat. */
+export function noteServerAgentDeviceSeen(deviceId: string): void {
+  lastHeartbeatByServerId.set(deviceId, Date.now());
+}
+
+export function serverAgentDeviceSeenWithin(deviceId: string, ms: number): boolean {
+  return Date.now() - (lastHeartbeatByServerId.get(deviceId) ?? 0) < ms;
 }
 
 export async function heartbeatServerAgentDevice(

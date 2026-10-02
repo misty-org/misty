@@ -2,7 +2,7 @@ import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deploymen
 import { useActivityStore } from "@/features/activity";
 import { resetAiSurfaceAccountState } from "@/features/ai-surface";
 import { useAppRouteMemoryStore } from "@/features/app-shell";
-import type { CurrentLicense } from "@/features/installer";
+import type { CurrentLicense } from "@/features/native-session";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState } from "@/features/spaces";
 import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";

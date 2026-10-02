@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/workspace";
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
 beforeEach(() => {
@@ -7,7 +7,7 @@ beforeEach(() => {
   native.invoke.mockReset().mockResolvedValue(true);
 });
 const input = {
-  tab: { id: "tab-1", instanceKey: "one" } as WorkspaceTab,
+  tab: { id: "tab-1", instanceKey: "one" } as WorkspaceView,
   url: "https://example.test",
   bounds: { x: 0, y: 0, width: 800, height: 600 },
   theme: "dark" as const,

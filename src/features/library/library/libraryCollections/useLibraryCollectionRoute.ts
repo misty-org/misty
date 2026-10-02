@@ -26,7 +26,7 @@ export function useLibraryCollectionRoute(data: SpaceLibraryData): SelectCollect
 
   const selectCollection: SelectCollection = useCallback(
     (next, id = "") => {
-      if (next === "smart" || next === "people" || next === "groups") {
+      if (next === "people" || next === "groups") {
         next = "recent";
         id = "";
       }
@@ -60,11 +60,7 @@ export function useLibraryCollectionRoute(data: SpaceLibraryData): SelectCollect
   );
 
   useEffect(() => {
-    if (
-      requestedCollection === "smart" ||
-      requestedCollection === "people" ||
-      requestedCollection === "groups"
-    ) {
+    if (requestedCollection === "people" || requestedCollection === "groups") {
       selectCollection("recent");
       return;
     }

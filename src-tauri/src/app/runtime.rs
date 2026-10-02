@@ -9,7 +9,7 @@ use crate::infra::connected_devices::ConnectedDevicesService;
 #[cfg(desktop)]
 use crate::infra::media_search::MediaSearchService;
 use crate::infra::{
-    agents::AgentService, claude::ClaudeService, commands::CommandService, devices::DeviceService,
+    agents::AgentService, commands::CommandService, devices::DeviceService,
     directory_size::DirectorySizeService, environment::AppEnvironmentService,
     explorer::ExplorerService, explorer_library::ExplorerLibraryService,
     file_sync::FileSyncService, metadata::MetadataService, operation_queue::OperationQueueService,
@@ -41,7 +41,6 @@ pub struct MistyRuntime {
     pub workspaces: WorkspaceService,
     pub operation_queue: OperationQueueService,
     pub agents: AgentService,
-    pub claude: ClaudeService,
 }
 
 impl MistyRuntime {
@@ -96,7 +95,6 @@ impl MistyRuntime {
             operation_queue.clone(),
         );
         let agents = AgentService::new(environment.clone());
-        let claude = ClaudeService::new();
         let file_sync = FileSyncService::new(
             environment.clone(),
             explorer.clone(),
@@ -131,7 +129,6 @@ impl MistyRuntime {
             workspaces,
             operation_queue,
             agents,
-            claude,
         }
     }
 }

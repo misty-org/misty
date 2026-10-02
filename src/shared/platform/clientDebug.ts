@@ -52,16 +52,6 @@ export function readClientDebugEvents(): ClientDebugEvent[] {
   }
 }
 
-export function clearClientDebugEvents(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(debugStorageKey);
-    window.dispatchEvent(new CustomEvent("misty-client-debug"));
-  } catch {
-    // Ignore unavailable storage.
-  }
-}
-
 export function clientDebugPanelEnabled(): boolean {
   return import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1";
 }

@@ -1,9 +1,9 @@
 import { ShortcutRuntime } from "@/features/shortcuts";
 import {
   allLayoutViews,
-  configureWorkspaceDefaultTab,
+  configureWorkspaceDefaultView,
   dockLeaves,
-  dockTabs,
+  dockTreeViews,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
 } from "@/features/workspace";
@@ -11,7 +11,7 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
-import { virtualWindowTransition } from "./useVirtualWindowTransition";
+import { windowTransition } from "./useWindowTransition";
 
 vi.mock("./WorkspaceDockTree", () => ({
   WorkspaceDockTree: (props: {
@@ -24,7 +24,7 @@ vi.mock("./WorkspaceDockTree", () => ({
       </button>
     </div>
   ),
-  minimumForWorkspaceTabs: () => ({ width: 280, height: 180 }),
+  minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
 
 function LocationProbe() {
@@ -50,11 +50,11 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     });
     Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
     useWorkspaceStore.persist.clearStorage();
+    configureWorkspaceDefaultView(1);
     useWorkspaceStore.getState().reset();
-    configureWorkspaceDefaultTab(0);
   });
   afterEach(() => {
-    configureWorkspaceDefaultTab(0);
+    configureWorkspaceDefaultView(0);
     cleanup();
     if (originalAnimate) HTMLElement.prototype.animate = originalAnimate;
     else delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
@@ -68,21 +68,21 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
         <WorkspaceCanvas />
       </MemoryRouter>,
     );
-    const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
+    const firstWindowId = useWorkspaceStore.getState().activeWindowId;
     expect(animate).not.toHaveBeenCalled();
 
     fireEvent.keyDown(window, { key: "n", code: "KeyN", metaKey: true });
-    const windows = useWorkspaceStore.getState().virtualWindowsByScope.global ?? [];
+    const windows = useWorkspaceStore.getState().windowsByScope.global ?? [];
     expect(windows).toHaveLength(2);
-    expect(useWorkspaceStore.getState().activeVirtualWindowId).not.toBe(firstWindowId);
-    expect(animate).toHaveBeenLastCalledWith(expect.any(Array), virtualWindowTransition);
+    expect(useWorkspaceStore.getState().activeWindowId).not.toBe(firstWindowId);
+    expect(animate).toHaveBeenLastCalledWith(expect.any(Array), windowTransition);
 
     fireEvent.keyDown(window, {
       key: "`",
       code: "Backquote",
       metaKey: true,
     });
-    expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(firstWindowId);
+    expect(useWorkspaceStore.getState().activeWindowId).toBe(firstWindowId);
     expect(animate).toHaveBeenCalledTimes(2);
   });
 
@@ -96,28 +96,28 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
       </MemoryRouter>,
     );
     if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Home" }));
-    else fireEvent.click(ui.getByRole("tab", { name: "Google" }));
+    else fireEvent.click(ui.getByRole("tab", { name: "New Tab" }));
     expect(ui.getByTestId("location").textContent).toBe("/browser");
     fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));
     expect(ui.getByTestId("location").textContent).toBe("/before");
   });
 
-  it("opens Google when the final tab closes without a Spaces snapshot", async () => {
+  it("leaves the final tab closed until the new-tab shortcut is used", async () => {
     render(
       <MemoryRouter initialEntries={["/browser"]}>
+        <ShortcutRuntime />
         <WorkspaceCanvas />
       </MemoryRouter>,
     );
-    const initial = dockTabs(useWorkspaceStore.getState().layout.root)[0];
+    const initial = allLayoutViews(useWorkspaceStore.getState().layout)[0];
     act(() => {
-      expect(useWorkspaceStore.getState().closeTab(initial.id)).toBe(true);
+      expect(useWorkspaceStore.getState().closeView(initial.id)).toBe(true);
     });
-    await waitFor(() => {
-      expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-        { title: "Google", route: "/browser", surfaceId: "browser" },
-      ]);
-    });
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)[0].id).not.toBe(initial.id);
+    await waitFor(() => expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual([]));
+    fireEvent.keyDown(window, { key: "t", code: "KeyT", metaKey: true });
+    const reopened = allLayoutViews(useWorkspaceStore.getState().layout);
+    expect(reopened).toMatchObject([{ surfaceId: "browser", route: "/browser" }]);
+    expect(reopened[0].id).not.toBe(initial.id);
   });
 
   it("creates an independent Google tab and lets the previous tab close", () => {
@@ -132,9 +132,9 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     const views = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(views).toHaveLength(2);
     expect(new Set(views.map((tab) => tab.instanceKey)).size).toBe(2);
-    expect(views.every((tab) => tab.surfaceId === "browser" && !tab.placeholder)).toBe(true);
+    expect(views.every((tab) => tab.surfaceId === "browser")).toBe(true);
     act(() => {
-      expect(useWorkspaceStore.getState().closeTab(initial.id)).toBe(true);
+      expect(useWorkspaceStore.getState().closeView(initial.id)).toBe(true);
     });
     const remaining = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(remaining).toHaveLength(1);
@@ -142,11 +142,11 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
   });
 
   it("opens Google in a new split while preserving the Agents panel", async () => {
-    const initial = dockTabs(useWorkspaceStore.getState().layout.root)[0];
+    const initial = dockTreeViews(useWorkspaceStore.getState().layout.root)[0];
     const request = workspaceSurfaceFromRoute("/agents");
     if (!request) throw new Error("Expected Agents surface");
     const agents = useWorkspaceStore.getState().openSurface(request);
-    useWorkspaceStore.getState().closeTab(initial.id);
+    useWorkspaceStore.getState().closeView(initial.id);
     const view = render(
       <MemoryRouter initialEntries={[agents.route]}>
         <LocationProbe />
@@ -159,12 +159,12 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
       const panes = dockLeaves(layout.root);
       expect(panes).toHaveLength(2);
       const focused = panes.find((pane) => pane.id === layout.focusedPaneId);
-      expect(focused?.tabs.find((tab) => tab.id === focused.activeTabId)).toMatchObject({
-        title: "Google",
+      expect(focused?.views.find((tab) => tab.id === focused.activeViewId)).toMatchObject({
+        title: "google.com",
         route: "/browser",
         surfaceId: "browser",
       });
-      expect(dockTabs(layout.root)).toContainEqual(
+      expect(dockTreeViews(layout.root)).toContainEqual(
         expect.objectContaining({ id: agents.id, surfaceId: "agents" }),
       );
       expect(view.getByTestId("location").textContent).toBe("/browser");

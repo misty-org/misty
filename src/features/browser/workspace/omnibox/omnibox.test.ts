@@ -124,7 +124,7 @@ describe("omnibox ranking", () => {
     );
     const rows = matches.filter((match) => match.target.url === "https://docs.example.com/start");
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ bookmarked: true, removable: true, switchTabId: "tab-2" });
+    expect(rows[0]).toMatchObject({ bookmarked: true, removable: true, switchViewId: "tab-2" });
   });
 
   it("keeps private and agent tabs out of an ordinary tab's suggestions", async () => {

@@ -16,13 +16,13 @@ func TestSettingsProfilesSchemaMatchesClient(t *testing.T) {
 		t.Fatal("client/server settings allowlists differ")
 	}
 }
-func TestSettingsProfilesRejectNonportableAndInvalidValues(t *testing.T) {
-	for _, values := range []map[string]any{{"browser.downloads.directory": "/tmp"}, {"credentials": "secret"}, {"browser.searchEngine": "invalid"}, {"files.hidden": "true"}, {"app.appearance.panel_opacity": 2.0}} {
+func TestSettingsProfilesRejectUnknownAndInvalidValues(t *testing.T) {
+	for _, values := range []map[string]any{{"credentials": "secret"}, {"browser.searchEngine": "invalid"}, {"files.hidden": "true"}, {"app.appearance.panel_opacity": 2.0}} {
 		if ValidateProfilePatch(values, nil) == nil {
 			t.Fatalf("accepted invalid values: %v", values)
 		}
 	}
-	if err := ValidateProfilePatch(map[string]any{"browser.searchEngine": "bing", "files.hidden": true}, nil); err != nil {
+	if err := ValidateProfilePatch(map[string]any{"browser.searchEngine": "bing", "files.hidden": true, "browser.downloads.directory": "/tmp", "app.zoom": 1.25, "app.shortcuts.bindings": "[]"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if ValidateProfilePatch(map[string]any{"files.hidden": true}, []string{"files.hidden"}) == nil {
@@ -30,5 +30,17 @@ func TestSettingsProfilesRejectNonportableAndInvalidValues(t *testing.T) {
 	}
 	if ValidateProfilePatch(nil, []string{"unknown"}) == nil {
 		t.Fatal("accepted reset of unknown setting")
+	}
+}
+
+func TestCollectionTabOrderPreferences(t *testing.T) {
+	key := "collections.tabs.journal"
+	for _, raw := range []string{`{}`, `[1]`, `["all","all"]`, `["bad id"]`} {
+		if ValidateProfilePatch(map[string]any{key: raw}, nil) == nil {
+			t.Fatalf("accepted invalid order: %s", raw)
+		}
+	}
+	if err := ValidateProfilePatch(map[string]any{key: `["drawings","all","notes"]`}, nil); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -21,13 +21,18 @@ function Fixture({ position = "left" }: { position?: DockPosition }) {
           </button>
         </div>
       </div>
-      <button aria-expanded="true">Activity</button>
-      <button data-state="open">Sync</button>
-      <button>Search</button>
+      <div data-navigator-profile-bar="fixed">
+        <button aria-expanded="true">Activity</button>
+        <button data-state="open">Sync</button>
+        <button>Search</button>
+        <button data-navigation-destination aria-pressed="true">
+          Settings
+        </button>
+        <button aria-label="Profile" aria-expanded="true">
+          Profile
+        </button>
+      </div>
       <button>Create Space</button>
-      <button aria-label="Profile" aria-expanded="true">
-        Profile
-      </button>
       <NavigatorEdgeMarkers navigatorRef={ref} position={position} />
     </nav>
   );
@@ -60,15 +65,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("anchors markers outside the nested rail and excludes utility controls even when open", () => {
-  render(<Fixture />);
-  expect(markers()).toHaveLength(3);
-  expect(screen.getByRole("navigation").contains(markers()[0])).toBe(false);
-  expect(markers()[0].dataset).toMatchObject({ edge: "left", state: "active" });
-  expect(markers()[0].style.top).toBe("116px");
-  expect(markers()[1].dataset.state).toBe("hidden");
-  expect(markers()[2].style.top).toBe("216px");
-});
+it.each(["left", "right", "top", "bottom"] as const)(
+  "excludes active utility controls from the %s edge",
+  (position) => {
+    render(<Fixture position={position} />);
+    expect(markers()).toHaveLength(3);
+    expect(screen.getByRole("navigation").contains(markers()[0])).toBe(false);
+    expect(markers()[0].dataset).toMatchObject({ edge: position, state: "active" });
+    expect(markers()[1].dataset.state).toBe("hidden");
+    expect(markers()[2].dataset.state).toBe("active");
+  },
+);
 
 it("moves the active marker to Spaces when its selected child is collapsed", async () => {
   render(<Fixture />);

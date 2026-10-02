@@ -15,7 +15,6 @@ import type {
   GeneratedImageThumbnail,
   ListDirectoryRequest,
   MediaSearchSnapshot,
-  NativeWorkspaceDocument,
   OperationQueueSnapshot,
   PasteBlobRequest,
   PasteItemsRequest,
@@ -35,8 +34,6 @@ import type {
   SearchResult,
   SearchScanRequest,
   SearchStatus,
-  SettingsSnapshot,
-  SmartLibraryAsset,
   SmartLibraryAssetsPage,
   SmartLibraryAssetsPageRequest,
   SmartLibraryImportPreflight,
@@ -101,26 +98,6 @@ export function searchCancelScan(): Promise<SearchStatus> {
 }
 export function searchQuery(request: SearchQueryRequest): Promise<SearchResult[]> {
   return invokeSearch("search_query", {
-    request,
-  });
-}
-export function explorerCreateItem(request: CreateItemRequest): Promise<ExplorerOperationResult> {
-  return invoke("explorer_create_item", {
-    request,
-  });
-}
-export function explorerRenameItem(request: RenameItemRequest): Promise<ExplorerOperationResult> {
-  return invoke("explorer_rename_item", {
-    request,
-  });
-}
-export function explorerDeleteItems(request: DeleteItemsRequest): Promise<ExplorerOperationResult> {
-  return invoke("explorer_delete_items", {
-    request,
-  });
-}
-export function explorerPasteItems(request: PasteItemsRequest): Promise<ExplorerOperationResult> {
-  return invoke("explorer_paste_items", {
     request,
   });
 }
@@ -279,19 +256,6 @@ export function smartLibrarySetServerFolderId(
     serverFolderId,
   });
 }
-export function smartLibrarySearch(
-  query: string,
-  collection?: string,
-  limit = 100,
-): Promise<SmartLibraryAsset[]> {
-  return invoke("smart_library_search", {
-    request: {
-      query,
-      collection,
-      limit,
-    },
-  });
-}
 export function smartLibraryDelete(): Promise<SmartLibrarySnapshot> {
   return invoke("smart_library_delete");
 }
@@ -419,15 +383,6 @@ export function explorerOpenAssociation(filePath: string): Promise<string | null
     filePath,
   });
 }
-export function explorerSetOpenAssociation(
-  filePath: string,
-  applicationPath: string,
-): Promise<SettingsSnapshot> {
-  return invoke("explorer_set_open_association", {
-    filePath,
-    applicationPath,
-  });
-}
 export function explorerQueuePasteItems(
   request: PasteItemsRequest,
 ): Promise<OperationQueueSnapshot> {
@@ -471,15 +426,5 @@ export function explorerQueueDeleteItems(
 ): Promise<OperationQueueSnapshot> {
   return invoke("explorer_queue_delete_items", {
     request,
-  });
-}
-export function workspacesSnapshot(): Promise<NativeWorkspaceDocument> {
-  return invoke("workspaces_snapshot");
-}
-export function workspacesSave(
-  document: NativeWorkspaceDocument,
-): Promise<NativeWorkspaceDocument> {
-  return invoke("workspaces_save", {
-    document,
   });
 }

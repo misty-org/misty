@@ -3,11 +3,11 @@ import { SystemErrorActivity } from "@/features/activity";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useAuth } from "@/features/auth";
 import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import { useConnectionsStore } from "@/features/integrations";
 import { MistyPicker } from "@/features/picker";
 import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import { configureSocialRuntime } from "./SocialRuntime";
 export function initializeHostSocialRuntime() {
@@ -16,12 +16,12 @@ export function initializeHostSocialRuntime() {
     api: spacesApi,
     useSpacesStore,
     useAuth,
-    useSetupStore,
+    useNativeSessionStore,
     useConnectionsStore,
     Picker: MistyPicker,
     Error: SystemErrorActivity,
     useAiSurfaceAdapter,
-    useWorkspaceTabTitle,
+    useWorkspaceViewTitle: useWorkspaceViewTitle,
     useSpaceChatDraft,
     openProviderAuthorizationLink,
   });

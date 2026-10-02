@@ -13,7 +13,7 @@ fn scope() -> VaultScope {
     VaultScope {
         deployment: "https://sync.example.test".into(),
         account_id: "account-fixture".into(),
-        workspace_id: Uuid::new_v4().to_string(),
+        vault_id: Uuid::new_v4().to_string(),
     }
 }
 

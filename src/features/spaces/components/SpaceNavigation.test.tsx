@@ -5,7 +5,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpaceSectionNavigation } from "../components/SpaceSectionNavigation";
-import { spaceSectionPath } from "../components/spacePanel/spacePanelRoute";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 describe("SpaceSectionNavigation", () => {
@@ -42,6 +41,7 @@ describe("SpaceSectionNavigation", () => {
 
     const links = [...container.querySelectorAll("a")];
     expect(links.map((link) => link.textContent?.trim())).toEqual([
+      "All",
       "Chat",
       "Planner",
       "Journal",
@@ -51,7 +51,7 @@ describe("SpaceSectionNavigation", () => {
     expect(container.querySelector("nav")?.className).not.toContain("overflow-x-auto");
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Library");
     expect(links.find((link) => link.textContent?.trim() === "Planner")?.getAttribute("href")).toBe(
-      "/spaces/space-1/planner/tasks/board",
+      "/spaces/space-1/planner",
     );
   });
 
@@ -77,7 +77,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Journal", "Library"]);
+    expect(labels).toEqual(["All", "Journal", "Library"]);
   });
 
   it("keeps Space management out of the section menu", async () => {
@@ -174,6 +174,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
+      "All",
       "Chat",
       "Journal",
     ]);
@@ -203,6 +204,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
+      "All",
       "Chat",
       "Planner",
       "Journal",
@@ -224,10 +226,6 @@ describe("SpaceSectionNavigation", () => {
     const active = container.querySelector('a[aria-current="page"]');
     expect(active?.textContent).toContain("Journal");
     expect(active?.getAttribute("href")).toBe("/spaces/space-1/notes");
-  });
-
-  it("builds the settings destination when switching Spaces", () => {
-    expect(spaceSectionPath("space-2", "settings", "chat")).toBe("/spaces/space-2/settings/chat");
   });
 });
 

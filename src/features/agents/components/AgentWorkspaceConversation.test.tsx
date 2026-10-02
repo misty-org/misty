@@ -1,11 +1,26 @@
+import { createRef } from "react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCompanionPresentation, useCompanionState } from "../companion/companionState";
 import { AgentCompanionPanel } from "../companion/AgentCompanionPanel";
-import { AgentWorkspaceConversation } from "./AgentWorkspaceConversation";
+import { AgentWorkspaceConversation, type AgentVoiceControl } from "./AgentWorkspaceConversation";
+const voiceMock = vi.hoisted(() => ({
+  recording: false,
+  requesting: false,
+  transcribing: false,
+  start: vi.fn(async () => {}),
+  stop: vi.fn(),
+  onTranscript: undefined as ((text: string) => void) | undefined,
+}));
+vi.mock("@/features/ai-surface/useAiVoiceRecorder", () => ({
+  useAiVoiceRecorder: (options: { onTranscript(text: string): void }) => {
+    voiceMock.onTranscript = options.onTranscript;
+    return voiceMock;
+  },
+}));
 vi.mock("@/features/global-search/MistyModelPicker", () => ({
   MistyModelPicker: () => null,
 }));
@@ -41,6 +56,7 @@ const renderWorkspace = (profile = agent) =>
   );
 beforeEach(() => {
   vi.clearAllMocks();
+  voiceMock.recording = false;
   useCompanionState.setState({
     accountId: "owner",
     submit: async ({ prompt, attachments, conversationId }) =>
@@ -219,4 +235,31 @@ it("sends follow-ups to the scheduled conversation even when another chat is glo
   fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
   await waitFor(() => expect(submit).toHaveBeenCalledOnce());
   expect(submit.mock.calls[0][5]).toEqual({ conversationId: "scheduled-chat", context: [] });
+});
+
+it("shares panel voice controls with the composer and leaves transcription for review", async () => {
+  const voiceRef = createRef<AgentVoiceControl>();
+  const view = () => (
+    <MemoryRouter>
+      <AgentWorkspaceConversation
+        agent={agent}
+        spaceId=""
+        accountId="owner"
+        onCreate={() => {}}
+        voiceControlRef={voiceRef}
+      />
+    </MemoryRouter>
+  );
+  const { rerender } = render(view());
+  voiceRef.current?.toggle();
+  expect(voiceMock.start).toHaveBeenCalledOnce();
+  voiceMock.recording = true;
+  rerender(view());
+  voiceRef.current?.toggle();
+  expect(voiceMock.stop).toHaveBeenCalledOnce();
+  await act(async () => voiceMock.onTranscript?.("Review my notes"));
+  expect(
+    (screen.getByRole("textbox", { name: "Message Misty" }) as HTMLTextAreaElement).value,
+  ).toBe("Review my notes");
+  expect(submit).not.toHaveBeenCalled();
 });

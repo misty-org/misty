@@ -6,7 +6,6 @@ import type {
   SemanticReindexCompletion,
   SemanticReindexInput,
   SemanticReindexPlan,
-  SemanticSearchHit,
   SemanticSearchResponse,
   SmartLibraryPreviewInput,
   SmartLibraryProgress,
@@ -150,14 +149,6 @@ export function completeSemanticReindex(
   return smartLibraryApi.completeReindex(jobId, assets);
 }
 
-export function searchSmartLibrary(
-  folderId: string,
-  query: string,
-  limit = 100,
-): Promise<SemanticSearchResponse> {
-  return smartLibraryApi.searchFolder(folderId, query, limit);
-}
-
 export async function deleteSmartLibraryFolder(folderId: string): Promise<void> {
   await smartLibraryApi.removeFolder(folderId);
 }
@@ -177,5 +168,3 @@ function validatePreviewBatch(previews: SmartLibraryPreviewInput[]): void {
     throw new Error("Library analysis batches must contain one to eight previews.");
   }
 }
-
-export type SmartLibrarySearchHit = SemanticSearchHit;

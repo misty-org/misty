@@ -1,12 +1,13 @@
 import { afterEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ http: vi.fn(), generation: 1 }));
-vi.mock("./client/http", () => ({ httpRequest: mocks.http }));
+const mocks = vi.hoisted(() => ({ http: vi.fn(), generation: 1, invalid: vi.fn() }));
+vi.mock("./client/http", () => ({ httpRequest: mocks.http, httpOutageRemainingMs: () => 0 }));
 vi.mock("./deployment/api", () => ({
   readDeploymentScope: () => "test",
   resolveApiBase: async () => "https://events.example/api",
 }));
 vi.mock("./client/session", () => ({
   apiRequestCredentials: () => "include",
+  notifyApiSessionInvalid: mocks.invalid,
   readApiAuthToken: async () => "",
   readApiSessionGeneration: () => mocks.generation,
 }));
@@ -164,4 +165,13 @@ it("hands the shared stream to a waiting window when its leader closes", async (
     else Reflect.deleteProperty(navigator, "locks");
     vi.unstubAllGlobals();
   }
+});
+
+it("reports a rejected cookie session once and stops stream retries", async () => {
+  vi.useFakeTimers();
+  mocks.http.mockResolvedValue(new Response("expired", { status: 401 }));
+  stops.push(subscribeAccountEvents("expired", vi.fn()));
+  await vi.advanceTimersByTimeAsync(600_000);
+  expect(mocks.http).toHaveBeenCalledTimes(1);
+  expect(mocks.invalid).toHaveBeenCalledTimes(1);
 });

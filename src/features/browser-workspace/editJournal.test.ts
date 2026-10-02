@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { EditJournal } from "./editJournal";
+import { EditJournal, editJournalKey } from "./editJournal";
 import type { WorkspaceChange } from "./model";
 const identity = {
   deployment: "https://misty.test",
   account_id: "a",
-  workspace_id: "w",
+  vault_id: "w",
   device_id: "d",
 };
 const change: WorkspaceChange = {
@@ -23,6 +23,89 @@ function disk() {
   };
 }
 describe("durable renderer edit journal", () => {
+  it("upgrades queued legacy changes without changing operation IDs or replaying the rename", () => {
+    const storage = disk();
+    storage.setItem(
+      editJournalKey(identity),
+      JSON.stringify({
+        version: 1,
+        edits: [
+          {
+            id: "pending-before-rename",
+            activeEpoch: "epoch:one",
+            changes: [
+              { action: "create", kind: "layout", id: "layout:one", fields: { title: "Work" } },
+              {
+                action: "patch",
+                kind: "tab",
+                id: "view:one",
+                fields: {
+                  website_id: "website:one",
+                  placement: { layout_id: "layout:one", pane_id: "pane:one", order: 0 },
+                },
+              },
+              {
+                action: "patch",
+                kind: "website",
+                id: "website:one",
+                fields: { group_id: "group:one" },
+              },
+              { action: "delete", kind: "group", id: "group:removed" },
+              {
+                action: "patch",
+                kind: "tab_group",
+                id: "group:tabs",
+                fields: { layout_ids: ["layout:one"] },
+              },
+              {
+                action: "patch",
+                kind: "saved_tab_group",
+                id: "group:saved",
+                fields: { layouts: "[]" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const journal = new EditJournal(storage, identity);
+    expect(journal.pending).toEqual([
+      {
+        id: "pending-before-rename",
+        activeEpoch: "epoch:one",
+        changes: [
+          { action: "create", kind: "tab", id: "layout:one", fields: { title: "Work" } },
+          {
+            action: "patch",
+            kind: "view",
+            id: "view:one",
+            fields: {
+              bookmark_id: "website:one",
+              placement: { tab_id: "layout:one", pane_id: "pane:one", order: 0 },
+            },
+          },
+          {
+            action: "patch",
+            kind: "bookmark",
+            id: "website:one",
+            fields: { folder_id: "group:one" },
+          },
+          { action: "delete", kind: "folder", id: "group:removed" },
+          {
+            action: "patch",
+            kind: "tab_group",
+            id: "group:tabs",
+            fields: { tab_ids: ["layout:one"] },
+          },
+          { action: "patch", kind: "saved_tab_group", id: "group:saved", fields: { tabs: "[]" } },
+        ],
+      },
+    ]);
+    journal.append([change], "epoch:one");
+    expect(JSON.parse(storage.getItem(editJournalKey(identity))!).version).toBe(2);
+    expect(new EditJournal(storage, identity).pending).toEqual(journal.pending);
+  });
+
   it("preserves IDs and batches across restart, isolated by account and deployment", () => {
     const storage = disk(),
       journal = new EditJournal(storage, identity);

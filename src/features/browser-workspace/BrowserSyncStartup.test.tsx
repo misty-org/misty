@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   generation: 1,
   transitioning: false,
   setState: vi.fn(),
+  locked: null as string | null,
+  reenroll: null as string | null,
 }));
 
 vi.mock("@/api/deployment/api", () => ({
@@ -27,8 +29,10 @@ vi.mock("./native", () => ({
   unlockNativeSync: mocks.unlock,
 }));
 vi.mock("./store", () => ({
-  browserSyncRetryEvent: "misty:retry-browser-sync",
-  useBrowserSyncStore: { setState: mocks.setState },
+  useBrowserSyncStore: {
+    setState: mocks.setState,
+    getState: () => ({ locked: mocks.locked, reenroll: mocks.reenroll }),
+  },
 }));
 
 import { BrowserSyncStartup } from "./BrowserSyncStartup";
@@ -45,6 +49,8 @@ describe("BrowserSyncStartup", () => {
     vi.resetAllMocks();
     vi.useFakeTimers();
     mocks.generation = 1;
+    mocks.locked = null;
+    mocks.reenroll = null;
     mocks.transitioning = false;
     mocks.credentials.mockResolvedValue("cookie-session:account-1");
   });
@@ -67,7 +73,7 @@ describe("BrowserSyncStartup", () => {
     expect(container.textContent).toBe("Local workspace");
   });
 
-  it("accepts a badge retry only for the active account", async () => {
+  it("does not start another recovery from obsolete retry events", async () => {
     mocks.read.mockResolvedValue(null);
     mocks.unlock.mockRejectedValue(new Error("Unavailable"));
     await act(async () =>
@@ -81,7 +87,25 @@ describe("BrowserSyncStartup", () => {
     await act(async () => {
       window.dispatchEvent(new CustomEvent("misty:retry-browser-sync", { detail: "account-1" }));
     });
-    expect(mocks.unlock).toHaveBeenCalledTimes(2);
+    expect(mocks.unlock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not apply an in-flight startup result after an explicit lock", async () => {
+    let finish!: (view: unknown) => void;
+    mocks.read.mockResolvedValue(null);
+    mocks.unlock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await act(async () =>
+      root.render(<BrowserSyncStartup accountId="account-1">Workspace</BrowserSyncStartup>),
+    );
+    mocks.locked = "account-1";
+    mocks.setState.mockClear();
+    await act(async () => finish({ account_id: "account-1", status: { phase: "ready" } }));
+    expect(mocks.setState.mock.calls.some(([update]) => update.session)).toBe(false);
   });
 
   it("restarts a terminal remembered session in the background", async () => {
@@ -297,3 +321,21 @@ describe("BrowserSyncStartup", () => {
     expect(mocks.unlock).toHaveBeenCalledTimes(1);
   });
 });
+
+// Explicit locking and rejected identities must not be undone by background retries.
+it.each(["locked", "reenroll"] as const)(
+  "does not auto-unlock an account marked %s",
+  async (field) => {
+    vi.clearAllMocks();
+    mocks.transitioning = false;
+    mocks[field] = "account-1";
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(<BrowserSyncStartup accountId="account-1">Workspace</BrowserSyncStartup>),
+    );
+    expect(mocks.credentials).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+    mocks[field] = null;
+  },
+);

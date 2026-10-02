@@ -1,14 +1,6 @@
 import type { CompareDialogSeed } from "../../model/interfaces/workspace/ExplorerCompareDialog";
-import type {
-  ContextMenuBranchItem,
-  ContextMenuEntry,
-} from "../../model/types/workspace/ExplorerContextMenu";
 import { useExplorerStore } from "../../store";
 import { explorerCompareWithEvent } from "../ExplorerWorkspaceConstants";
-
-export function isContextMenuBranch(item: ContextMenuEntry): item is ContextMenuBranchItem {
-  return "items" in item;
-}
 
 export function openCompareWith(paneId: string): void {
   window.dispatchEvent(

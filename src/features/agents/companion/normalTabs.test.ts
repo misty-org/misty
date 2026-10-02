@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   panes: [] as Array<{
     id: string;
-    activeTabId?: string;
-    tabs: Array<{ id: string; surfaceId: string; title: string }>;
+    activeViewId?: string;
+    views: Array<{ id: string; surfaceId: string; title: string }>;
   }>,
   open: vi.fn(),
   created: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
   useWorkspaceStore: {
     getState: () => ({
       layout: { root: {}, focusedPaneId: "focused" },
-      openBrowserTab: mocks.open,
+      openBrowserView: mocks.open,
     }),
   },
 }));
@@ -46,13 +46,13 @@ describe("ordinary companion browser tabs", () => {
     mocks.panes = [
       {
         id: "other",
-        activeTabId: "other",
-        tabs: [{ id: "other", surfaceId: "browser", title: "Other" }],
+        activeViewId: "other",
+        views: [{ id: "other", surfaceId: "browser", title: "Other" }],
       },
       {
         id: "focused",
-        activeTabId: "chosen",
-        tabs: [{ id: "chosen", surfaceId: "browser", title: "Chosen" }],
+        activeViewId: "chosen",
+        views: [{ id: "chosen", surfaceId: "browser", title: "Chosen" }],
       },
     ];
     const result = await companionBrowserContext(() => {});

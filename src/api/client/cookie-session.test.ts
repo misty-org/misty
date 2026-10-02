@@ -47,6 +47,56 @@ describe("JWT cookie transport", () => {
     });
   });
 
+  it("blocks rejected cookie generations locally but permits login and independent credentials", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(null, { status: 401 }));
+    const { cookieSessionFetch } = await import("./cookie-session");
+    const url = "https://misty.example/v1/settings/preferences";
+    expect((await cookieSessionFetch(url, {})).status).toBe(401);
+    expect(fetch).toHaveBeenCalledTimes(3); // request, /me validation, refresh
+    expect((await cookieSessionFetch(url, {})).status).toBe(401);
+    expect((await cookieSessionFetch("https://misty.example/v1/me", {})).status).toBe(401);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await cookieSessionFetch(url, { headers: { Authorization: "Bearer device-credential" } });
+    expect(fetch).toHaveBeenCalledTimes(4);
+    fetch.mockImplementation(async () => new Response(null, { status: 204 }));
+    await cookieSessionFetch("https://misty.example/v1/login", { method: "POST", body: "{}" });
+    expect((await cookieSessionFetch(url, {})).status).toBe(204);
+    expect(fetch).toHaveBeenCalledTimes(6);
+  });
+
+  it("clears a rejected generation after another window establishes cookies", async () => {
+    const channels: TestChannel[] = [];
+    class TestChannel {
+      onmessage?: (event: { data: string }) => void;
+      constructor() {
+        channels.push(this);
+      }
+      postMessage(data: string) {
+        for (const channel of channels) if (channel !== this) channel.onmessage?.({ data });
+      }
+    }
+    vi.stubGlobal("BroadcastChannel", TestChannel);
+    try {
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () => new Response(null, { status: 401 }));
+      const first = await import("./cookie-session");
+      const base = "https://misty.example/v1";
+      await first.cookieSessionFetch(`${base}/me`, {});
+      expect(fetch).toHaveBeenCalledTimes(3);
+      vi.resetModules(); // Separate window with its own transport cache.
+      const second = await import("./cookie-session");
+      fetch.mockImplementation(async () => new Response(null, { status: 204 }));
+      await second.cookieSessionFetch(`${base}/login`, { method: "POST" });
+      expect((await first.cookieSessionFetch(`${base}/me`, {})).status).toBe(204);
+      expect(fetch).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("answers account requests locally while signed out, without refreshing", async () => {
     native.enabled = true;
     native.fetch.mockImplementation(async () => new Response(null, { status: 204 }));
@@ -89,6 +139,35 @@ describe("JWT cookie transport", () => {
     await cookieSessionFetch("https://files.example/download", {});
     expect(browserFetch).toHaveBeenCalledTimes(4);
     expect(native.fetch).not.toHaveBeenCalled();
+  });
+
+  it("allows Google begin and completion while signed out without refreshing another session", async () => {
+    native.enabled = true;
+    native.fetch.mockImplementation(async () => new Response(null, { status: 202 }));
+    const { configureApiSession } = await import("./session");
+    configureApiSession({
+      isTransitioning: () => false,
+      readGeneration: () => 0,
+      readToken: async () => null,
+      isSignedOut: () => true,
+    });
+    const { cookieSessionFetch } = await import("./cookie-session");
+    await cookieSessionFetch("https://misty.example/v1/auth/google", { method: "GET" });
+    await cookieSessionFetch("https://misty.example/v1/auth/google", {
+      method: "POST",
+      body: "{}",
+    });
+    await cookieSessionFetch("https://misty.example/v1/auth/google/complete", {
+      method: "POST",
+      body: JSON.stringify({ flow_token: "secret" }),
+    });
+    expect(native.fetch.mock.calls.map(([url]) => url)).toEqual([
+      "https://misty.example/v1/auth/google",
+      "https://misty.example/v1/auth/google",
+      "https://misty.example/v1/auth/google/complete",
+    ]);
+    for (const [, options] of native.fetch.mock.calls)
+      expect(new Headers(options.headers).get("X-Misty-CSRF")).toBe("1");
   });
 
   it("shares a refresh across simultaneous expired requests without exposing tokens", async () => {

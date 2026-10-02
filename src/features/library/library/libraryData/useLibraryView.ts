@@ -12,7 +12,7 @@ export function useLibraryView() {
   const [selectedCollectionId, setSelectedCollectionId] = useState("");
   const [selectedAlbumFolderId, setSelectedAlbumFolderId] = useState("");
   const [mediaType, setMediaType] = useState<LibraryMediaType>("");
-  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("grid");
+  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("list");
   const [libraryItemScale, setLibraryItemScale] = useState(1);
   const [sort, setSort] = useState<NonNullable<LibraryItemQuery["sort"]>>("recently-added");
   const [direction, setDirection] = useState<NonNullable<LibraryItemQuery["direction"]>>("desc");

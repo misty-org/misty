@@ -1,7 +1,13 @@
+import type * as ClientModule from "./client";
 import { MockTelemetryClient } from "@/telemetry/client";
 import { ANALYTICS_SESSION_TIMEOUT_MS, AnalyticsLifecycleManager } from "@/telemetry/lifecycle";
 import type { CommonClientProperties } from "@/telemetry/model/interfaces/types";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./client", async (importOriginal) => {
+  const actual = await importOriginal<typeof ClientModule>();
+  return { ...actual, analytics: new actual.MockTelemetryClient() };
+});
 
 const metadata: CommonClientProperties = {
   platform: "macos",
@@ -108,7 +114,7 @@ describe("analytics lifecycle", () => {
     lifecycle.setAnalyticsAuthenticationState(true);
     expect(sync).toHaveBeenCalledTimes(1);
     lifecycle.telemetryPreferencesChanged(false, true);
-    expect(sync).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(sync).toHaveBeenCalledTimes(2));
     lifecycle.setAnalyticsAuthenticationState(false);
     lifecycle.telemetryPreferencesChanged(false, false);
     expect(sync).toHaveBeenCalledTimes(2);

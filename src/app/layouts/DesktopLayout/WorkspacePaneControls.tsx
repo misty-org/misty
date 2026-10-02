@@ -37,7 +37,7 @@ export function WorkspacePaneControls({
     {
       id: pane.id,
       paneId: pane.id,
-      label: pane.tabs.find((tab) => tab.id === pane.activeTabId)?.title ?? "Pane",
+      label: pane.views.find((tab) => tab.id === pane.activeViewId)?.title ?? "Pane",
       scope: "workspace-panes",
     },
     () => liftPanePresentation(root, pane.id),
@@ -147,7 +147,7 @@ export function WorkspacePaneControls({
                     key={target.id}
                     icon={<ArrowLeftRight />}
                     label={`Swap with pane ${index + 1}: ${
-                      target.tabs.find((tab) => tab.id === target.activeTabId)?.title ?? "Empty"
+                      target.views.find((tab) => tab.id === target.activeViewId)?.title ?? "Empty"
                     }`}
                     onSelect={() => useWorkspaceStore.getState().swapPanes(pane.id, target.id)}
                   />

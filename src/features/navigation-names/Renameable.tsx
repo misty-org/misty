@@ -2,6 +2,7 @@ import { Pencil, RotateCcw } from "lucide-react";
 import {
   cloneElement,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactElement,
@@ -63,7 +64,8 @@ export function Renameable({
     setBrowserWebviewsSuspended(menu || editing, reason);
     return () => setBrowserWebviewsSuspended(false, reason);
   }, [menu, editing, reason]);
-  useEffect(() => {
+  // Select in the commit that mounts the editor, so the name is never briefly unselected.
+  useLayoutEffect(() => {
     if (editing) {
       input.current?.focus();
       input.current?.select();

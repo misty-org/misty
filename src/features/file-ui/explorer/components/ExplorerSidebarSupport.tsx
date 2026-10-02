@@ -134,7 +134,7 @@ export const sidebarStyles = {
   smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
 } as const;
 
-export { DeviceDialog, SmartFolderDialog } from "./ExplorerSidebarDialogs";
+export { SmartFolderDialog } from "./ExplorerSidebarDialogs";
 export { smartFolderQueryFromRules } from "./ExplorerSidebarQuery";
 
 export function SidebarSectionHeader(props: {

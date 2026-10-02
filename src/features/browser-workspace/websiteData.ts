@@ -34,12 +34,14 @@ export const deviceDataStateLabel: Record<DeviceDataState, string> = {
   attention: "Needs attention",
 };
 
-/** The device this session writes: the one it drives, or itself before trees. */
+/** The workspace this machine is on, or its own device before workspace mode. */
 export function currentDeviceId(session: {
   device_id: string;
-  trees?: { driving_tree: string | null } | null;
+  sync?: { driving_workspace: string | null; on_workspace?: string | null } | null;
 }) {
-  return session.trees ? session.trees.driving_tree : session.device_id;
+  return session.sync
+    ? (session.sync.on_workspace ?? session.sync.driving_workspace)
+    : session.device_id;
 }
 
 /** The written device first, then the rest in a stable order. */

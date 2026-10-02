@@ -211,14 +211,6 @@ export interface ExplorerLibrarySnapshot {
   lastOpenedPath: string;
 }
 
-export interface RecordRecentRequest {
-  item: ExplorerLibraryItem;
-}
-
-export interface RecordLastOpenedRequest {
-  path: string;
-}
-
 export interface PilotAllowance {
   sampleImages: number;
   maximumAnalyzedImages: number;

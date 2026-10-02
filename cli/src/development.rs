@@ -24,7 +24,6 @@ pub fn setup(workspace: &Workspace) -> Result<()> {
 
 // Executable tasks only; imported helpers and test fixtures are not commands.
 const TASKS: &[&str] = &[
-    "build-native-services",
     "run-signed-desktop",
     "run-tool",
     "tauri",

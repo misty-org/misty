@@ -4,7 +4,7 @@ import { useSpacesStore } from "@/features/spaces";
 import { SystemErrorActivity, reportSystemError } from "@/features/activity";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { AiSurfaceAdapter } from "@/features/ai-surface/types";
-import { useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { usePinnedIds } from "@/shared/hooks/usePinnedIds";
 import { useSpaceDrawings } from "./hooks/useSpaceDrawings";
 import { useDrawingRoom } from "./hooks/useDrawingRoom";
@@ -16,7 +16,7 @@ import { SpaceDrawingsView, type DrawingsViewRuntime } from "./SpaceDrawingsView
 const Canvas = lazy(() => import("./components/CollaborativeDrawingCanvas"));
 const emptyMembers: never[] = [];
 function Title({ title, tab }: { title: string; tab?: string }) {
-  useWorkspaceTabTitle(tab, title);
+  useWorkspaceViewTitle(tab, title);
   return null;
 }
 function AI({ adapter }: { adapter: AiSurfaceAdapter }) {
@@ -29,10 +29,12 @@ export function SpaceDrawings(props: {
   workspaceTabId?: string;
 }) {
   const { user } = useAuth();
+  const readOnly = useSpacesStore((state) => state.referenceOnly);
   const members = useSpacesStore((state) => state.membersBySpace[props.spaceId] ?? emptyMembers);
   const runtime = useMemo<DrawingsViewRuntime>(
     () => ({
       user,
+      readOnly,
       members,
       useList: useSpaceDrawings,
       useRoom: (space, id, _user, options) => useDrawingRoom(space, id, user!, options),
@@ -48,7 +50,7 @@ export function SpaceDrawings(props: {
       NewDialog: (props) => <NewDrawingDialog {...props} reportError={reportSystemError} />,
       Canvas,
     }),
-    [user, members],
+    [user, members, readOnly],
   );
   return <SpaceDrawingsView {...props} runtime={runtime} />;
 }

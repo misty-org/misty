@@ -47,7 +47,7 @@ export interface OmniboxMatch {
   /** The row can be removed from history (Shift+Delete). */
   removable?: boolean;
   /** The page is also open in this tab; the row offers to switch to it. */
-  switchTabId?: string;
+  switchViewId?: string;
   /** The page is saved as a bookmark. */
   bookmarked?: boolean;
   faviconUrl?: string | null;

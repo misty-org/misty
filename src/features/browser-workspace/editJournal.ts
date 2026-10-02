@@ -3,6 +3,7 @@ import type { Resume, WorkspaceChange } from "./model";
 export interface PendingEdit {
   id: string;
   changes: WorkspaceChange[];
+  /** Written by older versions, which synced focus; dropped unsent. */
   resume?: Resume;
   activeEpoch?: string;
 }
@@ -19,14 +20,14 @@ export class EditJournal {
   private readonly key: string;
   constructor(
     private readonly storage: JournalStorage,
-    identity: { deployment: string; account_id: string; workspace_id: string; device_id: string },
+    identity: { deployment: string; account_id: string; vault_id: string; device_id: string },
     nativeKey?: string,
   ) {
     this.key = nativeKey ?? editJournalKey(identity);
     const encoded = storage.getItem(this.key);
-    const saved = encoded ? JSON.parse(encoded) : { version: 1, edits: [] };
+    const saved = encoded ? JSON.parse(encoded) : { version: 2, edits: [] };
     if (
-      saved.version !== 1 ||
+      (saved.version !== 1 && saved.version !== 2) ||
       !Array.isArray(saved.edits) ||
       saved.edits.length > 10_000 ||
       saved.edits.some(
@@ -34,7 +35,13 @@ export class EditJournal {
       )
     )
       throw new Error("The local workspace edit journal needs recovery");
-    this.edits = saved.edits;
+    this.edits =
+      saved.version === 1
+        ? saved.edits.map((edit: PendingEdit) => ({
+            ...edit,
+            changes: edit.changes.map(legacyChange),
+          }))
+        : saved.edits;
   }
   get pending(): readonly PendingEdit[] {
     return this.edits;
@@ -62,9 +69,6 @@ export class EditJournal {
     flush();
     this.save([...this.edits, ...additions]);
   }
-  appendResume(resume: Resume, activeEpoch?: string): void {
-    this.save([...this.edits, { id: crypto.randomUUID(), changes: [], resume, activeEpoch }]);
-  }
   retainActiveEpoch(activeEpoch: string | null): void {
     const retired = this.edits.filter((edit) => !activeEpoch || edit.activeEpoch !== activeEpoch);
     if (!retired.length) return;
@@ -78,7 +82,7 @@ export class EditJournal {
     this.save(this.edits.slice(1));
   }
   private save(edits: PendingEdit[]): void {
-    const encoded = JSON.stringify({ version: 1, edits });
+    const encoded = JSON.stringify({ version: 2, edits });
     if (edits.length > 10_000 || encoded.length > 16_000_000)
       throw new Error("Too many workspace edits are waiting to be saved");
     this.storage.setItem(this.key, encoded); // Keep the previous journal if storage fails.
@@ -89,8 +93,44 @@ export class EditJournal {
 export function editJournalKey(identity: {
   deployment: string;
   account_id: string;
-  workspace_id: string;
+  vault_id: string;
   device_id: string;
 }) {
-  return `misty:workspace-edit-journal:v1:${JSON.stringify([identity.deployment, identity.account_id, identity.workspace_id, identity.device_id])}`;
+  return `misty:workspace-edit-journal:v1:${JSON.stringify([identity.deployment, identity.account_id, identity.vault_id, identity.device_id])}`;
+}
+
+/** Journal version 1 predates the folder/bookmark/tab/view record names: its
+ * `tab` was today's view and its `layout` today's tab. */
+const legacyKinds: Record<string, string> = {
+  group: "folder",
+  website: "bookmark",
+  layout: "tab",
+  tab: "view",
+};
+const legacyFields: Record<string, [string, string][]> = {
+  website: [["group_id", "folder_id"]],
+  tab: [["website_id", "bookmark_id"]],
+  tab_group: [["layout_ids", "tab_ids"]],
+  saved_tab_group: [["layouts", "tabs"]],
+};
+function legacyChange(change: WorkspaceChange): WorkspaceChange {
+  const old = change as unknown as { kind: string; fields?: Record<string, unknown> };
+  const fields = old.fields ? { ...old.fields } : undefined;
+  if (fields) {
+    for (const [from, to] of legacyFields[old.kind] ?? [])
+      if (from in fields) {
+        fields[to] = fields[from];
+        delete fields[from];
+      }
+    const placement = fields.placement as Record<string, unknown> | undefined;
+    if (old.kind === "tab" && placement && "layout_id" in placement) {
+      const { layout_id, ...rest } = placement;
+      fields.placement = { ...rest, tab_id: layout_id };
+    }
+  }
+  return {
+    ...change,
+    kind: legacyKinds[old.kind] ?? old.kind,
+    ...(fields ? { fields } : {}),
+  } as WorkspaceChange;
 }

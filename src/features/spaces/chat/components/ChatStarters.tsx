@@ -1,14 +1,6 @@
 import type { SpaceChatStarter } from "./ChatMessages";
 
-const dotClass = "motion-safe:animate-bounce";
-
-/**
- * The opening screen of an empty conversation.
- *
- * It used to pitch three starter cards, which was a lot of furniture for a
- * thread you are about to type in anyway. This matches the Library's empty
- * state instead, with the ellipsis doing the only moving.
- */
+/** The opening screen of an empty conversation. */
 export function SpaceChatStarters({
   onStarter,
 }: {
@@ -16,16 +8,12 @@ export function SpaceChatStarters({
   onStarter?: (starter: SpaceChatStarter) => void;
 }) {
   return (
-    <div className="grid min-h-48 place-items-center text-sm text-cream-muted">
+    <div className="flex min-h-48 flex-col items-center justify-center gap-2 text-center text-sm text-cream-muted">
       {onStarter ? (
-        <p className="m-0 flex items-baseline">
-          Nothing to see here
-          <span aria-hidden="true" className="flex">
-            <span className={`${dotClass} [animation-delay:-300ms]`}>.</span>
-            <span className={`${dotClass} [animation-delay:-150ms]`}>.</span>
-            <span className={dotClass}>.</span>
-          </span>
-        </p>
+        <>
+          <h2 className="m-0 font-medium text-cream">Start the conversation</h2>
+          <p className="m-0">Send a message below to get things started.</p>
+        </>
       ) : (
         <p className="m-0">You can read this conversation, but you cannot send messages.</p>
       )}

@@ -1,11 +1,15 @@
-import { describe, expect, it } from "vitest";
+import type * as SocialRuntimeModule from "@/features/spaces/chat/SocialRuntime";
+vi.mock("@/features/spaces/chat/SocialRuntime", async (importOriginal) => ({
+  ...(await importOriginal<typeof SocialRuntimeModule>()),
+  SocialError: (await import("@/features/activity")).SystemErrorActivity,
+}));
+import { describe, expect, it, vi } from "vitest";
 import { createElement, createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   buildChatDisplayRows,
   formatChatMessageTime,
-  isInFlightRun,
   mergeSpaceMessages,
   messageReplyPreviewText,
 } from "@/features/spaces/chat";
@@ -172,16 +176,5 @@ describe("Space chat display rows", () => {
     ];
 
     expect(messageReplyPreviewText(repliedTo)).toBe("I think it tried @Sam to fix itself");
-  });
-});
-
-describe("Agent run states", () => {
-  it("treats only the working states as in flight", () => {
-    expect(["queued", "working", "retrying"].every((state) => isInFlightRun({ state }))).toBe(true);
-    expect(
-      ["completed", "failed", "canceled", "awaiting_approval"].some((state) =>
-        isInFlightRun({ state }),
-      ),
-    ).toBe(false);
   });
 });

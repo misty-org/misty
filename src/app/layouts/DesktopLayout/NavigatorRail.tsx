@@ -5,7 +5,7 @@ import {
 } from "@/features/webviews/browserRuntime";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable } from "@/shared/ui";
-import { dockingGeometry } from "./dockingGeometry";
+import { dockingGeometry, type DockingGeometry } from "./dockingGeometry";
 import { navigatorMotionClass } from "./styles";
 
 /** One fixed-width rail; auto-hide reveals it above the workspace without reflow. */
@@ -13,6 +13,7 @@ export function NavigatorRail(props: {
   autoHide: boolean;
   position: DockPosition;
   children: ReactNode;
+  geometry?: DockingGeometry;
 }) {
   const [revealed, setRevealed] = useState(false);
   const rail = useRef<HTMLDivElement>(null);
@@ -20,8 +21,15 @@ export function NavigatorRail(props: {
   const pointerInside = useRef(false);
   const hide = useRef(() => {});
   const cancelHide = useRef(() => {});
-  const geometry = dockingGeometry(props.position, props.autoHide);
+  const geometry =
+    props.geometry ??
+    dockingGeometry({
+      navigation: props.position,
+      tabs: props.position === "top" ? "left" : "top",
+      autoHide: props.autoHide,
+    });
   const hidden = props.autoHide && !revealed;
+  const restoringFocus = useRef(false);
 
   useEffect(() => {
     if (!props.autoHide) {
@@ -131,9 +139,9 @@ export function NavigatorRail(props: {
             !rail.current?.querySelector('[aria-haspopup][aria-expanded="true"]')
           ) {
             event.preventDefault();
-            document
-              .querySelector<HTMLButtonElement>("[data-navigator-visibility-toggle]")
-              ?.focus();
+            restoringFocus.current = true;
+            edge.current?.focus();
+            restoringFocus.current = false;
             setRevealed(false);
           }
         }}
@@ -149,11 +157,13 @@ export function NavigatorRail(props: {
           className="absolute z-30 border-0 bg-transparent p-0"
           style={{ ...geometry.reveal, pointerEvents: revealed ? "none" : undefined }}
           tabIndex={revealed ? -1 : 0}
+          onClick={() => setRevealed(true)}
           onPointerEnter={() => {
             cancelHide.current();
             setRevealed(true);
           }}
           onFocus={() => {
+            if (restoringFocus.current) return;
             setRevealed(true);
             requestAnimationFrame(() =>
               rail.current?.querySelector<HTMLElement>("button:not(:disabled), a[href]")?.focus(),

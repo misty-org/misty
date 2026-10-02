@@ -1,26 +1,26 @@
-import type { DockSplitDirection, WorkspaceDockNode, WorkspacePane, WorkspaceTab } from "./model";
+import type { DockSplitDirection, WorkspaceDockNode, WorkspacePane, WorkspaceView } from "./model";
 
 export function createDockId(prefix: "pane" | "split" | "tab"): string {
   return `${prefix}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export function createDockLeaf(tabs: WorkspaceTab[] = []): WorkspacePane {
+export function createDockLeaf(tabs: WorkspaceView[] = []): WorkspacePane {
   return {
     type: "leaf",
     id: createDockId("pane"),
-    tabs,
-    activeTabId: tabs[tabs.length - 1]?.id ?? null,
+    views: tabs,
+    activeViewId: tabs[tabs.length - 1]?.id ?? null,
   };
 }
 
 export function fillEmptyDockLeaves(
   node: WorkspaceDockNode,
-  createTab?: () => WorkspaceTab,
+  createTab?: () => WorkspaceView,
 ): WorkspaceDockNode {
   if (node.type === "leaf") {
-    if (node.tabs.length || !createTab) return node;
+    if (node.views.length || !createTab) return node;
     const tab = createTab();
-    return { ...node, tabs: [tab], activeTabId: tab.id };
+    return { ...node, views: [tab], activeViewId: tab.id };
   }
   const first = fillEmptyDockLeaves(node.first, createTab);
   const second = fillEmptyDockLeaves(node.second, createTab);
@@ -31,8 +31,8 @@ export function dockLeaves(node: WorkspaceDockNode): WorkspacePane[] {
   return node.type === "leaf" ? [node] : [...dockLeaves(node.first), ...dockLeaves(node.second)];
 }
 
-export function dockTabs(node: WorkspaceDockNode): WorkspaceTab[] {
-  return dockLeaves(node).flatMap((leaf) => leaf.tabs);
+export function dockTreeViews(node: WorkspaceDockNode): WorkspaceView[] {
+  return dockLeaves(node).flatMap((leaf) => leaf.views);
 }
 
 /** Relocate an existing pane without creating or discarding any pane contents. */
@@ -87,13 +87,13 @@ export function capDockLeaves(node: WorkspaceDockNode, maximum: number): Workspa
   const leaves = dockLeaves(node);
   if (leaves.length <= maximum) return node;
   const kept = leaves.slice(0, Math.max(1, maximum));
-  const overflowTabs = leaves.slice(kept.length).flatMap((leaf) => leaf.tabs);
+  const overflowTabs = leaves.slice(kept.length).flatMap((leaf) => leaf.views);
   if (overflowTabs.length) {
     const target = kept[kept.length - 1];
     kept[kept.length - 1] = {
       ...target,
-      tabs: [...target.tabs, ...overflowTabs],
-      activeTabId: overflowTabs[0]?.id ?? target.activeTabId,
+      views: [...target.views, ...overflowTabs],
+      activeViewId: overflowTabs[0]?.id ?? target.activeViewId,
     };
   }
   return dockGrid(kept);
@@ -151,24 +151,24 @@ export function swapDockLeaves(
   return mapDockLeaf(
     mapDockLeaf(node, firstPaneId, (pane) => ({
       ...pane,
-      tabs: second.tabs,
-      activeTabId: second.activeTabId,
+      views: second.views,
+      activeViewId: second.activeViewId,
     })),
     secondPaneId,
-    (pane) => ({ ...pane, tabs: first.tabs, activeTabId: first.activeTabId }),
+    (pane) => ({ ...pane, views: first.views, activeViewId: first.activeViewId }),
   );
 }
 
-export function mapDockTabs(
+export function mapDockTreeViews(
   node: WorkspaceDockNode,
-  update: (tab: WorkspaceTab) => WorkspaceTab,
+  update: (tab: WorkspaceView) => WorkspaceView,
 ): WorkspaceDockNode {
   if (node.type === "leaf") {
-    const tabs = node.tabs.map(update);
-    return tabs.every((tab, index) => tab === node.tabs[index]) ? node : { ...node, tabs };
+    const tabs = node.views.map(update);
+    return tabs.every((tab, index) => tab === node.views[index]) ? node : { ...node, views: tabs };
   }
-  const first = mapDockTabs(node.first, update);
-  const second = mapDockTabs(node.second, update);
+  const first = mapDockTreeViews(node.first, update);
+  const second = mapDockTreeViews(node.second, update);
   return first === node.first && second === node.second ? node : { ...node, first, second };
 }
 
@@ -197,7 +197,7 @@ export function insertDockSplit(
 }
 
 export function collapseEmptyDockLeaves(node: WorkspaceDockNode): WorkspaceDockNode | null {
-  if (node.type === "leaf") return node.tabs.length ? node : null;
+  if (node.type === "leaf") return node.views.length ? node : null;
   const first = collapseEmptyDockLeaves(node.first);
   const second = collapseEmptyDockLeaves(node.second);
   if (!first) return second;
@@ -249,10 +249,10 @@ export function canFitDockSplit(
 
 export function normalizeDockNode(node: WorkspaceDockNode): WorkspaceDockNode {
   if (node.type === "leaf") {
-    const activeTabId = node.tabs.some((tab) => tab.id === node.activeTabId)
-      ? node.activeTabId
-      : (node.tabs[node.tabs.length - 1]?.id ?? null);
-    return activeTabId === node.activeTabId ? node : { ...node, activeTabId };
+    const activeTabId = node.views.some((tab) => tab.id === node.activeViewId)
+      ? node.activeViewId
+      : (node.views[node.views.length - 1]?.id ?? null);
+    return activeTabId === node.activeViewId ? node : { ...node, activeViewId: activeTabId };
   }
   const ratio = clampDockRatio(node.ratio);
   const first = normalizeDockNode(node.first);
@@ -327,4 +327,13 @@ export function normalizePaneLayout(root: WorkspaceDockNode): WorkspaceDockNode 
     };
   }
   return root;
+}
+
+export function mapDockLeafForView(
+  root: WorkspaceDockNode,
+  viewId: string,
+  update: (pane: WorkspacePane) => WorkspacePane,
+): WorkspaceDockNode {
+  const pane = dockLeaves(root).find((pane) => pane.views.some((view) => view.id === viewId));
+  return pane ? mapDockLeaf(root, pane.id, update) : root;
 }

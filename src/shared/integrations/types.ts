@@ -1,5 +1,4 @@
 export type IntegrationCapability =
-  | "mail"
   | "chat"
   | "notes"
   | "calendar"
@@ -17,12 +16,3 @@ export type IntegrationCapability =
   | "social_send"
   | "social_automation"
   | "agent_tools";
-
-export type IntegrationConnectionStatus =
-  "connected" | "syncing" | "needs_reconnect" | "error" | "disconnected";
-
-export interface IntegrationProviderDefinition {
-  id: string;
-  name: string;
-  capabilities: IntegrationCapability[];
-}

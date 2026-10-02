@@ -17,7 +17,17 @@ export function searchSettings(query: string): SettingsSearchResult[] {
     .filter((d) =>
       `${d.label} ${d.id} ${d.page} ${d.keywords?.join(" ") ?? ""}`.toLowerCase().includes(needle),
     )
-    .map((d) => ({ key: d.id, label: d.label, page: d.page as SettingsSection, focus: d.label }));
+    .map((d) => ({
+      key: d.id,
+      label: d.label,
+      page: [
+        "browser.privacy.page_state_restore",
+        "browser.privacy.page_state_agent_restore",
+      ].includes(d.id)
+        ? ("sync" as const)
+        : (d.page as SettingsSection),
+      focus: d.label,
+    }));
   const pages = settingsRegistry
     .filter((p) => settingsPageTitle(p).toLowerCase().includes(needle))
     .map((p) => ({ key: `page:${p.id}`, label: settingsPageTitle(p), page: p.id, focus: "" }));

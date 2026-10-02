@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -51,6 +52,36 @@ func (db *Database) SettingsProfiles(ctx context.Context, userID string) ([]Sett
 	}
 	return profiles, rows.Err()
 }
+
+// AccountPreferencesID is stable across devices and independent of profile selection.
+func AccountPreferencesID(userID string) string {
+	return uuid.NewSHA1(uuid.NameSpaceURL, []byte("misty:account-preferences:"+userID)).String()
+}
+
+// AccountPreferences reads the authoritative record without enrollment or a write transaction.
+func (db *Database) AccountPreferences(ctx context.Context, userID string) (SettingsProfile, error) {
+	var p SettingsProfile
+	var raw []byte
+	err := db.Conn.QueryRowContext(ctx, `
+  SELECT id,name,schema_version,revision,values_json FROM settings_profiles
+  WHERE id=$1 AND user_id=$2 AND NOT deleted`, AccountPreferencesID(userID), userID).
+		Scan(&p.ID, &p.Name, &p.SchemaVersion, &p.Revision, &raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, ErrSettingsProfileNotFound
+	}
+	if err != nil {
+		return p, err
+	}
+	err = json.Unmarshal(raw, &p.Values)
+	return p, err
+}
+
+// EnsureAccountPreferences imports the first device's effective preferences once.
+// Concurrent enrollment and subsequent calls return the existing authoritative record.
+func (db *Database) EnsureAccountPreferences(ctx context.Context, userID string, values map[string]any) (SettingsProfile, error) {
+	return db.CreateSettingsProfile(ctx, userID, AccountPreferencesID(userID), "Settings", values)
+}
+
 func validateProfileName(name string) error {
 	if strings.TrimSpace(name) == "" || len([]rune(name)) > 80 {
 		return fmt.Errorf("profile name must contain 1–80 characters")
@@ -78,7 +109,7 @@ func (db *Database) CreateSettingsProfile(ctx context.Context, userID, id, name 
 	}
 	defer tx.Rollback()
 	// Caller-generated IDs make creation retryable without duplicating profiles.
-	_, err = tx.ExecContext(ctx, `INSERT INTO settings_profiles(id,user_id,name,values_json) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING`, id, userID, strings.TrimSpace(name), raw)
+	result, err := tx.ExecContext(ctx, `INSERT INTO settings_profiles(id,user_id,name,values_json) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING`, id, userID, strings.TrimSpace(name), raw)
 	if err != nil {
 		return p, err
 	}
@@ -93,8 +124,10 @@ func (db *Database) CreateSettingsProfile(ctx context.Context, userID, id, name 
 	if err = json.Unmarshal(raw, &p.Values); err != nil {
 		return p, err
 	}
-	if err = notifySettingsProfile(ctx, tx, userID, id); err != nil {
-		return p, err
+	if inserted, _ := result.RowsAffected(); inserted > 0 {
+		if err = notifySettingsProfile(ctx, tx, userID, id); err != nil {
+			return p, err
+		}
 	}
 	return p, tx.Commit()
 }
@@ -142,6 +175,8 @@ func (db *Database) PatchSettingsProfile(ctx context.Context, userID, id string,
 	if !errors.Is(err, sql.ErrNoRows) {
 		return p, err
 	}
+	previousValues, _ := json.Marshal(p.Values)
+	previousName := p.Name
 	for key, value := range patch.Set {
 		p.Values[key] = value
 	}
@@ -151,22 +186,30 @@ func (db *Database) PatchSettingsProfile(ctx context.Context, userID, id string,
 	if patch.Name != nil {
 		p.Name = strings.TrimSpace(*patch.Name)
 	}
-	p.Revision++
 	raw, _ = json.Marshal(p.Values)
-	_, err = tx.ExecContext(ctx, `UPDATE settings_profiles SET name=$2,values_json=$3,revision=$4,updated_at=now() WHERE id=$1`, id, p.Name, raw, p.Revision)
-	if err != nil {
-		return p, err
+	changed := p.Name != previousName || !bytes.Equal(previousValues, raw)
+	if changed {
+		p.Revision++
+		_, err = tx.ExecContext(ctx, `UPDATE settings_profiles SET name=$2,values_json=$3,revision=$4,updated_at=now() WHERE id=$1`, id, p.Name, raw, p.Revision)
+		if err != nil {
+			return p, err
+		}
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO settings_profile_receipts(profile_id,mutation_id,payload_hash) VALUES($1,$2,$3)`, id, patch.MutationID, hash)
 	if err != nil {
 		return p, err
 	}
-	if err = notifySettingsProfile(ctx, tx, userID, id); err != nil {
-		return p, err
+	if changed {
+		if err = notifySettingsProfile(ctx, tx, userID, id); err != nil {
+			return p, err
+		}
 	}
 	return p, tx.Commit()
 }
 func (db *Database) DeleteSettingsProfile(ctx context.Context, userID, id string) error {
+	if id == AccountPreferencesID(userID) {
+		return fmt.Errorf("account settings cannot be deleted as a profile")
+	}
 	tx, err := db.Conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err

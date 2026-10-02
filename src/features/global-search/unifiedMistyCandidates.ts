@@ -2,13 +2,12 @@ import { shortcutCommandRegistry } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import type { GlobalSearchFilters, GlobalSearchResult, UnifiedMistyCandidate } from "./types";
-export { mistyIntent } from "./mistyIntent";
+
 const coreToolCommandIds = new Set([
   "tool.home",
   "tool.journal",
   "tool.planner",
   "tool.social",
-  "tool.inbox",
   "tool.library",
   "tool.browser",
   "tool.files",
@@ -71,7 +70,7 @@ export function buildUnifiedMistyCandidates(
 }
 function emptyCandidates(): UnifiedMistyCandidate[] {
   const state = useWorkspaceStore.getState();
-  const recent = (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
+  const recent = (state.windowsByScope[state.activeScopeKey] ?? [])
     .flatMap((window) => allLayoutViews(window.layout))
     .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)
     .slice(0, 4)

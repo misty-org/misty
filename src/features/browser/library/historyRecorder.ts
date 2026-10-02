@@ -1,16 +1,16 @@
 import {
   isBrowserInternalUrl,
-  parseBrowserTabState,
+  parseBrowserViewState,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
-import { mapAllVirtualWorkspaceTabs } from "@/features/workspace/virtualWindows";
+import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { browserLibrary } from "./native";
 
 /** Finds a tab in any virtual window or Space, active or not. */
-function findWorkspaceTab(tabId: string): WorkspaceTab | null {
-  let found: WorkspaceTab | null = null;
-  mapAllVirtualWorkspaceTabs(useWorkspaceStore.getState(), (tab) => {
+function findWorkspaceView(tabId: string): WorkspaceView | null {
+  let found: WorkspaceView | null = null;
+  mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (tab) => {
     if (!found && tab.id === tabId) found = tab;
     return tab;
   });
@@ -22,34 +22,17 @@ function findWorkspaceTab(tabId: string): WorkspaceTab | null {
  * for its own work, and Misty's own pages are left out.
  */
 function historyTarget(tabId: string): { profileId?: string } | null {
-  const tab = findWorkspaceTab(tabId);
+  const tab = findWorkspaceView(tabId);
   if (!tab) return null;
-  const state = parseBrowserTabState(tab.state);
+  const state = parseBrowserViewState(tab.state);
   if (state.agentOwned || state.private || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
-
-/** A typed navigation is claimed by the tab's next recorded visit, after any redirects. */
-const TYPED_NAVIGATION_WINDOW_MS = 30_000;
 const typedNavigations = new Map<string, number>();
 
 /** Marks the tab's next visit as typed by the person, which ranks it higher in the address bar. */
 export function markBrowserNavigationTyped(tabId: string): void {
   typedNavigations.set(tabId, Date.now());
-}
-
-function claimTypedNavigation(tabId: string): boolean {
-  const markedAt = typedNavigations.get(tabId);
-  typedNavigations.delete(tabId);
-  return markedAt !== undefined && Date.now() - markedAt <= TYPED_NAVIGATION_WINDOW_MS;
-}
-
-export function recordBrowserVisit(tabId: string, url: string, title: string): void {
-  if (!/^https?:\/\//i.test(url)) return;
-  const typed = claimTypedNavigation(tabId);
-  const target = historyTarget(tabId);
-  if (!target) return;
-  void browserLibrary.recordVisit({ ...target, url, title, typed }).catch(() => undefined);
 }
 
 /** Removes a page from the tab's profile history. Private and agent tabs have none. */
@@ -65,7 +48,7 @@ export function recordBrowserVisitTitle(tabId: string, url: string, title: strin
   void browserLibrary.setVisitTitle({ ...target, url, title }).catch(() => undefined);
 }
 
-export function browserTabUrl(tabId: string): string | null {
-  const tab = findWorkspaceTab(tabId);
-  return tab ? parseBrowserTabState(tab.state).url : null;
+export function browserViewUrl(tabId: string): string | null {
+  const tab = findWorkspaceView(tabId);
+  return tab ? parseBrowserViewState(tab.state).url : null;
 }

@@ -1,12 +1,12 @@
 import { blankBrowserUrl } from "./browserUrl";
-import { parseBrowserTabState, type WorkspaceTab } from "./model";
+import { parseBrowserViewState, type WorkspaceView } from "./model";
 
-export const privateTabTitle = "Private tab";
+export const privateViewTitle = "Private tab";
 
-export function isPrivateBrowserTab(
-  tab: Pick<WorkspaceTab, "surfaceId" | "state"> | null | undefined,
+export function isPrivateBrowserView(
+  tab: Pick<WorkspaceView, "surfaceId" | "state"> | null | undefined,
 ) {
-  return Boolean(tab && tab.surfaceId === "browser" && parseBrowserTabState(tab.state).private);
+  return Boolean(tab && tab.surfaceId === "browser" && parseBrowserViewState(tab.state).private);
 }
 
 /**
@@ -14,11 +14,11 @@ export function isPrivateBrowserTab(
  * in recovery snapshots and in Sync. The tab keeps its place, but not where it
  * was or what it showed.
  */
-export function scrubPrivateTab(tab: WorkspaceTab): WorkspaceTab {
-  if (!isPrivateBrowserTab(tab)) return tab;
+export function scrubPrivateView(tab: WorkspaceView): WorkspaceView {
+  if (!isPrivateBrowserView(tab)) return tab;
   return {
     ...tab,
-    title: privateTabTitle,
+    title: privateViewTitle,
     state: { version: 1, url: blankBrowserUrl, faviconUrl: null, private: true },
   };
 }

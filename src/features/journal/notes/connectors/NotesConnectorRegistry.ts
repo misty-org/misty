@@ -1,8 +1,4 @@
-import type {
-  NotesConnector,
-  NotesIntegrationCard,
-  SyncResult,
-} from "../model/interfaces/connectors";
+import type { NotesConnector, SyncResult } from "../model/interfaces/connectors";
 import type { UnifiedNote } from "../model/types/types";
 
 /**
@@ -55,10 +51,3 @@ export class NotesConnectorRegistry {
     return results.filter((result): result is SyncResult => result !== undefined);
   }
 }
-
-/**
- * Integrations that exist in Misty but are not note sources yet. They stay
- * visible so the Notes area reads as one view onto the shared connector system
- * rather than a private integration list.
- */
-export const adjacentIntegrations: NotesIntegrationCard[] = [];

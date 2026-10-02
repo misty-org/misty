@@ -453,13 +453,6 @@ export type NoteAiSelection = {
   x: number;
   y: number;
 };
-export interface NotesInlineProposal {
-  selection: AiSelectionSnapshot;
-  replacement: string;
-  artifactId: string;
-  invocationId?: string;
-  status: "proposed" | "stale" | "applying" | "applied" | "discarded" | "failed";
-}
 export const noteSelectionActions: AiSuggestedAction[] = [
   {
     id: "notes.improve",

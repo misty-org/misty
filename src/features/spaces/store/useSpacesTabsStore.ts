@@ -274,10 +274,6 @@ export function spacesTabsSessionKey(accountId: string, spaceId: string): string
   return `${accountId}::${spaceId}`;
 }
 
-export function activeSpacesTab(session: SpacesTabsSession | undefined): SpacesTab | null {
-  return session?.tabs.find((tab) => tab.id === session.activeTabId) ?? session?.tabs[0] ?? null;
-}
-
 export function defaultSpaceRoute(spaceId: string): string {
   const preferences = useSettingsStore.getState().settings?.document.spaces as
     Record<string, unknown> | undefined;

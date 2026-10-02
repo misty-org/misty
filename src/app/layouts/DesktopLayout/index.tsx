@@ -1,4 +1,3 @@
-import type { DesktopNavItem } from "@/app/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
 import { ScheduledTasksBridge } from "@/features/scheduled";
@@ -32,10 +31,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { Outlet } from "react-router-dom";
 import "./docking.css";
 import { dockingGeometry } from "./dockingGeometry";
+import { useMergedTitlebar } from "./useMergedTitlebar";
+import { useDockingTransition } from "./useDockingTransition";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { GlobalNavigator } from "./GlobalNavigator";
 import { settingsFallbackRoute } from "./helpers";
-import { NavigatorControls } from "./NavigatorControls";
 import { NavigatorRail } from "./NavigatorRail";
 import {
   navigatorRailWidth,
@@ -47,7 +47,6 @@ import { RestoreGlyph } from "./RestoreGlyph";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { SettingsOverlay } from "./SettingsOverlays";
 import * as styles from "./styles";
-import { WorkStatusPopup } from "./WorkStatusPopup";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
@@ -57,17 +56,13 @@ export type {
   AppNoticeEntry,
   AppNoticeKind,
   AppNoticeSource,
-  DesktopNavItem,
   DesktopPlatform,
   FramePacingState,
   WindowBounds,
   WindowRect,
 } from "@/app/layouts/model/types";
 
-export function DesktopLayout(props: {
-  getRouteId: (pathname: string) => AppTab;
-  navItems: DesktopNavItem[];
-}) {
+export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   const { user, refreshUser, transitioning } = useAuth();
   const {
     location,
@@ -192,7 +187,7 @@ export function DesktopLayout(props: {
       const views = allLayoutViews(state.layout);
       const existingPlaceholder = views.find((v) => v.placeholder);
       if (existingPlaceholder) {
-        state.focusTab(existingPlaceholder.id);
+        state.focusView(existingPlaceholder.id);
       }
       return;
     }
@@ -271,18 +266,12 @@ export function DesktopLayout(props: {
     return () => setBrowserWebviewsSuspended(false, "shell-overlay");
   }, [profileOpen, settingsOpen]);
 
-  useEffect(() => {
-    setProfileOpen(false);
-    setBrowserWebviewsSuspended(true, "docking-layout");
-    const timer = window.setTimeout(
-      () => setBrowserWebviewsSuspended(false, "docking-layout"),
-      320,
-    );
-    return () => {
-      window.clearTimeout(timer);
-      setBrowserWebviewsSuspended(false, "docking-layout");
-    };
-  }, [docking]);
+  useEffect(() => setProfileOpen(false), [docking]);
+  const shellRef = useRef<HTMLElement>(null);
+  useDockingTransition(
+    shellRef,
+    `${docking.navigation}:${docking.tabs}:${navigatorLayout.autoHide}`,
+  );
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
@@ -293,35 +282,39 @@ export function DesktopLayout(props: {
   );
   const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(location.pathname);
-  const sharedTitlebar = !isAuthRoute && !standaloneRouteTitle && docking.tabs === "top";
-  const geometry = dockingGeometry(docking.navigation, navigatorLayout.autoHide, sharedTitlebar);
-  const titlebarControlsRef = useRef<HTMLDivElement>(null);
-  const [titlebarControlsWidth, setTitlebarControlsWidth] = useState(0);
+  const sharedTitlebar =
+    !isAuthRoute &&
+    !standaloneRouteTitle &&
+    docking.tabs === "top" &&
+    !(docking.navigation === "top" && !navigatorLayout.autoHide);
+  const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
+  const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
   useLayoutEffect(() => {
-    const controls = titlebarControlsRef.current;
-    if (!controls) return;
-    const measure = () => setTitlebarControlsWidth(controls.offsetWidth);
+    const windowsControls = windowsTitlebarControlsRef.current;
+    const measure = () => {
+      setWindowsTitlebarControlsWidth(windowsControls?.offsetWidth ?? 0);
+    };
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(controls);
+    if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
-  }, [isAuthRoute]);
-  const titlebarControlsLeft = titlebarNavigationGeometry.left;
+  }, [isAuthRoute, shouldShowWindowsControls]);
   const tabsFollowNavigator = docking.navigation === "left" && !navigatorLayout.autoHide;
-  const titlebarReservedWidth = titlebarControlsLeft + (titlebarControlsWidth || 24) + 16;
-  const topTabInsets =
-    docking.tabs === "top"
-      ? {
-          animate: true,
-          // The grid column and this inset transition together, keeping tabs
-          // between their two endpoints and clear of the navigation controls.
-          // Beside the navigator, the first tab lines up with the pane's edge.
-          left: tabsFollowNavigator
-            ? Math.max(0, titlebarReservedWidth - navigatorWidth)
-            : Math.max(8, titlebarReservedWidth),
-          right: shouldShowWindowsControls ? 140 / appZoom : 0,
-        }
-      : undefined;
+  const geometry = dockingGeometry({
+    ...docking,
+    autoHide: navigatorLayout.autoHide,
+    shareTopBand: !isAuthRoute && !standaloneRouteTitle,
+    chromeLeft: titlebarNavigationGeometry.left,
+    chromeRight: shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
+  });
+  const topTabInsets = geometry.titlebarInsets;
+  useMergedTitlebar(
+    shellRef,
+    `${docking.navigation}:${docking.tabs}:${navigatorLayout.autoHide}`,
+    !isAuthRoute,
+    titlebarNavigationGeometry.left,
+    shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
+  );
   const navigatorContent = (
     <GlobalNavigator
       syncControl={
@@ -329,7 +322,7 @@ export function DesktopLayout(props: {
           key={user?.id}
           accountId={user?.id ?? ""}
           onOpenSettings={() => {
-            useSettingsStore.getState().setActiveSection("browser-handoff");
+            useSettingsStore.getState().setActiveSection("sync");
             openSettingsOverlay();
           }}
         />
@@ -350,6 +343,7 @@ export function DesktopLayout(props: {
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <main
+        ref={shellRef}
         className={cn(
           "misty-docking-frame",
           "transition-[grid-template-columns,grid-template-rows]",
@@ -372,6 +366,7 @@ export function DesktopLayout(props: {
         <header
           className={cn("misty-docking-titlebar", isAuthRoute && "border-b-0 bg-transparent")}
           data-shared-tabs={sharedTitlebar}
+          data-shared-chrome={!isAuthRoute}
           onPointerDown={handleDesktopTitlebarPointerDown}
         >
           {sharedTitlebar ? (
@@ -385,30 +380,9 @@ export function DesktopLayout(props: {
               style={{ width: tabsFollowNavigator ? navigatorWidth : topTabInsets?.left }}
             />
           ) : null}
-          {!isAuthRoute ? (
-            <div
-              ref={titlebarControlsRef}
-              className="misty-docking-titlebar-controls"
-              style={{
-                left: titlebarControlsLeft,
-              }}
-            >
-              <NavigatorControls
-                position={docking.navigation}
-                autoHide={navigatorLayout.autoHide}
-                onToggleAutoHide={toggleNavigatorAutoHide}
-              />
-              {shouldShowWindowsControls ? (
-                <div
-                  id="misty-windows-workspace-controls"
-                  className={styles.windowsWorkspaceControlsClass}
-                  data-misty-window-drag-block="true"
-                />
-              ) : null}
-            </div>
-          ) : null}
           {shouldShowWindowsControls ? (
             <div
+              ref={windowsTitlebarControlsRef}
               className={styles.windowsTitlebarControlsClass}
               data-misty-window-drag-block="true"
               style={{
@@ -416,6 +390,13 @@ export function DesktopLayout(props: {
                 transformOrigin: "top right",
               }}
             >
+              {!isAuthRoute ? (
+                <div
+                  id="misty-windows-workspace-controls"
+                  className={styles.windowsWorkspaceControlsClass}
+                  data-misty-window-drag-block="true"
+                />
+              ) : null}
               <Pressable
                 aria-label="Minimize window"
                 className={styles.windowsTitlebarControlButtonClass}
@@ -445,7 +426,11 @@ export function DesktopLayout(props: {
         </header>
 
         {!isAuthRoute ? (
-          <NavigatorRail autoHide={navigatorLayout.autoHide} position={docking.navigation}>
+          <NavigatorRail
+            autoHide={navigatorLayout.autoHide}
+            position={docking.navigation}
+            geometry={geometry}
+          >
             {navigatorContent}
           </NavigatorRail>
         ) : null}
@@ -478,11 +463,7 @@ export function DesktopLayout(props: {
           </>
         </section>
 
-        {!isAuthRoute ? (
-          <>
-            <WorkStatusPopup />
-          </>
-        ) : null}
+        {!isAuthRoute ? <></> : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
         {!isAuthRoute ? (
           <>
@@ -522,7 +503,10 @@ function standaloneWorkspaceRouteTitle(pathname: string): string | null {
 function StandaloneRouteSurface(props: { title: string; children: ReactNode }) {
   return (
     <section className="grid h-full min-h-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg">
-      <header className="flex h-[38px] items-center border-b border-charcoal-border bg-charcoal-workspace px-3">
+      <header
+        data-window-toolbar
+        className="flex h-[38px] items-center border-b border-charcoal-border bg-charcoal-workspace px-3"
+      >
         <span className="text-sm font-medium text-cream-bright">{props.title}</span>
       </header>
       <div className="min-h-0 overflow-auto">{props.children}</div>

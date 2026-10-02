@@ -11,6 +11,7 @@ import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
 import ForgotPasswordForm from "./components/ForgotPasswordForm";
+import GoogleSignInButton from "./components/GoogleSignInButton";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { accountSignIn } from "./store/useAccountStore";
 
@@ -221,6 +222,12 @@ export default function SignIn() {
         }
       >
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+          <GoogleSignInButton
+            disabled={loading || transitioning}
+            onBusy={setLoading}
+            onError={setError}
+            onSuccess={() => navigate(from, { replace: true })}
+          />
           <AuthField
             id="signin-email"
             label="Email"

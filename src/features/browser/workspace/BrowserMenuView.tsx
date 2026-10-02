@@ -108,18 +108,18 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               icon={<VenetianMask />}
               label="New private tab"
               shortcut="browser.new_private_tab"
-              onSelect={commands.newPrivateTab}
+              onSelect={commands.newPrivateView}
             />
             <Item
               icon={<RotateCcw />}
               label="Reopen closed tab"
               shortcut="workspace.reopen_tab"
-              onSelect={commands.reopenTab}
+              onSelect={commands.reopenView}
             />
             <DropdownMenuSeparator />
             <BrowserHistoryMenu
               openHistory={() => commands.openPage("history")}
-              reopenClosedTab={commands.reopenClosedTab}
+              reopenClosedView={commands.reopenClosedTab}
               clearBrowsingData={commands.clearBrowsingData}
             />
             <Item
@@ -138,7 +138,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               <Item
                 icon={<BookmarkCheck />}
                 label="Bookmark all tabs"
-                onSelect={commands.bookmarkAllTabs}
+                onSelect={commands.bookmarkAllViews}
               />
               <Item
                 icon={<Library />}

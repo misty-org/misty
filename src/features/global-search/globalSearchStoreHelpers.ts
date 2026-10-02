@@ -6,8 +6,6 @@ import {
 
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId, normalizeActionState } from "./globalMistyActions";
-import { globalMistyApi } from "./globalMistyApi";
-import { globalSearchContext } from "./globalSearchContext";
 import type { GlobalSearchState } from "./globalSearchState";
 import type {
   GlobalAiActionProposal,
@@ -16,10 +14,8 @@ import type {
   GlobalAiConversation,
   GlobalAiMessage,
   GlobalAiMode,
-  GlobalSearchContextItem,
   GlobalSearchDocument,
   GlobalSearchFilters,
-  GlobalSearchResult,
 } from "./types";
 
 export type GlobalSearchSet = (
@@ -360,20 +356,6 @@ export function writeLastMode(accountId: string, mode: GlobalAiMode) {
   }
 }
 
-export function localConversation(spaceId?: string): GlobalAiConversation {
-  const now = new Date().toISOString();
-  return {
-    id: `local-${globalMistyId()}`,
-    title: "New conversation",
-    spaceId,
-    createdAt: now,
-    updatedAt: now,
-    modelId: "",
-    messages: [],
-    remote: false,
-  };
-}
-
 export function normalizeConversation(conversation: GlobalAiConversation): GlobalAiConversation {
   const now = new Date().toISOString();
   return {
@@ -422,77 +404,6 @@ export function updateConversation(
       conversation.id === conversationId ? update(conversation) : conversation,
     ),
   });
-}
-
-export function appendConversationMessage(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversationId: string,
-  message: GlobalAiMessage,
-) {
-  updateConversation(set, get, conversationId, (conversation) => ({
-    ...conversation,
-    updatedAt: message.createdAt,
-    messages: [...conversation.messages, message],
-  }));
-}
-
-export async function askMisty(
-  conversationId: string,
-  prompt: string,
-  context: GlobalAiContextRef[],
-  results: GlobalSearchResult[],
-): Promise<GlobalAiMessage> {
-  const safeContext = context.filter((item) => !item.localPath || item.attached);
-  try {
-    const response = await globalMistyApi.turn(conversationId, {
-      mode: "ask",
-      prompt,
-      context: safeContext,
-    });
-    if (response.message)
-      return {
-        ...response.message,
-        citations: response.citations ?? response.message.citations ?? [],
-      };
-    if (response.text)
-      return {
-        ...conversationMessage("assistant", "ask", response.text),
-        citations: response.citations ?? citationsForResults(results),
-      };
-  } catch {
-    // Compatibility path for servers that predate persistent Global Misty turns.
-  }
-  const retrieval = globalSearchContext(results, 10);
-  const response = await globalMistyApi.complete(buildGroundedPrompt(prompt, retrieval));
-  return {
-    ...conversationMessage("assistant", "ask", response.text),
-    citations: citationsForResults(results),
-  };
-}
-
-function buildGroundedPrompt(prompt: string, context: GlobalSearchContextItem[]): string {
-  const sources = context
-    .map(
-      (item, index) =>
-        `[${index + 1}] ${item.kind}: ${item.title}${item.space ? ` (${item.space})` : ""}\n${item.snippet}`,
-    )
-    .join("\n\n");
-  return [
-    "You are Misty, the account-wide AI inside the Misty app.",
-    "Answer concisely. Ground Misty-specific claims only in the supplied sources. If the sources are insufficient, say so plainly.",
-    `User request: ${prompt}`,
-    sources ? `Sources:\n${sources}` : "No Misty sources matched this request.",
-  ].join("\n\n");
-}
-
-function citationsForResults(results: GlobalSearchResult[]) {
-  return results.slice(0, 8).map((result) => ({
-    id: result.id,
-    title: result.title,
-    href: result.href,
-    kind: result.kind,
-  }));
 }
 
 export function searchResultMatchesFilters(

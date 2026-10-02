@@ -1,6 +1,5 @@
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
-import { Avatar, AvatarFallback, AvatarImage, cn, Pressable } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Pressable } from "@/shared/ui";
 import { ImageIcon } from "lucide-react";
 import {
   hasAnyAttachment,
@@ -26,7 +25,7 @@ export function MessageReplyPreview({
 }) {
   const agentAuthored = Boolean(message && isAgentAuthoredMessage(message));
   return (
-    <div className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-5">
+    <div className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-4">
       <div aria-hidden="true" className="relative">
         <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-cream-muted/55" />
       </div>
@@ -41,18 +40,11 @@ export function MessageReplyPreview({
           <>
             <Avatar className="size-[18px] shrink-0">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback
-                className={cn(
-                  "text-[7px] font-semibold",
-                  agentAuthored
-                    ? cn(robotAvatarClass, avatarInkClass)
-                    : cn(avatarColorClass(message.sender_name), avatarInkClass),
-                )}
-              >
+              <AvatarFallback className="bg-charcoal-card text-cream text-[7px] font-semibold">
                 {agentAuthored ? "AI" : initials(message.sender_name)}
               </AvatarFallback>
             </Avatar>
-            <strong className="shrink-0 font-semibold text-cream-bright">
+            <strong className="max-w-[40%] truncate font-semibold text-cream-bright">
               @{message.sender_name}
             </strong>
             <span className="min-w-0 truncate text-cream/80">

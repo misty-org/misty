@@ -6,7 +6,7 @@ import { useAuth } from "@/features/auth";
 import { useAppThemeStore, useSettingsStore } from "@/features/settings";
 import { SystemErrorActivity } from "@/features/activity";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
-import { useWorkspaceTabFocused, useWorkspaceTabTitle } from "@/features/workspace";
+import { useWorkspaceViewFocused, useWorkspaceViewTitle } from "@/features/workspace";
 import {
   registerShortcutHandler,
   effectiveShortcut,
@@ -26,7 +26,7 @@ export function HostRoadmapRuntimeProvider(props: {
   children: ReactNode;
 }) {
   const { user } = useAuth();
-  const focused = useWorkspaceTabFocused();
+  const focused = useWorkspaceViewFocused();
   const theme = useAppThemeStore((state) => state.resolvedTheme);
   const settings = useSettingsStore((state) => state.settings?.document);
   const shortcutLabels = useMemo(
@@ -95,6 +95,6 @@ function HostRoadmapIntegration(
   props: Parameters<RoadmapRuntime["renderIntegration"]>[0] & { workspaceTabId?: string },
 ) {
   useAiSurfaceAdapter(props.adapter);
-  useWorkspaceTabTitle(props.workspaceTabId, props.title);
+  useWorkspaceViewTitle(props.workspaceTabId, props.title);
   return null;
 }

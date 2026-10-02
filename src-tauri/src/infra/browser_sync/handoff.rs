@@ -182,8 +182,8 @@ pub(super) async fn capture_current(
     if !super::may_capture(&committed, active) {
         return Err(issue(misty_browser_sync::Error::InactiveDevice));
     }
-    // Tree mode has no account-wide tenure: credentials are published bare.
-    let epoch = if committed.tree_mode {
+    // Workspace mode has no account-wide tenure: credentials are published bare.
+    let epoch = if committed.workspace_mode {
         None
     } else {
         Some(
@@ -294,11 +294,7 @@ pub(super) async fn capture_current(
         .invalidate_browser_readiness()
         .await
         .map_err(issue)?;
-    let _ = app.emit_to(
-        "main",
-        "misty:browser-sync-changed",
-        &active.scope.workspace_id,
-    );
+    let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
     Ok(())
 }
 
@@ -507,11 +503,7 @@ pub(super) async fn restore_current(
         let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
     }
     active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
-    let _ = app.emit_to(
-        "main",
-        "misty:browser-sync-changed",
-        &active.scope.workspace_id,
-    );
+    let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
     result?;
     Ok(())
 }

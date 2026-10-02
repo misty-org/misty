@@ -104,7 +104,7 @@ describe("spaceRequest account isolation", () => {
   });
 
   it("locks Spaces after a network failure", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
 
     await expect(spaceRequest("/spaces")).rejects.toThrow("Failed to fetch");
     expect(isSpaceReferenceOnly()).toBe(true);

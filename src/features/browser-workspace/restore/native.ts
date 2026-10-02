@@ -28,13 +28,15 @@ export interface RestoreAction {
 /** Field values never come back to the renderer from capture. */
 export const capturePageState = (
   runtimeId: string,
-  tabId: string,
+  viewId: string,
   excluded: boolean,
   force: boolean,
 ) =>
-  invoke<boolean>("browser_page_state_capture", { request: { runtimeId, tabId, excluded, force } });
-export const restorePageState = (runtimeId: string, tabId: string) =>
-  invoke<RestoreReport>("browser_page_state_restore", { request: { runtimeId, tabId } });
+  invoke<boolean>("browser_page_state_capture", {
+    request: { runtimeId, viewId, excluded, force },
+  });
+export const restorePageState = (runtimeId: string, viewId: string) =>
+  invoke<RestoreReport>("browser_page_state_restore", { request: { runtimeId, viewId } });
 export const pageControls = (runtimeId: string) =>
   invoke<PageControl[]>("browser_page_state_controls", { runtimeId });
 export const pageAct = (runtimeId: string, action: RestoreAction) =>

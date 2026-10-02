@@ -13,7 +13,3 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
   }
   return <LoadingScreen label={props.label ?? "Loading Space"} />;
 }
-
-export function SpacesAppLoadingPlaceholder() {
-  return <LoadingScreen label="Switching Spaces account" />;
-}

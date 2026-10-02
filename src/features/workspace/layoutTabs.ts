@@ -1,12 +1,12 @@
 import { workspaceSurfaceFromRoute } from "./routeSurface";
-import { createDockLeaf, dockLeaves, dockTabs, mapDockTabs } from "./dockTree";
-import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceLayoutTab, WorkspaceTab } from "./model";
+import { createDockLeaf, dockLeaves, dockTreeViews, mapDockTreeViews } from "./dockTree";
+import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceTab, WorkspaceView } from "./model";
 
-export function layoutTabs(layout: WorkspaceLayout): WorkspaceLayoutTab[] {
+export function layoutTabs(layout: WorkspaceLayout): WorkspaceTab[] {
   if (layout.tabs?.length) return layout.tabs;
   return [
     {
-      id: `layout:${dockTabs(layout.root)[0]?.id ?? layout.root.id}`,
+      id: `layout:${dockTreeViews(layout.root)[0]?.id ?? layout.root.id}`,
       root: layout.root,
       focusedPaneId: layout.focusedPaneId,
     },
@@ -17,66 +17,69 @@ export function allLayoutPanes(layout: WorkspaceLayout) {
   return layoutTabs(layout).flatMap((tab) => dockLeaves(tab.root));
 }
 
-export function allLayoutViews(layout: WorkspaceLayout): WorkspaceTab[] {
-  return layoutTabs(layout).flatMap((tab) => dockTabs(tab.root));
+export function allLayoutViews(layout: WorkspaceLayout): WorkspaceView[] {
+  return layoutTabs(layout).flatMap((tab) => dockTreeViews(tab.root));
 }
 
 export function activeLayoutView(
   layout: Pick<WorkspaceLayout, "root" | "focusedPaneId">,
-): WorkspaceTab | null {
+): WorkspaceView | null {
   const panes = dockLeaves(layout.root);
   const pane = panes.find((pane) => pane.id === layout.focusedPaneId) ?? panes[0];
-  return pane?.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane?.tabs[0] ?? null;
+  return pane?.views.find((tab) => tab.id === pane.activeViewId) ?? pane?.views[0] ?? null;
 }
 
-export function selectLayoutTab(layout: WorkspaceLayout, id: string): WorkspaceLayout {
+export function activateTab(layout: WorkspaceLayout, id: string): WorkspaceLayout {
   const tabs = layoutTabs(layout);
   const active = tabs.find((tab) => tab.id === id);
   return active
-    ? { root: active.root, focusedPaneId: active.focusedPaneId, tabs, activeLayoutTabId: id }
+    ? { root: active.root, focusedPaneId: active.focusedPaneId, tabs, activeTabId: id }
     : layout;
 }
 
 /** A window with no tabs is a valid workspace: one layout tab whose pane is empty. */
-export function isEmptyLayoutTab(tab: WorkspaceLayoutTab): boolean {
-  return dockTabs(tab.root).length === 0;
+export function isEmptyTab(tab: WorkspaceTab): boolean {
+  return dockTreeViews(tab.root).length === 0;
 }
 
-export function emptyLayoutTab(): WorkspaceLayoutTab {
+export function emptyTab(): WorkspaceTab {
   const pane = createDockLeaf();
   return { id: `layout:${pane.id}`, root: pane, focusedPaneId: pane.id };
 }
 
-export function appendLayoutTab(layout: WorkspaceLayout, tab: WorkspaceLayoutTab): WorkspaceLayout {
+export function appendTab(layout: WorkspaceLayout, tab: WorkspaceTab): WorkspaceLayout {
   // The empty placeholder never lingers beside real tabs.
-  const kept = isEmptyLayoutTab(tab) ? [] : layoutTabs(layout).filter((t) => !isEmptyLayoutTab(t));
-  return selectLayoutTab({ ...layout, tabs: [...kept, tab] }, tab.id);
+  const kept = isEmptyTab(tab) ? [] : layoutTabs(layout).filter((t) => !isEmptyTab(t));
+  return activateTab({ ...layout, tabs: [...kept, tab] }, tab.id);
 }
 
-export function singleViewLayoutTab(view: WorkspaceTab): WorkspaceLayoutTab {
+export function singleViewTab(view: WorkspaceView): WorkspaceTab {
   const pane = createDockLeaf([view]);
   return { id: `layout:${view.id}`, root: pane, focusedPaneId: pane.id };
 }
 
 export function mapLayoutViews(
   layout: WorkspaceLayout,
-  update: (view: WorkspaceTab) => WorkspaceTab,
+  update: (view: WorkspaceView) => WorkspaceView,
 ): WorkspaceLayout {
-  if (!layout.tabs?.length) return { ...layout, root: mapDockTabs(layout.root, update) };
-  const tabs = layoutTabs(layout).map((tab) => ({ ...tab, root: mapDockTabs(tab.root, update) }));
-  return selectLayoutTab({ ...layout, tabs }, layout.activeLayoutTabId ?? tabs[0].id);
+  if (!layout.tabs?.length) return { ...layout, root: mapDockTreeViews(layout.root, update) };
+  const tabs = layoutTabs(layout).map((tab) => ({
+    ...tab,
+    root: mapDockTreeViews(tab.root, update),
+  }));
+  return activateTab({ ...layout, tabs }, layout.activeTabId ?? tabs[0].id);
 }
 
 /** Preserve the old visible split, and lift every hidden view into its own tab. */
-export function migrateLayoutTabs(layout: WorkspaceLayout): WorkspaceLayout {
+export function migrateTabs(layout: WorkspaceLayout): WorkspaceLayout {
   if (layout.tabs?.length) return layout;
-  const hidden: WorkspaceTab[] = [];
+  const hidden: WorkspaceView[] = [];
   const visit = (node: WorkspaceDockNode): WorkspaceDockNode => {
     if (node.type === "split")
       return { ...node, first: visit(node.first), second: visit(node.second) };
-    const active = node.tabs.find((tab) => tab.id === node.activeTabId) ?? node.tabs[0];
-    hidden.push(...node.tabs.filter((tab) => tab !== active));
-    return { ...node, tabs: active ? [active] : [], activeTabId: active?.id ?? null };
+    const active = node.views.find((tab) => tab.id === node.activeViewId) ?? node.views[0];
+    hidden.push(...node.views.filter((tab) => tab !== active));
+    return { ...node, views: active ? [active] : [], activeViewId: active?.id ?? null };
   };
   const root = visit(layout.root);
   const view = activeLayoutView({ ...layout, root });
@@ -91,15 +94,15 @@ export function migrateLayoutTabs(layout: WorkspaceLayout): WorkspaceLayout {
     tabs: [
       active,
       ...hidden.map((view) => ({
-        ...singleViewLayoutTab(view),
+        ...singleViewTab(view),
         legacyNameKeys: [`tab:${view.id}`, `group:${view.groupInstanceId}`],
       })),
     ],
-    activeLayoutTabId: active.id,
+    activeTabId: active.id,
   };
 }
 
-export function paneViewLabel(view: WorkspaceTab | null | undefined): string {
+export function paneViewLabel(view: WorkspaceView | null | undefined): string {
   if (!view || view.placeholder) return "New Tab";
   return (
     view.title?.trim() ||
@@ -107,7 +110,7 @@ export function paneViewLabel(view: WorkspaceTab | null | undefined): string {
     (view.surfaceId === "home" ? "Home" : "New Tab")
   );
 }
-export function layoutTabLabel(tab: WorkspaceLayoutTab): string {
+export function tabLabel(tab: WorkspaceTab): string {
   const view = activeLayoutView(tab);
   if (view?.placeholder) return tab.title && tab.title !== "New pane" ? tab.title : "New Tab";
   return tab.title || paneViewLabel(view);
@@ -117,12 +120,12 @@ export function layoutTabLabel(tab: WorkspaceLayoutTab): string {
 export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayout {
   const tabs = layoutTabs(layout);
   const visible = new Set(allLayoutViews(layout).map((view) => view.id));
-  const recovered = new Map<string, WorkspaceTab>();
+  const recovered = new Map<string, WorkspaceView>();
   let changed = false;
   const visit = (node: WorkspaceDockNode): WorkspaceDockNode => {
     if (node.type === "split")
       return { ...node, first: visit(node.first), second: visit(node.second) };
-    const active = node.tabs[0];
+    const active = node.views[0];
     if (!active || !node.history?.entries.some((entry) => entry.id !== active.id)) return node;
     changed = true;
     for (const entry of node.history.entries) {
@@ -139,11 +142,11 @@ export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayou
   };
   const updated = tabs.map((tab) => ({
     ...tab,
-    root: visit(tab.id === layout.activeLayoutTabId ? layout.root : tab.root),
+    root: visit(tab.id === layout.activeTabId ? layout.root : tab.root),
   }));
   if (!changed) return layout;
-  return selectLayoutTab(
-    { ...layout, tabs: [...updated, ...Array.from(recovered.values(), singleViewLayoutTab)] },
-    layout.activeLayoutTabId ?? tabs[0].id,
+  return activateTab(
+    { ...layout, tabs: [...updated, ...Array.from(recovered.values(), singleViewTab)] },
+    layout.activeTabId ?? tabs[0].id,
   );
 }

@@ -6,11 +6,9 @@ const mocks = vi.hoisted(() => ({
   failWrite: false,
   generation: 0,
   apply: vi.fn(async (_values: unknown, _valid?: () => boolean) => {}),
-  list: vi.fn(),
+  ensure: vi.fn(),
+  read: vi.fn(),
   patch: vi.fn(),
-  create: vi.fn(),
-  rename: vi.fn(),
-  remove: vi.fn(),
 }));
 vi.mock("@/api/client/session", () => ({ readApiSessionGeneration: () => mocks.generation }));
 vi.mock("../store/useSettingsStore", () => ({
@@ -37,14 +35,12 @@ const a: SettingsProfile = {
   revision: 1,
   values: { [key]: "old" },
 };
-const b: SettingsProfile = { ...a, id: "b", name: "Personal", values: { [key]: "personal" } };
 function online(value: boolean) {
   Object.defineProperty(navigator, "onLine", { configurable: true, value });
 }
 async function setup(scope = "deployment/account-a") {
   const state = initialProfileState({});
-  state.selectedProfileId = "a";
-  state.profiles = { a: structuredClone(a), b: structuredClone(b) };
+  state.profile = structuredClone(a);
   mocks.disk.set(scope, state);
   await store.getState().configure(scope, "account-a", {});
 }
@@ -57,7 +53,8 @@ describe("durable settings profile controller", () => {
     vi.clearAllMocks();
     vi.stubGlobal("BroadcastChannel", undefined);
     online(false);
-    mocks.list.mockResolvedValue({ profiles: [a, b] });
+    mocks.ensure.mockResolvedValue(a);
+    mocks.read.mockResolvedValue(a);
     mocks.patch.mockImplementation(async (edit) => ({ ...a, revision: 2, values: edit.set }));
   });
   afterEach(() => {
@@ -76,20 +73,18 @@ describe("durable settings profile controller", () => {
     expect(mocks.patch).not.toHaveBeenCalled();
   });
 
-  it("restarts offline, switches cached profiles, and replays into the original profile", async () => {
+  it("restarts offline and replays edits into the shared account record", async () => {
     await setup();
     await store.getState().edit(key, "offline edit");
     const mutation = structuredClone(store.getState().state!.outbox[0]);
-    await store.getState().select("b");
     store.getState().disconnect();
     await store.getState().configure("deployment/account-a", "account-a", {});
-    expect(store.getState().state?.selectedProfileId).toBe("b");
-    expect(resolveSetting(store.getState().state!, key).value).toBe("personal");
+    expect(resolveSetting(store.getState().state!, key).value).toBe("offline edit");
     online(true);
     await store.getState().refresh();
     expect(mocks.patch).toHaveBeenCalledWith(mutation);
     expect(store.getState().state?.outbox).toHaveLength(0);
-    expect(resolveSetting(store.getState().state!, key).value).toBe("personal");
+    expect(resolveSetting(store.getState().state!, key).value).toBe("offline edit");
   });
 
   it("keeps the mutation ID after a lost response and only removes it after durable acknowledgement", async () => {
@@ -138,29 +133,62 @@ describe("durable settings profile controller", () => {
     finish({ ...a, revision: 5, values: { [key]: "stale" } });
     await pending;
     expect(store.getState().accountId).toBe("account-b");
-    expect(store.getState().state!.profiles).toEqual({});
+    expect(store.getState().state!.profile).toBeNull();
     expect((mocks.disk.get("deployment/account-a") as DeviceProfileState).outbox).toHaveLength(1);
     expect(mocks.apply.mock.calls[mocks.apply.mock.calls.length - 1]?.[0]).not.toEqual({
       [key]: "stale",
     });
   });
 
-  it("persists profile-specific overrides across restart and resets to the profile value", async () => {
+  it("takes remote updates without a local override", async () => {
     await setup();
-    await store.getState().edit(key, "device value", "device");
-    await store.getState().select("b");
-    store.getState().disconnect();
-    await store.getState().configure("deployment/account-a", "account-a", {});
-    await store.getState().select("a");
-    expect(resolveSetting(store.getState().state!, key)).toEqual({
-      value: "device value",
-      source: "device",
+    mocks.read.mockResolvedValue({
+      ...a,
+      revision: 3,
+      values: { [key]: "remote", "app.zoom": 1.25 },
     });
-    await store.getState().edit(key, undefined, "device");
-    expect(resolveSetting(store.getState().state!, key)).toEqual({
-      value: "old",
-      source: "profile",
-    });
-    expect(store.getState().state!.outbox).toHaveLength(0);
+    online(true);
+    await store.getState().refresh();
+    expect(resolveSetting(store.getState().state!, key).value).toBe("remote");
+    expect(mocks.apply).toHaveBeenLastCalledWith(
+      { [key]: "remote", "app.zoom": 1.25 },
+      expect.any(Function),
+    );
+  });
+  it("queues edits before first enrollment and uses server values for unrelated settings", async () => {
+    await store.getState().configure("new/account", "account-a", { appearance: { app_zoom: 2 } });
+    await store.getState().edit(key, "offline");
+    online(true);
+    await store.getState().refresh();
+    expect(mocks.ensure).toHaveBeenCalledWith({ "app.zoom": 2 });
+    expect(mocks.patch).toHaveBeenCalledWith(
+      expect.objectContaining({ set: { [key]: "offline" } }),
+    );
+    expect(store.getState().state?.seed).toEqual({});
+  });
+  it("reads enrolled settings without writes or repeated projection", async () => {
+    await setup();
+    mocks.apply.mockClear();
+    online(true);
+    await store.getState().refresh();
+    await store.getState().refresh();
+    expect(mocks.read).toHaveBeenCalledTimes(2);
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    expect(mocks.patch).not.toHaveBeenCalled();
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it("does not enqueue or refresh an unchanged preference", async () => {
+    await setup();
+    mocks.apply.mockClear();
+    online(true);
+    await store.getState().edit(key, "old");
+    expect(store.getState().state?.outbox).toHaveLength(0);
+    expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.apply).not.toHaveBeenCalled();
+  });
+  it("does not create local-only preferences when signed out", async () => {
+    await store.getState().configure("signed-out", "", {});
+    await expect(store.getState().edit(key, "new")).rejects.toThrow("Sign in");
+    expect(store.getState().state?.outbox).toHaveLength(0);
   });
 });

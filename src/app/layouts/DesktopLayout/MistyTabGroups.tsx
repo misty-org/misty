@@ -16,7 +16,7 @@ import {
 } from "@/shared/ui";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
-import type { WorkspaceLayoutTab, WorkspaceTab } from "@/features/workspace/model";
+import type { WorkspaceTab, WorkspaceView } from "@/features/workspace/model";
 import {
   tabGroupColors,
   type MistyTabGroup,
@@ -34,9 +34,9 @@ export function TabGroupTabMenu({
   onEdit,
   onOpen,
 }: {
-  tab: WorkspaceLayoutTab;
+  tab: WorkspaceTab;
   onEdit(id: string): void;
-  onOpen(tab: WorkspaceTab): void;
+  onOpen(tab: WorkspaceView): void;
 }) {
   const groups = useWorkspaceStore((s) => s.tabGroups);
   const layout = useWorkspaceStore((s) => s.layout);
@@ -105,7 +105,7 @@ export function TabGroupHeader({
   group: MistyTabGroup;
   count: number;
   onEdit(id: string): void;
-  onOpen(tab: WorkspaceTab): void;
+  onOpen(tab: WorkspaceView): void;
 }) {
   return (
     <div
@@ -152,7 +152,7 @@ export function TabGroupEditor({
 }: {
   id: string;
   onClose(): void;
-  onOpen(tab: WorkspaceTab): void;
+  onOpen(tab: WorkspaceView): void;
 }) {
   const group = useWorkspaceStore((s) => s.tabGroups.find((g) => g.id === id));
   const [name, setName] = useState(group?.name ?? "");
@@ -172,7 +172,7 @@ export function TabGroupEditor({
   const save = () => useWorkspaceStore.getState().updateTabGroup(id, { name, color });
   const openCurrent = () => {
     const s = useWorkspaceStore.getState();
-    const tab = s.selectLayoutTab(s.layout.activeLayoutTabId!);
+    const tab = s.selectTab(s.layout.activeTabId!);
     if (tab) onOpen(tab);
   };
   return (

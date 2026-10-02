@@ -1,8 +1,7 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
-import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
-import { Avatar, AvatarFallback, AvatarImage, Badge, BrandIcon, cn } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Badge, BrandIcon, Button } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -49,13 +48,15 @@ export function ChatMessageRow({
       {dateLabel ? <ChatDateDivider label={dateLabel} /> : null}
       <article
         className={[
-          "group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-xl px-3 py-1",
-          "transition-colors duration-150 hover:bg-charcoal-card",
+          "group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
+          "transition-colors duration-150 hover:bg-charcoal-card focus-within:bg-charcoal-card focus-visible:outline-none",
           // `first:` covers the message that opens a thread with no date
           // divider above it, whose top margin would double the scroller's.
           compact ? "" : "mt-4 first:mt-0",
         ].join(" ")}
         id={`message-${message.id}`}
+        tabIndex={0}
+        aria-label={`Message from ${message.sender_name}`}
       >
         {message.reply_to_message_id ? (
           <MessageReplyPreview
@@ -77,14 +78,7 @@ export function ChatMessageRow({
           ) : (
             <Avatar className="mt-0.5 size-10">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback
-                className={cn(
-                  "text-xs font-semibold",
-                  agentAuthored
-                    ? cn(robotAvatarClass, avatarInkClass)
-                    : cn(avatarColorClass(message.sender_name), avatarInkClass),
-                )}
-              >
+              <AvatarFallback className="bg-charcoal-card text-cream text-xs font-semibold">
                 {agentAuthored ? (
                   <Bot className="size-4" strokeWidth={2} />
                 ) : (
@@ -120,11 +114,16 @@ export function ChatMessageRow({
 
           {message.local_delivery_state === "failed" ? (
             <div
-              className="mt-1 flex items-center gap-1.5 text-[11px] text-notification-red"
+              className="mt-1 flex items-center gap-1.5 text-[11px] text-cream-muted"
               role="alert"
             >
               <CircleAlert className="size-3" aria-hidden="true" />
               Message couldn’t be sent.
+              {props.onRetry && (
+                <Button variant="ghost" size="sm" onClick={() => props.onRetry?.(message)}>
+                  Retry
+                </Button>
+              )}
             </div>
           ) : null}
 
@@ -147,9 +146,11 @@ export function ChatMessageRow({
           />
         </div>
 
-        {props.canWrite && !message.local_delivery_state ? (
+        {!message.local_delivery_state && props.editingMessageId !== message.id ? (
           <MessageHoverActions
             message={message}
+            canWrite={props.canWrite}
+            onError={props.onError}
             currentUserId={props.currentUserId}
             isOwner={props.isOwner}
             onReply={props.onReply}

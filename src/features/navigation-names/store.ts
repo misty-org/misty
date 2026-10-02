@@ -57,6 +57,3 @@ export async function setNavigationName(key: string, value: string | null) {
 export const windowNameKey = (id: string) => `window:${id}`;
 export const tabNameKey = (id: string) => `tab:${id}`;
 export const groupNameKey = (id: string) => `group:${id}`;
-export const sectionNameKey = (app: string) => `section:${app === "chat" ? "social" : app}`;
-export const itemNameKey = (app: string, path: string[]) =>
-  `item:${JSON.stringify([app === "chat" ? "social" : app, ...(path[path.length - 1]?.startsWith("pin-") ? [path[path.length - 1]!] : path)])}`;

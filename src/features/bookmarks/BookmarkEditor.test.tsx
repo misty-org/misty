@@ -10,15 +10,13 @@ it("edits an existing bookmark instead of creating a duplicate", () => {
   const onClose = vi.fn();
   render(
     <BookmarkEditor
-      bookmark={bookmarks(useWorkspaceStore.getState().savedWebsites)[0]}
+      bookmark={bookmarks(useWorkspaceStore.getState().bookmarks)[0]}
       onClose={onClose}
     />,
   );
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "After" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(bookmarks(useWorkspaceStore.getState().savedWebsites)).toMatchObject([
-    { id, title: "After" },
-  ]);
+  expect(bookmarks(useWorkspaceStore.getState().bookmarks)).toMatchObject([{ id, title: "After" }]);
   expect(onClose).toHaveBeenCalledOnce();
 });
 it("keeps invalid addresses editable and reports the error", () => {
@@ -27,5 +25,5 @@ it("keeps invalid addresses editable and reports the error", () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(screen.getByRole("alert")).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
-  expect(useWorkspaceStore.getState().savedWebsites).toEqual([]);
+  expect(useWorkspaceStore.getState().bookmarks).toEqual([]);
 });

@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createWorkspaceVirtualWindow } from "@/features/workspace/virtualWindows";
+import { createWorkspaceWindow } from "@/features/workspace/windows";
 const mocks = vi.hoisted(() => ({
   baseline: {} as unknown,
   live: {} as unknown,
@@ -57,7 +57,6 @@ vi.mock("./native", () => ({
   watchNativeProfile: async () => mocks.detachProfile,
   activeDeviceEpoch: (session: { active: boolean }) => (session.active ? "epoch" : null),
   editNativeWorkspace: vi.fn(),
-  saveNativeResume: vi.fn(),
 }));
 vi.mock("./recovery", () => ({
   openWorkspaceRecovery: async () => ({
@@ -83,12 +82,12 @@ beforeEach(() => {
   mocks.values.clear();
   mocks.values.set("before-sync", "{}");
   mocks.flush.mockResolvedValue(undefined);
-  mocks.baseline = { virtualWindowsByScope: { global: [] }, websiteGroups: [], savedWebsites: [] };
-  mocks.live = { windows: [createWorkspaceVirtualWindow()], groups: [], websites: [] };
+  mocks.baseline = { windowsByScope: { global: [] }, bookmarkFolders: [], bookmarks: [] };
+  mocks.live = { windows: [createWorkspaceWindow()], groups: [], websites: [] };
   mocks.session = {
     account_id: "a",
     deployment: "https://sync.example",
-    workspace_id: "w",
+    vault_id: "w",
     device_id: "d",
     profile_id: "p",
     active: true,

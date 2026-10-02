@@ -105,7 +105,6 @@ const presets: Record<string, EditableThemeTokens> = {
 };
 
 let previewSnapshot: ExtensionThemeSnapshot | null = null;
-let previewOwner: string | null = null;
 let revision = 0;
 
 export function extensionThemeSnapshot(): ExtensionThemeSnapshot {
@@ -116,80 +115,9 @@ export function extensionThemeSnapshot(): ExtensionThemeSnapshot {
 
 export function applyStoredExtensionTheme(): ExtensionThemeSnapshot {
   previewSnapshot = null;
-  previewOwner = null;
   const snapshot = extensionThemeSnapshot();
   applySnapshot(snapshot);
   return snapshot;
-}
-
-export function revertExtensionThemePreview(owner?: string): void {
-  if (!previewSnapshot || (owner != null && previewOwner !== owner)) return;
-  previewSnapshot = null;
-  previewOwner = null;
-  applySnapshot(extensionThemeSnapshot());
-  announceThemeChange();
-}
-
-export function runExtensionThemeCommand(
-  command: string,
-  payload: Record<string, unknown>,
-  owner = "host",
-): Record<string, unknown> {
-  if (command === "themes.snapshot") {
-    const snapshot = extensionThemeSnapshot();
-    return response(snapshot, "Current Misty theme loaded.");
-  }
-
-  if (command === "themes.applyPreset") {
-    const presetId = typeof payload.preset === "string" ? payload.preset : "";
-    const preset = presets[presetId];
-    if (!preset) return { ok: false, message: "That theme preset is unavailable." };
-    const snapshot = snapshotFromEditable(presetId, preset);
-    if (payload.preview === false) {
-      persistSnapshot(snapshot);
-      previewSnapshot = null;
-      previewOwner = null;
-    } else {
-      previewSnapshot = snapshot;
-      previewOwner = owner;
-    }
-    applySnapshot(snapshot);
-    announceThemeChange();
-    return response(snapshot, `Previewing ${presetLabel(presetId)}.`);
-  }
-
-  if (command === "themes.preview" || command === "themes.apply") {
-    const current = extensionThemeSnapshot();
-    const editable = editableTokens(payload.tokens, current.tokens);
-    if (!editable) return { ok: false, message: "Theme colors must use six-digit hex values." };
-    const requestedId =
-      typeof payload.preset === "string" && payload.preset in presets ? payload.preset : "custom";
-    const snapshot = snapshotFromEditable(requestedId, editable);
-    if (command === "themes.apply") {
-      persistSnapshot(snapshot);
-      previewSnapshot = null;
-      previewOwner = null;
-    } else {
-      previewSnapshot = snapshot;
-      previewOwner = owner;
-    }
-    applySnapshot(snapshot);
-    announceThemeChange();
-    return response(snapshot, command === "themes.apply" ? "Theme saved." : "Preview updated.");
-  }
-
-  if (command === "themes.revert") {
-    if (previewSnapshot && previewOwner !== owner)
-      return { ok: false, message: "Another App owns the current preview." };
-    previewSnapshot = null;
-    previewOwner = null;
-    const snapshot = storedSnapshot() ?? snapshotFromEditable("misty-dark", presets["misty-dark"]);
-    applySnapshot(snapshot);
-    announceThemeChange();
-    return response(snapshot, "Reverted to the saved theme.");
-  }
-
-  return { ok: false, message: "This theme command is unavailable." };
 }
 
 function snapshotFromEditable(
@@ -223,17 +151,6 @@ function snapshotFromEditable(
   };
 }
 
-function response(snapshot: ExtensionThemeSnapshot, message: string) {
-  return {
-    ok: true,
-    themeId: snapshot.themeId,
-    mode: snapshot.mode,
-    revision: snapshot.revision,
-    tokens: snapshot.tokens,
-    message,
-  };
-}
-
 function editableTokens(
   value: unknown,
   fallback: ExtensionThemeTokens,
@@ -260,17 +177,6 @@ function editableTokens(
   return result;
 }
 
-function persistSnapshot(snapshot: ExtensionThemeSnapshot): void {
-  try {
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({ themeId: snapshot.themeId, tokens: editableFromSnapshot(snapshot) }),
-    );
-  } catch {
-    // The active theme still applies for this session when storage is unavailable.
-  }
-}
-
 function storedSnapshot(): ExtensionThemeSnapshot | null {
   try {
     const raw = window.localStorage.getItem(storageKey);
@@ -286,12 +192,6 @@ function storedSnapshot(): ExtensionThemeSnapshot | null {
   } catch {
     return null;
   }
-}
-
-function editableFromSnapshot(snapshot: ExtensionThemeSnapshot): EditableThemeTokens {
-  const { background, surface, text, textMuted, accent, selection, success, warning, danger } =
-    snapshot.tokens;
-  return { background, surface, text, textMuted, accent, selection, success, warning, danger };
 }
 
 function applySnapshot(snapshot: ExtensionThemeSnapshot): void {
@@ -331,17 +231,6 @@ function applySnapshot(snapshot: ExtensionThemeSnapshot): void {
   };
   for (const [name, value] of Object.entries(cssTokens)) root.style.setProperty(name, value);
   useAppThemeStore.getState().setResolvedTheme(snapshot.mode as ResolvedAppTheme);
-}
-
-function announceThemeChange(): void {
-  window.dispatchEvent(new CustomEvent(extensionThemeChangedEvent));
-}
-
-function presetLabel(id: string): string {
-  return id
-    .split("-")
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function relativeLuminance(hex: string): number {

@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, desktop, environment, home, release, server, website};
+use crate::{
+    checks, config::Settings, deploy, desktop, environment, home, release, server, server_release,
+    website,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty", version, about)]
@@ -80,9 +83,6 @@ enum HomeCommand {
         /// Exact output directory. Defaults to ~/.misty.
         #[arg(long)]
         destination: Option<PathBuf>,
-        /// Existing Misty home whose portable plugins should be copied.
-        #[arg(long)]
-        source: Option<PathBuf>,
     },
     /// Validate layout, permissions, and retired paths without displaying values.
     Check {
@@ -105,6 +105,7 @@ enum EnvCommand {
     /// Split legacy private files into the scoped layout.
     Migrate,
     /// Create missing private files without overwriting configured values.
+    /// For prod, also generate any missing production secrets locally.
     Init {
         #[arg(value_enum)]
         target: environment::Target,
@@ -208,6 +209,9 @@ enum ServerCommand {
         /// Stream underlying build output.
         #[arg(long)]
         verbose: bool,
+        /// Also open the local operator console in your browser.
+        #[arg(long)]
+        gui: bool,
     },
     /// Show service health and any unfinished or failed setup jobs.
     Status,
@@ -225,6 +229,12 @@ enum ServerCommand {
         follow: bool,
         #[arg(long, default_value_t = 100)]
         tail: u32,
+    },
+    /// Test, build and push the production images from this computer, tag the
+    /// commit, and save the image digests in server/.env/prod.
+    Release {
+        /// Release version, such as 0.1.0 (tagged server-v0.1.0).
+        version: String,
     },
     /// Operate the production Compose stack explicitly.
     Prod {
@@ -254,6 +264,48 @@ enum ProdCommand {
         volumes: bool,
     },
     Logs,
+    /// Encrypt both databases with age and upload them to the backup bucket.
+    Backup,
+    /// Copy this computer's server/.env/prod (and misty-billing/.env/prod) to the VPS.
+    Push(DeployTarget),
+    /// Push the production environment, then update and start both stacks on the VPS.
+    Deploy(DeployTarget),
+    /// Replace both databases with a backup from the bucket.
+    Restore {
+        /// Backup timestamp such as 20271003T020000Z, or `latest`.
+        backup: String,
+        /// age identity file that decrypts the backup.
+        #[arg(long)]
+        identity: PathBuf,
+        /// Confirm that production data will be replaced.
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct DeployTarget {
+    /// SSH destination such as misty@203.0.113.10; defaults to MISTY_DEPLOY_HOST.
+    #[arg(long)]
+    host: Option<String>,
+    /// Misty checkout on the VPS, relative to the SSH user's home.
+    #[arg(long, default_value = "misty")]
+    dir: String,
+    /// Directory for billing's deploy files on the VPS, relative to the SSH user's home.
+    #[arg(long, default_value = "misty-billing")]
+    billing_dir: String,
+}
+
+impl DeployTarget {
+    fn remote(&self) -> Result<deploy::Remote> {
+        let host = match &self.host {
+            Some(host) => host.clone(),
+            None => std::env::var("MISTY_DEPLOY_HOST").map_err(|_| {
+                anyhow::anyhow!("pass --host or set MISTY_DEPLOY_HOST in misty/cli/.env/common.env")
+            })?,
+        };
+        deploy::Remote::new(&host, &self.dir, &self.billing_dir)
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -305,17 +357,21 @@ struct Release {
 
 #[derive(Debug, Subcommand)]
 enum ReleaseCommand {
+    /// Validate locally saved release configuration before compiling or uploading.
+    Check,
     Start {
         version: String,
         #[arg(long)]
         dry_run: bool,
-        #[arg(long)]
-        no_macos: bool,
-        #[arg(long)]
-        no_windows: bool,
+        /// Release operating systems, comma-separated; defaults to the current OS.
+        #[arg(long, value_enum, value_delimiter = ',')]
+        os: Vec<release::ReleaseOs>,
     },
     Build {
         version: String,
+        /// Upload verified local artifacts to the draft after building.
+        #[arg(long)]
+        upload: bool,
         #[arg(long)]
         dry_run: bool,
     },
@@ -390,19 +446,20 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             EnvCommand::Migrate => environment::migrate(&settings.workspace),
             EnvCommand::Init { target } => {
                 environment::init(&settings.workspace, target)?;
-                if target == environment::Target::Dev {
-                    server::initialize_development_secrets(&settings.workspace)?;
+                match target {
+                    environment::Target::Dev => {
+                        server::initialize_development_secrets(&settings.workspace)
+                    }
+                    environment::Target::Prod => {
+                        deploy::initialize_production_secrets(&settings.workspace)
+                    }
                 }
-                Ok(())
             }
             EnvCommand::Check { target } => environment::check(&settings.workspace, target),
             EnvCommand::Status { target } => environment::status(&settings.workspace, target),
         },
         Command::Home(command) => match command.command {
-            HomeCommand::Generate {
-                destination,
-                source,
-            } => home::generate(destination.as_deref(), source.as_deref()),
+            HomeCommand::Generate { destination } => home::generate(destination.as_deref()),
             HomeCommand::Check { path } => home::check(path.as_deref()),
         },
         Command::Check(command) => match command.target {
@@ -450,16 +507,31 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 detach: _,
                 no_build,
                 verbose,
-            } => server::up(&settings.workspace, true, !no_build, verbose),
+                gui,
+            } => {
+                server::up(&settings.workspace, true, !no_build, verbose)?;
+                if gui {
+                    crate::console::open(&settings.workspace)
+                } else {
+                    println!("Console: misty server up --gui");
+                    Ok(())
+                }
+            }
             ServerCommand::Status => server::status(&settings.workspace),
             ServerCommand::Deploy => server::deploy_development(&settings.workspace),
             ServerCommand::Url => server::url(&settings.workspace),
-            ServerCommand::Down { volumes } => server::down(&settings.workspace, volumes),
+            ServerCommand::Down { volumes } => {
+                crate::console::stop(&settings.workspace)?;
+                server::down(&settings.workspace, volumes)
+            }
             ServerCommand::Logs {
                 service,
                 follow,
                 tail,
             } => server::logs(&settings.workspace, service.as_deref(), follow, tail),
+            ServerCommand::Release { version } => {
+                server_release::release(&settings.workspace, &version)
+            }
             ServerCommand::Prod { command } => match command {
                 ProdCommand::Check => server::production_check(&settings.workspace),
                 ProdCommand::Up => server::production_up(&settings.workspace),
@@ -467,6 +539,16 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                     server::production_down(&settings.workspace, volumes)
                 }
                 ProdCommand::Logs => server::production_logs(&settings.workspace),
+                ProdCommand::Backup => server::production_backup(&settings.workspace),
+                ProdCommand::Push(target) => deploy::push(&settings.workspace, &target.remote()?),
+                ProdCommand::Deploy(target) => {
+                    deploy::deploy(&settings.workspace, &target.remote()?)
+                }
+                ProdCommand::Restore {
+                    backup,
+                    identity,
+                    yes,
+                } => server::production_restore(&settings.workspace, &backup, &identity, yes),
             },
             ServerCommand::Image { command } => match command {
                 ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),
@@ -493,14 +575,22 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             },
         },
         Command::Release(command) => match command.command {
+            ReleaseCommand::Check => release::check(&settings.workspace),
             ReleaseCommand::Start {
                 version,
                 dry_run,
-                no_macos,
-                no_windows,
-            } => release::start(&settings.workspace, &version, dry_run, no_macos, no_windows),
-            ReleaseCommand::Build { version, dry_run } => {
-                release::build(&settings.workspace, &version, dry_run)
+                os,
+            } => release::start(&settings.workspace, &version, dry_run, &os),
+            ReleaseCommand::Build {
+                version,
+                dry_run,
+                upload,
+            } => {
+                release::build(&settings.workspace, &version, dry_run)?;
+                if upload && !dry_run {
+                    release::upload(&settings.workspace, &version, false)?;
+                }
+                Ok(())
             }
             ReleaseCommand::Upload { version, dry_run } => {
                 release::upload(&settings.workspace, &version, dry_run)
@@ -604,7 +694,7 @@ fn doctor(settings: &Settings) -> Result<()> {
     crate::process::CommandSpec::new("cargo")
         .args(["cyclonedx", "--version"])
         .run(&settings.workspace.misty)?;
-    report_release_inputs();
+    release::check(&settings.workspace)?;
     report_repository_status(settings)?;
     println!("workspace  {}", settings.workspace.root.display());
     Ok(())
@@ -634,33 +724,6 @@ fn verify_rust_targets(settings: &Settings) -> Result<()> {
     }
     println!("Rust targets       ready");
     Ok(())
-}
-
-fn report_release_inputs() {
-    let mut names = vec![
-        "TAURI_UPDATER_PUBLIC_KEY",
-        "TAURI_UPDATER_ENDPOINT",
-        "TAURI_CSP_CONNECT_SOURCES",
-        "TAURI_CSP_IMAGE_SOURCES",
-        "TAURI_SIGNING_PRIVATE_KEY",
-        "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
-    ];
-    if cfg!(target_os = "macos") {
-        names.extend(["APPLE_SIGNING_IDENTITY", "MISTY_NOTARY_KEYCHAIN_PROFILE"]);
-    }
-    let missing = names
-        .into_iter()
-        .filter(|name| {
-            std::env::var(name)
-                .map(|value| value.trim().is_empty())
-                .unwrap_or(true)
-        })
-        .collect::<Vec<_>>();
-    if missing.is_empty() {
-        println!("Release inputs     ready");
-    } else {
-        println!("Release inputs     missing: {}", missing.join(", "));
-    }
 }
 
 fn report_repository_status(settings: &Settings) -> Result<()> {
@@ -702,15 +765,7 @@ mod tests {
             vec!["misty", "env", "check", "prod"],
             vec!["misty", "env", "status", "dev"],
             vec!["misty", "home", "generate"],
-            vec![
-                "misty",
-                "home",
-                "generate",
-                "--destination",
-                "/tmp/.misty",
-                "--source",
-                "/tmp/source/.misty",
-            ],
+            vec!["misty", "home", "generate", "--destination", "/tmp/.misty"],
             vec!["misty", "home", "check"],
             vec!["misty", "check", "all"],
             vec!["misty", "check", "app"],
@@ -751,11 +806,40 @@ mod tests {
                 "--dry-run",
             ],
             vec!["misty", "server", "r2", "configure-cors", "--apply"],
-            vec!["misty", "release", "start", "0.1.0", "--no-windows"],
-            vec!["misty", "release", "start", "0.1.0", "--no-macos"],
+            vec!["misty", "release", "start", "0.1.0"],
+            vec!["misty", "release", "start", "0.1.0", "--os", "macos"],
+            vec!["misty", "release", "start", "0.1.0", "--os", "windows"],
             vec!["misty", "release", "verify", "0.1.0", "--dry-run"],
         ] {
             Cli::try_parse_from(arguments).unwrap();
+        }
+    }
+
+    #[test]
+    fn release_os_accepts_multiple_platforms_and_rejects_invalid_values() {
+        let parsed = Cli::try_parse_from([
+            "misty",
+            "release",
+            "start",
+            "0.1.0",
+            "--os",
+            "macos,windows",
+        ])
+        .unwrap();
+        let Command::Release(Release {
+            command: ReleaseCommand::Start { os, .. },
+        }) = parsed.command
+        else {
+            panic!("expected release start");
+        };
+        assert_eq!(os, [release::ReleaseOs::Macos, release::ReleaseOs::Windows]);
+        for value in ["linux", "", "macos,linux"] {
+            assert!(
+                Cli::try_parse_from(["misty", "release", "start", "0.1.0", "--os", value]).is_err()
+            );
+        }
+        for flag in ["--no-macos", "--no-windows"] {
+            assert!(Cli::try_parse_from(["misty", "release", "start", "0.1.0", flag]).is_err());
         }
     }
 

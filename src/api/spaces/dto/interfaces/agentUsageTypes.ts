@@ -61,23 +61,3 @@ export interface BillingUsage {
   agent_usage?: AgentUsage;
   storage?: SpacesSnapshot["owner_storage"];
 }
-
-export function quotaPercentUsed(usage: AiQuotaUsage | AgentUsage | undefined): number {
-  if (!usage) return 0;
-  if ("used_ratio" in usage) return Math.max(0, Math.min(100, usage.used_ratio * 100));
-  return Math.max(0, Math.min(100, usage.percentage_used));
-}
-
-export function personalAgentUsage(result: BillingUsage | null): AgentUsage | null {
-  const personal = result?.personal?.ai;
-  if (personal) {
-    return {
-      percentage_used: quotaPercentUsed(personal),
-      available: personal.available,
-      paused: personal.paused,
-      reset_at: personal.reset_at,
-      plan: result?.plan,
-    };
-  }
-  return result?.agent_usage ?? null;
-}

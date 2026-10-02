@@ -33,8 +33,7 @@ export function SpaceLibraryUploadTray({
     <Popover>
       <PopoverTrigger asChild>
         <IconButton
-          size="md"
-          variant="outline"
+          shape="round"
           label={
             uploading
               ? `${active.length} upload${active.length === 1 ? "" : "s"} in progress`

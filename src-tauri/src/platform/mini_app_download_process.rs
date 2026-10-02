@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     fs::File,
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{

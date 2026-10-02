@@ -61,7 +61,8 @@ pub struct KeyEnvelope {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeviceGrant {
-    pub workspace_id: String,
+    #[serde(alias = "workspace_id")]
+    pub vault_id: String,
     pub device_id: String,
     pub key_epoch: u64,
     pub public_key: String,
@@ -70,13 +71,13 @@ pub struct DeviceGrant {
 
 impl DeviceGrant {
     pub fn signing_bytes(&self) -> Result<Vec<u8>> {
-        if !valid_id(&self.workspace_id) || !valid_id(&self.device_id) || !counter(self.key_epoch) {
+        if !valid_id(&self.vault_id) || !valid_id(&self.device_id) || !counter(self.key_epoch) {
             return Err(Error::Invalid);
         }
         decode_fixed::<32>(&self.public_key)?;
         Ok(serde_json::to_vec(&(
             "misty.sync.device.v1",
-            &self.workspace_id,
+            &self.vault_id,
             &self.device_id,
             self.key_epoch,
             &self.public_key,
@@ -87,7 +88,8 @@ impl DeviceGrant {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Mutation {
-    pub workspace_id: String,
+    #[serde(alias = "workspace_id")]
+    pub vault_id: String,
     pub operation_id: String,
     pub device_id: String,
     pub device_counter: u64,
@@ -98,7 +100,7 @@ pub struct Mutation {
 
 impl Mutation {
     pub fn signing_bytes(&self) -> Result<Vec<u8>> {
-        if !valid_id(&self.workspace_id)
+        if !valid_id(&self.vault_id)
             || !valid_id(&self.operation_id)
             || !valid_id(&self.device_id)
             || !counter(self.device_counter)
@@ -109,7 +111,7 @@ impl Mutation {
         self.envelope.decode(MAX_EVENT_BYTES)?;
         Ok(serde_json::to_vec(&(
             "misty.sync.mutation.v1",
-            &self.workspace_id,
+            &self.vault_id,
             &self.operation_id,
             &self.device_id,
             self.device_counter,
@@ -149,8 +151,9 @@ fn is_false(value: &bool) -> bool {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Workspace {
-    pub workspace_id: String,
+pub struct Vault {
+    #[serde(alias = "workspace_id")]
+    pub vault_id: String,
     pub key_epoch: u64,
     pub head_sequence: u64,
     pub root_public_key: String,
@@ -171,6 +174,10 @@ pub struct Device {
     pub control_version: u8,
     #[serde(default = "default_full_sync")]
     pub full_sync: bool,
+    /// The device keeps bookmarks in collections.
+    #[serde(default)]
+    #[serde(alias = "cold_records")]
+    pub uses_collections: bool,
     #[serde(default)]
     pub activation_request: Option<String>,
     #[serde(default)]
@@ -178,9 +185,11 @@ pub struct Device {
     #[serde(default)]
     pub os_version: String,
     #[serde(default)]
-    pub activation_tree_id: Option<String>,
+    #[serde(alias = "activation_tree_id")]
+    pub activation_workspace_id: Option<String>,
     #[serde(default)]
-    pub tree_last_counter: u64,
+    #[serde(alias = "tree_last_counter")]
+    pub workspace_last_counter: u64,
     #[serde(default)]
     pub created_at: Option<String>,
 }
@@ -212,7 +221,7 @@ pub enum ServerFrame {
         challenge: String,
     },
     Welcome {
-        workspace: Workspace,
+        vault: Vault,
         connection_id: String,
     },
     Devices {
@@ -237,41 +246,51 @@ pub enum ServerFrame {
     AccountEvent {
         event: AccountEvent,
     },
-    // Tree protocol (v2).
-    Trees {
-        trees: Vec<crate::tree::protocol::Tree>,
+    // Workspace protocol (v2).
+    Workspaces {
+        workspaces: Vec<crate::workspace::protocol::Workspace>,
     },
-    TreeDelta {
-        delta: crate::tree::protocol::TreeDelta,
+    WorkspaceDelta {
+        delta: crate::workspace::protocol::WorkspaceDelta,
     },
-    TreeSnapshot {
-        snapshot: crate::tree::protocol::TreeSnapshot,
+    WorkspaceSnapshot {
+        snapshot: crate::workspace::protocol::WorkspaceSnapshot,
     },
-    /// The client's copy of a watched tree is already at `version`.
-    TreeCurrent {
-        tree_id: String,
+    /// The client's copy of a watched workspace is already at `version`.
+    WorkspaceCurrent {
+        workspace_id: String,
         version: u64,
     },
-    TreeAck {
+    WorkspaceAck {
         request_id: Option<String>,
-        receipt: crate::tree::protocol::TreeReceipt,
+        receipt: crate::workspace::protocol::WorkspaceReceipt,
     },
-    TreeError {
+    WorkspaceError {
         code: String,
         request_id: Option<String>,
         operation_id: Option<String>,
-        tree_id: Option<String>,
+        workspace_id: Option<String>,
     },
     Slot {
         request_id: Option<String>,
-        slot: Option<crate::tree::protocol::Slot>,
+        slot: Option<crate::workspace::protocol::Slot>,
     },
     Blobs {
         request_id: Option<String>,
-        blobs: Vec<crate::tree::protocol::Blob>,
+        blobs: Vec<crate::workspace::protocol::Blob>,
     },
     BlobAck {
         request_id: Option<String>,
+    },
+    // Collections.
+    Records {
+        request_id: Option<String>,
+        listing: crate::collections::wire::Listing,
+    },
+    RecordsAck {
+        request_id: Option<String>,
+        collection: String,
+        results: Vec<crate::collections::wire::Answer>,
     },
 }
 
@@ -304,38 +323,49 @@ pub enum ClientFrame<'a> {
     Resume {
         after: u64,
     },
-    PublishTree {
+    PublishWorkspace {
         request_id: &'a str,
-        tree_op: &'a crate::tree::protocol::TreeOp,
+        workspace_op: &'a crate::workspace::protocol::WorkspaceOp,
     },
     Claim {
         request_id: &'a str,
-        claim: &'a crate::tree::protocol::TreeClaim,
+        claim: &'a crate::workspace::protocol::WorkspaceClaim,
     },
-    WatchTree {
-        tree_id: &'a str,
+    WatchWorkspace {
+        workspace_id: &'a str,
         after: u64,
     },
-    UnwatchTree {
-        tree_id: &'a str,
+    UnwatchWorkspace {
+        workspace_id: &'a str,
     },
     SlotGet {
         request_id: &'a str,
-        tree_id: &'a str,
-        tab_node_id: &'a str,
+        workspace_id: &'a str,
+        view_node_id: &'a str,
         slot: i16,
     },
     BlobPut {
         request_id: &'a str,
-        blob: &'a crate::tree::protocol::Blob,
+        blob: &'a crate::workspace::protocol::Blob,
     },
     BlobGet {
         request_id: &'a str,
-        #[serde(with = "crate::tree::protocol::b64::list")]
+        #[serde(with = "crate::workspace::protocol::b64::list")]
         blob_hashes: &'a [Vec<u8>],
+    },
+    RecordsPull {
+        request_id: &'a str,
+        collection: &'a str,
+        after: u64,
+    },
+    RecordsPush {
+        request_id: &'a str,
+        collection: &'a str,
+        writes: &'a [crate::collections::wire::Write],
     },
 }
 
-/// Wire protocol spoken by this client: per-device trees plus the
-/// account-wide credential log on the same socket.
-pub const PROTOCOL_VERSION: u8 = 2;
+/// Wire protocol spoken by this client: workspaces and collections plus the
+/// vault-wide credential log on the same socket. Version 3 renamed trees to
+/// workspaces and the sync workspace to the vault on the wire.
+pub const PROTOCOL_VERSION: u8 = 3;

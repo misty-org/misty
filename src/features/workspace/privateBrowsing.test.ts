@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createBrowserTabState, parseBrowserTabState, type WorkspaceTab } from "./model";
-import { isPrivateBrowserTab, privateTabTitle, scrubPrivateTab } from "./privateBrowsing";
+import { createBrowserViewState, parseBrowserViewState, type WorkspaceView } from "./model";
+import { isPrivateBrowserView, privateViewTitle, scrubPrivateView } from "./privateBrowsing";
 
-const tab = (state: unknown): WorkspaceTab => ({
+const tab = (state: unknown): WorkspaceView => ({
   id: "tab:1",
   surfaceId: "browser",
   groupKey: "tool:browser",
@@ -17,23 +17,23 @@ const tab = (state: unknown): WorkspaceTab => ({
 
 describe("private browser tabs", () => {
   it("keeps the private flag through parsing", () => {
-    const state = { ...createBrowserTabState("https://example.com/secret"), private: true };
-    expect(parseBrowserTabState(state).private).toBe(true);
-    expect(isPrivateBrowserTab(tab(state))).toBe(true);
-    expect(isPrivateBrowserTab(tab(createBrowserTabState("https://example.com")))).toBe(false);
+    const state = { ...createBrowserViewState("https://example.com/secret"), private: true };
+    expect(parseBrowserViewState(state).private).toBe(true);
+    expect(isPrivateBrowserView(tab(state))).toBe(true);
+    expect(isPrivateBrowserView(tab(createBrowserViewState("https://example.com")))).toBe(false);
   });
 
   it("never lets a private tab's page or title leave the app", () => {
-    const scrubbed = scrubPrivateTab(
-      tab({ ...createBrowserTabState("https://example.com/secret"), private: true }),
+    const scrubbed = scrubPrivateView(
+      tab({ ...createBrowserViewState("https://example.com/secret"), private: true }),
     );
-    expect(scrubbed.title).toBe(privateTabTitle);
+    expect(scrubbed.title).toBe(privateViewTitle);
     expect(JSON.stringify(scrubbed)).not.toContain("example.com");
-    expect(isPrivateBrowserTab(scrubbed)).toBe(true);
+    expect(isPrivateBrowserView(scrubbed)).toBe(true);
   });
 
   it("leaves ordinary tabs untouched", () => {
-    const ordinary = tab(createBrowserTabState("https://example.com"));
-    expect(scrubPrivateTab(ordinary)).toBe(ordinary);
+    const ordinary = tab(createBrowserViewState("https://example.com"));
+    expect(scrubPrivateView(ordinary)).toBe(ordinary);
   });
 });
