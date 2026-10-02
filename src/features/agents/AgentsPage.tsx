@@ -1,58 +1,55 @@
+import { ScheduledPage } from "@/features/scheduled/ScheduledPage";
 import { observeAccountChanges } from "@/api/accountEvents";
 import { useAuth } from "@/features/auth";
-import { MistyComposer } from "@/features/global-search/MistyComposer";
-import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  Button,
-  IconButton,
-  Input,
-} from "@/shared/ui";
-import { ArrowLeft, ChevronDown, MousePointer2, Plus, X } from "lucide-react";
+import { Button } from "@/shared/ui";
 import { useEffect, useId, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "./agentsWorkspace.css";
-import { AgentAvatar } from "./components/AgentAvatar";
-import { AgentEditor } from "./components/AgentEditor";
 import { AgentNavigationIsland, type AgentSection } from "./components/AgentNavigationIsland";
 import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
-import { AgentWorkspaceRoster, AgentHistory } from "./components/AgentWorkspaceRoster";
-import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
+import { AgentCollection } from "./components/AgentCollection";
+import { AgentHistory } from "./components/AgentWorkspaceRoster";
+import { AgentOverviewPanel } from "./components/AgentOverviewPanel";
+import { AgentSetup } from "./components/AgentSetup";
+import { useAgentAccess } from "./components/AgentAccess";
+import { McpConnectionsSheet } from "./mcp/McpConnectionsSheet";
+import {
+  AgentWorkspaceConversation,
+  type AgentVoiceControl,
+} from "./components/AgentWorkspaceConversation";
 import { MistyDashboard } from "./components/MistyDashboard";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
+import { AgentConversationHeading } from "./page/AgentConversationHeading";
+import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
+import { AgentNewChat } from "./page/AgentNewChat";
+import { AgentProfileSection, AgentWelcome } from "./page/AgentProfileSection";
+import { useAgentChangeGuard } from "./page/useAgentChangeGuard";
 
 /*
- * WORLD: The approved Grok Bot layout, expressed in Misty's shared theme and controls.
- * STORY: Pick an agent and talk; settings, companion controls, and history open on demand.
- * FIRST VIEWPORT: A 244px roster with search, centered identity toggling a navigation island,
- * and a quiet transcript/composer. Each text-only island button opens its own dropdown.
- * FORM: Approved agents-persistent-island mockups, no chevrons, independent task activity.
+ * THESIS: An ongoing conversation with an agent whose context and work remain visible.
+ * OWN-WORLD: Misty monochrome shared controls, 6px buttons, 8px islands, existing cloud avatars.
+ * STORY: Talk in the center; inspect identity, account access, activity and completed results at right.
+ * FIRST VIEWPORT: Journal collection header, section and view islands, and shared item rows.
+ * FORM: Desktop-only Journal entry; existing conversations and overview open from real rows.
+ * SIGNATURE: The identity control reveals the overview without replacing the conversation or its draft.
  * FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review,
- * the verdict, DESIGN.md, and every shipping raster carrying its provenance
+ *   the verdict, DESIGN.md, and every shipping raster carrying its provenance
  */
 export default function NativeAgentsPage() {
   const { user } = useAuth();
   const spaceId = "";
+  const navigate = useNavigate();
+  const access = useAgentAccess(user?.id ?? "");
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const voiceRef = useRef<AgentVoiceControl>(null);
+  const [voiceState, setVoiceState] = useState({ recording: false, busy: false });
   const { agents, loading, error, load } = usePersonalAgentsStore();
   const [selected, setSelected] = useState<string>();
   const [newChat, setNewChat] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
-  const [rosterOpen, setRosterOpen] = useState(false);
-  const rosterId = useId();
-  const showAgentsRef = useRef<HTMLButtonElement>(null);
-  const rosterWasOpen = useRef(false);
-  useEffect(() => {
-    if (!rosterOpen && rosterWasOpen.current) showAgentsRef.current?.focus();
-    rosterWasOpen.current = rosterOpen;
-  }, [rosterOpen]);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const [entryOpen, setEntryOpen] = useState(!params.has("agent"));
   const [islandVisible, setIslandVisible] = useState(true);
   const islandId = useId();
   const workspaceRef = useRef<HTMLElement>(null);
@@ -65,76 +62,91 @@ export default function NativeAgentsPage() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
   const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
-  const [editorStatus, setEditorStatus] = useState({ dirty: false, busy: false });
   const [chatRevision, setChatRevision] = useState(0);
-  const [conversationStatus, setConversationStatus] = useState({ dirty: false, busy: false });
-  const [pendingChange, setPendingChange] = useState<() => void>();
   const working = useMistyStore((s) => s.working);
+  const guard = useAgentChangeGuard(working);
+  const { change, setEditorStatus } = guard;
+  const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
   const conversationSpaceId =
     conversations.find((c) => c.id === activeConversationId)?.spaceId ?? "";
   useEffect(() => {
     setSelected(undefined);
+    setEntryOpen(true);
     setSettingsModalOpen(false);
+    setConnectionsOpen(false);
     if (!user?.id) {
       void load("");
       return;
     }
     return observeAccountChanges(user.id, ["agents"], () => load(user.id));
   }, [user?.id, load]);
+  useEffect(() => {
+    const store = useMistyStore.getState();
+    store.setAccount(user?.id ?? "");
+    if (user?.id) void store.loadConversations();
+  }, [user?.id]);
   const linkedAgentId = params.get("agent");
+  const linkedConversationId = params.get("conversation");
   useEffect(() => {
     if (!linkedAgentId) return;
+    setEntryOpen(false);
     setSelected(linkedAgentId);
     setNewChat(false);
     setActiveSection(undefined);
     setChatRevision((n) => n + 1);
-  }, [linkedAgentId, params]);
+    const needsLoad =
+      linkedConversationId &&
+      useMistyStore.getState().activeConversationId !== linkedConversationId;
+    useMistyStore.setState({
+      selectedAgentId: linkedAgentId,
+      activeConversationId: linkedConversationId ?? "",
+    });
+    if (needsLoad) void useMistyStore.getState().selectConversation(linkedConversationId);
+  }, [linkedAgentId, linkedConversationId]);
   const profile =
     agents.find((a) => a.id === selected) ?? agents.find((a) => a.system_managed) ?? agents[0];
   const agentConversations = conversations.filter(
     (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
   );
   const conversation = agentConversations.find((c) => c.id === activeConversationId);
-  const change = (action: () => void, replacesConversation = true) => {
-    if (
-      pendingChange ||
-      editorStatus.busy ||
-      (replacesConversation && (conversationStatus.busy || working))
-    )
-      return;
-    if (editorStatus.dirty || (replacesConversation && conversationStatus.dirty)) {
-      setPendingChange(() => action);
-    } else action();
-  };
   const openSettingsModal = (tab: AgentSettingsTab = "settings") =>
     change(() => {
       setSettingsModalMode("edit");
       setSettingsModalTab(tab);
       setSettingsModalOpen(true);
-      setRosterOpen(false);
       setActiveSection(undefined);
     }, false);
   const select = (id: string, startNew = false, conversationId?: string) =>
     change(() => {
       setChatRevision((n) => n + 1);
+      setEntryOpen(false);
       setSelected(id);
-      setRosterOpen(false);
+      setVoiceState({ recording: false, busy: false });
       setNewChat(false);
       setActiveSection(undefined);
       setSettingsModalOpen(false);
-      const latest = conversations.find(
-        (c) => c.agentId === id || (!c.agentId && agents.find((a) => a.id === id)?.system_managed),
-      );
+      const latest = [...conversations]
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .find(
+          (c) =>
+            c.agentId === id || (!c.agentId && agents.find((a) => a.id === id)?.system_managed),
+        );
+      const nextConversationId = startNew ? "" : (conversationId ?? latest?.id ?? "");
+      const next = new URLSearchParams(params);
+      next.set("agent", id);
+      if (nextConversationId) next.set("conversation", nextConversationId);
+      else next.delete("conversation");
+      setParams(next, { replace: true });
       useMistyStore.setState({
         selectedAgentId: id,
-        activeConversationId: startNew ? "" : (conversationId ?? latest?.id ?? ""),
+        activeConversationId: nextConversationId,
         context: [],
         handoff: undefined,
         browserRequest: undefined,
       });
-      if (conversationId) void useMistyStore.getState().selectConversation(conversationId);
+      if (nextConversationId) void useMistyStore.getState().selectConversation(nextConversationId);
     });
   const create = () =>
     change(() => {
@@ -143,15 +155,14 @@ export default function NativeAgentsPage() {
       setSettingsModalTab("settings");
       setSettingsModalOpen(true);
       setActiveSection(undefined);
-      setRosterOpen(false);
     });
   const beginNewChat = () =>
     change(() => {
+      setEntryOpen(false);
       setNewChat(true);
       setRecipientSearch("");
       setActiveSection(undefined);
       setSettingsModalOpen(false);
-      setRosterOpen(false);
     });
   const closeSettings = () => change(() => setSettingsModalOpen(false), false);
   const openSection = (section?: AgentSection) =>
@@ -164,12 +175,25 @@ export default function NativeAgentsPage() {
       setActiveSection(undefined);
       setIslandVisible(!islandVisible);
     }, false);
-  const saveProfile = async (id: string) => {
+  const saveProfile = async (id: string, companion = false) => {
     await load(user?.id ?? "");
     setSelected(id);
-    setSettingsModalOpen(false);
+    setEntryOpen(false);
+    if (settingsModalMode === "create") {
+      setChatRevision((n) => n + 1);
+      useMistyStore.setState({
+        selectedAgentId: id,
+        activeConversationId: "",
+        context: [],
+        handoff: undefined,
+        browserRequest: undefined,
+      });
+    }
+    setSettingsModalMode("edit");
+    setSettingsModalTab(companion ? "companion" : "settings");
+    setSettingsModalOpen(companion);
     setActiveSection(undefined);
-    setPendingChange(undefined);
+    guard.cancel();
   };
   const removeProfile = async () => {
     setSelected(undefined);
@@ -177,219 +201,167 @@ export default function NativeAgentsPage() {
     setActiveSection(undefined);
     await load(user?.id ?? "");
   };
-  const disabled = working || editorStatus.busy || conversationStatus.busy;
+  const browseAgents = () =>
+    change(() => {
+      setEntryOpen(true);
+      setActiveSection(undefined);
+      const next = new URLSearchParams(params);
+      next.delete("agent");
+      next.delete("conversation");
+      setParams(next, { replace: true });
+    });
+  const disabled = working || guard.busy;
+  const navigation = (
+    <AgentNavigationIsland
+      id={islandId}
+      activeSection={activeSection}
+      onSectionChange={openSection}
+      collisionBoundary={workspaceRef.current}
+      profileDisabled={!profile}
+      contentRef={dropdownRef}
+      dismissalBlocked={guard.pending}
+      restoreTriggerFocus={!settingsModalOpen}
+      conversations={
+        <AgentHistory
+          conversations={agentConversations}
+          activeId={activeConversationId}
+          disabled={disabled}
+          onSelect={(id) => profile && select(profile.id, false, id)}
+          onNewChat={() => profile && select(profile.id, true)}
+        />
+      }
+      activity={<MistyDashboard spaceId={spaceId} agentId={profile?.id} />}
+      profile={
+        profile && (
+          <AgentProfileSection
+            key={`${user?.id}:${profile.id}:${spaceId}`}
+            profile={profile}
+            conversation={conversation}
+            working={working}
+            onStatusChange={setEditorStatus}
+            onTalk={() => openSection()}
+            spaceId={spaceId}
+            onSaved={saveProfile}
+            onRemoved={removeProfile}
+          />
+        )
+      }
+    />
+  );
+  const overview = profile && (
+    <AgentOverviewPanel
+      key={`${user?.id}:${profile.id}`}
+      profile={profile}
+      access={access}
+      conversations={agentConversations}
+      navigation={navigation}
+      working={working && (workingAgentId === profile.id || Boolean(conversation))}
+      recording={voiceState.recording}
+      voiceBusy={voiceState.busy || !user?.id}
+      onTalk={() => voiceRef.current?.toggle()}
+      onCompanion={() => openSettingsModal("companion")}
+      onConnections={() => setConnectionsOpen(true)}
+      onOpenResult={(href) => change(() => navigate(href))}
+    />
+  );
   return (
-    <main
-      ref={workspaceRef}
-      className="agents-workspace"
-      data-roster-open={rosterOpen}
-      data-settings-open={settingsModalOpen}
-    >
-      <AgentWorkspaceRoster
-        id={rosterId}
-        agents={agents}
-        conversations={conversations}
-        selectedId={newChat ? undefined : profile?.id}
-        loading={loading}
-        disabled={disabled}
-        open={rosterOpen}
-        onSelect={select}
-        onNewChat={beginNewChat}
-        onCreate={create}
-        onClose={() => setRosterOpen(false)}
-      />
-      <div className="agents-main">
-        {error && (
-          <div role="alert" className="agents-notice">
-            <p>{error}</p>
-            <Button variant="outline" size="sm" onClick={() => void load(user?.id ?? "")}>
-              Retry
-            </Button>
-          </div>
-        )}
-        <header
-          className="agent-conversation-heading"
-          data-tauri-drag-region
-          data-misty-window-titlebar-region="true"
-        >
-          <div className="agent-heading-start">
-            <IconButton
-              className="agents-roster-back"
-              label="Show agents"
-              ref={showAgentsRef}
-              aria-controls={rosterId}
-              aria-expanded={rosterOpen}
-              data-agent-navigation-control
-              onClick={() =>
-                change(() => {
-                  setActiveSection(undefined);
-                  setRosterOpen(true);
-                }, false)
-              }
-            >
-              <ArrowLeft size={16} />
-            </IconButton>
-          </div>
-          {newChat ? (
-            <>
-              <label className="agent-recipient-input">
-                <span>To:</span>
-                <Input
-                  ref={recipientInputRef}
-                  variant="bare"
-                  autoFocus
-                  aria-label="Search or create agents"
-                  placeholder="Search or create agents"
-                  value={recipientSearch}
-                  onChange={(e) => setRecipientSearch(e.target.value)}
-                />
-              </label>
-              <IconButton label="Close new chat" onClick={() => setNewChat(false)}>
-                <X size={16} />
-              </IconButton>
-            </>
-          ) : (
-            <>
-              <Button
-                ref={identityRef}
-                variant="ghost"
-                size="sm"
-                className="agent-heading-identity px-1"
-                aria-label="Agent details"
-                aria-expanded={islandVisible}
-                aria-controls={islandId}
-                data-agent-navigation-control
-                disabled={!profile}
-                onClick={toggleIsland}
-              >
-                <AgentAvatar agent={profile} />
-                <span className="truncate">{profile?.name || "Misty"}</span>
-                <ChevronDown aria-hidden="true" className="agent-heading-chevron size-3.5" />
-              </Button>
-              <div className="agent-heading-end">
-                <IconButton
-                  label="Companion controls"
-                  data-agent-navigation-control
-                  aria-pressed={settingsModalOpen && settingsModalTab === "companion"}
-                  onClick={() => openSettingsModal("companion")}
-                >
-                  <MousePointer2 size={16} />
-                </IconButton>
+    <main ref={workspaceRef} className="agents-workspace" data-settings-open={settingsModalOpen}>
+      {params.get("view") === "scheduled" && params.has("task") ? (
+        <ScheduledPage embedded />
+      ) : entryOpen ? (
+        <AgentCollection
+          agents={agents}
+          conversations={conversations}
+          loading={loading}
+          error={error}
+          disabled={disabled}
+          workingAgentId={working ? workingAgentId : undefined}
+          onSelect={select}
+          onCreate={create}
+          onNewChat={beginNewChat}
+          onRetry={() => void load(user?.id ?? "")}
+          initialSection={params.get("view") === "activity" ? "activity" : "all"}
+        />
+      ) : (
+        <>
+          <div className="agents-main">
+            {error && (
+              <div role="alert" className="agents-notice">
+                <p>{error}</p>
+                <Button variant="outline" size="sm" onClick={() => void load(user?.id ?? "")}>
+                  Retry
+                </Button>
               </div>
-            </>
+            )}
+            <AgentConversationHeading
+              newChat={newChat}
+              recipientSearch={recipientSearch}
+              recipientInputRef={recipientInputRef}
+              switcher={{
+                agents,
+                conversations,
+                selectedAgent: profile,
+                conversationId: activeConversationId,
+                disabled,
+                restoreTriggerFocus: !guard.pending && !settingsModalOpen,
+                triggerRef: identityRef,
+                onSelect: select,
+                onCreate: create,
+                onBrowse: browseAgents,
+              }}
+              disabled={disabled}
+              panelDisabled={!profile}
+              panelVisible={islandVisible}
+              onBack={browseAgents}
+              onRecipientSearch={setRecipientSearch}
+              onCloseNewChat={() => setNewChat(false)}
+              onNewChat={beginNewChat}
+              onTogglePanel={toggleIsland}
+            />
+            {!profile && activeSection && navigation}
+            {newChat ? (
+              <AgentNewChat
+                agents={agents}
+                search={recipientSearch}
+                onCreate={create}
+                onSelect={(id) => select(id, true)}
+              />
+            ) : (
+              <AgentWorkspaceConversation
+                key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
+                agent={profile}
+                spaceId={conversationSpaceId}
+                accountId={user?.id ?? ""}
+                voiceControlRef={voiceRef}
+                onVoiceStateChange={setVoiceState}
+                onDraftStateChange={guard.setConversationStatus}
+                emptyContent={
+                  profile ? (
+                    <AgentWelcome
+                      profile={profile}
+                      onCustomize={() => {
+                        setIslandVisible(true);
+                        setActiveSection("profile");
+                      }}
+                    />
+                  ) : undefined
+                }
+                onCreate={create}
+              />
+            )}
+          </div>
+          {!newChat && !settingsModalOpen && islandVisible && overview && (
+            <aside
+              id={`${islandId}-panel`}
+              className="agent-overview-rail misty-transient-scrollbar"
+              aria-label="Agent panel"
+            >
+              {overview}
+            </aside>
           )}
-        </header>
-        {!newChat && islandVisible && (
-          <AgentNavigationIsland
-            id={islandId}
-            activeSection={activeSection}
-            onSectionChange={openSection}
-            collisionBoundary={workspaceRef.current}
-            profileDisabled={!profile}
-            contentRef={dropdownRef}
-            dismissalBlocked={Boolean(pendingChange)}
-            restoreTriggerFocus={!settingsModalOpen}
-            conversations={
-              <AgentHistory
-                conversations={agentConversations}
-                activeId={activeConversationId}
-                disabled={disabled}
-                onSelect={(id) => profile && select(profile.id, false, id)}
-                onNewChat={() => profile && select(profile.id, true)}
-              />
-            }
-            activity={<MistyDashboard spaceId={spaceId} agentId={profile?.id} />}
-            profile={
-              profile && (
-                <>
-                  <AgentEditor
-                    key={`${user?.id}:${profile.id}:${spaceId}`}
-                    profile={profile}
-                    onStatusChange={setEditorStatus}
-                    onTalk={() => openSection()}
-                    spaceId={spaceId}
-                    onSaved={saveProfile}
-                    onRemoved={removeProfile}
-                  />
-                  {conversation && (
-                    <div className="agent-profile-model">
-                      <MistyModelPicker
-                        inline
-                        conversationId={conversation.id}
-                        modelId={conversation.modelId}
-                        reasoningEffort={conversation.reasoningEffort}
-                        disabled={working}
-                        onChange={(changes) =>
-                          useMistyStore.setState((s) => ({
-                            conversations: s.conversations.map((c) =>
-                              c.id === conversation.id ? { ...c, ...changes } : c,
-                            ),
-                          }))
-                        }
-                      />
-                    </div>
-                  )}
-                </>
-              )
-            }
-          />
-        )}
-        {newChat ? (
-          <section className="agent-new-chat">
-            <div className="agent-recipient-results" role="group" aria-label="Choose an agent">
-              <Button
-                variant="ghost"
-                justify="start"
-                className="agent-recipient-row"
-                onClick={create}
-              >
-                <Plus size={16} />
-                Create new agent
-              </Button>
-              {agents
-                .filter((a) =>
-                  a.name.toLocaleLowerCase().includes(recipientSearch.trim().toLocaleLowerCase()),
-                )
-                .map((a) => (
-                  <Button
-                    variant="ghost"
-                    justify="start"
-                    key={a.id}
-                    className="agent-recipient-row"
-                    onClick={() => select(a.id, true)}
-                  >
-                    <AgentAvatar agent={a} />
-                    <span className="truncate">{a.name}</span>
-                  </Button>
-                ))}
-            </div>
-            <div className="agent-compose-area">
-              <MistyComposer
-                layout="conversation"
-                value=""
-                onChange={() => {}}
-                mode="ask"
-                attachments={[]}
-                maxAttachments={4}
-                onAddFiles={() => {}}
-                onRemoveAttachment={() => {}}
-                onSubmit={() => {}}
-                placeholder="Message…"
-                disabled
-              />
-            </div>
-          </section>
-        ) : (
-          <AgentWorkspaceConversation
-            key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
-            agent={profile}
-            spaceId={conversationSpaceId}
-            accountId={user?.id ?? ""}
-            onDraftStateChange={setConversationStatus}
-            onCreate={create}
-          />
-        )}
-      </div>
+        </>
+      )}
+      <McpConnectionsSheet open={connectionsOpen} onOpenChange={setConnectionsOpen} />
       <AgentSettingsModal
         open={settingsModalOpen}
         onOpenChange={(open) => (open ? setSettingsModalOpen(true) : closeSettings())}
@@ -397,45 +369,26 @@ export default function NativeAgentsPage() {
         mode={settingsModalMode}
       >
         {settingsModalMode === "create" && (
-          <AgentEditor
+          <AgentSetup
             key={`${user?.id}:create`}
+            access={access}
+            onConnections={() => setConnectionsOpen(true)}
+            onCompanion={() => openSettingsModal("companion")}
             onStatusChange={setEditorStatus}
-            spaceId={spaceId}
             onSaved={saveProfile}
-            onRemoved={removeProfile}
           />
         )}
       </AgentSettingsModal>
-      <AlertDialog
-        open={Boolean(pendingChange)}
-        onOpenChange={(open) => !open && setPendingChange(undefined)}
-      >
-        <AlertDialogContent
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            if (dropdownRef.current?.isConnected) dropdownRef.current.focus();
-            else if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
-            else identityRef.current?.focus();
-          }}
-        >
-          <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-          <AlertDialogDescription>
-            You have unsaved changes or an unsent message.
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                pendingChange?.();
-                setPendingChange(undefined);
-                setEditorStatus({ dirty: false, busy: false });
-              }}
-            >
-              Discard and switch
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AgentDiscardDialog
+        open={guard.pending}
+        onCancel={guard.cancel}
+        onDiscard={guard.discard}
+        restoreFocus={() => {
+          if (dropdownRef.current?.isConnected) dropdownRef.current.focus();
+          else if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
+          else identityRef.current?.focus();
+        }}
+      />
     </main>
   );
 }

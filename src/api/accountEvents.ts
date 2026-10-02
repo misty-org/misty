@@ -1,12 +1,14 @@
-import { httpRequest } from "./client/http";
+import { httpOutageRemainingMs, httpRequest } from "./client/http";
 import { onRateLimitRecovery } from "./client/rateLimit";
 import { parseRetryAfter } from "./client/errors";
 import {
   apiRequestCredentials,
   readApiAuthToken,
   readApiSessionGeneration,
+  notifyApiSessionInvalid,
 } from "./client/session";
 import { readDeploymentScope, resolveApiBase } from "./deployment/api";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 
 export interface AccountEvent {
   topic: string;
@@ -39,7 +41,9 @@ export function subscribeAccountEvents(accountId: string, listener: Subscriber):
     };
     const stopRecovery = onRateLimitRecovery(() => dispatch({ topic: "reset" }));
     current.controller.signal.addEventListener("abort", stopRecovery, { once: true });
-    void coordinate(channelKey, current.controller.signal, generation, dispatch).catch(() => {});
+    void coordinate(channelKey, current.controller.signal, generation, dispatch, accountId).catch(
+      () => {},
+    );
   }
   subscription.listeners.add(listener);
   const current = subscription;
@@ -57,6 +61,7 @@ async function coordinate(
   signal: AbortSignal,
   generation: number,
   dispatch: Subscriber,
+  accountId: string,
 ) {
   const shared = typeof BroadcastChannel !== "undefined" && navigator.locks;
   const channel = shared ? new BroadcastChannel(`misty:account-events:${key}`) : null;
@@ -71,9 +76,9 @@ async function coordinate(
   try {
     if (shared)
       await navigator.locks.request(`misty:account-events:${key}`, { signal }, () =>
-        stream(signal, generation, deliver),
+        stream(signal, generation, deliver, accountId),
       );
-    else await stream(signal, generation, deliver);
+    else await stream(signal, generation, deliver, accountId);
   } finally {
     channel?.close();
   }
@@ -92,14 +97,36 @@ function validEvent(value: unknown): value is AccountEvent {
       "agents",
       "approvals",
       "interventions",
+      "scheduled-tasks",
+      "usage",
+      "library-renditions",
+      "device-pairing",
+      "devices",
     ].includes(event.topic) &&
     (event.id === undefined || (typeof event.id === "string" && event.id.length <= 200))
   );
 }
 
-async function stream(signal: AbortSignal, generation: number, deliver: Subscriber) {
+async function stream(
+  signal: AbortSignal,
+  generation: number,
+  deliver: Subscriber,
+  accountId: string,
+) {
   let failures = 0;
   while (!signal.aborted && generation === readApiSessionGeneration()) {
+    // On the desktop, the sync socket already carries these invalidations;
+    // follow it instead of holding a second connection while it is up.
+    if (await nativeFeedConnected(accountId)) {
+      await followNativeFeed(accountId, signal, deliver);
+      failures = 0;
+      continue;
+    }
+    // Hand over to the native feed as soon as it connects.
+    const attempt = new AbortController();
+    const abortAttempt = () => attempt.abort();
+    signal.addEventListener("abort", abortAttempt, { once: true });
+    const stopWatching = watchNativeFeed(accountId, abortAttempt);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let delay = Math.min(60_000, 1_000 * 2 ** Math.min(failures++, 6)) + Math.random() * 1_000;
     try {
@@ -109,12 +136,20 @@ async function stream(signal: AbortSignal, generation: number, deliver: Subscrib
       if (token) headers.set("Authorization", `Bearer ${token}`);
       const response = await httpRequest(`${base}/misty/events`, {
         headers,
-        signal,
+        signal: attempt.signal,
         credentials: apiRequestCredentials(),
       });
       delay = Math.max(delay, parseRetryAfter(response.headers.get("Retry-After")) ?? 0);
       if (!response.ok || !response.body) {
         await response.body?.cancel();
+        if (
+          response.status === 401 &&
+          !token &&
+          apiRequestCredentials() !== "omit" &&
+          generation === readApiSessionGeneration() &&
+          !signal.aborted
+        )
+          notifyApiSessionInvalid();
         if ([401, 403].includes(response.status)) return;
         if (response.status === 404) delay = Math.max(delay, 60_000);
         throw new Error("Event stream unavailable");
@@ -123,7 +158,7 @@ async function stream(signal: AbortSignal, generation: number, deliver: Subscrib
       const decoder = new TextDecoder();
       let buffer = "";
       const connectedAt = Date.now();
-      while (!signal.aborted) {
+      while (!attempt.signal.aborted) {
         const chunk = await reader.read();
         if (chunk.done) break;
         buffer += decoder.decode(chunk.value, { stream: true });
@@ -148,11 +183,100 @@ async function stream(signal: AbortSignal, generation: number, deliver: Subscrib
     } catch {
       /* Reconnect observes durable state; it never replays an action. */
     } finally {
+      stopWatching();
+      signal.removeEventListener("abort", abortAttempt);
       await reader?.cancel().catch(() => {});
       reader?.releaseLock();
     }
-    await waitForEventRetry(delay, signal);
+    // A handover to the native feed retries at once.
+    if (!signal.aborted && attempt.signal.aborted) continue;
+    // Share the client's outage cooldown instead of reconnecting into it.
+    await waitForEventRetry(Math.max(delay, httpOutageRemainingMs()), signal);
   }
+}
+
+interface NativeAccountFeed {
+  accountId: string;
+  connected: boolean;
+}
+
+async function nativeFeedConnected(accountId: string): Promise<boolean> {
+  if (!hasTauriInternals()) return false;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const feed = await invoke<NativeAccountFeed | null>("browser_sync_account_feed");
+    return !!feed && feed.connected && feed.accountId === accountId;
+  } catch {
+    // Not the main window, or no sync session: use the event stream.
+    return false;
+  }
+}
+
+/** Calls `onConnected` once the native feed for this account comes up. */
+function watchNativeFeed(accountId: string, onConnected: () => void): () => void {
+  if (!hasTauriInternals()) return () => {};
+  let stopped = false;
+  let unlisten: (() => void) | undefined;
+  void import("@tauri-apps/api/event")
+    .then(({ listen }) =>
+      listen("misty:browser-sync-changed", () => {
+        void nativeFeedConnected(accountId).then((connected) => {
+          if (connected && !stopped) onConnected();
+        });
+      }),
+    )
+    .then((stop) => {
+      if (stopped) stop();
+      else unlisten = stop;
+    })
+    .catch(() => {});
+  return () => {
+    stopped = true;
+    unlisten?.();
+  };
+}
+
+/** Delivers the sync socket's invalidations until it disconnects. A reset on
+ * entry covers anything between the previous source closing and this one. */
+async function followNativeFeed(accountId: string, signal: AbortSignal, deliver: Subscriber) {
+  const { listen } = await import("@tauri-apps/api/event");
+  await new Promise<void>((resolve) => {
+    const unlisteners: Array<() => void> = [];
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      signal.removeEventListener("abort", finish);
+      for (const stop of unlisteners) stop();
+      resolve();
+    };
+    signal.addEventListener("abort", finish, { once: true });
+    void Promise.all([
+      listen<{ accountId?: string; topic?: string; id?: string | null }>(
+        "misty:account-event",
+        ({ payload }) => {
+          if (done || payload?.accountId !== accountId) return;
+          const event = { topic: payload.topic ?? "", ...(payload.id ? { id: payload.id } : {}) };
+          if (validEvent(event)) deliver(event);
+        },
+      ),
+      listen("misty:browser-sync-changed", () => {
+        void nativeFeedConnected(accountId).then((connected) => {
+          if (!connected) {
+            // Leaving the feed: the next source starts from a full re-read.
+            deliver({ topic: "reset" });
+            finish();
+          }
+        });
+      }),
+    ])
+      .then((stops) => {
+        unlisteners.push(...stops);
+        if (done) for (const stop of stops) stop();
+        else deliver({ topic: "reset" });
+      })
+      .catch(finish);
+  });
 }
 
 export function waitForEventRetry(ms: number, signal: AbortSignal): Promise<void> {

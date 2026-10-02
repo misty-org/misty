@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
 
 let mockAccounts: Array<{ id: string; email: string; name: string }> = [];
 
+vi.mock("@/api/account/api", () => ({
+  accountApi: { googleAvailable: async () => ({ enabled: false }) },
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof ReactRouter>("react-router-dom");
   return {

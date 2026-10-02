@@ -5,11 +5,13 @@ import { cn } from "../utils";
 
 const iconButtonSizes = {
   // Inline closers inside tabs and menu rows.
-  "2xs": "size-5 [&_svg:not([class*='size-'])]:size-3",
-  xs: "size-6 [&_svg:not([class*='size-'])]:size-3.5",
-  sm: "size-8",
-  md: "size-9",
-  lg: "size-10",
+  // Width and height stay separate classes so a caller's `w-auto` replaces the width
+  // outright instead of racing `size-*` in the stylesheet.
+  "2xs": "h-5 w-5 [&_svg:not([class*='size-'])]:size-3",
+  xs: "h-6 w-6 [&_svg:not([class*='size-'])]:size-3.5",
+  sm: "h-8 w-8",
+  md: "h-9 w-9",
+  lg: "h-10 w-10",
 } as const;
 
 /** Glyph geometry for icons inside toolbar-sized icon buttons. */

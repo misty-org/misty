@@ -5,13 +5,18 @@ edition = "2021"
 publish = false
 
 [dependencies]
-tantivy = "0.25"
+tantivy = "0.26.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 
 [dev-dependencies]
 tempfile = "3"
+
+# This helper is a separate Cargo project and does not inherit the desktop profile.
+[profile.dev]
+debug = 1
+incremental = false
 
 [profile.release]
 codegen-units = 1

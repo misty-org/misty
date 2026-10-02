@@ -18,14 +18,6 @@ export function formatLongDate(date: Date): string {
   }).format(date);
 }
 
-export function formatClockTime(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
-}
-
 export function formatAgendaTime(startsAt: string, allDay: boolean): string {
   if (allDay) return "All day";
   const date = new Date(startsAt);
@@ -49,11 +41,4 @@ export function formatRelativeDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
     new Date(timestamp),
   );
-}
-
-export function localDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

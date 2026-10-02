@@ -12,7 +12,7 @@
 <h1 align="center">Misty</h1>
 
 Misty is a browser workspace for organizing your tabs, continuing across computers, and working alongside agents in your browsing context. Keep websites in groups, work in split panes, and bring your workspace with you through encrypted sync.
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/misty-org/misty)
 Misty is in development. Everyday browser features and cross-device sync are actively being built and verified. See the [wiki](https://github.com/misty-org/misty/wiki/Features) for current capabilities and limits.
 
 ## Requirements
@@ -23,7 +23,13 @@ Current desktop sync work targets **macOS and Windows**. To build from source, y
 
 ## Checks
 
-GitHub Actions runs only the code tests: the frontend suite and the server suites (Go with Postgres, the agent runtime, and journal collaboration), plus a secret scan. Everything else runs locally before you push.
+There is no GitHub CI. Git hooks run the checks on this computer:
+
+- **Every commit** runs a secret scan of the staged changes and each test suite the commit touches: frontend (`src/`), server (`server/`: Go against a disposable Postgres, the agent runtime, journal collaboration), CLI (`cli/`) and desktop (`src-tauri/`).
+- **Every push** requires a clean tree, scans the new commits for secrets, and runs every suite.
+- Turn the hooks on once per clone: `git config core.hooksPath .githooks`. Run a suite by hand with `.githooks/checks.sh frontend|server|rust-cli|rust-desktop|all`. Skip once with `--no-verify`.
+
+Other local gates:
 
 - `npm run check` — formatting, types, lint, frontend tests, and the production dependency audit.
 - `npm run cli -- check all` — the full local gate: `npm run check`, the release task tests, the native desktop crate (format, clippy, tests), the server (Go format, vet, tests, contracts, app suites), the website, built-in tools, and the CLI.

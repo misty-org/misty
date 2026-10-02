@@ -1,4 +1,4 @@
-import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
+import { readDeploymentStorageItem } from "@/api/deployment/api";
 
 type PlannerSubpage = "tasks" | "agenda" | "roadmaps";
 type JournalSubpage = "notes" | "drawings";
@@ -6,50 +6,6 @@ type JournalSubpage = "notes" | "drawings";
 interface SpaceSubpageMemory {
   planner?: Partial<Record<PlannerSubpage, string>> & { active?: PlannerSubpage };
   journal?: Partial<Record<JournalSubpage, string>> & { active?: JournalSubpage };
-}
-
-export function rememberSpaceSubpageRoute(accountId: string, spaceId: string, route: string) {
-  if (!accountId || !spaceId) return;
-  const parsed = parseSpaceRoute(spaceId, route);
-  if (!parsed) return;
-  const current = readMemory(accountId, spaceId);
-  if (parsed.section === "planner") {
-    const rememberedRoute = isLegacyRoadmapRoute(spaceId, route)
-      ? `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`
-      : route;
-    current.planner = {
-      ...current.planner,
-      active: parsed.subpage,
-      [parsed.subpage]: rememberedRoute,
-    };
-  } else {
-    current.journal = {
-      ...current.journal,
-      active: parsed.subpage,
-      [parsed.subpage]: route,
-    };
-  }
-  try {
-    window.localStorage.setItem(
-      deploymentStorageKey(memoryKey(accountId, spaceId)),
-      JSON.stringify(current),
-    );
-  } catch {
-    // Route memory is an optional navigation enhancement.
-  }
-}
-
-export function rememberedPlannerRoute(
-  accountId: string,
-  spaceId: string,
-  subpage?: PlannerSubpage,
-) {
-  const memory = readMemory(accountId, spaceId).planner;
-  const selected = subpage ?? memory?.active ?? "tasks";
-  const remembered = memory?.[selected];
-  return validRememberedRoute(spaceId, remembered, "planner", selected)
-    ? remembered
-    : defaultPlannerRoute(spaceId, selected);
 }
 
 export function rememberedJournalRoute(
@@ -63,13 +19,6 @@ export function rememberedJournalRoute(
   return validRememberedRoute(spaceId, remembered, "journal", selected)
     ? remembered
     : `/spaces/${encodeURIComponent(spaceId)}/${selected}`;
-}
-
-function defaultPlannerRoute(spaceId: string, subpage: PlannerSubpage) {
-  const base = `/spaces/${encodeURIComponent(spaceId)}/planner`;
-  if (subpage === "agenda") return `${base}/agenda/month`;
-  if (subpage === "roadmaps") return `${base}/roadmaps`;
-  return `${base}/tasks/board`;
 }
 
 function parseSpaceRoute(
@@ -97,20 +46,6 @@ function parseSpaceRoute(
     return undefined;
   }
   return undefined;
-}
-
-function isLegacyRoadmapRoute(spaceId: string, route: string) {
-  try {
-    const parts = new URL(route, "https://misty.local").pathname.split("/").filter(Boolean);
-    return (
-      parts[0] === "spaces" &&
-      decodeURIComponent(parts[1] ?? "") === spaceId &&
-      parts[2] === "planner" &&
-      (parts[3] === "goals" || parts[3] === "milestones")
-    );
-  } catch {
-    return false;
-  }
 }
 
 function validRememberedRoute(

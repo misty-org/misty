@@ -24,9 +24,6 @@ pub mod browser_search_suggest;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
 mod browser_theme;
-pub mod claude;
-#[cfg(all(desktop, not(target_os = "macos")))]
-pub mod code_lsp;
 pub mod command_defaults;
 pub mod commands;
 #[cfg(desktop)]
@@ -42,12 +39,11 @@ pub mod explorer;
 pub mod explorer_library;
 pub mod file_sync;
 mod macos_privacy;
-pub mod mail_cache;
 #[cfg(desktop)]
 pub mod media_search;
 pub mod metadata;
 pub mod misty;
-pub mod misty_template;
+pub mod misty_home;
 pub mod native_clipboard;
 pub mod operation_queue;
 pub mod paths;
@@ -64,11 +60,7 @@ mod settings_migration;
 pub mod smart_library;
 mod smart_library_ingestion;
 #[cfg(desktop)]
-pub mod ssh_terminal;
-#[cfg(desktop)]
 pub mod system_dependencies;
-#[cfg(desktop)]
-pub mod terminal;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;
@@ -80,14 +72,6 @@ mod browser_profile;
 pub mod page_state;
 
 pub mod browser_provider;
-
-#[cfg(all(debug_assertions, target_os = "macos"))]
-pub(crate) async fn evaluate_probe_javascript(
-    webview: tauri::Webview,
-    script: String,
-) -> Result<String, String> {
-    browser_macos::evaluate_browser_async_javascript(webview, script).await
-}
 
 pub mod navigation_names;
 
@@ -101,9 +85,6 @@ pub(crate) mod space_peer_files;
 pub(crate) mod space_peer_roots;
 #[cfg(target_os = "macos")]
 pub(crate) mod space_peer_session;
-
-#[cfg(target_os = "macos")]
-pub(crate) mod terminal_service;
 
 pub mod misty_context;
 
@@ -132,6 +113,8 @@ mod browser_data_budget;
 mod browser_data_coverage;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_session_storage;
+#[cfg(any(target_os = "macos", windows))]
+mod browser_signin_scope;
 #[cfg(any(target_os = "macos", windows))]
 mod browser_storage_restore;
 #[cfg(any(target_os = "macos", windows))]

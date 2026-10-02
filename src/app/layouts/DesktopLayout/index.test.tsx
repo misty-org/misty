@@ -107,9 +107,6 @@ vi.mock("@/features/tour", () => ({
 
 vi.mock("./ProfileMenu", () => ({ ProfileMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
-vi.mock("./WorkStatusPopup", () => ({
-  WorkStatusPopup: () => null,
-}));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
 vi.mock("@/features/global-search", () => ({
   GlobalMisty: () => null,
@@ -140,7 +137,7 @@ import { notifyAccountScopeReset } from "@/features/auth/store/accountEvents";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { useSettingsStore } from "@/features/settings";
 import { DesktopLayout } from "./index";
-import { navigatorLayoutStorageKey } from "./navigatorMode";
+import { navigatorLayoutStorageKey, publishNavigatorLayout } from "./navigatorMode";
 
 describe("DesktopLayout on Auth Routes", () => {
   let container: HTMLDivElement;
@@ -186,7 +183,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<SignIn />} />
             </Route>
           </Routes>
@@ -221,7 +218,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<SignIn />} />
             </Route>
             <Route path="/browser" element={<div>Account workspace</div>} />
@@ -244,14 +241,14 @@ describe("DesktopLayout on Auth Routes", () => {
   });
 
   it.each([
-    ["/browser", "true", "1 / -1"],
-    ["/activity", "false", "2"],
+    ["/browser", "true", "1 / 4"],
+    ["/activity", "false", "1 / 4"],
     ["/signin", "false", "2"],
   ])("reserves native chrome correctly on %s", async (route, sharedTabs, row) => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={[route]}>
-          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+          <DesktopLayout getRouteId={() => "browser"} />
         </MemoryRouter>,
       );
     });
@@ -263,11 +260,11 @@ describe("DesktopLayout on Auth Routes", () => {
     );
   });
 
-  it("reserves titlebar controls when the thin rail is hidden", async () => {
+  it("reserves native window controls when Layout settings hides the rail", async () => {
     await act(async () =>
       root.render(
         <MemoryRouter initialEntries={["/browser"]}>
-          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+          <DesktopLayout getRouteId={() => "browser"} />
         </MemoryRouter>,
       ),
     );
@@ -275,9 +272,7 @@ describe("DesktopLayout on Auth Routes", () => {
     const before = frame.style.gridTemplateColumns;
     const dragRegion = container.querySelector<HTMLElement>(".misty-docking-titlebar-drag-region")!;
     expect(dragRegion.style.width).toBe(before.split(" ")[0]);
-    await act(async () =>
-      container.querySelector<HTMLButtonElement>('[aria-label="Auto-hide navigation"]')!.click(),
-    );
+    await act(async () => publishNavigatorLayout({ autoHide: true }));
     expect(frame.style.gridTemplateColumns).not.toBe(before);
     expect(Number.parseFloat(dragRegion.style.width)).toBeGreaterThan(56);
     await act(async () => {
@@ -291,11 +286,11 @@ describe("DesktopLayout on Auth Routes", () => {
     expect(container.querySelector('button[aria-label="Go forward"]')).toBeNull();
   });
 
-  it("keeps the workspace mounted and reserves titlebar space when navigation is toggled", async () => {
+  it("keeps the workspace mounted when navigation visibility changes from settings", async () => {
     await act(async () =>
       root.render(
         <MemoryRouter initialEntries={["/browser"]}>
-          <DesktopLayout getRouteId={() => "browser"} navItems={[]} />
+          <DesktopLayout getRouteId={() => "browser"} />
         </MemoryRouter>,
       ),
     );
@@ -303,23 +298,15 @@ describe("DesktopLayout on Auth Routes", () => {
     const canvas = container.querySelector<HTMLElement>('[data-testid="workspace-canvas"]')!;
     const originalColumns = frame.style.gridTemplateColumns;
     const originalInset = canvas.dataset.tabInset;
-    await act(async () =>
-      container.querySelector<HTMLButtonElement>('[aria-label="Auto-hide navigation"]')!.click(),
-    );
-    expect(frame.style.gridTemplateColumns).toBe("0px minmax(0, 1fr)");
-    expect(useSettingsStore.getState().updateSetting).toHaveBeenLastCalledWith(
-      "appearance",
-      "navigator_auto_hide",
-      true,
-    );
+    await act(async () => publishNavigatorLayout({ autoHide: true }));
+    expect(frame.style.gridTemplateColumns).toBe("0px minmax(0, 1fr) 0px");
+    expect(container.querySelector('[aria-label="Auto-hide navigation"]')).toBeNull();
     expect(container.querySelector(".misty-docking-nav")?.hasAttribute("inert")).toBe(true);
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBe(canvas);
     // Both changing lengths must use the same timeline; an instant grid jump
     // followed by animated padding sends the tabs underneath the window controls.
     expect(frame.className).toContain("transition-[grid-template-columns,grid-template-rows]");
-    await act(async () =>
-      container.querySelector<HTMLButtonElement>('[aria-label="Auto-hide navigation"]')!.click(),
-    );
+    await act(async () => publishNavigatorLayout({ autoHide: false }));
     expect(frame.style.gridTemplateColumns).toBe(originalColumns);
     expect(canvas.dataset.tabInset).toBe(originalInset);
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBe(canvas);
@@ -330,7 +317,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<div data-testid="auth-outlet">Sign In Screen</div>} />
             </Route>
           </Routes>
@@ -353,7 +340,7 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/register"]}>
           <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "register" as any} navItems={[]} />}>
+            <Route element={<DesktopLayout getRouteId={() => "register" as any} />}>
               <Route
                 path="/register"
                 element={<div data-testid="auth-outlet">Register Screen</div>}

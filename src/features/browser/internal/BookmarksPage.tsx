@@ -100,7 +100,7 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
               <MenuItem
                 label="Open all in new tabs"
                 disabled={!matches.length}
-                onSelect={() => matches.forEach((b) => props.openInNewTab(b.url))}
+                onSelect={() => matches.forEach((b) => props.openInNewView(b.url))}
               />
               <MenuItem
                 label="Rename folder"
@@ -130,7 +130,9 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
               <ListRowButton
                 title={b.url}
                 onClick={(event) =>
-                  event.metaKey || event.ctrlKey ? props.openInNewTab(b.url) : props.navigate(b.url)
+                  event.metaKey || event.ctrlKey
+                    ? props.openInNewView(b.url)
+                    : props.navigate(b.url)
                 }
               >
                 <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-1.5">
@@ -150,7 +152,7 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
                   icon={<MoreHorizontal size={16} />}
                 />
                 <DropdownMenuContent align="end">
-                  <MenuItem label="Open in new tab" onSelect={() => props.openInNewTab(b.url)} />
+                  <MenuItem label="Open in new tab" onSelect={() => props.openInNewView(b.url)} />
                   <MenuItem label="Edit bookmark" onSelect={() => setEditing(b)} />
                   <DropdownMenuSeparator />
                   <MenuItem label="Remove bookmark" onSelect={() => removeBookmark(b.id)} />

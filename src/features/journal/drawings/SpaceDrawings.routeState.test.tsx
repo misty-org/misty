@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, lazy, Suspense } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,12 +18,6 @@ const { drawing } = vi.hoisted(() => ({
     role: "creator",
     can_delete: true,
   } satisfies SpaceDrawing,
-}));
-
-vi.mock("@/features/auth", () => ({
-  useAuth: () => ({
-    user: { id: "account-1", name: "Alex", email: "alex@example.com" },
-  }),
 }));
 
 vi.mock("./hooks/useSpaceDrawings", () => ({
@@ -46,7 +40,14 @@ vi.mock("./components/DrawingPreview", () => ({
   DrawingPreview: () => <div data-testid="drawing-preview" />,
 }));
 
-import { SpaceDrawings } from "./SpaceDrawings";
+vi.mock("@/features/auth", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuth: () => ({ user: { id: "account-1", name: "Alex", email: "alex@example.com" } }),
+}));
+
+const SpaceDrawings = lazy(() =>
+  import("./SpaceDrawings").then((module) => ({ default: module.SpaceDrawings })),
+);
 
 function LocationProbe() {
   const location = useLocation();
@@ -56,10 +57,12 @@ function LocationProbe() {
 function drawingSurface(entry: string) {
   return (
     <MemoryRouter key={entry} initialEntries={[entry]}>
-      <SpaceDrawings
-        spaceId="space-product"
-        drawingId={entry.includes("drawing-1") ? "drawing-1" : ""}
-      />
+      <Suspense fallback={<div>Loading drawing route</div>}>
+        <SpaceDrawings
+          spaceId="space-product"
+          drawingId={entry.includes("drawing-1") ? "drawing-1" : ""}
+        />
+      </Suspense>
       <LocationProbe />
     </MemoryRouter>
   );
@@ -83,14 +86,18 @@ describe("SpaceDrawings route-backed page state", () => {
 
   it("keeps the listing page after a tab remount even when a drawing remains selected", async () => {
     const listRoute = "/spaces/space-product/drawings/drawing-1?view=list";
-    await act(async () => root.render(drawingSurface(listRoute)));
+    await act(async () => {
+      root.render(drawingSurface(listRoute));
+      await import("./SpaceDrawings");
+    });
 
-    expect(container.textContent).toContain("My Drawings");
+    expect(container.textContent).not.toContain("Sign in to open drawings");
+    expect(container.textContent).toContain("Journal");
     expect(container.querySelector('button[aria-label="Back to drawings"]')).toBeNull();
 
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-label="Open System design"]')
+      Array.from(container.querySelectorAll("button"))
+        .find((button) => button.getAttribute("aria-label") === "System design")
         ?.click();
     });
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
@@ -103,8 +110,12 @@ describe("SpaceDrawings route-backed page state", () => {
     });
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(listRoute);
 
-    await act(async () => root.render(drawingSurface(listRoute)));
-    expect(container.textContent).toContain("My Drawings");
+    await act(async () => {
+      root.render(drawingSurface(listRoute));
+      await import("./SpaceDrawings");
+    });
+    expect(container.textContent).not.toContain("Sign in to open drawings");
+    expect(container.textContent).toContain("Journal");
     expect(container.querySelector('button[aria-label="Back to drawings"]')).toBeNull();
   });
 });

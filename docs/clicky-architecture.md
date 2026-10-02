@@ -338,8 +338,7 @@ permissions. No capability is implied when its actual executor is unavailable.
 Configuration: put the server-side OpenAI key in
 `server/.env/dev/integrations/ai.env` as `MISTY_REALTIME_API_KEY`, then restart the
 dev API with `misty server up --detach`. Production loads the corresponding
-`server/.env/prod/integrations/ai.env`; self-hosted Compose exposes the same
-variable on the API only. Keep the existing gateway key for fallback. The key
+`server/.env/prod/integrations/ai.env`. Keep the existing gateway key for fallback. The key
 is optional; without it the active media path remains WebSocket. Do not paste
 keys into source, diagnostics, or chat.
 

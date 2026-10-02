@@ -56,7 +56,6 @@ export function GlobalMistyComposerBar(props: {
         </header>
       )}
       <MistyComposer
-        inputFirst={!!props.headerControls}
         value={props.query}
         onChange={props.onQuery}
         mode={props.mode}
@@ -78,7 +77,7 @@ export function GlobalMistyComposerBar(props: {
               ? "What would you like to do?"
               : undefined
         }
-        className={cn("rounded-none border-0 shadow-none")}
+        className="mx-3 my-2"
         onError={props.onError}
         modelControl={
           props.headerControls ? (

@@ -1,8 +1,7 @@
 import {
-  createBrowserTabState,
+  createBrowserViewState,
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
-  type WorkspaceTab,
 } from "./model";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
@@ -16,19 +15,15 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   )
     return null;
   const url = new URL(pathname, "https://misty.local");
-  if (
-    path === "/scheduled" ||
-    ((path === "/agents" || path === "/apps/agents") &&
-      url.searchParams.get("view") === "scheduled")
-  ) {
-    url.searchParams.delete("view");
+  if (path === "/scheduled") {
+    url.searchParams.set("view", "scheduled");
     return {
       ...request(
-        "scheduled",
-        "tool:scheduled",
-        "Scheduled",
-        `/scheduled${url.search}${url.hash}`,
-        "scheduled",
+        "agents",
+        "tool:agents",
+        "Agents",
+        `/agents${url.search}${url.hash}`,
+        "agents",
         "single",
       ),
       scopeKey: "global",
@@ -101,7 +96,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     return {
       ...request("browser", "tool:browser", "Browser", "/browser", undefined, "multiple"),
       scopeKey: "global",
-      state: createBrowserTabState(url ?? undefined),
+      state: createBrowserViewState(url ?? undefined),
     };
   }
   return null;
@@ -111,17 +106,6 @@ export type SpaceWorkspaceTool = "journal" | "planner" | "social" | "library" | 
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
-}
-
-/** Whether a tab owns the route even when a nested route or redirect changed its exact URL. */
-export function workspaceTabMatchesRoute(
-  tab: Pick<WorkspaceTab, "surfaceId" | "groupKey">,
-  pathname: string,
-): boolean {
-  const surface = workspaceSurfaceFromRoute(pathname);
-  return Boolean(
-    surface && surface.surfaceId === tab.surfaceId && surface.groupKey === tab.groupKey,
-  );
 }
 
 function request(

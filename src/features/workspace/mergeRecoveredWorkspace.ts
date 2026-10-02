@@ -10,9 +10,9 @@ export function mergeRecoveredWorkspace(
   baseline: Partial<WorkspaceStore>,
 ): Partial<WorkspaceStore> {
   const live = partialWorkspaceStore(current);
-  const windows = { ...recovered.virtualWindowsByScope };
-  for (const scope of Object.keys(live.virtualWindowsByScope ?? {}) as WorkspaceScopeKey[]) {
-    const added = live.virtualWindowsByScope?.[scope] ?? [];
+  const windows = { ...recovered.windowsByScope };
+  for (const scope of Object.keys(live.windowsByScope ?? {}) as WorkspaceScopeKey[]) {
+    const added = live.windowsByScope?.[scope] ?? [];
     const ids = new Set(added.map((window) => window.id));
     windows[scope] = [...(windows[scope] ?? []).filter((window) => !ids.has(window.id)), ...added];
   }
@@ -29,10 +29,10 @@ export function mergeRecoveredWorkspace(
     ...recovered,
     ...live,
     layoutsByScope: { ...recovered.layoutsByScope, ...live.layoutsByScope },
-    virtualWindowsByScope: windows,
-    activeVirtualWindowIdByScope: {
-      ...recovered.activeVirtualWindowIdByScope,
-      ...live.activeVirtualWindowIdByScope,
+    windowsByScope: windows,
+    activeWindowIdByScope: {
+      ...recovered.activeWindowIdByScope,
+      ...live.activeWindowIdByScope,
     },
     tabGroups: records(
       recovered.tabGroups ?? [],
@@ -46,25 +46,24 @@ export function mergeRecoveredWorkspace(
     migratedTabGroupIds: [
       ...new Set([...(recovered.migratedTabGroupIds ?? []), ...current.migratedTabGroupIds]),
     ],
-    websiteGroups: records(
-      recovered.websiteGroups ?? [],
-      current.websiteGroups,
-      baseline.websiteGroups ?? [],
+    bookmarkFolders: records(
+      recovered.bookmarkFolders ?? [],
+      current.bookmarkFolders,
+      baseline.bookmarkFolders ?? [],
     ),
-    savedWebsites: records(
-      recovered.savedWebsites ?? [],
-      current.savedWebsites,
-      baseline.savedWebsites ?? [],
-    ),
-    expandedWebsiteGroups: { ...recovered.expandedWebsiteGroups, ...current.expandedWebsiteGroups },
-    selectedWebsiteByGroup: {
-      ...recovered.selectedWebsiteByGroup,
-      ...current.selectedWebsiteByGroup,
+    bookmarks: records(recovered.bookmarks ?? [], current.bookmarks, baseline.bookmarks ?? []),
+    expandedBookmarkFolders: {
+      ...recovered.expandedBookmarkFolders,
+      ...current.expandedBookmarkFolders,
     },
-    closedTabs: [...(recovered.closedTabs ?? []), ...current.closedTabs],
-    closedVirtualWindowsByScope: {
-      ...recovered.closedVirtualWindowsByScope,
-      ...current.closedVirtualWindowsByScope,
+    selectedBookmarkByFolder: {
+      ...recovered.selectedBookmarkByFolder,
+      ...current.selectedBookmarkByFolder,
+    },
+    closedItems: [...(recovered.closedItems ?? []), ...current.closedItems],
+    closedWindowsByScope: {
+      ...recovered.closedWindowsByScope,
+      ...current.closedWindowsByScope,
     },
   };
 }

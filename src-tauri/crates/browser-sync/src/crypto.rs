@@ -20,7 +20,7 @@ const MAX_LOCAL_BYTES: usize = 32 << 20;
 pub struct VaultScope {
     pub deployment: String,
     pub account_id: String,
-    pub workspace_id: String,
+    pub vault_id: String,
 }
 
 impl VaultScope {
@@ -29,7 +29,7 @@ impl VaultScope {
             || self.deployment.len() > 2048
             || self.account_id.is_empty()
             || self.account_id.len() > 1024
-            || !valid_id(&self.workspace_id)
+            || !valid_id(&self.vault_id)
         {
             return Err(Error::Invalid);
         }
@@ -42,7 +42,7 @@ impl VaultScope {
             domain,
             &self.deployment,
             &self.account_id,
-            &self.workspace_id,
+            &self.vault_id,
             identity,
         ))?)
     }
@@ -224,7 +224,7 @@ impl VaultRoot {
     ) -> Result<DeviceGrant> {
         scope.validate()?;
         let mut grant = DeviceGrant {
-            workspace_id: scope.workspace_id.clone(),
+            vault_id: scope.vault_id.clone(),
             device_id: device_id.into(),
             key_epoch: epoch,
             public_key: device.public_key(),
@@ -237,7 +237,7 @@ impl VaultRoot {
 
     pub fn verify_grant(&self, scope: &VaultScope, grant: &DeviceGrant) -> Result<()> {
         scope.validate()?;
-        if grant.workspace_id != scope.workspace_id {
+        if grant.vault_id != scope.vault_id {
             return Err(Error::Identity);
         }
         let signature = Signature::from_bytes(&decode_fixed(&grant.signature)?);
@@ -276,7 +276,7 @@ impl VaultRoot {
             return Err(Error::Identity);
         }
         let mut mutation = Mutation {
-            workspace_id: scope.workspace_id.clone(),
+            vault_id: scope.vault_id.clone(),
             operation_id: operation_id.into(),
             device_id: grant.device_id.clone(),
             device_counter,
@@ -290,7 +290,7 @@ impl VaultRoot {
         };
         let key = self.derive(
             "misty.sync.event-key.v1",
-            &(&scope.workspace_id, grant.key_epoch),
+            &(&scope.vault_id, grant.key_epoch),
         )?;
         mutation.envelope = encrypt(
             key.as_ref(),
@@ -311,7 +311,7 @@ impl VaultRoot {
         mutation: &Mutation,
     ) -> Result<Zeroizing<Vec<u8>>> {
         self.verify_grant(scope, grant)?;
-        if mutation.workspace_id != scope.workspace_id
+        if mutation.vault_id != scope.vault_id
             || mutation.device_id != grant.device_id
             || mutation.key_epoch != grant.key_epoch
         {
@@ -325,7 +325,7 @@ impl VaultRoot {
             .map_err(|_| Error::Identity)?;
         let key = self.derive(
             "misty.sync.event-key.v1",
-            &(&scope.workspace_id, mutation.key_epoch),
+            &(&scope.vault_id, mutation.key_epoch),
         )?;
         decrypt(
             key.as_ref(),
@@ -345,7 +345,7 @@ impl VaultRoot {
         if !valid_id(device_id) {
             return Err(Error::Invalid);
         }
-        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.workspace_id))?;
+        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.vault_id))?;
         encrypt(
             key.as_ref(),
             plaintext,
@@ -364,7 +364,7 @@ impl VaultRoot {
         if !valid_id(device_id) {
             return Err(Error::Invalid);
         }
-        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.workspace_id))?;
+        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.vault_id))?;
         decrypt(
             key.as_ref(),
             envelope,
@@ -404,7 +404,7 @@ impl DeviceKey {
         }
         Ok(self.sign(&serde_json::to_vec(&(
             "misty.sync.connect.v1",
-            &scope.workspace_id,
+            &scope.vault_id,
             device_id,
             challenge,
         ))?))

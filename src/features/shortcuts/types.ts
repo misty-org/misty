@@ -4,12 +4,10 @@ export type ShortcutScope =
   | "global"
   | "workspace"
   | "tool:browser"
-  | "tool:code"
   | "tool:files"
   | "tool:library"
   | "tool:planner"
-  | "tool:roadmap"
-  | "tool:terminal";
+  | "tool:roadmap";
 
 export interface ShortcutBindingPair {
   primary: string | null;

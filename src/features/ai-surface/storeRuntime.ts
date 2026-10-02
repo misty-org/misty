@@ -1,13 +1,7 @@
 import type { StoreApi } from "zustand";
 import { aiPaneSession, aiMessage, aiSessionKey } from "./storeHelpers";
 import type { AiPaneSession, AiSurfaceState } from "./store";
-import type {
-  AiArtifact,
-  AiCompanionAnchor,
-  AiInvocationEvent,
-  AiSurfaceAdapter,
-  MistySpeech,
-} from "./types";
+import type { AiArtifact, AiInvocationEvent, AiSurfaceAdapter, MistySpeech } from "./types";
 
 type SetState = StoreApi<AiSurfaceState>["setState"];
 type GetState = StoreApi<AiSurfaceState>["getState"];
@@ -196,23 +190,6 @@ export function patchArtifact(
       ),
     })),
   });
-}
-
-export function pointerAnchor(
-  paneId: string,
-  anchor: AiCompanionAnchor | undefined,
-  element: HTMLElement,
-): AiCompanionAnchor {
-  if (anchor?.kind === "pointer" && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)) {
-    return { ...anchor, paneId };
-  }
-  const bounds = element.getBoundingClientRect();
-  return {
-    kind: "pointer",
-    paneId,
-    x: anchor?.x ?? bounds.left + bounds.width / 2,
-    y: anchor?.y ?? bounds.top + bounds.height / 2,
-  };
 }
 
 export function makeSpeech(

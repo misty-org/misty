@@ -59,7 +59,7 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
       });
     }
   },
-  beginAuthorization: async (provider, capabilities, returnTo = "/inbox") => {
+  beginAuthorization: async (provider, capabilities, returnTo = "/home") => {
     const generation = accountGeneration;
     const accountId = get().accountId;
     if (!accountId) throw new Error("Sign in before connecting an account.");

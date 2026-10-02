@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     sync::{
@@ -13,7 +13,6 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_os = "macos"))]
 use tantivy::{
-    collector::TopDocs,
     doc,
     query::{AllQuery, BooleanQuery, FuzzyTermQuery, Occur, Query, TermQuery},
     schema::{
@@ -27,11 +26,7 @@ use walkdir::WalkDir;
 use crate::{
     domain::{
         explorer::{ExplorerLocation, ExplorerLocationKind, FileEntry, FileKind},
-        file_master::{
-            join_remote_path, normalize_remote_path, RemoteBrowseTarget, RemoteJobStart,
-            RemoteJobStatus, RemoteListItem,
-        },
-        listing_cache::ListingCache,
+        file_master::RemoteBrowseTarget,
     },
     error::{ApiError, ApiResult},
     infra::environment::AppEnvironmentService,
@@ -41,8 +36,6 @@ const SEARCH_SCHEMA_VERSION: u32 = 1;
 const INDEX_MEMORY_BUDGET_BYTES: usize = 96 * 1024 * 1024;
 const DEFAULT_RESULT_LIMIT: usize = 100;
 const DEFAULT_MAX_DEPTH: usize = 18;
-const DEFAULT_REMOTE_MAX_DEPTH: usize = 12;
-const REMOTE_DIRECTORY_LIMIT: usize = 20_000;
 const SEARCH_MANIFEST_FILE: &str = "manifest.sqlite3";
 const SCAN_LOCK_FILE: &str = ".scan.lock";
 /// A scan that another process finished this recently is not repeated.
@@ -2514,24 +2507,10 @@ fn delete_doc(writer: &IndexWriter, fields: &SearchIndexFields, path: &str) -> A
     Ok(())
 }
 #[cfg(not(target_os = "macos"))]
-fn query_documents(
-    reader: &IndexReader,
-    fields: SearchIndexFields,
-    text: &str,
-) -> ApiResult<Vec<SearchDoc>> {
-    let searcher = reader.searcher();
-    let hits = searcher
-        .search(&build_query(fields, text), &TopDocs::with_limit(10_000))
-        .map_err(|e| ApiError::Message(e.to_string()))?;
-    hits.into_iter()
-        .filter_map(
-            |(_, address)| match searcher.doc::<TantivyDocument>(address) {
-                Ok(doc) => doc_from_tantivy(fields, &doc).map(Ok),
-                Err(e) => Some(Err(ApiError::Message(e.to_string()))),
-            },
-        )
-        .collect()
-}
+#[path = "search_local_query.rs"]
+mod local_query;
+#[cfg(not(target_os = "macos"))]
+use local_query::query_documents;
 #[cfg(target_os = "macos")]
 #[path = "search_remote_engine.rs"]
 mod remote_engine;

@@ -246,62 +246,6 @@ export function SmartFolderDialog(props: {
   );
 }
 
-export function DeviceDialog(props: {
-  title: string;
-  label: string;
-  placeholder?: string;
-  value: string;
-  confirmLabel: string;
-  onChange: (value: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const inputId = `device-dialog-${props.title.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) props.onCancel();
-      }}
-    >
-      <DialogContent className="sm:max-w-sm">
-        <form
-          className="contents"
-          onSubmit={(event) => {
-            event.preventDefault();
-            props.onConfirm();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>{props.title}</DialogTitle>
-            <DialogDescription>Update the drive entry shown in Explorer.</DialogDescription>
-          </DialogHeader>
-          <div className={fieldClass}>
-            <Label className={fieldLabelClass} htmlFor={inputId}>
-              {props.label}
-            </Label>
-            <Input
-              id={inputId}
-              autoFocus
-              value={props.value}
-              placeholder={props.placeholder}
-              onChange={(event) => props.onChange(event.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={props.onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!props.value.trim()}>
-              {props.confirmLabel}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function defaultSmartFolderRule(): SavedSearchRule {
   return { field: "text", operator: "contains", value: "" };
 }

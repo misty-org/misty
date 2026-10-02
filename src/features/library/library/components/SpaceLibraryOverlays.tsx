@@ -73,6 +73,9 @@ export function SpaceLibraryOverlays() {
     unlockPassword,
     setUnlockPassword,
     unlockSaving,
+    unlockConfigured,
+    unlockConfirmation,
+    setUnlockConfirmation,
     closeSensitiveUnlock,
     setCopiedEditDefinition,
     setReloadKey,
@@ -264,6 +267,9 @@ export function SpaceLibraryOverlays() {
           submit: (event) => void submitTextDialog(event),
         }}
         unlock={{
+          configured: unlockConfigured,
+          confirmation: unlockConfirmation,
+          setConfirmation: setUnlockConfirmation,
           scope: unlockScope,
           password: unlockPassword,
           saving: unlockSaving,

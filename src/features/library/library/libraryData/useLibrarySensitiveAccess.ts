@@ -1,5 +1,6 @@
 import type { LibraryUnlockScope } from "@/api/spaces/dto/types/SpaceLibraryDialogs";
 import { useEffect, useState } from "react";
+import { accountApi } from "@/api/account/api";
 import { activeSensitiveGrant } from "../SpaceLibraryPrimitives";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
 
@@ -23,11 +24,35 @@ export function useLibrarySensitiveAccess(options: {
   const [unlockScope, setUnlockScope] = useState<LibraryUnlockScope>("");
   const [unlockPassword, setUnlockPassword] = useState("");
   const [unlockSaving, setUnlockSaving] = useState(false);
+  const [unlockConfigured, setUnlockConfigured] = useState<boolean | null>(null);
+  const [unlockConfirmation, setUnlockConfirmation] = useState("");
+
+  useEffect(() => {
+    if (!unlockScope) return;
+    let active = true;
+    setUnlockConfigured(null);
+    void accountApi
+      .libraryLock()
+      .then(({ configured }) => {
+        if (active) setUnlockConfigured(configured);
+      })
+      .catch((error) => {
+        if (active)
+          setLocalError(
+            error instanceof Error ? error.message : "Could not check the library lock.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [unlockScope, spaceId, setLocalError]);
 
   useEffect(() => {
     setSensitiveGrants({});
     setUnlockScope("");
     setUnlockPassword("");
+    setUnlockConfirmation("");
+    setUnlockConfigured(null);
   }, [spaceId]);
 
   useEffect(() => {
@@ -61,6 +86,10 @@ export function useLibrarySensitiveAccess(options: {
     setUnlockPassword,
     unlockSaving,
     setUnlockSaving,
+    unlockConfigured,
+    setUnlockConfigured,
+    unlockConfirmation,
+    setUnlockConfirmation,
     sensitiveCollectionScope,
     sensitiveCollectionToken: sensitiveCollectionScope
       ? activeSensitiveGrant(sensitiveGrants[sensitiveCollectionScope])
@@ -69,6 +98,8 @@ export function useLibrarySensitiveAccess(options: {
       if (unlockSaving) return;
       setUnlockScope("");
       setUnlockPassword("");
+      setUnlockConfirmation("");
+      setUnlockConfigured(null);
       setLocalError("");
     },
   };

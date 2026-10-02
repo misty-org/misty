@@ -1,3 +1,4 @@
+import { writeProfilePreference } from "@/features/settings/sync";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -11,12 +12,6 @@ export interface SavedDockingLayout extends DockingLayout {
   id: string;
   name: string;
 }
-export const dockingPresets: SavedDockingLayout[] = [
-  { id: "classic", name: "Classic", navigation: "left", tabs: "top" },
-  { id: "top-bar", name: "Top bar", navigation: "top", tabs: "left" },
-  { id: "bottom-dock", name: "Bottom dock", navigation: "bottom", tabs: "left" },
-  { id: "right-rail", name: "Right rail", navigation: "right", tabs: "bottom" },
-];
 export const defaultDockingLayout: DockingLayout = { navigation: "left", tabs: "top" };
 export const isSideDock = (position: DockPosition) => position === "left" || position === "right";
 const isPosition = (value: unknown): value is DockPosition =>
@@ -24,23 +19,21 @@ const isPosition = (value: unknown): value is DockPosition =>
 export function validDockingLayout(value: unknown): value is DockingLayout {
   if (!value || typeof value !== "object") return false;
   const layout = value as Partial<DockingLayout>;
-  return (
-    isPosition(layout.navigation) && isPosition(layout.tabs) && layout.navigation !== layout.tabs
-  );
+  return isPosition(layout.navigation) && isPosition(layout.tabs);
 }
 interface DockingState {
   /** Previous device-wide choice, used only for windows without their own layout. */
   initialLayout: DockingLayout;
   savedLayouts: SavedDockingLayout[];
-  saveLayout(name: string, layout: DockingLayout): string | null;
-  removeLayout(id: string): void;
+  saveLayout(name: string, layout: DockingLayout): Promise<string | null>;
+  removeLayout(id: string): Promise<void>;
 }
 export const useDockingLayoutStore = create<DockingState>()(
   persist(
-    (set, get) => ({
+    (_set, get) => ({
       initialLayout: defaultDockingLayout,
       savedLayouts: [],
-      saveLayout: (name, layout) => {
+      saveLayout: async (name, layout) => {
         if (!validDockingLayout(layout)) return null;
         const trimmed = name.trim().slice(0, 40);
         if (!trimmed) return null;
@@ -49,15 +42,18 @@ export const useDockingLayoutStore = create<DockingState>()(
         );
         const id = existing?.id ?? crypto.randomUUID();
         const saved = { navigation: layout.navigation, tabs: layout.tabs, id, name: trimmed };
-        set({
-          savedLayouts: existing
-            ? get().savedLayouts.map((item) => (item.id === id ? saved : item))
-            : [...get().savedLayouts, saved],
-        });
+        const savedLayouts = existing
+          ? get().savedLayouts.map((item) => (item.id === id ? saved : item))
+          : [...get().savedLayouts, saved];
+        await writeProfilePreference("app.layout.presets", JSON.stringify(savedLayouts));
         return id;
       },
-      removeLayout: (id) =>
-        set({ savedLayouts: get().savedLayouts.filter((item) => item.id !== id) }),
+      removeLayout: async (id) => {
+        await writeProfilePreference(
+          "app.layout.presets",
+          JSON.stringify(get().savedLayouts.filter((item) => item.id !== id)),
+        );
+      },
     }),
     {
       name: "misty:desktop-docking:v1",

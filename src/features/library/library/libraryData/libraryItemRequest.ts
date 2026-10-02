@@ -67,7 +67,7 @@ export function libraryItemRequest(
   const { spaceId, collection, selectedCollectionId, searchQuery, libraryQuery } = options;
 
   const semantic =
-    (collection === "recent" || collection === "smart") &&
+    collection === "recent" &&
     Boolean(searchQuery) &&
     !searchQuery.includes(":") &&
     !options.mediaType &&

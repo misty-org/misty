@@ -1,3 +1,4 @@
+import { useOverlaySide } from "./OverlaySide";
 import {
   menuContentClass,
   menuIndicatorClass,
@@ -10,7 +11,7 @@ import {
   type MenuWidth,
 } from "./popupStyles";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronRight, Circle } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "../utils";
@@ -76,18 +77,22 @@ DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayNam
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & { width?: MenuWidth }
->(({ className, align = "start", sideOffset = 4, width, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
-      ref={ref}
-      data-slot="dropdown-menu-content"
-      sideOffset={sideOffset}
-      align={align}
-      className={cn(menuContentClass, width && menuWidthClass[width], className)}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-));
+>(({ className, align = "start", side, sideOffset = 4, width, ...props }, ref) => {
+  const placement = useOverlaySide();
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        ref={ref}
+        data-slot="dropdown-menu-content"
+        side={side ?? placement}
+        sideOffset={sideOffset}
+        align={align}
+        className={cn(menuContentClass, width && menuWidthClass[width], className)}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  );
+});
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 const DropdownMenuItem = React.forwardRef<
@@ -136,9 +141,8 @@ const DropdownMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem> & {
     inset?: boolean;
-    indicator?: "dot" | "check";
   }
->(({ className, children, inset, indicator = "dot", ...props }, ref) => (
+>(({ className, children, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     data-slot="dropdown-menu-radio-item"
@@ -148,7 +152,7 @@ const DropdownMenuRadioItem = React.forwardRef<
   >
     <span data-slot="dropdown-menu-radio-item-indicator" className={menuIndicatorClass}>
       <DropdownMenuPrimitive.ItemIndicator>
-        {indicator === "check" ? <Check /> : <Circle className="size-2 fill-current" />}
+        <Check />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
     {children}

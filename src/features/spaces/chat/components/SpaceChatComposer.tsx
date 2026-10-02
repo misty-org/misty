@@ -2,20 +2,21 @@ import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft"
 import type { MistyPickerSource } from "@/features/picker";
 import {
   cn,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
+  IconButton,
+  MessageComposer,
+  MessageComposerSend,
+  messageComposerTextClass,
   InputGroupText,
-  InputGroupTextarea,
   Popover,
   PopoverAnchor,
   PopoverTrigger,
 } from "@/shared/ui";
-import { Plus, Send } from "lucide-react";
+import { AtSign, Plus, Smile } from "lucide-react";
 import { useId, useMemo, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { splitMentionSegments } from "../hooks/mentionHighlight";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { useComposerInput } from "../hooks/useComposerInput";
+import { ChatEmojiPicker } from "./ChatEmojiPicker";
 import { ChatAttachmentChips } from "./ChatAttachmentChips";
 import { ChatReplyBanner } from "./ChatReplyBanner";
 import { ChatSuggestionPopover } from "./ChatSuggestionPopover";
@@ -24,10 +25,6 @@ const MAX_MESSAGE_LENGTH = 3000;
 // place in the toolbar once it's actually useful information.
 const MESSAGE_LENGTH_WARNING_THRESHOLD = MAX_MESSAGE_LENGTH - 200;
 
-// Shared between the textarea and its highlight overlay so wrapped lines
-// stay pixel-aligned between the two layers.
-const composerTextClass =
-  "min-h-20 max-h-40 whitespace-pre-wrap break-words px-4 py-3.5 text-base md:text-sm";
 export interface SpaceChatComposerProps {
   draft: SpaceChatDraft;
   suggestions: ChatSuggestionsState;
@@ -66,6 +63,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
     });
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (suggestions.open) {
       if (event.key === "ArrowDown") {
         event.preventDefault();
@@ -96,7 +94,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
     }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      event.currentTarget.form?.requestSubmit();
+      if (!draft.isEmpty && !draft.attachmentUploading) event.currentTarget.form?.requestSubmit();
     }
   };
   return (
@@ -104,24 +102,42 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
       <form onSubmit={props.onSubmit}>
         <Popover open={suggestions.open} onOpenChange={suggestions.setOpen}>
           <PopoverAnchor asChild>
-            <InputGroup
+            <MessageComposer
               ref={composerRef}
-              className="rounded-xl border border-charcoal-border bg-charcoal-card shadow-none"
-            >
-              {draft.replyToMessageId ? (
-                <ChatReplyBanner
-                  senderName={props.replyToSenderName}
-                  onCancel={() => draft.setReplyToMessageId("")}
-                />
-              ) : null}
+              inputRef={textareaRef}
+              context={
+                <>
+                  {draft.replyToMessageId ? (
+                    <ChatReplyBanner
+                      senderName={props.replyToSenderName}
+                      onCancel={() => draft.setReplyToMessageId("")}
+                    />
+                  ) : null}
 
-              <div className="relative">
-                {hasMention ? (
+                  <ChatAttachmentChips
+                    pendingAttachments={draft.pendingAttachments}
+                    selectedLibraryIds={draft.selectedLibraryIds}
+                    libraryItems={suggestions.libraryItems}
+                    onRemoveAttachment={(id) =>
+                      draft.setPendingAttachments((current) =>
+                        current.filter((item) => item.id !== id),
+                      )
+                    }
+                    onRemoveLibraryItem={(id) =>
+                      draft.setSelectedLibraryIds((current) =>
+                        current.filter((item) => item !== id),
+                      )
+                    }
+                  />
+                </>
+              }
+              overlay={
+                hasMention ? (
                   <div
                     ref={overlayRef}
                     aria-hidden="true"
                     className={cn(
-                      composerTextClass,
+                      messageComposerTextClass,
                       "pointer-events-none absolute inset-0 overflow-hidden text-cream",
                     )}
                   >
@@ -129,7 +145,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                       segment.mention ? (
                         <mark
                           key={index}
-                          className="-mx-1 rounded-[3px] bg-mention-bg/35 px-1 py-0.5 text-cream"
+                          className="-mx-1 rounded-[3px] bg-charcoal-active px-1 py-0.5 text-cream"
                         >
                           {segment.text}
                         </mark>
@@ -139,100 +155,92 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                     )}
                     {draft.text.endsWith("\n") ? "​" : null}
                   </div>
-                ) : null}
-                <InputGroupTextarea
-                  ref={textareaRef}
-                  className={cn(
-                    composerTextClass,
-                    "relative field-sizing-content resize-none",
-                    hasMention && "text-transparent caret-cream placeholder:text-transparent",
-                  )}
-                  aria-label={props.isConversation ? "Message this group" : "Message this Space"}
-                  aria-autocomplete="list"
-                  aria-controls={suggestions.open ? listId : undefined}
-                  aria-expanded={suggestions.open}
-                  aria-haspopup="listbox"
-                  aria-activedescendant={
-                    suggestions.open && suggestions.suggestions[suggestions.activeIndex]
-                      ? `${listId}-option-${suggestions.activeIndex}`
-                      : undefined
-                  }
-                  role="combobox"
-                  wrap="soft"
-                  maxLength={MAX_MESSAGE_LENGTH}
-                  placeholder="Write a message… Use @ to mention or add"
-                  value={draft.text}
-                  onChange={(event) => input.onChange(event.target.value)}
-                  onKeyDown={onKeyDown}
-                  onScroll={(event) => {
-                    if (overlayRef.current)
-                      overlayRef.current.scrollTop = event.currentTarget.scrollTop;
-                  }}
-                />
-              </div>
-
-              <ChatAttachmentChips
-                pendingAttachments={draft.pendingAttachments}
-                selectedLibraryIds={draft.selectedLibraryIds}
-                libraryItems={suggestions.libraryItems}
-                onRemoveAttachment={(id) =>
-                  draft.setPendingAttachments((current) => current.filter((item) => item.id !== id))
-                }
-                onRemoveLibraryItem={(id) =>
-                  draft.setSelectedLibraryIds((current) => current.filter((item) => item !== id))
-                }
-              />
-
-              <InputGroupAddon
-                align="block-end"
-                className="min-h-11 border-t border-charcoal-border/60 px-3"
-              >
-                {props.canUploadAttachments || props.canBrowseLibrary ? (
-                  <InputGroupButton
-                    variant="ghost"
-                    size="icon-xs"
+                ) : null
+              }
+              inputProps={{
+                className: cn(
+                  "relative",
+                  hasMention && "text-transparent caret-cream placeholder:text-transparent",
+                ),
+                "aria-label": props.isConversation ? "Message this group" : "Message this Space",
+                "aria-autocomplete": "list",
+                "aria-controls": suggestions.open ? listId : undefined,
+                "aria-expanded": suggestions.open,
+                "aria-haspopup": "listbox",
+                "aria-activedescendant":
+                  suggestions.open && suggestions.suggestions[suggestions.activeIndex]
+                    ? `${listId}-option-${suggestions.activeIndex}`
+                    : undefined,
+                role: "combobox",
+                wrap: "soft",
+                maxLength: MAX_MESSAGE_LENGTH,
+                placeholder: "Write a message…",
+                value: draft.text,
+                onChange: (event) => input.onChange(event.target.value),
+                onKeyDown,
+                onScroll: (event) => {
+                  if (overlayRef.current)
+                    overlayRef.current.scrollTop = event.currentTarget.scrollTop;
+                },
+              }}
+              footer={
+                draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? (
+                  <InputGroupText className="ml-auto tabular-nums">
+                    {draft.text.length}/{MAX_MESSAGE_LENGTH}
+                  </InputGroupText>
+                ) : undefined
+              }
+              leading={
+                props.canUploadAttachments || props.canBrowseLibrary ? (
+                  <IconButton
+                    variant="toolbar"
+                    size="sm"
                     type="button"
                     disabled={draft.attachmentUploading || draft.attachmentSlotsLeft === 0}
                     onClick={() =>
                       props.onOpenPicker(props.canUploadAttachments ? "files" : "library")
                     }
-                    aria-label="Add files or Library items"
+                    label="Add files or Library items"
                   >
                     <Plus />
-                  </InputGroupButton>
-                ) : null}
-                <PopoverTrigger asChild>
-                  <InputGroupButton
-                    variant="ghost"
-                    size="icon-xs"
-                    type="button"
-                    onClick={() => {
-                      input.beginMention();
+                  </IconButton>
+                ) : null
+              }
+              actions={
+                <>
+                  <PopoverTrigger asChild>
+                    <IconButton
+                      variant="toolbar"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        input.beginMention();
+                        focusCaretToEnd();
+                      }}
+                      label="Mention someone"
+                    >
+                      <AtSign />
+                    </IconButton>
+                  </PopoverTrigger>
+                  <ChatEmojiPicker
+                    onSelect={(emoji) => {
+                      draft.setText((current) => current + emoji);
                       focusCaretToEnd();
                     }}
-                    aria-label="Mention someone"
                   >
-                    <span aria-hidden="true">@</span>
-                  </InputGroupButton>
-                </PopoverTrigger>
-                {draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? (
-                  <InputGroupText className="ml-auto tabular-nums">
-                    {draft.text.length}/{MAX_MESSAGE_LENGTH}
-                  </InputGroupText>
-                ) : null}
-                <InputGroupButton
-                  className={
-                    draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto"
-                  }
-                  size="icon-sm"
-                  disabled={draft.isEmpty}
-                  type="submit"
-                  aria-label="Send message"
-                >
-                  <Send />
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
+                    <IconButton variant="toolbar" size="sm" type="button" label="Insert emoji">
+                      <Smile />
+                    </IconButton>
+                  </ChatEmojiPicker>
+
+                  <MessageComposerSend
+                    type="submit"
+                    label="Send message"
+                    disabled={draft.isEmpty || draft.attachmentUploading}
+                  />
+                </>
+              }
+            />
           </PopoverAnchor>
           <ChatSuggestionPopover
             listId={listId}

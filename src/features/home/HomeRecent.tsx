@@ -1,4 +1,4 @@
-import { isPrivateBrowserTab, useWorkspaceStore } from "@/features/workspace";
+import { isPrivateBrowserView, useWorkspaceStore } from "@/features/workspace";
 import { Pressable } from "@/shared/ui";
 import { History, RotateCcw } from "lucide-react";
 import { formatRelativeDate } from "./homeFormat";
@@ -10,14 +10,14 @@ import { describeTab, type ContinueItem } from "./useContinueItems";
  * were closed, which reopen where they were.
  */
 export function HomeRecent(props: { items: ContinueItem[] }) {
-  const closedTabs = useWorkspaceStore((state) => state.closedTabs);
+  const closedTabs = useWorkspaceStore((state) => state.closedItems);
   const closed = closedTabs
     .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) => !isPrivateBrowserTab(entry.tab))
+    .filter(({ entry }) => !isPrivateBrowserView(entry.view))
     .slice(0, Math.max(0, 8 - props.items.length));
 
   const reopen = (index: number) => {
-    const tab = useWorkspaceStore.getState().reopenClosedTab(index);
+    const tab = useWorkspaceStore.getState().reopenClosedView(index);
     if (!tab) return;
     window.dispatchEvent(new Event("misty:workspace-projection-applied"));
   };
@@ -48,9 +48,9 @@ export function HomeRecent(props: { items: ContinueItem[] }) {
             </li>
           ))}
           {closed.map(({ entry, index }) => (
-            <li key={`closed:${entry.tab.id}`}>
+            <li key={`closed:${entry.view.id}`}>
               <RecentRow
-                item={{ tab: entry.tab, windowTitle: "", ...describeTab(entry.tab) }}
+                item={{ tab: entry.view, windowTitle: "", ...describeTab(entry.view) }}
                 when="Closed"
                 reopen
                 onOpen={() => reopen(index)}

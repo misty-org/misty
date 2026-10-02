@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const spaceRequestMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/auth", () => ({
+  accountScopeResetEvent: "misty:test-account-reset",
   useAuth: () => ({ user: { id: "account-beta" } }),
 }));
 
@@ -38,7 +39,7 @@ import { resetNotesAccountState } from "./store/useNotesStore";
 
 function buttonByText(text: string): HTMLButtonElement {
   const button = Array.from(document.body.querySelectorAll("button")).find(
-    (candidate) => candidate.textContent?.trim() === text,
+    (candidate) => (candidate.getAttribute("aria-label") || candidate.textContent?.trim()) === text,
   );
   if (!button) throw new Error(`Button not found: ${text}`);
   return button as HTMLButtonElement;
@@ -146,7 +147,7 @@ describe("SpaceNotes beta simplification", () => {
     await wait(180);
 
     await act(async () => {
-      buttonByText("New").click();
+      buttonByText("New note").click();
     });
 
     expect(document.body.textContent).toContain("New note");
@@ -226,8 +227,10 @@ describe("SpaceNotes beta simplification", () => {
     });
     await wait(180);
 
-    const noteRow = Array.from(document.body.querySelectorAll("h3"))
-      .find((candidate) => candidate.textContent?.trim() === "Delete me")
+    await act(async () => buttonByText("Notes").click());
+
+    const noteRow = Array.from(document.body.querySelectorAll("button"))
+      .find((candidate) => candidate.getAttribute("aria-label") === "Delete me")
       ?.closest<HTMLButtonElement>("button");
     expect(noteRow).toBeTruthy();
     await act(async () => {
@@ -365,14 +368,14 @@ describe("SpaceNotes beta simplification", () => {
     await wait(180);
 
     // Initial view is the note list
-    expect(container.querySelector("h1")?.textContent).toBe("My Notes");
+    expect(container.querySelector("h1")?.textContent).toBe("Journal");
     expect(container.querySelector("h1")?.closest(".rounded-2xl")).toBeNull();
     expect(container.textContent).toContain("Alpha Roadmap Note");
     expect(container.textContent).toContain("Beta Sprint Plan");
 
     // Search notes in List view
     const searchInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Search notes"]',
+      'input[aria-label="Search journal"]',
     );
     expect(searchInput).not.toBeNull();
 
@@ -381,7 +384,7 @@ describe("SpaceNotes beta simplification", () => {
     });
 
     expect(container.querySelector('section[aria-label="Recently edited"]')).toBeNull();
-    const resultsPanel = searchInput?.closest(".rounded-2xl");
+    const resultsPanel = container.querySelector("table");
     expect(resultsPanel?.textContent).toContain("Beta Sprint Plan");
     expect(resultsPanel?.textContent).not.toContain("Alpha Roadmap Note");
 
@@ -389,32 +392,15 @@ describe("SpaceNotes beta simplification", () => {
       useNotesStore.getState().setQuery("");
     });
 
-    // Select the note, then use the explicit Open action to enter document view.
-    const betaNoteCard = Array.from(container.querySelectorAll("h3")).find(
-      (el) => el.textContent === "Beta Sprint Plan",
-    );
-    expect(betaNoteCard).toBeTruthy();
-    await act(async () => {
-      betaNoteCard?.click();
-    });
+    // Opening the row enters the existing document editor directly.
     expect(
-      betaNoteCard
-        ?.closest("button")
-        ?.parentElement?.querySelector<HTMLButtonElement>(
-          'button[aria-label="More actions for Beta Sprint Plan"]',
-        ),
+      container.querySelector('button[aria-label="More actions for Beta Sprint Plan"]'),
     ).toBeTruthy();
-    const openButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Open Beta Sprint Plan"]',
-    );
-    expect(openButton).toBeTruthy();
-    expect(openButton?.dataset.variant).toBe("default");
-    expect(openButton?.querySelector('[data-icon="inline-end"]')).not.toBeNull();
     await act(async () => {
-      openButton?.click();
+      buttonByText("Beta Sprint Plan").click();
     });
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
-      "/spaces/space-product/notes?view=doc&note=note-2",
+      "/spaces/space-product/notes?note=note-2&view=doc",
     );
 
     // Now in document view with Back button
@@ -432,15 +418,15 @@ describe("SpaceNotes beta simplification", () => {
     expect(container.textContent).toContain("Alpha Roadmap Note");
     expect(container.textContent).toContain("Beta Sprint Plan");
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
-      "/spaces/space-product/notes?view=list&note=note-2",
+      "/spaces/space-product/notes?note=note-2&view=list",
     );
 
     // A tab remount must follow the remembered list route instead of reopening the document.
     await act(async () => {
-      root.render(notesSurface("/spaces/space-product/notes?view=list&note=note-2"));
+      root.render(notesSurface("/spaces/space-product/notes?note=note-2&view=list"));
     });
     await wait();
     expect(container.querySelector('button[aria-label="Back to notes"]')).toBeNull();
-    expect(container.querySelector('input[aria-label="Search notes"]')).not.toBeNull();
+    expect(container.querySelector('input[aria-label="Search journal"]')).not.toBeNull();
   });
 });

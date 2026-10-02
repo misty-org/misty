@@ -1,4 +1,4 @@
-import { BrandIcon, MailProviderIcon } from "@/shared/ui";
+import { BrandIcon } from "@/shared/ui";
 import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
 import { providerFromRoute } from "@/features/webviews/providers";
 import {
@@ -53,28 +53,11 @@ export function DestinationIcon({
     const Icon = nativeIcon;
     return <Icon aria-hidden />;
   }
-  if (
-    item.id === "integrations" &&
-    (appId === "social" || appId === "inbox" || appId === "music" || appId === "media")
-  )
-    return <Plug aria-hidden />;
-  if (appId === "social" || appId === "inbox" || appId === "music" || appId === "media") {
-    const family = appId === "social" ? "chat" : appId;
-    const provider = providerFromRoute(item.route, family);
-    if (provider) return <BrandIcon brand={provider} size={18} />;
-  }
-  if (appId === "inbox") {
+  if (item.id === "integrations" && appId === "social") return <Plug aria-hidden />;
+  if (appId === "social") {
     const provider =
-      new URL(item.route, "https://misty.local").searchParams.get("provider") ?? item.id;
-    if (provider === "google" || provider === "microsoft")
-      return <MailProviderIcon provider={provider} />;
-  }
-  if (appId === "social" || appId === "music" || appId === "media") {
-    const family = appId === "social" ? "chat" : appId;
-    const provider = providerFromRoute(
-      `/apps/${appId}?provider=${encodeURIComponent(item.id)}`,
-      family,
-    );
+      providerFromRoute(item.route, "chat") ??
+      providerFromRoute(`/apps/social?provider=${encodeURIComponent(item.id)}`, "chat");
     if (provider) return <BrandIcon brand={provider} size={18} />;
   }
   if (appId === "library") {

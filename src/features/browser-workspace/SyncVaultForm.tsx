@@ -14,6 +14,10 @@ export interface VaultUnlockRequest {
 export function SyncVaultForm(props: {
   create: boolean;
   local: boolean;
+  compact?: boolean;
+  sectionTitle?: string;
+  /** The server rejected this device's identity; unlocking registers it again. */
+  reenroll?: boolean;
   onGenerateSecret(): Promise<string>;
   onUnlock(request: VaultUnlockRequest): Promise<void>;
 }) {
@@ -87,11 +91,21 @@ export function SyncVaultForm(props: {
   return (
     <form onSubmit={submit} className="ph-no-capture" data-private="true">
       <SettingsSection
-        title={props.create ? "Create your sync vault" : "Unlock your sync vault"}
+        surface={props.compact ? "plain" : "card"}
+        title={
+          props.sectionTitle ??
+          (props.create
+            ? "Create your sync vault"
+            : props.reenroll
+              ? "Reconnect this device"
+              : "Unlock your sync vault")
+        }
         description={
           props.create
-            ? "Choose a separate sync password. Your password and sync secret unlock this workspace on your other devices."
-            : "Use the sync password and secret from your first device. Your Misty account password does not unlock the vault."
+            ? "Choose a separate sync password. Your password and sync secret unlock this vault on your other devices."
+            : props.reenroll
+              ? "This device lost its sync access. Enter your sync password and secret to register it again. Its previous local sync data stays on this device."
+              : "Use the sync password and secret from your first device. Your Misty account password does not unlock the vault."
         }
       >
         <SettingsRow label="Sync password">
@@ -197,12 +211,12 @@ export function SyncVaultForm(props: {
           account, device, connection and sync timing metadata.
         </SettingsNote>
         {error && (
-          <p role="alert" className="px-5 py-3 text-sm text-destructive">
+          <p role="alert" className="px-5 py-3 text-sm text-cream">
             {error}
           </p>
         )}
         <div className="flex flex-wrap justify-end gap-2 px-5 pb-4">
-          {props.local && !props.create && (
+          {props.local && !props.create && !props.reenroll && (
             <Button
               type="button"
               variant="outline"
@@ -213,7 +227,13 @@ export function SyncVaultForm(props: {
             </Button>
           )}
           <Button type="submit" disabled={busy || (props.create && (!saved || !secret))}>
-            {busy ? "Opening vault…" : props.create ? "Create sync vault" : "Unlock sync"}
+            {busy
+              ? "Opening vault…"
+              : props.create
+                ? "Create sync vault"
+                : props.reenroll
+                  ? "Reconnect device"
+                  : "Unlock sync"}
           </Button>
         </div>
       </SettingsSection>

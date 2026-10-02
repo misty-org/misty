@@ -1,7 +1,5 @@
 import type { MistyTabGroup } from "./tabGroups";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
-import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
 import { browserHomeUrl } from "./browserHome";
 export * from "./browserSearchEngine";
 import { blankBrowserUrl } from "./browserUrl";
@@ -16,19 +14,7 @@ export {
   normalizeBrowserHomeUrl,
 } from "./browserHome";
 
-export type WorkspaceSurfaceId =
-  | "home"
-  | "inbox"
-  | "space"
-  | "browser"
-  | "terminal"
-  | "code"
-  | "files"
-  | "agents"
-  | "scheduled"
-  | "official-app"
-  | "extension"
-  | "marketplace";
+export type WorkspaceSurfaceId = "home" | "space" | "browser" | "files" | "agents" | "scheduled";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 export type WorkspaceInstancePolicy = "multiple" | "single";
@@ -37,7 +23,7 @@ export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;
 
-export interface BrowserTabState {
+export interface BrowserViewState {
   version: 1;
   url: string;
   faviconUrl: string | null;
@@ -45,163 +31,12 @@ export interface BrowserTabState {
   /** Native browser profile identity; preserved across navigation. */
   profileId?: string;
   /** Saved website used to open this tab, independent of its current URL. */
-  websiteId?: string;
+  bookmarkId?: string;
   /** A private tab: throwaway website data, no history, never saved or synced. */
   private?: true;
 }
 
-export type CodeMultibufferKind =
-  "search" | "references" | "diagnostics" | "rename" | "code-action";
-
-export interface CodeLocationSpec {
-  path: string;
-  line: number;
-  character: number;
-}
-
-export type CodeMultibufferSpec =
-  | {
-      id: string;
-      kind: "search";
-      title: string;
-      query: string;
-      caseSensitive: boolean;
-    }
-  | {
-      id: string;
-      kind: "references";
-      title: string;
-      origin: CodeLocationSpec;
-    }
-  | {
-      id: string;
-      kind: "diagnostics";
-      title: string;
-    }
-  | {
-      id: string;
-      kind: "rename" | "code-action";
-      title: string;
-      origin: CodeLocationSpec;
-      expired: true;
-    };
-
-export type CodeViewportState =
-  | { kind: "file"; activeFilePath: string | null }
-  | { kind: "multibuffer"; spec: CodeMultibufferSpec };
-
-export interface CodeTabState {
-  version: 2;
-  rootPath: string | null;
-  viewport: CodeViewportState;
-  explorerWidth: number;
-}
-
-export function createCodeTabState(
-  initial: Partial<Omit<CodeTabState, "version" | "viewport">> & {
-    viewport?: CodeViewportState;
-    /** Accepted while callers migrate from version 1. */
-    activeFilePath?: string | null;
-  } = {},
-): CodeTabState {
-  return {
-    version: 2,
-    rootPath: initial.rootPath ?? null,
-    viewport: sanitizeCodeViewport(
-      initial.viewport ?? { kind: "file", activeFilePath: initial.activeFilePath ?? null },
-    ),
-    explorerWidth: clampCodeExplorerWidth(initial.explorerWidth),
-  };
-}
-
-export function parseCodeTabState(value: unknown): CodeTabState {
-  if (!value || typeof value !== "object") return createCodeTabState();
-  const candidate = value as Partial<CodeTabState> & {
-    activeFilePath?: unknown;
-    version?: unknown;
-  };
-  return createCodeTabState({
-    rootPath:
-      typeof candidate.rootPath === "string" && candidate.rootPath.trim()
-        ? candidate.rootPath
-        : null,
-    viewport:
-      candidate.version === 2
-        ? sanitizeCodeViewport(candidate.viewport)
-        : {
-            kind: "file",
-            activeFilePath:
-              typeof candidate.activeFilePath === "string" && candidate.activeFilePath.trim()
-                ? candidate.activeFilePath
-                : null,
-          },
-    explorerWidth: candidate.explorerWidth,
-  });
-}
-
-export function codeTabActiveFilePath(state: CodeTabState): string | null {
-  return state.viewport.kind === "file" ? state.viewport.activeFilePath : null;
-}
-
-function sanitizeCodeViewport(value: unknown): CodeViewportState {
-  if (!value || typeof value !== "object") return { kind: "file", activeFilePath: null };
-  const candidate = value as { kind?: unknown; activeFilePath?: unknown; spec?: unknown };
-  if (candidate.kind === "multibuffer") {
-    const spec = sanitizeMultibufferSpec(candidate.spec);
-    if (spec) return { kind: "multibuffer", spec };
-  }
-  return {
-    kind: "file",
-    activeFilePath:
-      typeof candidate.activeFilePath === "string" && candidate.activeFilePath.trim()
-        ? candidate.activeFilePath
-        : null,
-  };
-}
-
-function sanitizeMultibufferSpec(value: unknown): CodeMultibufferSpec | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Record<string, unknown>;
-  const id = typeof candidate.id === "string" && candidate.id ? candidate.id : "code-result";
-  const title =
-    typeof candidate.title === "string" && candidate.title ? candidate.title : "Results";
-  if (candidate.kind === "search" && typeof candidate.query === "string") {
-    return {
-      id,
-      kind: "search",
-      title,
-      query: candidate.query,
-      caseSensitive: candidate.caseSensitive === true,
-    };
-  }
-  if (candidate.kind === "diagnostics") return { id, kind: "diagnostics", title };
-  const origin = sanitizeCodeLocation(candidate.origin);
-  if (candidate.kind === "references" && origin) return { id, kind: "references", title, origin };
-  if ((candidate.kind === "rename" || candidate.kind === "code-action") && origin) {
-    return { id, kind: candidate.kind, title, origin, expired: true };
-  }
-  return null;
-}
-
-function sanitizeCodeLocation(value: unknown): CodeLocationSpec | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<CodeLocationSpec>;
-  if (typeof candidate.path !== "string" || !candidate.path) return null;
-  return {
-    path: candidate.path,
-    line: typeof candidate.line === "number" && candidate.line >= 0 ? candidate.line : 0,
-    character:
-      typeof candidate.character === "number" && candidate.character >= 0 ? candidate.character : 0,
-  };
-}
-
-function clampCodeExplorerWidth(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.min(42, Math.max(14, value))
-    : 22;
-}
-
-export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {
+export function createBrowserViewState(url = browserHomeUrl()): BrowserViewState {
   return {
     version: 1,
     url,
@@ -209,9 +44,10 @@ export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {
   };
 }
 
-export function parseBrowserTabState(value: unknown): BrowserTabState {
-  if (!value || typeof value !== "object") return createBrowserTabState();
-  const candidate = value as Partial<BrowserTabState>;
+export function parseBrowserViewState(value: unknown): BrowserViewState {
+  if (!value || typeof value !== "object") return createBrowserViewState();
+  const candidate = value as Partial<BrowserViewState> & { websiteId?: unknown };
+  const bookmarkId = candidate.bookmarkId ?? candidate.websiteId;
   const url =
     typeof candidate.url === "string" && candidate.url.trim() ? candidate.url : browserHomeUrl();
   return {
@@ -226,10 +62,9 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
       typeof candidate.profileId === "string" && /^[a-f0-9]{64}$/.test(candidate.profileId)
         ? candidate.profileId
         : undefined,
-    websiteId:
-      typeof candidate.websiteId === "string" &&
-      /^[A-Za-z0-9:_.-]{1,200}$/.test(candidate.websiteId)
-        ? candidate.websiteId
+    bookmarkId:
+      typeof bookmarkId === "string" && /^[A-Za-z0-9:_.-]{1,200}$/.test(bookmarkId)
+        ? bookmarkId
         : undefined,
     private: candidate.private === true || undefined,
   };
@@ -259,10 +94,10 @@ export function sanitizeBrowserTitle(title?: string, url?: string): string {
   if (trimmed && !isPlaceholderBrowserTitle(trimmed)) {
     return trimmed;
   }
-  return url ? browserTabTitle(url) : "New Tab";
+  return url ? browserViewTitle(url) : "New Tab";
 }
 
-export function browserTabTitle(url: string): string {
+export function browserViewTitle(url: string): string {
   if (url === blankBrowserUrl) return "New Tab";
   const internal = browserInternalPage(url);
   if (internal) return browserInternalPages[internal].title;
@@ -287,17 +122,6 @@ function browserFaviconUrl(value: string): string | null {
   }
 }
 
-export interface WorkspaceSurfaceDescriptor<TState = unknown> {
-  id: WorkspaceSurfaceId;
-  title: string;
-  icon: LucideIcon;
-  instancePolicy: WorkspaceInstancePolicy;
-  sidebar?: (state: TState) => ReactNode;
-  content: (state: TState) => ReactNode;
-  serialize: (state: TState) => unknown;
-  restore: (snapshot: unknown) => TState;
-}
-
 export interface DockWidgetDescriptor<TState = unknown> {
   kind: WorkspaceSurfaceId;
   instancePolicy: "singleton" | "per-space" | "multiple";
@@ -309,7 +133,7 @@ export interface DockWidgetDescriptor<TState = unknown> {
   dispose?: (state: TState) => void;
 }
 
-export interface WorkspaceTab {
+export interface WorkspaceView {
   /** An unused new tab or split can take the next selected destination. */
   placeholder?: boolean;
   /** Stable identity of this pane’s app group, independent of its label. */
@@ -329,9 +153,9 @@ export interface WorkspaceTab {
 export interface WorkspacePane {
   type: "leaf";
   id: string;
-  tabs: WorkspaceTab[];
-  activeTabId: string | null;
-  history?: { entries: WorkspaceTab[]; index: number };
+  views: WorkspaceView[];
+  activeViewId: string | null;
+  history?: { entries: WorkspaceView[]; index: number };
 }
 
 export interface WorkspaceSplit {
@@ -349,12 +173,12 @@ export interface WorkspaceLayout {
   /** Active tab projection, retained for pane/runtime consumers. */
   root: WorkspaceDockNode;
   focusedPaneId: string;
-  tabs?: WorkspaceLayoutTab[];
-  activeLayoutTabId?: string;
+  tabs?: WorkspaceTab[];
+  activeTabId?: string;
 }
 
 /** A window tab owns a split tree; each leaf contains one app view. */
-export interface WorkspaceLayoutTab {
+export interface WorkspaceTab {
   /** Chrome-style grouping of visible layout tabs, independent of pane identities. */
   tabGroupId?: string;
   id: string;
@@ -365,7 +189,7 @@ export interface WorkspaceLayoutTab {
   focusedPaneId: string;
 }
 
-export interface WorkspaceVirtualWindow {
+export interface WorkspaceWindow {
   dockingLayout?: DockingLayout;
   id: string;
   title: string;
@@ -376,14 +200,14 @@ export interface WorkspaceVirtualWindow {
 
 export interface WorkspaceSnapshot {
   tabGroups?: MistyTabGroup[];
-  version: 2 | 3;
+  version: 2 | 3 | 4;
   accountId: string;
   deviceId: string;
   savedAt: number;
   layout: WorkspaceLayout;
-  lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
-  virtualWindows?: WorkspaceVirtualWindow[];
-  activeVirtualWindowId?: string;
+  lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
+  windows?: WorkspaceWindow[];
+  activeWindowId?: string;
 }
 
 export interface OpenWorkspaceSurfaceRequest {
@@ -402,6 +226,4 @@ export interface OpenWorkspaceSurfaceRequest {
   syncExistingRoute?: boolean;
   paneId?: string;
 }
-
-export const workspaceDefaultMinimumSize = { width: 280, height: 180 } as const;
 export const maxWorkspacePanels = 4;

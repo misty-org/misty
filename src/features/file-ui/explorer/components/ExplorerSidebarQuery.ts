@@ -44,5 +44,5 @@ function operatorSymbol(operator: string): string {
 
 function quoteSearchToken(value: string): string {
   if (!value) return "";
-  return /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
+  return /[\s"\\]/.test(value) ? `"${value.replace(/["\\]/g, "\\$&")}"` : value;
 }

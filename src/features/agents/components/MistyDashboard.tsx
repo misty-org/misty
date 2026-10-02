@@ -1,6 +1,6 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { activityParent, type MistyActivityEntry } from "@/features/misty/activity";
-import { Button } from "@/shared/ui";
+import { Button, CollectionItems } from "@/shared/ui";
 import {
   CalendarClock,
   Check,
@@ -27,14 +27,23 @@ const stateLabels: Record<string, string> = {
   awaiting_intervention: "Needs attention",
 };
 
+export type AgentActivityState =
+  "loading" | "unavailable" | "needs_input" | "working" | "waiting_for_device" | "queued" | "idle";
+
 export function MistyDashboard({
   agentId,
   spaceId = "",
   onScheduled,
+  limit,
+  onActivityStateChange,
+  collection,
 }: {
+  collection?: { query: string; view: "list" | "grid"; activityId?: string };
   agentId?: string;
   spaceId?: string;
   onScheduled?(): void;
+  limit?: number;
+  onActivityStateChange?(value: AgentActivityState): void;
 }) {
   const { user } = useAgentsAuth();
   const identity = useRef("");
@@ -42,6 +51,25 @@ export function MistyDashboard({
   const [entries, setEntries] = useState<MistyActivityEntry[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  useEffect(() => {
+    const states = new Set(entries.map((entry) => entry.state));
+    onActivityStateChange?.(
+      loading
+        ? "loading"
+        : error
+          ? "unavailable"
+          : states.has("awaiting_approval") || states.has("awaiting_intervention")
+            ? "needs_input"
+            : states.has("running")
+              ? "working"
+              : states.has("awaiting_device")
+                ? "waiting_for_device"
+                : states.has("queued")
+                  ? "queued"
+                  : "idle",
+    );
+  }, [entries, loading, error, onActivityStateChange]);
   const [expandedId, setExpandedId] = useState<string>();
   const refresh = useCallback(async () => {
     if (!user?.id) {
@@ -65,9 +93,9 @@ export function MistyDashboard({
     setLoading(true);
     setError("");
     setEntries([]);
-    setExpandedId(undefined);
+    setExpandedId(collection?.activityId);
     return observeAccountChanges(user?.id ?? "", ["runs", "invocations"], refresh);
-  }, [refresh, user?.id]);
+  }, [refresh, user?.id, collection?.activityId]);
   return (
     <section className="agent-activity" aria-label="Agent activity">
       {error && (
@@ -82,10 +110,43 @@ export function MistyDashboard({
         <p className="agents-list-note" role="status">
           Loading activity…
         </p>
-      ) : !entries.length && !error ? (
-        <p className="agents-list-note">No activity yet.</p>
       ) : null}
-      {entries.map((entry) => (
+      {collection && (
+        <CollectionItems
+          columnSetId="agent-activity"
+          fields={["Type", "Events", "Delegation"]}
+          view={collection.view}
+          categoryLabel="Status"
+          items={entries
+            .filter((entry) =>
+              entry.title.toLocaleLowerCase().includes(collection.query.trim().toLocaleLowerCase()),
+            )
+            .map((entry) => ({
+              id: entry.id,
+              title: entry.title,
+              icon: entry.state === "completed" ? <Check /> : <Clock />,
+              category: stateLabels[entry.state] ?? entry.state,
+              metadata: {
+                Type: entry.kind === "run" ? "Task" : "Conversation",
+                Events: entry.events.length,
+                Delegation: entry.delegation_depth ? `Level ${entry.delegation_depth}` : "Direct",
+              },
+              sortValues: { Delegation: entry.delegation_depth },
+              updatedAt: entry.updated_at,
+              updated: new Date(entry.updated_at).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              }),
+              onOpen: () => setExpandedId(expandedId === entry.id ? undefined : entry.id),
+            }))}
+        />
+      )}
+      {(collection
+        ? entries.filter((entry) => entry.id === expandedId)
+        : limit && !showAll
+          ? entries.slice(0, limit)
+          : entries
+      ).map((entry) => (
         <ActivityItem
           key={`${user?.id}:${spaceId}:${agentId}:${entry.id}`}
           entry={entry}
@@ -95,6 +156,11 @@ export function MistyDashboard({
           onChanged={refresh}
         />
       ))}
+      {limit && entries.length > limit && (
+        <Button variant="ghost" size="sm" onClick={() => setShowAll(!showAll)}>
+          {showAll ? "Show less activity" : "View all activity"}
+        </Button>
+      )}
       {onScheduled && (
         <Button
           variant="ghost"

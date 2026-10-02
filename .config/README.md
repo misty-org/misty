@@ -20,6 +20,6 @@ Prettier's package.json field and Tailwind's CSS `@config` directive are discove
 
 The main and cursor companion HTML entry points live in `src/app/`, Vite's app root. Development and packaged URLs remain `/index.html` and `/companion.html`; public assets and build output remain in the repository's `public/` and `dist/` directories.
 
-Some files still have required root discovery roles: npm manifests, TypeScript configuration, Rust and Node version pins, shadcn's `components.json`, and Git rules. `.github/workflows` contains the shared CI and release automation. Personal agent directories such as `.agents`, `.codex`, `.claude`, `.cursor`, and `.impeccable` are ignored; they are optional local tools, not build dependencies.
+Some files still have required root discovery roles: npm manifests, TypeScript configuration, Rust and Node version pins, shadcn's `components.json`, and Git rules. There is no GitHub CI: `.githooks/` runs the checks locally on every commit and push. Personal agent directories such as `.agents`, `.codex`, `.claude`, `.cursor`, and `.impeccable` are ignored; they are optional local tools, not build dependencies.
 
 Setup, product, design, and engineering documentation live in the [Misty wiki](https://github.com/misty-org/misty/wiki/). Current work lives in the [Misty Roadmap](https://github.com/orgs/misty-org/projects/1).

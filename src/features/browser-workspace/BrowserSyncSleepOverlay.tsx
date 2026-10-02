@@ -4,7 +4,6 @@ import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime"
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { cn, BlockingScreen, Pressable } from "@/shared/ui";
 import misty from "@/assets/branding/misty-icon.png?inline";
-import { DeviceChooseOverlay } from "./DeviceChooseOverlay";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
 import { useBrowserSyncStore } from "./store";
 
@@ -82,7 +81,7 @@ export function BrowserSyncSleepOverlay({ accountId }: { accountId: string }) {
     accountId &&
     session?.account_id === accountId &&
     session.full_sync !== false &&
-    !session.trees &&
+    !session.sync &&
     session.workspace.active_device?.device_id &&
     (session.status.phase === "ready" || session.status.phase === "catching_up") &&
     session.status.applied_sequence >= session.status.head_sequence &&
@@ -149,8 +148,8 @@ export function BrowserSyncSleepOverlay({ accountId }: { accountId: string }) {
       }
     }
   };
-  // Tree mode replaces the resting screen with a workspace chooser.
-  if (session?.trees) return <DeviceChooseOverlay accountId={accountId} />;
+  // Tree mode never blocks: any number of machines edit one device's tabs.
+  if (session?.sync) return null;
   if (!sleeping) return null;
   return <SyncSleepScreen busy={busy} error={error} onWake={() => void wake()} />;
 }

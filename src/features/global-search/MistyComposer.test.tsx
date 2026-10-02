@@ -127,3 +127,55 @@ it("disables the message field and ignores pasted files when unavailable", () =>
   });
   expect(addFiles).not.toHaveBeenCalled();
 });
+
+it("sends once on Enter and preserves newline and IME input", () => {
+  const submit = vi.fn();
+  const props = {
+    value: "Hello",
+    onChange: vi.fn(),
+    mode: "ask" as const,
+    attachments: [],
+    maxAttachments: 4,
+    onAddFiles: vi.fn(),
+    onRemoveAttachment: vi.fn(),
+    onSubmit: submit,
+  };
+  const view = render(<MistyComposer {...props} />);
+  const input = screen.getByLabelText("Message Misty");
+  fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+  expect(submit).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(submit).toHaveBeenCalledTimes(1);
+  view.rerender(
+    <MistyComposer
+      {...props}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          submit();
+        }
+      }}
+    />,
+  );
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(submit).toHaveBeenCalledTimes(2);
+});
+
+it("does not send on Enter with a pending attachment", () => {
+  const submit = vi.fn();
+  render(
+    <MistyComposer
+      value="Wait for upload"
+      onChange={vi.fn()}
+      mode="ask"
+      attachments={[{ ...attachment, state: "uploading" }]}
+      maxAttachments={4}
+      onAddFiles={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSubmit={submit}
+    />,
+  );
+  fireEvent.keyDown(screen.getByLabelText("Message Misty"), { key: "Enter" });
+  expect(submit).not.toHaveBeenCalled();
+});

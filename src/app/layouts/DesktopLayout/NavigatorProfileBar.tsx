@@ -24,7 +24,6 @@ export function NavigatorProfileBar(props: {
         {props.utilityControls}
         <IconButton
           label="Settings"
-          data-navigation-destination="true"
           className={navigatorIslandActionClass}
           aria-pressed={props.settingsOpen}
           onClick={props.onSettingsClick}

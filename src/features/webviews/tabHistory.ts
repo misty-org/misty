@@ -13,8 +13,6 @@ export function configureTabHistoryBudget(kb: number) {
   budgetBytes = Math.round(clamped) * 1024;
 }
 
-export const tabHistoryBudgetBytes = () => budgetBytes;
-
 const syncable = (url: string) => /^https?:\/\//i.test(url) && url.length <= 8192;
 const byteLength = (value: string) => new TextEncoder().encode(value).length;
 

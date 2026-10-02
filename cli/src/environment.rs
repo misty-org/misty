@@ -49,9 +49,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_AGENT_RUNTIME_URL",
             "MISTY_ALLOWED_ORIGINS",
             "MISTY_API_IMAGE",
-            "MISTY_COLLAB_IMAGE",
-            "MISTY_COLLAB_PUBLIC_URL",
-            "MISTY_DEPLOYMENT_MODE",
             "MISTY_ENVIRONMENT",
             "MISTY_HOST_PORT",
             "MISTY_INSTANCE_NAME",
@@ -105,6 +102,8 @@ const FILES: &[FileSpec] = &[
             "R2_ENDPOINT",
             "R2_SECRET_KEY",
             "MISTY_R2_ALLOWED_ORIGINS",
+            "MISTY_BACKUP_BUCKET",
+            "MISTY_BACKUP_AGE_RECIPIENT",
         ],
     },
     FileSpec {
@@ -234,6 +233,7 @@ const FILES: &[FileSpec] = &[
         names: &[
             "GOOGLE_CLIENT_ID",
             "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_SIGN_IN_REDIRECT_URL",
             "MISTY_GOOGLE_DRIVE_CLIENT_ID",
             "MISTY_GOOGLE_DRIVE_CLIENT_SECRET",
         ],
@@ -292,7 +292,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS",
             "MISTY_AUTH_SIGNING_KEY",
             "MISTY_AUTH_SIGNING_KEY_PREVIOUS",
-            "MISTY_COLLAB_INTERNAL_SECRET",
         ],
     },
 ];
@@ -315,22 +314,28 @@ const DEPRECATED_NAMES: &[&str] = &[
     "SLACK_CLIENT_ID",
     "SLACK_CLIENT_SECRET",
     "SLACK_SIGNING_SECRET",
+    "MISTY_DEPLOYMENT_MODE",
+    "MISTY_COLLAB_IMAGE",
+    "MISTY_COLLAB_PUBLIC_URL",
+    "MISTY_COLLAB_INTERNAL_SECRET",
 ];
 
 const DEPRECATED_CLI_NAMES: &[&str] = &[
     "MISTY_SOURCE_DIR",
     "MISTY_PROXY_SOURCE_DIR",
     "MISTY_HUB_SOURCE_DIR",
-    "MISTY_RCLONE_SOURCE",
 ];
 
 const PROD_REQUIRED: &[&str] = &[
+    "AGENT_RUNTIME_DB_PASSWORD",
     "DB_HOST",
     "DB_MIGRATION_PASSWORD",
     "DB_MIGRATION_USER",
     "DB_NAME",
     "DB_PASSWORD",
     "DB_USER",
+    "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
+    "MISTY_AGENT_RUNTIME_IMAGE",
     "MISTY_API_IMAGE",
     "MISTY_AUTH_SIGNING_KEY",
     "MISTY_DEVICE_PAIRING_PEPPER",
@@ -431,16 +436,12 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
         );
     }
 
-    let deployment = values
-        .get("MISTY_DEPLOYMENT_MODE")
-        .map(|s| s.trim())
-        .unwrap_or("self_hosted");
     let billing = values
         .get("MISTY_BILLING_ADAPTER")
         .map(|s| s.trim())
         .unwrap_or("none");
-    if deployment == "hosted" && billing != "http" {
-        bail!("Hosted deployment requires MISTY_BILLING_ADAPTER=http");
+    if target == Target::Prod && billing != "http" {
+        bail!("Production requires MISTY_BILLING_ADAPTER=http");
     }
     if !matches!(billing, "" | "none" | "null" | "http") {
         bail!("Unknown MISTY_BILLING_ADAPTER mode");
@@ -451,7 +452,10 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
             .context("MISTY_BILLING_URL is required")?;
         let url = url::Url::parse(raw).context("Invalid MISTY_BILLING_URL")?;
         let local = target == Target::Dev
-            && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]" | "host.docker.internal"));
+            && matches!(
+                url.host_str(),
+                Some("127.0.0.1" | "localhost" | "[::1]" | "host.docker.internal")
+            );
         if (url.scheme() != "https" && !(url.scheme() == "http" && local))
             || url.host_str().is_none()
             || !url.username().is_empty()
@@ -843,6 +847,7 @@ fn cli_owner(name: &str) -> Result<&'static str> {
         || name.starts_with("WINDOWS_")
         || name.starts_with("MISTY_CODESIGN_")
         || name.starts_with("MISTY_NOTARY_")
+        || matches!(name, "MISTY_RELEASE_API_URL" | "MISTY_RELEASE_WEB_URL")
     {
         return Ok("release.env");
     }
@@ -860,6 +865,7 @@ fn cli_owner(name: &str) -> Result<&'static str> {
             | "MISTY_DEV_SIGNING_IDENTITY"
             | "MISTY_DESKTOP_DEV_PORT"
             | "MISTY_DESKTOP_INITIAL_ROUTE"
+            | "MISTY_DEPLOY_HOST"
     ) {
         return Ok("common.env");
     }
@@ -973,6 +979,23 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
 }
 
 /// The environment registry is shared by init, validation, setup and Compose.
+/// Settings registry as JSON for the operator console's Configuration page.
+pub fn schema_json() -> serde_json::Value {
+    let entries = FILES
+        .iter()
+        .flat_map(|spec| {
+            spec.names.iter().map(move |name| {
+                serde_json::json!({
+                    "file": spec.path,
+                    "name": name,
+                    "required": DEV_REQUIRED.contains(name),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::Value::Array(entries)
+}
+
 pub fn describe() -> Result<()> {
     for spec in FILES {
         println!("{}", spec.path);
@@ -1275,6 +1298,12 @@ mod tests {
             ("MISTY_CLOUDFLARE_WORKER_HOST", "fixture.workers.dev"),
             ("MISTY_DEV_API_ORIGIN", "https://api.example.com"),
             ("MISTY_DEV_API_TUNNEL_HOSTNAME", "api.example.com"),
+            ("MISTY_BILLING_ADAPTER", "http"),
+            ("MISTY_BILLING_URL", "https://billing.example.com/adapter"),
+            (
+                "MISTY_BILLING_SECRET",
+                "fixture-billing-secret-32-bytes-long", // gitleaks:allow -- synthetic test fixture
+            ),
         ] {
             set(&workspace, Target::Dev, key, val).unwrap();
         }

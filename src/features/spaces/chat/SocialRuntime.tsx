@@ -3,11 +3,11 @@ import type { SystemErrorActivity } from "@/features/activity";
 import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { useAuth } from "@/features/auth";
 import type { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import type { useSetupStore } from "@/features/installer";
+import type { useNativeSessionStore } from "@/features/native-session";
 import type { useConnectionsStore } from "@/features/integrations";
 import type { MistyPicker } from "@/features/picker";
 import type { useSpacesStore } from "@/features/spaces";
-import type { useWorkspaceTabTitle } from "@/features/workspace";
+import type { useWorkspaceViewTitle } from "@/features/workspace";
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 export interface SocialRuntime {
@@ -15,12 +15,12 @@ export interface SocialRuntime {
   api: typeof spacesApi;
   useSpacesStore: typeof useSpacesStore;
   useAuth: typeof useAuth;
-  useSetupStore: typeof useSetupStore;
+  useNativeSessionStore: typeof useNativeSessionStore;
   useConnectionsStore: typeof useConnectionsStore;
   Picker: typeof MistyPicker;
   Error: React.ComponentType<React.ComponentProps<typeof SystemErrorActivity>>;
   useAiSurfaceAdapter: typeof useAiSurfaceAdapter;
-  useWorkspaceTabTitle: typeof useWorkspaceTabTitle;
+  useWorkspaceViewTitle: typeof useWorkspaceViewTitle;
   useSpaceChatDraft: typeof useSpaceChatDraft;
   openProviderAuthorizationLink: typeof openProviderAuthorizationLink;
 }
@@ -54,10 +54,10 @@ function hook<K extends keyof SocialRuntime>(name: K): SocialRuntime[K] {
 }
 export const useSocialSpaces = hook("useSpacesStore"),
   useSocialAuth = hook("useAuth"),
-  useSocialSetup = hook("useSetupStore"),
+  useSocialSetup = hook("useNativeSessionStore"),
   useSocialConnections = hook("useConnectionsStore"),
   useSocialAi = hook("useAiSurfaceAdapter"),
-  useSocialTitle = hook("useWorkspaceTabTitle"),
+  useSocialTitle = hook("useWorkspaceViewTitle"),
   useSocialDraft = hook("useSpaceChatDraft"),
   openSocialAuthorization = hook("openProviderAuthorizationLink");
 export const SocialPicker = (props: React.ComponentProps<typeof MistyPicker>) => {

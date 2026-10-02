@@ -1,12 +1,5 @@
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-
-export type ReasoningEffort = "" | "low" | "medium" | "high";
 export type AgentRunMode = "ask" | "auto" | "full";
-export interface GatewayModel {
-  id: string;
-  name: string;
-  capabilities: string[];
-}
 
 export interface GlobalSpaceLibraryHit {
   space_id: string;

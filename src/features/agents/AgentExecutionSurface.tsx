@@ -11,7 +11,7 @@ import {
   steerLocalExecution,
   useLocalExecution,
 } from "./localExecution";
-import { Button, Input, ViewportLayer } from "@/shared/ui";
+import { Button, MessageComposer, MessageComposerSend, ViewportLayer } from "@/shared/ui";
 
 import { TaskArtifacts } from "./TaskArtifactList";
 
@@ -181,10 +181,9 @@ export function AgentExecutionSurface() {
         className="flex shrink-0 gap-2 border-t border-charcoal-border p-3"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!steering.trim()) return;
+          if (routing || !steering.trim()) return;
           const prompt = steering;
           setSteering("");
-          if (routing) return;
           setRouting(true);
           void routeLocalFollowup(prompt)
             .then(setError)
@@ -192,19 +191,32 @@ export function AgentExecutionSurface() {
             .finally(() => setRouting(false));
         }}
       >
-        <label className="sr-only" htmlFor="agent-steering">
-          Message this agent
-        </label>
-        <Input
-          id="agent-steering"
-          className="h-auto min-w-0 flex-1"
-          value={steering}
-          onChange={(e) => setSteering(e.target.value)}
-          placeholder="Message this agent…"
+        <MessageComposer
+          className="w-full"
+          inputProps={{
+            id: "agent-steering",
+            "aria-label": "Message this agent",
+            value: steering,
+            onChange: (event) => setSteering(event.target.value),
+            placeholder: "Message this agent…",
+            disabled: routing,
+            onKeyDown: (event) => {
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            },
+          }}
+          actions={
+            <MessageComposerSend
+              type="submit"
+              label="Send message"
+              busy={routing}
+              disabled={!steering.trim()}
+            />
+          }
         />
-        <Button variant="outline" size="sm" disabled={routing || !steering.trim()}>
-          {routing ? "Interpreting…" : "Send"}
-        </Button>
       </form>
       {error && (
         <p role="alert" className="px-4 pb-3 text-sm text-red-300">

@@ -138,15 +138,15 @@ fn concurrent_group_edits_merge_by_field_and_deletion_wins_over_offline_edits() 
     let left = apply(&apply(&initial, rename.clone(), MAC), hide.clone(), WINDOWS);
     let right = apply(&apply(&initial, hide, WINDOWS), rename, MAC);
     assert_eq!(
-        left.live(Kind::Group, "social").unwrap().values(),
-        right.live(Kind::Group, "social").unwrap().values()
+        left.live(Kind::Folder, "social").unwrap().values(),
+        right.live(Kind::Folder, "social").unwrap().values()
     );
     assert_eq!(
-        left.live(Kind::Group, "social").unwrap().values()["label"],
+        left.live(Kind::Folder, "social").unwrap().values()["label"],
         "Friends"
     );
     assert_eq!(
-        left.live(Kind::Group, "social").unwrap().values()["hidden"],
+        left.live(Kind::Folder, "social").unwrap().values()["hidden"],
         true
     );
     let last = apply(
@@ -157,7 +157,7 @@ fn concurrent_group_edits_merge_by_field_and_deletion_wins_over_offline_edits() 
         WINDOWS,
     );
     assert_eq!(
-        last.live(Kind::Group, "social").unwrap().values()["label"],
+        last.live(Kind::Folder, "social").unwrap().values()["label"],
         "People"
     );
     let deleted = apply(
@@ -173,7 +173,7 @@ fn concurrent_group_edits_merge_by_field_and_deletion_wins_over_offline_edits() 
         ])),
         MAC,
     );
-    assert!(stale.live(Kind::Group, "social").is_none());
+    assert!(stale.live(Kind::Folder, "social").is_none());
 }
 
 fn browser_tab(id: &str, pane: &str) -> Value {
@@ -205,9 +205,9 @@ fn competing_split_changes_preserve_views_and_do_not_restore_deleted_windows() {
     };
     let mac = apply(&initial, split("pane:two", "tab:two"), MAC);
     let merged = apply(&mac, split("pane:three", "tab:three"), WINDOWS);
-    assert_eq!(merged.orphaned_tabs().unwrap(), vec!["tab:two"]);
+    assert_eq!(merged.orphaned_views().unwrap(), vec!["tab:two"]);
     for tab in ["tab:one", "tab:two", "tab:three"] {
-        assert!(merged.live(Kind::Tab, tab).is_some());
+        assert!(merged.live(Kind::View, tab).is_some());
     }
     let closed = apply(
         &merged,
@@ -215,7 +215,7 @@ fn competing_split_changes_preserve_views_and_do_not_restore_deleted_windows() {
         MAC,
     );
     assert!(closed.live(Kind::Window, "window:one").is_none());
-    assert_eq!(closed.orphaned_tabs().unwrap().len(), 3);
+    assert_eq!(closed.orphaned_views().unwrap().len(), 3);
 }
 
 fn credential(updates: Value) -> Value {
@@ -383,7 +383,7 @@ fn space_routes_survive_native_sync_round_trip() {
         WINDOWS,
     );
     let restored: Document = serde_json::from_slice(&updated.encode().unwrap()).unwrap();
-    let fields = restored.live(Kind::Tab, "space-tab").unwrap().values();
+    let fields = restored.live(Kind::View, "space-tab").unwrap().values();
     assert_eq!(fields["surface"], "space");
     assert_eq!(
         fields["tool_route"],
@@ -400,17 +400,17 @@ fn group_icons_accept_small_pngs_and_reject_other_payloads() {
         serde_json::from_value(json!({"label":"My group","icon":icon,"order":0,"hidden":false}))
             .unwrap()
     };
-    assert!(validate(Kind::Group, &fields(png)).is_ok());
-    assert!(validate(Kind::Group, &fields("rocket")).is_ok());
+    assert!(validate(Kind::Folder, &fields(png)).is_ok());
+    assert!(validate(Kind::Folder, &fields("rocket")).is_ok());
     for value in [
         "data:image/svg+xml;base64,PHN2Zz4=",
         "https://example.com/icon.png",
         "data:image/png;base64,bm90LXBuZw==",
     ] {
-        assert!(validate(Kind::Group, &fields(value)).is_err());
+        assert!(validate(Kind::Folder, &fields(value)).is_err());
     }
     assert!(validate(
-        Kind::Group,
+        Kind::Folder,
         &fields(&format!("data:image/png;base64,{}", "A".repeat(32768)))
     )
     .is_err());
@@ -422,7 +422,7 @@ fn group_icons_accept_small_pngs_and_reject_other_payloads() {
         MAC,
     );
     assert_eq!(
-        initial.live(Kind::Group, "group:custom").unwrap().values()["icon"],
+        initial.live(Kind::Folder, "group:custom").unwrap().values()["icon"],
         png
     );
 }
@@ -444,7 +444,7 @@ fn home_tabs_survive_native_sync_and_can_be_deleted() {
     );
     let restored: Document = serde_json::from_slice(&initial.encode().unwrap()).unwrap();
     assert_eq!(
-        restored.live(Kind::Tab, "tab:home").unwrap().values()["tool_route"],
+        restored.live(Kind::View, "tab:home").unwrap().values()["tool_route"],
         "/home"
     );
     let closed = apply(
@@ -454,11 +454,11 @@ fn home_tabs_survive_native_sync_and_can_be_deleted() {
         }])),
         MAC,
     );
-    assert!(closed.live(Kind::Tab, "tab:home").is_none());
+    assert!(closed.live(Kind::View, "tab:home").is_none());
     let mut invalid = fields;
     invalid["tool_route"] = json!("/agents");
     assert!(misty_browser_sync::document::entities::validate(
-        Kind::Tab,
+        Kind::View,
         &serde_json::from_value(invalid).unwrap()
     )
     .is_err());

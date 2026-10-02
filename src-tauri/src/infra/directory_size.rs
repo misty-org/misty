@@ -12,7 +12,6 @@ use crate::{
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tokio::sync::Mutex as AsyncMutex;
 
 const DIRECTORY_SIZE_CACHE_TTL_MS: i64 = 24 * 60 * 60 * 1000;
@@ -26,7 +25,6 @@ struct DirectorySizeInner {
     db_path: PathBuf,
     db_lock: Arc<Mutex<()>>,
     home_dir: PathBuf,
-    mount_root: PathBuf,
     calculating: AsyncMutex<HashSet<String>>,
 }
 
@@ -83,7 +81,6 @@ impl DirectorySizeService {
                 db_path: environment.misty_db_path(),
                 db_lock: Arc::new(Mutex::new(())),
                 home_dir: environment.home_dir(),
-                mount_root: environment.mount_root(),
                 calculating: AsyncMutex::new(HashSet::new()),
             }),
         }
@@ -152,9 +149,6 @@ impl DirectorySizeService {
                 continue;
             }
             let path = PathBuf::from(trimmed);
-            if path.starts_with(&self.inner.mount_root) {
-                continue;
-            }
             let target = {
                 let normalized_path = path
                     .canonicalize()
@@ -425,22 +419,6 @@ fn sql_error(error: rusqlite::Error) -> ApiError {
     ApiError::Message(format!("SQLite directory size store failed: {error}"))
 }
 
-fn remote_size_from_value(value: &Value) -> Option<u64> {
-    if let Some(number) = value.as_u64() {
-        return Some(number);
-    }
-    [
-        "sizeBytes",
-        "size_bytes",
-        "bytes",
-        "totalBytes",
-        "total_bytes",
-        "size",
-    ]
-    .iter()
-    .find_map(|key| value.get(*key).and_then(Value::as_u64))
-}
-
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -456,19 +434,6 @@ fn display_path(path: &Path) -> String {
 mod tests {
     use super::*;
     use uuid::Uuid;
-
-    #[test]
-    fn directory_size_remote_response_accepts_common_byte_fields() {
-        assert_eq!(
-            remote_size_from_value(&serde_json::json!({ "sizeBytes": 42 })),
-            Some(42)
-        );
-        assert_eq!(
-            remote_size_from_value(&serde_json::json!({ "bytes": 7 })),
-            Some(7)
-        );
-        assert_eq!(remote_size_from_value(&serde_json::json!(9)), Some(9));
-    }
 
     #[test]
     fn directory_size_stale_cache_returns_unknown() {

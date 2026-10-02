@@ -1,17 +1,17 @@
 import {
   blankBrowserUrl,
   browserHomeUrl,
-  browserTabTitle,
-  createBrowserTabState,
+  browserViewTitle,
+  createBrowserViewState,
   useWorkspaceStore,
-  type WorkspaceTab,
+  type WorkspaceView,
 } from "@/features/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { browserRuntimeCreated, browserRuntimeId } from "./browserRuntime";
 
 export function useBrowserOnlineStatus(
-  tab: WorkspaceTab,
+  tab: WorkspaceView,
   currentUrl: string,
   nativeRuntime: boolean,
 ) {
@@ -47,9 +47,9 @@ export function useBrowserOnlineStatus(
 
   const handleGoHome = () => {
     const home = browserHomeUrl();
-    useWorkspaceStore.getState().updateBrowserTab(tab.id, {
-      ...createBrowserTabState(home),
-      title: browserTabTitle(home),
+    useWorkspaceStore.getState().updateBrowserView(tab.id, {
+      ...createBrowserViewState(home),
+      title: browserViewTitle(home),
     });
   };
 

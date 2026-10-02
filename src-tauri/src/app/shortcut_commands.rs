@@ -2,9 +2,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::app::runtime::MistyRuntime;
 use crate::error::{ApiError, ApiResult};
-use crate::infra::commands::{
-    ReassignShortcutRequest, ResetShortcutRequest, ShortcutsSnapshot, UpdateShortcutRequest,
-};
+use crate::infra::commands::{ShortcutOverride, ShortcutsSnapshot};
 
 #[tauri::command]
 pub async fn shortcuts_snapshot(
@@ -14,33 +12,6 @@ pub async fn shortcuts_snapshot(
     let snapshot = state.commands.snapshot().await?;
     refresh_native_menu(&app, &snapshot)?;
     Ok(snapshot)
-}
-
-#[tauri::command]
-pub async fn shortcuts_update(
-    request: UpdateShortcutRequest,
-    state: State<'_, MistyRuntime>,
-    app: AppHandle,
-) -> ApiResult<ShortcutsSnapshot> {
-    publish(app, state.commands.update(request).await?)
-}
-
-#[tauri::command]
-pub async fn shortcuts_reassign(
-    request: ReassignShortcutRequest,
-    state: State<'_, MistyRuntime>,
-    app: AppHandle,
-) -> ApiResult<ShortcutsSnapshot> {
-    publish(app, state.commands.reassign(request).await?)
-}
-
-#[tauri::command]
-pub async fn shortcuts_reset(
-    request: ResetShortcutRequest,
-    state: State<'_, MistyRuntime>,
-    app: AppHandle,
-) -> ApiResult<ShortcutsSnapshot> {
-    publish(app, state.commands.reset(request).await?)
 }
 
 fn publish(app: AppHandle, snapshot: ShortcutsSnapshot) -> ApiResult<ShortcutsSnapshot> {
@@ -54,4 +25,13 @@ fn refresh_native_menu(app: &AppHandle, snapshot: &ShortcutsSnapshot) -> ApiResu
     crate::infra::app_menu::refresh(&app, &snapshot)
         .map_err(|err| ApiError::Message(format!("Failed to refresh app menu: {err}")))?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn shortcuts_replace(
+    overrides: Vec<ShortcutOverride>,
+    state: State<'_, MistyRuntime>,
+    app: AppHandle,
+) -> ApiResult<ShortcutsSnapshot> {
+    publish(app, state.commands.replace(overrides).await?)
 }

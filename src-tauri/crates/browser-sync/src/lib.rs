@@ -1,15 +1,17 @@
 //! Native-only browser synchronization. Secret types deliberately cannot be
 //! serialized or formatted; the web renderer only receives projected UI state.
+pub mod collections;
 pub mod crypto;
 pub mod document;
 pub mod protocol;
 pub mod recovery;
+mod recovery_pending;
 pub mod restore;
 pub mod secure_store;
 pub mod store;
 pub mod transport;
-pub mod tree;
 pub mod worker;
+pub mod workspace;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -31,7 +33,7 @@ pub enum Error {
     Network,
     #[error("Sign in again to reconnect sync")]
     Authentication,
-    #[error("This device does not have permission to sync this workspace")]
+    #[error("This device does not have permission to sync this account")]
     DeviceForbidden,
     #[error("Sync requires a newer client or a vault recovery step")]
     Recovery,

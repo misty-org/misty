@@ -5,66 +5,6 @@ import { Button, IconButton } from "@/shared/ui";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";
-import { SpaceLibraryEmptyState, SpaceLibraryHeader } from "./SpaceLibraryChrome";
-
-export function SpaceLibraryTopChrome() {
-  const { data } = useSpaceLibraryContext();
-  const {
-    canUploadLibrary,
-    usage,
-    uploadJobs,
-    setUploadJobs,
-    searchInput,
-    setSearchInput,
-    setSearchFocused,
-    mediaType,
-    setMediaType,
-    sort,
-    setSort,
-    direction,
-    setDirection,
-    currentAlbum,
-    libraryViewMode,
-    setLibraryViewMode,
-    libraryItemScale,
-    setLibraryItemScale,
-    visibleItems,
-  } = data;
-  const { uploading } = uploadStatus(uploadJobs);
-  const uploadDisabled = (usage?.remaining_bytes ?? 1) <= 0;
-
-  return (
-    <>
-      <SpaceLibraryHeader
-        uploadAvailable={canUploadLibrary}
-        uploading={uploading}
-        uploadDisabled={uploadDisabled}
-        onUpload={() => data.setFilePickerOpen(true)}
-        uploadJobs={uploadJobs}
-        onClearUploads={() => setUploadJobs([])}
-        searchInput={searchInput}
-        onSearchInput={setSearchInput}
-        onSearchFocus={() => setSearchFocused(true)}
-        onSearchBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-        mediaType={mediaType}
-        onMediaType={(value) => setMediaType(value as typeof mediaType)}
-        sort={sort}
-        direction={direction}
-        onSort={(nextSort, nextDirection) => {
-          setSort(nextSort);
-          setDirection(nextDirection);
-        }}
-        albumOrderAvailable={Boolean(currentAlbum)}
-        viewMode={libraryViewMode}
-        onViewMode={setLibraryViewMode}
-        itemScale={libraryItemScale}
-        onItemScale={setLibraryItemScale}
-        visibleItemCount={visibleItems.length}
-      />
-      <SpaceLibraryInlineStatus />
-    </>
-  );
-}
 
 export function SpaceLibraryInlineStatus() {
   const { data, itemActions, collectionActions } = useSpaceLibraryContext();
@@ -119,27 +59,6 @@ export function SpaceLibraryInlineStatus() {
         />
       ) : null}
     </>
-  );
-}
-
-export function SpaceLibraryUploadEmptyState() {
-  const { data } = useSpaceLibraryContext();
-  const { uploadJobs, canUploadLibrary, usage } = data;
-  const { uploading } = uploadStatus(uploadJobs);
-
-  return (
-    <SpaceLibraryEmptyState
-      collection={data.collection}
-      searching={Boolean(data.searchQuery || data.mediaType)}
-      uploadAvailable={canUploadLibrary}
-      uploading={uploading}
-      uploadDisabled={(usage?.remaining_bytes ?? 1) <= 0}
-      onUpload={() => data.setFilePickerOpen(true)}
-      onClearSearch={() => {
-        data.setSearchInput("");
-        data.setMediaType("");
-      }}
-    />
   );
 }
 
@@ -298,23 +217,4 @@ function SpaceLibrarySelectionToolbar({
       </IconButton>
     </div>
   );
-}
-
-function uploadStatus(uploadJobs: ReturnType<typeof useSpaceLibraryContext>["data"]["uploadJobs"]) {
-  const uploading = uploadJobs.some((job) => !["ready", "failed"].includes(job.stage));
-  const failedUploads = uploadJobs.filter((job) => job.stage === "failed");
-  const uploadProgress =
-    uploadJobs.length > 0
-      ? Math.round(
-          (uploadJobs.reduce(
-            (total, job) =>
-              total + (job.stage === "ready" || job.stage === "failed" ? 1 : job.progress),
-            0,
-          ) /
-            uploadJobs.length) *
-            100,
-        )
-      : 0;
-
-  return { failedUploads, uploadProgress, uploading };
 }

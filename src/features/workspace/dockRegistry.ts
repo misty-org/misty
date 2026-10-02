@@ -1,10 +1,5 @@
 import type { DockWidgetDescriptor, WorkspaceSurfaceId } from "./model";
-import {
-  createBrowserTabState,
-  createCodeTabState,
-  parseBrowserTabState,
-  parseCodeTabState,
-} from "./model";
+import { createBrowserViewState, parseBrowserViewState } from "./model";
 
 const identityState = {
   create: () => ({}),
@@ -14,27 +9,16 @@ const identityState = {
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   home: descriptor("home", "singleton", "suspend", 360, 240),
-  inbox: descriptor("inbox", "singleton", "suspend", 520, 280),
   space: descriptor("space", "per-space", "suspend", 360, 240),
   browser: {
     ...descriptor("browser", "multiple", "keep-alive", 360, 240),
-    create: createBrowserTabState,
-    serialize: parseBrowserTabState,
-    restore: parseBrowserTabState,
-  },
-  terminal: descriptor("terminal", "multiple", "keep-alive", 320, 180),
-  code: {
-    ...descriptor("code", "multiple", "keep-alive", 480, 280),
-    create: createCodeTabState,
-    serialize: parseCodeTabState,
-    restore: parseCodeTabState,
+    create: createBrowserViewState,
+    serialize: parseBrowserViewState,
+    restore: parseBrowserViewState,
   },
   files: descriptor("files", "multiple", "suspend", 360, 240),
   scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
-  "official-app": descriptor("official-app", "multiple", "keep-alive", 420, 280),
-  extension: descriptor("extension", "multiple", "keep-alive", 420, 280),
-  marketplace: descriptor("marketplace", "singleton", "suspend", 360, 240),
 };
 
 function descriptor(

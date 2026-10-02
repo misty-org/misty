@@ -4,14 +4,8 @@ vi.mock("./nativeNotifications", () => ({
   publishNativeActivity: native.publish,
   syncNativeBadge: native.badge,
 }));
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({ loadInbox: async () => {}, markInboxSeen: async () => {} }),
-  },
-}));
 import { useActivityStore } from "./useActivityStore";
 import { reportSystemError } from "./systemActivity";
-import { activityItemFromSpaceInbox } from "./activityModel";
 import type { ActivityItem } from "./types";
 const store = () => useActivityStore.getState();
 const mention = (id = "mention"): ActivityItem => ({
@@ -142,16 +136,13 @@ describe("Activity lifecycle", () => {
     store().clearDeviceHistory();
     expect(store().attentionCount).toBe(1);
   });
-  it("isolates accounts and deployments including local read and mute preferences", () => {
+  it("isolates accounts including local read and mute preferences", () => {
+    store().setAccount("one");
     store().ingestLocal({ id: "job", kind: "completion", title: "Finished" });
     store().setSourceMuted("app:files", true);
-    localStorage.setItem("misty:deployment-scope", "another");
-    store().setAccount("one");
-    expect(store().allItems).toEqual([]);
-    expect(store().hasUnseenHistory).toBe(false);
     store().setAccount("two");
     expect(store().allItems).toEqual([]);
-    localStorage.removeItem("misty:deployment-scope");
+    expect(store().hasUnseenHistory).toBe(false);
     store().setAccount("one");
     expect(store().attentionCount).toBe(1);
   });
@@ -221,16 +212,5 @@ describe("Activity lifecycle", () => {
     store().setAccount("one");
     store().ingestLocal({ id: "later-job", kind: "completion", title: "New result" });
     expect(store().allItems).toHaveLength(2);
-  });
-  it("does not treat words in a conversation as operation status", () => {
-    const item = activityItemFromSpaceInbox("one", {
-      id: 1,
-      kind: "unread",
-      space_id: "space",
-      space_name: "Space",
-      created_at: "2026-09-09T12:00:00Z",
-      payload: { preview: "I fixed the error that blocked us" },
-    } as Parameters<typeof activityItemFromSpaceInbox>[1]);
-    expect(item.kind).toBe("message");
   });
 });

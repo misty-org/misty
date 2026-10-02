@@ -1,12 +1,14 @@
 #![allow(unexpected_cfgs)]
 use super::*;
-use objc::{msg_send, sel, sel_impl};
 use objc::runtime::{Class, Object, Sel, BOOL, YES};
+use objc::{msg_send, sel, sel_impl};
 use std::sync::OnceLock;
 
 type Target = (AppHandle, String);
 static TARGETS: OnceLock<Mutex<HashMap<usize, Target>>> = OnceLock::new();
-fn targets() -> &'static Mutex<HashMap<usize, Target>> { TARGETS.get_or_init(Mutex::default) }
+fn targets() -> &'static Mutex<HashMap<usize, Target>> {
+    TARGETS.get_or_init(Mutex::default)
+}
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,10 +26,16 @@ struct PointerPosition {
 }
 
 fn pointer_message(raw: &str) -> Option<PointerMessage> {
-    if raw.len() > 1024 { return None; }
+    if raw.len() > 1024 {
+        return None;
+    }
     let message: PointerMessage = serde_json::from_str(raw).ok()?;
     let p = &message.pointer;
-    if !p.x.is_finite() || !p.y.is_finite() || !(0.0..=100_000.0).contains(&p.x) || !(0.0..=100_000.0).contains(&p.y) {
+    if !p.x.is_finite()
+        || !p.y.is_finite()
+        || !(0.0..=100_000.0).contains(&p.x)
+        || !(0.0..=100_000.0).contains(&p.y)
+    {
         return None;
     }
     Some(message)
@@ -39,7 +47,9 @@ struct BackgroundMessage {
     background: String,
 }
 fn background_message(raw: &str) -> Option<BackgroundMessage> {
-    if raw.len() > 1024 { return None; }
+    if raw.len() > 1024 {
+        return None;
+    }
     let message: BackgroundMessage = serde_json::from_str(raw).ok()?;
     let color = message.background.as_bytes();
     if color.len() != 7 || color[0] != b'#' || !color[1..].iter().all(u8::is_ascii_hexdigit) {
@@ -49,38 +59,83 @@ fn background_message(raw: &str) -> Option<BackgroundMessage> {
 }
 
 pub(super) fn forget(id: &str) {
-    if let Ok(mut values) = targets().lock() { values.retain(|_, (_, target)| target != id); }
+    if let Ok(mut values) = targets().lock() {
+        values.retain(|_, (_, target)| target != id);
+    }
 }
 extern "C" fn receive(this: &Object, _: Sel, _: *mut Object, message: *mut Object) {
-    let target = targets().lock().ok().and_then(|values| values.get(&(this as *const _ as usize)).cloned());
-    let Some((app, id)) = target else { return; };
+    let target = targets()
+        .lock()
+        .ok()
+        .and_then(|values| values.get(&(this as *const _ as usize)).cloned());
+    let Some((app, id)) = target else {
+        return;
+    };
     unsafe {
         let body: *mut Object = msg_send![message, body];
-        if body.is_null() { return; }
+        if body.is_null() {
+            return;
+        }
         let is_string: BOOL = msg_send![body, isKindOfClass: Class::get("NSString").unwrap()];
-        if is_string != YES { return; }
+        if is_string != YES {
+            return;
+        }
         let raw: *const std::os::raw::c_char = msg_send![body, UTF8String];
-        if raw.is_null() { return; }
-        let Ok(token) = std::ffi::CStr::from_ptr(raw).to_str() else { return; };
+        if raw.is_null() {
+            return;
+        }
+        let Ok(token) = std::ffi::CStr::from_ptr(raw).to_str() else {
+            return;
+        };
         if let Some(background) = background_message(token) {
             let frame: *mut Object = msg_send![message, frameInfo];
             let main_frame: BOOL = msg_send![frame, isMainFrame];
-            if main_frame != YES || !super::shortcut_token_matches(&app.state::<BrowserSessionState>(), &id, &background.token) { return; }
-            let _ = app.emit_to(super::browser_owner_label(&app, &id), "misty://browser-background", json!({ "id": id, "color": background.background }));
+            if main_frame != YES
+                || !super::shortcut_token_matches(
+                    &app.state::<BrowserSessionState>(),
+                    &id,
+                    &background.token,
+                )
+            {
+                return;
+            }
+            let _ = app.emit_to(
+                super::browser_owner_label(&app, &id),
+                "misty://browser-background",
+                json!({ "id": id, "color": background.background }),
+            );
             return;
         }
         // Companion tracking shares the authenticated native channel with focus.
         // URL-based telemetry cancels WebKit loads while the user moves the mouse.
         if let Some(message) = pointer_message(token) {
-            if !super::shortcut_token_matches(&app.state::<BrowserSessionState>(), &id, &message.token) { return; }
-            super::emit_browser_pointer(&app, &id, super::super::browser_scripts::BrowserPointerNavigation {
-                x: message.pointer.x, y: message.pointer.y, inside: message.pointer.inside,
-            });
+            if !super::shortcut_token_matches(
+                &app.state::<BrowserSessionState>(),
+                &id,
+                &message.token,
+            ) {
+                return;
+            }
+            super::emit_browser_pointer(
+                &app,
+                &id,
+                super::super::browser_scripts::BrowserPointerNavigation {
+                    x: message.pointer.x,
+                    y: message.pointer.y,
+                    inside: message.pointer.inside,
+                },
+            );
             return;
         }
-        if !super::shortcut_token_matches(&app.state::<BrowserSessionState>(), &id, token) { return; }
+        if !super::shortcut_token_matches(&app.state::<BrowserSessionState>(), &id, token) {
+            return;
+        }
     }
-    let _ = app.emit_to(super::browser_owner_label(&app,&id), "misty://browser-focus", BrowserFocusEvent { id });
+    let _ = app.emit_to(
+        super::browser_owner_label(&app, &id),
+        "misty://browser-focus",
+        BrowserFocusEvent { id },
+    );
 }
 
 #[cfg(test)]
@@ -103,8 +158,13 @@ mod tests {
 
     #[test]
     fn native_pointer_messages_require_bounded_coordinates_and_a_token() {
-        assert!(pointer_message(r#"{"token":"test","pointer":{"x":12.5,"y":40,"inside":true}}"#).is_some());
-        assert!(pointer_message(r#"{"token":"test","pointer":{"x":0,"y":0,"inside":false}}"#).is_some());
+        assert!(
+            pointer_message(r#"{"token":"test","pointer":{"x":12.5,"y":40,"inside":true}}"#)
+                .is_some()
+        );
+        assert!(
+            pointer_message(r#"{"token":"test","pointer":{"x":0,"y":0,"inside":false}}"#).is_some()
+        );
         for raw in [
             r#"{"pointer":{"x":0,"y":0,"inside":true}}"#,
             r#"{"token":"test","pointer":{"x":-1,"y":0,"inside":true}}"#,

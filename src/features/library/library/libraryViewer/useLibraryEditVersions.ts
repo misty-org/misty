@@ -1,10 +1,10 @@
+import { subscribeAccountEvents } from "@/api/accountEvents";
+import { useAuth } from "@/features/auth";
 import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { defaultLibraryEdit, normalizeLibraryEdit } from "../SpaceLibraryViewerUtils";
-
-const RENDITION_POLL_MS = 1500;
 
 export interface LibraryEditVersionsState {
   editVersions: LibraryEditVersion[];
@@ -16,10 +16,10 @@ export interface LibraryEditVersionsState {
 }
 
 /**
- * Loads the item's edit history and polls while a rendition is being produced.
- *
- * Renditions are produced server-side, so the only way to learn one finished is
- * to re-read the version list. Polling stops as soon as nothing is in flight.
+ * Loads the item's edit history and re-reads it while a rendition is being
+ * produced. The server reports each rendition outcome to the edit's author
+ * ("library-renditions" account event); the Space's Library events cover other
+ * members. Nothing is re-read once no rendition is in flight.
  */
 export function useLibraryEditVersions(options: {
   spaceId: string;
@@ -29,6 +29,7 @@ export function useLibraryEditVersions(options: {
   onRenditionReady: () => void;
 }): LibraryEditVersionsState {
   const { spaceId, item, reauthenticationToken, editable, onRenditionReady } = options;
+  const accountId = useAuth().user?.id ?? "";
   const [editVersions, setEditVersions] = useState<LibraryEditVersion[]>([]);
   const [editingAvailable, setEditingAvailable] = useState(false);
   const [editDraft, setEditDraft] = useState<LibraryEditDefinition>(() => defaultLibraryEdit());
@@ -62,10 +63,16 @@ export function useLibraryEditVersions(options: {
     };
   }, [editable, item, reauthenticationToken, spaceId]);
 
+  const pending = editVersions.some(
+    (version) => version.rendition_state === "queued" || version.rendition_state === "processing",
+  );
+  // Read inside event handlers without re-subscribing on every version list.
+  const latestVersions = useRef(editVersions);
   useEffect(() => {
-    const pending = editVersions.some(
-      (version) => version.rendition_state === "queued" || version.rendition_state === "processing",
-    );
+    latestVersions.current = editVersions;
+  }, [editVersions]);
+
+  useEffect(() => {
     if (!item || !pending) return;
     let current = true;
     const refresh = () =>
@@ -73,10 +80,11 @@ export function useLibraryEditVersions(options: {
         .editVersions(spaceId, item.id, reauthenticationToken)
         .then((result) => {
           if (!current) return;
+          const previousVersions = latestVersions.current;
           const newlyReady = result.versions.some(
             (version) =>
               version.rendition_state === "ready" &&
-              editVersions.some(
+              previousVersions.some(
                 (previous) => previous.id === version.id && previous.rendition_state !== "ready",
               ),
           );
@@ -84,12 +92,21 @@ export function useLibraryEditVersions(options: {
           if (newlyReady) onRenditionReady();
         })
         .catch(() => undefined);
-    const timer = window.setInterval(refresh, RENDITION_POLL_MS);
+    const stopEvents = subscribeAccountEvents(accountId, (event) => {
+      if (event.topic === "library-renditions" || event.topic === "reset") refresh();
+    });
+    const onLibraryEvent = (event: Event) => {
+      if ((event as CustomEvent<{ space_id?: string }>).detail?.space_id === spaceId) refresh();
+    };
+    window.addEventListener("misty:space-library-event", onLibraryEvent);
+    // A rendition can finish between the version read and this subscription.
+    refresh();
     return () => {
       current = false;
-      window.clearInterval(timer);
+      stopEvents();
+      window.removeEventListener("misty:space-library-event", onLibraryEvent);
     };
-  }, [editVersions, item, onRenditionReady, reauthenticationToken, spaceId]);
+  }, [accountId, item, onRenditionReady, pending, reauthenticationToken, spaceId]);
 
   return {
     editVersions,

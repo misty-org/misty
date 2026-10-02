@@ -1,4 +1,4 @@
-import type { WorkspaceTab } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/workspace";
 
 export function seedNavigatorApps() {}
 
@@ -15,26 +15,26 @@ export const spaceFixture = {
   updated_at: "2026-08-17T00:00:00Z",
 };
 
-export const spaceTab: WorkspaceTab = {
+export const spaceTab: WorkspaceView = {
   id: "tab-1",
-  surfaceId: "official-app",
-  groupKey: "app:journal",
+  surfaceId: "space",
+  groupKey: "space:space-1:journal",
   instanceKey: "journal",
   title: "Journal",
-  route: "/apps/journal?space=space-1&view=notes",
+  route: "/spaces/space-1/notes",
   sidebarVisible: true,
   state: {},
   createdAt: 1,
   lastFocusedAt: 1,
 };
 
-export const browserTab: WorkspaceTab = {
+export const browserTab: WorkspaceView = {
   id: "browser-tab",
-  surfaceId: "official-app",
-  groupKey: "app:browser",
+  surfaceId: "browser",
+  groupKey: "tool:browser",
   instanceKey: "browser",
   title: "Browser",
-  route: "/apps/browser",
+  route: "/browser",
   sidebarVisible: true,
   state: { version: 1, url: "https://www.google.com", faviconUrl: null },
   createdAt: 2,

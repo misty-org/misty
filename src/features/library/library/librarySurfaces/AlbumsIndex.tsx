@@ -1,8 +1,7 @@
-import { Button } from "@/shared/ui";
-import { Folder, Pencil, Plus, Trash2 } from "lucide-react";
+import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
+import { Button, CollectionItems } from "@/shared/ui";
+import { Folder, Pencil, Trash2 } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
-import { AlbumCover } from "../SpaceLibraryPrimitives";
-import { collectionCardClassName } from "../components/SpaceLibraryCollections";
 import { LibraryNothingHere } from "./LibraryNothingHere";
 
 /** The album browser: folders and albums for the current folder level. */
@@ -10,8 +9,13 @@ export function AlbumsIndex() {
   const { data, collectionActions } = useSpaceLibraryContext();
   const { collection, selectedCollectionId, canEditLibrary, spaceId } = data;
   const { currentAlbumFolder, visibleAlbumFolders, visibleAlbumsForFolder } = data;
+  const creator = useSpaceItemCreator(spaceId);
   if (collection !== "albums" || selectedCollectionId) return null;
 
+  const matches = (name: string) =>
+    name.toLocaleLowerCase().includes(data.searchInput.trim().toLocaleLowerCase());
+  const folders = visibleAlbumFolders.filter((folder) => matches(folder.name));
+  const albums = visibleAlbumsForFolder.filter((album) => matches(album.name));
   return (
     <div className="mb-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -63,55 +67,47 @@ export function AlbumsIndex() {
               <Folder size={13} />
               New folder
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              onClick={collectionActions.openCreateAlbum}
-            >
-              <Plus size={13} />
-              New album
-            </Button>
           </div>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        {visibleAlbumFolders.map((folder) => (
-          <Button
-            className={`${collectionCardClassName} p-4`}
-            type="button"
-            key={folder.id}
-            onClick={() => data.setSelectedAlbumFolderId(folder.id)}
-          >
-            <Folder className="size-[26px]" />
-            <span className="mt-5 block truncate text-xs font-medium">{folder.name}</span>
-            <span className="mt-1 block text-[10px] text-cream-muted">
-              {folder.album_count + folder.folder_count} items
-            </span>
-          </Button>
-        ))}
-        {visibleAlbumsForFolder.map((album) => (
-          <Button
-            className={collectionCardClassName}
-            type="button"
-            key={album.id}
-            onClick={() => collectionActions.selectCollection("albums", album.id)}
-          >
-            <AlbumCover spaceId={spaceId} itemId={album.cover_item_id} />
-            <span className="block p-3">
-              <span className="block truncate text-xs font-medium">{album.name}</span>
-              <span className="mt-1 block text-[10px] text-cream-muted">
-                {album.item_count} items
-              </span>
-            </span>
-          </Button>
-        ))}
-      </div>
+      <CollectionItems
+        columnSetId="albums"
+        fields={["Items", "Created"]}
+        view={data.libraryViewMode}
+        categoryLabel="Type"
+        items={[
+          ...folders.map((folder) => ({
+            id: folder.id,
+            title: folder.name,
+            icon: <Folder />,
+            category: "Folder",
+            creator: creator(folder.created_by_user_id),
+            metadata: { Created: new Date(folder.created_at).toLocaleDateString() },
+            sortValues: { Created: Date.parse(folder.created_at) },
+            updatedAt: folder.updated_at,
+            updated: new Date(folder.updated_at).toLocaleDateString(),
+            onOpen: () => data.setSelectedAlbumFolderId(folder.id),
+          })),
+          ...albums.map((album) => ({
+            id: album.id,
+            title: album.name,
+            icon: <Folder />,
+            category: "Album",
+            metadata: {
+              Items: album.item_count,
+              Created: new Date(album.created_at).toLocaleDateString(),
+            },
+            sortValues: { Created: Date.parse(album.created_at) },
+            creator: creator(album.created_by_user_id),
+            updatedAt: album.updated_at,
+            updated: new Date(album.updated_at).toLocaleDateString(),
+            onOpen: () => collectionActions.selectCollection("albums", album.id),
+          })),
+        ]}
+      />
 
-      {visibleAlbumFolders.length === 0 && visibleAlbumsForFolder.length === 0 ? (
-        <LibraryNothingHere />
-      ) : null}
+      {folders.length === 0 && albums.length === 0 ? <LibraryNothingHere /> : null}
     </div>
   );
 }

@@ -36,7 +36,10 @@ vi.mock("@/features/auth", () => ({
   accountScopeResetEvent: "misty:account-scope-reset",
   useAuth: () => ({ user: { id: "user-1", name: "Matthew Chen", email: "matt@example.com" } }),
 }));
-vi.mock("@/features/activity", () => ({ SystemErrorActivity: () => null }));
+vi.mock("@/features/activity", () => ({
+  reportSystemError: vi.fn(),
+  SystemErrorActivity: () => null,
+}));
 vi.mock("@/features/ai-surface/AiPaneHost", () => ({ useAiSurfaceAdapter: vi.fn() }));
 vi.mock("@/features/journal", () => ({
   JournalAttribution: () => null,
@@ -46,7 +49,7 @@ vi.mock("@/features/spaces", () => ({
   useSpacesStore: (selector: (state: unknown) => unknown) =>
     selector({ membersBySpace: { "space-1": [] } }),
 }));
-vi.mock("@/features/workspace", () => ({ useWorkspaceTabTitle: vi.fn() }));
+vi.mock("@/features/workspace", () => ({ useWorkspaceViewTitle: vi.fn() }));
 vi.mock("./hooks/useSpaceDrawings", () => ({
   useSpaceDrawings: () => ({
     drawings,
@@ -82,7 +85,7 @@ describe("SpaceDrawings list layout", () => {
     container.remove();
   });
 
-  it("puts creation and search in My Drawings, then removes section headers while searching", async () => {
+  it("searches the full-width Journal drawing list", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/drawings"]}>
@@ -91,14 +94,10 @@ describe("SpaceDrawings list layout", () => {
       );
     });
 
-    expect(container.querySelector("h1")?.textContent).toBe("My Drawings");
+    expect(container.querySelector("h1")?.textContent).toBe("Journal");
     expect(container.querySelector("h1")?.closest(".rounded-2xl")).toBeNull();
-    expect(container.querySelector('section[aria-label="Pinned"]')?.textContent).toContain(
-      "Pinned sketch",
-    );
-    expect(container.querySelector('section[aria-label="Recently edited"]')?.textContent).toContain(
-      "Recent sketch",
-    );
+    expect(container.textContent).toContain("Pinned sketch");
+    expect(container.textContent).toContain("Recent sketch");
 
     const search = container.querySelector<HTMLInputElement>('input[aria-label="Search drawings"]');
     await act(async () => {

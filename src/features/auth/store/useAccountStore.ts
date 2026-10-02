@@ -1,12 +1,6 @@
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
-import type {
-  AccountAuthUser,
-  AccountHandoffPath,
-  AccountMeResponse,
-  LoginResponse,
-} from "@/api/account/types";
-import { fetchCurrentInstanceDescriptor, resolveDeploymentTarget } from "@/api/deployment/api";
+import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
 import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
 import { analytics } from "@/telemetry/client";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
@@ -24,7 +18,13 @@ configureAccountApi({ readAnalyticsEnabled: () => analytics.isAnalyticsEnabled()
 function authenticatedUser(data: LoginResponse, operation: string): AccountAuthUser {
   const id = data.user_id ?? data.id;
   if (!id) throw new AccountApiError(`${operation} response did not include a user id.`);
-  return { id, name: data.name, username: data.username, email: data.email };
+  return {
+    id,
+    name: data.name,
+    username: data.username,
+    email: data.email,
+    provider: data.provider,
+  };
 }
 
 async function persistLogin(data: LoginResponse, operation: string): Promise<AccountAuthUser> {
@@ -36,6 +36,44 @@ async function persistLogin(data: LoginResponse, operation: string): Promise<Acc
 
 export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {
   return persistLogin(await accountApi.signIn(email, password), "Sign-in");
+}
+
+export async function accountGoogleSignIn(
+  launch: (url: string) => Promise<void>,
+  signal: AbortSignal,
+): Promise<AccountAuthUser> {
+  const result = await googleFlow(launch, signal, false);
+  if ("reauthentication_token" in result) throw new Error("Unexpected Google sign-in response.");
+  return persistLogin(result, "Google sign-in");
+}
+
+export async function accountGoogleReauthenticate(
+  launch: (url: string) => Promise<void>,
+  signal: AbortSignal,
+): Promise<string> {
+  const result = await googleFlow(launch, signal, true);
+  if (!("reauthentication_token" in result))
+    throw new Error("Unexpected Google reauthentication response.");
+  return result.reauthentication_token;
+}
+
+async function googleFlow(
+  launch: (url: string) => Promise<void>,
+  signal: AbortSignal,
+  reauthenticate: boolean,
+): Promise<LoginResponse | { reauthentication_token: string }> {
+  const flow = await accountApi.beginGoogle(reauthenticate, signal);
+  signal.throwIfAborted();
+  await launch(flow.url);
+  const deadline = Date.now() + Math.min(flow.expires_in, 600) * 1000;
+  while (Date.now() < deadline) {
+    signal.throwIfAborted();
+    const result = await accountApi.completeGoogle(flow.flow_token, signal);
+    signal.throwIfAborted();
+    if (!("status" in result)) return result;
+    await new Promise<void>((resolve) => setTimeout(resolve, 2500));
+  }
+  throw new Error("Google sign-in expired. Please try again.");
 }
 
 /** Ends the account's server session and forgets its saved cookies, so the
@@ -58,30 +96,13 @@ export async function accountRegister(
   username: string,
   email: string,
   password: string,
-  selfHostToken?: string,
 ): Promise<AccountAuthUser> {
-  let path: "/register" | "/self-host/bootstrap" | "/self-host/enroll" = "/register";
-  const body: Record<string, string> = { name, username, email, password };
-  if ((await resolveDeploymentTarget()).mode === "self_hosted") {
-    const descriptor = await fetchCurrentInstanceDescriptor();
-    if (!selfHostToken?.trim()) throw new Error("An enrollment token is required.");
-    if (descriptor.bootstrap_required) {
-      path = "/self-host/bootstrap";
-      body.bootstrap_token = selfHostToken.trim();
-    } else {
-      path = "/self-host/enroll";
-      body.invitation = selfHostToken.trim();
-    }
-  }
-  return persistLogin(await accountApi.register(path, body), "Registration");
+  const body = { name, username, email, password };
+  return persistLogin(await accountApi.register(body), "Registration");
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {
   return accountApi.me();
-}
-
-export function accountCreateHandoffUrl(path?: AccountHandoffPath): Promise<{ url: string }> {
-  return accountApi.handoff(path);
 }
 
 export function accountFetchAvatar(): Promise<Blob> {
@@ -93,10 +114,6 @@ export function accountUpdateTelemetryPreferences(
   errorReportingEnabled: boolean,
 ): Promise<void> {
   return accountApi.updateTelemetry(analyticsEnabled, errorReportingEnabled);
-}
-
-export function resolveAccountApiBase(): Promise<string> {
-  return accountApi.resolveBase();
 }
 
 configureTelemetryPreferencesSync(accountUpdateTelemetryPreferences);

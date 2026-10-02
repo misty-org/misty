@@ -20,12 +20,14 @@ export function NewCalendarEventDialog({
   open,
   anchor,
   busy,
+  error,
   onOpenChange,
   onCreate,
 }: {
   open: boolean;
   anchor: Date;
   busy: boolean;
+  error?: string;
   onOpenChange: (open: boolean) => void;
   onCreate: (input: CalendarEventInput) => void;
 }) {
@@ -118,6 +120,11 @@ export function NewCalendarEventDialog({
             />
           </label>
         </div>
+        {error && (
+          <p role="alert" className="text-sm text-cream-muted">
+            {error}
+          </p>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel

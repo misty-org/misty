@@ -1,4 +1,3 @@
-import { InstallerCard } from "@/features/installer";
 import { DesktopUpdaterSettings } from "@/features/updater";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -23,20 +22,6 @@ export function UpdatesSection(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("general", "auto_update_enabled", value)}
           />
         </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Runtime">
-        <div className="bg-charcoal-card">
-          <InstallerCard
-            embedded
-            variant="compact"
-            className={
-              "[&_button:disabled]:border-charcoal-border/80 " +
-              "[&_button:disabled]:bg-charcoal-bg [&_button:disabled]:text-cream-muted " +
-              "[&_button:disabled]:opacity-100 [&_button:disabled]:shadow-none"
-            }
-          />
-        </div>
       </SettingsSectionBlock>
     </>
   );

@@ -4,6 +4,7 @@ import {
   isApiSessionTransitioning,
   readApiAuthToken,
   readApiSessionGeneration,
+  notifyApiSessionInvalid,
 } from "@/api/client/session";
 import { resolveApiBase } from "@/api/deployment/api";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
@@ -57,6 +58,12 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
   if (!response.ok) {
     const text = await response.text();
     assertStableManagedAiAccount(accountGeneration);
+    if (
+      response.status === 401 &&
+      !headers.has("Authorization") &&
+      (init?.credentials ?? apiRequestCredentials()) !== "omit"
+    )
+      notifyApiSessionInvalid();
     const payload = parseManagedAiError(text);
     if (payload?.code === "hosted_ai_limit_reached") {
       const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "Monday";

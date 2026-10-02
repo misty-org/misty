@@ -1,3 +1,5 @@
+import { httpOutageRemainingMs } from "@/api/client/http";
+import { coalescedReload, resetCoalescedReloads } from "./coalescedReload";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
 import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/store/useSpaceMessageSpansStore";
@@ -18,6 +20,10 @@ let realtimeOpenTimer: number | null = null;
 let realtimeConnectPromise: Promise<void> | null = null;
 let realtimeTicketCooldownUntil = 0;
 let reconnectAttempt = 0;
+// Backoff resets only after a connection proves stable, so a socket that
+// opens and immediately drops keeps backing off instead of retrying at 2s.
+const stableConnectionMs = 30_000;
+let realtimeOpenedAt = 0;
 let realtimeWanted = false;
 let realtimeAccountId = "";
 let realtimeGeneration = 0;
@@ -90,7 +96,7 @@ export function createSpacesRealtimeActions(
               return;
             }
             clearRealtimeOpenTimer();
-            reconnectAttempt = 0;
+            realtimeOpenedAt = Date.now();
             set((state) => ({
               realtimeConnected: true,
               error: state.snapshotReady ? null : state.error,
@@ -112,8 +118,7 @@ export function createSpacesRealtimeActions(
               if (envelope.type === "replay") {
                 for (const event of envelope.events)
                   applyRealtimeEventSafely(event, accountId, get, set);
-                if (envelope.resync_required)
-                  void Promise.all([get().load({ force: true }), get().loadInbox()]);
+                if (envelope.resync_required) void resyncSpaces(get);
               } else if (envelope.type === "event") {
                 applyRealtimeEventSafely(envelope.event, accountId, get, set);
               } else if (envelope.type === "presence") {
@@ -124,7 +129,7 @@ export function createSpacesRealtimeActions(
                   },
                 }));
               } else {
-                void Promise.all([get().load({ force: true }), get().loadInbox()]);
+                void resyncSpaces(get);
               }
             } catch {
               /* malformed server frames are ignored and recovered on reconnect */
@@ -139,6 +144,9 @@ export function createSpacesRealtimeActions(
               return;
             clearRealtimeOpenTimer();
             realtimeSocket = null;
+            if (realtimeOpenedAt && Date.now() - realtimeOpenedAt >= stableConnectionMs)
+              reconnectAttempt = 0;
+            realtimeOpenedAt = 0;
             set({ realtimeConnected: false });
             scheduleReconnect(get, accountId, generation);
           };
@@ -182,8 +190,13 @@ export function createSpacesRealtimeActions(
   };
 }
 
+function resyncSpaces(get: () => SpacesStore) {
+  return coalescedReload("spaces", () => get().load({ force: true }));
+}
+
 export function resetSpacesRealtimeRuntime(): void {
   stopRealtimeConnection();
+  resetCoalescedReloads();
   reconnectAttempt = 0;
   realtimeConnectPromise = null;
   realtimeTicketCooldownUntil = 0;
@@ -214,8 +227,8 @@ export async function applyRealtimeEvent(
         detail: { spaceId: event.space_id, conversationId, event },
       }),
     );
-    if (conversationId) await get().loadInbox();
-    else if (includedMessage) {
+    // Conversation threads load their own messages from the window event.
+    if (!conversationId && includedMessage)
       set((state) => ({
         messagesBySpace: {
           ...state.messagesBySpace,
@@ -224,22 +237,22 @@ export async function applyRealtimeEvent(
           ]),
         },
       }));
-      await get().loadInbox();
-    } else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
+    else if (!conversationId)
+      await coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id));
   } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)
-    await get().loadNodes(event.space_id);
+    await coalescedReload(`nodes:${event.space_id}`, () => get().loadNodes(event.space_id));
   else if (
     event.type.startsWith("member.") ||
     event.type.startsWith("owner.") ||
     event.type.startsWith("space.")
   ) {
-    await get().load({ force: true });
+    await coalescedReload("spaces", () => get().load({ force: true }));
     if (accountId !== realtimeAccountId || generation !== readAccountGeneration()) return;
     if (!get().spaces.some((space) => space.id === event.space_id)) return;
     try {
-      await get().loadMembers(event.space_id);
+      await coalescedReload(`members:${event.space_id}`, () => get().loadMembers(event.space_id));
     } catch (error) {
       if (!accessErrors.isInaccessibleSpaceError(error)) throw error;
     }
@@ -281,7 +294,11 @@ export function scheduleReconnect(get: () => SpacesStore, accountId: string, gen
     reconnectTimer != null
   )
     return;
-  const delay = Math.min(60_000, 2_000 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 750);
+  // Never reconnect sooner than the client's shared outage cooldown.
+  const delay = Math.max(
+    httpOutageRemainingMs(),
+    Math.min(60_000, 2_000 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 750),
+  );
   reconnectAttempt += 1;
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null;

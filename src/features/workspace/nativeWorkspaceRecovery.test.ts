@@ -137,7 +137,7 @@ it("migrates the owned latest global layout, archives account/legacy copies, the
   const h = await context();
   const browserWrite = vi.spyOn(localStorage, "setItem");
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Latest");
+  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Latest");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "a",
     ready: true,
@@ -162,13 +162,13 @@ it("preserves browser originals on failed native writes and can retry without re
   expect(localStorage.getItem("misty:workspace-account:a")).toBe(raw);
   expect(h.useWorkspaceRecoveryState.getState().ready).toBe(false);
   expect(h.useWorkspaceRecoveryState.getState().usable).toBe(true);
-  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Recover me");
-  const tab = h.workspace.getState().openBrowserTab({
+  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
+  const tab = h.workspace.getState().openBrowserView({
     url: "https://new.example",
   });
   native.fail = false;
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().websiteGroups[0].fields.label).toBe("Recover me");
+  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
   expect(localStorage.getItem("misty:workspace-account:a")).toBeNull();
   expect(JSON.stringify(h.workspace.getState().layout)).toContain(tab.id);
   expect(h.pendingRecoveredWorkspace("a")).toBeDefined();
@@ -176,7 +176,7 @@ it("preserves browser originals on failed native writes and can retry without re
 it("keeps temporary tabs selected while restoring old windows after an unreadable store recovers", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  const saved = h.workspace.getState().openBrowserTab({
+  const saved = h.workspace.getState().openBrowserView({
     url: "https://saved.example",
   });
   await h.flushNativeWorkspace("a");
@@ -187,23 +187,23 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
     usable: true,
     ready: false,
   });
-  const added = h.workspace.getState().openBrowserTab({
+  const added = h.workspace.getState().openBrowserView({
     url: "https://temporary.example",
   });
-  const active = h.workspace.getState().activeVirtualWindowId;
+  const active = h.workspace.getState().activeWindowId;
   await expect(h.flushNativeWorkspace("a")).rejects.toThrow("unsaved changes");
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().activeVirtualWindowId).toBe(active);
+  expect(h.workspace.getState().activeWindowId).toBe(active);
   native.failRead = false;
   await h.restoreNativeWorkspace("a");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     ready: true,
     issue: null,
   });
-  const windows = JSON.stringify(h.workspace.getState().virtualWindowsByScope);
+  const windows = JSON.stringify(h.workspace.getState().windowsByScope);
   expect(windows).toContain(saved.id);
   expect(windows).toContain(added.id);
-  expect(h.workspace.getState().activeVirtualWindowId).toBe(active);
+  expect(h.workspace.getState().activeWindowId).toBe(active);
   const persisted = native.values.get("a:workspace")!.value;
   expect(JSON.parse(persisted).syncBaseline).toBeDefined();
   h.closeNativeWorkspaceRecovery();
@@ -215,7 +215,7 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
 it("does not expose a previous account when recovery fails for the next account", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  h.workspace.getState().openBrowserTab({
+  h.workspace.getState().openBrowserView({
     url: "https://private.example",
   });
   await h.flushNativeWorkspace("a");
@@ -223,9 +223,7 @@ it("does not expose a previous account when recovery fails for the next account"
   native.generation++;
   native.failRead = true;
   await h.restoreNativeWorkspace("b");
-  expect(JSON.stringify(h.workspace.getState().virtualWindowsByScope)).not.toContain(
-    "private.example",
-  );
+  expect(JSON.stringify(h.workspace.getState().windowsByScope)).not.toContain("private.example");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "b",
     usable: true,
@@ -253,7 +251,7 @@ it("does not import an unowned global layout into a newly signed-in account", as
   expect(
     h.workspace
       .getState()
-      .websiteGroups.some((group) => group.fields.label === "Private old layout"),
+      .bookmarkFolders.some((group) => group.fields.label === "Private old layout"),
   ).toBe(false);
   expect(localStorage.getItem("misty:desktop-dock:space-apps-v1")).toBe(raw);
 });
@@ -288,7 +286,7 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
   native.invoke.mockClear();
   for (let i = 0; i < 50; i++)
     h.workspace.setState({
-      selectedWebsiteByGroup: {
+      selectedBookmarkByFolder: {
         saved: `site-${i}`,
       },
     });
@@ -299,7 +297,7 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
   native.invoke.mockClear();
   for (let i = 0; i < 10; i++) {
     h.workspace.setState({
-      selectedWebsiteByGroup: {
+      selectedBookmarkByFolder: {
         saved: `later-${i}`,
       },
     });
@@ -312,4 +310,64 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
   expect(
     native.invoke.mock.calls.filter(([command]) => command === "browser_recovery_write"),
   ).toHaveLength(1);
+});
+
+it("restores what it can from an unreadable save and lists the rest, keeping the original", async () => {
+  native.values.set("a:workspace", { revision: 1, value: "{not a workspace" });
+  const h = await context();
+  await h.restoreNativeWorkspace("a");
+  expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
+    usable: true,
+    ready: true,
+    issue: null,
+    notRestored: [{ id: "workspace", title: "Saved windows and tabs" }],
+  });
+  const archived = [...native.values].filter(([id]) => id.startsWith("a:archive:"));
+  expect(archived.map(([, record]) => record.value)).toContain("{not a workspace");
+  // The fresh workspace saves normally over the unreadable copy.
+  const tab = h.workspace.getState().openBrowserView({ url: "https://after.example" });
+  await h.flushNativeWorkspace("a");
+  expect(native.values.get("a:workspace")?.value).toContain(tab.id);
+});
+
+it("keeps other tabs when one saved view cannot be restored", async () => {
+  const h = await context();
+  await h.restoreNativeWorkspace("a");
+  const damaged = h.workspace.getState().openBrowserView({ url: "https://damaged.example" });
+  const kept = h.workspace.getState().openBrowserView({ url: "https://kept.example" });
+  await h.flushNativeWorkspace("a");
+  h.closeNativeWorkspaceRecovery();
+  const record = native.values.get("a:workspace")!;
+  const saved = JSON.parse(record.value);
+  // An unparseable URL is damage restore cannot repair, so migrating it throws.
+  // (A missing or non-string route is repaired instead.)
+  let hits = 0;
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const view = node as { id?: string; route?: unknown };
+    if (view.id === damaged.id && "route" in view) {
+      view.route = "http://[";
+      hits++;
+    }
+    Object.values(node).forEach(walk);
+  };
+  walk(saved);
+  expect(hits).toBeGreaterThan(0);
+  native.values.set("a:workspace", { ...record, value: JSON.stringify(saved) });
+  const again = await context();
+  await again.restoreNativeWorkspace("a");
+  const state = again.useWorkspaceRecoveryState.getState();
+  expect(state).toMatchObject({ usable: true, ready: true, issue: null });
+  expect(state.notRestored.map((view) => view.id)).toContain(damaged.id);
+  expect(JSON.stringify(again.workspace.getState().windowsByScope)).toContain(kept.id);
+});
+
+it("lists refused saves per item instead of reporting a blanket failure", async () => {
+  const h = await context();
+  native.fail = true;
+  await h.restoreNativeWorkspace("a");
+  const state = h.useWorkspaceRecoveryState.getState();
+  expect(state.issue).toBeNull();
+  expect(state.usable).toBe(true);
+  expect(state.saves.failed.map((f) => f.key)).toContain("workspace");
 });

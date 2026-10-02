@@ -1,7 +1,7 @@
 import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
 import { reportSystemError } from "@/features/activity";
 import { routes } from "@/features/app-shell";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import {
   DropdownMenuContent,
   DropdownMenuLabel,
@@ -9,15 +9,7 @@ import {
   MenuItem,
   MenuSubmenu,
 } from "@/shared/ui";
-import {
-  Check,
-  ExternalLink,
-  LogIn,
-  LogOut,
-  Plus,
-  Repeat2,
-  UserCircle,
-} from "lucide-react";
+import { Check, ExternalLink, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -35,7 +27,7 @@ function Initials(props: { children: string }) {
 export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
-  const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
+  const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user, accounts, transitioning, switchAccount, logout } = useAuth();
   const me = useUserStore(
     useShallow((state) => ({ id: state.me?.id, email: state.me?.email, name: state.me?.name })),
@@ -89,7 +81,7 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
   };
 
   return (
-    <DropdownMenuContent side="right" align="end" sideOffset={10} width="md" aria-label="Profile">
+    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
       <DropdownMenuLabel className="truncate py-1.5 text-xs font-medium text-cream">
         {email || "Not signed in"}
       </DropdownMenuLabel>

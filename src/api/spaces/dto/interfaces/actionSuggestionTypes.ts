@@ -30,11 +30,3 @@ export interface SpaceActionSuggestionBatch {
   dismissed_by_me: boolean;
   items: SpaceActionSuggestionItem[];
 }
-
-export interface SpaceActionSuggestionSettings {
-  space_id: string;
-  enabled: boolean;
-  weekly_limit: number;
-  weekly_used: number;
-  reset_at: string;
-}

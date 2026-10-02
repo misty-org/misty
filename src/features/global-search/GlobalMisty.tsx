@@ -379,7 +379,7 @@ export function GlobalMistySurface(props: {
     if (candidate.type === "command") {
       closePanel();
       if (onCommand) onCommand(candidate.commandId, candidate.tabId);
-      else if (candidate.tabId) useWorkspaceStore.getState().focusTab(candidate.tabId);
+      else if (candidate.tabId) useWorkspaceStore.getState().focusView(candidate.tabId);
       else if (candidate.commandId) invokeShortcutCommand(candidate.commandId);
     }
   };

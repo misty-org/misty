@@ -7,9 +7,10 @@ import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, IconButton, Spinner } from "@/shared/ui";
 import { Mic, Square, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useImperativeHandle, type Ref, type ReactNode } from "react";
 import { useCompanionState } from "../companion/companionState";
 import { AgentConversationView } from "./AgentConversationView";
+export type AgentVoiceControl = { toggle(): void };
 export function AgentWorkspaceConversation({
   agent,
   conversationId,
@@ -18,6 +19,8 @@ export function AgentWorkspaceConversation({
   accountId,
   onCreate,
   onDraftStateChange,
+  voiceControlRef,
+  onVoiceStateChange,
 }: {
   agent?: AgentProfile;
   conversationId?: string;
@@ -25,6 +28,8 @@ export function AgentWorkspaceConversation({
   spaceId: string;
   accountId: string;
   onCreate: () => void;
+  voiceControlRef?: Ref<AgentVoiceControl>;
+  onVoiceStateChange?(state: { recording: boolean; busy: boolean }): void;
   onDraftStateChange?: (status: { dirty: boolean; busy: boolean }) => void;
 }) {
   const spaceId = "";
@@ -49,6 +54,20 @@ export function AgentWorkspaceConversation({
     },
     onError: reportError,
   });
+  useImperativeHandle(voiceControlRef, () => ({
+    toggle() {
+      if (!agent?.enabled || !accountId || state.working || voice.requesting || voice.transcribing)
+        return;
+      if (voice.recording) voice.stop();
+      else void voice.start();
+    },
+  }));
+  useEffect(() => {
+    onVoiceStateChange?.({
+      recording: voice.recording,
+      busy: voice.requesting || voice.transcribing,
+    });
+  }, [voice.recording, voice.requesting, voice.transcribing, onVoiceStateChange]);
   useEffect(() => {
     const store = useMistyStore.getState();
     store.setAccount(accountId);

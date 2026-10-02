@@ -1,9 +1,5 @@
 const unsaved = new Set<string>();
 let updating = false;
-export function setWorkspaceUnsaved(viewId: string, dirty: boolean) {
-  if (dirty) unsaved.add(viewId);
-  else unsaved.delete(viewId);
-}
 export function workspaceViewHasUnsavedChanges(viewId: string) {
   return unsaved.has(viewId);
 }

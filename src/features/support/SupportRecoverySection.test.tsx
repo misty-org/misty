@@ -102,7 +102,7 @@ describe("SupportRecoverySection", () => {
     await act(async () => continueButton?.click());
     expect(mocks.openExternal).toHaveBeenCalledOnce();
     const issueUrl = new URL(String(mocks.openExternal.mock.calls[0]?.[0]));
-    expect(issueUrl.pathname).toBe("/misty-org/misty-public/issues/new");
+    expect(issueUrl.pathname).toBe("/misty-org/misty/issues/new");
     expect(issueUrl.searchParams.get("title")).toContain("Planner focus jumps");
     expect(mocks.downloadBundle).not.toHaveBeenCalled();
   });

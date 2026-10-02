@@ -1,29 +1,6 @@
 import { JournalDeleteDialog } from "@/features/journal";
 import type { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
-import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
-import { personInitials } from "@/shared/lib/personInitials";
-import {
-  Avatar,
-  AvatarFallback,
-  Button,
-  cn,
-  ContextMenu,
-  ContextMenuAction,
-  ContextMenuContent,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  EmptyState,
-  IconButton,
-  Input,
-  ListRowButton,
-  MenuItem,
-  Skeleton,
-} from "@/shared/ui";
-import { MoreHorizontal, Pencil, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
+import { JournalCollection } from "./components/JournalCollection";
 import {
   useCallback,
   useEffect,
@@ -35,7 +12,6 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { NotePreviewHeader } from "./components/NotePreviewHeader";
 import type { NotePreviewProps } from "./components/NotePreviewView";
 import type { NoteReadingPaneProps } from "./components/NoteReadingPaneView";
 import type { NewNoteDialogProps } from "./model/interfaces/components/NotesIntegrationsDialog";
@@ -74,11 +50,9 @@ export function SpaceNotesView(
   const {
     user,
     referenceOnly,
-    members,
     useStore: useNotesStore,
     subscribeChanges,
     ReadingPane: NoteReadingPane,
-    Preview: NotePreview,
     NewNoteDialog,
   } = props.runtime;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -181,8 +155,6 @@ export function SpaceNotesView(
     availableNoteIds,
     loading,
   );
-  const pinnedNotes = orderedNotes.filter((note) => pinnedIdSet.has(note.id));
-  const recentNotes = orderedNotes.filter((note) => !pinnedIdSet.has(note.id));
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
   const selectedConnector = selectedNote
     ? store.registry.forSource(selectedNote.source)
@@ -196,23 +168,11 @@ export function SpaceNotesView(
     },
     [searchParams, setSearchParams],
   );
-  const creatorNameForNote = (note: UnifiedNote) => {
-    const creator = members.find((member) => member.user_id === note.creatorUserId);
-    if (creator?.name) return creator.name;
-    if (note.creatorUserId === user?.id) return user?.name || user?.email || "You";
-    return "Unknown creator";
-  };
   const openNote = (note: UnifiedNote, rename = false) => {
     actions.selectNote(note.id);
     rememberNoteView("doc", note);
     if (!rename) return;
     window.setTimeout(() => props.runtime.renameNote(note.sourceId), 0);
-  };
-  const selectFromList = (note: UnifiedNote) => {
-    {
-      actions.selectNote(note.id);
-      rememberNoteView("list", note);
-    }
   };
   return (
     <div className={shellClass}>
@@ -221,143 +181,22 @@ export function SpaceNotesView(
         workspaceTabId: props.workspaceTabId,
       })}
       {view === "list" ? (
-        <div
-          className={cn(
-            "grid min-h-0 flex-1 gap-5",
-            "p-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]",
-            false,
-          )}
-        >
-          {loading ? (
-            <>
-              {<Skeleton className="min-h-72 rounded-2xl" />}
-              <Skeleton className="min-h-72 rounded-2xl" />
-            </>
-          ) : (
-            <>
-              <section className="flex min-h-0 flex-col">
-                <div className={cn("mb-2 flex shrink-0 items-center gap-2", "h-8")}>
-                  <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
-                    My Notes
-                  </h1>
-                  {!referenceOnly ? (
-                    <Button
-                      className={cn("shrink-0 gap-1.5 px-2.5 text-xs", "h-8")}
-                      type="button"
-                      onClick={() => setNewNoteOpen(true)}
-                    >
-                      <Plus className="size-3.5" aria-hidden="true" />
-                      New
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
-                  <div className="shrink-0 border-b border-charcoal-border p-3">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute inset-y-0 left-3 my-auto size-3.5 text-cream-muted" />
-                      <Input
-                        className={cn("bg-charcoal-bg pl-9", "h-8 text-xs")}
-                        aria-label="Search notes"
-                        placeholder="Search notes"
-                        value={store.query}
-                        onChange={(event) => actions.setQuery(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="misty-scrollbar min-h-0 flex-1 overflow-y-auto">
-                    {visibleNotes.length === 0 ? (
-                      <EmptyState
-                        className="h-full min-h-48"
-                        title={store.query ? "No matching notes" : "Capture ideas together"}
-                        description={
-                          store.query
-                            ? `Nothing matches “${store.query}”.`
-                            : "Create a shared note for writing, planning, and decisions."
-                        }
-                        action={
-                          store.query ? (
-                            <Button variant="secondary" onClick={() => actions.setQuery("")}>
-                              Clear search
-                            </Button>
-                          ) : !referenceOnly ? (
-                            <Button onClick={() => setNewNoteOpen(true)}>Create note</Button>
-                          ) : undefined
-                        }
-                      />
-                    ) : store.query.trim() ? (
-                      <NoteRows
-                        notes={visibleNotes}
-                        selectedId={selectedNote?.id}
-                        pinnedIds={pinnedIdSet}
-                        onSelect={selectFromList}
-                        onRename={(note) => openNote(note, true)}
-                        onTogglePin={togglePinned}
-                        onDelete={(note) => setDeleteNoteId(note.id)}
-                      />
-                    ) : (
-                      <div className="pb-2">
-                        <NoteSection
-                          title="Pinned"
-                          notes={pinnedNotes}
-                          emptyLabel="Pin a note from its menu for quick access."
-                          selectedId={selectedNote?.id}
-                          pinnedIds={pinnedIdSet}
-                          onSelect={selectFromList}
-                          onRename={(note) => openNote(note, true)}
-                          onTogglePin={togglePinned}
-                          onDelete={(note) => setDeleteNoteId(note.id)}
-                        />
-                        <NoteSection
-                          title="Recently edited"
-                          notes={recentNotes}
-                          emptyLabel="Your pinned notes are shown above."
-                          selectedId={selectedNote?.id}
-                          pinnedIds={pinnedIdSet}
-                          onSelect={selectFromList}
-                          onRename={(note) => openNote(note, true)}
-                          onTogglePin={togglePinned}
-                          onDelete={(note) => setDeleteNoteId(note.id)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              <section className={cn("min-h-0 flex-col", "flex")}>
-                {selectedNote ? (
-                  <NotePreviewHeader note={selectedNote} onOpen={() => openNote(selectedNote)} />
-                ) : (
-                  <div className="mb-2 flex h-8 shrink-0 items-center">
-                    <h2 className="m-0 text-sm font-semibold text-cream-bright">Note preview</h2>
-                  </div>
-                )}
-                <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
-                  {selectedNote ? (
-                    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto]">
-                      <NotePreview
-                        key={selectedNote.id}
-                        note={selectedNote}
-                        accountId={store.accountId}
-                        linkableNotes={store.notes}
-                      />
-                      <NoteMetadata
-                        note={selectedNote}
-                        creatorName={creatorNameForNote(selectedNote)}
-                      />
-                    </div>
-                  ) : (
-                    <EmptyState
-                      className="h-full"
-                      title="No note selected"
-                      description="Choose a note from the list to preview it."
-                    />
-                  )}
-                </div>
-              </section>
-            </>
-          )}
-        </div>
+        <JournalCollection
+          spaceId={props.spaceId}
+          notes={visibleNotes}
+          loading={loading}
+          error={store.phase === "error" || Object.keys(store.connectorErrors).length > 0}
+          onRetry={() => void actions.refresh()}
+          query={store.query}
+          onQueryChange={actions.setQuery}
+          pinnedIds={pinnedIdSet}
+          readOnly={referenceOnly}
+          onCreate={() => setNewNoteOpen(true)}
+          onOpen={openNote}
+          onRename={(note) => openNote(note, true)}
+          onTogglePin={togglePinned}
+          onDelete={(note) => setDeleteNoteId(note.id)}
+        />
       ) : (
         <div className="min-h-0 flex-1 overflow-hidden">
           <NoteReadingPane
@@ -368,6 +207,14 @@ export function SpaceNotesView(
             onBack={() => rememberNoteView("list", selectedNote)}
             editingNoteId={store.editingNoteId}
             referenceOnly={referenceOnly}
+            renameRequested={
+              searchParams.get("rename") === "1" && selectedNote?.sourceId === noteTarget
+            }
+            onRenameHandled={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("rename");
+              setSearchParams(next, { replace: true });
+            }}
             onEditingNoteChange={actions.setEditingNoteId}
             onSaveBody={
               selectedConnector?.capabilities.update
@@ -434,184 +281,4 @@ export function SpaceNotesView(
       />
     </div>
   );
-}
-type NoteRowsProps = {
-  notes: UnifiedNote[];
-  selectedId?: string;
-  pinnedIds: Set<string>;
-  onSelect: (note: UnifiedNote) => void;
-  onRename: (note: UnifiedNote) => void;
-  onTogglePin: (noteId: string) => void;
-  onDelete: (note: UnifiedNote) => void;
-};
-function NoteSection(
-  props: NoteRowsProps & {
-    title: string;
-    emptyLabel: string;
-  },
-) {
-  return (
-    <section aria-label={props.title}>
-      <h2 className="m-0 px-3.5 pb-1.5 pt-3 text-xs font-semibold text-cream-muted">
-        {props.title}
-      </h2>
-      {props.notes.length ? (
-        <NoteRows {...props} />
-      ) : (
-        <p className="px-3.5 py-2 text-[11px] leading-4 text-cream-muted/75">{props.emptyLabel}</p>
-      )}
-    </section>
-  );
-}
-function NoteRows(props: NoteRowsProps) {
-  return props.notes.map((note) => {
-    const isSelected = note.id === props.selectedId;
-    const isPinned = props.pinnedIds.has(note.id);
-    const title = note.title || "Untitled note";
-    const canRename = note.role !== "viewer";
-    return (
-      <ContextMenu key={note.id}>
-        <ContextMenuTrigger asChild>
-          <div
-            className={cn(
-              "group/note flex items-center transition-colors",
-              "h-10",
-              isSelected
-                ? "bg-charcoal-hover hover:bg-charcoal-hover"
-                : "bg-transparent hover:bg-charcoal-border/65",
-            )}
-          >
-            <ListRowButton
-              aria-current={isSelected ? "true" : undefined}
-              className="self-stretch items-center rounded-none px-3.5"
-              onClick={() => props.onSelect(note)}
-            >
-              <h3 className="m-0 min-w-0 flex-1 truncate text-[13px] font-medium text-cream-bright">
-                {title}
-              </h3>
-              {isPinned ? (
-                <Pin className="size-3 shrink-0 text-cream-muted" aria-hidden="true" />
-              ) : null}
-            </ListRowButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton
-                  label={`More actions for ${title}`}
-                  tooltip={false}
-                  className={cn(
-                    "mr-2 aria-expanded:opacity-100",
-                    "opacity-0 group-hover/note:opacity-100",
-                  )}
-                >
-                  <MoreHorizontal className="size-4" aria-hidden="true" />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <MenuItem
-                  icon={isPinned ? <PinOff /> : <Pin />}
-                  label={isPinned ? "Unpin" : "Pin"}
-                  onSelect={() => props.onTogglePin(note.id)}
-                />
-                {canRename || note.canDelete ? <DropdownMenuSeparator /> : null}
-                {canRename ? (
-                  <MenuItem
-                    icon={<Pencil />}
-                    label="Rename"
-                    onSelect={() => props.onRename(note)}
-                  />
-                ) : null}
-                {note.canDelete ? (
-                  <MenuItem
-                    icon={<Trash2 />}
-                    label="Delete"
-                    destructive
-                    onSelect={() => props.onDelete(note)}
-                  />
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-44">
-          <ContextMenuAction
-            icon={isPinned ? <PinOff /> : <Pin />}
-            label={isPinned ? "Unpin" : "Pin"}
-            onSelect={() => props.onTogglePin(note.id)}
-          />
-          {canRename || note.canDelete ? <ContextMenuSeparator /> : null}
-          {canRename ? (
-            <ContextMenuAction
-              icon={<Pencil />}
-              label="Rename"
-              onSelect={() => props.onRename(note)}
-            />
-          ) : null}
-          {note.canDelete ? (
-            <ContextMenuAction
-              icon={<Trash2 />}
-              label="Delete"
-              destructive
-              onSelect={() => props.onDelete(note)}
-            />
-          ) : null}
-        </ContextMenuContent>
-      </ContextMenu>
-    );
-  });
-}
-function NoteMetadata(props: { note: UnifiedNote; creatorName: string }) {
-  return (
-    <section
-      className="shrink-0 border-t border-charcoal-border px-5 py-3.5"
-      aria-label="Note details"
-    >
-      <dl className="m-0 grid grid-cols-2 gap-x-8 gap-y-3 lg:grid-cols-4">
-        <div className="min-w-0">
-          <dt className="text-[11px] font-medium text-cream-muted">Created by</dt>
-          <dd className="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-cream-bright">
-            <Avatar className="size-5 shrink-0">
-              <AvatarFallback
-                className={cn(
-                  "text-[10px] font-semibold",
-                  avatarColorClass(props.note.creatorUserId ?? props.note.id),
-                  avatarInkClass,
-                )}
-              >
-                {personInitials(props.creatorName)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate">{props.creatorName}</span>
-          </dd>
-        </div>
-        <MetadataField label="Last edited" value={formatNoteDate(props.note.updatedAt)} />
-        <MetadataField label="Created" value={formatNoteDate(props.note.createdAt)} />
-        <MetadataField label="Access" value={noteRoleLabel(props.note.role)} />
-      </dl>
-    </section>
-  );
-}
-function MetadataField(props: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-cream-muted">{props.label}</dt>
-      <dd className="m-0 mt-1.5 truncate text-xs text-cream-bright" title={props.value}>
-        {props.value}
-      </dd>
-    </div>
-  );
-}
-function formatNoteDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-function noteRoleLabel(role: UnifiedNote["role"]): string {
-  if (role === "creator") return "Owner";
-  if (role === "editor") return "Can edit";
-  if (role === "viewer") return "View only";
-  return "Shared";
 }

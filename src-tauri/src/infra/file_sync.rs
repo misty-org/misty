@@ -245,9 +245,20 @@ impl FileSyncService {
             let service = service.clone();
             Box::pin(async move { service.sync_saved_pair(pair_id).await })
         });
+        // Two local folders change by filesystem notification, so they compare
+        // when something changes plus a slow safety pass. A remote side has no
+        // change feed and keeps the short compare interval.
+        let (interval, trigger, guard) = match local_pair_watcher(&pair) {
+            Some((watcher, trigger)) => (
+                Duration::from_secs(600),
+                Some(trigger),
+                Some(Box::new(watcher) as Box<dyn Send>),
+            ),
+            None => (Duration::from_secs(5), None, None),
+        };
         let _ = self
             .master
-            .start(pair.id, Duration::from_secs(5), executor)
+            .start_triggered(pair.id, interval, executor, trigger, guard)
             .await;
     }
 
@@ -534,93 +545,33 @@ fn relative_path(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::domain::file_sync::{
-        FileSyncCompareRow, FileSyncCompareSide, FileSyncEndpoint, FileSyncEndpointKind,
+/// Watches both folders of an all-local pair. Returns `None` for a pair with a
+/// remote side, or when a folder cannot be watched (the caller then polls).
+fn local_pair_watcher(
+    pair: &FileSyncPair,
+) -> Option<(notify::RecommendedWatcher, tokio::sync::mpsc::Receiver<()>)> {
+    use notify::{RecursiveMode, Watcher};
+    let local = |endpoint: &crate::domain::file_sync::FileSyncEndpoint| {
+        (endpoint.kind == crate::domain::file_sync::FileSyncEndpointKind::Local
+            && !endpoint.local_path.is_empty())
+        .then(|| PathBuf::from(&endpoint.local_path))
     };
-
-    fn pair(policy: FileSyncPolicy) -> FileSyncPair {
-        FileSyncPair {
-            left: FileSyncEndpoint {
-                kind: FileSyncEndpointKind::Local,
-                local_path: "/local".into(),
-                ..FileSyncEndpoint::default()
-            },
-            right: FileSyncEndpoint {
-                kind: FileSyncEndpointKind::Remote,
-                remote_name: "drive".into(),
-                remote_path: "/".into(),
-                ..FileSyncEndpoint::default()
-            },
-            preferred_policy: policy,
-            ..FileSyncPair::default()
+    let (left, right) = (local(&pair.left)?, local(&pair.right)?);
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
+    // FSEvents on macOS (see Cargo features): no per-file descriptors.
+    let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        if matches!(&event, Ok(event) if matches!(event.kind, notify::EventKind::Access(_))) {
+            return;
         }
-    }
-
-    fn row(disposition: FileSyncCompareDisposition) -> FileSyncCompareRow {
-        FileSyncCompareRow {
-            disposition,
-            left: FileSyncCompareSide::default(),
-            right: FileSyncCompareSide::default(),
-            ..FileSyncCompareRow::default()
-        }
-    }
-
-    #[test]
-    fn bidirectional_watch_copies_presence_and_leaves_differences_for_review() {
-        let rows = watched_actions(
-            &pair(FileSyncPolicy::BiDirectional),
-            vec![
-                row(FileSyncCompareDisposition::LeftOnly),
-                row(FileSyncCompareDisposition::RightOnly),
-                row(FileSyncCompareDisposition::Different),
-            ],
-        );
-        assert_eq!(rows[0].action, FileSyncPlannedAction::CopyLeftToRight);
-        assert_eq!(rows[1].action, FileSyncPlannedAction::CopyRightToLeft);
-        assert_eq!(rows[2].action, FileSyncPlannedAction::Skip);
-    }
-
-    #[test]
-    fn remote_first_watch_mirrors_remote_presence_to_local() {
-        let rows = watched_actions(
-            &pair(FileSyncPolicy::RemoteFirst),
-            vec![
-                row(FileSyncCompareDisposition::LeftOnly),
-                row(FileSyncCompareDisposition::RightOnly),
-                row(FileSyncCompareDisposition::Different),
-            ],
-        );
-        assert_eq!(rows[0].action, FileSyncPlannedAction::DeleteLeft);
-        assert_eq!(rows[1].action, FileSyncPlannedAction::CopyRightToLeft);
-        assert_eq!(rows[2].action, FileSyncPlannedAction::CopyRightToLeft);
-    }
-
-    #[test]
-    fn pair_display_name_prefers_saved_name_and_falls_back_to_id() {
-        let mut named = pair(FileSyncPolicy::BiDirectional);
-        named.id = 7;
-        named.name = "  Documents mirror  ".into();
-        assert_eq!(pair_display_name(&named), "Documents mirror");
-
-        named.name.clear();
-        assert_eq!(pair_display_name(&named), "#7");
-    }
-
-    #[test]
-    fn operation_status_helper_treats_only_finished_states_as_terminal() {
-        use crate::domain::operation_queue::OperationStatus;
-
-        assert!(!terminal_operation_status(OperationStatus::Queued));
-        assert!(!terminal_operation_status(OperationStatus::InProgress));
-        assert!(!terminal_operation_status(
-            OperationStatus::WaitingForResolution
-        ));
-        assert!(terminal_operation_status(OperationStatus::Completed));
-        assert!(terminal_operation_status(OperationStatus::Failed));
-        assert!(terminal_operation_status(OperationStatus::Canceled));
-        assert!(terminal_operation_status(OperationStatus::Skipped));
-    }
+        // A full channel already holds a pending run; errors also re-run.
+        let _ = sender.try_send(());
+    })
+    .ok()?;
+    watcher.watch(&left, RecursiveMode::Recursive).ok()?;
+    watcher.watch(&right, RecursiveMode::Recursive).ok()?;
+    Some((watcher, receiver))
 }
+
+#[cfg(test)]
+#[path = "file_sync_tests.rs"]
+mod tests;

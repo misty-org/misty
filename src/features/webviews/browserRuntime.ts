@@ -1,38 +1,25 @@
-import type { BrowserBounds, BrowserTheme } from "./types";
-import type { ActiveBrowserAgentGrant } from "./browserAgentAccess";
-import { revokeBrowserAgentGrant } from "./browserAgentAccess";
-import type { WorkspaceTab } from "@/features/workspace";
-import { parseBrowserTabState } from "@/features/workspace/model";
+import type { WorkspaceView } from "@/features/workspace";
+import { parseBrowserViewState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
-import type { PageDocument } from "@/features/workspace/pageSnapshot";
+import type { ActiveBrowserAgentGrant } from "./browserAgentAccess";
+import type { BrowserBounds, BrowserTheme } from "./types";
+export type {
+  BrowserCompatibilityIssue,
+  BrowserHistory,
+  BrowserInspection,
+  BrowserInteractiveControl,
+  BrowserMistyPage,
+  HistoryStep,
+  PagePreview,
+} from "./browserRuntimeTypes";
 
-export interface BrowserHistory {
-  entries: string[];
-  index: number;
-  /** Entries the webview's own history also holds. Misty's back/forward uses
-   * the webview inside this range and loads the URL directly outside it
-   * (entries synced from another device, or from before a restart). */
-  native?: { lo: number; hi: number };
-}
-
-/** Where a back/forward step goes, and whether the webview can take it. */
-export interface HistoryStep {
-  url: string;
-  native: boolean;
-}
-
-export interface BrowserCompatibilityIssue {
-  kind: "cloudflare_challenge";
-  url: string;
-}
-
-export interface PagePreview {
-  url: string;
-  dataUrl?: string;
-  document?: PageDocument | null;
-}
-
+import type {
+  BrowserCompatibilityIssue,
+  BrowserHistory,
+  HistoryStep,
+  PagePreview,
+} from "./browserRuntimeTypes";
 export function savePagePreview(tabId: string, preview: PagePreview) {
   useBrowserRuntimeStore.setState((runtime) => {
     const previews = { ...runtime.previews };
@@ -230,7 +217,7 @@ export async function browserProfileChanged(
   if (typeof window !== "undefined") window.dispatchEvent(new Event(browserRuntimeResumeEvent));
 }
 
-type BrowserRuntimeTab = Pick<WorkspaceTab, "id" | "instanceKey">;
+type BrowserRuntimeTab = Pick<WorkspaceView, "id" | "instanceKey">;
 type BrowserSyncInput = {
   originSpaceId?: string;
   /** Opaque host-issued context used by agent browser grants. */
@@ -239,7 +226,7 @@ type BrowserSyncInput = {
   profileId?: string;
   providerId?: string;
   profileProviderId?: string;
-  tab: WorkspaceTab;
+  tab: WorkspaceView;
   url: string;
   bounds: BrowserBounds;
   theme: BrowserTheme;
@@ -280,19 +267,6 @@ export function browserRuntimeIdForScope(scopeId: string): string | null {
   return null;
 }
 
-export function setNativeBrowserCompanionState(request: {
-  targetId: string;
-  visible: boolean;
-  phase: string;
-  name: string;
-  label: string;
-  speech?: string;
-  captureAttached?: boolean;
-  suggestions: Array<{ id: string; label: string }>;
-}): Promise<void> {
-  return invoke<void>("browser_webviews_set_companion", { request }).catch(() => undefined);
-}
-
 export function captureNativeBrowserRegion(
   id: string,
   region: { x: number; y: number; width: number; height: number },
@@ -302,13 +276,13 @@ export function captureNativeBrowserRegion(
 
 /** Capture an already-rendered page. Background reads never bring it to the front. */
 export async function captureBrowserPagePreview(
-  tab: WorkspaceTab,
+  tab: WorkspaceView,
   bounds: { width: number; height: number },
   stillCurrent: () => boolean,
   background = false,
   previewRuntimeId?: string,
 ): Promise<void> {
-  const state = parseBrowserTabState(tab.state);
+  const state = parseBrowserViewState(tab.state);
   const id = previewRuntimeId ?? browserRuntimeId(tab);
   if (
     state.private ||
@@ -348,8 +322,8 @@ export async function captureBrowserPagePreview(
 }
 
 /** Prepare every browser card without focusing, navigating, or resizing its real tab. */
-export async function prepareBrowserPagePreview(tab: WorkspaceTab, stillCurrent: () => boolean) {
-  const state = parseBrowserTabState(tab.state);
+export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent: () => boolean) {
+  const state = parseBrowserViewState(tab.state);
   if (state.private || !/^https?:\/\//i.test(state.url) || !stillCurrent()) return;
   const existing = browserRuntimeCreated(tab);
   const id = existing ? browserRuntimeId(tab) : `preview-${crypto.randomUUID()}`;
@@ -394,14 +368,36 @@ export function browserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
   return createdRuntimeIds.has(browserRuntimeId(tab));
 }
 
+/** Remote URL changes held for pages on screen, applied once they are hidden. */
+const deferredNavigations = new Map<
+  string,
+  { tab: BrowserRuntimeTab; url: string; stillCurrent: () => boolean }
+>();
+
+function releaseDeferredNavigation(id: string): void {
+  const deferred = deferredNavigations.get(id);
+  if (!deferred) return;
+  deferredNavigations.delete(id);
+  void navigateSyncedBrowserWebview(deferred.tab, deferred.url, deferred.stillCurrent).catch(
+    () => undefined,
+  );
+}
+
 /** Apply a committed sync URL to an existing page without showing or focusing
- * it. Unopened pages will use the projected URL when they are created. */
+ * it. Unopened pages will use the projected URL when they are created. A page
+ * on screen is never reloaded under its reader by another machine's
+ * navigation: the change applies when the page is next hidden. */
 export function navigateSyncedBrowserWebview(
   tab: BrowserRuntimeTab,
   url: string,
   stillCurrent: () => boolean,
 ): Promise<void> {
   const id = browserRuntimeId(tab);
+  if (visibleRuntimeIds.has(id) || desiredVisibleRuntimeIds.has(id)) {
+    deferredNavigations.set(id, { tab, url, stillCurrent });
+    return Promise.resolve();
+  }
+  deferredNavigations.delete(id);
   return enqueue(id, async () => {
     // Creation/closing may still be queued, and a newer local or remote edit
     // may have superseded this URL while we waited for the native view.
@@ -483,7 +479,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
         ...(input.profileId ? { profileId: input.profileId } : {}),
-        ...(parseBrowserTabState(input.tab.state).private ? { private: true } : {}),
+        ...(parseBrowserViewState(input.tab.state).private ? { private: true } : {}),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,
@@ -512,7 +508,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
         ...(input.profileId ? { profileId: input.profileId } : {}),
-        ...(parseBrowserTabState(input.tab.state).private ? { private: true } : {}),
+        ...(parseBrowserViewState(input.tab.state).private ? { private: true } : {}),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,
@@ -535,29 +531,6 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     return;
   }
   visibleRuntimeIds.add(id);
-}
-
-export interface BrowserInspection {
-  url?: string;
-  title?: string;
-  text?: string;
-  truncated?: boolean;
-  interactive?: BrowserInteractiveControl[];
-}
-
-export interface BrowserInteractiveControl {
-  ref: string;
-  tag: string;
-  role: string;
-  name: string;
-}
-
-export interface BrowserMistyPage {
-  title: string;
-  text: string;
-  truncated: boolean;
-  urlFingerprint: string;
-  interactive: BrowserInteractiveControl[];
 }
 
 export function browserContentHash(value: string): string {
@@ -699,6 +672,7 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
   const id = registerBrowserRuntime(tab);
   desiredVisibleRuntimeIds.delete(id);
   visibleRuntimeIds.delete(id);
+  releaseDeferredNavigation(id);
   // Always enqueue the hide. A create/reconcile operation may still be in
   // flight even when the frontend has not marked this runtime visible yet.
   // The native command safely no-ops when no child exists.
@@ -707,57 +681,16 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
   });
 }
 
-export async function closeBrowserRuntime(tab: WorkspaceTab): Promise<void> {
-  const id = registerBrowserRuntime(tab);
-  desiredVisibleRuntimeIds.delete(id);
-  const grants = useBrowserRuntimeStore.getState().grants[tab.id] ?? [];
-  await Promise.allSettled(grants.map((grant) => revokeBrowserAgentGrant(id, grant)));
-  await enqueue(id, async () => {
-    // Reopening a just-closed tab can request this same stable runtime while
-    // grant cleanup is still in flight. The new request owns the child now;
-    // do not let the stale close tear it down or delete its id mapping.
-    if (desiredVisibleRuntimeIds.has(id)) return;
-    if (createdRuntimeIds.has(id)) {
-      await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
-    }
-    createdRuntimeIds.delete(id);
-    visibleRuntimeIds.delete(id);
-    lastBounds.delete(id);
-    browserSyncStates.delete(id);
-    runtimeTabIds.delete(id);
-    if (![...runtimeTabIds.values()].includes(tab.id))
-      useBrowserRuntimeStore.getState().removeTab(tab.id);
-  });
-}
-
-export function hideAllBrowserWebviews(): Promise<void[]> {
-  desiredVisibleRuntimeIds.clear();
-  const trackedHides = Promise.all(
-    [...visibleRuntimeIds].map((id) => {
-      visibleRuntimeIds.delete(id);
-      return enqueue(id, async () => {
-        await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
-      });
-    }),
-  );
-  // A native child can outlive frontend module state after a renderer
-  // refresh. Always hide every native browser child so overlays do not depend
-  // on visibleRuntimeIds being current.
-  return Promise.all([
-    trackedHides.then(() => undefined),
-    invoke<void>("browser_webviews_hide_all").catch(() => undefined),
-  ]);
-}
-
 export async function parkAllBrowserWebviews(): Promise<void> {
   const generation = ++browserParkGeneration;
   desiredVisibleRuntimeIds.clear();
   visibleRuntimeIds.clear();
+  [...deferredNavigations.keys()].forEach(releaseDeferredNavigation);
   createdRuntimeIds.forEach((id) => lastBounds.delete(id));
 
-  // Browser workspace cleanup may already have queued an individual hide.
-  // Let that settle, then revive each child underneath the renderer so a
-  // later Browser tab switch has no native hide/show gap.
+  // Let in-flight creation, reconciliation, and individual hides settle
+  // before hiding every native child. Keep the pages loaded, but do not
+  // expose them again until their Browser surface requests reconciliation.
   await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
   if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > 0) return;
   await invoke<void>("browser_webviews_park_all").catch(() => undefined);

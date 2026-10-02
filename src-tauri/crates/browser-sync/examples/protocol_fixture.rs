@@ -8,7 +8,7 @@ fn main() {
     let scope = VaultScope {
         deployment: "https://sync.example.test".into(),
         account_id: "fixture-account".into(),
-        workspace_id: "01951d32-40ac-7000-8000-000000000001".into(),
+        vault_id: "01951d32-40ac-7000-8000-000000000001".into(),
     };
     let device_id = "01951d32-40ac-7000-8000-000000000002";
     let operation_id = "01951d32-40ac-7000-8000-000000000003";
@@ -33,7 +33,7 @@ fn main() {
         "warning": "Public test credentials. Not a real account or session.",
         "deployment": scope.deployment,
         "account_id": scope.account_id,
-        "workspace_id": scope.workspace_id,
+        "vault_id": scope.vault_id,
         "password": password,
         "sync_secret": secret,
         "root_public_key": root.public_key().unwrap(),
@@ -45,7 +45,7 @@ fn main() {
         "mutation": mutation,
         "plaintext": plaintext,
         "challenge": challenge,
-        "connection_signing_bytes": serde_json::to_string(&("misty.sync.connect.v1", &scope.workspace_id, device_id, challenge)).unwrap(),
+        "connection_signing_bytes": serde_json::to_string(&("misty.sync.connect.v1", &scope.vault_id, device_id, challenge)).unwrap(),
         "connection_signature": device.connection_proof(&scope, device_id, challenge).unwrap(),
     });
     println!("{}", serde_json::to_string_pretty(&fixture).unwrap());

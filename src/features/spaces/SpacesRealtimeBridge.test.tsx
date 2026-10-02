@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
     snapshotReady: true,
     error: null as string | null,
     load: vi.fn(async () => undefined),
-    loadInbox: vi.fn(async () => undefined),
     connectRealtime: vi.fn(async () => undefined),
     disconnectRealtime: vi.fn(),
     clearError: vi.fn(),
@@ -51,7 +50,6 @@ describe("SpacesRealtimeBridge", () => {
     mocks.spaces.loading = false;
     mocks.spaces.error = null;
     mocks.spaces.load.mockClear();
-    mocks.spaces.loadInbox.mockClear();
     mocks.spaces.connectRealtime.mockClear();
     mocks.spaces.disconnectRealtime.mockClear();
     mocks.spaces.clearError.mockClear();
@@ -77,7 +75,6 @@ describe("SpacesRealtimeBridge", () => {
     expect(mocks.spaces.disconnectRealtime).toHaveBeenCalled();
     expect(mocks.spaces.connectRealtime).not.toHaveBeenCalled();
     expect(mocks.spaces.load).not.toHaveBeenCalled();
-    expect(mocks.spaces.loadInbox).not.toHaveBeenCalled();
   });
 
   it("keeps reconnect failures out of Activity", async () => {

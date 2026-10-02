@@ -105,10 +105,6 @@ export function resolveJournalAssetUrl(downloadPath: string): Promise<string> {
   return pending;
 }
 
-export function clearJournalAssetCache(): void {
-  resolvedAssetCache.clear();
-}
-
 async function putDirectlyToR2(transfer: UploadReservation["transfer"], file: File): Promise<void> {
   if (!/^https:\/\//i.test(transfer.url)) {
     throw new Error("Journal assets require a direct Cloudflare R2 upload.");
@@ -183,4 +179,8 @@ function dataURLFromBytes(bytes: ArrayBuffer, mimeType: string): string {
     binary += String.fromCharCode(...view.subarray(offset, offset + chunkSize));
   }
   return `data:${mimeType || "application/octet-stream"};base64,${btoa(binary)}`;
+}
+
+export function clearJournalAssetCache(): void {
+  resolvedAssetCache.clear();
 }

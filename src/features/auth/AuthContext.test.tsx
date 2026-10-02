@@ -109,7 +109,7 @@ vi.mock("./store/useAuthTokenStore", () => ({
 vi.mock("./store/useUserStore", () => ({
   useUserStore: mocks.useUserStore,
 }));
-vi.mock("@/features/installer", () => {
+vi.mock("@/features/native-session", () => {
   const state = {
     signOut: mocks.signOut,
     saveAuthenticatedUser: mocks.saveAuthenticatedUser,
@@ -119,7 +119,7 @@ vi.mock("@/features/installer", () => {
     },
   };
   return {
-    useSetupStore: Object.assign(
+    useNativeSessionStore: Object.assign(
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
       {
         getState: () => state,
@@ -137,7 +137,7 @@ vi.mock("@/features/app-shell", () => {
     },
   };
   return {
-    useSetupStore: Object.assign(
+    useNativeSessionStore: Object.assign(
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
       {
         getState: () => state,
@@ -275,7 +275,7 @@ describe("AuthProvider account switching", () => {
     expect(mocks.saveAuthenticatedUser).not.toHaveBeenCalled();
     expect(mocks.userState.me?.id).toBe(mocks.accountA.id);
     expect(auth?.user?.id).toBe(mocks.accountA.id);
-    expect(mocks.setAccountSessionTransitioning.mock.calls.map(([value]) => value)).toEqual([true]);
+    expect(mocks.setAccountSessionTransitioning.mock.calls).toEqual([[true], [false]]);
   });
   it("preserves the original sign-in error when the previous saved session is stale", async () => {
     function Probe() {

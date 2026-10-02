@@ -1,4 +1,4 @@
-import { createBrowserTabState, type WorkspaceTab } from "@/features/workspace";
+import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -6,12 +6,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBrowserRuntimeStore } from "./browserRuntime";
 import { BrowserWorkspace } from "./BrowserWorkspace";
 const invoke = vi.hoisted(() =>
-  vi.fn<(command: string, args?: unknown) => Promise<unknown>>(async () => undefined),
+  vi.fn<(command: string, args?: unknown) => Promise<unknown>>(async (command) =>
+    ["browser_downloads_list", "browser_downloads_progress", "browser_history_suggest"].includes(
+      command,
+    )
+      ? []
+      : undefined,
+  ),
 );
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => vi.fn()) }));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke,
 }));
-const browserTab: WorkspaceTab = {
+const browserTab: WorkspaceView = {
   id: "tab:browser",
   surfaceId: "browser",
   groupKey: "tool:browser",
@@ -19,7 +26,7 @@ const browserTab: WorkspaceTab = {
   title: "New Tab",
   route: "/browser",
   sidebarVisible: true,
-  state: createBrowserTabState(),
+  state: createBrowserViewState(),
   createdAt: 1,
   lastFocusedAt: 1,
 };
@@ -81,12 +88,12 @@ describe("BrowserWorkspace", () => {
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
-    const nextTab: WorkspaceTab = {
+    const nextTab: WorkspaceView = {
       ...browserTab,
       id: "tab:google",
       instanceKey: "browser:google",
       title: "Google",
-      state: createBrowserTabState("https://google.com"),
+      state: createBrowserViewState("https://google.com"),
     };
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
     invoke.mockClear();
@@ -110,7 +117,7 @@ describe("BrowserWorkspace", () => {
     const webTab = {
       ...browserTab,
       title: "Google",
-      state: createBrowserTabState("https://www.google.com/"),
+      state: createBrowserViewState("https://www.google.com/"),
     };
     await act(async () => root.render(<BrowserWorkspace tab={webTab} />));
     expect(container.querySelector("iframe")).toBeNull();
@@ -118,14 +125,14 @@ describe("BrowserWorkspace", () => {
       container.querySelector('[data-testid="browser-native-runtime-required"]'),
     ).not.toBeNull();
     expect(container.textContent).toContain("Open this page in the Misty desktop app");
-    expect(container.textContent).toContain("Open in Misty Browser");
+    expect(container.textContent).toContain("Open in browser");
   });
   it("renders browser controls without a nested browser tab strip", () => {
     act(() => root.render(<BrowserWorkspace tab={browserTab} />));
     const workspace = container.querySelector("[data-browser-workspace-tab]");
     expect(workspace).not.toBeNull();
-    expect(workspace?.classList.contains("grid-rows-[44px_minmax(0,1fr)]")).toBe(true);
-    expect(workspace?.classList.contains("grid-rows-[44px_auto_minmax(0,1fr)]")).toBe(false);
+    expect(workspace?.classList.contains("grid-rows-[44px_minmax(0,1fr)]")).toBe(false);
+    expect(workspace?.classList.contains("grid-rows-[44px_auto_minmax(0,1fr)]")).toBe(true);
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
@@ -135,11 +142,11 @@ describe("BrowserWorkspace", () => {
     expect(container.querySelector('[aria-label^="Close "]')).toBeNull();
   });
   it("quietly identifies browser tabs owned by Misty's current work", () => {
-    const agentOwnedTab: WorkspaceTab = {
+    const agentOwnedTab: WorkspaceView = {
       ...browserTab,
       title: "Misty research · family activities",
       state: {
-        ...createBrowserTabState("https://www.google.com/search?q=family+activities"),
+        ...createBrowserViewState("https://www.google.com/search?q=family+activities"),
         agentOwned: true,
       },
     };
@@ -169,7 +176,7 @@ describe("BrowserWorkspace", () => {
   it("selects the complete address when the omnibox receives focus", async () => {
     const tab = {
       ...browserTab,
-      state: createBrowserTabState("https://example.com/path?q=misty"),
+      state: createBrowserViewState("https://example.com/path?q=misty"),
     };
     await act(async () => root.render(<BrowserWorkspace tab={tab} />));
     const input = container.querySelector<HTMLInputElement>(
@@ -186,7 +193,7 @@ describe("BrowserWorkspace", () => {
   it("shows the current page on focus, then direct and web-search suggestions while typing", async () => {
     const tab = {
       ...browserTab,
-      state: createBrowserTabState("https://youtube.com/watch?v=misty"),
+      state: createBrowserViewState("https://youtube.com/watch?v=misty"),
     };
     await act(async () => root.render(<BrowserWorkspace tab={tab} />));
     const input = container.querySelector<HTMLInputElement>(
@@ -197,14 +204,20 @@ describe("BrowserWorkspace", () => {
       await settleBrowserOverlay();
     });
     const focusedOptions = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(focusedOptions.some((option) => option.textContent?.includes("youtube.com"))).toBe(true);
+    expect(focusedOptions.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("youtube.com")]),
+    );
     await act(async () => {
       fireEvent.change(input!, { target: { value: "vimeo.com" } });
       await settleBrowserOverlay();
     });
     const options = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(options.some((option) => option.textContent?.includes("vimeo.com"))).toBe(true);
-    expect(options.some((option) => option.textContent?.includes("Search with Google"))).toBe(true);
+    expect(options.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("vimeo.com")]),
+    );
+    expect(options.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Search with Google")]),
+    );
   });
   it("opens a functional browser menu", async () => {
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
@@ -259,7 +272,15 @@ describe("BrowserWorkspace", () => {
           releaseRestack = resolve;
         });
       }
-      return Promise.resolve(undefined);
+      return Promise.resolve(
+        [
+          "browser_downloads_list",
+          "browser_downloads_progress",
+          "browser_history_suggest",
+        ].includes(command)
+          ? []
+          : undefined,
+      );
     });
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');

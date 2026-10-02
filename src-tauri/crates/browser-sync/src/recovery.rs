@@ -6,10 +6,10 @@ use crate::{
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
 
-const MAX_BYTES: usize = 16 << 20;
+pub(crate) const MAX_BYTES: usize = 16 << 20;
 const MAX_TOTAL_BYTES: u64 = 128 << 20;
 const MAX_RECORDS: u64 = 128;
 const MAX_ARCHIVES: u64 = 32;
@@ -19,15 +19,21 @@ const MAX_ARCHIVES: u64 = 32;
 pub struct RecoveryRecord {
     pub revision: u64,
     pub value: String,
+    /// Kept in the encrypted pending slot because the database write failed.
+    /// `revision` is still the saved one; the next write retries from it.
+    #[serde(default)]
+    pub pending: bool,
 }
 
 pub struct RecoveryStore {
     connection: Connection,
-    scope: VaultScope,
-    root: VaultRoot,
+    pub(crate) scope: VaultScope,
+    pub(crate) root: VaultRoot,
+    /// Encrypted pending saves beside the database; see `recovery_pending`.
+    pub(crate) pending: PathBuf,
 }
 
-fn validate_key(key: &str) -> Result<()> {
+pub(crate) fn validate_key(key: &str) -> Result<()> {
     if key.is_empty()
         || key.len() > 200
         || !key
@@ -69,7 +75,7 @@ impl RecoveryStore {
         if let Some(proof) = proof {
             let bytes = root.open_local(
                 &scope,
-                &scope.workspace_id,
+                &scope.vault_id,
                 "workspace-recovery:identity:v1",
                 &serde_json::from_str(&proof)?,
             )?;
@@ -79,7 +85,7 @@ impl RecoveryStore {
         } else {
             let proof = root.seal_local(
                 &scope,
-                &scope.workspace_id,
+                &scope.vault_id,
                 "workspace-recovery:identity:v1",
                 b"misty-workspace-recovery-v1",
             )?;
@@ -89,14 +95,20 @@ impl RecoveryStore {
             )?;
         }
         tx.commit()?;
-        Ok(Self {
+        let pending = path.with_file_name("recovery-pending");
+        let mut store = Self {
             connection,
             scope,
             root,
-        })
+            pending,
+        };
+        // Saves that could not reach the database last time land now if they can.
+        let _ = store.replay_pending();
+        Ok(store)
     }
 
-    pub fn read(&self, key: &str) -> Result<Option<RecoveryRecord>> {
+    /// The database copy only; `read` also sees pending saves.
+    pub(crate) fn read_saved(&self, key: &str) -> Result<Option<RecoveryRecord>> {
         validate_key(key)?;
         let row: Option<(u64, String)> = self
             .connection
@@ -114,22 +126,32 @@ impl RecoveryStore {
         }
         let raw = self.root.open_local(
             &self.scope,
-            &self.scope.workspace_id,
+            &self.scope.vault_id,
             &aad(key, revision),
             &serde_json::from_str(&envelope)?,
         )?;
         let value = String::from_utf8(raw.to_vec()).map_err(|_| Error::Invalid)?;
-        Ok(Some(RecoveryRecord { revision, value }))
+        Ok(Some(RecoveryRecord {
+            revision,
+            value,
+            pending: false,
+        }))
     }
 
+    /// The database write only; `write` falls back to a pending slot.
     /// Exact retry after a lost response performs no write. Revision checking
     /// prevents a delayed renderer from overwriting a newer local record.
-    pub fn write(&mut self, key: &str, expected: u64, value: &str) -> Result<RecoveryRecord> {
+    pub(crate) fn write_saved(
+        &mut self,
+        key: &str,
+        expected: u64,
+        value: &str,
+    ) -> Result<RecoveryRecord> {
         validate_key(key)?;
         if value.len() > MAX_BYTES {
             return Err(Error::TooLarge);
         }
-        let current = self.read(key)?;
+        let current = self.read_saved(key)?;
         if let Some(current) = current.as_ref().filter(|record| record.value == value) {
             return Ok(current.clone());
         }
@@ -146,7 +168,7 @@ impl RecoveryStore {
         let raw = Zeroizing::new(value.as_bytes().to_vec());
         let encrypted = serde_json::to_string(&self.root.seal_local(
             &self.scope,
-            &self.scope.workspace_id,
+            &self.scope.vault_id,
             &aad(key, revision),
             &raw,
         )?)?;
@@ -182,6 +204,7 @@ impl RecoveryStore {
         Ok(RecoveryRecord {
             revision,
             value: value.into(),
+            pending: false,
         })
     }
 }

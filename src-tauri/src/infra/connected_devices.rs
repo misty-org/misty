@@ -41,7 +41,7 @@ use crate::{
         ClipboardOffer, ClipboardOfferKind, OpenWorkspaceRouteRequest, OpenWorkspaceRouteResult,
         OpenWorkspaceRouteStatus, PeerError, PeerErrorCode, PeerFileReference, PeerRequest,
         PeerRequestEnvelope, PeerResponse, PeerResponseEnvelope, PeerRoot, PeerTicketClaims,
-        WorkspaceRouteSurface, DEVICE_ALPN, MAX_CONTROL_FRAME_BYTES,
+        WorkspaceRouteSurface, MAX_CONTROL_FRAME_BYTES,
     },
     error::{ApiError, ApiResult},
     infra::{peer_files::PeerRootRegistry, peer_identity},
@@ -1122,7 +1122,7 @@ async fn peer_media_handler(
 ) -> axum::response::Response {
     use axum::{
         body::Body,
-        http::{header, HeaderValue, Response, StatusCode},
+        http::{header, Response, StatusCode},
     };
     let grant = state.grants.lock().ok().and_then(|mut grants| {
         grants.retain(|_, grant| grant.expires_at > unix_now());

@@ -49,6 +49,10 @@ func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) ht
 
 		user, err := database.CreateUserWithUsername(body.Name, body.Username, body.Email, body.Password)
 		if err != nil {
+			if errors.Is(err, db.ErrEmailTaken) {
+				http.Error(w, "email already registered", http.StatusConflict)
+				return
+			}
 			if errors.Is(err, db.ErrInvalidUsername) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -90,11 +94,8 @@ func Login(database *db.Database) http.HandlerFunc {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		if user == nil || bcrypt.CompareHashAndPassword([]byte(hash), []byte(body.Password)) != nil {
+		if user == nil || user.Provider != "misty" || bcrypt.CompareHashAndPassword([]byte(hash), []byte(body.Password)) != nil {
 			http.Error(w, "invalid credentials", http.StatusUnauthorized)
-			return
-		}
-		if !acceptSelfHostLogin(w, r, database, user.ID) {
 			return
 		}
 
@@ -119,6 +120,7 @@ func writeAuthSession(
 		"name":     user.Name,
 		"username": user.Username,
 		"email":    user.Email,
+		"provider": user.Provider,
 	})
 }
 

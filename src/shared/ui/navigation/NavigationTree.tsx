@@ -22,8 +22,7 @@ export const navigationTreeSurfaceClass = cn(
 );
 export const navigationTreeIconClass = cn(
   "pointer-events-none flex size-[var(--navigation-primary-icon-slot,18px)]",
-  "shrink-0 items-center justify-center [transform:translateZ(0)]",
-  "[backface-visibility:hidden]",
+  "shrink-0 items-center justify-center",
   "[&_[data-app-icon]]:!size-[var(--navigation-primary-icon-size,18px)]",
   "[&_svg]:!size-[var(--navigation-primary-icon-size,18px)]",
   "[&_svg]:overflow-visible",

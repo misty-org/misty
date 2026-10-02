@@ -6,21 +6,21 @@ import {
   dockLeaves,
   isBrowserInternalUrl,
   type BrowserInternalPage,
-  type BrowserTabState,
-  type WorkspaceTab,
+  type BrowserViewState,
+  type WorkspaceView,
   useWorkspaceStore,
 } from "@/features/workspace";
 import { save } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { browserPageTools } from "../library/native";
-import { bookmarkWindowTabs } from "./bookmarkWindowTabs";
+import { bookmarkWindowViews } from "./bookmarkWindowViews";
 import { browserRuntimeCreated, browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
 
 export interface BrowserPageCommands {
   newTab: () => void;
   newWindow: () => void;
-  newPrivateTab: () => void;
-  reopenTab: () => void;
+  newPrivateView: () => void;
+  reopenView: () => void;
   /** Reopens one tab from the recently closed list. */
   reopenClosedTab: (index: number) => void;
   help: () => void;
@@ -36,7 +36,7 @@ export interface BrowserPageCommands {
   qrCode?: () => void;
   bookmark?: () => void;
   /** Saves every web page in this window to a new bookmark group. */
-  bookmarkAllTabs: () => void;
+  bookmarkAllViews: () => void;
   clearBrowsingData: () => void;
 }
 
@@ -65,8 +65,8 @@ function safeFileName(title: string): string {
  * native page) is showing, so their menu items disable themselves.
  */
 export function useBrowserPageCommands(input: {
-  tab: WorkspaceTab;
-  state: BrowserTabState;
+  tab: WorkspaceView;
+  state: BrowserViewState;
   nativeRuntime: boolean;
   focused: () => boolean;
   navigate: (url: string) => void;
@@ -86,9 +86,9 @@ export function useBrowserPageCommands(input: {
   const openInNewTab = (url: string) => {
     const workspace = useWorkspaceStore.getState();
     const pane = dockLeaves(workspace.layout.root).find((candidate) =>
-      candidate.tabs.some((item) => item.id === tab.id),
+      candidate.views.some((item) => item.id === tab.id),
     );
-    workspace.openBrowserTab({ url, paneId: pane?.id });
+    workspace.openBrowserView({ url, paneId: pane?.id });
   };
 
   const openPage = (page: BrowserInternalPage) => {
@@ -101,17 +101,17 @@ export function useBrowserPageCommands(input: {
   const commands: BrowserPageCommands = {
     newTab: () => void invokeShortcutCommand("workspace.new_tab"),
     newWindow: () => void invokeShortcutCommand("workspace.new_virtual_window"),
-    newPrivateTab: () => {
+    newPrivateView: () => {
       const workspace = useWorkspaceStore.getState();
       const pane = dockLeaves(workspace.layout.root).find((candidate) =>
-        candidate.tabs.some((item) => item.id === tab.id),
+        candidate.views.some((item) => item.id === tab.id),
       );
-      workspace.openBrowserTab({ paneId: pane?.id, private: true });
+      workspace.openBrowserView({ paneId: pane?.id, private: true });
     },
-    reopenTab: () => void invokeShortcutCommand("workspace.reopen_tab"),
+    reopenView: () => void invokeShortcutCommand("workspace.reopen_tab"),
     reopenClosedTab: (index) => {
       // The reopened tab is focused; the canvas then follows it to its route.
-      if (useWorkspaceStore.getState().reopenClosedTab(index))
+      if (useWorkspaceStore.getState().reopenClosedView(index))
         window.dispatchEvent(new Event("misty:workspace-projection-applied"));
     },
     help: () => setHelpRequest((value) => value + 1),
@@ -120,9 +120,9 @@ export function useBrowserPageCommands(input: {
     clearBrowsingData: () => setClearDataRequest((value) => value + 1),
     bookmark: webPage ? () => setBookmarkRequest((value) => value + 1) : undefined,
     qrCode: webPage ? () => setQrCodeRequest((value) => value + 1) : undefined,
-    bookmarkAllTabs: () => {
+    bookmarkAllViews: () => {
       try {
-        const result = bookmarkWindowTabs();
+        const result = bookmarkWindowViews();
         notice(
           tab.id,
           result
@@ -180,7 +180,7 @@ export function useBrowserPageCommands(input: {
     command();
     return true;
   };
-  useShortcutHandler("browser.new_private_tab", run(commands.newPrivateTab), focused, 100);
+  useShortcutHandler("browser.new_private_tab", run(commands.newPrivateView), focused, 100);
   useShortcutHandler("browser.find", run(commands.find), focused, 100);
   useShortcutHandler("browser.print", run(commands.print), focused, 100);
   useShortcutHandler(

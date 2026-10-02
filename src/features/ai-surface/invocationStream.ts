@@ -118,7 +118,13 @@ export async function readInvocationStream(
         signal.removeEventListener("abort", finish);
         resolve();
       };
-      const timer = setTimeout(finish, Math.max(serverDelay, retryDelay * (attempt + 1)));
+      // Exponential with equal jitter: viewers dropped together by a deploy
+      // do not all reconnect on the same tick.
+      const backoff = retryDelay * 2 ** attempt;
+      const timer = setTimeout(
+        finish,
+        Math.max(serverDelay, backoff / 2 + Math.random() * (backoff / 2)),
+      );
       signal.addEventListener("abort", finish, { once: true });
     });
   }

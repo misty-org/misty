@@ -55,6 +55,7 @@ pub(super) fn platform(
     if platform == "macos-universal" {
         notarize_macos_bundle(workspace, &bundle)?;
         verify_macos_bundle(workspace, &bundle)?;
+        archive_stapled_app(workspace, &bundle)?;
     }
     let destination = state::release_root(workspace, &release.version).join(platform);
     if destination.exists() {
@@ -84,6 +85,32 @@ pub(super) fn platform(
     )?;
     println!("Built {platform} artifacts in {}", destination.display());
     Ok(())
+}
+
+// Stapling changes the app after Tauri generated its initial updater archive.
+// Ship and sign an archive containing the final, notarized application bytes.
+fn archive_stapled_app(workspace: &Workspace, bundle: &Path) -> Result<()> {
+    let app = find_app(bundle).context("macOS app bundle was not produced")?;
+    let archive = app.with_extension("app.tar.gz");
+    CommandSpec::new("tar")
+        .arg("-czf")
+        .arg(archive.as_os_str())
+        .arg("-C")
+        .arg(app.parent().context("app parent missing")?.as_os_str())
+        .arg(app.file_name().context("app name missing")?)
+        .run(&workspace.misty)?;
+    let configured_key = std::env::var("TAURI_SIGNING_PRIVATE_KEY")?;
+    let key = if Path::new(&configured_key).is_file() {
+        std::fs::read_to_string(&configured_key)?
+    } else {
+        configured_key
+    };
+    CommandSpec::new(npm())
+        .args(["run", "tauri", "--", "signer", "sign"])
+        .arg(archive.as_os_str())
+        .env("TAURI_SIGNING_PRIVATE_KEY", key)
+        .env_remove("TAURI_SIGNING_PRIVATE_KEY_PATH")
+        .run(&workspace.misty)
 }
 
 fn notarize_macos_bundle(workspace: &Workspace, bundle: &Path) -> Result<()> {

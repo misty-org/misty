@@ -23,6 +23,7 @@ export * from "./controls/Pressable";
 export * from "./controls/SegmentedControl";
 
 // overlays
+export * from "./overlays/OverlaySide";
 export * from "./overlays/AlertDialog";
 export * from "./overlays/BlockingScreen";
 export * from "./overlays/Command";
@@ -77,12 +78,20 @@ export * from "./navigation/NavigationTree";
 // icons
 export * from "./icons/AssetIcon";
 export * from "./icons/BrandIcon";
-export * from "./icons/MailProviderIcon";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
 
 // patterns
 export * from "./patterns/ComingSoonSurface";
 export * from "./patterns/DiscoverCard";
+export * from "./patterns/CollectionWorkspace";
+export * from "./patterns/CollectionFilterMenu";
+export * from "./patterns/CollectionItemDialog";
 
 export * from "./utils";
+
+export {
+  MessageComposer,
+  MessageComposerSend,
+  messageComposerTextClass,
+} from "./patterns/MessageComposer";

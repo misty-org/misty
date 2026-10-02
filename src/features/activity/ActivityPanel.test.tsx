@@ -7,11 +7,6 @@ vi.mock("./nativeNotifications", () => ({
   publishNativeActivity: vi.fn(),
   syncNativeBadge: vi.fn(),
 }));
-vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({ loadInbox: async () => {}, markInboxSeen: async () => {} }),
-  },
-}));
 import { ActivityPanel } from "./ActivityPanel";
 import { ActivityMenu } from "@/app/layouts/DesktopLayout/ActivityMenu";
 import { openActivityPanel, closeActivityPanel, useActivityPanel } from "./activityPanelState";
@@ -34,7 +29,9 @@ it("opens above the current workspace and closes without changing its route", as
         </MemoryRouter>,
       ),
     );
-    await act(async () => host.querySelector<HTMLButtonElement>('[title="Activity"]')?.click());
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[aria-label="Activity"]')?.click(),
+    );
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Activity");
     expect(document.querySelector('[data-slot="popover-content"]')).toBeNull();
     expect(document.querySelector('[aria-label="Filter activity"]')).not.toBeNull();

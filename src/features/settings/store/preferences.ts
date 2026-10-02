@@ -1,5 +1,5 @@
 import { appZoomBaseline, appZoomFromStoredScale } from "@/shared/hooks/useAppZoom";
-import { booleanSetting, numberSetting, sectionRecord, stringSetting } from "../SettingsControls";
+import { booleanSetting, numberSetting, stringSetting } from "../SettingsControls";
 export const settingsBoolean = booleanSetting;
 export const settingsNumber = numberSetting;
 export const settingsString = stringSetting;
@@ -36,45 +36,6 @@ export function selectFilePreferences(
   return {
     defaultViewModeIndex: settingsNumber(source, "files", "default_view_mode_index", 0),
     showHiddenFiles: settingsBoolean(source, "files", "show_hidden_files", false),
-  };
-}
-export function selectTerminalPreferences(
-  document: Record<string, unknown> | null | undefined,
-): TerminalPreferences {
-  const source = document ?? {};
-  return {
-    cursorBlink: settingsBoolean(source, "terminal", "cursor_blink", true),
-    cursorStyleIndex: settingsNumber(source, "terminal", "cursor_style_index", 0),
-    fontFamily: settingsString(source, "terminal", "font_family", ""),
-    fontSize: clampSettingsNumber(settingsNumber(source, "terminal", "font_size", 13), 8, 32),
-    scrollback: clampSettingsNumber(
-      settingsNumber(source, "terminal", "scrollback", 50_000),
-      1_000,
-      500_000,
-    ),
-  };
-}
-export function selectEditorPreferences(
-  document: Record<string, unknown> | null | undefined,
-): EditorPreferences {
-  const source = document ?? {};
-  return {
-    autosaveDelayMs: clampSettingsNumber(
-      settingsNumber(source, "editor", "autosave_delay_ms", 1000),
-      0,
-      30_000,
-    ),
-    fontFamily: settingsString(source, "editor", "font_family", ""),
-    fontSize: clampSettingsNumber(settingsNumber(source, "editor", "font_size", 14), 8, 32),
-    formatOnSave: settingsBoolean(source, "editor", "format_on_save", false),
-    interfaceScale:
-      Math.round(
-        clampSettingsNumber(settingsNumber(source, "editor", "interface_scale", 1), 0.8, 1.5) * 10,
-      ) / 10,
-    lineNumbers: settingsBoolean(source, "editor", "line_numbers", true),
-    tabSize: clampSettingsNumber(settingsNumber(source, "editor", "tab_size", 2), 1, 8),
-    theme: settingsString(source, "editor", "theme", "gruvbox-dark"),
-    wordWrap: settingsBoolean(source, "editor", "word_wrap", true),
   };
 }
 export function selectNotificationPreferences(
@@ -129,31 +90,6 @@ export function selectGeneralPreferences(
     searchEngineIndex: settingsNumber(source, "general", "browser_search_engine_index", 0),
     startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
     workspaceDefaultTabIndex: settingsNumber(source, "general", "workspace_default_tab_index", 0),
-  };
-}
-export function selectAgentPreferences(
-  document: Record<string, unknown> | null | undefined,
-): AgentPreferences {
-  const source = document ?? {};
-  // This selector is fail-closed: a missing section reads as enabled: false and
-  // Agents go dark. The settings section was renamed from "assistant" to
-  // "agent", so the stored document for every existing user still uses the old
-  // key until they next save. Read the current key first and fall back, or the
-  // rename silently disables Agents for everyone who already had them on.
-  const current = sectionRecord(source, "agent");
-  const agent = Object.keys(current).length > 0 ? current : sectionRecord(source, "assistant");
-  const scopesValue = agent.scopes;
-  const scopes =
-    scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
-      ? (scopesValue as Record<string, unknown>)
-      : {};
-  return {
-    enabled: agent.enabled === true,
-    scopes: {
-      filesAllowed: scopes.files_allowed === true,
-      cleanupAllowed: scopes.cleanup_allowed === true,
-      searchAllowed: scopes.search_allowed === true,
-    },
   };
 }
 export function selectShortcutPreferences(
@@ -216,24 +152,6 @@ export interface FilePreferences {
   defaultViewModeIndex: number;
   showHiddenFiles: boolean;
 }
-export interface TerminalPreferences {
-  cursorBlink: boolean;
-  cursorStyleIndex: number;
-  fontFamily: string;
-  fontSize: number;
-  scrollback: number;
-}
-export interface EditorPreferences {
-  autosaveDelayMs: number;
-  fontFamily: string;
-  fontSize: number;
-  formatOnSave: boolean;
-  interfaceScale: number;
-  lineNumbers: boolean;
-  tabSize: number;
-  theme: string;
-  wordWrap: boolean;
-}
 export interface NotificationPreferences {
   badgeCountEnabled: boolean;
   desktopNotificationsEnabled: boolean;
@@ -251,14 +169,6 @@ export interface GeneralPreferences {
   searchEngineIndex: number;
   startupViewIndex: number;
   workspaceDefaultTabIndex: number;
-}
-export interface AgentPreferences {
-  enabled: boolean;
-  scopes: {
-    filesAllowed: boolean;
-    cleanupAllowed: boolean;
-    searchAllowed: boolean;
-  };
 }
 export interface ShortcutPreferences {
   shortcutHintsEnabled: boolean;

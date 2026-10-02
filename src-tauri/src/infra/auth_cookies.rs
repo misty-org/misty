@@ -8,7 +8,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-const SERVICE: &str = "com.misty.auth.cookies.v1";
 static CLIENTS: OnceLock<Mutex<HashMap<String, Arc<AccountClient>>>> = OnceLock::new();
 
 pub(super) struct AccountClient {
@@ -43,6 +42,20 @@ fn key(url: &url::Url, account_id: &str) -> String {
 }
 fn clients() -> &'static Mutex<HashMap<String, Arc<AccountClient>>> {
     CLIENTS.get_or_init(Default::default)
+}
+
+fn credential_io<T>(operation: impl FnOnce() -> std::io::Result<T>) -> Result<T, String> {
+    let run = || operation().map_err(|error| error.to_string());
+    // A first restore may wait for Keychain authorization. Keep the account
+    // lifecycle barrier, but let Tokio service other work while this worker
+    // blocks (including on another credential operation's mutex).
+    if tokio::runtime::Handle::try_current()
+        .is_ok_and(|handle| handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread)
+    {
+        tokio::task::block_in_place(run)
+    } else {
+        run()
+    }
 }
 
 impl AccountClient {
@@ -97,24 +110,25 @@ impl AccountClient {
     }
     pub(super) fn persist(&self, url: &url::Url) -> Result<Option<String>, String> {
         if let Some(saved) = self.snapshot(url)? {
-            let encoded =
-                serde_json::to_string(&saved).map_err(|_| "Could not encode account cookies")?;
-            misty_credential_store::store(SERVICE, &key(url, &saved.account_id), &encoded)
-                .map_err(|e| e.to_string())?;
+            let encoded = zeroize::Zeroizing::new(
+                serde_json::to_string(&saved).map_err(|_| "Could not encode account cookies")?,
+            );
+            credential_io(|| {
+                misty_credential_store::account::store(&key(url, &saved.account_id), &encoded)
+            })?;
             *self
                 .account_id
                 .lock()
                 .map_err(|_| "Account cookie lock unavailable")? = Some(saved.account_id.clone());
             return Ok(Some(saved.account_id));
         }
-        if let Some(account_id) = self
+        let mut account_id = self
             .account_id
             .lock()
-            .map_err(|_| "Account cookie lock unavailable")?
-            .take()
-        {
-            misty_credential_store::delete(SERVICE, &key(url, &account_id))
-                .map_err(|e| e.to_string())?;
+            .map_err(|_| "Account cookie lock unavailable")?;
+        if let Some(saved_account) = account_id.as_deref() {
+            credential_io(|| misty_credential_store::account::delete(&key(url, saved_account)))?;
+            *account_id = None;
         }
         Ok(None)
     }
@@ -169,7 +183,7 @@ fn now() -> u64 {
         .unwrap_or_default()
         .as_secs()
 }
-// The native client decodes only to select a file and preserve expiry. Every
+// The native client decodes only to select a saved account and preserve expiry. Every
 // authenticated request is verified cryptographically by the server.
 fn identity(token: &str, kind: &str) -> Result<(String, u64), String> {
     if token.len() > 4096 || token.split('.').count() != 3 {
@@ -241,11 +255,12 @@ pub async fn auth_cookie_restore(
         let Some(account_id) = account_id.filter(|id| !id.is_empty()) else {
             return Ok(false);
         };
-        let Some(value) = misty_credential_store::load(SERVICE, &key(&url, &account_id))
-            .map_err(|e| e.to_string())?
+        let Some(value) =
+            credential_io(|| misty_credential_store::account::load(&key(&url, &account_id)))?
         else {
             return Ok(false);
         };
+        let value = zeroize::Zeroizing::new(value);
         let Some(client) = AccountClient::restore(&url, &account_id, &value)? else {
             return Ok(false);
         };
@@ -270,10 +285,7 @@ pub async fn auth_cookie_forget(
             }) || current(&url)
                 .is_ok_and(|client| client.require_account(&url, &account_id).is_ok())
         },
-        || {
-            misty_credential_store::delete(SERVICE, &key(&url, &account_id))
-                .map_err(|e| e.to_string())
-        },
+        || credential_io(|| misty_credential_store::account::delete(&key(&url, &account_id))),
     )
     .await
 }

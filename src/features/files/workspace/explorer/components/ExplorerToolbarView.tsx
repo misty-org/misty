@@ -33,7 +33,6 @@ import { ExplorerToolbarDragNavigationView } from "./ExplorerToolbarDragNavigati
 
 export { ExplorerPaneToolbarActions } from "./ExplorerPaneToolbarActions";
 export type {
-  ExplorerCommandId,
   ExplorerLocationResult,
   ExplorerPaneToolbarActionsProps,
 } from "./ExplorerToolbarModel";
@@ -81,7 +80,7 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
 
   return (
     <header className={toolbarStyles.root}>
-      <div className={toolbarStyles.navRow}>
+      <div className={toolbarStyles.navRow} data-window-toolbar>
         <div className={toolbarStyles.navButtons}>
           <ExplorerToolbarDragNavigationView
             DropTarget={DropTarget}
@@ -103,6 +102,7 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
 
         <div
           className={cx(toolbarStyles.pathBar, pathEditing && toolbarStyles.pathBarEditing)}
+          data-misty-window-drag-block="true"
           title={pathEditing ? undefined : "Click empty space to edit path"}
           onClick={(event) => {
             if (event.target === event.currentTarget) beginPathEdit();

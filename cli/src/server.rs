@@ -90,7 +90,7 @@ pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
     }
 }
 
-fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
+pub(crate) fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
     let mut contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -432,7 +432,7 @@ pub fn deploy_development(workspace: &Workspace) -> Result<()> {
         )
 }
 
-fn development_compose() -> CommandSpec {
+pub(crate) fn development_compose() -> CommandSpec {
     compose("compose.dev.yml")
 }
 
@@ -472,6 +472,34 @@ pub fn production_down(workspace: &Workspace, volumes: bool) -> Result<()> {
         command = command.arg("--volumes");
     }
     command.arg("--remove-orphans").run(&workspace.server)
+}
+
+pub fn production_backup(workspace: &Workspace) -> Result<()> {
+    environment::check(workspace, Target::Prod)?;
+    CommandSpec::new("bash")
+        .arg("scripts/prod-backup.sh")
+        .run(&workspace.server)
+}
+
+pub fn production_restore(
+    workspace: &Workspace,
+    backup: &str,
+    identity: &Path,
+    confirmed: bool,
+) -> Result<()> {
+    if !confirmed {
+        bail!("restore replaces production data; rerun with --yes");
+    }
+    environment::check(workspace, Target::Prod)?;
+    let identity = identity
+        .canonicalize()
+        .with_context(|| format!("cannot read age identity {}", identity.display()))?;
+    CommandSpec::new("bash")
+        .arg("scripts/prod-restore.sh")
+        .arg(backup)
+        .arg(identity)
+        .env("MISTY_RESTORE_CONFIRMED", "yes")
+        .run(&workspace.server)
 }
 
 pub fn production_logs(workspace: &Workspace) -> Result<()> {

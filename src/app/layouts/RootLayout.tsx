@@ -1,7 +1,8 @@
+import { cn } from "@/shared/ui";
 import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import { SettingsProfilesBridge, useDocumentAppAppearance } from "@/features/settings";
 import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
@@ -22,7 +23,7 @@ export function RootLayout(props: {
   useShortcutHandler("app.zoom_reset", appZoom.resetZoom);
   useDocumentAppAppearance();
   const setupLoadStarted = useRef(false);
-  const { loadSystem } = useSetupStore(
+  const { loadSystem } = useNativeSessionStore(
     useShallow((state) => ({
       loadSystem: state.loadSystem,
     })),
@@ -72,7 +73,12 @@ function AuthenticatedTreeOutlet() {
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {
   return (
     <div
-      className={`pointer-events-none fixed inset-x-0 top-10 layer-dialog-backdrop mx-auto w-fit rounded-full border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream shadow-xl transition duration-150 ${props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}`}
+      className={cn(
+        "pointer-events-none fixed inset-x-0 top-10 layer-dialog-backdrop mx-auto w-fit rounded-full",
+        "border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream",
+        "shadow-xl transition duration-150",
+        props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
+      )}
       role="status"
       aria-live="polite"
       aria-hidden={!props.visible}

@@ -36,7 +36,8 @@ impl Vault for OsVault {
         crate::infra::credential_store::load(SERVICE, key).map_err(|error| error.to_string())
     }
     fn store(&self, key: &str, value: &str) -> Result<(), String> {
-        crate::infra::credential_store::store(SERVICE, key, value).map_err(|error| error.to_string())
+        crate::infra::credential_store::store(SERVICE, key, value)
+            .map_err(|error| error.to_string())
     }
     fn delete(&self, key: &str) -> Result<(), String> {
         crate::infra::credential_store::delete(SERVICE, key).map_err(|error| error.to_string())

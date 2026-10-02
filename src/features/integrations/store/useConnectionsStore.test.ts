@@ -80,8 +80,8 @@ describe("account connections store", () => {
     useConnectionsStore.getState().setAccount("account-a");
 
     await expect(
-      useConnectionsStore.getState().beginAuthorization("google", ["mail"]),
+      useConnectionsStore.getState().beginAuthorization("google", ["calendar_read"]),
     ).resolves.toBe("https://accounts.example/authorize");
-    expect(connectionsApi.authorize).toHaveBeenCalledWith("google", ["mail"], "/inbox");
+    expect(connectionsApi.authorize).toHaveBeenCalledWith("google", ["calendar_read"], "/home");
   });
 });

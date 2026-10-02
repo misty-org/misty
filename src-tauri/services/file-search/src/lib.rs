@@ -258,7 +258,10 @@ pub fn execute(
             }
             let searcher = reader.searcher();
             let hits = searcher
-                .search(&build_query(fields, text), &TopDocs::with_limit(10_000))
+                .search(
+                    &build_query(fields, text),
+                    &TopDocs::with_limit(10_000).order_by_score(),
+                )
                 .map_err(|e| ApiError::Message(e.to_string()))?;
             let mut docs = Vec::new();
             for (_, address) in hits {

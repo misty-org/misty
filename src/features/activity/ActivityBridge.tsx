@@ -39,13 +39,25 @@ export function ActivityBridge() {
     const store = useCapabilityApprovals.getState();
     store.setAccount(accountId);
     useAgentInterventions.getState().setAccount(accountId);
-    const remove = observeAccountChanges(
-      accountId,
-      ["approvals", "interventions", "invocations"],
-      refresh,
+    // Each source re-reads only on its own topic. An invocation changing state
+    // can only remove pending items (new ones publish their own topic), so it
+    // re-reads only sources that currently hold items.
+    const removeApprovals = observeAccountChanges(accountId, ["approvals"], () =>
+      refresh(["approvals"]),
+    );
+    const removeInterventions = observeAccountChanges(accountId, ["interventions"], () =>
+      refresh(["interventions"]),
+    );
+    const removeInvocations = observeAccountChanges(accountId, ["invocations"], () =>
+      refresh([
+        ...(useCapabilityApprovals.getState().items.length ? (["approvals"] as const) : []),
+        ...(useAgentInterventions.getState().items.length ? (["interventions"] as const) : []),
+      ]),
     );
     return () => {
-      remove();
+      removeApprovals();
+      removeInterventions();
+      removeInvocations();
       setAccount("");
       useCapabilityApprovals.getState().setAccount("");
       useAgentInterventions.getState().setAccount("");

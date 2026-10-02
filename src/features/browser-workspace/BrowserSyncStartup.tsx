@@ -7,7 +7,7 @@ import {
 } from "@/api/client/session";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { readNativeSync, unlockNativeSync } from "./native";
-import { browserSyncRetryEvent, useBrowserSyncStore } from "./store";
+import { useBrowserSyncStore } from "./store";
 
 /** Best-effort background startup. Sync must never gate the signed-in app: a
  * missing vault, unavailable server, or browser-profile recovery remains visible
@@ -26,12 +26,22 @@ export function BrowserSyncStartup({
     const generation = readApiSessionGeneration();
     const valid = () =>
       active && !isApiSessionTransitioning() && generation === readApiSessionGeneration();
+    const canConnect = () =>
+      valid() &&
+      useBrowserSyncStore.getState().locked !== accountId &&
+      useBrowserSyncStore.getState().reenroll !== accountId;
     let running = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
     let nextAttempt = 0;
     const connect = async () => {
-      if (!valid() || running) return;
+      if (
+        !valid() ||
+        running ||
+        useBrowserSyncStore.getState().locked === accountId ||
+        useBrowserSyncStore.getState().reenroll === accountId
+      )
+        return;
       running = true;
       clearTimeout(timer);
       let opening = false;
@@ -39,11 +49,11 @@ export function BrowserSyncStartup({
         // Restore the native JWT cookie jar before asking sync to use it. This
         // is local credential loading, not a dependency on the /me request.
         await readApiAuthToken();
-        if (!valid()) return;
+        if (!canConnect()) return;
         const account = { apiBase: await resolveApiBase(), accountId };
-        if (!valid()) return;
+        if (!canConnect()) return;
         const existing = await readNativeSync();
-        if (!valid()) return;
+        if (!canConnect()) return;
         if (
           existing?.account_id === accountId &&
           existing.deployment === new URL(account.apiBase).href.replace(/\/$/, "") &&
@@ -63,13 +73,13 @@ export function BrowserSyncStartup({
         // Try the saved client key directly, even without cached vault metadata.
         // Native code fetches any missing metadata and verifies the key.
         const opened = await unlockNativeSync(account, null, null, false);
-        if (valid()) {
+        if (canConnect()) {
           if (opened.status?.phase === "ready") failures = 0;
           useBrowserSyncStore.setState({ session: opened, issue: null });
         }
       } catch (error) {
         if (!opening) failures += 1;
-        if (valid())
+        if (canConnect())
           useBrowserSyncStore.setState({
             session: null,
             issue: error instanceof Error ? error.message : String(error),
@@ -90,18 +100,13 @@ export function BrowserSyncStartup({
       // Connectivity flapping must not bypass a failed attempt's cooldown.
       if (Date.now() >= nextAttempt) void connect();
     };
-    const requestedRetry = (event: Event) => {
-      if ((event as CustomEvent<string>).detail === accountId) void connect();
-    };
     void connect();
     window.addEventListener("online", retry);
-    window.addEventListener(browserSyncRetryEvent, requestedRetry);
     return () => {
       active = false;
       useBrowserSyncStore.setState({ connecting: false });
       clearTimeout(timer);
       window.removeEventListener("online", retry);
-      window.removeEventListener(browserSyncRetryEvent, requestedRetry);
     };
   }, [accountId, enabled]);
   return children;

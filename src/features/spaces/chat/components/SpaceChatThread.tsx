@@ -63,6 +63,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       onCancelEditing={editing.cancel}
       onSaveEdited={(event, message) => void actions.saveEdited(event, message)}
       onReply={props.onReply}
+      onRetry={access.canWriteMessages ? (message) => void actions.retry(message) : undefined}
       onToggleReaction={(message, emoji, reacted) =>
         void actions.toggleReaction(message, emoji, reacted)
       }

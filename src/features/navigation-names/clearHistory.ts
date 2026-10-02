@@ -10,15 +10,13 @@ import {
 export async function clearNavigationRestoreHistory() {
   const state = useWorkspaceStore.getState(),
     account = useNavigationNames.getState().account;
-  const openWindows = Object.values(state.virtualWindowsByScope).flatMap(
-    (windows) => windows ?? [],
-  );
-  const closedWindows = Object.values(state.closedVirtualWindowsByScope).flatMap(
+  const openWindows = Object.values(state.windowsByScope).flatMap((windows) => windows ?? []);
+  const closedWindows = Object.values(state.closedWindowsByScope).flatMap(
     (windows) => windows ?? [],
   );
   const open = openWindows.flatMap((window) => allLayoutViews(window.layout));
   const closed = [
-    ...state.closedTabs.map((entry) => entry.tab),
+    ...state.closedItems.map((entry) => entry.view),
     ...closedWindows.flatMap((window) => allLayoutViews(window.layout)),
   ];
   const keys = (tabs: typeof open) =>
@@ -46,15 +44,15 @@ export async function clearNavigationRestoreHistory() {
   }
   // Do not discard new close events that arrived while the file writes completed.
   useWorkspaceStore.setState((current) => ({
-    closedTabs: current.closedTabs.filter((entry) => !state.closedTabs.includes(entry)),
-    closedVirtualWindowsByScope: Object.fromEntries(
-      Object.entries(current.closedVirtualWindowsByScope).map(([scope, windows]) => [
+    closedItems: current.closedItems.filter((entry) => !state.closedItems.includes(entry)),
+    closedWindowsByScope: Object.fromEntries(
+      Object.entries(current.closedWindowsByScope).map(([scope, windows]) => [
         scope,
         windows?.filter(
           (window) =>
-            !state.closedVirtualWindowsByScope[
-              scope as keyof typeof state.closedVirtualWindowsByScope
-            ]?.includes(window),
+            !state.closedWindowsByScope[scope as keyof typeof state.closedWindowsByScope]?.includes(
+              window,
+            ),
         ),
       ]),
     ),

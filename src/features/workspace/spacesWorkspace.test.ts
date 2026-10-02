@@ -19,16 +19,16 @@ it("opens Spaces beside a browser and keeps both pane identities while changing 
   const before = dockLeaves(useWorkspaceStore.getState().layout.root);
   expect(before).toHaveLength(2);
   expect(
-    before.find((pane) => pane.id === browserPane)?.tabs.some((tab) => tab.id === browser.id),
+    before.find((pane) => pane.id === browserPane)?.views.some((tab) => tab.id === browser.id),
   ).toBe(true);
   expect(
-    before.find((pane) => pane.id === spacePane)?.tabs.some((tab) => tab.id === space.id),
+    before.find((pane) => pane.id === spacePane)?.views.some((tab) => tab.id === space.id),
   ).toBe(true);
-  useWorkspaceStore.getState().updateTabRoute(space.id, "/spaces/project/planner");
+  useWorkspaceStore.getState().updateViewRoute(space.id, "/spaces/project/planner");
   const after = dockLeaves(useWorkspaceStore.getState().layout.root);
   expect(after.map((pane) => pane.id)).toEqual(before.map((pane) => pane.id));
-  expect(after.find((pane) => pane.id === browserPane)?.tabs).toEqual(
-    before.find((pane) => pane.id === browserPane)?.tabs,
+  expect(after.find((pane) => pane.id === browserPane)?.views).toEqual(
+    before.find((pane) => pane.id === browserPane)?.views,
   );
   expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
 });

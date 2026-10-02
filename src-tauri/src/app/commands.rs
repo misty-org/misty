@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::app::runtime::MistyRuntime;
-use crate::domain::clipboard::{
-    ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
-};
+use crate::domain::clipboard::{ClipboardImage, ClipboardPayload, ClipboardPayloadKind};
 use crate::domain::explorer::{
     ClipboardOperation, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
     ExplorerOperationResult, ExplorerPreviewPayload, GeneratedImageThumbnail, ListDirectoryRequest,
@@ -25,11 +23,8 @@ use crate::domain::file_sync::FileSyncPair;
 use crate::domain::operation_queue::{ConflictPolicy, OperationQueueSnapshot};
 use crate::domain::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
-use crate::infra::agents::{
-    OpenAgentCitationRequest, PrepareScopedAgentDocumentRequest, RegisterFolderScopeRequest,
-};
+use crate::infra::agents::PrepareScopedAgentDocumentRequest;
 use crate::infra::autostart::LaunchOnLoginSnapshot;
-use crate::infra::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
 use crate::infra::connected_devices::{
     ConnectPeerRequest, ConnectedDevicesService, ConnectedDevicesSnapshot,
     InitializeConnectedDevicesRequest, PeerPathRequest, PeerReadRequest,
@@ -39,7 +34,7 @@ use crate::infra::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
 #[cfg(not(target_os = "macos"))]
 use crate::infra::document_intelligence::PrepareAgentDocumentRequest;
 use crate::infra::document_intelligence::PreparedAgentDocument;
-use crate::infra::environment::{AppEnvironmentSnapshot, ServerMode};
+use crate::infra::environment::AppEnvironmentSnapshot;
 use crate::infra::explorer::SavePreviewRequest;
 use crate::infra::explorer_library::{
     ExplorerLibrarySnapshot, RecordLastOpenedRequest, RecordRecentRequest, SetTagsRequest,
@@ -94,8 +89,6 @@ pub struct ClipboardFileBytes {
     pub bytes: Vec<u8>,
 }
 
-const NOTE_ASSET_MAX_BYTES: usize = 15 * 1024 * 1024;
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteAssetStoreRequest {
@@ -127,64 +120,10 @@ pub async fn app_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<AppSnapsh
 }
 
 #[tauri::command]
-pub async fn app_environment_snapshot(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<AppEnvironmentSnapshot> {
-    Ok(state.environment.snapshot())
-}
-
-#[tauri::command]
-pub async fn app_configure_server(
-    mode: ServerMode,
-    url: Option<String>,
-    deployment_id: Option<String>,
-    name: Option<String>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state
-        .environment
-        .configure_server(mode, url, deployment_id, name)
-        .map_err(ApiError::Message)
-}
-
-#[tauri::command]
-pub async fn mail_cache_read(
-    account_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Option<String>> {
-    crate::infra::mail_cache::read(&state.environment.cache_dir(), &account_id).await
-}
-
-#[tauri::command]
-pub async fn mail_cache_write(
-    account_id: String,
-    value: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mail_cache::write(&state.environment.cache_dir(), &account_id, &value).await
-}
-
-#[tauri::command]
-pub async fn mail_cache_remove(
-    account_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    crate::infra::mail_cache::remove(&state.environment.cache_dir(), &account_id).await
-}
-
-#[tauri::command]
 pub async fn agents_device_snapshot(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {
     state.agents.device_snapshot().await
-}
-
-#[tauri::command]
-pub async fn agents_register_folder_scope(
-    request: RegisterFolderScopeRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.agents.register_folder_scope(request).await
 }
 
 #[tauri::command]
@@ -193,14 +132,6 @@ pub async fn agents_revoke_folder_scope(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<()> {
     state.agents.revoke_folder_scope(scope_id).await
-}
-
-#[tauri::command]
-pub async fn agents_open_citation(
-    request: OpenAgentCitationRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.agents.open_citation(request).await
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -274,29 +205,6 @@ pub async fn agents_device_identity_store(
     encoded_identity: String,
 ) -> ApiResult<()> {
     crate::infra::agent_device_identity::store(&local_device_id, &encoded_identity)
-}
-
-#[tauri::command]
-pub fn claude_status(state: State<'_, MistyRuntime>) -> ClaudeStatus {
-    state.claude.status()
-}
-
-#[tauri::command]
-pub fn claude_send_message(
-    request: ClaudeSendRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ClaudeStatus> {
-    state.claude.send_message(request)
-}
-
-#[tauri::command]
-pub fn claude_drain_events(state: State<'_, MistyRuntime>) -> Vec<ClaudeStreamEvent> {
-    state.claude.drain_events()
-}
-
-#[tauri::command]
-pub fn claude_abort(state: State<'_, MistyRuntime>) -> ApiResult<ClaudeStatus> {
-    state.claude.abort()
 }
 
 #[tauri::command]
@@ -477,99 +385,6 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
         });
     }
     crate::infra::native_clipboard::write_native_clipboard_file_refs(&references)
-}
-
-#[tauri::command]
-pub async fn notes_store_asset(
-    request: NoteAssetStoreRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<NoteAssetStoreResult> {
-    if request.bytes.is_empty() {
-        return Err(ApiError::Message(
-            "The selected note file is empty.".to_owned(),
-        ));
-    }
-    if request.bytes.len() > NOTE_ASSET_MAX_BYTES {
-        return Err(ApiError::Message(
-            "Note files must be 15 MB or smaller for this beta.".to_owned(),
-        ));
-    }
-
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .unwrap_or_default();
-    let original_name = safe_file_name(&request.file_name, "note-asset");
-    let original_path = Path::new(&original_name);
-    let stem = original_path
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .filter(|name| !name.is_empty())
-        .unwrap_or("note-asset");
-    let extension = original_path
-        .extension()
-        .and_then(|value| value.to_str())
-        .map(|value| format!(".{}", safe_path_segment(value, "file")))
-        .unwrap_or_default();
-    let file_name = format!("{stem}-{timestamp}{extension}");
-    let directory = state
-        .environment
-        .notes_dir()
-        .join(safe_path_segment(&request.account_id, "account"))
-        .join(safe_path_segment(&request.space_id, "space"))
-        .join(safe_path_segment(&request.note_id, "note"));
-
-    tokio::fs::create_dir_all(&directory)
-        .await
-        .map_err(|error| {
-            ApiError::Message(format!(
-                "Misty could not prepare note asset storage: {error}"
-            ))
-        })?;
-    let path = directory.join(&file_name);
-    tokio::fs::write(&path, &request.bytes)
-        .await
-        .map_err(|error| {
-            ApiError::Message(format!("Misty could not save this note file: {error}"))
-        })?;
-
-    Ok(NoteAssetStoreResult {
-        path: path.to_string_lossy().into_owned(),
-        name: original_name,
-        mime_type: request
-            .mime_type
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty()),
-        byte_size: request.bytes.len() as u64,
-    })
-}
-
-fn safe_file_name(value: &str, fallback: &str) -> String {
-    let name = Path::new(value.trim())
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(fallback);
-    safe_path_segment(name, fallback)
-}
-
-fn safe_path_segment(value: &str, fallback: &str) -> String {
-    let sanitized: String = value
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_' | ' ') {
-                character
-            } else {
-                '-'
-            }
-        })
-        .collect::<String>()
-        .trim_matches([' ', '.', '-'])
-        .to_owned();
-    if sanitized.is_empty() {
-        fallback.to_owned()
-    } else {
-        sanitized
-    }
 }
 
 #[tauri::command]
@@ -869,49 +684,6 @@ pub async fn search_query(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<Vec<SearchResult>> {
     state.search.query(request).await
-}
-
-#[tauri::command]
-pub async fn explorer_create_item(
-    request: CreateItemRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ExplorerOperationResult> {
-    if request.directory.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
-    state.explorer.create_item(request).await
-}
-
-#[tauri::command]
-pub async fn explorer_rename_item(
-    request: RenameItemRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ExplorerOperationResult> {
-    if request.path.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
-    state.explorer.rename_item(request).await
-}
-
-#[tauri::command]
-pub async fn explorer_delete_items(
-    request: DeleteItemsRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ExplorerOperationResult> {
-    if request
-        .paths
-        .iter()
-        .any(|path| path.starts_with("misty://device/"))
-    {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
-    state.explorer.delete_items(request).await
 }
 
 #[cfg(desktop)]
