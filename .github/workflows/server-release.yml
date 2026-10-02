@@ -24,6 +24,8 @@ env:
 jobs:
   tests:
     uses: ./.github/workflows/tests.yml
+    with:
+      server-only: true
 
   build:
     name: Build and push images
