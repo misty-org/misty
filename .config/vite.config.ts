@@ -5,6 +5,21 @@ import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import { resolve } from "node:path";
 
+const nodeShims: Record<string, string> = {
+  fs: "fs",
+  "fs/promises": "fsPromises",
+  path: "path",
+  os: "os",
+  util: "util",
+  crypto: "crypto",
+  buffer: "buffer",
+  assert: "other",
+  async_hooks: "other",
+  child_process: "other",
+  net: "other",
+  string_decoder: "other",
+};
+
 export default defineConfig(({ command, mode }) => {
   const env = loadAppEnv(process.cwd());
   if (
@@ -86,9 +101,15 @@ export default defineConfig(({ command, mode }) => {
       entries: ["index.html"],
     },
     resolve: {
-      alias: {
-        "@": new URL("../src", import.meta.url).pathname,
-      },
+      alias: [
+        { find: "@", replacement: new URL("../src", import.meta.url).pathname },
+        // Midscene's planner runs in the app; its Node-only helpers get browser stubs.
+        ...Object.entries(nodeShims).map(([name, file]) => ({
+          find: new RegExp(`^node:${name}$`),
+          replacement: new URL(`../src/shared/platform/nodeShims/${file}.ts`, import.meta.url)
+            .pathname,
+        })),
+      ],
     },
     build: {
       outDir: resolve(process.cwd(), "dist"),

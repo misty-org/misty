@@ -1,5 +1,10 @@
 # Midscene browser execution
 
+> October 4, 2026: desktop browser tasks now run Midscene on the device through
+> `browser_act`; see Phase 4 in
+> [agent-architecture/BRIEF.md](../agent-architecture/BRIEF.md). The runtime
+> integration below remains for paths that grant native input directly.
+
 Misty uses the MIT-licensed `@midscene/core` 1.14.0 visual planner through its
 exported `standardPlan` API. This is an execution adapter for the existing agent
 runtime, not a separate account, browser profile, or unrestricted desktop agent.
