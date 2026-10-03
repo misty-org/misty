@@ -21,6 +21,10 @@ export interface ScreenActResult extends Record<string, unknown> {
 }
 
 const actionLimit = 24;
+// A malformed planner reply is shown to the planner and retried this often.
+const invalidReplyLimit = 2;
+// Actions in a row after which an unchanged screenshot ends the goal.
+const unchangedLimit = 3;
 // Stays inside the server's five-minute tool call.
 const timeLimitMs = 4 * 60_000;
 
@@ -36,6 +40,14 @@ function parseJob(job: ScreenActJob) {
     taskId: typeof config.taskId === "string" ? config.taskId : undefined,
     allowConsequential: input.allowConsequential === true,
   };
+}
+
+function isInvalidPlannerReply(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  // Reasoning models can also spend the whole output cap and return nothing.
+  return /parse error|Invalid parameters|unsupported_screen_action|ZodError|invalid_type|empty content/i.test(
+    message,
+  );
 }
 
 /**
@@ -79,6 +91,11 @@ export async function runScreenAct(
   let cursor: { x: number; y: number } | undefined;
   let frame: ScreenFrame | undefined;
   let dispatched = false;
+  let calls = 0;
+  let invalidReplies = 0;
+  // The frame an action was planned on, to notice when the page ignores it.
+  let acted: { image: string; description: string } | undefined;
+  let unchanged = 0;
   try {
     for (let step = 0; ; step++) {
       signal.throwIfAborted();
@@ -92,9 +109,32 @@ export async function runScreenAct(
         cursor,
         image: frame!.image,
       });
+      if (acted) {
+        unchanged = frame.image.dataUrl === acted.image ? unchanged + 1 : 0;
+        if (unchanged >= unchangedLimit)
+          return finish(
+            "incomplete",
+            `The page did not respond after ${unchanged} tries at: ${acted.description}.`,
+          );
+        if (unchanged)
+          history.push(
+            `The screenshot did not change after "${acted.description}". Try something different or report that you cannot finish.`,
+          );
+        acted = undefined;
+      }
       if (step >= actionLimit || Date.now() - started > timeLimitMs)
         return finish("incomplete", `Stopped after ${step} actions without reaching the goal.`);
-      const plan = await planScreenAction(job.id, step, frame, goal, history);
+      let plan: Awaited<ReturnType<typeof planScreenAction>>;
+      try {
+        plan = await planScreenAction(job.id, calls++, frame, goal, history);
+      } catch (error) {
+        if (!isInvalidPlannerReply(error) || ++invalidReplies > invalidReplyLimit) throw error;
+        history.push(
+          `Your last reply was invalid (${String((error as Error).message).slice(0, 200)}). Reply again with every required parameter.`,
+        );
+        step--;
+        continue;
+      }
       if (!plan.action)
         return finish(plan.complete ? "done" : "incomplete", plan.message.slice(0, 800));
       if (plan.consequential && !allowConsequential)
@@ -110,6 +150,7 @@ export async function runScreenAct(
         description: plan.description,
         action: { kind: "native", input: plan.action },
       });
+      acted = { image: frame.image.dataUrl, description: plan.description ?? "the last action" };
       cursor = result?.cursor ?? cursor;
       const at = cursor ? ` Cursor now at (${cursor.x.toFixed(3)}, ${cursor.y.toFixed(3)}).` : "";
       history.push(

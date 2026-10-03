@@ -21,8 +21,9 @@ const actionContext =
   "sign-in, passwords, codes, CAPTCHAs, missing permissions or decisions the user must make. Use only " +
   "the listed actions. Click a field before typing; use Meta+a to replace existing text. All " +
   "coordinates MUST be fractions 0..1 of the screenshot. Report complete only when the requested " +
-  "result is visible in this fresh screenshot; an earlier action is not proof. Mark consequential " +
-  "actions (sending, publishing, buying, deleting, submitting, changing access) truthfully.";
+  "result is visible in this fresh screenshot; an earlier action is not proof. Every action needs " +
+  "consequential and description. Consequential means sending or posting to other people, " +
+  "publishing, buying, deleting, or changing access; saving the user's own edits is not.";
 
 /**
  * Asks Midscene's planner for the next action on a fresh frame. The planner
@@ -45,7 +46,7 @@ export async function planScreenAction(
     consequential: z
       .boolean()
       .describe(
-        "True for sending, publishing, deleting, purchasing, submitting or access changes.",
+        "True for sending or posting to other people, publishing, purchasing, deleting or access changes. Saving the user's own edits is false.",
       ),
     description: z.string().min(1).max(500).describe("Visible target and purpose of this action"),
   };

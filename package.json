@@ -21,6 +21,7 @@
     "check:format": "node cli/tasks/run-tool.ts prettier --check \"src/**/*.{ts,tsx,css}\"",
     "cli": "cargo run --manifest-path cli/Cargo.toml --",
     "test:tasks": "node --test cli/tasks/*.test.ts",
+    "acceptance": "MISTY_ACCEPTANCE=1 node cli/tasks/run-tool.ts acceptance run",
     "tool": "node cli/tasks/run-tool.ts",
     "release": "cargo run --manifest-path cli/Cargo.toml -- release",
     "release:keys": "node cli/tasks/release/setup-keys.ts"

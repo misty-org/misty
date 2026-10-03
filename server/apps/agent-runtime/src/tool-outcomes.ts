@@ -26,7 +26,10 @@ export function unconfirmedToolResultReason(output: unknown): string {
 
 export type ToolOutcome =
   | { kind: "confirmed" }
-  /** The run hands off to a screen: Misty opens it and continues the conversation. */
+  /**
+   * The run hands off to the user: a screen Misty opens, or an app card they
+   * answer. The desktop continues the conversation once it is done.
+   */
   | { kind: "handoff"; reason: string }
   /** The call had no effect; the model sees why and plans again. */
   | { kind: "retry"; reason: string }
@@ -35,14 +38,20 @@ export type ToolOutcome =
 
 const runEndingCodes = ["authorization_or_state_changed", "agent_execution_time_limit", "agent_model_turn_limit", "permission_denied"];
 
-/** The message for a screen request, or "" when the output is not one. */
-export function screenHandoffMessage(output: unknown): string {
+const handoffDefaults: Record<string, string> = {
+  screen_requested: "Misty is opening a screen and will continue this conversation with it attached.",
+  waiting_for_user: "Connect the app with the card above. Misty continues once it's connected.",
+  awaiting_approval: "An action is waiting for your approval above. Misty continues after you decide.",
+};
+
+/** The user-facing message for a handoff result, or "" when the output is not one. */
+export function handoffMessage(output: unknown): string {
   if (!output || typeof output !== "object") return "";
   const result = output as Record<string, unknown>;
-  if (result.status !== "screen_requested") return "";
-  return typeof result.message === "string" && result.message.trim()
-    ? result.message.slice(0, 300)
-    : "Misty is opening a screen and will continue this conversation with it attached.";
+  const fallback = handoffDefaults[String(result.status)];
+  if (!fallback) return "";
+  const text = result.status === "screen_requested" ? result.message : result.user_message;
+  return typeof text === "string" && text.trim() ? text.slice(0, 300) : fallback;
 }
 
 /** The run lost its authority or budget, or its tool sequence already stopped. */
@@ -59,7 +68,7 @@ export function endsRun(message: string): boolean {
  */
 export function classifyToolOutcome(input: { success: boolean; output?: unknown; error?: unknown; readOnly: boolean; rejected: boolean }): ToolOutcome {
   if (input.success) {
-    const handoff = screenHandoffMessage(input.output);
+    const handoff = handoffMessage(input.output);
     if (handoff) return { kind: "handoff", reason: handoff };
     const reason = unconfirmedToolResultReason(input.output);
     if (!reason) return { kind: "confirmed" };

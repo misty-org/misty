@@ -8,22 +8,19 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	agent "github.com/kannachi323/misty/server/internal/agents"
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 // The desktop runs Midscene's screen loop for a browser.act job and sends its
 // model calls here. Misty keeps the gateway key, admits each call against the
 // run's model-turn budget and meters it to the run. Inference happens at the
-// gateway; this only forwards.
+// model provider; this only forwards.
 const (
 	screenActTool        = "browser.act"
 	screenModelBodyLimit = 12 << 20
-	screenModelMaxOutput = 2200
+	screenModelMaxOutput = 6000
 	screenModelMaxCalls  = 40
 )
 
@@ -58,7 +55,7 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		node := "screen:" + job.ID + ":" + strconv.Itoa(call)
+		node := "model:screen:" + job.ID + ":" + strconv.Itoa(call)
 		if err := s.meterAIInvocationRuntimeModel(r.Context(), record, node, "running", mustJSONRaw(map[string]any{"input_bytes": len(raw)})); err != nil {
 			writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": "screen_model_budget", "message": "The task's model allowance is used up."})
 			return
@@ -83,29 +80,27 @@ type screenModelUsage struct {
 	CompletionTokens int64 `json:"completion_tokens"`
 }
 
-// forwardScreenModel calls the gateway's OpenAI-compatible endpoint with the
-// run's model. The client cannot choose the model or raise the output limit.
+// forwardScreenModel calls the deployment's model provider with the run's
+// model. The client cannot choose the model or raise the output limit.
 func forwardScreenModel(ctx context.Context, model string, messages json.RawMessage) (json.RawMessage, screenModelUsage, error) {
 	var usage screenModelUsage
-	key := strings.TrimSpace(envconfig.Getenv("AI_GATEWAY_API_KEY"))
-	base := strings.TrimSpace(envconfig.Getenv("AI_GATEWAY_BASE_URL"))
-	if base == "" {
-		base = agent.TestingDefaultVercelAIBaseURL
+	endpoint, err := resolveScreenModelEndpoint(model)
+	if err != nil {
+		return nil, usage, err
 	}
-	if key == "" {
-		return nil, usage, errScreenModelUnconfigured
-	}
-	payload, err := json.Marshal(map[string]any{"model": model, "messages": messages, "max_tokens": screenModelMaxOutput, "temperature": 0, "stream": false})
+	payload, err := json.Marshal(screenModelPayload(endpoint, messages))
 	if err != nil {
 		return nil, usage, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(base, "/")+"/chat/completions", bytes.NewReader(payload))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, usage, err
 	}
-	request.Header.Set("Authorization", "Bearer "+key)
+	if endpoint.key != "" {
+		request.Header.Set("Authorization", "Bearer "+endpoint.key)
+	}
 	request.Header.Set("Content-Type", "application/json")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
