@@ -53,6 +53,12 @@ export const assistantApi = {
       `/misty/conversations/${encodeURIComponent(conversationId)}`,
       { method: "PATCH", body: JSON.stringify({ title }) },
     ),
+  /** Records that the user has seen the conversation now. */
+  markConversationRead: (conversationId: string) =>
+    apiRequest<{ id: string; lastReadAt: string }>(
+      `/misty/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "PATCH", body: JSON.stringify({ read: true }) },
+    ),
   bindConversationSpace: (conversationId: string, spaceId: string) =>
     apiRequest<{ id: string; spaceId: string }>(
       `/misty/conversations/${encodeURIComponent(conversationId)}`,

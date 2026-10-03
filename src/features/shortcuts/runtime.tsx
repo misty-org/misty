@@ -146,11 +146,14 @@ export function ShortcutRuntime(): null {
 }
 
 export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: boolean): boolean {
-  if (document.querySelector("[data-device-sync-sleep]")) return false;
   if (event.defaultPrevented || document.documentElement.dataset.shortcutCapture === "true")
     return false;
-  const activeScope = focusedShortcutScope();
   const editable = editableOverride ?? isEditableShortcutTarget(event.target);
+  // Plain typing in a field: every command allowed in one needs Cmd, Ctrl or Option,
+  // so skip the registry scan below rather than run it on each keystroke.
+  if (editable && !event.metaKey && !event.ctrlKey && !event.altKey) return false;
+  if (document.querySelector("[data-device-sync-sleep]")) return false;
+  const activeScope = focusedShortcutScope();
   const snapshot = useSettingsStore.getState().shortcuts;
   const platform = snapshot?.detectedPlatform ?? detectShortcutPlatform();
   const effectiveById = new Map(

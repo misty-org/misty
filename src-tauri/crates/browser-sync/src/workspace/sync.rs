@@ -22,6 +22,7 @@ use super::{
     state::{Verifier, WorkspaceState},
 };
 use crate::{
+    batch::{BatchPolicy, Batcher, Lane},
     crypto::{DeviceKey, VaultRoot, VaultScope},
     document::{Change, Resume, ViewRecord},
     protocol::{DeviceGrant, MAX_COUNTER},
@@ -163,6 +164,8 @@ pub struct WorkspaceSync {
     roster_confirmed: bool,
     /// Persisted: the followed workspace and the seat this session caught up under.
     local: WorkspaceLocal,
+    /// When each workspace's queue is due to publish.
+    batch: Batcher,
 }
 
 impl WorkspaceSync {
@@ -181,7 +184,37 @@ impl WorkspaceSync {
             displaced_with_edits: false,
             roster_confirmed: false,
             local: WorkspaceLocal::default(),
+            batch: Batcher::default(),
         }
+    }
+
+    /// Takes the server's batching policy; false if it is not newer.
+    pub fn set_batch_policy(&mut self, policy: BatchPolicy) -> bool {
+        self.batch.set_policy(policy)
+    }
+
+    /// Publishes every queue on the next tick, regardless of batching, until
+    /// `flush_settled`.
+    pub fn flush(&mut self) {
+        self.batch.flush();
+    }
+
+    pub fn flush_settled(&mut self) {
+        self.batch.settled();
+    }
+
+    /// Nothing waits on the server and nothing publishable is queued: a
+    /// flush has done all it can on this connection.
+    pub fn flushed(&self, store: &Store) -> Result<bool> {
+        if !self.inflight.is_empty() {
+            return Ok(false);
+        }
+        for workspace in self.publish_targets() {
+            if self.current.contains(&workspace) && store.workspace_desired_exists(&workspace)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Until the server's roster arrives again, the cached seat is unverified.
@@ -592,6 +625,9 @@ impl WorkspaceSync {
         let remote = delta.changes.iter().any(|c| c.device_id != self.device_id);
         match state.apply_delta(v, delta) {
             Ok(()) => {
+                if remote {
+                    self.batch.contend(&workspace, Instant::now());
+                }
                 self.accept(store, v, state, remote)?;
                 Ok(Vec::new())
             }
@@ -642,7 +678,9 @@ impl WorkspaceSync {
             if receipt.reason.as_deref() == Some("not_driver") {
                 self.drop_signin_writes(store, v.root, &workspace)?;
             }
-            // Version conflicts rebase onto the next delta and are retried.
+            // Version conflicts rebase onto the next delta and are retried
+            // without waiting for another batch.
+            self.batch.retry(&workspace);
             return Ok(());
         }
         let mut state = self
@@ -697,6 +735,7 @@ impl WorkspaceSync {
         request: Option<&str>,
         operation: Option<&str>,
         code: &str,
+        retry_after: Option<Duration>,
     ) -> Result<()> {
         if let Some((_, reply)) = request.and_then(|r| self.claims.remove(r)) {
             if let Some(reply) = reply {
@@ -718,6 +757,18 @@ impl WorkspaceSync {
         match (workspace, code) {
             (_, "sync_unavailable") => Err(Error::Network),
             (_, "sync_device_forbidden") => Err(Error::DeviceForbidden),
+            // Too many ops from this device: the server applied nothing. Keep
+            // every queued edit and wait as long as it asks before sending again.
+            (Some(workspace), "sync_rate_limited") => {
+                let (_, op, _, _) = self.inflight.remove(&workspace).expect("present");
+                store.finish_workspace_op(&workspace, &op.operation_id)?;
+                self.batch.hold(
+                    &workspace,
+                    retry_after.unwrap_or(Duration::from_secs(5)),
+                    Instant::now(),
+                );
+                Ok(())
+            }
             // A structurally rejected op can never succeed as built. Drop its
             // oldest edit and retry the rest: repeated rejections isolate the
             // bad edit, and every other queued edit still reaches the server.
@@ -733,6 +784,7 @@ impl WorkspaceSync {
                         store.set_workspace_desired(root, &workspace, &desired)?;
                     }
                 }
+                self.batch.retry(&workspace);
                 Ok(())
             }
             (None, _) => Ok(()),
@@ -789,9 +841,16 @@ impl WorkspaceSync {
             let mut desired = store.workspace_desired(root, &target)?.unwrap_or_default();
             let empty = WorkspaceState::empty(&target);
             let state = self.states.get(&target).unwrap_or(&empty);
+            let edits = batch.len();
             desired.push_batch(batch, state.version);
             model::rebase_batches(&state.records, &desired.batches(), &state.tombstones)?;
+            // What an in-flight op carried is drained by count when it is
+            // acknowledged, so only the edits behind it fold.
+            let carried = self.inflight.get(&target).map_or(0, |(_, _, _, c)| c.changes);
+            let folded = super::fold::fold(&mut desired, carried);
+            super::stats::add(&super::stats::EDITS_COALESCED, folded as u64);
             store.set_workspace_desired(root, &target, &desired)?;
+            self.batch.edited(&target, edits, Instant::now());
         }
         Ok(())
     }
@@ -813,7 +872,9 @@ impl WorkspaceSync {
         // Keep write order: an in-flight op may already carry an older value.
         self.queue(store, root, &workspace, |d| {
             d.slots.push((tab, slot, plaintext))
-        })
+        })?;
+        self.batch.edited(&workspace, 1, Instant::now());
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -935,6 +996,7 @@ impl WorkspaceSync {
         {
             return Err(Error::Network);
         }
+        let now = Instant::now();
         let mut out = Vec::new();
         let writable: Vec<String> = self
             .publish_targets()
@@ -949,9 +1011,28 @@ impl WorkspaceSync {
             {
                 self.drop_signin_writes(store, root, &workspace)?;
             }
+            if !store.workspace_desired_exists(&workspace)? {
+                continue;
+            }
+            // A queue still inside its batch is not decrypted on every tick.
+            if !self.batch.due(&workspace, Lane::Workspace, now)
+                && !self.batch.due(&workspace, Lane::Slots, now)
+            {
+                super::stats::add(&super::stats::OPS_DEFERRED, 1);
+                continue;
+            }
             let Some(desired) = store.workspace_desired(root, &workspace)? else {
                 continue;
             };
+            let lane = if desired.changes.is_empty() {
+                Lane::Slots
+            } else {
+                Lane::Workspace
+            };
+            if !self.batch.due(&workspace, lane, now) {
+                super::stats::add(&super::stats::OPS_DEFERRED, 1);
+                continue;
+            }
             let state = self
                 .states
                 .get(&workspace)
@@ -1010,8 +1091,19 @@ impl WorkspaceSync {
                 changes: desired.changes.len(),
                 slots: take,
             };
+            // The queue is spoken for; edits from now on start the next batch.
+            self.batch.published(&workspace);
+            if take < desired.slots.len() {
+                // Writes beyond one op's size already waited their turn.
+                self.batch.retry(&workspace);
+            }
             match result {
                 Ok(op) => {
+                    let written = op.upserts.len() + op.deletes.len();
+                    super::stats::add(
+                        &super::stats::EDITS_COALESCED,
+                        carried.changes.saturating_sub(written) as u64,
+                    );
                     self.inflight.insert(
                         workspace.clone(),
                         (request_id.clone(), op.clone(), Instant::now(), carried),

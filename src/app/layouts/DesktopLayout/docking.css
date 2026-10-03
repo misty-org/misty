@@ -602,11 +602,6 @@
   height: 14px;
   stroke-width: 2.29;
 }
-.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
-  .misty-tab-group-member:not([data-group-active="true"])::after {
-  bottom: 0;
-}
-
 /* Pinned tabs in a horizontal strip are icon-only and fixed width, like Chrome. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab.misty-workspace-tab-pinned {

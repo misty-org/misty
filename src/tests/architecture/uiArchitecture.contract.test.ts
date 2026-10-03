@@ -21,6 +21,9 @@ const customPropertyDefinitionOwners = new Set([
   "src/features/settings/store/appTheme.ts",
   // The companion's runtime size feeds four rules in cursorCompanion.css.
   "src/features/agents/companion/CursorCompanionRoot.tsx",
+  // Dragged widths: the Misty panel and the agent sidebar restyle only their column.
+  "src/features/agents/panel/MistyPanelDock.tsx",
+  "src/features/agents/workspace/AgentWorkspaceFrame.tsx",
 ]);
 /** The cursor companion rides the pointer and rotates every frame; it is never pixel-aligned. */
 const pointerFollowingFiles = new Set([

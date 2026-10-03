@@ -1,6 +1,6 @@
 :root {
   /* Fixed logical pixels keep the same thickness at every viewport size. */
-  --misty-scrollbar-size: 5px;
+  --misty-scrollbar-size: 8px;
 }
 
 @layer base {

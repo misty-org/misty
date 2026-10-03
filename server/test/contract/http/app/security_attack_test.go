@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -70,11 +72,22 @@ func (c *attackClient) do(method, path string, body any, headers map[string]stri
 	return recorder
 }
 
+// attackRun keeps each run's accounts apart: the test database can outlive a
+// run, and an account left by an earlier one would already be registered.
+var attackRun = func() string {
+	suffix := make([]byte, 4)
+	_, _ = rand.Read(suffix)
+	return hex.EncodeToString(suffix)
+}()
+
+// attackEmail is the address registerAttackUser gives an account named name.
+func attackEmail(name string) string { return name + "_" + attackRun + "@attack.test" }
+
 func registerAttackUser(t *testing.T, server *Server, name, address string) *attackClient {
 	t.Helper()
 	client := &attackClient{t: t, server: server, address: address}
 	response := client.do(http.MethodPost, "/v1/register", map[string]string{
-		"name": name, "username": name, "email": name + "@attack.test", "password": "correct horse battery staple",
+		"name": name, "username": name + "_" + attackRun, "email": attackEmail(name), "password": "correct horse battery staple",
 	}, nil)
 	if response.Code != http.StatusCreated {
 		t.Fatalf("register %s = %d %s", name, response.Code, response.Body.String())
@@ -102,20 +115,20 @@ func TestAttackPasswordGuessingIsCappedPerAccount(t *testing.T) {
 	// Guesses spread across addresses, so the per-address limit never trips.
 	for attempt := 0; attempt < 10; attempt++ {
 		guesser := &attackClient{t: t, server: server, address: "203.0.113." + string(rune('1'+attempt%9)) + ":5000"}
-		response := guesser.do(http.MethodPost, "/v1/login", map[string]string{"email": "guess_victim@attack.test", "password": "wrong guess"}, nil)
+		response := guesser.do(http.MethodPost, "/v1/login", map[string]string{"email": attackEmail("guess_victim"), "password": "wrong guess"}, nil)
 		if response.Code != http.StatusUnauthorized {
 			t.Fatalf("guess %d: status %d", attempt, response.Code)
 		}
 	}
 	// Even the right password is refused until the window passes.
 	late := &attackClient{t: t, server: server, address: "203.0.113.200:5000"}
-	response := late.do(http.MethodPost, "/v1/login", map[string]string{"email": "GUESS_VICTIM@attack.test", "password": "correct horse battery staple"}, nil)
+	response := late.do(http.MethodPost, "/v1/login", map[string]string{"email": strings.ToUpper(attackEmail("guess_victim")), "password": "correct horse battery staple"}, nil)
 	if response.Code != http.StatusTooManyRequests || response.Header().Get("Retry-After") == "" {
 		t.Fatalf("eleventh attempt: status %d", response.Code)
 	}
 	// Another account is unaffected.
 	registerAttackUser(t, server, "guess_bystander", "198.51.100.21:4000")
-	response = late.do(http.MethodPost, "/v1/login", map[string]string{"email": "guess_bystander@attack.test", "password": "correct horse battery staple"}, nil)
+	response = late.do(http.MethodPost, "/v1/login", map[string]string{"email": attackEmail("guess_bystander"), "password": "correct horse battery staple"}, nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("bystander login: status %d %s", response.Code, response.Body.String())
 	}
@@ -158,7 +171,7 @@ func TestAttackAnotherAccountsSpaceIsUnreachable(t *testing.T) {
 		{http.MethodPost, "/v1/spaces/" + escaped + "/notes", map[string]string{"title": "planted"}},
 		{http.MethodGet, "/v1/spaces/" + escaped + "/members", nil},
 		{http.MethodGet, "/v1/spaces/" + escaped + "/messages", nil},
-		{http.MethodPost, "/v1/spaces/" + escaped + "/invitations", map[string]string{"email": "space_attacker@attack.test"}},
+		{http.MethodPost, "/v1/spaces/" + escaped + "/invitations", map[string]string{"email": attackEmail("space_attacker")}},
 		{http.MethodDelete, "/v1/spaces/" + escaped, nil},
 	} {
 		response := attacker.do(probe.method, probe.path, probe.body, map[string]string{"Idempotency-Key": "attack-probe"})
@@ -226,7 +239,7 @@ func TestAttackInjectionPayloadsAreInert(t *testing.T) {
 		}
 	}
 	// The accounts table still answers normally.
-	response := user.do(http.MethodPost, "/v1/login", map[string]string{"email": "inject_user@attack.test", "password": "correct horse battery staple"}, nil)
+	response := user.do(http.MethodPost, "/v1/login", map[string]string{"email": attackEmail("inject_user"), "password": "correct horse battery staple"}, nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("login after payloads = %d %s", response.Code, response.Body.String())
 	}

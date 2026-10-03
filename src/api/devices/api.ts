@@ -18,9 +18,19 @@ export const devicesApi = {
   peerTicketKeys: <T>() => managedAiRequest<T>("/devices/peer-ticket-keys"),
   heartbeat: <T>(request: SignedDeviceRequest, localId: string, deviceId: string, body: unknown) =>
     signed<T>(request, localId, `${devicePath(deviceId)}/heartbeat`, "POST", body),
-  claimWorkflowJob: <T>(request: SignedDeviceRequest, localId: string, deviceId: string) =>
-    signed<T>(request, localId, `${devicePath(deviceId)}/workflow-node-jobs/claim`, "POST", {
-      protocolVersion: 2,
+  /** With waitMs the server holds the claim until a job is queued (at most 25 s). */
+  claimWorkflowJob: <T>(
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    hold?: { waitMs: number; signal: AbortSignal },
+  ) =>
+    request<T>(localId, `${devicePath(deviceId)}/workflow-node-jobs/claim`, {
+      method: "POST",
+      body: JSON.stringify(
+        hold ? { protocolVersion: 2, waitMs: hold.waitMs } : { protocolVersion: 2 },
+      ),
+      signal: hold?.signal,
     }),
   beginWorkflowJob: <T>(
     request: SignedDeviceRequest,

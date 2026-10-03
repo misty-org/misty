@@ -2,9 +2,13 @@ import { useEffect, type ReactNode } from "react";
 import { layoutTabs, tabLabel } from "@/features/workspace/layoutTabs";
 import type { WorkspaceLayout, WorkspaceTab } from "@/features/workspace/model";
 import { keepPeek, usePeekStore } from "@/features/workspace/peek";
+import { useMistyPanelSide } from "@/features/agents";
+import { cn } from "@/shared/ui";
 import { PeekOverlay } from "./PeekOverlay";
+import { WorkspaceMistyDock } from "./WorkspaceMistyDock";
 
-/** One panel per workspace tab; a peeked tab floats over the tab it came from. */
+/** One panel per workspace tab; a peeked tab floats over the tab it came from. The
+ * active tab also holds the Misty panel when no browser pane does. */
 export function WorkspaceTabPanels(props: {
   layout: WorkspaceLayout;
   renderTree(tab: WorkspaceTab, active: boolean): ReactNode;
@@ -13,6 +17,7 @@ export function WorkspaceTabPanels(props: {
   const { layout } = props;
   const tabs = layoutTabs(layout);
   const peek = usePeekStore((state) => state.peek);
+  const mistySide = useMistyPanelSide();
   const peeking =
     peek && peek.tabId === layout.activeTabId && tabs.some((tab) => tab.id === peek.sourceTabId)
       ? peek
@@ -31,14 +36,24 @@ export function WorkspaceTabPanels(props: {
     return (
       <div
         key={tab.id}
-        className={active ? "relative min-h-0 min-w-0 flex-1 overflow-hidden" : "hidden"}
+        className={
+          active
+            ? cn(
+                "relative flex min-h-0 min-w-0 flex-1 overflow-hidden",
+                mistySide === "left" && "flex-row-reverse",
+              )
+            : "hidden"
+        }
         role="tabpanel"
         data-browser-corner-clip="seam"
         aria-label={tabLabel(tab)}
         aria-hidden={!active}
         inert={!active}
       >
-        {props.renderTree(tab, tab.id === layout.activeTabId)}
+        <div className="relative min-h-0 min-w-0 flex-1">
+          {props.renderTree(tab, tab.id === layout.activeTabId)}
+        </div>
+        {tab.id === layout.activeTabId ? <WorkspaceMistyDock /> : null}
         {peekTab ? (
           <PeekOverlay tab={peekTab} onKeep={keepPeek} onClose={props.onClosePeek}>
             {props.renderTree(peekTab, true)}

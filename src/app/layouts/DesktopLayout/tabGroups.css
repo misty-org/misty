@@ -1,30 +1,39 @@
+/* A tab group's color is its filled label chip. Member tabs look exactly like
+   any other tab: nothing is drawn on or over them. Hover, focus and everything
+   else stay monochrome. */
 .misty-tab-group-header {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
   max-width: 180px;
   position: relative;
-  height: 28px;
   color: var(--tab-group-color);
 }
 .misty-tab-group-label {
   display: flex;
   align-items: center;
   min-width: 0;
-  padding: 3px 8px;
-  border-radius: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
   border: 0;
   background: var(--tab-group-color);
   color: #202124;
-  font-size: 11px;
-  line-height: 18px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+}
+/* An unnamed group is just its color. */
+.misty-tab-group-label[data-unnamed="true"] {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
 }
 .misty-tab-group-label:hover {
   filter: brightness(1.08);
 }
 .misty-tab-group-label:focus-visible {
-  outline: 2px solid var(--tab-group-color);
+  outline: 2px solid var(--color-cream);
   outline-offset: 2px;
 }
 .misty-tab-group-dot {
@@ -35,62 +44,32 @@
   background: var(--tab-group-color);
   flex-shrink: 0;
 }
-/* Bridge the strip's 4px gap, so the accent belongs to the whole group. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"]) {
   & .misty-tab-group-header:not(:first-child) {
     margin-left: 8px;
   }
-  & .misty-tab-group-member {
-    position: relative;
-    box-shadow: none;
-  }
-  & .misty-tab-group-header::after,
-  & .misty-tab-group-member::after,
-  & .misty-tab-group-member[data-group-active="true"]::before {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-    height: 2px;
-    bottom: -4px;
-    background: var(--tab-group-color);
-  }
-  & .misty-tab-group-header::after {
-    left: 0;
-    right: 0;
-    bottom: -3px;
-  }
-  & .misty-tab-group-member::after {
-    left: -5px;
-    right: -1px;
-  }
-  /* The continuous line rises around the selected tab, as in a browser strip. */
-  & .misty-tab-group-member[data-group-active="true"]::after {
-    left: -1px;
-    top: -2px;
-    height: auto;
-    background: none;
-    border: 2px solid var(--tab-group-color);
-    border-bottom: 0;
-    border-radius: 7px 7px 0 0;
-  }
-  & .misty-tab-group-member[data-group-active="true"]::before {
-    left: -5px;
-    width: 4px;
+  & .misty-tab-group-header + .misty-tab-group-member,
+  & .misty-tab-group-member + .misty-tab-group-header {
+    margin-left: 4px;
   }
 }
 .misty-tab-group-swatch {
-  width: 24px;
-  height: 24px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  border: 3px solid transparent;
+  border: 0;
+  color: #202124;
 }
-.misty-tab-group-swatch[aria-pressed="true"] {
-  outline: 2px solid var(--color-cream);
-  outline-offset: 2px;
+.misty-tab-group-swatch svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
 }
 .misty-tab-group-swatch:focus-visible {
   outline: 2px solid var(--color-cream);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 [data-tab-position="left"] .misty-tab-group-header,
 [data-tab-position="right"] .misty-tab-group-header {
@@ -103,10 +82,4 @@
   box-shadow: none;
   margin-left: 8px;
   width: calc(100% - 8px);
-}
-
-/* Leave room for the connecting line inside the strip's clipped scroll area. */
-.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
-  .misty-workspace-tab-list {
-  padding-block: 4px;
 }

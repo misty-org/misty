@@ -55,7 +55,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("shows matching skeletons and returns from details to the originating category", async () => {
+it("shows a skeleton, opens details from the cached listing and returns without refetching", async () => {
   let resolveCatalog!: (value: CatalogPage) => void;
   let resolveDetail!: (value: CatalogEntry) => void;
   vi.mocked(extensionsNative.search).mockReturnValue(
@@ -79,15 +79,15 @@ it("shows matching skeletons and returns from details to the originating categor
   expect(screen.queryByText("No extensions found. Try another search.")).toBeNull();
   await act(async () => resolveCatalog({ entries: [entry], count: 1, hasMore: false }));
   fireEvent.click(await screen.findByRole("button", { name: "OneTab" }));
-  expect(await screen.findByRole("status", { name: "Loading extension" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
-  await waitFor(() => expect(extensionsNative.detail).toHaveBeenCalledWith(1));
-  await act(async () => resolveDetail(entry));
+  // The listing entry renders at once while the detail endpoint revalidates it.
   expect(await screen.findByRole("heading", { name: "OneTab" })).toBeTruthy();
   expect(screen.queryByRole("status", { name: "Loading extension" })).toBeNull();
+  await waitFor(() => expect(extensionsNative.detail).toHaveBeenCalledWith(1));
+  await act(async () => resolveDetail(entry));
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
   expect(screen.getByTestId("route").textContent).toBe("/extensions?category=tabs");
   expect(await screen.findByRole("button", { name: "OneTab" })).toBeTruthy();
+  expect(extensionsNative.search).toHaveBeenCalledTimes(1);
 });
 
 it("shows a skeleton while the native runtime initializes instead of an empty catalog", () => {

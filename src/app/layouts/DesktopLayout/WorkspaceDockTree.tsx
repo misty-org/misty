@@ -4,6 +4,8 @@ import { useWorkspacePagePreview } from "@/features/workspace/useWorkspacePagePr
 import { panePlacement } from "@/features/workspace/panePlacement";
 import { WorkspacePaneControls } from "./WorkspacePaneControls";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
+import { browserRuntimeId } from "@/features/webviews/browserRuntime";
+import { useBrowserPaneDim } from "@/features/webviews/useBrowserPaneDim";
 import { useSettingsStore } from "@/features/settings";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
@@ -293,6 +295,9 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
     props.workspaceActive !== false && multiPane && !focused && focusPreferences.dim
       ? focusPreferences.strength
       : 0;
+  // A browser page draws above the pane, so the host dims it natively.
+  const activeView = pane.views.find((view) => view.id === pane.activeViewId);
+  useBrowserPaneDim(activeView?.surfaceId === "browser" ? browserRuntimeId(activeView) : null, dim);
   useEffect(() => {
     const element = sectionRef.current;
     if (!element) return;
@@ -402,18 +407,6 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
           aria-hidden
           className="pointer-events-none absolute inset-0 z-20 bg-black"
           style={{ opacity: dim }}
-        />
-      ) : null}
-      {focused && focusPreferences.indicator !== "none" ? (
-        <div
-          data-pane-focus
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute inset-0 z-20",
-            focusPreferences.indicator === "border"
-              ? "ring-2 ring-inset ring-cream-muted"
-              : "ring-1 ring-inset ring-cream-muted/50",
-          )}
         />
       ) : null}
       <WorkspacePaneControls pane={pane} onClose={() => props.onClosePane(pane.id)} />

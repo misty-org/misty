@@ -7,13 +7,13 @@ import {
 } from "@/features/bookmarks/favorites";
 import { dockTreeViews } from "@/features/workspace/dockTree";
 import { activeLayoutView } from "@/features/workspace/layoutTabs";
+import { useUserStore } from "@/features/auth/core";
+import { pinnedTabsBlockedReason } from "@/features/browser-workspace/pinnedTabsGate";
 import { useBrowserSyncStore } from "@/features/browser-workspace/store";
 import { parseBrowserViewState, type WorkspaceTab } from "@/features/workspace/model";
 import { pinnableTabUrl } from "@/features/workspace/pinnedTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { ContextMenuAction } from "@/shared/ui";
-
-const updateOtherDevices = "Update Misty on your other devices to keep pinned tabs in sync.";
+import { ContextMenuAction, ContextMenuLabel } from "@/shared/ui";
 
 /** Pin and favorite actions for the page in a tab's right-click menu. */
 export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
@@ -28,10 +28,9 @@ export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
 /** Pin and unpin in a tab's right-click menu. */
 function PinnedTabMenu({ tab }: { tab: WorkspaceTab }) {
   // Synced workspaces keep pins only once every device understands them.
-  const syncBlocksPins = useBrowserSyncStore((state) => {
-    const sync = state.session?.sync;
-    return Boolean(sync) && sync?.pinned_tabs !== true;
-  });
+  const session = useBrowserSyncStore((state) => state.session);
+  const ownerName = useUserStore((state) => state.me?.name);
+  const blockedReason = pinnedTabsBlockedReason(session, ownerName);
   if (tab.pinnedUrl) {
     const view = activeLayoutView(tab);
     const current =
@@ -55,13 +54,19 @@ function PinnedTabMenu({ tab }: { tab: WorkspaceTab }) {
   }
   if (!pinnableTabUrl(tab)) return null;
   return (
-    <ContextMenuAction
-      label="Pin tab"
-      icon={<Pin />}
-      disabled={syncBlocksPins}
-      title={syncBlocksPins ? updateOtherDevices : undefined}
-      onSelect={() => useWorkspaceStore.getState().pinTab(tab.id)}
-    />
+    <>
+      <ContextMenuAction
+        label="Pin tab"
+        icon={<Pin />}
+        disabled={Boolean(blockedReason)}
+        onSelect={() => useWorkspaceStore.getState().pinTab(tab.id)}
+      />
+      {blockedReason ? (
+        <ContextMenuLabel inset className="max-w-64 pt-0 font-normal">
+          {blockedReason}
+        </ContextMenuLabel>
+      ) : null}
+    </>
   );
 }
 

@@ -132,7 +132,44 @@ where
     pub(super) fn workspaces_disconnected(&mut self) {
         self.workspace_outbox.clear();
         self.workspaces.on_disconnect();
+        // Nothing more can be sent on this connection; the queues stay stored.
+        for (_, reply) in self.flushes.drain(..) {
+            let _ = reply.send(Err(Error::Network));
+        }
+        self.workspaces.flush_settled();
+        self.collections.flush_settled();
         let _ = self.publish_sync_state();
+    }
+
+    /// The server's batching policy, already scaled by the account's sync
+    /// frequency. Clamped on the way in (`BatchPolicy::from_wire`).
+    pub(super) fn batch_policy(&mut self, wire: &crate::batch::WirePolicy) {
+        let policy = crate::batch::BatchPolicy::from_wire(wire);
+        self.workspaces.set_batch_policy(policy.clone());
+        self.collections.set_batch_policy(policy);
+    }
+
+    /// Answers flushes once nothing publishable is left, or at their deadline.
+    pub(super) fn settle_flushes(&mut self) -> Result<()> {
+        if self.flushes.is_empty() {
+            return Ok(());
+        }
+        let done = self.workspaces.flushed(&self.store)? && self.collections_flushed()?;
+        let now = Instant::now();
+        let mut waiting = Vec::new();
+        for (deadline, reply) in self.flushes.drain(..) {
+            if done || deadline <= now {
+                let _ = reply.send(Ok(()));
+            } else {
+                waiting.push((deadline, reply));
+            }
+        }
+        self.flushes = waiting;
+        if self.flushes.is_empty() {
+            self.workspaces.flush_settled();
+            self.collections.flush_settled();
+        }
+        Ok(())
     }
 
     pub(super) async fn workspace_roster(
@@ -251,12 +288,13 @@ where
         request: Option<&str>,
         operation: Option<&str>,
         code: &str,
+        retry_after: Option<Duration>,
     ) -> Result<()> {
-        if self.records_failed(request) {
+        if self.records_failed(request, code, retry_after) {
             return Ok(());
         }
         self.workspaces
-            .on_error(&mut self.store, &self.root, request, operation, code)?;
+            .on_error(&mut self.store, &self.root, request, operation, code, retry_after)?;
         self.publish_sync_state()
     }
 

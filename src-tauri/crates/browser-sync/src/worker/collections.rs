@@ -1,11 +1,13 @@
 //! Collections glue for the worker: pulls collections when a connection starts,
 //! when the server hints one moved (debounced) and on a slow safety interval;
-//! pushes pending writes one batch at a time. `records` holds the logic.
+//! pushes pending writes one batch at a time, once that collection's batch is
+//! due (`crate::batch`). `records` holds the logic.
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::*;
 use crate::{
-    collections::{self, wire, Collection, Confirmed, BOOKMARKS, COLLECTIONS},
+    batch::{BatchPolicy, Batcher, Lane},
+    collections::{self, wire, Collection, Confirmed, BOOKMARKS, COLLECTIONS, HISTORY},
     document::{Change, ViewRecord},
     workspace::model::collection_of,
 };
@@ -26,7 +28,16 @@ pub(super) struct CollectionSync {
     due: BTreeMap<&'static str, Instant>,
     /// Request id → collection, for pulls and pushes awaiting an answer.
     pulling: BTreeMap<String, &'static str>,
-    pushing: BTreeMap<String, &'static str>,
+    pushing: BTreeMap<String, Push>,
+    /// When each collection's pending writes are due; kept across connections.
+    batch: Batcher,
+}
+
+/// A push awaiting its answer: the records it sent, by keyed id, so an edit
+/// made meanwhile is not mistaken for one the server accepted.
+struct Push {
+    collection: &'static str,
+    sent: BTreeMap<String, Option<ViewRecord>>,
 }
 
 fn collection_name(name: &str) -> Option<&'static str> {
@@ -35,7 +46,11 @@ fn collection_name(name: &str) -> Option<&'static str> {
 
 impl CollectionSync {
     pub(super) fn connected(&mut self) {
-        *self = Self::default();
+        let batch = std::mem::take(&mut self.batch);
+        *self = Self {
+            batch,
+            ..Self::default()
+        };
         let now = Instant::now();
         for collection in COLLECTIONS {
             self.due.insert(collection, now);
@@ -59,10 +74,31 @@ impl CollectionSync {
     }
 
     fn busy(&self, collection: &str) -> bool {
-        self.pulling
-            .values()
-            .chain(self.pushing.values())
-            .any(|c| *c == collection)
+        self.pulling.values().any(|c| *c == collection) || self.pushing(collection)
+    }
+
+    fn pushing(&self, collection: &str) -> bool {
+        self.pushing.values().any(|p| p.collection == collection)
+    }
+
+    pub(super) fn set_batch_policy(&mut self, policy: BatchPolicy) {
+        self.batch.set_policy(policy);
+    }
+
+    pub(super) fn flush(&mut self) {
+        self.batch.flush();
+    }
+
+    pub(super) fn flush_settled(&mut self) {
+        self.batch.settled();
+    }
+}
+
+fn lane(collection: &str) -> Lane {
+    if collection == HISTORY {
+        Lane::History
+    } else {
+        Lane::Collections
     }
 }
 
@@ -101,7 +137,15 @@ where
             if !state.loaded || state.pending.is_empty() {
                 continue;
             }
+            if !self
+                .collections
+                .batch
+                .due(collection, lane(collection), std::time::Instant::now())
+            {
+                continue;
+            }
             let mut writes = Vec::new();
+            let mut sent = BTreeMap::new();
             for write in state.outgoing().into_iter().take(MAX_PUSH) {
                 let ciphertext = match &write.record {
                     Some(record) => Some(collections::seal(
@@ -113,6 +157,7 @@ where
                     )?),
                     None => None,
                 };
+                sent.insert(write.key.clone(), write.record);
                 writes.push(wire::Write {
                     key: write.key,
                     base_version: write.base_version,
@@ -122,7 +167,12 @@ where
             let request_id = uuid::Uuid::new_v4().to_string();
             self.collections
                 .pushing
-                .insert(request_id.clone(), collection);
+                .insert(request_id.clone(), Push { collection, sent });
+            self.collections.batch.published(collection);
+            if state.pending.len() > MAX_PUSH {
+                // The rest already waited their turn.
+                self.collections.batch.retry(collection);
+            }
             socket
                 .send(&ClientFrame::RecordsPush {
                     request_id: &request_id,
@@ -199,23 +249,46 @@ where
         request: Option<&str>,
         answers: Vec<wire::Answer>,
     ) -> Result<()> {
-        let Some(collection) = request.and_then(|r| self.collections.pushing.remove(r)) else {
+        let Some(Push { collection, sent }) =
+            request.and_then(|r| self.collections.pushing.remove(r))
+        else {
             return Ok(());
         };
         let mut state = self.store.collection(&self.root, collection)?;
         for answer in answers {
+            // An answer for a write this push did not send is ignored.
+            let Some(record) = sent.get(&answer.key) else {
+                continue;
+            };
             let current = answer
                 .current
                 .as_ref()
                 .and_then(|row| self.open_row(collection, row));
-            state.answered(&answer.key, answer.applied, answer.version, current);
+            state.answered(
+                &answer.key,
+                record,
+                answer.applied,
+                answer.version,
+                current,
+            );
+        }
+        // Writes that lost a race retry on the server's copy without
+        // waiting for another batch.
+        if !state.pending.is_empty() {
+            self.collections.batch.retry(collection);
         }
         self.store.set_collection(&self.root, collection, &state)?;
         self.publish_sync_state()
     }
 
-    /// A failed request is retried on the next pull or push.
-    pub(super) fn records_failed(&mut self, request: Option<&str>) -> bool {
+    /// A failed request is retried on the next pull or push; a push the
+    /// server turned away for rate waits as long as it asked.
+    pub(super) fn records_failed(
+        &mut self,
+        request: Option<&str>,
+        code: &str,
+        retry_after: Option<Duration>,
+    ) -> bool {
         let Some(request) = request else { return false };
         if let Some(collection) = self.collections.pulling.remove(request) {
             self.collections
@@ -223,7 +296,31 @@ where
                 .insert(collection, Instant::now() + HINT_DEBOUNCE);
             return true;
         }
-        self.collections.pushing.remove(request).is_some()
+        let Some(Push { collection, .. }) = self.collections.pushing.remove(request) else {
+            return false;
+        };
+        if code == "sync_rate_limited" {
+            self.collections.batch.hold(
+                collection,
+                retry_after.unwrap_or(Duration::from_secs(5)),
+                std::time::Instant::now(),
+            );
+        }
+        true
+    }
+
+    /// No push awaits the server and no loaded collection has pending writes.
+    pub(super) fn collections_flushed(&self) -> Result<bool> {
+        for collection in COLLECTIONS {
+            if self.collections.pushing(collection) {
+                return Ok(false);
+            }
+            let state = self.store.collection(&self.root, collection)?;
+            if state.loaded && !state.pending.is_empty() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Every active device runs a version that understands tab groups and
@@ -326,6 +423,7 @@ where
             .into_iter()
             .map(|r| ((r.kind, r.id.clone()), r))
             .collect();
+        let mut edits = 0;
         for change in changes {
             let (kind, id, record) = match change {
                 Change::Create { kind, id, fields } => {
@@ -362,9 +460,21 @@ where
                 shown.remove(&(kind, id.clone()));
             }
             let key = collections::record_key(&self.root, &self.scope, collection, &id)?;
-            state.write(key, record);
+            // A record the server never had needs no delete. While a push is
+            // in flight its create may still land, so the delete stays.
+            let settled = state.loaded && !self.collections.pushing(collection);
+            if !state.queue(key, record, settled) {
+                crate::workspace::stats::add(&crate::workspace::stats::EDITS_COALESCED, 1);
+            }
+            edits += 1;
         }
-        self.store.set_collection(&self.root, collection, &state)
+        self.store.set_collection(&self.root, collection, &state)?;
+        if edits > 0 {
+            self.collections
+                .batch
+                .edited(collection, edits, std::time::Instant::now());
+        }
+        Ok(())
     }
 
     fn collection_view(&self, collection: &str, state: &Collection) -> Result<Vec<ViewRecord>> {

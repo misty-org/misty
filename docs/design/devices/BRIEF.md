@@ -24,7 +24,7 @@ Add a device once. One secure step admits a device to sync, agents and the share
 
 The vault root key is the client-only verifier. It is derived on a client from the sync password and secret, or held by an already enrolled device that saved its key. The server stores only the root **public** key (`browser_sync_vaults.root_public_key`), so it can verify grants but never produce one. A stolen session, a compromised server or a malicious server operator cannot add a device.
 
-A device that has signed in but has no vault proof is **pending**. A pending device sees no presence, no addresses and no peers, and receives no agent jobs. It can only complete admission. Agent work that uses a device (shared folders, the Misty browser) therefore needs that device added, even on a single device; adding the first device means setting up sync.
+A device that has signed in but has no vault proof is **pending**. A pending device sees no presence, no addresses and no peers, and can only complete admission, with one exception: agents may work on the device itself (its shared folders and the Misty browser), under grants it signs for itself. That reaches only the computer the person is at, so it needs no vault proof. Reaching any other device, and being reached from one, needs the device added; adding the first device means setting up sync.
 
 Two ways to admit:
 

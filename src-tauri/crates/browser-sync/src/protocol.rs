@@ -270,6 +270,14 @@ pub enum ServerFrame {
         request_id: Option<String>,
         operation_id: Option<String>,
         workspace_id: Option<String>,
+        /// With `sync_rate_limited`: wait this long before sending again.
+        #[serde(default)]
+        retry_after_ms: Option<u64>,
+    },
+    /// When to publish batched changes. Sent only to clients that ask for it
+    /// (`batching=1`), after `welcome` and whenever it changes.
+    BatchPolicy {
+        policy: crate::batch::WirePolicy,
     },
     Slot {
         request_id: Option<String>,
@@ -364,6 +372,11 @@ pub enum ClientFrame<'a> {
         writes: &'a [crate::collections::wire::Write],
     },
 }
+
+/// Connection parameter telling the server this client batches its changes:
+/// it may send `batch_policy` frames and answer over-rate ops with
+/// `sync_rate_limited` (which older clients would treat as a rejected edit).
+pub const BATCHING: &str = "1";
 
 /// Wire protocol spoken by this client: workspaces and collections plus the
 /// vault-wide credential log on the same socket. Version 3 renamed trees to

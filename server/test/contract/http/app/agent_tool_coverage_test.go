@@ -32,6 +32,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^POST /me/screen-model/\{jobID\}$`, why: "the screen planner's model pass-through during browser.act"},
 	{pattern: `^POST /me/companion/refine-point/\{invocationID\}$`, why: "the desktop companion sharpens its own pointer from a screen crop"},
 	{pattern: `^\S+ /me/(deletion|export|library-lock|avatar|profile|device|telemetry)$`, why: "account identity and security"},
+	{pattern: `^POST /me/(email/verify|referral/claim)$`, why: "verifying the account's email and claiming a referral are the person's own account steps"},
 	{pattern: `^\S+ /(realtime|agent-voice)/`, why: "live session transports"},
 	{pattern: `^\S+ /(ai/invocations|ai/complete|misty/agent-execution|misty/agent-followup|agent-runs/)`, why: "starting and steering runs is the runtime itself"},
 	{pattern: `^\S+ /ai/senses`, why: "model choices are account settings"},
@@ -58,7 +59,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /ai/agent-methods`, tool: "methods.save"},
 	{pattern: `^\S+ /ai/memories/`, tool: "memory.update"},
 	{pattern: `^POST /ai/artifacts/`, why: "a person's review of an agent's output"},
-	{pattern: `^\S+ /me/space-templates`, why: "personal Space templates are saved from the template picker in Settings"},
+	{pattern: `^\S+ /me/space-templates`, why: "personal Space templates are saved by the person from Space settings"},
 
 	// Spaces and members.
 	{pattern: `^POST /spaces$`, tool: "spaces.manage"},

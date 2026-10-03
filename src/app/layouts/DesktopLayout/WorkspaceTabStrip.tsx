@@ -273,7 +273,6 @@ export function WorkspaceTabStrip(
                   >
                     <div
                       style={group ? groupStyle(group) : undefined}
-                      data-group-active={group ? active : undefined}
                       data-active={active}
                       {...hoverCards.bind(view, label, active)}
                       data-reorder-item={tab.id}

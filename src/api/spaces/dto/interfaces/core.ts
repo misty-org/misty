@@ -44,20 +44,41 @@ export interface SpaceTemplateSeedSummary {
   collection_count: number;
 }
 
+/** Exactly what a template creates, shown before anything exists. */
+export interface SpaceTemplateSeedPreview {
+  tasks: string[];
+  notes: string[];
+  collections: string[];
+}
+
 export interface SpaceTemplate {
+  /** Saved by the person from one of their Spaces. */
   personal?: boolean;
   id: string;
   name: string;
   description: string;
   version: number;
-  recommended_integrations: SpaceIntegrationProvider[];
+  /** A key the client maps to a monochrome glyph. */
+  icon: string;
+  /** Fills the name field until the person types their own; empty for Blank. */
+  suggested_name: string;
   seed_summary: SpaceTemplateSeedSummary;
+  seed_preview: SpaceTemplateSeedPreview;
 }
 
 export interface CreateSpaceRequest {
   name: string;
   template_id: string;
+  /** Copies this Space's structure instead of using a template. */
+  source_space_id?: string;
   integration_providers: SpaceIntegrationProvider[];
+}
+
+/** Someone the person already shares a Space with. */
+export interface SpacePerson {
+  user_id: string;
+  name: string;
+  email: string;
 }
 
 export interface SpaceSetup {
@@ -69,6 +90,8 @@ export interface SpaceSetup {
 export interface CreateSpaceResult {
   space: Space;
   setup: SpaceSetup;
+  /** The Space exists, but some starter notes could not be added. */
+  seed_incomplete?: boolean;
 }
 
 export interface SpaceInvitationPreview {

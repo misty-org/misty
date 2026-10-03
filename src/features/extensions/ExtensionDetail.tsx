@@ -174,10 +174,7 @@ function GrantedAccess({
   prepare(id: number): void;
 }) {
   return (
-    <DesktopSettingsSection
-      title="Granted access"
-      description="Removing a permission may disable functionality. Review the extension again to restore its requested access."
-    >
+    <DesktopSettingsSection title="Granted access">
       {[...selected.permissions, ...selected.hosts].map((permission) => (
         <DesktopSettingsRow key={permission} label={permission}>
           <Button

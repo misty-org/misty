@@ -37,7 +37,6 @@ import "./docking.css";
 import { dockingGeometry } from "./dockingGeometry";
 import { useMergedTitlebar } from "./useMergedTitlebar";
 import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
-import { WorkspaceWithMistyPanel } from "./WorkspaceWithMistyPanel";
 import { useDockingTransition } from "./useDockingTransition";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { GlobalNavigator } from "./GlobalNavigator";
@@ -465,14 +464,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 <Outlet />
               </StandaloneRouteSurface>
             ) : (
-              <WorkspaceWithMistyPanel>
-                <WorkspaceCanvas
-                  windowsTitlebarControls={shouldShowWindowsControls}
-                  tabPosition={docking.tabs}
-                  titlebarInsets={topTabInsets}
-                  hideTabStrip={focusMode}
-                />
-              </WorkspaceWithMistyPanel>
+              <WorkspaceCanvas
+                windowsTitlebarControls={shouldShowWindowsControls}
+                tabPosition={docking.tabs}
+                titlebarInsets={topTabInsets}
+                hideTabStrip={focusMode}
+              />
             )}
             {!isAuthRoute && user?.id ? (
               <CursorCompanionController key={user.id} accountId={user.id} />

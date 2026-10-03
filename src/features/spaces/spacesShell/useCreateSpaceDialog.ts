@@ -1,78 +1,94 @@
 import { personalSpaceTemplatesApi } from "@/api/spaces/templates";
 import { reportSystemError } from "@/features/support/systemErrors";
+import { useAppStore } from "@/features/app-shell";
 import { spacesApi } from "@/api/spaces/api";
-import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
+import type {
+  CreateSpaceRequest,
+  CreateSpaceResult,
+  Space,
+  SpacePerson,
+  SpaceTemplate,
+} from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { restoreDocumentInteractivityAfterModalClose } from "./spacesShellStorage";
+import { blankTemplate } from "./templateIcons";
 
-export const CREATE_STEP_COUNT = 2;
+export type CreateSpaceTab = "templates" | "mine";
 
 /**
- * The focused two-step "Create a Space" flow: name, then template.
- *
- * Templates load lazily the first time the dialog opens, and a failure there is
- * non-fatal — a Blank Space is always offered as a fallback.
+ * The one-screen "Create a Space" flow. Built-in templates, saved templates and
+ * people load independently each time it opens; a failure in any of them never
+ * blocks creating a Space, and Blank is always offered.
  */
 export function useCreateSpaceDialog(options: {
-  createSpace: (input: {
-    name: string;
-    template_id: string;
-    integration_providers: SpaceIntegrationProvider[];
-  }) => Promise<{ space: { id: string } }>;
+  createSpace: (input: CreateSpaceRequest) => Promise<CreateSpaceResult>;
   clearError: () => void;
+  spaces: Space[];
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<CreateSpaceTab>("templates");
   const [name, setName] = useState("");
-  const [step, setStep] = useState(0);
-  const [templates, setTemplates] = useState<SpaceTemplate[]>([]);
-  const [templateId, setTemplateIdValue] = useState("blank");
-  const [loadError, setLoadError] = useState("");
-  const [createError, setCreateError] = useState("");
-  const setTemplateId = (id: string) => {
-    setTemplateIdValue(id);
-  };
+  const [curated, setCurated] = useState<SpaceTemplate[]>();
+  const [curatedFailed, setCuratedFailed] = useState(false);
+  const [personal, setPersonal] = useState<SpaceTemplate[]>();
+  const [personalFailed, setPersonalFailed] = useState(false);
+  const [people, setPeople] = useState<SpacePerson[]>([]);
+  const [template, setTemplate] = useState<SpaceTemplate | undefined>(blankTemplate);
+  const [sourceSpace, setSourceSpace] = useState<Space>();
+  const [invites, setInvites] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   useEffect(() => {
-    if (!open || templates.length) return;
+    if (!open) return;
     let active = true;
-    Promise.all([spacesApi.templates(), personalSpaceTemplatesApi.list()])
-      .then(([curated, personal]) => {
-        if (!active) return;
-        setTemplates([
-          ...curated.templates,
-          ...personal.templates.map((item) => ({
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            version: item.version,
-            personal: true,
-            recommended_integrations: [],
-            seed_summary: { task_count: 0, note_count: 0, collection_count: 0 },
-          })),
-        ]);
-        setLoadError("");
-      })
-      .catch((error) => {
-        if (active)
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : "Templates could not be loaded. Reopen this dialog to retry.",
-          );
-      });
+    // Earlier results stay on screen while these refresh.
+    void Promise.allSettled([
+      spacesApi.templates(),
+      personalSpaceTemplatesApi.list(),
+      personalSpaceTemplatesApi.people(),
+    ]).then(([curatedResult, personalResult, peopleResult]) => {
+      if (!active) return;
+      if (curatedResult.status === "fulfilled") {
+        setCurated(curatedResult.value.templates);
+        setCuratedFailed(false);
+      } else setCuratedFailed(true);
+      if (personalResult.status === "fulfilled") {
+        setPersonal(personalResult.value.templates);
+        setPersonalFailed(false);
+      } else setPersonalFailed(true);
+      if (peopleResult.status === "fulfilled") setPeople(peopleResult.value.people);
+    });
     return () => {
       active = false;
     };
-  }, [open, templates.length]);
+  }, [open]);
+
+  /** The current suggestion, which the name follows until the person types their own. */
+  const suggestedName = sourceSpace ? sourceSpace.name : (template?.suggested_name ?? "");
+  const followSuggestion = (next: string) => {
+    if (!name.trim() || name === suggestedName) setName(next);
+  };
+  const chooseTemplate = (next: SpaceTemplate) => {
+    followSuggestion(next.suggested_name);
+    setTemplate(next);
+    setSourceSpace(undefined);
+  };
+  const copySpace = (space: Space) => {
+    followSuggestion(space.name);
+    setSourceSpace(space);
+    setTemplate(undefined);
+  };
 
   const resetDraft = () => {
     setCreateError("");
     setName("");
-    setStep(0);
-    setTemplateId("blank");
+    setTab("templates");
+    setTemplate(blankTemplate);
+    setSourceSpace(undefined);
+    setInvites([]);
   };
 
   const close = () => {
@@ -91,45 +107,64 @@ export function useCreateSpaceDialog(options: {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || creating || step < CREATE_STEP_COUNT - 1) return;
+    if (!trimmed || creating || (!template && !sourceSpace)) return;
     setCreating(true);
     setCreateError("");
+    const pendingInvites = invites;
+    let created: CreateSpaceResult;
     try {
-      const created = await options.createSpace({
+      created = await options.createSpace({
         name: trimmed,
-        template_id: templateId,
+        template_id: sourceSpace ? "" : (template?.id ?? blankTemplate.id),
+        ...(sourceSpace ? { source_space_id: sourceSpace.id } : {}),
         integration_providers: [],
       });
-      setOpen(false);
-      restoreDocumentInteractivityAfterModalClose();
-      resetDraft();
-      navigate(`/spaces/${encodeURIComponent(created.space.id)}/home`);
     } catch (error) {
       setCreateError(
-        error instanceof Error ? error.message : "The Space could not be created. Try again.",
+        error instanceof Error ? error.message : "The Space wasn't created. Try again.",
       );
-      reportSystemError({
-        error,
-        scope: "spaces:create",
-        title: "Space could not be created",
-      });
-    } finally {
+      reportSystemError({ error, scope: "spaces:create", title: "Space could not be created" });
       setCreating(false);
+      return;
     }
+    setCreating(false);
+    setOpen(false);
+    restoreDocumentInteractivityAfterModalClose();
+    resetDraft();
+    navigate(`/spaces/${encodeURIComponent(created.space.id)}/home`);
+    const sent = await Promise.allSettled(
+      pendingInvites.map((email) => spacesApi.invite(created.space.id, email)),
+    );
+    const unsent = sent.filter((result) => result.status === "rejected").length;
+    const notes = [
+      created.seed_incomplete ? "Some starter notes couldn't be added." : "",
+      unsent
+        ? `${unsent} invitation${unsent === 1 ? "" : "s"} couldn't be sent. Invite them from Members.`
+        : "",
+    ].filter(Boolean);
+    if (notes.length) useAppStore.getState().setMessage(`Space created. ${notes.join(" ")}`);
   };
 
   return {
     open,
     setOpen,
+    tab,
+    setTab,
     name,
     setName,
-    step,
-    setStep,
-    templates,
-    templateId,
-    setTemplateId,
+    curated: curated ?? (curatedFailed ? [blankTemplate] : undefined),
+    curatedFailed,
+    personal,
+    personalFailed,
+    people,
+    spaces: options.spaces,
+    template,
+    sourceSpace,
+    chooseTemplate,
+    copySpace,
+    invites,
+    setInvites,
     creating,
-    loadError,
     createError,
     close,
     start,
