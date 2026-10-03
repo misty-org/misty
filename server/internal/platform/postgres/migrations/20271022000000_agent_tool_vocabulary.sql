@@ -2,7 +2,7 @@
 -- Agent tools take the agent vocabulary (docs/plans/agent-harness.md): dotted, singular names
 -- that never use UI labels. No aliases are kept, so stored references move with them: the
 -- action journal, device job capabilities and the capability lists on grants.
-CREATE TEMP TABLE tool_renames(old_name text PRIMARY KEY, new_name text NOT NULL) ON COMMIT DROP;
+CREATE TEMP TABLE tool_renames(old_name text PRIMARY KEY, new_name text NOT NULL);
 INSERT INTO tool_renames VALUES
     ('spaces.list', 'space.list'),
     ('spaces.manage', 'space.manage'),
@@ -113,9 +113,10 @@ UPDATE trusted_devices c SET capabilities = (
     LEFT JOIN tool_renames r ON r.old_name = item.value)
 WHERE jsonb_typeof(c.capabilities) = 'array' AND EXISTS (
     SELECT 1 FROM jsonb_array_elements_text(c.capabilities) value JOIN tool_renames r ON r.old_name = value);
+DROP TABLE tool_renames;
 
 -- +goose Down
-CREATE TEMP TABLE tool_renames(old_name text PRIMARY KEY, new_name text NOT NULL) ON COMMIT DROP;
+CREATE TEMP TABLE tool_renames(old_name text PRIMARY KEY, new_name text NOT NULL);
 INSERT INTO tool_renames VALUES
     ('space.list', 'spaces.list'),
     ('space.manage', 'spaces.manage'),
@@ -226,3 +227,4 @@ UPDATE trusted_devices c SET capabilities = (
     LEFT JOIN tool_renames r ON r.old_name = item.value)
 WHERE jsonb_typeof(c.capabilities) = 'array' AND EXISTS (
     SELECT 1 FROM jsonb_array_elements_text(c.capabilities) value JOIN tool_renames r ON r.old_name = value);
+DROP TABLE tool_renames;
