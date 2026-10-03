@@ -23,14 +23,43 @@ const models = list(process.env.MISTY_WORKFLOW_EVAL_MODELS || "anthropic/claude-
 const judgeModel = process.env.MISTY_WORKFLOW_EVAL_JUDGE?.trim() || "anthropic/claude-haiku-5.5";
 const only = new Set(list(process.env.MISTY_WORKFLOW_EVAL_TASKS));
 const accounts = new Set(list(process.env.MISTY_WORKFLOW_EVAL_ACCOUNTS));
-const device = process.env.MISTY_WORKFLOW_EVAL_DEVICE === "1";
+// The person's own computer, by its agent-device id (trusted_devices.id): runs carry the
+// workspace context a chat sent from it carries, signed by it through the debug build's
+// eval bridge, so device tools such as web.fetch run on it as they would for a real request.
+const deviceId = process.env.MISTY_WORKFLOW_EVAL_DEVICE?.trim() || "";
+const device = /^device_[0-9a-f-]{36}$/.test(deviceId);
+const workspaceCapabilities = ["bookmark.add", "bookmark.list", "browser.tab.list", "browser.tab.open", "web.fetch"];
+
+async function deviceContexts(userId: string, agentId: string): Promise<unknown[]> {
+  if (!device) return [];
+  const bridge = process.env.MISTY_BROWSER_EVAL_BRIDGE?.replace(/\/$/, "");
+  const token = process.env.MISTY_BROWSER_EVAL_BRIDGE_TOKEN;
+  if (!bridge || !token) throw new Error("A device needs the desktop's eval bridge: set MISTY_BROWSER_EVAL_BRIDGE and its token.");
+  const scope = `workspace:${deviceId}`;
+  const response = await fetch(`${bridge}/run-grants`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      apiBase: `${process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081"}/v1`.replace(/\/v1\/v1$/, "/v1"), accountId: userId,
+      grants: [{ targetDeviceId: deviceId, agentId, capabilities: workspaceCapabilities, scopes: [scope] }],
+    }),
+  });
+  const signed = (await response.json()) as { ok: boolean; result?: unknown[]; error?: string };
+  if (!signed.ok || !signed.result?.[0]) throw new Error(`run grant: ${signed.error ?? response.status}`);
+  return [{ device_id: deviceId, kind: "workspace", opaque_ref: scope, display_name: "Misty browser",
+    capabilities: workspaceCapabilities, metadata: { source: "desktop" }, run_grant: signed.result[0] }];
+}
+
 const enabled = process.env.MISTY_WORKFLOW_EVAL === "1";
 
 const selected = (task: WorkflowTask) => !only.size || only.has(task.id) || only.has(task.category) || only.has(task.source);
 
 /** The request each agent.entry sends today. Schedules run as the composer until the eval can claim one. */
-function request(task: WorkflowTask, model: string, agentId: string, siteBase: string): Record<string, unknown> {
-  const base = { prompt: task.prompt, model_override: model, reasoning_effort: "low", window_label: "main", ...(agentId ? { agent_id: agentId } : {}) };
+function request(task: WorkflowTask, model: string, agentId: string, siteBase: string, contexts: unknown[]): Record<string, unknown> {
+  const base = {
+    prompt: task.prompt, model_override: model, reasoning_effort: "low", window_label: "main",
+    ...(agentId ? { agent_id: agentId } : {}), ...(contexts.length ? { device_contexts: contexts } : {}),
+  };
   if (task.surface === "cursor") {
     return { ...base, mode: "companion", surface_id: "global", companion_mode: "auto", ...(task.start?.screen ? { display_captures: [displayCapture(task.start.screen)] } : {}) };
   }
@@ -38,10 +67,10 @@ function request(task: WorkflowTask, model: string, agentId: string, siteBase: s
   return { ...base, mode: "drawer", surface_id: "global", ...tab };
 }
 
-async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, model: string, agentId: string, siteBase: string): Promise<WorkflowRun> {
+async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, model: string, agentId: string, siteBase: string, contexts: unknown[]): Promise<WorkflowRun> {
   const before = budget.balance;
   const started = performance.now();
-  const result = await client.run(request(task, model, agentId, siteBase));
+  const result = await client.run(request(task, model, agentId, siteBase, contexts));
   const run: WorkflowRun = {
     taskId: task.id, category: task.category, source: task.source, surface: task.surface, model,
     terminal: result.terminal, tools: result.tools, screenRequests: result.screenRequests,
@@ -80,6 +109,9 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
   const client = await EvalClient.open();
   const agents = await client.json<{ agents: Array<{ id: string }> }>("/misty/agents");
   const agentId = agents.agents[0]?.id ?? "";
+  const me = await client.json<{ id: string }>("/me");
+  // Signed once per pass; a run grant lasts six hours.
+  const contexts = await deviceContexts(me.id, agentId);
   const tasks = loadTasks().filter(selected);
   const sites = await serveSites();
   const runs: WorkflowRun[] = [];
@@ -99,7 +131,7 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
           stopped = `budget: $${budget.spent.toFixed(2)} of $${budget.cap.toFixed(2)} spent`;
           break outer;
         }
-        const run = await runTask(client, budget, task, model, agentId, sites.base);
+        const run = await runTask(client, budget, task, model, agentId, sites.base, contexts);
         runs.push(run);
         refusedInARow = run.error && run.tools.length === 0 && run.ms < 3_000 ? refusedInARow + 1 : 0;
         if (refusedInARow >= 3) {

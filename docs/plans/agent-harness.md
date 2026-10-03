@@ -1,7 +1,8 @@
 # Agent harness — architecture plan
 
-Status: proposal, revision 4, October 15, 2026. Nothing here is built yet. Decisions from the
-October 15 review are recorded below.
+Status: revision 4, October 15, 2026; phases 0 to 7 built overnight on October 16 on the
+`agent-harness` branch (not pushed). What landed, what was deferred and the eval evidence are
+in [Status, October 16](#status-october-16-2026).
 
 The model decides; the harness decides what the model sees (tools, their descriptions, the
 prompt, the context) and carries out what it picks. Runs go wrong today because of what the
@@ -18,6 +19,64 @@ finishes the approved [agents-at-cursor brief](../design/agents-at-cursor/BRIEF.
 Misty keeps its own harness rather than adopting one. Agents must run on any model, and the
 popular open harnesses (OpenCode, Pi, Hermes, Codex) are built and tuned for coding. Misty
 learns their patterns and keeps the browser, desktop, cursor and personal-data work its own.
+
+## Status, October 16, 2026
+
+Built overnight on the `agent-harness` branch, one commit per phase, every pre-commit suite
+passing (Go, agent runtime, frontend, contracts). Nothing is pushed or deployed.
+
+| Phase | Landed | Deferred |
+|---|---|---|
+| P0 Evals | Runner through the local stack's real API, answer and route scored apart, AI Gateway spend cap, fixture screens, seed script, card handling | Fixture search index; resume fixtures; cold/warm and relabel runs; state checks for account tasks |
+| P1 web.fetch | Desktop fetch (`web_fetch.rs`, guards on every hop, address pinning) with readable text and question-matched excerpts; Worker fallback (`server/apps/web-fetch`); routing note | Deploying the Worker; reading the current Misty tab in the background |
+| P2 Vocabulary | Every tool renamed (no aliases, migration), `agent.entry`, glossary of UI labels, UI-side words in the progress timeline | Voice tool rename to ask, status, stop |
+| P3 agent.tool | `agent_tool_use` / `agent_tool_load`, runs start in answer (browse when a browser is attached), only visible tools reach the model | |
+| P4 Cursor | Every typed and spoken request carries every display; `show_on_screen` and the teach mode removed; cursor prompt uses search and fetch for facts the screen doesn't show; no pointing tags in notes | `screen_look` / `screen_open` inside the run (needs the catalog to grow mid-run) |
+| P5 Families | One correction per family, each tied to a baseline run | Gemini note until Gemini has runs |
+| P6 Condenser | `src/condenser.ts`; agent.tool survives compaction | |
+| P7 Workflows | `memory.workflow.*` (renamed methods), `find`, `learn`, versioned learned steps (`agent_method_lessons`) | Reverting a worse version automatically (needs eval scores) |
+
+### Evidence (Haiku 5.5, local stack)
+
+| Task | Before (October 15) | After (October 16) |
+|---|---|---|
+| video-members | 4 runs, screen hand-offs, no member names | One run, 2 searches and 3 page reads, all nine members with the source, no screen |
+| read-linked-page | 8 searches, no answer from the page | Answer from the RFC text itself through web_fetch |
+| research-compare-pricing | Luna: 39 calls, 7 minutes | Haiku: correct table with conditions, still 26 calls (vendor pricing pages render in JavaScript, so fetch can't read them) |
+| Account tasks (issue, drafts, triage) | not run | Correct in substance: issue #1 in misty-eval-sandbox labeled bug, follow-up drafts only, nothing sent; the judge can't see app results yet |
+
+Spend for the whole night: $3.69 of the $8 budget (AI Gateway balance $5.51).
+
+### Changes made on this computer
+
+- The dev stack (`misty server up`) runs this branch; both new migrations are applied.
+- `wrangler dev` serves the web-fetch Worker on 127.0.0.1:8790 for the dev API
+  (`server/.env/dev/integrations/web-fetch.env`, git-ignored). Stop it with
+  `pkill -f "wrangler dev"`; without it, runs with no device simply don't get web_fetch.
+- The CLI was rebuilt into `cli/target/release/misty` (it knows the new env file); the `misty`
+  in `~/.cargo/bin` is unchanged. Builds ran with a Docker config without the credential
+  store, the known workaround for hanging pulls.
+- Your local plan was raised to Ultra only during eval passes and is back to Pro.
+- The desktop app needs a restart to load the new Rust side (web.fetch on the device, and
+  `folder.send` for sending shared files to the Library).
+- Google Calendar now uses a Composio-managed auth config; the custom read-only one is disabled.
+- Seed data lives in your secondary accounts (Gmail label `Misty eval`, `misty-eval-sandbox`
+  with issue #1, `#marketing-drafts`, five calendar events, the Weekly sync note), plus Gmail
+  drafts and a "Prep for Pigment call" event in Misty's calendar from the eval runs.
+
+### Next, in order
+
+1. Deploy the web-fetch Worker and set its URL and secret in production
+   (`server/apps/web-fetch/README.md`).
+2. Restart the desktop app and run the suite with a device, so tab and browser tasks run end to end.
+3. State checks for account tasks (read the issue, drafts and events back through Composio)
+   so the judge has evidence.
+4. Read the current Misty tab in the background (a `browser.tab.read` device tool), and a
+   hidden-tab tier for pages that only render in a browser; both cut the remaining over-reach.
+5. Decide where "my calendar" should go when the person has both Misty's calendar and Google
+   Calendar (schedule-meeting used Misty's).
+6. `screen_look` and `screen_open` inside the run; voice tools renamed to ask, status, stop.
+7. A full three-model pass, then cold and warm runs for `memory.workflow`.
 
 ## Agent vocabulary
 

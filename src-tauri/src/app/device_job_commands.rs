@@ -71,10 +71,20 @@ pub async fn device_sign_run_grants(
     grants: Vec<RunGrantRequest>,
 ) -> Result<Vec<SignedRecord>, String> {
     require_device_window(&webview)?;
+    sign_run_grants(&state, &api_base, &account_id, grants).await
+}
+
+/// One signing path for chats and for the debug-only eval bridge.
+pub(crate) async fn sign_run_grants(
+    state: &MistyRuntime,
+    api_base: &str,
+    account_id: &str,
+    grants: Vec<RunGrantRequest>,
+) -> Result<Vec<SignedRecord>, String> {
     if grants.len() > 16 {
         return Err("Too many devices in one request.".into());
     }
-    let context = context(&state, &api_base, &account_id).await?;
+    let context = context(state, api_base, account_id).await?;
     grants
         .into_iter()
         .map(|grant| {
@@ -93,7 +103,7 @@ pub async fn device_sign_run_grants(
 fn surface_for(operation: &str, scope_id: &str) -> &'static str {
     if scope_id.starts_with("inbox:") {
         "inbox"
-    } else if operation.starts_with("files.") || operation == "read_content" {
+    } else if operation.starts_with("folder.") || operation == "read_content" {
         "folders"
     } else if operation.starts_with("terminal.") {
         "terminal"
