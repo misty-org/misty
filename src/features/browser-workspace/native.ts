@@ -97,6 +97,10 @@ export interface NativeSyncView {
     workspace_records_written?: number;
     workspace_ops_suppressed?: number;
     workspace_ops_built?: number;
+    /** Ticks that held a queue back until its batch was due. */
+    workspace_ops_deferred?: number;
+    /** Queued edits that never reached the server (folded or cancelled out). */
+    workspace_edits_coalesced?: number;
   };
   presence: { device_id: string; online: boolean; ready: boolean; applied_sequence: number }[];
   workspace: WorkspaceRecords;
@@ -127,6 +131,9 @@ export const renameNativeDevice = (sessionId: string, deviceId: string, name: st
 /** Open `workspaceId` on this machine. Other machines keep editing it too. */
 export const claimNativeWorkspace = (sessionId: string, workspaceId: string) =>
   invoke<void>("browser_sync_claim", { sessionId, workspaceId });
+/** Sync now: send batched changes without waiting for their batch. */
+export const flushNativeSync = (sessionId: string) =>
+  invoke<void>("browser_sync_flush", { sessionId });
 export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
   session.full_sync !== false && session.workspace.active_device?.device_id === session.device_id
     ? session.workspace.active_device.epoch

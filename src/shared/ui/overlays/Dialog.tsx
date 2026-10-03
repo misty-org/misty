@@ -128,10 +128,7 @@ const DialogContent = React.forwardRef<
             "pointer-events-auto relative grid",
             "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
             "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-            "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
             "data-[state=closed]:pointer-events-none",
             className,
           )}

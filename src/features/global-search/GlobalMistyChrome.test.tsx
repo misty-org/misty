@@ -2,7 +2,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef, type ComponentProps } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { GlobalMistyComposerBar } from "./GlobalMistyChrome";
-vi.mock("./MistyModelPicker", () => ({ MistyModelPicker: () => <button>Model</button> }));
+vi.mock("@/features/agents/models/ReasoningPicker", () => ({
+  ReasoningPicker: () => <button>Thinking</button>,
+}));
 afterEach(cleanup);
 it("keeps attachment/options icon-only and separates microphone recording from input selection", async () => {
   const voice = {
@@ -36,7 +38,7 @@ it("keeps attachment/options icon-only and separates microphone recording from i
     voice,
     onError: vi.fn(),
     onClose: vi.fn(),
-    onModelChange: vi.fn(),
+    onReasoningChange: vi.fn(),
     reasoningEffort: "high",
   } as unknown as ComponentProps<typeof GlobalMistyComposerBar>;
   render(<GlobalMistyComposerBar {...props} />);

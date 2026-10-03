@@ -98,13 +98,6 @@ export function SyncVaultForm(props: {
               ? "Reconnect this device"
               : "Unlock your sync vault")
         }
-        description={
-          props.create
-            ? "Choose a separate sync password. Your password and sync secret unlock this vault on your other devices."
-            : props.reenroll
-              ? "This device lost its sync access. Enter your sync password and secret to register it again. Its previous local sync data stays on this device."
-              : "Use the sync password and secret from your first device. Your Misty account password does not unlock the vault."
-        }
       >
         <SettingsRow label="Sync password">
           <Input
@@ -191,10 +184,7 @@ export function SyncVaultForm(props: {
             </label>
           </SettingsRow>
         )}
-        <SettingsRow
-          label="Remember on this device"
-          description="Keep the vault key in this device’s operating-system credential store."
-        >
+        <SettingsRow label="Remember on this device">
           <label className="flex items-center gap-2 text-sm text-cream">
             <Checkbox
               checked={remember}

@@ -2,13 +2,13 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 const settingsOverlayLayerClass = [
-  "fixed inset-0 layer-workspace-overlay grid place-items-center bg-black/45 px-8 py-8",
+  "fixed inset-0 layer-workspace-overlay grid place-items-center bg-black/45 px-6 py-6",
   "animate-in fade-in-0 duration-200",
 ].join(" ");
 const settingsOverlayPanelClass = [
-  "h-[min(760px,calc(100dvh-64px))] w-[min(980px,calc(100dvw-144px))]",
+  "h-[min(900px,calc(100dvh-48px))] w-[min(1200px,calc(100dvw-96px))]",
   "min-w-0 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card shadow-2xl",
-  "animate-in fade-in-0 zoom-in-98 duration-200 ease-out",
+  "misty-dialog-motion",
 ].join(" ");
 
 /**

@@ -3,7 +3,6 @@ import {
   pendingQuestionSet,
   useConversationCollaboration,
 } from "@/features/agents/agentCollaboration";
-import { MistyOverlayControls } from "./MistyOverlayControls";
 import { readOptionalSurfaceContext } from "./optionalSurfaceContext";
 import { thinkingEffort } from "@/features/agents/thinkingMode";
 import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
@@ -377,7 +376,7 @@ export function GlobalMistySurface(props: {
         voice={voice}
         onError={setVoiceError}
         onClose={closePanel}
-        onModelChange={(settings) =>
+        onReasoningChange={(settings) =>
           useController.setState((state) =>
             state.accountId !== props.accountId
               ? state
@@ -522,7 +521,6 @@ export function GlobalMisty(props: Parameters<typeof GlobalMistySurface>[0]) {
           title="Misty context could not start"
         />
       )}
-      <MistyOverlayControls />
       <GlobalMistySurface {...props} />
     </>
   );
