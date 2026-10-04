@@ -18,6 +18,7 @@ import {
   MenuItem,
   ContextMenuAction,
   IconButton,
+  itemTones,
 } from "@/shared/ui";
 import { MoreHorizontal, Pencil, PencilRuler, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 
@@ -98,6 +99,7 @@ export function DrawingCollection(props: {
             id: d.id,
             title: d.title || "Untitled drawing",
             icon: <PencilRuler size={18} />,
+            tone: itemTones.drawing,
             category: "Drawing",
             creator: creatorName(d.creator_user_id),
             metadata: {

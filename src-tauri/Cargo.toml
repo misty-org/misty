@@ -14,6 +14,12 @@ crate-type = ["lib"]
 name = "misty-desktop"
 path = "src/main.rs"
 
+[[test]]
+name = "webview_url"
+path = "tests/webview_url.rs"
+# AppKit and WKWebView must be exercised on the process's main thread.
+harness = false
+
 [build-dependencies]
 cc = "1"
 tauri-build = { version = "2", features = [] }
@@ -31,6 +37,7 @@ hex = "0.4"
 jsonwebtoken = { version = "10.3", default-features = false, features = ["aws_lc_rs"] }
 misty-credential-store = { path = "vendor/misty-credential-store" }
 misty-browser-sync = { path = "crates/browser-sync" }
+misty-agent-files = { path = "crates/agent-files" }
 libc = "0.2"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }

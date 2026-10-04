@@ -31,7 +31,7 @@ func VoiceWebRTCConfigured() bool {
 
 func realtimeRTCConfig() map[string]any {
 	return map[string]any{
-		"type": "realtime", "model": strings.TrimPrefix(AgentRealtimeModel, "openai/"),
+		"type": "realtime", "model": strings.TrimPrefix(RealtimeModelID(), "openai/"),
 		"instructions":      "You are Misty's voice interface. Speak only the confirmed reply supplied by the server. No tools are available in this voice session.",
 		"output_modalities": []string{"audio"}, "max_output_tokens": 4096,
 		"tools": []any{},
@@ -204,4 +204,8 @@ func (v *VoiceWebRTC) Read() (VoiceRealtimeEvent, error) {
 		event.ResponseID, event.Status = wire.Response.ID, wire.Response.Status
 	}
 	return event, nil
+}
+
+func (v *VoiceWebRTC) SetOutputLimit(tokens int) error {
+	return v.write(map[string]any{"type": "session.update", "session": map[string]any{"type": "realtime", "max_output_tokens": tokens}})
 }

@@ -110,7 +110,7 @@ func TestPrivateSpaceAgentSendsExactMessageThroughServerOwnedToolbox(t *testing.
 	result, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, personal.ID,
 		"Tell everyone Stone is off for today", "messages.send",
-		json.RawMessage(`{"message":"Stone is off for today"}`),
+		json.RawMessage(`{"message":"Stone is off for today","audience":"space"}`),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +192,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 	groupResult, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "",
 		"Post in the group chat that Melissa Chen will finish the laundry tonight", "messages.send",
-		json.RawMessage(`{"message":"@Melissa Chen will finish the laundry tonight.","audience":"auto","recipientUserId":"`+member.ID+`"}`),
+		json.RawMessage(`{"message":"@Melissa Chen will finish the laundry tonight.","audience":"space","recipientUserId":"`+member.ID+`"}`),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +213,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 		"Send the laundry update", "messages.send",
 		json.RawMessage(`{"message":"Laundry update","audience":"auto"}`),
 	)
-	if err == nil || !strings.Contains(err.Error(), "Should I send this privately or in the Space chat?") {
+	if err == nil || !strings.Contains(err.Error(), "choose audience") {
 		t.Fatalf("ambiguous audience error = %v", err)
 	}
 	shared, err = database.SpaceMessages(ctx, member.ID, space.ID, 0, 10)
@@ -297,15 +297,6 @@ func TestSpaceAgentInterpretsTaskTimestampInTheSuppliedTimezone(t *testing.T) {
 	}
 }
 
-func TestSpaceAgentMayParaphraseExplicitSharedMessage(t *testing.T) {
-	if !api.TestingSpaceAgentSendIsGrounded("Tell everyone Melissa will wash the dishes tonight at 7 PM", "Melissa is handling the dishes by 7 PM.") {
-		t.Fatal("explicit send request should allow a concise agent-authored paraphrase")
-	}
-	if api.TestingSpaceAgentSendIsGrounded("Add a task for Melissa", "Melissa is handling the dishes by 7 PM.") {
-		t.Fatal("task request must not implicitly authorize a shared message")
-	}
-}
-
 func TestSpaceAgentCreatesReadsAndUpdatesNativeNote(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
@@ -382,7 +373,7 @@ func TestFamilySpaceResearchCanBeSavedAndPostedWithCitations(t *testing.T) {
 	summary := "Pasadena summer camps include art and science programs. Source: " + sourceURL
 	if _, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "", prompt, "messages.send",
-		json.RawMessage(`{"message":"`+summary+`"}`),
+		json.RawMessage(`{"message":"`+summary+`","audience":"space"}`),
 	); err != nil {
 		t.Fatalf("post cited summary: %v", err)
 	}

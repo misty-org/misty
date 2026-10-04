@@ -10,24 +10,30 @@ import (
 	"net/http"
 	"strings"
 	"time"
+ "github.com/kannachi323/misty/server/internal/aimodels"
 
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body any, headers map[string]string, dst any) (resultErr error) {
 	key := strings.TrimSpace(a.APIKey)
-	if key == "" {
-		return errors.New("AI Gateway key is required")
+	if key == "" && a.callProvider != "openai-compatible" {
+		return errors.New("AI provider key is required")
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	wirePayload := payload
+ if a.callProvider != "" {
+  var native map[string]any
+  if json.Unmarshal(payload, &native) == nil { if model, ok := native["model"].(string); ok { native["model"] = aimodels.NativeModel(a.callProvider, model); wirePayload, _ = json.Marshal(native) } }
+ }
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(wirePayload))
 	if err != nil {
 		return err
 	}
-	request.Header.Set("Authorization", "Bearer "+key)
+	if key != "" { request.Header.Set("Authorization", "Bearer "+key) }
 	request.Header.Set("Content-Type", "application/json")
 	for name, value := range headers {
 		request.Header.Set(name, value)
@@ -56,13 +62,13 @@ func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body a
 	success = response.StatusCode >= 200 && response.StatusCode < 300
 	raw, err = io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
 	if err != nil || len(raw) > 8<<20 {
-		return errors.New("AI Gateway response too large or incomplete")
+		return errors.New("AI provider response too large or incomplete")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("AI Gateway status %d", response.StatusCode)
+		return fmt.Errorf("AI provider status %d", response.StatusCode)
 	}
 	if err = json.Unmarshal(raw, dst); err != nil {
-		return fmt.Errorf("AI Gateway returned invalid JSON: %w", err)
+		return fmt.Errorf("AI provider returned invalid JSON: %w", err)
 	}
 	return nil
 }

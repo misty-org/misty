@@ -1,5 +1,6 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
 import { LibraryItemThumbnail } from "@/features/library";
+import { FileNameIcon } from "@/features/file-ui";
 import { spacesApi } from "@/api/spaces/api";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +16,8 @@ import {
   useCollectionRefinement,
   CollectionItems,
   CollectionViewToggle,
-  Spinner,
+  itemTones,
+  CollectionSkeleton,
 } from "@/shared/ui";
 import { useSpaceOverview } from "./useSpaceOverview";
 import { useSpaceItemCreator } from "./useSpaceItemCreator";
@@ -31,6 +33,13 @@ const icons = {
   task: appIcons.planner,
   file: Images,
   chat: MessagesSquare,
+};
+const tones = {
+  note: itemTones.note,
+  drawing: itemTones.drawing,
+  task: itemTones.task,
+  file: itemTones.image,
+  chat: itemTones.chat,
 };
 export function SpaceOverview({ space }: { space: Space }) {
   const { user } = useAuth();
@@ -139,7 +148,7 @@ export function SpaceOverview({ space }: { space: Space }) {
       )}
       {itemActions.dialog}
       {data.loading || (filter === "favorites" && !personal.ready && !personal.error) ? (
-        <Spinner label="Loading items" />
+        <CollectionSkeleton label="Loading items" view={view} />
       ) : (
         <CollectionItems
           columnSetId="space-overview"
@@ -152,7 +161,13 @@ export function SpaceOverview({ space }: { space: Space }) {
             return {
               ...item,
               ...itemActions.forItem(item),
-              icon: <Icon size={18} />,
+              // Files take their type's glyph and tone, matching the explorer and Library.
+              icon: item.libraryItem?.file ? (
+                <FileNameIcon name={item.libraryItem.file.original_filename} size={18} />
+              ) : (
+                <Icon size={18} />
+              ),
+              tone: tones[item.kind],
               preview:
                 view === "grid" && item.libraryItem?.file ? (
                   <LibraryItemThumbnail

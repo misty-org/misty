@@ -89,7 +89,9 @@ export class CompanionVoiceWebRTC {
       this.sources.delete(source);
     };
     this.sources.add(source);
-    this.next = Math.max(this.next, this.context.currentTime + 0.03);
+    // Preserve contiguous microphone samples; only rebuffer after an actual
+    // underrun rather than inserting a gap whenever lead falls below 30 ms.
+    if (this.next <= this.context.currentTime) this.next = this.context.currentTime + 0.08;
     source.start(this.next);
     this.next += buffer.duration;
   }

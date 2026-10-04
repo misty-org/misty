@@ -8,13 +8,15 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/kannachi323/misty/server/internal/aimodels"
 )
 
 type Service struct {
-	store    *SessionStore
-	provider ModelProvider
-	policy   PermissionPolicy
-	meter    UsageMeter
+	store         *SessionStore
+	provider      ModelProvider
+	policy        PermissionPolicy
+	meter         UsageMeter
+	modelResolver aimodels.Resolver
 }
 
 type ToolExecutor func(context.Context, ToolRequest) (json.RawMessage, error)
@@ -54,10 +56,11 @@ func (s *Service) CompleteWithToolsForSpaceContext(ctx context.Context, userID, 
 		billingUserID = userID
 	}
 	if execute == nil || len(manifest.Tools) == 0 {
-		// The plain completion path has no session to carry the identity, so it
-		// is the one place the two prompts have to travel together.
-		merged := strings.TrimSpace(strings.TrimSpace(systemPrompt) + "\n\n" + prompt)
-		text, _, err := s.CompleteWithTierForSpaceContext(ctx, billingUserID, spaceID, merged, "automation_ai", tier)
+		// A read-only completion still needs its instructions in the provider's
+		// authoritative field. Folding them into the user message loses them to
+		// the persona/injection rules in buildAgentPrompt.
+		tier = NormalizeAgentTier(tier)
+		text, _, err := s.completeWithProviderContext(ctx, billingUserID, spaceID, systemPrompt, prompt, "automation_ai", TestingResolveAgentProvider(s.provider, tier), tier)
 		return ToolCompletion{Text: text}, err
 	}
 	session := s.CreateSessionWithBillingAndSpace(userID, billingUserID, spaceID)
@@ -136,24 +139,38 @@ func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, m
 }
 
 func (s *Service) CompleteWithTierForSpaceContext(ctx context.Context, userID, spaceID, prompt, meterName string, tier AgentTier) (string, UsageSettlement, error) {
-	return s.completeWithProviderContext(ctx, userID, spaceID, prompt, meterName, TestingResolveAgentProvider(s.provider, NormalizeAgentTier(tier)), NormalizeAgentTier(tier))
+	return s.completeWithProviderContext(ctx, userID, spaceID, "", prompt, meterName, TestingResolveAgentProvider(s.provider, NormalizeAgentTier(tier)), NormalizeAgentTier(tier))
 }
 
-func (s *Service) completeWithProviderContext(ctx context.Context, userID, spaceID, prompt, meterName string, selectedProvider ModelProvider, tier AgentTier) (string, UsageSettlement, error) {
+func (s *Service) completeWithProviderContext(ctx context.Context, userID, spaceID, systemPrompt, prompt, meterName string, selectedProvider ModelProvider, tier AgentTier) (string, UsageSettlement, error) {
+	if s.modelResolver != nil {
+		config, configErr := s.modelResolver(ctx, userID, "routing")
+		if configErr != nil {
+			return "", UsageSettlement{}, configErr
+		}
+		if config != nil {
+			var providerErr error
+			selectedProvider, providerErr = accountCompletionProvider(config)
+			if providerErr != nil {
+				return "", UsageSettlement{}, providerErr
+			}
+		}
+	}
 	prompt = strings.TrimSpace(prompt)
+	systemPrompt = strings.TrimSpace(systemPrompt)
 	if prompt == "" {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is required")
 	}
-	if len(prompt) > MaxUserMessageBytes {
+	if len(prompt)+len(systemPrompt) > MaxUserMessageBytes {
 		return "", UsageSettlement{}, ErrInvalidRequest("prompt is too large")
 	}
-	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, AgentTier: tier, Mode: ModeAsk, Messages: []Message{{Role: RoleUser, Content: prompt}}}
+	request := ModelRequest{SessionID: uuid.NewString(), UserID: userID, SystemPrompt: systemPrompt, AgentTier: tier, Mode: ModeAsk, Messages: []Message{{Role: RoleUser, Content: prompt}}}
 	provider, model := TestingProviderStatus(selectedProvider)
 	idempotencyKey := "completion:" + request.SessionID
 	var reservation *UsageReservation
 	var err error
 	if s.meter != nil && provider != ProviderMock {
-		reservation, err = ReserveUsage(s.meter, userID, spaceID, idempotencyKey, meterName, provider, model, estimateRequestTokens(request), MaxModelOutputTokens)
+		reservation, err = ReserveMeasuredUsage(s.meter, userID, idempotencyKey, provider, model, map[string]int64{"input_bytes": int64(TestingRequestSizeBytes(request)), "output_tokens": MaxModelOutputTokens}, "")
 		if err != nil {
 			return "", UsageSettlement{}, err
 		}

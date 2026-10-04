@@ -6,7 +6,7 @@ import {
   explorerListDirectory,
 } from "../../../native";
 import { multiPanelStoreForPane, useMultiPanelStore } from "@/features/workspace";
-import type { DirectorySizeRecord } from "@/native/ipc";
+import type { DirectoryListing, DirectorySizeRecord } from "@/native/ipc";
 import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import { errorText, userFacingErrorText } from "@/shared/lib/format";
 import type { ExplorerStore } from "../../model/interfaces/store/types";
@@ -22,6 +22,8 @@ export function createNavigationActions(
   set: ExplorerSet,
   get: ExplorerGet,
 ): Partial<ExplorerStore> {
+  const navigationVersions = new Map<string, number>();
+  const loadVersions = new Map<string, number>();
   return {
     loadPane: (paneId, path, mode = "push", options) => {
       const environment = useAppStore.getState().app?.environment;
@@ -30,6 +32,30 @@ export function createNavigationActions(
         : undefined;
       if (isRetiredCloudLocation(path, legacyMount)) path = environment?.homeDir || "/";
       path = H.normalizedPath(path);
+      if (path === "misty-transfers://history") {
+        navigationVersions.set(paneId, (navigationVersions.get(paneId) ?? 0) + 1);
+        const listing: DirectoryListing = {
+          path,
+          title: "Transfers",
+          parentPath: null,
+          entries: [],
+          totalCount: 0,
+          hiddenCount: 0,
+          location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
+        };
+        multiPanelStoreForPane(paneId).getState().updateActiveTabPath(paneId, path, "Transfers");
+        set((state) => ({
+          inlineEdit: state.inlineEdit?.paneId === paneId ? null : state.inlineEdit,
+          panes: {
+            ...state.panes,
+            [paneId]: {
+              ...H.applyNavigationResult(state.panes[paneId] ?? H.emptyPaneState(), listing, mode),
+              needsLoad: false,
+            },
+          },
+        }));
+        return Promise.resolve();
+      }
       if (H.isExplorerInternalTabPath(path)) {
         set((state) => ({
           panes: {
@@ -53,8 +79,12 @@ export function createNavigationActions(
         options?.forceRemoteRefresh ? "force" : "cached",
       ].join("\0");
       const pendingLoad = explorerRuntime.paneLoadRequestsInFlight.get(loadKey);
-      if (pendingLoad) return pendingLoad;
+      if (pendingLoad && loadVersions.get(loadKey) === navigationVersions.get(paneId))
+        return pendingLoad;
 
+      const version = (navigationVersions.get(paneId) ?? 0) + 1;
+      navigationVersions.set(paneId, version);
+      loadVersions.set(loadKey, version);
       const loadRequest = (async () => {
         set((state) => {
           const pane = state.panes[paneId] ?? H.emptyPaneState();
@@ -136,6 +166,7 @@ export function createNavigationActions(
             H.sortForPane(get(), paneId),
             get().directorySizes,
           );
+          if (navigationVersions.get(paneId) !== version) return;
           if (listing.path.startsWith("misty://device/")) {
             void connectedDevicesSubscribeDirectory(listing.path);
           }
@@ -171,6 +202,7 @@ export function createNavigationActions(
           });
           void get().loadDirectorySizeSnapshot(H.folderPathsForListing(listing));
         } catch (error) {
+          if (navigationVersions.get(paneId) !== version) return;
           set((state) => ({
             panes: {
               ...state.panes,
@@ -190,6 +222,7 @@ export function createNavigationActions(
       void loadRequest.finally(() => {
         if (explorerRuntime.paneLoadRequestsInFlight.get(loadKey) === loadRequest) {
           explorerRuntime.paneLoadRequestsInFlight.delete(loadKey);
+          loadVersions.delete(loadKey);
         }
       });
       return loadRequest;

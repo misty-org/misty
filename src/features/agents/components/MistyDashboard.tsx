@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { runtimeAiApi as ai, runtimeAgentsApi as agents, useAgentsAuth } from "../AgentsRuntime";
 import type { PersonalAgentRunDetail } from "../model/interfaces/personal";
+import { ToolActivity } from "./ToolActivity";
 
 const finishedStates = new Set(["completed", "failed", "canceled", "completed_with_errors"]);
 const stateLabels: Record<string, string> = {
@@ -352,23 +353,7 @@ function ActivityDetails({
           </div>
         ))}
       {result && <p className="agent-activity-result">{result}</p>}
-      {entry.events.length > 0 && (
-        <details className="agent-activity-events">
-          <summary>Tool activity</summary>
-          <ul>
-            {entry.events.map((event, index) => (
-              <li key={index}>
-                {event.text ||
-                  event.error ||
-                  event.toolName ||
-                  event.tool_name ||
-                  event.phase ||
-                  event.type}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <ToolActivity events={entry.events} />
       {!loading && !error && !detail?.instruction && !result && !entry.events.length && (
         <p className="text-cream-muted">No details available.</p>
       )}

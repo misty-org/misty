@@ -154,7 +154,7 @@ func TestForegroundAgentModelTurnBudget(t *testing.T) {
 		mode, surface string
 		limit         int
 	}{
-		{"auto", "global", 120}, {"agent", "global", 120}, {"user", "global", 20}, {"team", "global", 20}, {"agent", "sdk", 20}, {"agent", "routine", 20},
+		{"auto", "global", 120}, {"agent", "global", 120}, {"user", "global", 20}, {"team", "global", 120}, {"agent", "sdk", 20}, {"agent", "routine", 20}, {"team", "sdk", 20}, {"team", "routine", 20},
 	} {
 		payload, _ := json.Marshal(map[string]string{"agent_id": agent.ID, "execution_mode": scenario.mode, "task_id": lease.TaskID, "window_label": lease.WindowLabel})
 		run, _, err := database.CreateAIInvocationRecord(ctx, AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user, SpaceID: space.ID, SurfaceID: scenario.surface, Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: payload, ExpiresAt: time.Now().Add(time.Hour)})
@@ -166,6 +166,21 @@ func TestForegroundAgentModelTurnBudget(t *testing.T) {
 		}
 		if scenario.limit == 120 {
 			foreground = run
+		}
+	}
+	// A team flag cannot borrow another native task/window's higher allowance.
+	// foreground is the team admission above, so the remaining claim/replay
+	// assertions exercise the new path through all 120 actual model claims.
+	for _, mismatch := range []struct{ task, window string }{
+		{"other-task", lease.WindowLabel}, {lease.TaskID, "other-agent-window"},
+	} {
+		payload, _ := json.Marshal(map[string]string{"agent_id": agent.ID, "execution_mode": "team", "task_id": mismatch.task, "window_label": mismatch.window})
+		invalid := foreground
+		invalid.ID = "invocation_" + uuid.NewString()
+		invalid.IdempotencyKey = uuid.NewString()
+		invalid.RequestPayload = payload
+		if _, _, err := database.CreateAIInvocationRecord(ctx, invalid); !errors.Is(err, ErrSpaceForbidden) {
+			t.Fatalf("team admission accepted a substituted lease %+v: %v", mismatch, err)
 		}
 	}
 	runtime := uuid.NewString()

@@ -28,17 +28,19 @@ func mistyTurnSource(trigger string) string {
 }
 
 type scheduledTaskInput struct {
-	AgentID string `json:"agent_id"`
-	Title   string `json:"title"`
-	Prompt  string `json:"prompt"`
-	Enabled *bool  `json:"enabled"`
+	MethodVersionID string         `json:"method_version_id,omitempty"`
+	MethodInputs    map[string]any `json:"method_inputs,omitempty"`
+	AgentID         string         `json:"agent_id"`
+	Title           string         `json:"title"`
+	Prompt          string         `json:"prompt"`
+	Enabled         *bool          `json:"enabled"`
 	db.ScheduledTaskSchedule
 }
 
 func (input scheduledTaskInput) task(id string) db.ScheduledTask {
 	enabled := input.Enabled == nil || *input.Enabled
 	return db.ScheduledTask{
-		ID: id, Title: strings.TrimSpace(input.Title), Prompt: strings.TrimSpace(input.Prompt),
+		MethodVersionID: input.MethodVersionID, MethodInputs: input.MethodInputs, ID: id, Title: strings.TrimSpace(input.Title), Prompt: strings.TrimSpace(input.Prompt),
 		Enabled: enabled, ScheduledTaskSchedule: input.ScheduledTaskSchedule,
 	}
 }
@@ -65,6 +67,10 @@ func (s *AIService) ScheduledTasks() http.HandlerFunc {
 		}
 		var body scheduledTaskInput
 		if decodeAIJSON(w, r, &body) != nil {
+			return
+		}
+		if err := s.prepareScheduledMethod(r.Context(), userID, &body); err != nil {
+			writeAgentMethodError(w, err)
 			return
 		}
 		task := body.task("")
@@ -99,9 +105,35 @@ func (s *AIService) ScheduledTask() http.HandlerFunc {
 		}
 		id := strings.TrimSpace(chi.URLParam(r, "taskID"))
 		switch r.Method {
+		case http.MethodGet:
+			item, err := s.database.ScheduledTaskByID(r.Context(), userID, id)
+			if err != nil {
+				TestingWriteAIError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"task": item})
 		case http.MethodPut:
 			var body scheduledTaskInput
 			if decodeAIJSON(w, r, &body) != nil {
+				return
+			}
+			prior, err := s.database.ScheduledTaskByID(r.Context(), userID, id)
+			if err != nil {
+				TestingWriteAIError(w, err)
+				return
+			}
+			// Generic schedule editors cannot silently unpin or retarget a workflow.
+			if prior.MethodVersionID != "" {
+				if body.MethodVersionID != "" && body.MethodVersionID != prior.MethodVersionID {
+					TestingWriteAIError(w, db.ErrSpaceConflict)
+					return
+				}
+				body.MethodVersionID = prior.MethodVersionID
+				body.MethodInputs = prior.MethodInputs
+				body.AgentID = prior.AgentID
+			}
+			if err := s.prepareScheduledMethod(r.Context(), userID, &body); err != nil {
+				writeAgentMethodError(w, err)
 				return
 			}
 			updated, err := s.database.UpdateScheduledTask(r.Context(), userID, body.task(id), time.Now().UTC())
@@ -216,6 +248,14 @@ func (s *AIService) startScheduledTaskRun(ctx context.Context, item db.Scheduled
 		ConversationID: conversationID, AgentID: bound.AgentID, Timezone: item.Timezone,
 		IdempotencyKey: "scheduled-task:" + item.ID + ":" + scheduledAt.UTC().Format(time.RFC3339),
 	}
+	body.MethodVersionID = item.MethodVersionID
+	body.MethodInputs = item.MethodInputs
+	if _, err := resolveInvocationMethod(ctx, s.database, item.UserID, &body); err != nil {
+		return fail(err)
+	}
+	if err := pinInvocationSkills(ctx, s.database, item.UserID, &body); err != nil {
+		return fail(err)
+	}
 	payload, _ := json.Marshal(body)
 	invocation, created, err := s.database.CreateAIInvocationRecord(ctx, db.AIInvocationRecord{
 		ID: "invocation_" + uuid.NewString(), UserID: item.UserID, ConversationID: conversationID,
@@ -252,4 +292,35 @@ func (s *SpacesService) completeScheduledTaskInvocation(ctx context.Context, rec
 		return err
 	}
 	return s.database.CompleteScheduledTaskRun(ctx, *task, runErr, time.Now().UTC())
+}
+
+func (s *AIService) prepareScheduledMethod(ctx context.Context, user string, body *scheduledTaskInput) error {
+	if body.MethodVersionID == "" {
+		if len(body.MethodInputs) > 0 {
+			return db.ErrSpaceInvalid
+		}
+		return nil
+	}
+	if db.AppAuthorityFromContext(ctx) != nil {
+		return db.ErrSpaceForbidden
+	}
+	m, err := s.database.AgentMethodVersion(ctx, user, body.MethodVersionID)
+	if err != nil {
+		return err
+	}
+	if !m.Enabled || m.Kind != "workflow" || (body.AgentID != "" && body.AgentID != m.AgentID) {
+		return db.ErrSpaceForbidden
+	}
+	prompt, err := db.RenderAgentMethod(m.Definition, body.MethodInputs)
+	if err != nil {
+		return err
+	}
+	body.AgentID = m.AgentID
+	body.Prompt = prompt
+	if strings.TrimSpace(body.Title) == "" {
+		body.Title = m.Definition.Title
+	}
+	// Device targets can be saved, but cloud scheduling must fail truthfully until a
+	// native device hands off a fresh lease; never redirect them to ambient control.
+	return nil
 }

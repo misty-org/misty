@@ -11,6 +11,7 @@ import (
 
 func TestLibraryEditRenditionReservationCompletionAndDownload(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Rendition Owner", "rendition-owner@example.com", "password123")
 	spaceID := createTestSpace(t, database, ctx, owner.ID, "Renditions").ID

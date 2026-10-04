@@ -1,21 +1,9 @@
-import { z } from "zod";
-import { readFile, writeFile } from "node:fs/promises";
-import { mistySocialCapabilities } from "../../../src/shared/schemas/communications-capabilities.ts";
-import { mistyTaskCapabilities } from "../../../src/shared/schemas/task-capabilities.ts";
-import { MistyBrowserInteractionSchema } from "../../../src/shared/schemas/browser.ts";
+import { execFileSync } from "node:child_process";
 
-// Reserve Misty-owned semantic definitions before any provider can
-// claim them. This is the same internal contract data, not a second handwritten tool catalog.
-const capabilityTarget = new URL("../../internal/capabilities/builtins.json", import.meta.url);
-const capabilityExpected = JSON.stringify([...mistySocialCapabilities, ...mistyTaskCapabilities], null, 2) + "\n";
-if (process.argv.includes("--check")) {
-  if (await readFile(capabilityTarget, "utf8") !== capabilityExpected) throw new Error("Go capability contracts differ from the internal contract source");
-} else await writeFile(capabilityTarget, capabilityExpected);
-
-// The runtime driver uses the internal interaction vocabulary, not a parallel schema.
-const browserTarget = new URL("../../internal/capabilities/browser-interaction.json", import.meta.url);
-const browserExpected = JSON.stringify(z.toJSONSchema(MistyBrowserInteractionSchema), null, 2) + "\n";
-if (process.argv.includes("--check")) {
-  if (await readFile(browserTarget, "utf8") !== browserExpected) throw new Error("Browser interaction schema differs from the internal contract source");
-} else await writeFile(browserTarget, browserExpected);
-
+// Phase 1 removed the frontend capability definitions. The retained contracts
+// now belong to Go and are consumed directly by the workflow runtime; validate
+// those canonical schemas instead of importing the retired frontend catalog.
+execFileSync("go", ["test", "./internal/capabilities", "./internal/agenttools"], {
+  cwd: new URL("../../", import.meta.url),
+  stdio: "inherit",
+});

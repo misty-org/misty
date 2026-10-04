@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kannachi323/misty/server/internal/billingadapter"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 
 	"github.com/go-chi/chi/v5"
@@ -207,6 +208,8 @@ func (s *SpacesService) MemberAvatar() http.HandlerFunc {
 
 func writeSpaceError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, billingadapter.ErrDenied), errors.Is(err, billingadapter.ErrUnavailable):
+		writeBillingError(w, err)
 	case errors.Is(err, db.ErrAppRuntimeForbidden):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "space_app_unavailable", "message": "The owning app is not available in this Space."})
 	case errors.Is(err, db.ErrSpaceNotFound), errors.Is(err, db.ErrSpaceInviteNotFound):
@@ -232,7 +235,7 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, db.ErrPersonalStorageQuota):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "owner_storage_quota_exceeded", "reason": "personal_storage_limit_reached"})
 	case errors.Is(err, db.ErrSpaceStorageQuota):
-		writeJSON(w, http.StatusConflict, map[string]string{"code": "owner_storage_quota_exceeded", "reason": "space_storage_limit_reached"})
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "owner_storage_quota_exceeded", "reason": "personal_storage_limit_reached"})
 	case errors.Is(err, db.ErrLibraryQuota):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "owner_storage_quota_exceeded"})
 	case isHostedAILimitReached(err):

@@ -23,7 +23,6 @@ import {
   Moon,
   MoreHorizontal,
   Star,
-  PanelLeft,
   ArrowLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -152,14 +151,12 @@ function Preview() {
     [filter, setFilter] = useState("Recent"),
     [search, setSearch] = useState(""),
     [menu, setMenu] = useState(false),
-    [mobileNav, setMobileNav] = useState(false),
     [chosen, setChosen] = useState(""),
     [grid, setGrid] = useState(false);
   const scheduled = view === "scheduled";
   const go = (next: string) => {
     setView(next);
     setSearch("");
-    setMobileNav(false);
     setChosen("");
     history.replaceState(null, "", `?view=${next}`);
   };
@@ -173,7 +170,7 @@ function Preview() {
   return (
     <div className="preview">
       <aside
-        className={`sidebar ${mobileNav ? "mobile-open" : ""}`}
+        className="sidebar"
         aria-label={scheduled ? "Scheduled navigation" : "Spaces navigation"}
       >
         <header className="sidebar-heading">
@@ -356,14 +353,6 @@ function Preview() {
         </footer>
       </aside>
       <main className={scheduled ? "main scheduled-main" : "main"}>
-        <div className="mobile-heading">
-          <GlyphButton
-            icon={PanelLeft}
-            label="Toggle navigation"
-            onClick={() => setMobileNav(!mobileNav)}
-          />
-          <span>{scheduled ? "Scheduled" : "Personal space"}</span>
-        </div>
         {scheduled ? (
           <section className="scheduled-start">
             <Clock3 className="hero-clock" size={48} strokeWidth={1.25} />

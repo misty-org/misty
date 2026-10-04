@@ -6,13 +6,9 @@
   "scripts": {
     "dev": "npm run dev:desktop",
     "dev:desktop": "node cli/tasks/run-tool.ts vite --mode desktop",
-    "dev:web": "node cli/tasks/run-tool.ts vite --mode web --host 0.0.0.0 --port 5173",
     "build": "npm run build:desktop",
     "build:desktop": "tsc && node cli/tasks/run-tool.ts vite build --mode desktop",
-    "build:web": "tsc && node --max-old-space-size=8192 cli/tasks/run-tool.ts vite build --mode web",
-    "deploy:web:dev": "npm run build:web && node cli/tasks/run-tool.ts wrangler deploy --env dev",
     "preview": "node cli/tasks/run-tool.ts vite preview --mode desktop",
-    "preview:web": "node cli/tasks/run-tool.ts vite preview --mode web",
     "tauri": "node --disable-warning=ExperimentalWarning --experimental-strip-types cli/tasks/tauri.ts",
     "typecheck": "tsc --noEmit",
     "lint": "node cli/tasks/run-tool.ts eslint src",
@@ -144,7 +140,8 @@
     "fast-uri": "^3.1.8",
     "@excalidraw/excalidraw": {
       "nanoid": "3.3.18",
-      "@radix-ui/react-tabs": "1.1.21"
+      "@radix-ui/react-tabs": "1.1.21",
+      "sass": "1.93.3"
     },
     "@excalidraw/mermaid-to-excalidraw": {
       "nanoid": "5.1.16"

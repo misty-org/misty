@@ -7,7 +7,6 @@ import {
   Images,
   Layers,
   ListTodo,
-  Menu,
   MessagesSquare,
   MoreHorizontal,
   Notebook,
@@ -40,18 +39,13 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
   WorkspaceSidebar,
   WorkspaceSidebarHeading,
   WorkspaceSectionLabel,
 } from "@/shared/ui";
 import { Chat } from "./Chat";
 import { Collection } from "./Collection";
-import { ConversationIcon, itemIcons, useNarrow } from "./controls";
+import { ConversationIcon, itemIcons } from "./controls";
 import {
   blankDraft,
   conversations as seedConversations,
@@ -123,7 +117,6 @@ export function App() {
         ],
   );
   const [moreRecents, setMoreRecents] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
   const [opened, setOpened] = useState<Item>();
   const [management, setManagement] = useState<"Members" | "Usage">();
   const [creating, setCreating] = useState<ItemKind>();
@@ -131,7 +124,6 @@ export function App() {
   const [newGroup, setNewGroup] = useState<Conversation["group"]>("Channels");
   const [notice, setNotice] = useState("");
   const [chatQuery, setChatQuery] = useState("");
-  const narrow = useNarrow();
   const touchRecent = (id: string) =>
     setRecents((current) => [id, ...current.filter((x) => x !== id)]);
   const favorite = (id: string) =>
@@ -140,14 +132,12 @@ export function App() {
     setActiveId(id);
     setPage("Chat");
     touchRecent(id);
-    setNavOpen(false);
     setConversations((current) =>
       current.map((c) => (c.id === id ? { ...c, unread: undefined } : c)),
     );
   };
   const openItem = (item: Item) => {
     touchRecent(item.id);
-    setNavOpen(false);
     if (item.kind === "chat") switchChat(item.id);
     else setOpened(item);
   };
@@ -273,7 +263,6 @@ export function App() {
             aria-pressed={page === name || (page === "Browse chats" && name === "Chat")}
             onClick={() => {
               setPage(name);
-              setNavOpen(false);
             }}
           >
             <Icon size={18} />
@@ -346,22 +335,6 @@ export function App() {
   return (
     <div className="prototype-root">
       <div className="prototype-topbar">
-        {narrow && (
-          <Sheet open={navOpen} onOpenChange={setNavOpen}>
-            <SheetTrigger asChild>
-              <IconButton label="Open Space navigation" tooltip={false}>
-                <Menu />
-              </IconButton>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] p-0 pt-10">
-              <SheetTitle className="sr-only">family Space</SheetTitle>
-              <SheetDescription className="sr-only">
-                Navigate tools and recent items.
-              </SheetDescription>
-              {sidebar}
-            </SheetContent>
-          </Sheet>
-        )}
         <span className="font-semibold text-cream">misty</span>
         <span className="topbar-divider" />
         <span>Spaces</span>
@@ -370,7 +343,7 @@ export function App() {
         <span className="ml-auto text-xs text-cream-muted">Interactive prototype</span>
       </div>
       <div className="prototype-workspace">
-        {!narrow && sidebar}
+        {sidebar}
         <main className="prototype-main">
           {page === "Chat" ? (
             <Chat

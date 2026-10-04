@@ -17,6 +17,7 @@ vi.mock("@/api/accountEvents", () => ({
 vi.mock("../AgentsRuntime", () => ({
   useAgentsAuth: () => ({ user: { id: "owner" } }),
   runtimeAiApi: { activity: fixture.activity },
+  runtimeAssistantApi: {},
 }));
 vi.mock("./AgentAvatar", () => ({ AgentAvatar: () => <span>Avatar</span> }));
 vi.mock("./MistyDashboard", () => ({

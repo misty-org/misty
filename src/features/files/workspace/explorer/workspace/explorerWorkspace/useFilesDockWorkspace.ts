@@ -26,6 +26,12 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
     const tab = dockLeaves(state.layout.root)
       .flatMap((pane) => pane.views)
       .find((entry) => entry.id === options.workspaceId);
+    if (
+      tab &&
+      new URL(tab.route, "https://misty.local").searchParams.get("view") === "transfers" &&
+      !(tab.state && typeof tab.state === "object" && "path" in tab.state)
+    )
+      return "misty-transfers://history";
     if (!tab?.state || typeof tab.state !== "object") return null;
     const path = (tab.state as { path?: unknown }).path;
     return typeof path === "string" && path ? path : null;
@@ -83,6 +89,12 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
     if (!tab) return;
     const storedPath =
       tab.state && typeof tab.state === "object" ? (tab.state as { path?: unknown }).path : null;
+    const url = new URL(tab.route, "https://misty.local");
+    if (options.activePath === "misty-transfers://history")
+      url.searchParams.set("view", "transfers");
+    else if (url.searchParams.get("view") === "transfers") url.searchParams.delete("view");
+    const route = `/files${url.search}`;
+    if (route !== tab.route) workspace.updateViewRoute(tab.id, route, true);
     if (storedPath === options.activePath) return;
     workspace.updateViewState(
       tab.id,
@@ -112,6 +124,7 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
 }
 
 function fileTabTitle(path: string): string {
+  if (path === "misty-transfers://history") return "Transfers";
   const normalized = path.replace(/\/+$/, "");
   return normalized.split("/").filter(Boolean).pop() ?? "Files";
 }

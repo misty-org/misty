@@ -87,7 +87,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
       <DropdownMenuContent
         align="end"
         width="lg"
-        className="max-h-[calc(100dvh-80px)]"
+        className="max-h-[var(--radix-dropdown-menu-content-available-height)]"
         data-browser-menu
       >
         {commands ? (

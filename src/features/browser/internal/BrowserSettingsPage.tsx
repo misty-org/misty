@@ -1,5 +1,4 @@
-import { Button } from "@/shared/ui";
-import { Settings2 } from "lucide-react";
+import { Button, EmptyState } from "@/shared/ui";
 import { useEffect } from "react";
 import { InternalPageFrame } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
@@ -12,16 +11,21 @@ export function BrowserSettingsPage(props: BrowserInternalPageProps) {
   return (
     <InternalPageFrame
       title="Browser settings"
-      icon={Settings2}
       actions={
-        <Button variant="toolbar" size="xs" onClick={props.clearBrowsingData}>
+        <Button variant="outline" onClick={props.clearBrowsingData}>
           Clear browsing data…
         </Button>
       }
     >
-      <Button variant="toolbar" size="xs" onClick={openBrowserSettings}>
-        Open Browser settings
-      </Button>
+      <EmptyState
+        title="Browser settings"
+        description="Manage your browser preferences in Settings."
+        action={
+          <Button variant="primary" onClick={openBrowserSettings}>
+            Open Browser settings
+          </Button>
+        }
+      />
     </InternalPageFrame>
   );
 }

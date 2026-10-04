@@ -5,6 +5,7 @@ export async function companionStage<T>(
   label: string,
   timeoutMs: number,
 ): Promise<T> {
+  const started = performance.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancel: () => void = () => {};
   try {
@@ -21,6 +22,8 @@ export async function companionStage<T>(
       }),
     ]);
   } finally {
+    // Stage names and durations only: never record prompts, captures or audio.
+    console.debug("[companion stage]", label, Math.round(performance.now() - started));
     clearTimeout(timer);
     signal.removeEventListener("abort", cancel);
   }

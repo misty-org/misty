@@ -17,7 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   IconButton,
-  Spinner,
+  CollectionSkeleton,
   type CollectionItem,
 } from "@/shared/ui";
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
@@ -251,7 +251,7 @@ export function PlannerCollection({ spaceId, canManage }: { spaceId: string; can
         </div>
       )}
       {loading && !items.length ? (
-        <Spinner label="Loading planner" />
+        <CollectionSkeleton label="Loading planner" view={view} />
       ) : (
         <CollectionItems
           columnSetId={`planner:${section}`}

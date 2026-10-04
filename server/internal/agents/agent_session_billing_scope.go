@@ -56,6 +56,7 @@ func (s *Service) SendMessageWithTierContext(ctx context.Context, sessionID, use
 			session.SpaceContextRevision = request.SpaceContextRevision
 		}
 		session.ProviderCallsThisTurn = 0
+		session.BillingTurnSequence = session.nextSequence + 1
 		session.ToolResults = nil
 		clear(session.PendingToolRequests)
 		for _, selected := range request.SelectedPaths {

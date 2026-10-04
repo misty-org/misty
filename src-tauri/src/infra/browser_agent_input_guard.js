@@ -1,9 +1,10 @@
-function guard(locked, view = window, depth = 0) {
+function guard(locked, view = window, depth = 0, nativeGuard = false) {
   if (depth > 8) return;
   view.__MISTY_AGENT_INPUT_LOCKED__ = locked;
+  view.__MISTY_AGENT_NATIVE_INPUT_GUARD__ = nativeGuard;
   const visitFrame = frame => {
     try {
-      if (frame.contentDocument?.defaultView) guard(view.__MISTY_AGENT_INPUT_LOCKED__, frame.contentDocument.defaultView, depth + 1);
+      if (frame.contentDocument?.defaultView) guard(view.__MISTY_AGENT_INPUT_LOCKED__, frame.contentDocument.defaultView, depth + 1, nativeGuard);
     } catch { /* Never bypass a frame's origin or sandbox boundary. */ }
   };
   for (const frame of view.document.querySelectorAll("iframe,frame")) visitFrame(frame);
@@ -23,7 +24,7 @@ function guard(locked, view = window, depth = 0) {
   for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'keydown', 'keyup', 'beforeinput', 'paste', 'drop', 'wheel']) {
     view.addEventListener(type, event => {
       if (!view.__MISTY_AGENT_INPUT_LOCKED__) return;
-      if (event.isTrusted) {
+      if (event.isTrusted && !view.__MISTY_AGENT_NATIVE_INPUT_GUARD__) {
         event.preventDefault();
         event.stopImmediatePropagation();
       } else if (type === 'click' && event.target instanceof view.HTMLInputElement && event.target.type === 'file') {

@@ -1,5 +1,5 @@
 export interface ProviderAuthorizationOpenResult {
-  strategy: "misty-browser" | "window-open";
+  strategy: "misty-browser";
   platform: string;
   attemptedAt: number;
   fallbackReason?: string;

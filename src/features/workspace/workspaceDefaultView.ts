@@ -6,10 +6,13 @@ import {
 } from "./model";
 
 export const workspaceDefaultViewOptions = ["Home", "Browser", "Files", "Agents"] as const;
-let defaultIndex = 0;
+export const workspaceDefaultViewIndex = 1;
+let defaultIndex = workspaceDefaultViewIndex;
 export function configureWorkspaceDefaultView(index: number): void {
   defaultIndex =
-    Number.isInteger(index) && index >= 0 && index < workspaceDefaultViewOptions.length ? index : 0;
+    Number.isInteger(index) && index >= 0 && index < workspaceDefaultViewOptions.length
+      ? index
+      : workspaceDefaultViewIndex;
 }
 function createTab(index: number, placeholder: boolean): WorkspaceView {
   const now = Date.now();

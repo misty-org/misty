@@ -9,12 +9,11 @@ import {
 import {
   appIconStrokeWidth,
   cn,
-  navigationMenuLinkClass,
+  NavigationTray,
+  NavigationTrayItem,
   Pressable,
-  TooltipHint,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/shared/ui";
 import { PanelsTopLeft, Plus } from "lucide-react";
@@ -56,7 +55,7 @@ function activeSpaceIdFromTab(tab: WorkspaceView | undefined): string {
     return "";
   }
 }
-const tileClass = "misty-space-rail-control misty-space-rail-avatar relative p-0";
+const tileClass = "misty-space-rail-avatar";
 
 /** The global navigator's Spaces toggle and the stack of Space avatars beneath it. */
 export function WorkspaceSpaceNavigation({
@@ -79,101 +78,73 @@ export function WorkspaceSpaceNavigation({
     onOpen?.();
   };
   return (
-    <div
-      data-spaces-tray="true"
-      className={cn("grid min-w-0 rounded-lg", (open || activeSpaceId) && "bg-charcoal-hover")}
+    <NavigationTray
+      id="navigator-spaces"
+      label="Spaces"
+      groupLabel="Your Spaces"
+      icon={
+        <PanelsTopLeft
+          className="size-4 shrink-0 justify-self-center"
+          size={16}
+          strokeWidth={appIconStrokeWidth}
+          aria-hidden="true"
+        />
+      }
+      active={Boolean(activeSpaceId)}
+      open={open}
+      onToggle={toggle}
     >
-      <TooltipHint content={open ? "Hide Spaces" : "Show Spaces"}>
-        <Pressable
-          className={cn(
-            navigationMenuLinkClass,
-            "w-full",
-            (open || activeSpaceId) && "text-cream-bright",
-          )}
-          aria-label="Spaces"
-          aria-expanded={open}
-          aria-controls="navigator-spaces"
-          data-active={activeSpaceId ? "true" : undefined}
-          data-spaces-toggle="true"
-          onClick={toggle}
-        >
-          <PanelsTopLeft
-            className="size-4 shrink-0 justify-self-center"
-            size={16}
-            strokeWidth={appIconStrokeWidth}
-            aria-hidden="true"
-          />
-          <span>Spaces</span>
-        </Pressable>
-      </TooltipHint>
-      <div
-        id="navigator-spaces"
-        data-spaces-stack="true"
-        data-open={open ? "true" : "false"}
-        inert={!open}
-        // Height only: the clipped row already hides a closed stack, and fading
-        // it makes WebKit composite the rail and re-rasterize its glyphs.
-        className={cn(
-          "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+      {spaces.map((space) => {
+        const unread = unreadActivityCountForSpace(activityItems, space.id);
+        const active = space.id === activeSpaceId;
+        const name = spaceNavigationName(space);
+        return (
+          <Tooltip key={space.id}>
+            <TooltipTrigger asChild>
+              <NavigationTrayItem>
+                <Pressable
+                  className={tileClass}
+                  aria-label={unread > 0 ? `${name}, ${unread} unread` : name}
+                  aria-current={active ? "page" : undefined}
+                  data-navigation-destination="true"
+                  data-active={active ? "true" : undefined}
+                  onClick={() => openSpace(space)}
+                >
+                  <SpaceAvatar space={space} />
+                  {unread > 0 ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-notification-red ring-2 ring-charcoal-workspace"
+                    />
+                  ) : null}
+                </Pressable>
+              </NavigationTrayItem>
+            </TooltipTrigger>
+            <TooltipContent>{name}</TooltipContent>
+          </Tooltip>
+        );
+      })}
+      <GlobalCreateSpaceDialog>
+        {(create) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <NavigationTrayItem>
+                <Pressable
+                  className={cn(
+                    tileClass,
+                    "grid place-items-center rounded-lg border border-dashed border-charcoal-active text-cream-muted",
+                  )}
+                  aria-label="Create Space"
+                  onClick={create}
+                >
+                  <Plus size={16} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
+                </Pressable>
+              </NavigationTrayItem>
+            </TooltipTrigger>
+            <TooltipContent>Create Space</TooltipContent>
+          </Tooltip>
         )}
-      >
-        <TooltipProvider delayDuration={350}>
-          <div
-            className="flex min-h-0 items-center gap-1.5 overflow-hidden"
-            aria-label="Your Spaces"
-            role="group"
-          >
-            {spaces.map((space) => {
-              const unread = unreadActivityCountForSpace(activityItems, space.id);
-              const active = space.id === activeSpaceId;
-              const name = spaceNavigationName(space);
-              return (
-                <Tooltip key={space.id}>
-                  <TooltipTrigger asChild>
-                    <Pressable
-                      className={tileClass}
-                      aria-label={unread > 0 ? `${name}, ${unread} unread` : name}
-                      aria-current={active ? "page" : undefined}
-                      data-navigation-destination="true"
-                      data-active={active ? "true" : undefined}
-                      onClick={() => openSpace(space)}
-                    >
-                      <SpaceAvatar space={space} />
-                      {unread > 0 ? (
-                        <span
-                          aria-hidden="true"
-                          className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-notification-red ring-2 ring-charcoal-workspace"
-                        />
-                      ) : null}
-                    </Pressable>
-                  </TooltipTrigger>
-                  <TooltipContent>{name}</TooltipContent>
-                </Tooltip>
-              );
-            })}
-            <GlobalCreateSpaceDialog>
-              {(create) => (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Pressable
-                      className={cn(
-                        tileClass,
-                        "grid place-items-center rounded-lg border border-dashed border-charcoal-active text-cream-muted",
-                      )}
-                      aria-label="Create Space"
-                      onClick={create}
-                    >
-                      <Plus size={16} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
-                    </Pressable>
-                  </TooltipTrigger>
-                  <TooltipContent>Create Space</TooltipContent>
-                </Tooltip>
-              )}
-            </GlobalCreateSpaceDialog>
-          </div>
-        </TooltipProvider>
-      </div>
-    </div>
+      </GlobalCreateSpaceDialog>
+    </NavigationTray>
   );
 }

@@ -66,7 +66,7 @@ func TestAIUsageDoesNotDependOnStorageEntitlements(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := newConversationTestBearerToken(t, database, user.ID)
-	adapter := &customerAdapter{summary: json.RawMessage(`{"tier":"pro","ai":{"used_ratio":0.25,"available":true,"paused":false}}`)}
+	adapter := &customerAdapter{summary: json.RawMessage(`{"tier":"pro","ai":{"used_ratio":0.25,"percentage_used":25,"available":true,"paused":false,"unit":"weighted_tokens","used":1500000,"reserved":100000,"limit":6000000,"remaining":4400000}}`)}
 	database.Billing = &billingadapter.Service{Adapter: adapter}
 	// Storage's entitlement source is unavailable; account AI remains readable.
 	t.Setenv("MISTY_BILLING_ADAPTER", "invalid-storage-adapter")
@@ -84,9 +84,44 @@ func TestAIUsageDoesNotDependOnStorageEntitlements(t *testing.T) {
 	if body["storage"] != nil || body["spaces"] != nil || !strings.Contains(string(body["agent_usage"]), `"percentage_used":25`) {
 		t.Fatalf("AI response mixed with storage: %s", response.Body.String())
 	}
+	var usage struct {
+		Unit                             string `json:"unit"`
+		Used, Reserved, Limit, Remaining int64
+	}
+	if err = json.Unmarshal(body["agent_usage"], &usage); err != nil {
+		t.Fatal(err)
+	}
+	if usage.Unit != "weighted_tokens" || usage.Used != 1500000 || usage.Reserved != 100000 || usage.Limit != 6000000 || usage.Remaining != 4400000 {
+		t.Fatalf("missing weighted token counts: %+v", usage)
+	}
 	response = httptest.NewRecorder()
 	GetBillingUsage(database).ServeHTTP(response, request)
 	if response.Code != 503 {
 		t.Fatalf("storage source unexpectedly available: %d", response.Code)
+	}
+}
+
+func TestCommandEstimateUsesAuthenticatedAccountAndNativeBytes(t *testing.T) {
+	database := openPresenceTestDatabase(t)
+	user, err := database.CreateUser("Estimate", uniqueTestEmail("estimate"), "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := newConversationTestBearerToken(t, database, user.ID)
+	adapter := &customerAdapter{summary: json.RawMessage(`{"command":{"estimated_units":1234,"estimated_percentage":0.01234,"maximum":1000000,"maximum_percentage":10}}`)}
+	database.Billing = &billingadapter.Service{Adapter: adapter}
+	request := httptest.NewRequest("POST", "/billing/estimate", strings.NewReader(`{"text":"你好","model":"test-model"}`))
+	request.AddCookie(&http.Cookie{Name: TestingSessionCookieName, Value: token})
+	response := httptest.NewRecorder()
+	EstimateAIUsage(database).ServeHTTP(response, request)
+	if response.Code != 200 || adapter.action != "check" || adapter.request.AccountID != user.ID || adapter.request.Usage.Units["input_bytes"] != 6 || adapter.request.Usage.Units["input_tokens"] != 0 || !strings.Contains(response.Body.String(), `"estimated_units":1234`) {
+		t.Fatalf("estimate %d %s %#v", response.Code, response.Body.String(), adapter.request)
+	}
+	request = httptest.NewRequest("POST", "/billing/estimate", strings.NewReader(`{"text":"draft","account_id":"other-user"}`))
+	request.AddCookie(&http.Cookie{Name: TestingSessionCookieName, Value: token})
+	response = httptest.NewRecorder()
+	EstimateAIUsage(database).ServeHTTP(response, request)
+	if response.Code != 400 {
+		t.Fatal("identity injection accepted", response.Code)
 	}
 }

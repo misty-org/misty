@@ -17,6 +17,9 @@ use tauri::{
 };
 use url::Url;
 
+#[path = "browser_native_input.rs"]
+mod native_input;
+
 #[path = "browser_task_files.rs"]
 mod task_files;
 
@@ -146,6 +149,7 @@ struct BrowserSession {
     scope_id: String,
     grants: HashMap<String, BrowserGrant>,
     snapshot_generation: u64,
+    snapshot_extension: Option<u64>,
     element_targets: HashMap<String, String>,
     downloads: Vec<BrowserDownload>,
     pending_agent_download: Option<PendingAgentDownload>,
@@ -707,15 +711,22 @@ fn webview_label(id: &str) -> Result<String, String> {
         .ok_or_else(|| "Browser tab identifier is invalid.".to_owned())
 }
 
+fn browser_page_origin(url:&Url)->String {
+    if super::extensions::is_extension_url(url) { format!("webkit-extension://{}",url.host_str().unwrap_or_default()) }
+    else { url.origin().ascii_serialization() }
+}
+
 fn external_url(raw: &str) -> Result<Url, String> {
     let url = Url::parse(raw).map_err(|_| "Enter a valid web address or search.".to_owned())?;
     if url.as_str() == "about:blank"
+        || super::extensions::is_extension_url(&url)
         || (matches!(url.scheme(), "http" | "https")
             && url.username().is_empty()
             && url.password().is_none())
     {
         return Ok(url);
     }
+    if url.scheme()=="webkit-extension" { return Err("This extension is not running. Enable it in Extensions on a supported Mac.".into()); }
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
 
@@ -920,6 +931,7 @@ pub async fn browser_webview_create(
         apply_shortcuts(&webview, &state)?;
         apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking)?;
         set_webview_bounds_if_changed(&app, &webview, position, size)?;
+        super::extensions::native::register(&webview,&request.id,request.private,&request.url);
         return present_macos_webview(&webview);
     }
 
@@ -933,7 +945,8 @@ pub async fn browser_webview_create(
     let download_id = request.id.clone();
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
-    let restoring_tab_session = profile_lease.tab_session.is_some();
+    let replacing_extension_view=super::extensions::pending_navigation(&request.id).await;
+    let restoring_tab_session = profile_lease.tab_session.is_some() || replacing_extension_view;
     let preview_only = request.preview_only;
     let initial_url = if restoring_tab_session {
         "about:blank".parse().map_err(|_| "Invalid bootstrap URL")?
@@ -950,6 +963,17 @@ pub async fn browser_webview_create(
         builder
             .data_store_identifier(profile_identifier)
             .incognito(browser_requires_ephemeral_store())
+    };
+    #[cfg(target_os = "macos")]
+    let builder = {
+        let pointer = super::extensions::native::configuration(
+            &app, profile_identifier, request.private || browser_requires_ephemeral_store(), request.url.clone(), !request.private && profile_lease.logical_profile_id.is_some(),
+        ).await?;
+        if let Some(pointer) = pointer {
+            let configuration = unsafe { objc2::rc::Retained::from_raw(pointer as *mut objc2_web_kit::WKWebViewConfiguration) }
+                .ok_or("Could not create extension-aware browser configuration.")?;
+            builder.with_webview_configuration(configuration)
+        } else { builder }
     };
     // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
     // such as Google serve their legacy compatibility UI. Derive the desktop
@@ -1026,6 +1050,7 @@ pub async fn browser_webview_create(
         })
         .on_page_load(move |webview, payload| {
             if preview_only { return; }
+            super::extensions::native::tab_event(&page_app, &page_id, "updated");
             if restoring_tab_session && payload.url().as_str() == "about:blank" { return; }
             #[cfg(any(target_os = "macos", windows))]
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { super::browser_session_storage::clear(&webview); }
@@ -1039,6 +1064,7 @@ pub async fn browser_webview_create(
                 if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                     if let Ok(mut sessions) = state.sessions.lock() {
                         if let Some(session) = sessions.get_mut(&page_id) {
+                            session.snapshot_generation = session.snapshot_generation.wrapping_add(1);
                             session.element_targets.clear();
                         }
                     }
@@ -1084,12 +1110,13 @@ pub async fn browser_webview_create(
     let webview = window
         .add_child(builder, position, size)
         .map_err(|error| error.to_string())?;
+    if !preview_only { super::extensions::native::register(&webview, &request.id, request.private, &request.url); }
     #[cfg(target_os = "macos")]
     focus_messages::install(&app, &webview, &request.id)?;
     #[cfg(target_os = "macos")]
     attachment_download::install(&webview)?;
     #[cfg(any(target_os = "macos", windows))]
-    if let Some(values) = &profile_lease.tab_session {
+    if let Some(values) = profile_lease.tab_session.as_ref().filter(|_|!replacing_extension_view) {
         let url = external_url(&request.url)?;
         if let Err(error) = super::browser_session_storage::install(
             &webview,
@@ -1877,6 +1904,7 @@ pub fn browser_webview_show(
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
+    super::extensions::native::tab_event(&app,&request.id,"activate");
     with_webview(&app, &request.id, |webview| present_macos_webview(&webview))
 }
 
@@ -2106,6 +2134,7 @@ pub fn browser_webview_close(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
+    super::extensions::native::tab_event(&app, &request.id, "close");
     let (children, private_session_ended) = {
         let mut sessions = state
             .sessions
@@ -2308,9 +2337,16 @@ pub async fn browser_agent_execute(
             .unwrap_or(""),
     )?;
     let (id, agent_id) = resolve_agent_webview(&app, &state, &request)?;
+    // Workspace control uses an inert webview as its task/grant carrier. Its
+    // unloaded about:blank URL is unrelated to the desktop being captured;
+    // querying it can fail before ScreenCaptureKit is ever reached.
     if request.operation.starts_with("browser.workspace.") {
         return super::workspace_autopilot::execute(&app, &request).await;
     }
+    if let Some(view)=app.get_webview(&webview_label(&id)?) {
+        super::extensions::authorize_agent_url(&view.url().map_err(|e|e.to_string())?).await?;
+    }
+    if let Some(url)=request.input.get("url").and_then(Value::as_str).and_then(|value|Url::parse(value).ok()) { super::extensions::authorize_agent_url(&url).await?; }
     if matches!(
         request.operation.as_str(),
         "browser.click"
@@ -2589,12 +2625,11 @@ async fn inspect_browser(
         include_str!("browser_inspection_snapshot.js"),
         include_str!("browser_semantic_snapshot.js")
     );
-    let raw = eval_json(
-        app.get_webview(&webview_label(id)?)
-            .ok_or_else(|| "Browser tab is not running.".to_owned())?,
-        script,
-    )
-    .await?;
+    let extension_id=request.input.get("extensionId").and_then(Value::as_u64);
+    let raw = if let Some(extension)=extension_id {
+        super::extensions::agent_action("popup-evaluate",Some(extension),id,Some(script)).await?["result"].clone()
+    } else { eval_json(webview.clone(),script).await? };
+    let extension_actions=super::extensions::agent_action("actions",None,id,None).await.unwrap_or_else(|_|json!({"actions":[]}));
     if webview.url().map_err(|error| error.to_string())? != observed_url {
         return Err("browser_document_changed: inspect the current page again".into());
     }
@@ -2620,12 +2655,13 @@ async fn inspect_browser(
     {
         return Err("Browser inspection is not granted.".to_owned());
     }
+    session.snapshot_extension=extension_id;
     let interactive = replace_snapshot_targets(session, snapshot.interactive);
     Ok(json!({
         "documentId": document_id,
         "url": observed_url.to_string(), "title": snapshot.title, "text": snapshot.text,
         "truncated": snapshot.truncated, "interactive": interactive, "semantic": snapshot.semantic,
-        "contentTrust": "untrusted-web-page", "target":target
+        "contentTrust": "untrusted-web-page", "target":target,"extensionId":extension_id,"extensions":extension_actions["actions"]
     }))
 }
 
@@ -2643,7 +2679,7 @@ fn browser_target_observation(session: &BrowserSession, url: &url::Url) -> Value
             })
         });
     let required = callback_page || super::browser_provider::authentication_required(provider, url);
-    let mut target = json!({"scopeId":session.scope_id,"origin":url.origin().ascii_serialization(),"authentication":if required {"required"} else {"unknown"},"accountIdentity":"unverified","trust":"host-observation","observedAt":Utc::now().to_rfc3339()});
+    let mut target = json!({"scopeId":session.scope_id,"origin":browser_page_origin(url),"authentication":if required {"required"} else {"unknown"},"accountIdentity":"unverified","trust":"host-observation","observedAt":Utc::now().to_rfc3339()});
     if let Some(profile) = session.context_profile_id() {
         target["profileId"] = json!(profile);
     }
@@ -2786,14 +2822,22 @@ async fn interact_browser(
         .get("action")
         .ok_or_else(|| "A browser action is required.".to_owned())?;
     let kind = action.get("kind").and_then(Value::as_str).unwrap_or("");
-    if !matches!(kind, "fill" | "select" | "scroll" | "key" | "point") {
+    if !matches!(kind, "fill" | "select" | "scroll" | "key" | "point" | "extension" | "native") {
         return Err("Unsupported browser interaction.".to_owned());
     }
     let element_ref = action.get("elementRef").and_then(Value::as_str);
-    if element_ref.is_none() && kind != "scroll" && kind != "point" {
+    if element_ref.is_none() && kind != "scroll" && kind != "point" && kind != "extension" && kind != "native" {
         return Err("An inspected element reference is required.".to_owned());
     }
-    let target = {
+    let extension_id=request.input.get("extensionId").and_then(Value::as_u64);
+    if kind == "native" {
+        if extension_id.is_some() { return Err("Native input is only available for the granted website viewport.".into()); }
+        native_input::validate(&action["input"])?;
+        if request.input["documentId"].as_str().filter(|id| !id.is_empty()).is_none() {
+            return Err("Inspect the browser before native input.".into());
+        }
+    }
+    let (target, generation) = {
         let mut sessions = state
             .sessions
             .lock()
@@ -2802,6 +2846,7 @@ async fn interact_browser(
             .get_mut(id)
             .ok_or_else(|| "Browser tab is not running.".to_owned())?;
         validate_browser_grant(session, request)?;
+        if session.snapshot_extension!=extension_id { return Err("Inspect the requested page or extension popup again.".into()); }
         let target = match element_ref {
             Some(reference) => Some(
                 session
@@ -2818,26 +2863,27 @@ async fn interact_browser(
             }
         };
         session.element_targets.clear();
-        target
+        (target, session.snapshot_generation)
     };
     let webview = app
         .get_webview(&webview_label(id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())?;
-    let origin = webview
-        .url()
-        .map_err(|error| error.to_string())?
-        .origin()
-        .ascii_serialization();
+    let origin = browser_page_origin(&webview.url().map_err(|error|error.to_string())?);
     let encoded_target = serde_json::to_string(&target).map_err(|error| error.to_string())?;
-    let encoded_action = serde_json::to_string(action).map_err(|error| error.to_string())?;
-    let encoded_origin = serde_json::to_string(&origin).map_err(|error| error.to_string())?;
+    let validation_action=json!({"kind":"scroll","x":0,"y":0});
+    let encoded_action = serde_json::to_string(if kind=="extension" {&validation_action} else {action}).map_err(|error| error.to_string())?;
+    let encoded_origin = if extension_id.is_some() { "location.origin".to_owned() }
+        else { serde_json::to_string(&origin).map_err(|error| error.to_string())? };
     let encoded_document = serde_json::to_string(&request.input.get("documentId"))
         .map_err(|error| error.to_string())?;
     let script = format!(
         "({})({encoded_target}, {encoded_action}, {encoded_origin}, {encoded_document})",
         include_str!("browser_inspection_interact.js")
     );
-    let result = eval_json(webview, script).await?;
+    let result = if let Some(extension)=extension_id {
+        // Evaluate inside the actual popup; it never receives renderer IPC.
+        super::extensions::agent_action("popup-evaluate",Some(extension),id,Some(script)).await?["result"].clone()
+    } else { eval_json(webview.clone(),script).await? };
     if result.get("ok").and_then(Value::as_bool) != Some(true) {
         if result.get("errorCode").and_then(Value::as_str) == Some("browser_snapshot_stale") {
             return Err("browser_snapshot_stale: inspected content changed before dispatch".into());
@@ -2847,6 +2893,13 @@ async fn interact_browser(
             .and_then(Value::as_str)
             .unwrap_or("Browser interaction failed.")
             .to_owned());
+    }
+    if kind == "native" {
+        return native_input::dispatch(app, webview, request, &action["input"], &origin, &result, generation).await;
+    }
+    if kind=="extension" {
+        let extension=action.get("extensionId").and_then(Value::as_u64).ok_or("An extension action ID is required.")?;
+        super::extensions::agent_action("invoke",Some(extension),id,None).await?;
     }
     let mut output = json!({"attempted": true});
     for field in ["textRetained", "websiteEditVerified", "scrolled"] {
@@ -2920,244 +2973,8 @@ async fn eval_json(webview: Webview, script: String) -> Result<Value, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[test]
-    fn popup_download_requires_exact_live_source_authority() {
-        let fixture = || {
-            let mut source = BrowserSession::default();
-            source.scope_id = "source-scope".into();
-            source.grants.insert(
-                "grant".into(),
-                BrowserGrant {
-                    agent_id: "agent".into(),
-                    capabilities: ["browser.click".into()].into(),
-                    expires_at: Utc::now() + chrono::Duration::minutes(1),
-                },
-            );
-            source.pending_agent_download = Some(PendingAgentDownload {
-                grant_id: "grant".into(),
-                agent_id: "agent".into(),
-                task_id: Some("task".into()),
-                expires_at: Utc::now() + chrono::Duration::seconds(30),
-                popup_id: Some("popup".into()),
-            });
-            source
-        };
-        assert_eq!(
-            popup_download_authority(&fixture(), "popup"),
-            Some(("source-scope".into(), "agent".into(), "task".into()))
-        );
-        assert!(popup_download_authority(&fixture(), "other-popup").is_none());
-        for case in 0..6 {
-            let mut source = fixture();
-            match case {
-                0 => source.pending_agent_download = None,
-                1 => source.grants.clear(),
-                2 => {
-                    source.pending_agent_download.as_mut().unwrap().expires_at =
-                        Utc::now() - chrono::Duration::seconds(1)
-                }
-                3 => {
-                    source.grants.get_mut("grant").unwrap().expires_at =
-                        Utc::now() - chrono::Duration::seconds(1)
-                }
-                4 => source.grants.get_mut("grant").unwrap().agent_id = "other-agent".into(),
-                _ => source.grants.get_mut("grant").unwrap().capabilities.clear(),
-            }
-            assert!(
-                popup_download_authority(&source, "popup").is_none(),
-                "case {case}"
-            );
-        }
-    }
-
-    #[test]
-    fn browser_labels_reject_unsafe_identifiers() {
-        assert!(webview_label("tab-123").is_ok());
-        assert!(webview_label("../main").is_err());
-        assert!(webview_label("").is_err());
-    }
-
-    #[test]
-    fn browser_navigation_accepts_only_web_urls() {
-        assert!(external_url("about:blank").is_ok());
-        assert!(external_url("https://example.com").is_ok());
-        assert!(external_url("javascript:alert(1)").is_err());
-        assert!(external_url("file:///tmp/private").is_err());
-        // Ordinary browsing can follow federated login redirects; this does not
-        // grant the destination provider-specific native or automation access.
-        assert!(external_url("https://tenant.identity.example/login").is_ok());
-        assert!(external_url("https://user:password@example.com").is_err());
-        assert!(external_url("misty-extension://localhost/app.js").is_err());
-    }
-
-    #[test]
-    fn browser_page_and_renderer_swap_sibling_order_for_overlays() {
-        assert!(!browser_child_should_be_below_renderer(false));
-        assert!(browser_child_should_be_below_renderer(true));
-    }
-
-    #[test]
-    fn managed_profile_observations_expose_only_logical_identity() {
-        let session = BrowserSession {
-            profile_id: Some("b".repeat(64)),
-            logical_profile_id: Some("a".repeat(64)),
-            ..Default::default()
-        };
-        let target =
-            browser_target_observation(&session, &Url::parse("https://example.test/").unwrap());
-        assert_eq!(target["profileId"], "a".repeat(64));
-        assert!(!target.to_string().contains(&"b".repeat(64)));
-    }
-
-    #[test]
-    fn browser_favicons_accept_only_bounded_web_urls() {
-        assert_eq!(
-            validated_favicon_url("https://example.com/icon-144.png").as_deref(),
-            Some("https://example.com/icon-144.png")
-        );
-        assert!(validated_favicon_url("data:image/svg+xml,<svg></svg>").is_none());
-        assert!(validated_favicon_url("file:///tmp/icon.png").is_none());
-        assert!(
-            validated_favicon_url(&format!("https://example.com/{}", "x".repeat(2_048))).is_none()
-        );
-    }
-
-    #[test]
-    fn browser_bounds_do_not_require_creation_fields() {
-        let request: BrowserWebviewBoundsRequest = serde_json::from_value(json!({
-            "id": "tab-123",
-            "x": 10.0,
-            "y": 20.0,
-            "width": 800.0,
-            "height": 600.0
-        }))
-        .unwrap();
-        assert_eq!(request.id, "tab-123");
-        assert!(!request.native_live_resize);
-        let (_, size) = logical_bounds(request.x, request.y, request.width, request.height);
-        assert_eq!(size.width, 800.0);
-        assert_eq!(size.height, 600.0);
-    }
-
-    #[test]
-    fn download_names_are_sanitized() {
-        assert_eq!(sanitize_download_name("../report.pdf"), "report.pdf");
-        assert_eq!(sanitize_download_name("  "), "download");
-        assert_eq!(sanitize_download_name("a/b:c.txt"), "abc.txt");
-    }
-
-    #[test]
-    fn downloads_never_overwrite_or_reuse_reserved_paths() {
-        let directory = tempdir().unwrap();
-        std::fs::write(directory.path().join("report.pdf"), b"existing").unwrap();
-        let state = BrowserSessionState::default();
-        let first = reserve_download_path(&state, directory.path(), "report.pdf");
-        let second = reserve_download_path(&state, directory.path(), "report.pdf");
-        assert_eq!(first.file_name().unwrap(), "report (1).pdf");
-        assert_eq!(second.file_name().unwrap(), "report (2).pdf");
-    }
-
-    #[test]
-    fn macos_download_completion_recovers_the_recorded_destination() {
-        let directory = tempdir().unwrap();
-        let path = directory.path().join("mockup.png");
-        let state = BrowserSessionState::default();
-        let url = Url::parse("https://example.test/mockup").unwrap();
-        let requested = requested_download(&state, "source", &url, &path);
-        std::fs::write(&path, b"\x89PNG\r\n\x1a\nimage").unwrap();
-        let finished = finish_download(&state, "source", &url, None, true);
-        assert!(finished.success);
-        assert_eq!(finished.path, requested.path);
-        assert_eq!(finished.download_id, requested.download_id);
-        assert!(finished.file.is_some());
-        assert!(!finish_download(&state, "source", &url, None, true).success);
-    }
-
-    #[test]
-    fn download_completion_never_guesses_between_simultaneous_identical_urls() {
-        let directory = tempdir().unwrap();
-        let state = BrowserSessionState::default();
-        let url = Url::parse("https://example.test/mockup").unwrap();
-        for name in ["one.png", "two.png"] {
-            let path = directory.path().join(name);
-            requested_download(&state, "source", &url, &path);
-            std::fs::write(&path, b"\x89PNG\r\n\x1a\nimage").unwrap();
-        }
-        assert!(!finish_download(&state, "source", &url, None, true).success);
-        let one = directory.path().join("one.png");
-        assert!(finish_download(&state, "source", &url, Some(&one), true).success);
-        assert!(finish_download(&state, "source", &url, None, true).success);
-    }
-
-    #[test]
-    fn browser_capabilities_are_closed_over_known_operations() {
-        assert!(is_browser_capability("browser.inspect"));
-        assert!(is_browser_capability("browser.type"));
-        assert!(is_browser_capability("browser.request"));
-        assert!(is_browser_capability("browser.interact"));
-        assert!(is_browser_capability("browser.downloads.list"));
-        assert!(!is_browser_capability("browser.eval"));
-    }
-
-    #[test]
-    fn new_snapshots_invalidate_old_element_references() {
-        let mut session = BrowserSession::default();
-        let first = replace_snapshot_targets(
-            &mut session,
-            vec![RawInteractiveElement {
-                target: "snapshot-a:0".to_owned(),
-                tag: "button".to_owned(),
-                role: String::new(),
-                name: "First".to_owned(),
-            }],
-        );
-        let first_ref = first[0]["ref"].as_str().unwrap().to_owned();
-        let second = replace_snapshot_targets(
-            &mut session,
-            vec![RawInteractiveElement {
-                target: "snapshot-b:0".to_owned(),
-                tag: "a".to_owned(),
-                role: String::new(),
-                name: "Second".to_owned(),
-            }],
-        );
-        assert!(!session.element_targets.contains_key(&first_ref));
-        assert_ne!(first[0]["ref"], second[0]["ref"]);
-    }
-
-    #[test]
-    fn grants_are_agent_capability_and_expiry_scoped() {
-        let mut session = BrowserSession::default();
-        session.grants.insert(
-            "grant".to_owned(),
-            BrowserGrant {
-                agent_id: "agent-a".to_owned(),
-                capabilities: HashSet::from(["browser.inspect".to_owned()]),
-                expires_at: Utc::now() + chrono::Duration::minutes(5),
-            },
-        );
-        let mut request = BrowserAgentExecuteRequest {
-            scope_id: "scope".to_owned(),
-            grant_id: "grant".to_owned(),
-            agent_id: "agent-a".to_owned(),
-            operation: "browser.inspect".to_owned(),
-            input: Value::Null,
-        };
-        assert!(validate_browser_grant(&mut session, &request).is_ok());
-        request.agent_id = "agent-b".to_owned();
-        assert!(validate_browser_grant(&mut session, &request).is_err());
-        request.agent_id = "agent-a".to_owned();
-        request.operation = "browser.click".to_owned();
-        assert!(validate_browser_grant(&mut session, &request).is_err());
-        session.grants.get_mut("grant").unwrap().expires_at = Utc::now();
-        request.operation = "browser.inspect".to_owned();
-        assert!(validate_browser_grant(&mut session, &request).is_err());
-    }
-}
+#[path = "browser_tests.rs"]
+mod tests;
 
 #[tauri::command]
 pub fn browser_profile_persistence() -> bool {
@@ -3188,14 +3005,16 @@ pub fn browser_runtime_for_scope(
 }
 
 fn apply_agent_input_lock(webview: &Webview, locked: bool) -> Result<(), String> {
+    native_input::set_locked(webview, locked)?;
     if !locked {
         webview
             .eval("window[Symbol.for('misty.browser.agent.cursor')]?.hide()")
             .map_err(|e| e.to_string())?;
     }
     let script = format!(
-        "({})({locked})",
-        include_str!("browser_agent_input_guard.js")
+        "({})({locked}, window, 0, {})",
+        include_str!("browser_agent_input_guard.js"),
+        cfg!(target_os = "macos")
     );
     webview.eval(&script).map_err(|e| e.to_string())
 }
@@ -3259,11 +3078,7 @@ async fn upload_browser(
     let webview = app
         .get_webview(&webview_label(id)?)
         .ok_or("browser_context_closed")?;
-    let origin = webview
-        .url()
-        .map_err(|e| e.to_string())?
-        .origin()
-        .ascii_serialization();
+    let origin = browser_page_origin(&webview.url().map_err(|e|e.to_string())?);
     // Reading a file must not extend a revoked task or execution grant.
     super::agent_workspace::authorize_scope(
         app,

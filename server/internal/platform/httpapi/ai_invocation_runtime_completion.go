@@ -24,6 +24,18 @@ func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *
 	}
 	record, err := s.database.ValidateAIInvocationRuntime(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID)
 	if err != nil {
+		// A model may finish while Stop is being committed. Accept only its signed
+		// measured accounting checkpoint; never restore task/device authority.
+		if strings.HasPrefix(body.NodeID, "model:") && body.State == "completed" {
+			if stopped, lookupErr := s.database.AIInvocationRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && aiInvocationTerminal(stopped.State) {
+				if settleErr := s.meterAIInvocationRuntimeModel(r.Context(), stopped, body.NodeID, body.State, body.Output); settleErr != nil {
+					writeAgentError(w, settleErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]bool{"accepted": true})
+				return
+			}
+		}
 		writeAgentError(w, err)
 		return
 	}
@@ -106,6 +118,10 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 	if !readAgentRuntimeRequest(s.agentRuntime, w, r, &body) {
 		return
 	}
+	if body.Status != "success" && body.Status != "failed" && body.Status != "incomplete" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_completion_status"})
+		return
+	}
 	if existing, lookupErr := s.database.AIInvocationRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && existing.SurfaceID == "routine" {
 		if err := s.retireRemovedInvocation(r.Context(), existing); err != nil {
 			writeAgentError(w, err)
@@ -127,6 +143,21 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 		// Durable completion requests are idempotent after the invocation reaches a
 		// terminal state.
 		if existing, lookupErr := s.database.AIInvocationRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && aiInvocationTerminal(existing.State) {
+			// Stop may persist cancellation before the runtime reports its final
+			// measured usage. Settle the original holds even though the task can no
+			// longer publish a result; the stable group key makes callback replay safe.
+			if settleErr := s.settleAIInvocationRuntimeUsage(existing, body.Status, body.Usage); settleErr != nil {
+				// A permanent quota denial already made this task fail. Keep
+				// retrying its accounting path, but acknowledge that same terminal
+				// result instead of turning completion replay into another error.
+				// Transient failures and canceled work still require reconciliation.
+				if existing.State == "failed" && isHostedAILimitReached(settleErr) {
+					writeJSON(w, http.StatusOK, map[string]any{"run_id": existing.ID, "state": existing.State, "code": "hosted_ai_limit_reached"})
+					return
+				}
+				writeAgentError(w, settleErr)
+				return
+			}
 			if body.Status == "failed" {
 				_ = s.completeAIInvocationRecap(r.Context(), existing, nil, "", errors.New(publicAgentRuntimeFailure(body.ErrorCode, body.ErrorMessage)))
 			} else if prepared, prepareErr := s.prepareAIInvocationRuntime(r.Context(), existing); prepareErr == nil {
@@ -140,10 +171,6 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 	}
 	if s.aiInvocations == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "invocation_stream_unavailable"})
-		return
-	}
-	if body.Status != "success" && body.Status != "failed" && body.Status != "incomplete" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_completion_status"})
 		return
 	}
 	if body.Status == "success" {
@@ -180,7 +207,11 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 		return
 	}
 	if body.Status == "incomplete" {
-		message := "This request finished only partially. Review completed and uncertain actions before retrying."
+		message := incompleteAgentRuntimeText(body.Text)
+		if _, err := s.aiInvocations.restoreDurable(r.Context(), *record); err != nil {
+			writeAgentError(w, err)
+			return
+		}
 		if err := s.aiInvocations.append(record.ID, aiInvocationEvent{Type: "assistant.message", Text: message, Summary: message}); err != nil {
 			writeAgentError(w, err)
 			return
@@ -219,6 +250,17 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"run_id": record.ID, "state": "completed"})
+}
+
+// A blocked task's explanation is its useful result even though the invocation
+// must remain failed. Never replace that result with a success or expose a
+// private context envelope in the terminal message.
+func incompleteAgentRuntimeText(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" || aiResponseLeaksContextEnvelope(text, "") {
+		return "This request finished only partially. Review completed and uncertain actions before retrying."
+	}
+	return truncateAgentRuntimeText(text, 12_000)
 }
 
 func (s *SpacesService) finishAIInvocationRuntimeAnswer(userID, invocationID string, body aiInvocationInput, answer string, resolved []aiResolvedContext, compiledPrompt string) error {

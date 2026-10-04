@@ -14,7 +14,7 @@ export function ExplorerMultiPanelWorkspace(props: MultiPanelWorkspaceProps) {
       onSpringLoad: () => void,
       springLoad: boolean,
     ) => {
-      if (!registerDropZone) return () => undefined;
+      if (!registerDropZone || tab.path === "misty-transfers://history") return () => undefined;
       return registerDropZone(
         element,
         createExplorerDropTargetSpec({

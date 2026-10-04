@@ -23,13 +23,9 @@ const (
 var ErrModelUnavailable = errors.New("agent model unavailable")
 
 type GatewayModel struct {
-	ID                           string   `json:"id"`
-	Name                         string   `json:"name"`
-	Capabilities                 []string `json:"capabilities"`
-	InputRateMilliUSDPerMillion  int64    `json:"-"`
-	CachedRateMilliUSDPerMillion int64    `json:"-"`
-	OutputRateMilliUSDPerMillion int64    `json:"-"`
-	HasTokenPricing              bool     `json:"-"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Capabilities []string `json:"capabilities"`
 }
 
 var gatewayCatalogCache struct {
@@ -39,6 +35,13 @@ var gatewayCatalogCache struct {
 }
 
 func GatewayModels(ctx context.Context) ([]GatewayModel, error) {
+	config, err := envconfig.AgentModel()
+	if err != nil {
+		return nil, err
+	}
+	if config.Provider != "gateway" {
+		return []GatewayModel{{ID: config.Model, Name: strings.TrimPrefix(config.Model, config.Provider+"/"), Capabilities: []string{"chat", "tools", "vision", "reasoning"}}}, nil
+	}
 	gatewayCatalogCache.Lock()
 	if time.Now().Before(gatewayCatalogCache.expiresAt) && len(gatewayCatalogCache.models) > 0 {
 		models := append([]GatewayModel(nil), gatewayCatalogCache.models...)
@@ -104,6 +107,19 @@ func NewGatewayProviderForModelWithReasoning(modelID, reasoningEffort string) (M
 	if modelID == "" || strings.ContainsAny(modelID, "\r\n\t ") || len(modelID) > 200 {
 		return nil, errors.New("invalid gateway model")
 	}
+	config, err := envconfig.AgentModel()
+	if err != nil {
+		return nil, err
+	}
+	if config.Provider == "openai" {
+		if modelID != config.Model {
+			return nil, ErrModelUnavailable
+		}
+		return NewOpenAIProvider(OpenAIProviderConfig{APIKey: firstEnv("MISTY_AGENT_MODEL_API_KEY", "OPENAI_API_KEY"), BaseURL: envOrDefault("MISTY_AGENT_MODEL_BASE_URL", defaultOpenAIBaseURL), Model: strings.TrimPrefix(modelID, "openai/"), ReasoningEffort: reasoningEffort}), nil
+	}
+	if config.Provider != "gateway" {
+		return nil, ErrModelUnavailable
+	}
 	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
 	if apiKey == "" {
 		return nil, errors.New("AI gateway is not configured")
@@ -162,12 +178,11 @@ func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
 	}
 	var payload struct {
 		Data []struct {
-			ID           string                     `json:"id"`
-			Name         string                     `json:"name"`
-			Type         string                     `json:"type"`
-			Tags         []string                   `json:"tags"`
-			Capabilities json.RawMessage            `json:"capabilities"`
-			Pricing      map[string]json.RawMessage `json:"pricing"`
+			ID           string          `json:"id"`
+			Name         string          `json:"name"`
+			Type         string          `json:"type"`
+			Tags         []string        `json:"tags"`
+			Capabilities json.RawMessage `json:"capabilities"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -179,9 +194,6 @@ func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
 		if itemType != "" && !strings.Contains(itemType, "language") && !strings.Contains(itemType, "chat") && !strings.Contains(itemType, "text") {
 			continue
 		}
-		input, inputOK := TestingGatewayTokenRate(item.Pricing["input"])
-		output, outputOK := TestingGatewayTokenRate(item.Pricing["output"])
-		cached, _ := TestingGatewayTokenRate(firstPricingValue(item.Pricing, "cached_input", "input_cache_read", "cache_read"))
 		capabilities := TestingGatewayCapabilities(item.Capabilities)
 		if len(item.Tags) > 0 {
 			capabilities = append(capabilities, item.Tags...)
@@ -192,8 +204,6 @@ func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
 		capabilities = append(capabilities, "language")
 		models = append(models, GatewayModel{
 			ID: item.ID, Name: item.Name, Capabilities: normalizedCapabilities(capabilities),
-			InputRateMilliUSDPerMillion: input, CachedRateMilliUSDPerMillion: cached,
-			OutputRateMilliUSDPerMillion: output, HasTokenPricing: inputOK && outputOK,
 		})
 	}
 	return TestingFilterChatModels(models), nil

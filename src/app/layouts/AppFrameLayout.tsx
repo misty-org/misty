@@ -17,7 +17,9 @@ import { desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
 
-const PlatformLayout = lazy(() => import("@/app/PlatformLayout"));
+const DesktopLayout = lazy(() =>
+  import("@/app/layouts/DesktopLayout").then(({ DesktopLayout }) => ({ default: DesktopLayout })),
+);
 
 export function AppFrameLayout() {
   const { user, transitioning } = useAuth();
@@ -51,7 +53,7 @@ export function AppFrameLayout() {
   if (isAuthRoute) {
     return (
       <Suspense fallback={<LoadingScreen fullScreen />}>
-        <PlatformLayout getRouteId={desktopRouteIdFromPath} />
+        <DesktopLayout getRouteId={desktopRouteIdFromPath} />
       </Suspense>
     );
   }
@@ -64,7 +66,7 @@ export function AppFrameLayout() {
       >
         <Suspense fallback={<LoadingScreen fullScreen />}>
           <ConnectedDevicesProvider>
-            <PlatformLayout getRouteId={desktopRouteIdFromPath} />
+            <DesktopLayout getRouteId={desktopRouteIdFromPath} />
           </ConnectedDevicesProvider>
         </Suspense>
       </BrowserSyncStartup>

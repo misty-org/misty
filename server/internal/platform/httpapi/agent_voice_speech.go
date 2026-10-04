@@ -75,13 +75,15 @@ func (s *AgentsService) AgentVoiceSpeech() http.HandlerFunc {
 				return
 			}
 		}
-		reservation, err := s.reserveAgentVoice(userID, serveragent.AgentVoiceUsage{Model: serveragent.AgentSpeechModel, DurationMS: max(int64(1000), int64(utf8.RuneCountInString(text))*100)})
+		speechModel, err := s.voiceAnalyzer.SpeechModel(ctx, userID)
+  if err != nil { writeAgentError(w, err); return }
+		reservation, err := s.reserveAgentVoice(userID, serveragent.AgentVoiceUsage{Model: speechModel, DurationMS: max(int64(1000), int64(utf8.RuneCountInString(text))*100)})
 		if err != nil {
 			writeAgentError(w, err)
 			return
 		}
 		started := time.Now()
-		audio, mimeType, usage, err := s.voiceAnalyzer.GenerateAgentSpeechWithUsage(ctx, text, "alloy")
+		audio, mimeType, usage, err := s.voiceAnalyzer.WithAIAccount(userID).GenerateAgentSpeechWithUsage(ctx, text, "alloy")
 		outcome := "completed"
 		if err != nil {
 			outcome = "failed"

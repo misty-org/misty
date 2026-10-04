@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import "@fontsource-variable/inter";
 import "@/styles/styles.css";
 import "@/styles/App.css";
-import { OfficialAppAuthProvider } from "@/features/auth";
+import { AuthContext } from "@/features/auth/authState";
 import { SpaceOverview } from "@/features/spaces/SpaceOverview";
 import { SpaceOverviewProvider } from "@/features/spaces/useSpaceOverview";
 import { SpaceWorkspaceRail } from "@/features/spaces/components/SpaceWorkspaceRail";
@@ -19,6 +19,22 @@ import { SpaceChatComposer } from "@/features/spaces/chat/components/SpaceChatCo
 import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { useChatSuggestions } from "@/features/spaces/chat/hooks/useChatSuggestions";
 import { useComposerInput } from "@/features/spaces/chat/hooks/useComposerInput";
+const fixtureUser = { id: "me", name: "You", email: "you@example.invalid" };
+const unavailable = async (): Promise<never> => {
+  throw new Error("Account actions are unavailable in this fixture.");
+};
+const fixtureAuth = {
+  user: fixtureUser,
+  accounts: [],
+  transitioning: false,
+  setUser: unavailable,
+  refreshUser: async () => fixtureUser,
+  authenticateAccount: unavailable,
+  switchAccount: unavailable,
+  resumeAccount: unavailable,
+  removeAccount: unavailable,
+  logout: unavailable,
+};
 const member: SpaceMember = {
   space_id: "preview",
   user_id: "sam",
@@ -231,7 +247,7 @@ function PreviewShell() {
   return (
     <SpaceOverviewProvider accountId="me" space={space}>
       <div className="flex h-dvh min-w-0 bg-charcoal-bg text-cream">
-        <div className="hidden h-full shrink-0 md:block">
+        <div className="h-full shrink-0">
           <SpaceWorkspaceRail activeSpaceId="preview" section={all ? "home" : "social"} />
         </div>
         <div className="min-w-0 flex-1">
@@ -243,10 +259,10 @@ function PreviewShell() {
 }
 createRoot(document.getElementById("root")!).render(
   <MemoryRouter initialEntries={["/spaces/preview/social/misty"]}>
-    <OfficialAppAuthProvider user={{ id: "me", name: "You", email: "you@example.invalid" }}>
+    <AuthContext.Provider value={fixtureAuth}>
       <TooltipProvider>
         <PreviewShell />
       </TooltipProvider>
-    </OfficialAppAuthProvider>
+    </AuthContext.Provider>
   </MemoryRouter>,
 );

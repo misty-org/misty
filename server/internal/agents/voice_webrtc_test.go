@@ -62,7 +62,13 @@ func TestVoiceWebRTCCallSidebandAndHangup(t *testing.T) {
 				}
 				commands <- event
 				if event["type"] == "session.update" {
-					_ = conn.WriteJSON(map[string]any{"type": "session.updated", "session": realtimeRTCConfig()})
+					config := realtimeRTCConfig()
+					update := event["session"].(map[string]any)
+					if update["type"] != "realtime" {
+						t.Error("missing realtime session type")
+					}
+					config["max_output_tokens"] = update["max_output_tokens"]
+					_ = conn.WriteJSON(map[string]any{"type": "session.updated", "session": config})
 				}
 				if event["type"] == "input_audio_buffer.commit" {
 					_ = conn.WriteJSON(map[string]any{"type": "conversation.item.input_audio_transcription.completed", "item_id": "input1", "transcript": "fixture", "usage": map[string]any{"type": "tokens", "input_tokens": 10, "output_tokens": 2}})
@@ -91,6 +97,12 @@ func TestVoiceWebRTCCallSidebandAndHangup(t *testing.T) {
 	if event, err := voice.Read(); err != nil || event.Type != "session-updated" || !VoiceRealtimeManualSession(event.Raw) {
 		t.Fatalf("configuration: %+v %v", event, err)
 	}
+	if err := voice.SetOutputLimit(128); err != nil {
+		t.Fatal(err)
+	}
+	if event, err := voice.Read(); err != nil || !VoiceRealtimeOutputLimit(event.Raw, 128) || !VoiceRealtimeManualSession(event.Raw) {
+		t.Fatalf("bounded configuration: %+v %v", event, err)
+	}
 	if err := voice.Send(map[string]string{"type": "input-audio-commit"}); err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +114,7 @@ func TestVoiceWebRTCCallSidebandAndHangup(t *testing.T) {
 	if err := voice.Send(map[string]string{"type": "response-cancel"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"session.update", "input_audio_buffer.commit", "output_audio_buffer.clear", "response.cancel"} {
+	for _, expected := range []string{"session.update", "session.update", "input_audio_buffer.commit", "output_audio_buffer.clear", "response.cancel"} {
 		select {
 		case command := <-commands:
 			if command["type"] != expected {

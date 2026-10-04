@@ -35,8 +35,8 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
     selector({ activeScopeKey: "" }),
 }));
 
-vi.mock("@/app/PlatformLayout", () => ({
-  default: () => <div data-testid="platform-layout">Platform Layout Content</div>,
+vi.mock("@/app/layouts/DesktopLayout", () => ({
+  DesktopLayout: () => <div data-testid="desktop-layout">Desktop Layout Content</div>,
 }));
 
 vi.mock("@/features/agents/AgentExecutionSurface", () => ({ AgentExecutionSurface: () => null }));
@@ -121,7 +121,7 @@ describe("AppFrameLayout", () => {
       "/spaces?tab=overview",
     );
     expect(container.textContent).not.toContain("Spaces content");
-    expect(container.querySelector('[data-testid="platform-layout"]')).toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
   });
 
   it("keeps the route and hook order stable while an account transition restores identity", async () => {
@@ -140,7 +140,7 @@ describe("AppFrameLayout", () => {
       root.render(view());
     });
     expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
-    expect(container.querySelector('[data-testid="platform-layout"]')).toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
     const loading = container.querySelector('[role="status"][aria-label="Restoring account"]');
     expect(loading?.textContent).toBe("");
     expect(loading?.classList.contains("bg-black")).toBe(true);
@@ -148,12 +148,12 @@ describe("AppFrameLayout", () => {
     await act(async () => {
       root.render(view());
     });
-    expect(container.querySelector('[data-testid="platform-layout"]')).toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
     mocks.transitioning = false;
     await act(async () => {
       root.render(view());
     });
-    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
   });
 
@@ -172,8 +172,8 @@ describe("AppFrameLayout", () => {
       );
     });
 
-    // Renders PlatformLayout (for the auth route)
-    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    // Renders DesktopLayout (for the auth route)
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
     // Does NOT render background app panels
     expect(container.querySelector('[data-testid="activity-panel"]')).toBeNull();
     expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
@@ -194,7 +194,7 @@ describe("AppFrameLayout", () => {
       );
     });
 
-    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="activity-panel"]')).toBeNull();
   });
 
@@ -215,7 +215,7 @@ describe("AppFrameLayout", () => {
     });
 
     expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
-    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
   });
 
   it("renders full app frame with services when user is authenticated", async () => {
@@ -233,7 +233,7 @@ describe("AppFrameLayout", () => {
       );
     });
 
-    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="activity-panel"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="update-notices"]')).not.toBeNull();
   });
@@ -247,16 +247,16 @@ describe("AppFrameLayout", () => {
     );
     mocks.user = { id: "account-a", email: "a@example.test" };
     await act(async () => root.render(view()));
-    const original = container.querySelector('[data-testid="platform-layout"]');
+    const original = container.querySelector('[data-testid="desktop-layout"]');
     expect(original).not.toBeNull();
     await act(async () => root.render(view()));
-    expect(container.querySelector('[data-testid="platform-layout"]')).toBe(original);
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBe(original);
     mocks.user = { id: "account-b", email: "b@example.test" };
     await act(async () => root.render(view()));
-    const switched = container.querySelector('[data-testid="platform-layout"]');
+    const switched = container.querySelector('[data-testid="desktop-layout"]');
     expect(switched).not.toBeNull();
     expect(switched).not.toBe(original);
-    expect(container.querySelectorAll('[data-testid="platform-layout"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-testid="desktop-layout"]')).toHaveLength(1);
     expect(errors.mock.calls.filter((args) => args.join(" ").includes("same key"))).toEqual([]);
   });
 
@@ -276,7 +276,7 @@ describe("AppFrameLayout", () => {
         </MemoryRouter>,
       );
     });
-    expect(container.querySelector('[data-testid="platform-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Local saving is unavailable");
     expect(container.textContent).not.toContain("Your workspace could not be restored");
     expect(container.querySelector('[role="dialog"]')).toBeNull();

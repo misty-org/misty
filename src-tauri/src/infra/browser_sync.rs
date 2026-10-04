@@ -73,6 +73,12 @@ fn session() -> &'static Mutex<Option<Session>> {
     SESSION.get_or_init(|| Mutex::new(None))
 }
 
+/// Native extension settings share the encrypted account transport, independent
+/// of whether this device shares its tabs or website sign-ins.
+pub(crate) async fn extension_sync_handle(account: &str) -> Option<WorkerHandle> {
+    session().lock().await.as_ref().filter(|s| s.scope.account_id == account).map(|s| s.handle.clone())
+}
+
 // A browser creation/import owns a read/write lease independently of worker
 // commands. Account changes take the write side before SESSION, so callbacks
 // cannot create a view after shutdown selected a different account.
@@ -371,6 +377,7 @@ pub(super) async fn change_account_if<T>(
         return action();
     }
     BROWSER_ACCOUNT_EPOCH.fetch_add(1, Ordering::AcqRel);
+    super::extensions::close_account().await;
     super::workspace_recovery::close_account()?;
     stop(current.take()).await;
     #[cfg(desktop)]
@@ -1055,7 +1062,9 @@ pub async fn browser_sync_account_feed(
     let current = session().lock().await;
     Ok(current.as_ref().map(|active| AccountFeed {
         account_id: active.scope.account_id.clone(),
-        connected: matches!(
+        // A live socket is insufficient if its renderer event forwarder has
+        // exited. Let consumers fall back to the authenticated event stream.
+        connected: !active.notifications.is_finished() && matches!(
             active.handle.status.borrow().phase,
             misty_browser_sync::worker::Phase::CatchingUp
                 | misty_browser_sync::worker::Phase::Ready
@@ -1090,6 +1099,12 @@ pub async fn browser_sync_edit(
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| "The workspace change is invalid.")?;
+    if changes.iter().any(|change| {
+        let (Change::Create { kind, .. } | Change::Patch { kind, .. } | Change::Delete { kind, .. }) = change;
+        matches!(kind, document::entities::Kind::ExtensionSyncKey | document::entities::Kind::ExtensionRemoval)
+    }) {
+        return Err("Extension storage is managed by the native extension runtime.".into());
+    }
     if let Some(result) = workspace_edit(
         &session_id,
         &active_epoch,

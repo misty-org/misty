@@ -2,7 +2,9 @@ import { createBrowserViewState, type WorkspaceView } from "@/features/workspace
 import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useExtensionsStore } from "@/features/extensions/store";
 import { useBrowserRuntimeStore } from "./browserRuntime";
 import { BrowserWorkspace } from "./BrowserWorkspace";
 const invoke = vi.hoisted(() =>
@@ -30,11 +32,19 @@ const browserTab: WorkspaceView = {
   createdAt: 1,
   lastFocusedAt: 1,
 };
+// The extensions toolbar links to the Extensions page.
+const view = (tab: WorkspaceView) => (
+  <MemoryRouter>
+    <BrowserWorkspace tab={tab} />
+  </MemoryRouter>
+);
 describe("BrowserWorkspace", () => {
   let container: HTMLDivElement;
   let root: Root;
   beforeEach(() => {
     invoke.mockClear();
+    // The desktop Browser waits for extensions to load before showing pages.
+    useExtensionsStore.setState({ ready: true });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -59,7 +69,7 @@ describe("BrowserWorkspace", () => {
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    await act(async () => root.render(view(browserTab)));
     expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(false);
     expect(invoke).not.toHaveBeenCalledWith("browser_webviews_set_overlay_active", {
       active: true,
@@ -75,7 +85,7 @@ describe("BrowserWorkspace", () => {
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    await act(async () => root.render(view(browserTab)));
     expect(container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.cursor).toBe("");
   });
   it("hides the previous native page when switching browser tabs", async () => {
@@ -95,23 +105,23 @@ describe("BrowserWorkspace", () => {
       title: "Google",
       state: createBrowserViewState("https://google.com"),
     };
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    await act(async () => root.render(view(browserTab)));
     invoke.mockClear();
-    await act(async () => root.render(<BrowserWorkspace tab={nextTab} />));
+    await act(async () => root.render(view(nextTab)));
     expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
       request: {
         id: "tab-browser-one",
       },
     });
   });
-  it("keeps Browser chrome and its backing surface dark across page colors", async () => {
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+  it("keeps Browser chrome and its page host on the tab surface", async () => {
+    await act(async () => root.render(view(browserTab)));
     expect(
       container.querySelector<HTMLElement>("[data-browser-toolbar]")?.style.backgroundColor,
-    ).toBe("rgb(24, 25, 28)");
+    ).toBe("var(--workspace-tab-surface)");
     expect(
       container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.backgroundColor,
-    ).toBe("rgb(24, 25, 28)");
+    ).toBe("var(--workspace-tab-surface)");
   });
   it("never embeds a website frame when the native Browser runtime is unavailable", async () => {
     const webTab = {
@@ -119,7 +129,7 @@ describe("BrowserWorkspace", () => {
       title: "Google",
       state: createBrowserViewState("https://www.google.com/"),
     };
-    await act(async () => root.render(<BrowserWorkspace tab={webTab} />));
+    await act(async () => root.render(view(webTab)));
     expect(container.querySelector("iframe")).toBeNull();
     expect(
       container.querySelector('[data-testid="browser-native-runtime-required"]'),
@@ -128,7 +138,7 @@ describe("BrowserWorkspace", () => {
     expect(container.textContent).toContain("Open in browser");
   });
   it("renders browser controls without a nested browser tab strip", () => {
-    act(() => root.render(<BrowserWorkspace tab={browserTab} />));
+    act(() => root.render(view(browserTab)));
     const workspace = container.querySelector("[data-browser-workspace-tab]");
     expect(workspace).not.toBeNull();
     expect(workspace?.classList.contains("grid-rows-[44px_minmax(0,1fr)]")).toBe(false);
@@ -150,14 +160,14 @@ describe("BrowserWorkspace", () => {
         agentOwned: true,
       },
     };
-    act(() => root.render(<BrowserWorkspace tab={agentOwnedTab} />));
+    act(() => root.render(view(agentOwnedTab)));
     const ownershipMarker = container.querySelector<HTMLElement>(
       '[title="This browser tab is scoped to Misty\'s current work"]',
     );
     expect(ownershipMarker?.textContent?.trim()).toBe("Misty");
   });
   it("opens the page annotation toolkit and closes it without navigating", async () => {
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    await act(async () => root.render(view(browserTab)));
     const annotate = container.querySelector<HTMLButtonElement>('[aria-label="Annotate page"]');
     await act(async () => annotate?.click());
     expect(container.querySelector('[aria-label="Browser annotation canvas"]')).not.toBeNull();
@@ -178,7 +188,7 @@ describe("BrowserWorkspace", () => {
       ...browserTab,
       state: createBrowserViewState("https://example.com/path?q=misty"),
     };
-    await act(async () => root.render(<BrowserWorkspace tab={tab} />));
+    await act(async () => root.render(view(tab)));
     const input = container.querySelector<HTMLInputElement>(
       '[aria-label="Search or enter address"]',
     );
@@ -195,7 +205,7 @@ describe("BrowserWorkspace", () => {
       ...browserTab,
       state: createBrowserViewState("https://youtube.com/watch?v=misty"),
     };
-    await act(async () => root.render(<BrowserWorkspace tab={tab} />));
+    await act(async () => root.render(view(tab)));
     const input = container.querySelector<HTMLInputElement>(
       '[aria-label="Search or enter address"]',
     );
@@ -220,7 +230,7 @@ describe("BrowserWorkspace", () => {
     );
   });
   it("opens a functional browser menu", async () => {
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    await act(async () => root.render(view(browserTab)));
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');
     await act(async () => {
       openMenu(trigger);
@@ -282,7 +292,7 @@ describe("BrowserWorkspace", () => {
           : undefined,
       );
     });
-    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    await act(async () => root.render(view(browserTab)));
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');
     await act(async () => {
       openMenu(trigger);

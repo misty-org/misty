@@ -79,8 +79,10 @@ export const fileBrowserStyles = {
   tableNameText:
     "min-w-0 cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap",
   tableIconSlot: "grid size-5 flex-none place-items-center",
-  entryIcon:
-    "block shrink-0 text-cream-muted group-data-[state=selected]/file-row:text-cream group-aria-pressed/file-row:text-cream group-hover/file-row:text-cream",
+  entryIcon: "block shrink-0",
+  // Untoned icons brighten with their row; toned icons keep their color.
+  entryIconMuted:
+    "text-cream-muted group-data-[state=selected]/file-row:text-cream group-aria-pressed/file-row:text-cream group-hover/file-row:text-cream",
   gridScroll:
     "misty-transient-scrollbar misty-file-browser-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   gridSizer: "relative min-w-0",

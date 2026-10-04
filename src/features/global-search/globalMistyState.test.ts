@@ -1,4 +1,4 @@
-import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
+import "./globalMistyState.testFixtures";
 import { aiSurfaceApi } from "@/features/ai-surface";
 import { assertMistyAvailable } from "@/features/misty/availability";
 import { requestHostContext } from "@/features/misty/contextBridge";
@@ -7,35 +7,6 @@ import { useSpacesStore } from "@/features/spaces";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { globalMistyApi } from "./globalMistyApi";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
-vi.mock("@/features/misty/availability", () => ({
-  assertMistyAvailable: vi.fn(async () => {}),
-}));
-vi.mock("@/features/misty/contextBridge", () => ({
-  requestHostContext: vi.fn(async () => ({
-    context: [],
-  })),
-}));
-vi.mock("@/features/agents/personalAgentsStore", () => ({
-  usePersonalAgentsStore: {
-    getState: () => ({
-      accountId: "account-a",
-      agents: [
-        {
-          id: "default-misty",
-          system_managed: true,
-          enabled: true,
-        },
-      ],
-      load: async () => {},
-    }),
-  },
-  selectedPersonalAgent: () => ({
-    id: "default-misty",
-    system_managed: true,
-    enabled: true,
-  }),
-}));
-initializeHostAgentsRuntime();
 describe("Global Misty state", () => {
   beforeEach(() => {
     window.localStorage.clear();

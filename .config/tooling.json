@@ -9,6 +9,5 @@
   "eslint": { "package": "eslint", "config": "eslint.config.js", "shortConfig": "-c" },
   "prettier": { "package": "prettier", "config": "prettier.json", "ignorePath": "prettierignore" },
   "audit-ci": { "package": "audit-ci", "config": "audit-ci.json" },
-  "wrangler": { "package": "wrangler", "config": "wrangler.jsonc", "shortConfig": "-c" },
   "gitleaks": { "executable": "gitleaks", "config": "gitleaks.toml" }
 }

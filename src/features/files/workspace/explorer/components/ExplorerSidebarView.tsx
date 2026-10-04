@@ -39,6 +39,8 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
     deviceCustomization,
     hiddenQuickAccessPaths,
     setHiddenQuickAccessPaths,
+    quickAccessOrder,
+    setQuickAccessOrder,
     toggleSection,
   } = props.runtime.useSidebarPreferences();
   const [deviceActionError, setDeviceActionError] = useState<string | null>(null);
@@ -59,6 +61,8 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
     sidebar: props,
     hiddenQuickAccessPaths,
     setHiddenQuickAccessPaths,
+    quickAccessOrder,
+    setQuickAccessOrder,
   });
   const deviceEntries = useMemo(
     () => buildDeviceEntries(props.devices, deviceCustomization),

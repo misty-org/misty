@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/kannachi323/misty/server/internal/cloudusage"
 	"strings"
 	"unicode/utf8"
 )
@@ -94,7 +95,7 @@ func (db *Store) ControlBrowserSyncDevice(ctx context.Context, user string, c Sy
 	if err = notifySync(ctx, tx, user, vault, "browser-presence"); err != nil {
 		return "", err
 	}
-	if err = tx.Commit(); err != nil {
+	if err = cloudusage.Commit(ctx, tx); err != nil {
 		return "", err
 	}
 	id, _ := request.(string)

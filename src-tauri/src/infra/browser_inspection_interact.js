@@ -21,6 +21,26 @@ function (target, action, expectedOrigin, expectedDocument) {
     snapshot.consumed = true;
     targets?.clear();
     switch (action.kind) {
+      case "native": {
+        const input = action.input;
+        // Native dispatch remains scoped to this WKWebView. Never let visual
+        // control type credentials or open an unobservable system file picker.
+        let control = document.activeElement;
+        if (["click", "scroll", "drag"].includes(input.kind)) {
+          const x = input.kind === "drag" ? input.fromX : input.x;
+          const y = input.kind === "drag" ? input.fromY : input.y;
+          control = document.elementFromPoint(Math.min(innerWidth - 1, x * innerWidth), Math.min(innerHeight - 1, y * innerHeight));
+        }
+        for (let depth = 0; control && /^(IFRAME|FRAME)$/.test(control.tagName); depth++) {
+          if (depth >= 8 || !control.contentDocument) throw new Error("This frame requires human interaction.");
+          if (["click", "scroll", "drag"].includes(input.kind)) throw new Error("Native point input inside frames requires human interaction.");
+          control = control.contentDocument.activeElement;
+        }
+        if (control?.closest?.('input[type="password"],input[type="file"]')) throw new Error("This control requires human interaction.");
+        return { ok: true, viewport: { width: innerWidth, height: innerHeight },
+          editable: !!control && (control.isContentEditable || control.matches?.('input:not([readonly]):not([disabled]),textarea:not([readonly]):not([disabled])')) };
+
+      }
       case "point": {
         if(![action.x,action.y].every(n=>typeof n==="number"&&Number.isFinite(n)&&n>=0&&n<=1))throw new Error("Point coordinates must be within the inspected viewport.");
         const x=action.x*innerWidth,y=action.y*innerHeight;

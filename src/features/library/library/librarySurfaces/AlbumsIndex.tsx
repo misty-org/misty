@@ -1,5 +1,5 @@
 import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
-import { Button, CollectionItems } from "@/shared/ui";
+import { Button, CollectionItems, itemTones } from "@/shared/ui";
 import { Folder, Pencil, Trash2 } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryNothingHere } from "./LibraryNothingHere";
@@ -81,6 +81,7 @@ export function AlbumsIndex() {
             id: folder.id,
             title: folder.name,
             icon: <Folder />,
+            tone: itemTones.folder,
             category: "Folder",
             creator: creator(folder.created_by_user_id),
             metadata: { Created: new Date(folder.created_at).toLocaleDateString() },
@@ -93,6 +94,7 @@ export function AlbumsIndex() {
             id: album.id,
             title: album.name,
             icon: <Folder />,
+            tone: itemTones.image,
             category: "Album",
             metadata: {
               Items: album.item_count,

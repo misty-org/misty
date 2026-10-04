@@ -20,6 +20,8 @@ export interface ScheduledTask extends ScheduledTaskSchedule {
   id: string;
   conversation_id?: string;
   agent_id?: string;
+  method_version_id?: string;
+  method_inputs?: Record<string, string | number | boolean>;
   title: string;
   prompt: string;
   enabled: boolean;
@@ -33,7 +35,10 @@ export interface ScheduledTask extends ScheduledTaskSchedule {
   updated_at: string;
 }
 
-export type ScheduledTaskInput = Pick<ScheduledTask, "title" | "prompt" | "enabled" | "agent_id"> &
+export type ScheduledTaskInput = Pick<
+  ScheduledTask,
+  "title" | "prompt" | "enabled" | "agent_id" | "method_version_id" | "method_inputs"
+> &
   ScheduledTaskSchedule;
 
 const base = "/ai/scheduled-tasks";

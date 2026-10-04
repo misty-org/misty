@@ -12,6 +12,7 @@ import type { AiInvocationDeviceContext } from "@/features/ai-surface";
 import type { GlobalAiContextRef } from "@/features/global-search/types";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { requestsScreenContext } from "./companion/companionIntent";
+import { lease, releaseLease, remoteLease } from "./executionLease";
 
 export const agentWorkerParameters = new URLSearchParams(
   typeof location === "undefined" ? "" : location.search,
@@ -20,6 +21,7 @@ export const isAgentWorkerWindow = () =>
   hasTauriInternals() && getCurrentWindow().label.startsWith("misty-agent-");
 export interface Execution {
   taskId: string;
+  conversationId?: string;
   accountId: string;
   agentId: string;
   spaceId: string;
@@ -32,47 +34,32 @@ export interface Execution {
   ready?: boolean;
   context: GlobalAiContextRef[];
   deviceContexts: AiInvocationDeviceContext[];
+  method?: {
+    versionId: string;
+    inputs?: Record<string, string | number | boolean>;
+    skillVersionIds?: string[];
+    invocationId?: string;
+  };
 }
 export const useLocalExecution = create<{ execution: Execution | null }>(() => ({
   execution: null,
 }));
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 let generation = 0;
-const remoteLease = (e: Execution, renew = false) =>
-  apiRequest("/misty/agent-execution", {
-    method: "POST",
-    body: JSON.stringify({
-      agent_id: e.agentId,
-      space_id: e.spaceId,
-      task_id: e.taskId,
-      window_label: getCurrentWindow().label,
-      renew,
-    }),
-  });
-const releaseLease = async (e: Execution) => {
-  // Attempt both boundaries even when connectivity is lost. Server authority expires independently.
-  await Promise.allSettled([
-    invoke("agent_workspace_release", { taskId: e.taskId }),
-    apiRequest(`/misty/agent-execution/${encodeURIComponent(e.taskId)}`, { method: "DELETE" }),
-  ]);
-};
-const lease = (execution: Execution) => ({
-  accountId: execution.accountId,
-  agentId: execution.agentId,
-  spaceId: execution.spaceId,
-  taskId: execution.taskId,
-});
 
 export async function startLocalExecution(
   accountId: string,
   agentId: string,
   _legacySpaceId: string,
   mode: "agent" | "team",
-  options?: { normalTabs: boolean; openWhenMissing?: boolean; desktopControl?: boolean },
+  options?: {
+    normalTabs: boolean;
+    openWhenMissing?: boolean;
+    desktopControl?: boolean;
+    method?: Execution["method"];
+  },
 ) {
   const spaceId = "";
-  // Preserve legacy wire values without letting them choose different behavior.
-  if (!options?.normalTabs && visibleAutopilotAvailable()) mode = "agent";
   if (!hasTauriInternals() || !/Mac|Win/.test(navigator.platform))
     throw new Error("Agent execution requires Misty on macOS or Windows.");
   const accountGeneration = readApiSessionGeneration();
@@ -116,6 +103,7 @@ export async function startLocalExecution(
     agentId,
     spaceId,
     mode,
+    method: options?.method ? structuredClone(options.method) : undefined,
     normalTabs: options?.normalTabs,
     desktopControl: options?.desktopControl,
     autopilot:
@@ -375,15 +363,24 @@ export async function settleLocalExecution(
 export async function steerLocalExecution(prompt: string) {
   const { useMistyStore } = await import("@/features/misty/useMistyStore");
   const before = useMistyStore.getState();
+  const execution = useLocalExecution.getState().execution;
+  const method = execution?.method;
+  const conversationId = execution?.conversationId ?? before.activeConversationId;
   await pauseLocalExecution();
   const { replaceActiveGlobalInvocationStream } =
     await import("@/features/global-search/globalSearchStoreHelpers");
   replaceActiveGlobalInvocationStream();
   useMistyStore.setState({
     working: false,
+    activeConversationId: conversationId,
     selectedSpaceId: useLocalExecution.getState().execution?.spaceId ?? before.selectedSpaceId,
   });
-  if (
+  if (method) {
+    throw new Error(
+      "This workflow stopped at takeover. Review its completed and uncertain results, " +
+        "then explicitly start a new run. Automatic workflow resume is not available.",
+    );
+  } else if (
     useLocalExecution.getState().execution?.normalTabs ||
     useLocalExecution.getState().execution?.desktopControl ||
     requestsScreenContext(prompt)
@@ -393,7 +390,7 @@ export async function steerLocalExecution(prompt: string) {
       throw new Error(
         "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there. The task remains paused.",
       );
-    await companion.submit({ prompt, conversationId: before.activeConversationId });
+    await companion.submit({ prompt, conversationId });
   } else if (useLocalExecution.getState().execution?.autopilot) {
     await useMistyStore.getState().submitAnswer(prompt, undefined, undefined, "workspace");
   } else {
@@ -407,6 +404,10 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
   const conversationId = useMistyStore.getState().activeConversationId;
   if (!execution || !conversationId) throw new Error("Open the active task conversation first.");
   await pauseLocalExecution(execution.taskId);
+  if (execution.method)
+    throw new Error(
+      "This workflow is stopped. Review its results and explicitly start a new run; automatic workflow resume is not available.",
+    );
   const routingGeneration = generation;
   const { route } = await apiRequest<{ route: "steer" | "queue" | "stop" }>(
     "/misty/agent-followup",

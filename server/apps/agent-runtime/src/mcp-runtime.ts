@@ -2,11 +2,10 @@ import {
   Client as MCPClient,
   StreamableHTTPClientTransport,
 } from "@misty/mcp-client-runtime";
-import { FatalError, RetryableError } from "workflow";
 import { controlPlaneRequest } from "./control-plane.js";
 import { ControlPlaneError } from "./control-plane-error.js";
-import { classifyMCPTransportError } from "./mcp-errors.js";
 import { resolveMCPEndpoint } from "./mcp-endpoint.js";
+import { rethrowStepError } from "./runtime-errors.js";
 import type {
   MCPRunAccess,
   MCPRemoteTool,
@@ -14,28 +13,6 @@ import type {
 } from "./types.js";
 import { normalizeToolInputSchema } from "./tool-schema.js";
 import { collectToolPages } from "./tool-discovery.js";
-
-function rethrowMCPError(error: unknown): never {
-  if (error instanceof ControlPlaneError) {
-    if (error.transient) {
-      throw new RetryableError(
-        "Misty's control plane is temporarily unavailable.",
-        {
-          retryAfter: error.status === 429 ? 5_000 : 1_000,
-        },
-      );
-    }
-    throw new FatalError("Misty's authorization or run state changed.");
-  }
-  const failure = classifyMCPTransportError(error);
-  if (failure.transient) {
-    throw new RetryableError(failure.message, {
-      retryAfter: failure.retryAfterMs,
-    });
-  }
-  if (failure.recognized) throw new FatalError(failure.message);
-  throw error;
-}
 
 export async function requestMCPToolExecution(
   context: RuntimeToolContext,
@@ -147,7 +124,7 @@ export async function discoverRemoteMCPTools(
     ) {
       return { supported: false, tools: [] };
     }
-    rethrowMCPError(error);
+    rethrowStepError(error);
   }
   if (
     !access.access_token ||
@@ -174,12 +151,12 @@ export async function discoverRemoteMCPTools(
       supported: true,
       tools: tools.map((item) => ({
         name: item.name,
-        capability: item.name.startsWith("sdk.") && typeof item._meta?.["misty/capability"] === "string" ? item._meta["misty/capability"] as string : undefined,
         description: (item.description || item.title || item.name).slice(
           0,
           2_000,
         ),
         inputSchema: normalizeToolInputSchema(item.inputSchema as Record<string, unknown>),
+        readOnly: item.annotations?.readOnlyHint === true,
       })),
     };
   } finally {

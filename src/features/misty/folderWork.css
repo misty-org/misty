@@ -1,0 +1,40 @@
+.misty-folder-work {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  padding: 4px 0;
+}
+.misty-folder-work__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.misty-folder-work__controls > span {
+  flex: 1;
+  min-width: 140px;
+}
+.misty-folder-work__receipt {
+  padding: 8px 0;
+}
+.misty-folder-work__receipt summary {
+  cursor: pointer;
+  color: var(--color-cream);
+}
+.misty-folder-work__receipt ol {
+  padding-left: 24px;
+  max-height: 240px;
+  overflow: auto;
+}
+.misty-folder-work__receipt li {
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+}
+.misty-folder-work__receipt li > span {
+  display: block;
+}
+.misty-folder-work__receipt li > span:first-child {
+  color: var(--color-cream);
+}
+.misty-folder-work p {
+  margin: 8px 0;
+}

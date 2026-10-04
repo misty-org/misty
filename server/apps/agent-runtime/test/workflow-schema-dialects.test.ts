@@ -5,6 +5,7 @@ import { isStepCount, jsonSchema, simulateReadableStream, tool } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import { z } from "zod";
+import { modelCatalog } from "../src/model-tools.js";
 
 const canonical = JSON.parse(readFileSync(new URL("../../../internal/capabilities/builtins.json", import.meta.url), "utf8")) as Array<{ name: string; inputSchema: any }>;
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } };
@@ -20,9 +21,10 @@ function model(call?: { toolName: string; input: string }) {
 }
 
 it("the actual pinned workflow adapter reconstructs every canonical SDK schema alongside Zod tools", async () => {
+  const catalog = modelCatalog(canonical.map((definition) => ({ name: definition.name, description: definition.name, inputSchema: definition.inputSchema })), ["misty_finish_task"]);
   const agent = new WorkflowAgent({ model: model(), stopWhen: isStepCount(1), tools: {
-    ...Object.fromEntries(canonical.map((definition, i) => [`capability_${i}`, tool({ inputSchema: jsonSchema(definition.inputSchema), execute: async () => ({}) })])),
-    discover: tool({ inputSchema: z.object({ query: z.string() }), execute: async () => ({}) }),
+    ...Object.fromEntries(catalog.tools.map((definition) => [definition.modelName, tool({ inputSchema: jsonSchema(definition.inputSchema as any), execute: async () => ({}) })])),
+    misty_finish_task: tool({ inputSchema: z.object({ summary: z.string() }), execute: async () => ({}) }),
   } });
   const result = await agent.stream({ prompt: "Readiness check" });
   expect(result.steps[0]?.text).toBe("Ready");

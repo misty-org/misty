@@ -5,7 +5,7 @@ import type {
   SpaceRoadmap,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
-import type { CollectionItem } from "@/shared/ui";
+import { itemTones, type CollectionItem } from "@/shared/ui";
 
 type Creator = ReturnType<typeof useSpaceItemCreator>;
 
@@ -32,6 +32,7 @@ export function taskItem(t: SpaceTask, creator: Creator, onOpen: () => void): Co
     id: t.id,
     title: t.title,
     icon: t.status === "done" ? <Check /> : <Clock3 />,
+    tone: itemTones.task,
     category: taskStatus[t.status] ?? t.status,
     creator: creator(t.created_by_user_id, t.created_by_agent_id),
     metadata: {
@@ -60,6 +61,7 @@ export function agendaItem(e: SpaceAgendaEntry, onOpen: () => void): CollectionI
     id: e.id,
     title: e.title,
     icon: <CalendarDays />,
+    tone: itemTones.event,
     category: dateTime(e.starts_at),
     metadata: {
       Ends: e.ends_at ? dateTime(e.ends_at) : "—",
@@ -81,6 +83,7 @@ export function roadmapItem(r: SpaceRoadmap, creator: Creator, onOpen: () => voi
     id: r.id,
     title: r.name,
     icon: <Flag />,
+    tone: itemTones.milestone,
     category: r.archived_at ? "Archived" : "Roadmap",
     creator: creator(r.created_by_user_id),
     metadata: {

@@ -84,6 +84,39 @@ export function applyGlobalInvocationEvent(
   messageId: string,
   event: AiInvocationEvent,
 ) {
+  if (event.type === "user.steering") {
+    const invocationId = get().invocationId;
+    const id = `${invocationId}-steering-${event.id}`;
+    updateConversation(set, get, conversationId, (conversation) => ({
+      ...conversation,
+      messages: conversation.messages.some((m) => m.id === id)
+        ? conversation.messages
+        : [
+            ...conversation.messages,
+            {
+              id,
+              role: "user",
+              mode: "ask",
+              content: event.text,
+              createdAt: new Date().toISOString(),
+              state: "completed",
+              activity: "Queued for the next safe boundary",
+            },
+          ],
+    }));
+    return;
+  }
+  if (event.type === "steering.received") {
+    for (const message of event.messages)
+      patchConversationMessage(
+        set,
+        get,
+        conversationId,
+        `${get().invocationId}-steering-${message.sequence}`,
+        { activity: "Received by the agent" },
+      );
+    return;
+  }
   if (event.type === "response.delta") {
     const current = get()
       .conversations.find((conversation) => conversation.id === conversationId)
@@ -101,6 +134,10 @@ export function applyGlobalInvocationEvent(
       state: "streaming",
       activity: undefined,
     });
+    return;
+  }
+  if (event.type === "app.request") {
+    patchConversationMessage(set, get, conversationId, messageId, { appRequest: event.appRequest });
     return;
   }
   if (event.type === "citation") {

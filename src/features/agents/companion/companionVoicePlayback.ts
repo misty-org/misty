@@ -8,6 +8,11 @@ export class CompanionVoicePlayback {
   private timer?: ReturnType<typeof setInterval>;
   private lastProgress = 0;
   private lastTime = -1;
+  private started = false;
+  private closed = false;
+  private lead = 0.25;
+  private underruns = 0;
+  private timeline: { start: number; duration: number; itemId: string }[] = [];
 
   constructor(
     private onPlaying: () => void,
@@ -34,7 +39,8 @@ export class CompanionVoicePlayback {
     }, 1000);
   }
 
-  append(encoded: string) {
+  append(encoded: string, itemId = "") {
+    if (this.closed) throw new Error("Voice turn cancelled.");
     if (this.complete) throw new Error("Audio arrived after playback completed.");
     const raw = atob(encoded);
     if (!raw.length || raw.length % 2 || this.bytes + raw.length > 24000 * 2 * 120)
@@ -56,19 +62,52 @@ export class CompanionVoicePlayback {
       if (this.complete && !this.sources.size) this.onDone();
     };
     this.sources.add(source);
-    this.nextTime = Math.max(this.nextTime, this.context.currentTime + 0.03);
+    // Network deltas arrive in bursts, not on the audio clock. Start with a
+    // small jitter cushion, then keep samples contiguous even when the next
+    // chunk arrives just before its scheduled start. Adding a fresh delay on
+    // every delta inserts audible holes inside words.
+    if (!this.started || this.nextTime <= this.context.currentTime) {
+      if (this.started) {
+        this.underruns++;
+        this.lead = Math.min(0.75, this.lead + 0.125);
+      }
+      this.nextTime = this.context.currentTime + this.lead;
+    }
     source.start(this.nextTime);
+    this.timeline.push({ start: this.nextTime, duration: buffer.duration, itemId });
     this.nextTime += buffer.duration;
-    this.onPlaying();
+    if (!this.started) {
+      this.started = true;
+      this.onPlaying();
+    }
+  }
+
+  /** Provider truncation uses played samples, excluding lead-in and underruns. */
+  heard() {
+    const itemId = this.timeline[this.timeline.length - 1]?.itemId ?? "";
+    const seconds = this.timeline
+      .filter((part) => part.itemId === itemId)
+      .reduce(
+        (sum, part) =>
+          sum + Math.max(0, Math.min(part.duration, this.context.currentTime - part.start)),
+        0,
+      );
+    return { itemId, audioEndMs: Math.floor(seconds * 1000) };
   }
 
   finish() {
     this.complete = true;
     if (!this.bytes) throw new Error("The voice provider returned no audio.");
+    console.debug("[companion audio]", {
+      audioMs: Math.round(this.bytes / 48),
+      underruns: this.underruns,
+    });
     if (!this.sources.size) this.onDone();
   }
 
   close() {
+    if (this.closed) return;
+    this.closed = true;
     clearInterval(this.timer);
     for (const source of this.sources) {
       source.onended = null;

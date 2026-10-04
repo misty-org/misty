@@ -81,7 +81,7 @@ func TestAgentMentionFailuresAreSafeAndActionable(t *testing.T) {
 		reason string
 	}{
 		{name: "personal hosted AI", err: serveragent.HostedAILimitReachedError{Required: 10, Available: 2, Scope: "personal"}, code: "hosted_ai_limit_reached", reason: "personal_ai_limit_reached"},
-		{name: "Space hosted AI", err: serveragent.HostedAILimitReachedError{Required: 10, Available: 2, Scope: "space"}, code: "hosted_ai_limit_reached", reason: "space_ai_limit_reached"},
+		{name: "Space hosted AI", err: serveragent.HostedAILimitReachedError{Required: 10, Available: 2, Scope: "space"}, code: "hosted_ai_limit_reached", reason: "personal_ai_limit_reached"},
 		{name: "integration", err: db.ErrWorkflowIntegrationRequired, code: "integration_required"},
 		{name: "permission", err: db.ErrLibraryForbidden, code: "forbidden"},
 		{name: "removed", err: db.ErrAgentNotFound, code: "resource_unavailable"},

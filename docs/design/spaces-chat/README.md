@@ -17,15 +17,15 @@ node node_modules/vite/bin/vite.js --config docs/design/spaces-chat/mockups/vite
 | Production components | [Chat and Space navigation](http://127.0.0.1:5217/production.html). Open All in the sidebar to review Yours, Suggested, and Favorites. |
 | Original approved prototype | [Chat](http://127.0.0.1:5217/), [Yours](http://127.0.0.1:5217/?view=all), [Suggested](http://127.0.0.1:5217/?view=all&filter=Suggested), [Favorites](http://127.0.0.1:5217/?view=all&filter=Favorites). Historical layout and interaction reference. |
 | Original prototype states | [Empty](http://127.0.0.1:5217/?state=empty), [loading](http://127.0.0.1:5217/?state=loading), [read only](http://127.0.0.1:5217/?state=read-only), [failed send](http://127.0.0.1:5217/?state=failed). |
-| Screenshot gallery | [Gallery](http://127.0.0.1:5217/gallery.html). Foregrounds the nine production captures and labels earlier screenshots as historical design studies. |
+| Screenshot gallery | [Gallery](http://127.0.0.1:5217/gallery.html). Foregrounds the desktop production captures and labels earlier screenshots as historical design studies. |
 
 Both previews are isolated from live accounts. `mockups/production.tsx` mounts the real message row, composer, conversation switcher, All collection, and sidebar inside a fixture wrapper; `productionData.ts` supplies adapters. Preview mutations affect memory only. The original prototype also keeps messages, drafts, attachments, favorites, recents, and new items in memory; reload or **Reset** restores its fixture.
 
 ## Implemented behavior
 
 - **Sidebar:** All, Chat, Planner, Journal, and Library; Recents always follows the main navigation, including while Chat is open. Five distinct opened items appear before Show more. Members and Usage are separate full-width ghost controls stacked below the divider, without an enclosing box.
-- **Chat:** avatars and message bodies align horizontally. Replies connect to the avatar gutter with an elbow and expose a jump to the original message. A single floating toolbar appears on hover or focus. Touch users tap the focusable message row to reveal that same toolbar; there is no permanent mobile action row. Inline edit, confirmed delete, reactions, Copy, and failed-send Retry follow existing permissions and ownership rules.
-- **Switching and composition:** the header opens a searchable shared Command in a Popover, or a bottom Sheet when the header is narrow. Everyone, channels, direct messages, and connected chats retain their provider routes. The compact composer grows with text and includes mentions, emoji, sending, and permitted attachments. Draft text, attachments, and reply targets survive conversation switching and remounting within the account session; reload or an account-session change clears them. Existing per-chat scroll restoration remains in use.
+- **Chat:** avatars and message bodies align horizontally. Replies connect to the avatar gutter with an elbow and expose a jump to the original message. A single floating toolbar appears on hover or focus. Keyboard focus reveals the same toolbar. Inline edit, confirmed delete, reactions, Copy, and failed-send Retry follow existing permissions and ownership rules.
+- **Switching and composition:** the header opens a searchable shared Command in a Popover at every window width. Everyone, channels, direct messages, and connected chats retain their provider routes. The compact composer grows with text and includes mentions, emoji, sending, and permitted attachments. Draft text, attachments, and reply targets survive conversation switching and remounting within the account session; reload or an account-session change clears them. Existing per-chat scroll restoration remains in use.
 - **All:** Yours shows items created or uploaded by the signed-in user; Suggested uses real task and Activity attention signals; Favorites collects personal stars across supported chats, tasks, notes, drawings, and files. Filters stay in that order. There is no Recent filter or shortcut block. Search, sorting where applicable, and list/grid views use shared collection controls.
 - **Personal state:** a server-backed account-and-Space index stores personal favorites and opened-item references. Authorized content reads supply current titles and destinations. Favorites are separate from Journal pins and Library's shared favorite field. Explicit request suggestions require a supplied unresolved request and an accessible content target; ordinary messages are not inferred to be requests.
 
@@ -33,20 +33,20 @@ Connected-provider capabilities continue to use the application's service permis
 
 ## Current screenshots
 
-Production component captures cover desktop (1440 × 900), narrow (720 × 900), and mobile (390 × 844):
+Production component captures cover desktop (1440 × 900) and narrow (720 × 900) windows:
 
 | Surface | Captures |
 | --- | --- |
-| Chat | [Desktop](mockups/screenshots/production-desktop.jpg), [narrow](mockups/screenshots/production-narrow.jpg), [mobile](mockups/screenshots/production-mobile.jpg) |
-| Conversation picker | [Popover](mockups/screenshots/production-switcher.jpg), [mobile Sheet](mockups/screenshots/production-mobile-switcher.jpg) |
+| Chat | [Desktop](mockups/screenshots/production-desktop.jpg), [narrow](mockups/screenshots/production-narrow.jpg) |
+| Conversation picker | [Popover](mockups/screenshots/production-switcher.jpg) |
 | Message edit | [Inline editing](mockups/screenshots/production-edit.jpg) |
 | All | [Yours](mockups/screenshots/production-all-yours.jpg), [Suggested](mockups/screenshots/production-all-suggested.jpg), [Favorites](mockups/screenshots/production-all-favorites.jpg) |
 
-The fixture wrapper hides navigation on mobile. These captures verify production component visuals and the conversation Sheet, not the full application's mobile navigation Sheet. Screenshots without the `production-` prefix preserve the earlier prototype and its prior dimensions and states; they do not override the final message layout or touch interaction.
+Screenshots without the `production-` prefix preserve the earlier prototype and its prior dimensions and states; they do not override the final message layout or touch interaction.
 
 ## Validation and rollout
 
-Application and preview TypeScript, targeted lint, and desktop build checks passed. The final frontend regression suite passed (64/64 across 17 files). Frontend tests cover message permissions, retry payload preservation, conversation changes during pending work, draft restoration and late uploads, scoped content reads, filters, navigation, and suggestion ordering. Browser fixture checks covered the three sizes above, keyboard search and selection, focus restoration, mobile conversation Sheet search focus, editing, and All filters.
+Application and preview TypeScript, targeted lint, and desktop build checks passed. The final frontend regression suite passed (64/64 across 17 files). Frontend tests cover message permissions, retry payload preservation, conversation changes during pending work, draft restoration and late uploads, scoped content reads, filters, navigation, and suggestion ordering. Browser fixture checks covered desktop and narrow window sizes, keyboard search and selection, focus restoration, conversation search focus, editing, and All filters.
 
 The independent review's final **SHIP** disposition was bounded to two repairs: upload session isolation and deletion-target scope. Both were resolved, and their targeted regression suite passed (4/4). This was not a new whole-surface audit or a full automated accessibility certification.
 

@@ -63,16 +63,38 @@ func cancelMistyRunTx(ctx context.Context, tx *sql.Tx, userID, runID, runtimeID 
 	return nil
 }
 
+// CancelMistyInvocationChildren commits parent cancellation, its stream event,
+// descendant revocation and durable runtime delivery under one parent row lock.
+// Repeated stops are harmless, and an already completed result remains completed.
 func (db *Database) CancelMistyInvocationChildren(ctx context.Context, userID, invocationID string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		var id string
-		if err := tx.QueryRowContext(ctx, `SELECT id FROM ai_invocations WHERE id=$1 AND user_id=$2 FOR UPDATE`, invocationID, userID).Scan(&id); err != nil {
+		var id, state, runtimeID string
+		if err := tx.QueryRowContext(ctx, `SELECT id,state,COALESCE(runtime_run_id,'') FROM ai_invocations WHERE id=$1 AND user_id=$2 FOR UPDATE`, invocationID, userID).Scan(&id, &state, &runtimeID); err != nil {
 			return err
 		}
 		if err := cancelMistyChildrenTx(ctx, tx, userID, id); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE ai_invocations SET state='canceled',updated_at=NOW() WHERE id=$1 AND user_id=$2 AND state IN ('queued','running','awaiting_approval','awaiting_device','awaiting_intervention','awaiting_timer')`, id, userID)
-		return err
+		if state == "completed" || state == "failed" {
+			return nil
+		}
+		// Also repair a canceled record from an older server that stopped before
+		// publishing its terminal event. The row lock serializes all event writers.
+		var recorded bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_events WHERE invocation_id=$1 AND event_type='invocation.canceled')`, id).Scan(&recorded); err != nil {
+			return err
+		}
+		if !recorded {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO ai_invocation_events(invocation_id,sequence,event_type,payload,native_resulting_state,receipt_key) SELECT $1,n,'invocation.canceled',jsonb_build_object('id',n::text,'type','invocation.canceled','state','canceled'),'canceled','owner:cancel' FROM (SELECT COALESCE(MAX(sequence),0)+1 n FROM ai_invocation_events WHERE invocation_id=$1) seq`, id); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE ai_invocations SET state='canceled',updated_at=NOW(),canceled_at=COALESCE(canceled_at,NOW()) WHERE id=$1 AND user_id=$2`, id, userID); err != nil {
+			return err
+		}
+		if runtimeID != "" {
+			return queueAgentContinuationTx(ctx, tx, userID, id, "runtime.cancel", runtimeID, AgentContinuation{RuntimeID: runtimeID})
+		}
+		return nil
 	})
 }

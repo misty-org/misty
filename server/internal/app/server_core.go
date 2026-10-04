@@ -148,6 +148,8 @@ func CreateServer() (*Server, error) {
 		return nil, fmt.Errorf("configure Agent runtime: %w", err)
 	}
 	s.Spaces.SetAgentRuntime(agentRuntime)
+	s.AIAnalyzer.ModelResolver = s.Spaces.ResolveAIModel
+	s.AIAgent.SetModelResolver(s.Spaces.ResolveAIModel)
 	s.AgentRuntime = agentRuntime
 	s.Spaces.SetUsageMeter(usageMeter)
 	s.Spaces.SetLibraryProvider(s.Library)

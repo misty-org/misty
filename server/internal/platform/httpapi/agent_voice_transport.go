@@ -8,7 +8,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func (s *AgentsService) openVoiceTransport(ctx context.Context, client *websocket.Conn, rtc bool) (voiceProvider, error) {
+func (s *AgentsService) openVoiceTransport(ctx context.Context, client *websocket.Conn, rtc bool, account ...string) (voiceProvider, error) {
+	analyzer := s.voiceAnalyzer
+ configured := false
+ if len(account) > 0 { var err error; analyzer, configured, err = analyzer.ConfiguredRealtime(ctx, account[0]); if err != nil { return nil, err } }
 	if rtc {
 		client.SetReadLimit(100 << 10)
 		_ = client.SetReadDeadline(time.Now().Add(20 * time.Second))
@@ -20,7 +23,10 @@ func (s *AgentsService) openVoiceTransport(ctx context.Context, client *websocke
 			return nil, errors.New("invalid voice offer")
 		}
 		_ = client.SetReadDeadline(time.Time{})
-		provider, answer, err := s.voiceAnalyzer.OpenVoiceWebRTC(ctx, offer.SDP)
+		var provider voiceProvider
+  answer := ""
+  err := errors.New("account connection uses the websocket transport")
+  if !configured { provider, answer, err = analyzer.OpenVoiceWebRTC(ctx, offer.SDP) }
 		if err == nil {
 			if err = client.WriteJSON(map[string]string{"type": "rtc.answer", "sdp": answer}); err != nil {
 				provider.Close()
@@ -34,5 +40,5 @@ func (s *AgentsService) openVoiceTransport(ctx context.Context, client *websocke
 			return nil, err
 		}
 	}
-	return s.voiceAnalyzer.OpenVoiceRealtime(ctx)
+	return analyzer.OpenVoiceRealtime(ctx)
 }

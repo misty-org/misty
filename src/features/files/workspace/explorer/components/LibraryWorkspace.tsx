@@ -2,28 +2,34 @@ import { MistyFilePicker } from "@/features/picker";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSmartLibraryStore } from "@/features/library/library";
 import type { SearchResult } from "@/native/ipc";
-import { Button, IconButton, Input, Pressable, Spinner } from "@/shared/ui";
-import { BrainCircuit, Film, FolderSearch, Images, Plus, Search, Tag, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { DEFAULT_LIBRARY_TAG_LIMIT } from "../utils/libraryTags";
-import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
 import {
-  SmartFolderDialog,
-  createSmartFolderDialogState,
-  smartFolderMatchMode,
-  smartFolderQueryFromRules,
-  searchResultContext,
-  searchResultSummary,
-} from "@/features/file-ui";
+  Button,
+  Spinner,
+  CollectionHeading,
+  CollectionPage,
+  CollectionSearch,
+  CollectionFilterMenu,
+  CollectionFilters,
+  CollectionViewToggle,
+  CollectionSkeleton,
+  NavIsland,
+  NavIslandItem,
+  EmptyState,
+} from "@/shared/ui";
+import { BrainCircuit, Plus } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { revealSearchResultInPane, searchResultNavigationTarget } from "../utils/searchNavigation";
+import { SmartFolderDialog, createSmartFolderDialogState } from "@/features/file-ui";
 import { LibraryDropReviewDialog } from "./LibraryDropReviewDialog";
-import { LibraryEmpty } from "./libraryWorkspace/LibraryDetailPrimitives";
-import { LibraryAssetViewer, LibraryGallery } from "./libraryWorkspace/LibraryGallery";
+import { LibraryAssetItems } from "./libraryWorkspace/LibraryAssetItems";
+import { LibraryAssetViewer } from "./libraryWorkspace/LibraryGallery";
+import { LibraryCollectionsPanel } from "./libraryWorkspace/LibraryCollectionsPanel";
+import { LibraryTagChips } from "./libraryWorkspace/LibraryTagChips";
 import { MediaLibraryPanel } from "./libraryWorkspace/MediaLibraryPanel";
 import { useLibraryAssetFilter } from "./libraryWorkspace/useLibraryAssetFilter";
 import { useSemanticAssetSearch } from "./libraryWorkspace/useSemanticAssetSearch";
 import { useSmartFolders } from "./libraryWorkspace/useSmartFolders";
-import { SearchResultThumbnail } from "./SearchResultThumbnail";
 
 export const libraryWorkspacePath = "misty://library";
 
@@ -32,6 +38,12 @@ export function LibraryWorkspace(props: {
   onOpenResult?: (result: SearchResult) => void | Promise<void>;
   /** Rendered as a section inside another page, which owns the title and scrolling. */
   embedded?: boolean;
+  renderHeader?: (controls: {
+    search: ReactNode;
+    actions: ReactNode;
+    filterControl: ReactNode;
+    viewToggle: ReactNode;
+  }) => ReactNode;
 }) {
   const {
     loaded,
@@ -68,6 +80,9 @@ export function LibraryWorkspace(props: {
     [library],
   );
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"list" | "grid">("list");
+  const [fileType, setFileType] = useState("all");
+  const [sort, setSort] = useState("relevance");
   const { semanticAssetIds, semanticSearching, semanticError } = useSemanticAssetSearch(
     query,
     library?.serverFolderId ?? undefined,
@@ -111,312 +126,241 @@ export function LibraryWorkspace(props: {
     setPickerOpen(true);
   };
 
+  const typeOf = (asset: (typeof analyzed)[number]) =>
+    asset.assetKind || asset.extension.replace(/^\./, "").toUpperCase() || "File";
+  const fileTypes = [...new Set(analyzed.map(typeOf))].sort();
+  const items = visibleAssets.filter((asset) => fileType === "all" || typeOf(asset) === fileType);
+  if (sort !== "relevance")
+    items.sort((a, b) =>
+      sort === "name"
+        ? a.name.localeCompare(b.name)
+        : sort === "name-desc"
+          ? b.name.localeCompare(a.name)
+          : sort === "size"
+            ? b.sizeBytes - a.sizeBytes
+            : b.modifiedMs - a.modifiedMs,
+    );
+  const assetView = tab === "library" || tab === "tags";
+  const controls = {
+    search: assetView ? (
+      <CollectionSearch
+        aria-label="Search Smart Library"
+        placeholder="Search Smart Library"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+    ) : null,
+    actions: (
+      <>
+        {pendingAnalysisCount > 0 && (
+          <Button variant="outline" disabled={analysisBusy} onClick={() => void analyzeFolder()}>
+            <BrainCircuit />
+            {analysisBusy ? "Analyzing…" : `Analyze ${pendingAnalysisCount.toLocaleString()} ready`}
+          </Button>
+        )}
+        <Button disabled={analysisBusy} onClick={selectFiles}>
+          {analysisBusy ? <Spinner label={false} /> : <Plus />}
+          {analysisBusy ? "Adding…" : "Add files"}
+        </Button>
+      </>
+    ),
+    filterControl: assetView ? (
+      <CollectionFilterMenu
+        label="Filter and sort Smart Library"
+        active={fileType !== "all" || sort !== "relevance"}
+        onReset={() => {
+          setFileType("all");
+          setSort("relevance");
+        }}
+        groups={[
+          {
+            label: "File type",
+            submenu: true,
+            value: fileType,
+            options: [
+              { value: "all", label: "All types" },
+              ...fileTypes.map((value) => ({ value, label: value })),
+            ],
+            onChange: setFileType,
+          },
+          {
+            label: "Sort by",
+            kind: "sort",
+            submenu: true,
+            value: sort,
+            options: [
+              { value: "relevance", label: "Relevance" },
+              { value: "name", label: "Name A–Z" },
+              { value: "name-desc", label: "Name Z–A" },
+              { value: "modified", label: "Recently modified" },
+              { value: "size", label: "Largest first" },
+            ],
+            onChange: setSort,
+          },
+        ]}
+      />
+    ) : null,
+    viewToggle: assetView ? <CollectionViewToggle value={view} onChange={setView} /> : null,
+  };
+  const sectionOptions = [
+    { value: "library", label: "Files" },
+    { value: "collections", label: "Collections" },
+    { value: "tags", label: "Tags" },
+    { value: "media", label: "Media" },
+  ];
+
+  const Surface = props.embedded ? "section" : CollectionPage;
+
   return (
-    <section
+    <Surface
       className={
         props.embedded
-          ? "grid min-h-0 text-cream"
-          : "grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg text-cream"
+          ? "flex min-h-0 min-w-0 flex-1 flex-col gap-4 text-cream"
+          : "flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-auto bg-charcoal-workspace px-4 pt-3 pb-5 text-cream sm:px-6"
       }
     >
-      <header
-        className={
-          props.embedded
-            ? "flex flex-wrap items-center justify-between gap-4 pb-4"
-            : "flex flex-wrap items-center justify-between gap-4 border-b border-charcoal-border/60 px-6 py-5"
-        }
-      >
-        <div>
-          {props.embedded ? null : (
-            <h1 className="m-0 text-2xl font-bold tracking-[-0.03em]">Library</h1>
-          )}
-          <p
-            className={
-              props.embedded ? "m-0 text-sm text-cream-muted" : "m-0 mt-1 text-sm text-cream-muted"
+      {props.renderHeader ? (
+        props.renderHeader(controls)
+      ) : (
+        <>
+          <CollectionHeading
+            title="Library"
+            actions={
+              <>
+                {controls.search}
+                {controls.actions}
+              </>
             }
-          >
-            Private, on-device files organized with AI tags, collections, and search.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {pendingAnalysisCount > 0 ? (
-            <Button
-              variant="outline"
-              disabled={analysisBusy}
-              type="button"
-              onClick={() => void analyzeFolder()}
+          />
+          <CollectionFilters
+            options={sectionOptions}
+            value={tab}
+            onChange={(value) => setTab(value as LibraryTab)}
+            filterControl={controls.filterControl}
+            actions={controls.viewToggle}
+          />
+        </>
+      )}
+      {props.renderHeader && (
+        <NavIsland aria-label="Smart Library sections" className="self-start">
+          {sectionOptions.map((option) => (
+            <NavIslandItem
+              key={option.value}
+              active={tab === option.value}
+              aria-pressed={tab === option.value}
+              onClick={() => setTab(option.value as LibraryTab)}
             >
-              <BrainCircuit size={16} />
-              {analysisBusy
-                ? "Analyzing…"
-                : `Analyze ${pendingAnalysisCount.toLocaleString()} ready`}
-            </Button>
-          ) : null}
-          <Button disabled={analysisBusy} type="button" onClick={() => void selectFiles()}>
-            {analysisBusy ? <Spinner label={false} /> : <Plus size={16} />}
-            {analysisBusy ? "Adding…" : "Add files"}
-          </Button>
-        </div>
-      </header>
-      <div
-        className={
-          props.embedded
-            ? "flex flex-wrap items-center gap-2 pb-4"
-            : "flex flex-wrap items-center gap-2 border-b border-charcoal-border/60 px-6 py-3"
-        }
-      >
-        {(
-          [
-            ["library", Images, "Files"],
-            ["collections", FolderSearch, "Collections"],
-            ["tags", Tag, "Tags"],
-            ["media", Film, "Media"],
-          ] as const
-        ).map(([value, Icon, label]) => (
-          <Button
-            key={value}
-            type="button"
-            variant={tab === value ? "secondary" : "ghost"}
-            size="sm"
-            aria-pressed={tab === value}
-            className={tab === value ? undefined : "text-cream-muted"}
-            onClick={() => setTab(value)}
-          >
-            <Icon size={15} />
-            {label}
-          </Button>
-        ))}
-      </div>
-      <div className={props.embedded ? "min-h-0" : "min-h-0 overflow-auto p-6"}>
-        {tab !== "media" &&
-          (!loaded ? (
-            <LibraryEmpty
-              title="Loading your library…"
-              text="Opening the private on-device catalog."
-            />
-          ) : !library ? (
-            <LibraryEmpty
-              title="No files in Library"
-              text="Add local files to analyze and organize them. Originals stay exactly where they are on this device."
-              action={
-                <Button onClick={() => void selectFiles()}>
-                  <Plus size={15} />
-                  Add files
-                </Button>
-              }
-            />
-          ) : null)}
+              {option.label}
+            </NavIslandItem>
+          ))}
+        </NavIsland>
+      )}
+      {error && (
+        <SystemErrorActivity
+          error={error}
+          scope="files:library"
+          title="Library needs attention"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      )}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
         {tab === "media" ? <MediaLibraryPanel /> : null}
-        {library && tab === "library" ? (
+        {assetView && !loaded ? (
+          <CollectionSkeleton label="Loading Smart Library" view={view} />
+        ) : null}
+        {loaded && assetView ? (
           <>
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <strong>{analyzed.length} analyzed files</strong>
-              </div>
-              <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-charcoal-border bg-transparent px-3 sm:w-[360px]">
-                <Search className="shrink-0 text-cream-muted" size={16} />
-                <Input
-                  aria-label="Search Library"
-                  className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm leading-none shadow-none focus-visible:ring-0"
-                  value={query}
-                  placeholder="Search subjects, descriptions, or tags"
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-                {semanticSearching ? <Spinner label={false} className="text-cream-muted" /> : null}
-              </div>
-            </div>
-            {semanticError ? (
+            {semanticSearching && (
+              <p role="status" className="text-sm text-cream-muted">
+                Searching file contents…
+              </p>
+            )}
+            {semanticError && (
               <SystemErrorActivity
                 error={semanticError}
                 scope="files:library:semantic-search"
                 title="Semantic search is unavailable"
                 target={{ kind: "workspace-tool", tool: "files" }}
               />
-            ) : null}
-            {error ? (
-              <SystemErrorActivity
-                error={error}
-                scope="files:library"
-                title="Library needs attention"
-                target={{ kind: "workspace-tool", tool: "files" }}
-              />
-            ) : null}
-            {query.trim() && !semanticSearching && visibleAssets.length === 0 ? (
-              <LibraryEmpty
-                title="No matching files"
-                text="Try a subject, character, visible phrase, description, or tag."
-              />
-            ) : (
-              <LibraryGallery
-                assets={visibleAssets}
-                rootPath={library.rootPath}
-                onOpen={setSelectedAssetId}
+            )}
+          </>
+        ) : null}
+        {loaded && tab === "library" ? (
+          <>
+            <LibraryAssetItems
+              assets={items}
+              rootPath={library?.rootPath ?? ""}
+              view={view}
+              sortResetKey={`${sort}:${fileType}:${query}`}
+              onOpen={setSelectedAssetId}
+            />
+            {!items.length && (
+              <EmptyState
+                title={
+                  query || fileType !== "all" || selectedTag
+                    ? "No matching files"
+                    : "No files in Library"
+                }
+                description={
+                  query || fileType !== "all" || selectedTag
+                    ? "Try another search or clear the filters."
+                    : "Add local files to analyze and organize them. Originals stay exactly where they are on this device."
+                }
+                action={
+                  query || fileType !== "all" || selectedTag ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setQuery("");
+                        setFileType("all");
+                        setSelectedTag(null);
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
               />
             )}
           </>
         ) : null}
-        {library && tab === "tags" ? (
+        {loaded && tab === "tags" ? (
           <>
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="m-0 text-xl font-bold">Tags</h2>
-                <p className="m-0 mt-1 text-sm text-cream-muted">
-                  Agents add tags during analysis. Open a file to review, remove, or add one.
-                </p>
-              </div>
-              <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-charcoal-border bg-transparent px-3 sm:w-[260px]">
-                <Search className="shrink-0 text-cream-muted" size={15} />
-                <Input
-                  className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm leading-none shadow-none focus-visible:ring-0"
-                  value={tagQuery}
-                  placeholder="Search tags"
-                  aria-label="Search tags"
-                  onChange={(event) => setTagQuery(event.target.value)}
-                />
-                {tagQuery ? (
-                  <IconButton size="xs" label="Clear tag search" onClick={() => setTagQuery("")}>
-                    <X size={14} />
-                  </IconButton>
-                ) : null}
-              </div>
-            </div>
-            <div className="mb-6 flex flex-wrap items-center gap-2">
-              <Button
-                variant="chip"
-                size="chip"
-                aria-pressed={!selectedTag}
-                onClick={() => setSelectedTag(null)}
-              >
-                All files
-              </Button>
-              {visibleTags.map((tag) => (
-                <Button
-                  variant="chip"
-                  size="chip"
-                  aria-pressed={selectedTag?.toLocaleLowerCase() === tag.name.toLocaleLowerCase()}
-                  key={tag.name}
-                  onClick={() => setSelectedTag(tag.name)}
-                >
-                  {tag.name} <span className="opacity-60">{tag.count}</span>
-                </Button>
-              ))}
-              {!tagQuery && tags.length > DEFAULT_LIBRARY_TAG_LIMIT ? (
-                <Button
-                  variant="chip"
-                  size="chip"
-                  aria-expanded={tagsExpanded}
-                  onClick={() => setTagsExpanded((current) => !current)}
-                >
-                  {tagsExpanded ? "Show less" : "Show more"}
-                </Button>
-              ) : null}
-              {tagQuery && visibleTags.length === 0 ? (
-                <span className="text-sm text-cream-muted">No matching tags</span>
-              ) : null}
-            </div>
-            <LibraryGallery
-              assets={visibleAssets}
-              rootPath={library.rootPath}
+            <LibraryTagChips
+              tags={tags}
+              visibleTags={visibleTags}
+              tagQuery={tagQuery}
+              selectedTag={selectedTag}
+              tagsExpanded={tagsExpanded}
+              onTagQuery={setTagQuery}
+              onSelectTag={setSelectedTag}
+              onToggleExpanded={() => setTagsExpanded((current) => !current)}
+            />
+            <LibraryAssetItems
+              assets={items}
+              rootPath={library?.rootPath ?? ""}
+              view={view}
+              sortResetKey={`${sort}:${fileType}:${query}:${selectedTag}`}
               onOpen={setSelectedAssetId}
             />
           </>
         ) : null}
         {tab === "collections" ? (
-          <>
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="m-0 text-xl font-bold">Collections</h2>
-                <p className="m-0 mt-1 text-sm text-cream-muted">
-                  Saved, rule-based views evaluated against the actual file index and AI metadata.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFolderDialog(createSmartFolderDialogState())}
-              >
-                <Plus size={15} />
-                New
-              </Button>
-            </div>
-            <div className="grid gap-2">
-              {savedSearches.map((search) => (
-                <div
-                  key={search.id}
-                  className="flex items-center gap-3 rounded-lg bg-charcoal-card p-3 shadow-xs inset-ring-1 inset-ring-cream/10"
-                >
-                  <Button
-                    variant="ghost"
-                    className="h-auto min-w-0 flex-1 justify-start py-1 text-left"
-                    onClick={() => void runFolder(search)}
-                  >
-                    <span className="min-w-0">
-                      <strong className="block">{search.name}</strong>
-                      <small className="block truncate font-normal text-cream-muted">
-                        {search.query ||
-                          smartFolderQueryFromRules(
-                            search.rules,
-                            smartFolderMatchMode(search.rules),
-                          )}
-                      </small>
-                    </span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFolderDialog(createSmartFolderDialogState(search))}
-                  >
-                    Edit
-                  </Button>
-                </div>
-              ))}
-            </div>
-            {folderError ? (
-              <SystemErrorActivity
-                error={folderError}
-                scope="files:library:collections"
-                title="Library collection needs attention"
-                target={{ kind: "workspace-tool", tool: "files" }}
-              />
-            ) : null}
-            {folderSearching ? <p className="text-sm text-cream-muted">Evaluating rules…</p> : null}
-            {folderResults.length > 0 ? (
-              <div className="mt-6 grid gap-1">
-                <h3 className="mb-2">Results · {folderResults.length}</h3>
-                {folderResults.map((result) => (
-                  <Pressable
-                    key={`${result.sourceKind}:${result.entry.path}`}
-                    className="hover:bg-cream/[0.045] grid min-h-[72px] grid-cols-[52px_minmax(0,1fr)] items-center gap-3 rounded-lg p-2"
-                    onClick={() =>
-                      void (props.onOpenResult
-                        ? props.onOpenResult(result)
-                        : props.paneId
-                          ? revealSearchResultInPane(
-                              props.paneId,
-                              searchResultNavigationTarget(result),
-                            )
-                          : undefined)
-                    }
-                  >
-                    <SearchResultThumbnail
-                      result={result}
-                      className="grid size-[52px] place-items-center overflow-hidden rounded-md bg-charcoal-card"
-                      imageClassName="size-full object-cover"
-                    />
-                    <span className="min-w-0">
-                      <strong className="block truncate">{result.entry.name}</strong>
-                      <span className="block truncate text-sm text-cream-muted">
-                        {searchResultSummary(result)}
-                      </span>
-                      <small className="block truncate text-cream-muted/70">
-                        {searchResultContext(result)}
-                      </small>
-                    </span>
-                  </Pressable>
-                ))}
-              </div>
-            ) : null}
-          </>
+          <LibraryCollectionsPanel
+            savedSearches={savedSearches}
+            results={folderResults}
+            searching={folderSearching}
+            error={folderError}
+            onEdit={(search) => setFolderDialog(createSmartFolderDialogState(search))}
+            onRun={(search) => void runFolder(search)}
+            onOpenResult={(result) =>
+              void (props.onOpenResult
+                ? props.onOpenResult(result)
+                : props.paneId
+                  ? revealSearchResultInPane(props.paneId, searchResultNavigationTarget(result))
+                  : undefined)
+            }
+          />
         ) : null}
       </div>
       {folderDialog ? (
@@ -460,7 +404,7 @@ export function LibraryWorkspace(props: {
           }}
         />
       ) : null}
-    </section>
+    </Surface>
   );
 }
 

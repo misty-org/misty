@@ -44,6 +44,25 @@ func useResourceAdapterFixture(t *testing.T, database *Database) {
 		if tier == "max" {
 			limit, spaces = MaxStorageBytes, 10
 		}
+		if req.Operation == "storage.check" || req.Operation == "storage.rendition" || req.Operation == "storage.commit" {
+			u := req.Usage.Units
+			used := u["object_bytes"] + u["database_bytes"] + u["sync_bytes"]
+			remaining := max(int64(0), limit-used-u["reserved_bytes"])
+			requested := u["requested_bytes"]
+			if req.Operation == "storage.rendition" && requested == 0 {
+				requested = min(max(u["source_bytes"], 1_000_000), 250_000_000, remaining)
+			}
+			allowed := requested <= remaining && requested >= u["minimum_bytes"]
+			if req.Operation == "storage.commit" {
+				allowed = u["added_bytes"] <= u["removed_bytes"] || used+u["reserved_bytes"] <= limit
+			}
+			raw, _ := json.Marshal(map[string]any{"used_bytes": used, "reserved_bytes": u["reserved_bytes"], "limit_bytes": limit, "remaining_bytes": remaining, "approved_bytes": requested, "over_quota": used+u["reserved_bytes"] > limit, "percentage_used": float64(used) * 100 / float64(limit)})
+			if !allowed {
+				w.WriteHeader(402)
+			}
+			json.NewEncoder(w).Encode(billingadapter.Decision{Allowed: allowed, Summary: raw})
+			return
+		}
 		raw, _ := json.Marshal(map[string]any{"entitlements": PlanEntitlements{Plan: Tier(tier), MaxOwnedSpaces: spaces, SpaceLimit: spaces, PersonalStorageLimitBytes: limit, SpaceStorageLimitBytes: limit, StorageLimitBytes: limit, UnlimitedCollaborators: true, UnlimitedAgentDefinitions: true}})
 		json.NewEncoder(w).Encode(billingadapter.Decision{Allowed: true, Summary: raw})
 	}))

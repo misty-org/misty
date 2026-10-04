@@ -1,0 +1,181 @@
+# Agent architecture — approved direction
+
+Approved by the owner on October 4, 2026. This brief supersedes the parts of
+[agent-workflows/PLAN.md](../agent-workflows/PLAN.md) that require a small
+enforced allowlist, an up-front work-location choice, a single explicitly
+selected Composio tool, and the single-step Midscene planner described in
+[agent-workflows/MIDSCENE.md](../agent-workflows/MIDSCENE.md). The security
+invariants listed below still apply.
+
+## Goal
+
+One sentence should be enough. For example:
+
+> check spaces, gather my two latest notes and upload them to my google drive
+> and move them to a folder called "misty space notes"
+
+Misty reads the request, plans, uses Misty data, connected apps and the screen as
+needed, and reports verified results. It does not ask the user to pick a mode,
+restate the task, or name tools. When the work needs a screen, the user can watch
+a cursor move, click, open tabs and search like a person.
+
+The engineering goal is that **no Misty-side gate decides what the agent may do
+before the model reads the request.** Capabilities are limited only by the
+owner's account permissions, the physical availability of a device or screen,
+and the approval policy below.
+
+## Principles
+
+1. **Decide after reading.** No keyword intent compilers, regex mode switches or
+   per-agent allowlists. The model plans with every tool the run can use.
+2. **One catalog per run.** The tools listed to the model, the tools the gateway
+   authorizes and the tools that execute come from one function. Prompts are
+   generated from that catalog, so they never promise a missing tool.
+3. **Real tool names.** The model sees `notes_search`, not `capability_15`.
+4. **Screens on demand.** A run opens a screen only when its plan needs one. Where
+   it opens is an account setting the user's words can override.
+5. **Composio for apps, Midscene for screens.** Misty does not write per-app
+   integrations or click logic.
+6. **Misty owns the platform:** its own data tools, the device adapter, the
+   policy gate, the action journal and billing.
+
+## Architecture
+
+```
+Composer (one input, no modes)
+  └─ Agent loop (Vercel Workflow; plans, picks API or screen)
+       └─ Capability gateway (Go: catalog · policy/approvals · journal · billing)
+            ├─ Misty data tools — notes, tasks, calendar, drawings, roadmaps,
+            │  library, messages, memory; optional `space` argument
+            ├─ Composio session — per Misty user; search, connect, execute
+            └─ Screen tasks — screen.open / screen.act / screen.read
+                 └─ Desktop host — Midscene Agent.aiAct + device adapter,
+                    visible cursor, Stop, inline approvals
+```
+
+- **Agent loop.** One durable loop for every entry point (panel, Agents page,
+  companion, voice). All tools are active on every turn.
+- **Capability gateway.** Resolves the run's catalog, authorizes each call with
+  the owner's account and Space permissions, applies the approval policy,
+  journals effects and meters usage. MCP is only its transport to the runtime.
+- **Misty data tools.** Flat, account-level tools. Reads cover every Space the
+  owner can access unless a `space` is given; writes default to the owner's
+  personal Space. `spaces_list` remains for naming destinations. Runs that
+  belong to a Space (Space conversations and runs started inside a Space) act
+  in that Space and follow the member's permissions there.
+- **Composio.** One session per Misty user, created and proxied by Go through
+  the REST v3.1 session API (`/api/v3.1/tool_router/session…`). The model uses
+  Misty's own `apps_search`, `apps_schemas`, `apps_connected`, `apps_connect`
+  and `apps_execute` tools, so the gateway sees every tool slug before it runs.
+  Connect Links become an in-chat "Connect Google Drive" card, and the
+  connecting call waits while the user signs in. The remote workbench and bash
+  tools stay disabled until the gateway can authorize what they run.
+- **Screen tasks.** `screen.act(goal)` is one device job per goal, not one per
+  click. The desktop runs Midscene's agent loop against a device adapter for the
+  Misty window, the agent window or the full desktop. Midscene's model calls go
+  through a Go vision proxy with their own meter.
+
+## Policy
+
+Every action is classified as read, create, update, consequential or
+destructive, using Composio's tool tags, Misty descriptor risk and Midscene's
+stop-before-irreversible instruction. One account setting controls autonomy.
+
+- Reads, and creates or updates the user explicitly asked for, run without a
+  prompt.
+- Sending to other people, publishing, purchasing, sharing, changing access and
+  deleting require approval unless the account setting allows them.
+- Read-only failures are retryable. They are never reported as "may have
+  happened" and never end a run.
+- A call Misty rejected without effect (invalid arguments, an unknown Space, an
+  unavailable tool) returns its error to the model, which corrects the call. The
+  rest of that model response is skipped and reported as not attempted. Repeating
+  an identical rejected write ends the run.
+- A write whose outcome is unknown, a denied approval, an unavailable device or
+  a required sign-in ends the run until the user resolves it.
+
+These invariants from the earlier plan remain:
+
+- The server checks every operation, including operations inside batch or proxy
+  tools. Prompt instructions are not a security boundary.
+- Every effect is journaled with an idempotency key; uncertain outcomes are
+  reconciled before retry.
+- Page content, tool results and messages from other agents never grant
+  authority or impersonate the owner.
+- No unrestricted shell or host code execution.
+- Device control requires a live, user-owned lease that Stop revokes at once.
+- Third-party app tokens keep their scoped authority.
+
+## Phases
+
+Each phase leaves the product working.
+
+### Phase 1 — Unblock the agent (implemented October 4, 2026; not yet verified)
+
+- Delete keyword intent compilation, required-tool derivation, conversation
+  focus and pending-action heuristics, send-overlap grounding, mutation-target
+  grounding and keyword memory gates.
+- Delete the personal-agent allowlist and agent workspace-app gating. Keep
+  physical constraints: browser tools need an attached browser; screen control
+  needs the agent's window lease.
+- One catalog per run: the MCP server advertises exactly the run's resolved
+  toolbox. Remove the parallel static registry.
+- Flat data tools with an optional `space`; remove `spaces.tools` and
+  `spaces.execute`.
+- Generate prompts from the catalog.
+- Runtime: real tool names, every tool active, no capability discovery tool or
+  keyword working set, no required-tool completion gate. Split the workflow file
+  by responsibility.
+- Read-only browser failures become retryable. Midscene planning no longer
+  consumes the run's model-turn limit.
+
+### Phase 2 — Composio sessions (implemented October 4, 2026; not yet verified)
+
+- Gateway-owned Composio sessions reaching every toolkit, connect cards and
+  policy on each tool slug. Done; see
+  [deploy/composio/README.md](../../../server/deploy/composio/README.md).
+- The calendar-only adapter and its per-agent calendar binding are deleted.
+  Connected apps belong to the account and every agent inherits them.
+- Connect and approval cards hold the calling tool for up to 40 seconds and the
+  model calls again to keep waiting. A durable wait would need the run state
+  machines that today only track browser devices; revisit if users routinely
+  take longer.
+- One account setting, *Ask before acting for you* (default on), covers sends,
+  posts, shares, invites, payments, access changes and deletes in connected
+  apps. Misty's own tools keep their current behavior.
+- The SDK provider capability system stays for now: it also carries the
+  official browser execution path. Remove it after Phase 4 retires the
+  low-level browser tools.
+
+### Phase 3 — Screens on demand
+
+- `screen.*` calls return a durable surface wait. The desktop opens the screen
+  from the account setting "Where Misty works on screen: Separate window / This
+  window / Ask each time", attaches it and resumes the run.
+- Delete the work-location dropdown, up-front window and execution-mode
+  branching, `companionBrowserIntent.ts`, and the screen-context regex (replaced
+  by an on-demand capture tool).
+
+### Phase 4 — Midscene on the desktop
+
+- Implement Midscene's `AbstractInterface` over the existing whole-window
+  capture and native input. Set `modelFamily` so grounding works.
+- Reuse the cursor companion overlay as the visible pointer; the adapter's
+  `beforeInvokeAction` moves it before each action.
+- Retire the low-level `browser.*` tools from the model's catalog.
+
+## Acceptance prompts
+
+Taken from real failed runs in October 2026. Each must complete or ask one
+useful question, never "I can't" because of a Misty-side gate.
+
+| Prompt | Expected path | Phase |
+| --- | --- | --- |
+| "find my two latest notes across spaces" | `notes_search` without a space | 1 |
+| "update the note I just read" | `notes_update` with no grounding error | 1 |
+| "tell the team the launch moved to Friday" | `messages_send` without word-overlap checks | 1 |
+| "just tell me what emails I missed" | Composio Gmail, with a connect card if needed | 2 |
+| The Google Drive request above | Notes + Composio Drive | 2 |
+| "Research GothamChess's latest uploads" | Composio search, or a screen task | 2–3 |
+| "Open example.com and tell me the heading" | Screen task in the default chat | 3 |
+| "Draw a house in Excalidraw" | Midscene with a visible cursor | 4 |

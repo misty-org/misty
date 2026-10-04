@@ -12,31 +12,65 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-func previousAIConversationExchange(turns []db.AIConversationTurnRecord, currentInvocationID string) (string, string) {
-	for index := len(turns) - 1; index >= 0; index-- {
-		turn := turns[index]
-		if turn.InvocationID == currentInvocationID || strings.TrimSpace(turn.Prompt) == "" {
-			continue
+// aiInvocationToolbox resolves one chat run's complete catalog: Misty data
+// tools, attached browser tools and the agent's connected tools. The runtime
+// context, the MCP server and every tool call use this same resolution.
+func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
+	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID}
+	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, s.aiInvocationConnectedTools(ctx, record, agentID)...)
+}
+
+// aiInvocationConnectedTools are the user's connected apps, plus an agent's
+// MCP connectors.
+func (s *SpacesService) aiInvocationConnectedTools(ctx context.Context, record *db.AIInvocationRecord, agentID string) []agenttools.Registration {
+	registrations := s.appsToolRegistrations()
+	if agentID == "" {
+		return registrations
+	}
+	run := &db.SpaceRun{ID: record.ID, OwnerUserID: record.UserID, RequestingMemberID: record.UserID, AgentID: agentID}
+	mcpHandler := func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
+		return s.executeMCPAgentTool(toolCtx, run, tool, false, "space_conversation")
+	}
+	registrations, _ = s.appendPersonalAgentMCPTools(ctx, record.UserID, agentID, registrations, nil, mcpHandler)
+	return registrations
+}
+
+func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt string, connected ...agenttools.Registration) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
+	browserTabs, browserCapabilities := aiInvocationBrowserGrants(ctx, database, actor.userID, actor.runID)
+	options := agentToolboxOptions{
+		accountLevel: actor.spaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities, extra: connected,
+	}
+	if actor.agentID == "" {
+		options.delegation = func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
+			var input struct {
+				Prompt string `json:"prompt"`
+			}
+			if json.Unmarshal(request.Arguments, &input) != nil || strings.TrimSpace(input.Prompt) == "" {
+				return nil, db.ErrSpaceInvalid
+			}
+			identity, err := database.EnsureAskIdentity(ctx, actor.userID, serveragent.InitialSelectedModelID)
+			if err != nil {
+				return nil, err
+			}
+			child, err := database.CreateCreatorAgentRun(ctx, actor.userID, actor.spaceID, identity.ID, db.CreatorAgentRunInput{Instruction: input.Prompt, Mode: "auto", ParentInvocationID: actor.runID, AIConversationID: actor.sessionID})
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(map[string]any{"run_id": child.ID, "state": child.State, "worker": "background"})
 		}
-		reply := firstAIText(turn.Reply, turn.Failure, turn.AgentError, turn.Status)
-		return strings.TrimSpace(turn.Prompt), strings.TrimSpace(reply)
 	}
-	return "", ""
-}
-
-func aiInvocationRequestedSpaceTools(prompt, previousUserPrompt, previousAgentReply string) []string {
-	requested := []string{
-		toolboxAgentsDelegate, toolboxContextGet, toolboxMembersList, toolboxMembersResolve,
-		toolboxMessagesSearch, toolboxLibrarySearch, toolboxLibraryRead,
-		toolboxTasksQuery, "calendar.query", toolboxNotesSearch, toolboxNotesRead,
-		toolboxDrawingsList, toolboxDrawingsRead, toolboxRoadmapsQuery, toolboxRoadmapsRead,
+	toolbox := buildAgentToolbox(database, options)
+	names := make([]string, 0, len(toolbox.Descriptors()))
+	for _, descriptor := range toolbox.Descriptors() {
+		names = append(names, descriptor.Name)
 	}
-	requested = append(requested, TestingCompileAgentIntentWithContinuation(prompt, previousUserPrompt, previousAgentReply)...)
-	return uniqueAgentToolNames(requested)
-}
-
-func TestingAIInvocationRequestedSpaceTools(prompt, previousUserPrompt, previousAgentReply string) []string {
-	return aiInvocationRequestedSpaceTools(prompt, previousUserPrompt, previousAgentReply)
+	invocation := agenttools.Invocation{
+		UserID: actor.userID, SpaceID: actor.spaceID, AgentID: actor.agentID,
+		RunID: actor.runID, SessionID: actor.sessionID, Source: "space_conversation",
+		Trigger: "message", OriginalInput: prompt, ConversationScopeKind: db.ConversationScopeEveryone,
+	}
+	manifest, err := toolbox.Resolve(ctx, invocation, names, authorizeSpaceAgentTool(database))
+	return toolbox, invocation, manifest, err
 }
 
 func TestingResolveAIInvocationSpaceToolNames(ctx context.Context, database *db.Database, userID, spaceID, invocationID, prompt string) ([]string, error) {
@@ -45,7 +79,7 @@ func TestingResolveAIInvocationSpaceToolNames(ctx context.Context, database *db.
 	}
 	_, _, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, spaceConversationToolActor{
 		userID: userID, spaceID: spaceID, runID: invocationID,
-	}, prompt, "", "")
+	}, prompt)
 	return manifestToolNames(manifest), err
 }
 
@@ -55,7 +89,7 @@ func TestingResolveAIInvocationSpaceToolNamesWithConversation(ctx context.Contex
 	}
 	_, _, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, spaceConversationToolActor{
 		userID: userID, spaceID: spaceID, runID: invocationID, sessionID: conversationID,
-	}, prompt, "", "")
+	}, prompt)
 	return manifestToolNames(manifest), err
 }
 
@@ -69,7 +103,7 @@ func TestingExecuteAIInvocationSpaceToolWithConversation(ctx context.Context, da
 	}
 	toolbox, invocation, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, spaceConversationToolActor{
 		userID: userID, spaceID: spaceID, runID: invocationID, sessionID: conversationID,
-	}, prompt, "", "")
+	}, prompt)
 	if err != nil {
 		return nil, err
 	}
@@ -79,63 +113,6 @@ func TestingExecuteAIInvocationSpaceToolWithConversation(ctx context.Context, da
 	return executeSpaceAgentToolbox(ctx, toolbox, invocation, database, serveragent.ToolRequest{
 		ID: "testing-" + name, Name: name, Arguments: arguments,
 	})
-}
-
-func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt, previousUserPrompt, previousAgentReply string) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
-	requested := aiInvocationRequestedSpaceTools(prompt, previousUserPrompt, previousAgentReply)
-	if actor.agentID == "" && database != nil && strings.TrimSpace(actor.sessionID) != "" {
-		_, _, action, actionErr := resolveAgentConversationAction(ctx, database, actor.userID, actor.sessionID, actor.spaceID, prompt)
-		if actionErr != nil {
-			return nil, agenttools.Invocation{}, serveragent.ToolManifest{}, actionErr
-		}
-		if action.Status == "planned" && action.Intent != "" {
-			requested = append(requested, action.Intent)
-		}
-	}
-	browserTabs, browserCapabilities := aiInvocationBrowserGrants(ctx, database, actor.userID, actor.runID)
-	delegation := func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
-		var input struct {
-			Prompt string `json:"prompt"`
-		}
-		if json.Unmarshal(request.Arguments, &input) != nil || strings.TrimSpace(input.Prompt) == "" {
-			return nil, db.ErrSpaceInvalid
-		}
-		identity, err := database.EnsureAskIdentity(ctx, actor.userID, serveragent.InitialSelectedModelID)
-		if err != nil {
-			return nil, err
-		}
-		child, err := database.CreateCreatorAgentRun(ctx, actor.userID, actor.spaceID, identity.ID, db.CreatorAgentRunInput{Instruction: input.Prompt, Mode: "auto", ParentInvocationID: actor.runID, AIConversationID: actor.sessionID})
-		if err != nil {
-			return nil, err
-		}
-		return json.Marshal(map[string]any{"run_id": child.ID, "state": child.State, "worker": "background"})
-	}
-	toolbox := spaceAgentToolboxWithBrowser(database, browserTabs, browserCapabilities, delegation)
-	for _, descriptor := range browserToolDescriptors() {
-		if browserCapabilities[descriptor.Name] {
-			requested = append(requested, descriptor.Name)
-		}
-	}
-	{
-		// Every owned tool is discoverable; the model chooses actions from the task.
-		requested = []string{}
-		for _, descriptor := range toolbox.Descriptors() {
-			requested = append(requested, descriptor.Name)
-		}
-	}
-	requested = uniqueAgentToolNames(requested)
-	explicit := make(map[string]bool, len(requested))
-	for _, name := range requested {
-		explicit[name] = true
-	}
-	invocation := agenttools.Invocation{
-		UserID: actor.userID, SpaceID: actor.spaceID, AgentID: actor.agentID,
-		RunID: actor.runID, SessionID: actor.sessionID, Source: "space_conversation",
-		Trigger: "message", OriginalInput: prompt, ExplicitTools: explicit,
-		ConversationScopeKind: db.ConversationScopeEveryone,
-	}
-	manifest, err := toolbox.Resolve(ctx, invocation, requested, authorizeSpaceAgentTool(database))
-	return toolbox, invocation, manifest, err
 }
 
 func aiInvocationBrowserGrants(ctx context.Context, database *db.Database, userID, invocationID string) ([]string, map[string]bool) {

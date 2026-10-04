@@ -32,6 +32,7 @@ type Session struct {
 	ID                    string
 	UserID                string
 	BillingUserID         string
+	BillingTurnSequence   int64 `json:"billingTurnSequence"`
 	BillingScope          string
 	ModelID               string
 	ReasoningEffort       string

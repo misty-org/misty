@@ -1,4 +1,5 @@
-import { aiSurfaceApi } from "@/features/ai-surface/api";
+import { MistyContextBar } from "@/features/misty/MistyContextBar";
+import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
@@ -7,14 +8,18 @@ import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, IconButton, Spinner } from "@/shared/ui";
 import { Mic, Square, X } from "lucide-react";
-import { useEffect, useRef, useState, useImperativeHandle, type Ref, type ReactNode } from "react";
+import { useEffect, useRef, useImperativeHandle, type Ref, type ReactNode } from "react";
 import { useCompanionState } from "../companion/companionState";
 import { AgentConversationView } from "./AgentConversationView";
+import { AgentWorkLocation } from "../workspace/AgentWorkLocation";
+import { AgentUsageControl } from "../workspace/AgentUsageControl";
 export type AgentVoiceControl = { toggle(): void };
 export function AgentWorkspaceConversation({
   agent,
   conversationId,
   emptyContent,
+  initialDraft = "",
+  showWorkLocation = false,
   spaceId: _legacySpaceId,
   accountId,
   onCreate,
@@ -25,6 +30,8 @@ export function AgentWorkspaceConversation({
   agent?: AgentProfile;
   conversationId?: string;
   emptyContent?: ReactNode;
+  initialDraft?: string;
+  showWorkLocation?: boolean;
   spaceId: string;
   accountId: string;
   onCreate: () => void;
@@ -34,7 +41,15 @@ export function AgentWorkspaceConversation({
 }) {
   const spaceId = "";
   const state = useMistyStore();
-  const [draft, setDraft] = useState("");
+  const draft = state.query;
+  const setDraft = (value: string | ((previous: string) => string)) => {
+    const store = useMistyStore.getState();
+    store.setQuery(typeof value === "function" ? value(store.query) : value);
+  };
+  useEffect(() => {
+    if (initialDraft && !useMistyStore.getState().query)
+      useMistyStore.getState().setQuery(initialDraft);
+  }, [initialDraft]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scoped = state.conversations.filter(
@@ -48,6 +63,7 @@ export function AgentWorkspaceConversation({
   const companion = useCompanionState((s) => s.presentation);
   const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
   const voice = useAiVoiceRecorder({
+    contextKey: `${accountId}:${agent?.id}:${conversation?.id ?? ""}`,
     onTranscript: (text) => {
       setDraft((previous) => (previous ? `${previous} ${text}` : text));
       textareaRef.current?.focus();
@@ -88,11 +104,12 @@ export function AgentWorkspaceConversation({
       selectedAgentId: agent?.id,
       selectedSpaceId: spaceId,
       activeConversationId: conversation?.id ?? "",
-      handoff: undefined,
-      browserRequest: undefined,
-      context: [],
+      ...(useMistyStore.getState().handoff?.surfaceId === "files"
+        ? {}
+        : { handoff: undefined, browserRequest: undefined, context: [] }),
     });
   const attachments = useGlobalMistyAttachments({
+    sharedAccountId: accountId,
     mode: "ask",
     activeConversationId: conversation?.id ?? "",
     newConversation: async () => {
@@ -121,15 +138,22 @@ export function AgentWorkspaceConversation({
   }, [hasDraft, composingBusy, onDraftStateChange]);
   const send = async (prompt = draft) => {
     if (
-      state.working ||
       !agent?.enabled ||
       attachments.attachments.some((a) => a.state !== "ready") ||
       (!prompt.trim() && !attachments.attachments.length)
     )
       return;
+    if (state.working) {
+      try {
+        await useMistyStore.getState().steerResponse?.(prompt, conversation?.id);
+      } catch (error) {
+        reportError(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
     prepare();
     try {
-      if (isDesktop) {
+      if (isDesktop && useMistyStore.getState().handoff?.surfaceId !== "files") {
         const submit = useCompanionState.getState().submit;
         if (!submit) throw new Error("The companion is starting. Try again in a moment.");
         await submit({
@@ -160,7 +184,11 @@ export function AgentWorkspaceConversation({
     }
   };
   return (
-    <section className="agent-conversation" aria-label={`${agent?.name || "Misty"} conversation`}>
+    <section
+      className="agent-conversation"
+      data-empty={!conversation?.messages.length}
+      aria-label={`${agent?.name || "Misty"} conversation`}
+    >
       <div className="agent-conversation-scroll" ref={scrollRef}>
         {conversation?.messages.length ? (
           <AgentConversationView
@@ -185,6 +213,11 @@ export function AgentWorkspaceConversation({
         {state.error && (
           <div role="alert" className="agent-compose-error">
             <p>{state.error}</p>
+            {state.working && state.invocationId && (
+              <Button variant="ghost" size="sm" onClick={() => void state.loadConversations(true)}>
+                Reconnect to task
+              </Button>
+            )}
             <IconButton label="Dismiss error" onClick={() => reportError("")}>
               <X size={16} />
             </IconButton>
@@ -195,7 +228,22 @@ export function AgentWorkspaceConversation({
             This agent is disabled. Enable it in Settings to start a conversation.
           </p>
         )}
+        <MistyContextBar />
+        {showWorkLocation && agent ? (
+          <AgentWorkLocation>
+            <MistyFolderWork accountId={accountId} disabled={state.working} />
+            <AgentUsageControl
+              draft={draft}
+              model={conversation?.modelId}
+              working={state.working}
+            />
+          </AgentWorkLocation>
+        ) : (
+          <MistyFolderWork accountId={accountId} disabled={state.working} />
+        )}
         <MistyComposer
+          hideUsageEstimate={showWorkLocation && Boolean(agent)}
+          modelId={conversation?.modelId}
           layout="conversation"
           value={draft}
           onChange={setDraft}
@@ -215,7 +263,7 @@ export function AgentWorkspaceConversation({
           }}
           placeholder={`Message ${agent?.name || "Misty"}…`}
           disabled={!agent?.enabled || !accountId}
-          busy={state.working}
+          busy={state.working && !draft.trim()}
           voiceControl={
             <IconButton
               label={voice.recording ? "Stop recording" : "Start voice input"}
@@ -242,10 +290,10 @@ export function AgentWorkspaceConversation({
               <IconButton
                 label="Stop response"
                 onClick={() => {
-                  if (state.invocationId)
-                    void aiSurfaceApi
-                      .cancelInvocation(state.invocationId)
-                      .catch((e) => reportError(String(e)));
+                  void useMistyStore
+                    .getState()
+                    .cancelResponse?.()
+                    .catch((e) => reportError(String(e)));
                 }}
               >
                 <Square size={16} />

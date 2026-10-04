@@ -8,6 +8,11 @@ import type { SpaceStorageUsage, StorageQuotaDimension } from "./library";
 export interface AgentUsage {
   /** 0–100. The server sends a percentage, not a ratio. */
   percentage_used: number;
+  unit?: "weighted_tokens" | "microusd";
+  used?: number;
+  reserved?: number;
+  limit?: number;
+  remaining?: number;
   available: boolean;
   paused: boolean;
   /** When the weekly allowance renews. */
@@ -15,11 +20,17 @@ export interface AgentUsage {
   plan?: string;
 }
 
-/** A customer-facing usage meter. Values are intentionally unit-agnostic. */
+/** Weekly account weighted-token meter. Legacy servers may omit the accounting unit. */
 export interface AiQuotaUsage {
+  percentage_used?: number;
+  default_command_limit?: number;
+  background_command_limit?: number;
+  policy_version?: string;
+  unit?: "weighted_tokens" | "microusd";
   used: number;
   reserved: number;
   limit: number;
+  /** Available weighted tokens after in-flight reservations. */
   remaining: number;
   /** 0–1. */
   used_ratio: number;
@@ -49,7 +60,23 @@ export interface BillingSpaceUsage {
   storage?: SpaceStorageUsage;
 }
 
+export interface TransferQuotaUsage {
+  used: number;
+  reserved: number;
+  limit: number;
+  remaining: number;
+  percentage_used: number;
+  reset_at?: string;
+  policy_version?: string;
+}
+
 export interface BillingUsage {
+  account?: {
+    ai?: AiQuotaUsage;
+    cloud_storage?: StorageQuotaDimension;
+    storage?: StorageQuotaDimension;
+    sync?: TransferQuotaUsage;
+  };
   plan?: string;
   entitlements?: BillingEntitlements;
   personal?: {

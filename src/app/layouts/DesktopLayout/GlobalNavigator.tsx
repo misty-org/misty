@@ -4,9 +4,9 @@ import { cn, OverlaySideProvider, inwardSide } from "@/shared/ui";
 import {
   NavigatorHeaderHomeButton,
   NavigatorHeaderAgentsButton,
-  NavigatorHeaderFilesButton,
   NavigatorHeaderSearchButton,
   NavigatorHomeLink,
+  NavigatorExtensionsLink,
 } from "./NavigatorUtilityIsland";
 import { useLocation } from "react-router-dom";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
@@ -14,6 +14,8 @@ import { WorkspaceSpaceNavigation } from "@/features/spaces";
 import { ActivityMenu } from "./ActivityMenu";
 import mistyLogo from "@/assets/branding/misty-white.png";
 import { useRef } from "react";
+import { NavigatorFiles } from "./NavigatorFiles";
+import { NavigatorDestinations } from "./NavigatorDestinations";
 import { NavigatorEdgeMarkers } from "./NavigatorEdgeMarkers";
 import { navigatorHeaderRowClass, navigatorHierarchyActionClass } from "./styles";
 
@@ -81,24 +83,45 @@ export function GlobalNavigator(props: {
         >
           {/* No visible scrollbar: a classic one appearing as the Space stack
               grows would narrow the rail and shift every centered icon. */}
-          <div
-            className={cn(
-              "misty-navigator-items grid content-start gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-2",
-              "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            )}
-          >
-            <NavigatorHomeLink active={onHome} />
-            <NavigatorHeaderHomeButton
-              path="/browser"
-              active={activeTab?.surfaceId === "browser"}
-            />
-            <NavigatorHeaderAgentsButton
-              path="/agents"
-              active={activeTab?.surfaceId === "agents" || activeTab?.surfaceId === "scheduled"}
-            />
-            <NavigatorHeaderFilesButton path="/files" active={activeTab?.surfaceId === "files"} />
-            <WorkspaceSpaceNavigation activeTab={activeTab} />
-          </div>
+          <NavigatorDestinations
+            position={props.position ?? "left"}
+            items={[
+              { value: "home", label: "Home", content: <NavigatorHomeLink active={onHome} /> },
+              {
+                value: "browser",
+                label: "Browser",
+                content: (
+                  <NavigatorHeaderHomeButton
+                    path="/browser"
+                    active={activeTab?.surfaceId === "browser"}
+                  />
+                ),
+              },
+              {
+                value: "agents",
+                label: "Agents",
+                content: (
+                  <NavigatorHeaderAgentsButton
+                    path="/agents"
+                    active={
+                      activeTab?.surfaceId === "agents" || activeTab?.surfaceId === "scheduled"
+                    }
+                  />
+                ),
+              },
+              { value: "files", label: "Files", content: <NavigatorFiles activeTab={activeTab} /> },
+              {
+                value: "extensions",
+                label: "Extensions",
+                content: <NavigatorExtensionsLink active={activeTab?.surfaceId === "extensions"} />,
+              },
+              {
+                value: "spaces",
+                label: "Spaces",
+                content: <WorkspaceSpaceNavigation activeTab={activeTab} />,
+              },
+            ]}
+          />
         </div>
         <NavigatorProfileBar
           utilityControls={

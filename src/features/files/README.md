@@ -2,7 +2,7 @@
 
 This directory contains Misty's built-in file browser, previews, file operations, including colocated tests. Its component entry and workspace code compile into Misty; they have no separate installation or update lifecycle.
 
-Each Files tab shows one file pane, with optional navigation and preview sidebars.
+Each Files tab shows one file pane, with optional navigation and preview sidebars. Transfers opens from the expandable Files group in the global navigator and uses the same collection page, search, section controls, and table as Spaces. Transfers occupies the full content pane without the folder sidebar, preview panel, or their bottom-bar toggles. History is searched and filtered before pagination; active operations refresh while the page is visible. The page supports native pause, resume, cancel, retry, undo, and the existing file-conflict dialog where available. Local copies report bytes and speed, including nested directories and moves across volumes. Pausing a local copy cancels its partial destination; resuming restarts that file. Pausing the queue only stops new operations from starting.
 
 Files supports local disks, OS-mounted network shares (such as SMB/NFS), and paired devices reached directly over the LAN. It has no cloud storage provider setup, OAuth flow, cloud API adapter, rclone process, internet relay, or public peer discovery. Pairing and device permissions still apply to LAN access. Retired provider locations are excluded from saved shortcuts and migrated to the local home folder when restored.
 

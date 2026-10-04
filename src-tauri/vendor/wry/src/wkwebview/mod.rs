@@ -5,7 +5,7 @@
 pub(crate) mod download;
 #[cfg(target_os = "macos")]
 mod drag_drop;
-mod navigation;
+pub(crate) mod navigation;
 #[cfg(feature = "mac-proxy")]
 mod proxy;
 #[cfg(target_os = "macos")]
@@ -1353,23 +1353,8 @@ r#"Object.defineProperty(window, 'ipc', {
   }
 }
 
-pub fn url_from_webview(webview: &WKWebView) -> Result<String> {
-  let url_obj = unsafe { webview.URL().unwrap() };
-  let absolute_url = url_obj.absoluteString().unwrap();
-
-  let bytes = {
-    let bytes: *const c_char = absolute_url.UTF8String();
-    bytes as *const u8
-  };
-
-  // 4 represents utf8 encoding
-  let len = absolute_url.lengthOfBytesUsingEncoding(4);
-  let bytes = unsafe { std::slice::from_raw_parts(bytes, len) };
-
-  std::str::from_utf8(bytes)
-    .map(Into::into)
-    .map_err(Into::into)
-}
+mod current_url;
+pub(crate) use current_url::url_from_webview;
 
 pub fn platform_webview_version() -> Result<String> {
   unsafe {
@@ -1491,6 +1476,12 @@ fn private_data_store(mtm: MainThreadMarker) -> Retained<WKWebsiteDataStore> {
       .get_or_insert_with(|| unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) })
       .clone()
   })
+}
+
+/// Shares the existing private session with a caller-supplied configuration.
+/// Used when attaching a native extension controller before view creation.
+pub fn extension_private_data_store(mtm: MainThreadMarker) -> Retained<WKWebsiteDataStore> {
+  private_data_store(mtm)
 }
 
 /// Ends the shared private session: the next private webview starts with no

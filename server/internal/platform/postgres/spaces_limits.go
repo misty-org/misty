@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	MaxSpaceNodes        = 5000
-	MaxMessageChars      = 4000
-	MaxMessageFiles      = 5
+	MaxSpaceNodes   = 5000
+	MaxMessageChars = 4000
+	MaxMessageFiles = 5
+	// Per-object processing bound, independent of any account or Space allowance.
 	MaxSpaceStorageBytes = int64(1_000_000_000)
 )
 

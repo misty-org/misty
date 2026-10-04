@@ -40,14 +40,15 @@ export function MessageHoverActions({ canWrite = true, ...props }: MessageHoverA
     ? "opacity-100"
     : [
         "pointer-events-none opacity-0",
-        "group-hover:pointer-events-auto group-hover:opacity-100",
-        "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+        "group-hover/chat-message:pointer-events-auto group-hover/chat-message:opacity-100",
+        "group-focus-within/chat-message:pointer-events-auto group-focus-within/chat-message:opacity-100",
       ].join(" ");
   return (
     <div
       className={[
-        "absolute right-2 -top-3 z-10 flex flex-nowrap items-center gap-0.5 rounded-md",
-        "border border-charcoal-border bg-charcoal-bg p-0.5 shadow-sm transition-opacity",
+        // Stay inside the row so revealing actions cannot steal hover from its neighbor.
+        "absolute right-2 top-0 z-10 flex flex-nowrap items-center gap-0.5 rounded-md",
+        "border border-charcoal-border bg-charcoal-bg p-0.5 shadow-sm",
         visibility,
       ].join(" ")}
     >

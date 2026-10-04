@@ -314,3 +314,65 @@ async fn cancellable_delete_removes_nested_directory() {
 
     let _ = tokio::fs::remove_dir_all(&root).await;
 }
+
+#[tokio::test]
+async fn local_copy_reports_exact_bytes_across_nested_files() {
+    let root = unique_test_dir("transfer-progress");
+    let service = test_explorer_service_for_home(root.join("home"));
+    let source = root.join("source");
+    let destination = root.join("destination");
+    tokio::fs::create_dir_all(source.join("nested"))
+        .await
+        .unwrap();
+    tokio::fs::write(source.join("one"), vec![1u8; 1_100_000])
+        .await
+        .unwrap();
+    tokio::fs::write(source.join("nested/two"), vec![2u8; 20])
+        .await
+        .unwrap();
+    let id = service
+        .transfers
+        .start_transfer(FileTransferRecord::new(
+            FileTransferType::Copy,
+            FileTransferItemType::Local,
+            "source",
+        ))
+        .await
+        .unwrap();
+    let mut progress =
+        transfer_progress::LocalTransferProgress::new(service.transfers.clone(), id, 1_100_020);
+    copy_local_path_with_progress(
+        &source,
+        &destination,
+        &AtomicBool::new(false),
+        Some(&mut progress),
+    )
+    .await
+    .unwrap();
+    progress.flush().await;
+    let row = service.transfers.transfer_by_id(id).await.unwrap();
+    assert_eq!(row.transferred_bytes, 1_100_020);
+    assert_eq!(row.total_bytes, 1_100_020);
+    assert!(row.bytes_per_second > 0);
+    assert_eq!(
+        tokio::fs::read(destination.join("nested/two"))
+            .await
+            .unwrap(),
+        vec![2u8; 20]
+    );
+    service
+        .transfers
+        .reset_local_progress(id, 1_100_020)
+        .await
+        .unwrap();
+    assert_eq!(
+        service
+            .transfers
+            .transfer_by_id(id)
+            .await
+            .unwrap()
+            .transferred_bytes,
+        0
+    );
+    let _ = tokio::fs::remove_dir_all(root).await;
+}

@@ -3,6 +3,7 @@ import type { AgentProfile } from "@/shared/schemas";
 import { Button, IconButton, Input } from "@/shared/ui";
 import { CalendarClock, MessageSquare, Plus, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { AgentConversationActions } from "./AgentConversationActions";
 import { AgentAvatar } from "./AgentAvatar";
 
 export function AgentWorkspaceRoster(props: {
@@ -181,28 +182,30 @@ export function AgentHistory(props: {
         const updated = new Date(chat.updatedAt);
         const validDate = Number.isFinite(updated.getTime());
         return (
-          <Button
-            key={chat.id}
-            variant="ghost"
-            justify="start"
-            className="agent-history-row"
-            aria-current={props.activeId === chat.id ? "true" : undefined}
-            aria-pressed={props.activeId === chat.id}
-            disabled={props.disabled}
-            onClick={() => props.onSelect(chat.id)}
-          >
-            <span className="agent-history-copy">
-              <span>
-                <strong>{chat.title || "Untitled conversation"}</strong>
-                {validDate && (
-                  <time dateTime={updated.toISOString()}>
-                    {updated.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </time>
-                )}
+          <div key={chat.id} className="flex min-w-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              justify="start"
+              className="agent-history-row min-w-0 flex-1"
+              aria-current={props.activeId === chat.id ? "true" : undefined}
+              aria-pressed={props.activeId === chat.id}
+              disabled={props.disabled}
+              onClick={() => props.onSelect(chat.id)}
+            >
+              <span className="agent-history-copy">
+                <span>
+                  <strong>{chat.title || "Untitled conversation"}</strong>
+                  {validDate && (
+                    <time dateTime={updated.toISOString()}>
+                      {updated.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </time>
+                  )}
+                </span>
+                {preview && <small>{preview}</small>}
               </span>
-              {preview && <small>{preview}</small>}
-            </span>
-          </Button>
+            </Button>
+            <AgentConversationActions conversation={chat} disabled={props.disabled} />
+          </div>
         );
       })}
       {!chats.length && (

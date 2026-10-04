@@ -17,6 +17,9 @@ pub use crate::domain::file_transfer::{
 use crate::error::{ApiError, ApiResult};
 use crate::infra::environment::AppEnvironmentService;
 
+mod history;
+use history::load_page;
+
 #[derive(Debug, Clone)]
 pub struct TransferService {
     db_path: PathBuf,
@@ -26,6 +29,7 @@ pub struct TransferService {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferFilter {
+    pub section: Option<String>,
     pub search: Option<String>,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
@@ -129,6 +133,16 @@ impl TransferService {
 
     pub async fn mark_started(&self, id: u64) -> ApiResult<()> {
         self.mutate(id, |record| record.mark_started()).await
+    }
+
+    /// Local retries restart their copy, so progress must restart with them.
+    pub async fn reset_local_progress(&self, id: u64, total: i64) -> ApiResult<()> {
+        self.mutate(id, move |record| {
+            record.transferred_bytes = 0;
+            record.total_bytes = total;
+            record.bytes_per_second = 0;
+        })
+        .await
     }
 
     pub async fn update_progress(
@@ -349,67 +363,6 @@ fn maybe_mark_undoable(record: &mut TransferRecord) {
     };
     record.undoable = supported;
     record.undo_token_id = if supported { record.id } else { 0 };
-}
-
-fn load_page(db_path: &Path, filter: TransferFilter) -> ApiResult<TransferPage> {
-    let conn = open_db(db_path)?;
-    let search = filter.search.unwrap_or_default().trim().to_owned();
-    let where_sql = transfer_search_where(&search);
-    let total_count = count_rows(&conn, where_sql, &search)?;
-    let offset = filter.offset.unwrap_or_default().min(total_count);
-    let limit = filter.limit.unwrap_or(50).clamp(1, 5_000);
-
-    let mut sql = String::from("SELECT ");
-    sql.push_str(transfer_select_columns());
-    sql.push_str(" FROM transfers ");
-    sql.push_str(where_sql);
-    sql.push_str(transfer_page_order_sql());
-    sql.push_str(" LIMIT ? OFFSET ?");
-
-    let rows = if search.is_empty() {
-        let mut stmt = conn.prepare(&sql).map_err(sql_error)?;
-        let mapped = stmt
-            .query_map(params![limit as i64, offset as i64], read_record)
-            .map_err(sql_error)?;
-        collect_rows(mapped)?
-    } else {
-        let pattern = format!("%{search}%");
-        let mut values = vec![pattern.as_str(); 12];
-        let limit_text = limit.to_string();
-        let offset_text = offset.to_string();
-        values.push(limit_text.as_str());
-        values.push(offset_text.as_str());
-        let mut stmt = conn.prepare(&sql).map_err(sql_error)?;
-        let mapped = stmt
-            .query_map(rusqlite::params_from_iter(values), read_record)
-            .map_err(sql_error)?;
-        collect_rows(mapped)?
-    };
-
-    Ok(TransferPage {
-        rows,
-        total_count,
-        db_path: db_path.display().to_string(),
-    })
-}
-
-fn count_rows(conn: &Connection, where_sql: &str, search: &str) -> ApiResult<usize> {
-    let sql = format!("SELECT COUNT(*) FROM transfers {where_sql}");
-    if search.is_empty() {
-        let count = conn
-            .query_row(&sql, [], |row| row.get::<_, i64>(0))
-            .map_err(sql_error)?;
-        return Ok(count.max(0) as usize);
-    }
-
-    let pattern = format!("%{search}%");
-    let values = vec![pattern.as_str(); 12];
-    let count = conn
-        .query_row(&sql, rusqlite::params_from_iter(values), |row| {
-            row.get::<_, i64>(0)
-        })
-        .map_err(sql_error)?;
-    Ok(count.max(0) as usize)
 }
 
 fn create_transfer(
@@ -1219,6 +1172,51 @@ mod tests {
             },
             root,
         )
+    }
+
+    #[tokio::test]
+    async fn transfer_sections_filter_before_pagination_and_count() {
+        let (service, root) = test_service("section-filter");
+        for (name, status) in [
+            ("active.txt", TransferStatus::InProgress),
+            ("done.txt", TransferStatus::Completed),
+            ("failed.txt", TransferStatus::Failed),
+            ("interrupted.txt", TransferStatus::Interrupted),
+        ] {
+            let mut record = TransferRecord::new(TransferType::Copy, TransferItemType::Local, name);
+            record.status = status;
+            service.create_transfer(record).await.unwrap();
+        }
+        let failed = service
+            .snapshot(TransferFilter {
+                section: Some("failed".into()),
+                limit: Some(1),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(failed.total_count, 2);
+        assert_eq!(failed.rows.len(), 1);
+        let active = service
+            .snapshot(TransferFilter {
+                section: Some("active".into()),
+                search: Some("active".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(active.total_count, 1);
+        assert_eq!(active.rows[0].file_name, "active.txt");
+        let completed = service
+            .snapshot(TransferFilter {
+                section: Some("completed".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(completed.total_count, 1);
+        assert_eq!(completed.rows[0].status, TransferStatus::Completed);
+        let _ = fs::remove_dir_all(root);
     }
 
     #[tokio::test]

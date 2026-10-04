@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,17 +19,25 @@ import (
 )
 
 type fixtureVoiceProvider struct {
-	events chan agent.VoiceRealtimeEvent
-	sent   chan map[string]any
-	done   chan struct{}
-	once   sync.Once
-	rtc    bool
+	events        chan agent.VoiceRealtimeEvent
+	sent          chan map[string]any
+	done          chan struct{}
+	once          sync.Once
+	rtc           bool
+	limitOverride int
 }
 
 func (p *fixtureVoiceProvider) WebRTC() bool { return p.rtc }
 
 func (p *fixtureVoiceProvider) Configure() error { return nil }
-func (p *fixtureVoiceProvider) Close()           { p.once.Do(func() { close(p.done) }) }
+func (p *fixtureVoiceProvider) SetOutputLimit(tokens int) error {
+	if p.limitOverride != 0 {
+		tokens = p.limitOverride
+	}
+	p.events <- agent.VoiceRealtimeEvent{Type: "session-updated", Raw: json.RawMessage(fmt.Sprintf(`{"session":{"max_output_tokens":%d,"audio":{"input":{"turn_detection":null}}}}`, tokens))}
+	return nil
+}
+func (p *fixtureVoiceProvider) Close() { p.once.Do(func() { close(p.done) }) }
 func (p *fixtureVoiceProvider) Read() (agent.VoiceRealtimeEvent, error) {
 	select {
 	case event := <-p.events:
@@ -59,6 +68,11 @@ type voiceFixture struct {
 
 func newVoiceFixture(t *testing.T, rtc ...bool) *voiceFixture {
 	t.Helper()
+	return newVoiceFixtureHooks(t, nil, rtc...)
+}
+
+func newVoiceFixtureHooks(t *testing.T, customize func(*voiceSessionHooks, *fixtureVoiceProvider), rtc ...bool) *voiceFixture {
+	t.Helper()
 	f := &voiceFixture{provider: &fixtureVoiceProvider{events: make(chan agent.VoiceRealtimeEvent, 16), sent: make(chan map[string]any, 16), done: make(chan struct{}), rtc: len(rtc) > 0 && rtc[0]}, settled: make(chan voiceSettlement, 1), states: make(chan string, 16), finished: make(chan struct{})}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		up := websocket.Upgrader{}
@@ -69,7 +83,7 @@ func newVoiceFixture(t *testing.T, rtc ...bool) *voiceFixture {
 		defer conn.Close()
 		defer f.provider.Close()
 		defer close(f.finished)
-		runVoiceSession(r.Context(), conn, f.provider, voiceSessionHooks{
+		hooks := voiceSessionHooks{
 			OperationID: "fixture", Access: func(context.Context) error { return nil },
 			Reply: func(_ context.Context, id string) (string, error) {
 				if id != "owned-completed" {
@@ -84,7 +98,11 @@ func newVoiceFixture(t *testing.T, rtc ...bool) *voiceFixture {
 				f.settled <- voiceSettlement{action, copied}
 				return nil
 			},
-		})
+		}
+		if customize != nil {
+			customize(&hooks, f.provider)
+		}
+		runVoiceSession(r.Context(), conn, f.provider, hooks)
 	}))
 	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
 	if err != nil {

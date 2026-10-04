@@ -17,6 +17,23 @@ export interface ToolExecutionContinuation {
   intervention?(attempt: number): Promise<boolean>;
 }
 
+/** Misty reported this call as failed without effect: it rejected the call
+ * before execution or recorded a definite failure. Unknown write outcomes
+ * arrive as an `uncertain` result instead, never as this error. */
+export class ToolRejectedError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(`${code}: ${message}`);
+    this.name = "ToolRejectedError";
+  }
+}
+
+// Transport anomalies where the call may have run despite the failure.
+const unverifiedFailureCodes = new Set(["invalid_tool_outcome", "missing_tool_result"]);
+
+export function rejectedWithoutEffect(error: unknown): boolean {
+  return error instanceof ToolRejectedError && !unverifiedFailureCodes.has(error.code);
+}
+
 /** Engine-independent outcomes for the authoritative transport response. */
 export type HarnessToolOutcome =
   | { status: "success"; result: unknown }
@@ -57,7 +74,7 @@ export async function continueToolExecution(continuation: ToolExecutionContinuat
   for (let attempt = 0; attempt < 64; attempt++) {
     const outcome = normalizeToolOutcome(await continuation.request(attempt));
     switch (outcome.status) {
-      case "failure": throw new Error(`${outcome.code}: ${outcome.message}`);
+      case "failure": throw new ToolRejectedError(outcome.code, outcome.message);
       case "approval_required":
         if (!(await continuation.approval(outcome.approval, attempt))) return {denied:true,reason:"creator_denied",approval_id:outcome.approval.id};
         break;

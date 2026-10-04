@@ -51,6 +51,7 @@ export interface TransferRecord {
 }
 
 export interface TransferFilter {
+  section?: "all" | "active" | "completed" | "failed";
   search?: string;
   offset?: number;
   limit?: number;

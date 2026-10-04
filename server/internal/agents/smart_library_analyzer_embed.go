@@ -19,6 +19,8 @@ func (a *SmartLibraryAnalyzer) Embed(ctx context.Context, inputs []string) ([][]
 }
 
 func (a *SmartLibraryAnalyzer) embedGateway(ctx context.Context, values []string, content []any) ([][]float64, ModelUsage, error) {
+	configured, _, configErr := a.forRole(ctx, "embedding")
+ if configErr != nil { return nil, ModelUsage{}, configErr }; a = configured
 	if len(values) == 0 || len(values) > 100 {
 		return nil, ModelUsage{}, errors.New("invalid embedding batch")
 	}
@@ -73,6 +75,9 @@ func (a *SmartLibraryAnalyzer) embedGatewayV4(ctx context.Context, values []stri
 // embedImageV1 uses the OpenAI-compatible multimodal parts accepted by Vercel
 // AI Gateway. This exact route is covered by a live cross-modal quality probe.
 func (a *SmartLibraryAnalyzer) embedImageV1(ctx context.Context, text string, asset SmartLibraryAsset) ([]float64, ModelUsage, error) {
+	configured, _, configErr := a.forRole(ctx, "embedding")
+ if configErr != nil { return nil, ModelUsage{}, configErr }; a = configured
+ if a.callProvider != "" || strings.HasPrefix(a.embeddingModel(), "openai/text-embedding-") { return nil, ModelUsage{}, errors.New("this embedding model supports text search; use a multimodal Gateway model for visual search") }
 	input := []map[string]any{{"type": "text", "text": text}, {"type": "image_url", "image_url": map[string]any{"url": "data:" + asset.MimeType + ";base64," + base64.StdEncoding.EncodeToString(asset.Bytes)}}}
 	body := map[string]any{"model": a.embeddingModel(), "input": input, "encoding_format": "float", "dimensions": SmartLibraryEmbeddingDims}
 	var response struct {
@@ -109,6 +114,13 @@ func (a *SmartLibraryAnalyzer) analyzeWithModel(ctx context.Context, model strin
 }
 
 func (a *SmartLibraryAnalyzer) analyzeWithModelPrompt(ctx context.Context, model string, assets []SmartLibraryAsset, prompt string) ([]SmartLibraryMetadata, ModelUsage, error) {
+ return a.analyzeWithModelPromptRole(ctx, "library", model, assets, prompt)
+}
+
+func (a *SmartLibraryAnalyzer) analyzeWithModelPromptRole(ctx context.Context, role, model string, assets []SmartLibraryAsset, prompt string) ([]SmartLibraryMetadata, ModelUsage, error) {
+ configured, config, configErr := a.forRole(ctx, role)
+ if configErr != nil { return nil, ModelUsage{}, configErr }; a = configured
+ if config != nil { model = config.Model }
 	content := []map[string]any{{"type": "text", "text": prompt}}
 	for _, asset := range assets {
 		content = append(content, map[string]any{"type": "text", "text": assetPromptEnvelope(asset)})
@@ -127,6 +139,8 @@ func (a *SmartLibraryAnalyzer) analyzeWithModelPrompt(ctx context.Context, model
 		"response_format":  map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "smart_library_analysis_v2", "strict": true, "schema": smartLibrarySchema()}},
 		"max_tokens":       6400,
 	}
+	if a.callProvider == "openai" { return a.analyzeOpenAIResponses(ctx, model, body) }
+ if config != nil { delete(body, "reasoning_effort"); if a.callReasoning != "" { body["reasoning_effort"] = a.callReasoning } }
 	var response struct {
 		Choices []struct {
 			Message struct {

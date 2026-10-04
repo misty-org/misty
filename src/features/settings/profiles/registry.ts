@@ -1,6 +1,6 @@
 import definitions from "./definitions.json";
 export type SettingOwnership = "account" | "resource";
-export type SettingsPlatform = "desktop" | "web";
+export type SettingsPlatform = "desktop";
 export type PreferenceValue = string | number | boolean;
 export type PreferenceValues = Record<string, PreferenceValue>;
 export interface SettingDefinition {
@@ -39,7 +39,7 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     label: "Enable Misty",
     page: "misty",
     owner: "account",
-    platforms: ["desktop", "web"],
+    platforms: ["desktop"],
     keywords: ["AI", "copilot", "hosted"],
   },
   {
@@ -47,7 +47,7 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     label: "Conversation retention",
     page: "agents-memory",
     owner: "account",
-    platforms: ["desktop", "web"],
+    platforms: ["desktop"],
     keywords: ["history", "days", "delete"],
   },
   {
@@ -55,7 +55,7 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     label: "Remembered context",
     page: "agents-memory",
     owner: "account",
-    platforms: ["desktop", "web"],
+    platforms: ["desktop"],
     keywords: ["memory", "remember", "personal"],
   },
   {
@@ -63,7 +63,7 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     label: "Filter models",
     page: "models",
     owner: "account",
-    platforms: ["desktop", "web"],
+    platforms: ["desktop"],
     keywords: ["available", "capabilities", "provider"],
   },
 ];

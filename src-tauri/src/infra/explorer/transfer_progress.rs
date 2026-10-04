@@ -95,3 +95,43 @@ impl ExplorerService {
         Ok(())
     }
 }
+
+/// Throttles journal writes while preserving exact byte counts across a folder copy.
+pub(super) struct LocalTransferProgress {
+    service: TransferService,
+    id: u64,
+    total: i64,
+    copied: i64,
+    started: std::time::Instant,
+    last_report: std::time::Instant,
+}
+
+impl LocalTransferProgress {
+    pub(super) fn new(service: TransferService, id: u64, total: i64) -> Self {
+        let now = std::time::Instant::now();
+        Self {
+            service,
+            id,
+            total,
+            copied: 0,
+            started: now,
+            last_report: now,
+        }
+    }
+
+    pub(super) async fn advance(&mut self, bytes: usize) {
+        self.copied = self.copied.saturating_add(bytes as i64);
+        if self.last_report.elapsed() >= std::time::Duration::from_millis(200) {
+            self.flush().await;
+        }
+    }
+
+    pub(super) async fn flush(&mut self) {
+        let speed = self.copied as f64 / self.started.elapsed().as_secs_f64().max(0.001);
+        let _ = self
+            .service
+            .update_progress_with_speed(self.id, self.copied, self.total.max(self.copied), speed)
+            .await;
+        self.last_report = std::time::Instant::now();
+    }
+}

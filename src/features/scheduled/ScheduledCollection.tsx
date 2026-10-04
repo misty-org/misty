@@ -10,7 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
-  Spinner,
+  CollectionSkeleton,
+  itemTones,
 } from "@/shared/ui";
 import type { ScheduledTask } from "@/api/scheduled/api";
 import { useScheduledTasksStore } from "./useScheduledTasksStore";
@@ -50,6 +51,7 @@ export function ScheduledCollection({
       id: task.id,
       title: task.title,
       icon: <CalendarClock />,
+      tone: itemTones.schedule,
       category: !task.enabled
         ? "Paused"
         : task.state === "running"
@@ -106,7 +108,7 @@ export function ScheduledCollection({
         </div>
       )}
       {state === "loading" && !items.length ? (
-        <Spinner label="Loading scheduled tasks" />
+        <CollectionSkeleton label="Loading scheduled tasks" view={view} />
       ) : (
         <CollectionItems
           columnSetId="scheduled"

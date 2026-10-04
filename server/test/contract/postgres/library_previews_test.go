@@ -11,6 +11,7 @@ import (
 
 func TestLibraryPreviewDerivativeAuthorizationAndReuse(t *testing.T) {
 	database := openTestDatabase(t)
+	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
 	owner, _ := database.CreateUser("Preview Owner", "preview-owner@example.com", "password123")
 	outsider, _ := database.CreateUser("Preview Outsider", "preview-outsider@example.com", "password123")

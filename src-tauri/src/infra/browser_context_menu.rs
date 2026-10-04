@@ -174,7 +174,8 @@ fn menu_actions(context: &AskContext) -> Vec<String> {
 
 fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
     let key = uuid::Uuid::new_v4().to_string();
-    let actions = menu_actions(&context);
+    let mut actions = menu_actions(&context);
+    if super::super::extensions::has_extensions() { actions.extend(["separator".into(),"extensions".into()]); }
     let owner = browser_owner_label(app, &context.id);
     let window = app
         .get_window(&owner)
@@ -262,6 +263,11 @@ pub(super) fn select(
     view.set_focus().map_err(|e| e.to_string())?;
     match action {
         "dismiss" => {}
+        "extensions" => {
+            let id=context.id.clone();
+            let agent=webview.label().starts_with("misty-agent-");
+            tauri::async_runtime::spawn(async move { let _=super::super::extensions::context_menu(&id, agent).await; });
+        }
         #[cfg(debug_assertions)]
         "inspect" => view.open_devtools(),
         "ask" => {

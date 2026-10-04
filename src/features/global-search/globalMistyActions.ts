@@ -9,7 +9,8 @@ export function normalizeActionState(state: string): GlobalAiActionProposal["sta
 }
 
 export function globalMistyError(error: unknown): string {
-  return error instanceof Error ? error.message : "Misty could not complete that request.";
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return message.trim().slice(0, 600) || "Misty could not complete that request.";
 }
 
 export function globalMistyId(): string {

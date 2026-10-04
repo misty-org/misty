@@ -17,9 +17,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   IconButton,
-  Spinner,
+  CollectionSkeleton,
+  itemTones,
 } from "@/shared/ui";
 import { MessagesSquare, MoreHorizontal, Plus, CalendarClock, Clock } from "lucide-react";
+import { AgentConversationActions } from "./AgentConversationActions";
 import { AgentAvatar } from "./AgentAvatar";
 import { ScheduledCollection } from "@/features/scheduled/ScheduledCollection";
 import { useScheduledTasksStore } from "@/features/scheduled";
@@ -157,6 +159,7 @@ export function AgentCollection({
             agentId: undefined,
             title: c.title || "Untitled conversation",
             icon: <MessagesSquare />,
+            tone: itemTones.chat,
             category: agent.name,
             metadata: {
               Agent: agent.name,
@@ -182,6 +185,7 @@ export function AgentCollection({
       agentId: undefined,
       title: entry.title || "Agent task",
       icon: <Clock />,
+      tone: itemTones.activity,
       category: "Activity",
       metadata: {
         Status: entry.state.replace(/_/g, " "),
@@ -204,6 +208,7 @@ export function AgentCollection({
       agentId: undefined,
       title: task.title,
       icon: <CalendarClock />,
+      tone: itemTones.schedule,
       category: "Scheduled",
       metadata: {
         Status: !task.enabled
@@ -236,7 +241,13 @@ export function AgentCollection({
     .map((row) => ({
       ...row,
       updatedAt: row.timestamp,
-      actions: (
+      actions: row.id.startsWith("conversation:") ? (
+        <AgentConversationActions
+          conversation={{ id: row.id.slice("conversation:".length), title: row.title }}
+          disabled={disabled}
+          onOpen={row.onOpen}
+        />
+      ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton disabled={disabled} label={`More actions for ${row.title}`}>
@@ -355,7 +366,7 @@ export function AgentCollection({
           collection={{ query, view, activityId: params.get("activity") ?? undefined }}
         />
       ) : loading ? (
-        <Spinner label="Loading agents" />
+        <CollectionSkeleton label="Loading agents" view={view} />
       ) : (
         <CollectionItems
           columnSetId={`agents:${section}`}

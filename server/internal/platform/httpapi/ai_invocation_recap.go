@@ -15,6 +15,10 @@ func publicAgentRuntimeFailure(code, _ string) string {
 		return "Misty timed out before completing this request."
 	case "authorization_or_state_changed":
 		return "Misty stopped because access or task state changed. Please try again."
+	case "model_provider_credit_exhausted":
+		return "Misty's AI provider has no available credit. The server administrator needs to add credit or configure another provider."
+	case "model_gateway_unavailable":
+		return "Misty's model providers are temporarily unavailable. Please try again shortly."
 	default:
 		return "Misty could not complete this request."
 	}

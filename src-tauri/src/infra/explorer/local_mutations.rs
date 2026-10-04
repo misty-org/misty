@@ -1,3 +1,4 @@
+use super::transfer_progress::LocalTransferProgress;
 use super::*;
 
 pub(super) async fn create_local_item_cancellable(
@@ -103,14 +104,23 @@ pub(super) async fn copy_local_path_cancellable(
     destination: &Path,
     cancellation: &AtomicBool,
 ) -> ApiResult<()> {
+    copy_local_path_with_progress(source, destination, cancellation, None).await
+}
+
+pub(super) async fn copy_local_path_with_progress(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+    progress: Option<&mut LocalTransferProgress>,
+) -> ApiResult<()> {
     ensure_not_canceled(cancellation)?;
     let metadata = tokio::fs::symlink_metadata(source).await.map_err(|error| {
         ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))
     })?;
     if metadata.is_dir() && !metadata.file_type().is_symlink() {
-        copy_local_directory_cancellable(source, destination, cancellation).await
+        copy_local_directory_cancellable(source, destination, cancellation, progress).await
     } else {
-        copy_local_file_cancellable(source, destination, cancellation).await
+        copy_local_file_with_progress(source, destination, cancellation, progress).await
     }
 }
 
@@ -118,6 +128,7 @@ pub(super) async fn copy_local_directory_cancellable(
     source: &Path,
     destination: &Path,
     cancellation: &AtomicBool,
+    mut progress: Option<&mut LocalTransferProgress>,
 ) -> ApiResult<()> {
     tokio::fs::create_dir(destination).await.map_err(|error| {
         ApiError::Message(format!(
@@ -165,8 +176,13 @@ pub(super) async fn copy_local_directory_cancellable(
                     })?;
                 pending.push((child_source, child_destination));
             } else {
-                copy_local_file_cancellable(&child_source, &child_destination, cancellation)
-                    .await?;
+                copy_local_file_with_progress(
+                    &child_source,
+                    &child_destination,
+                    cancellation,
+                    progress.as_deref_mut(),
+                )
+                .await?;
             }
         }
     }
@@ -177,6 +193,15 @@ pub(super) async fn copy_local_file_cancellable(
     source: &Path,
     destination: &Path,
     cancellation: &AtomicBool,
+) -> ApiResult<()> {
+    copy_local_file_with_progress(source, destination, cancellation, None).await
+}
+
+pub(super) async fn copy_local_file_with_progress(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+    mut progress: Option<&mut LocalTransferProgress>,
 ) -> ApiResult<()> {
     ensure_not_canceled(cancellation)?;
     if let Some(parent) = destination.parent() {
@@ -210,6 +235,9 @@ pub(super) async fn copy_local_file_cancellable(
                 destination.display()
             ))
         })?;
+        if let Some(progress) = progress.as_deref_mut() {
+            progress.advance(read).await;
+        }
         tokio::task::yield_now().await;
     }
     ensure_not_canceled(cancellation)?;
@@ -227,11 +255,20 @@ pub(super) async fn move_local_path_cancellable(
     destination: &Path,
     cancellation: &AtomicBool,
 ) -> ApiResult<()> {
+    move_local_path_with_progress(source, destination, cancellation, None).await
+}
+
+pub(super) async fn move_local_path_with_progress(
+    source: &Path,
+    destination: &Path,
+    cancellation: &AtomicBool,
+    progress: Option<&mut LocalTransferProgress>,
+) -> ApiResult<()> {
     ensure_not_canceled(cancellation)?;
     match tokio::fs::rename(source, destination).await {
         Ok(()) => Ok(()),
         Err(rename_error) => {
-            copy_local_path_cancellable(source, destination, cancellation).await?;
+            copy_local_path_with_progress(source, destination, cancellation, progress).await?;
             ensure_not_canceled(cancellation)?;
             let metadata = tokio::fs::symlink_metadata(source).await.map_err(|error| {
                 ApiError::Message(format!("Failed to inspect {}: {error}", source.display()))

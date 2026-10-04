@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter } from "react-router-dom";
+import { emitTo } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AuthProvider, useAuth } from "@/features/auth";
@@ -10,16 +11,12 @@ import type { AiCaptureAttachment, AiSelectionSnapshot } from "@/features/ai-sur
 import type { GlobalAiContextRef, MistyImageAttachment } from "@/features/global-search/types";
 import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import { AgentExecutionSurface } from "./AgentExecutionSurface";
-import {
-  agentWorkerParameters,
-  pauseLocalExecution,
-  routeLocalFollowup,
-  useLocalExecution,
-} from "./localExecution";
+import { agentWorkerParameters, pauseLocalExecution, useLocalExecution } from "./localExecution";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 
 export interface AgentWindowTask {
   queueId: string;
+  companion?: Parameters<ReturnType<typeof useMistyStore.getState>["submitAnswer"]>[6];
   context?: GlobalAiContextRef[];
   capture?: AiCaptureAttachment;
   selection?: AiSelectionSnapshot;
@@ -55,6 +52,10 @@ function Worker() {
     let disposed = false,
       busy = false,
       failed = false;
+    let currentQueue = "";
+    let lastAdmission:
+      | { queueId: string; result: { invocationId: string; eventsUrl: string; taskId?: string } }
+      | undefined;
     const take = async () => {
       if (
         disposed ||
@@ -65,24 +66,25 @@ function Worker() {
       )
         return;
       busy = true;
+      let task: AgentWindowTask | null = null;
       try {
         const active = useMistyStore.getState().working;
-        const task = await invoke<AgentWindowTask | null>(
+        task = await invoke<AgentWindowTask | null>(
           "agent_window_take_task",
           active ? { conversationId: useMistyStore.getState().activeConversationId } : {},
         );
         if (!task || disposed) return;
         if (task.accountId !== user.id || task.agentId !== agentId)
           throw new Error("The queued task belongs to a different agent or account.");
-        if (active) {
-          if (task.attachments.length) return;
-          const message = await routeLocalFollowup(task.prompt);
-          await invoke("agent_window_ack_task", { queueId: task.queueId });
-          setError(message);
+        if (lastAdmission?.queueId === task.queueId) {
+          await invoke("agent_window_ack_task", lastAdmission);
           return;
         }
+        if (active) return; // Independent work waits; steering uses the server's durable inbox.
+        currentQueue = task.queueId;
+        lastAdmission = undefined;
         const assertCurrent = () => {
-          if (disposed) throw new Error("Task stopped.");
+          if (disposed || currentQueue !== task?.queueId) throw new Error("Task stopped.");
         };
         await usePersonalAgentsStore.getState().load(user.id);
         assertCurrent();
@@ -96,18 +98,24 @@ function Worker() {
           panel: "answer",
         });
         if (task.conversationId) {
+          const requestedConversationId = task.conversationId;
           await useMistyStore.getState().loadConversations();
           const conversation = useMistyStore
             .getState()
-            .conversations.find((c) => c.id === task.conversationId && c.agentId === agentId);
+            .conversations.find((c) => c.id === requestedConversationId && c.agentId === agentId);
           if (conversation) useMistyStore.getState().selectConversation(conversation.id);
-          else if (task.attachments.length)
+          else
             throw new Error(
               "The conversation is unavailable to this agent. Reopen it and try again.",
             );
-          else useMistyStore.setState({ activeConversationId: "" });
         }
         assertCurrent();
+        if (useMistyStore.getState().working) {
+          setError(
+            "Reconnected to existing work. This request remains queued until that work finishes.",
+          );
+          return;
+        }
         // Selecting a conversation clears old handoffs; attach this task afterward.
         useMistyStore.setState({
           handoff: {
@@ -117,34 +125,89 @@ function Worker() {
             selection: task.selection,
           },
         });
-        await useMistyStore.getState().submitAnswer(task.prompt, task.attachments);
+        await useMistyStore.getState().submitAnswer(
+          task.prompt,
+          task.attachments,
+          task.selection,
+          "panel",
+          [],
+          { conversationId: task.conversationId ?? "", context: task.context ?? [] },
+          {
+            ...task.companion,
+            executionMode: "team",
+            turn: undefined,
+            capture: task.capture,
+            idempotencyKey: task.companion?.idempotencyKey ?? task.queueId,
+          },
+        );
         assertCurrent();
         if (!useMistyStore.getState().invocationId)
           throw new Error(
             useMistyStore.getState().error || "The queued task could not start. Retry when ready.",
           );
-        await invoke("agent_window_ack_task", { queueId: task.queueId });
+        const invocationId = useMistyStore.getState().invocationId!;
+        lastAdmission = {
+          queueId: task.queueId,
+          result: {
+            invocationId,
+            eventsUrl: `/ai/invocations/${encodeURIComponent(invocationId)}/events`,
+            taskId: useLocalExecution.getState().execution?.taskId,
+          },
+        };
+        await invoke("agent_window_ack_task", lastAdmission);
         setError("");
       } catch (e) {
         if (!disposed) {
           failed = true;
           setError(String(e));
+          if (task && !lastAdmission)
+            await invoke("agent_window_ack_task", {
+              queueId: task.queueId,
+              result: { error: String(e).slice(0, 2000) },
+            }).catch(() => {});
         }
       } finally {
         busy = false;
       }
     };
-    void take();
     // Queued tasks announce themselves; the slow pass recovers a missed event
     // or a failed acknowledgement.
     const timer = setInterval(() => void take(), 30_000);
+    const stop = getCurrentWindow().listen<string>("misty://agent-task-stop", ({ payload }) => {
+      if (payload !== currentQueue) return;
+      currentQueue = "";
+      void useMistyStore.getState().cancelResponse?.();
+    });
+    const unsubscribe = useMistyStore.subscribe((state, previous) => {
+      if (
+        !busy &&
+        state.invocationId &&
+        state.invocationId !== previous.invocationId &&
+        state.accountId === expectedAccount &&
+        state.selectedAgentId === agentId &&
+        state.invocationConversationId === state.activeConversationId
+      ) {
+        void emitTo("main", "misty://agent-task-admitted", {
+          accountId: expectedAccount,
+          agentId,
+          conversationId: state.activeConversationId,
+          invocationId: state.invocationId,
+        }).catch(() => {});
+      }
+      if (previous.working && !state.working) queueMicrotask(() => void take());
+    });
     const remove = getCurrentWindow().listen("misty://agent-task-queued", () => {
       failed = false;
       void take();
     });
+    void Promise.all([stop, remove]).then(() => {
+      if (!disposed) void take();
+    });
     return () => {
       disposed = true;
       clearInterval(timer);
+      unsubscribe();
+      void stop.then((fn) => fn());
       void remove.then((fn) => fn());
       void pauseLocalExecution();
     };

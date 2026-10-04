@@ -42,6 +42,7 @@ import {
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
+  extensions: "Extensions",
   space: "Space",
   browser: "Browser",
   files: "Files",

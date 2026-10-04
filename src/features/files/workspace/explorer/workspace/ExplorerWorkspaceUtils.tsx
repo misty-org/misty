@@ -14,7 +14,7 @@ export function ExplorerBottomBar(props: {
   sidebarVisible: boolean;
   previewVisible: boolean;
   onToggleSidebar: () => void;
-  onTogglePreview: () => void;
+  onTogglePreview?: () => void;
 }) {
   const SidebarIcon = props.sidebarVisible ? PanelLeftClose : PanelLeftOpen;
   const PreviewIcon = props.previewVisible ? PanelRightClose : PanelRightOpen;
@@ -29,17 +29,19 @@ export function ExplorerBottomBar(props: {
       >
         <SidebarIcon size={15} />
       </IconButton>
-      <div className={explorerShellStyles.bottomBarGroup}>
-        <IconButton
-          size="xs"
-          label={props.previewVisible ? "Hide preview" : "Show preview"}
-          tooltip={false}
-          aria-pressed={props.previewVisible}
-          onClick={props.onTogglePreview}
-        >
-          <PreviewIcon size={15} />
-        </IconButton>
-      </div>
+      {props.onTogglePreview && (
+        <div className={explorerShellStyles.bottomBarGroup}>
+          <IconButton
+            size="xs"
+            label={props.previewVisible ? "Hide preview" : "Show preview"}
+            tooltip={false}
+            aria-pressed={props.previewVisible}
+            onClick={props.onTogglePreview}
+          >
+            <PreviewIcon size={15} />
+          </IconButton>
+        </div>
+      )}
     </footer>
   );
 }

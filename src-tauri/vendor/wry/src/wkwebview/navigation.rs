@@ -1,3 +1,10 @@
+// The host can intercept main-frame navigations requiring a new native configuration.
+// The callback runs on the main thread and must not retain these borrowed pointers.
+#[cfg(target_os = "macos")]
+static NATIVE_NAVIGATION: std::sync::OnceLock<fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> bool> = std::sync::OnceLock::new();
+#[cfg(target_os = "macos")]
+pub fn set_native_navigation_interceptor(handler: fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> bool) { let _=NATIVE_NAVIGATION.set(handler); }
+
 use objc2::DeclaredClass;
 use objc2_foundation::{NSObjectProtocol, NSString};
 use objc2_web_kit::{
@@ -75,7 +82,13 @@ pub(crate) fn navigation_policy(
     } else {
       let function = &this.ivars().navigation_policy_function;
       match function(url.to_string()) {
-        true => (*handler).call((WKNavigationActionPolicy::Allow,)),
+        true => {
+          #[cfg(target_os = "macos")]
+          if NATIVE_NAVIGATION.get().is_some_and(|callback|callback((_webview as *const WKWebView).cast_mut().cast(),(action as *const WKNavigationAction).cast_mut().cast())) {
+            (*handler).call((WKNavigationActionPolicy::Cancel,)); return;
+          }
+          (*handler).call((WKNavigationActionPolicy::Allow,));
+        },
         false => (*handler).call((WKNavigationActionPolicy::Cancel,)),
       };
     }

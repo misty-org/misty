@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+ "github.com/kannachi323/misty/server/internal/aimodels"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -99,6 +100,11 @@ type SmartLibraryEmbedding struct {
 
 type SmartLibraryAnalyzer struct {
 	billing                     *library.Meter
+ ModelResolver aimodels.Resolver
+ account string
+ roleConfigs map[string]*aimodels.Resolved
+ callProvider, callReasoning string
+ realtimeConfig *aimodels.Resolved
 	APIKey, BaseURL             string
 	PrimaryModel, FallbackModel string
 	EmbeddingModel              string
@@ -115,6 +121,17 @@ func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibrar
 			return SmartLibraryAnalysis{}, err
 		}
 	}
+	clone := *a
+ clone.roleConfigs = map[string]*aimodels.Resolved{}
+ fallbackEnabled := true
+ for _, role := range []string{"library", "library-fallback"} {
+  config, configErr := a.roleConfig(ctx, role)
+  if role == "library-fallback" && errors.Is(configErr, aimodels.ErrDisabled) { fallbackEnabled = false; continue }
+  if configErr != nil { return SmartLibraryAnalysis{}, configErr }
+  clone.roleConfigs[role] = config
+  if config != nil { if role == "library" { clone.PrimaryModel = config.Model } else { clone.FallbackModel = config.Model } }
+ }
+ a = &clone
 	primaryModel := a.primaryModel()
 	fallbackModel := a.fallbackModel()
 	primary, usage, err := a.analyzeWithModel(ctx, primaryModel, assets)
@@ -133,8 +150,8 @@ func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibrar
 		if err != nil && reason == "" {
 			reason = "primary_request_failed"
 		}
-		if reason == "" && shouldRunVisualEntityAudit(result) {
-			audit, auditUsage, auditErr := a.analyzeWithModelPrompt(ctx, fallbackModel, []SmartLibraryAsset{asset}, visualEntityAuditPrompt)
+		if fallbackEnabled && reason == "" && shouldRunVisualEntityAudit(result) {
+			audit, auditUsage, auditErr := a.analyzeWithModelPromptRole(ctx, "library-fallback", fallbackModel, []SmartLibraryAsset{asset}, visualEntityAuditPrompt)
 			if billingErr := a.BillingError(); billingErr != nil {
 				return analysis, billingErr
 			}
@@ -158,7 +175,8 @@ func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibrar
 			analysis.Results = append(analysis.Results, result)
 			continue
 		}
-		fallback, fallbackUsage, fallbackErr := a.analyzeWithModel(ctx, fallbackModel, []SmartLibraryAsset{asset})
+		if !fallbackEnabled { analysis.Failures[asset.AssetID] = "analysis_quality_failed"; continue }
+		fallback, fallbackUsage, fallbackErr := a.analyzeWithModelPromptRole(ctx, "library-fallback", fallbackModel, []SmartLibraryAsset{asset}, TestingRichMetadataPrompt)
 		if billingErr := a.BillingError(); billingErr != nil {
 			return analysis, billingErr
 		}
@@ -221,6 +239,8 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 	if len(assets) == 0 {
 		return nil, ModelUsage{}, nil
 	}
+	configured, _, configErr := a.forRole(ctx, "embedding")
+ if configErr != nil { return nil, ModelUsage{}, configErr }; a = configured
 	results := make([]SmartLibraryEmbedding, 0, len(assets))
 	var total ModelUsage
 	for _, asset := range assets {
@@ -232,7 +252,7 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 		var usage ModelUsage
 		var err error
 		switch {
-		case len(asset.Bytes) > 0 && (asset.MimeType == "image/jpeg" || asset.MimeType == "image/png"):
+		case a.callProvider == "" && !strings.HasPrefix(a.embeddingModel(), "openai/text-embedding-") && len(asset.Bytes) > 0 && (asset.MimeType == "image/jpeg" || asset.MimeType == "image/png"):
 			var vector []float64
 			vector, usage, err = a.embedImageV1(ctx, value, asset)
 			vectors = [][]float64{vector}

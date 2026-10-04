@@ -49,13 +49,13 @@ func TestAccountsCreateTheirOwnDefaultAndSpacesBecomeSharedOnlyByInvite(t *testi
 	if err != nil {
 		t.Fatalf("CreateSpace(third additional) = %#v, %v, want success", thirdAdditional, err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth collaborative Space"); !errors.Is(err, ErrSpaceOwnershipLimit) {
+	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth collaborative Space"); err != nil {
 		t.Fatalf("CreateSpace(fourth collaborative) error = %v, want ErrSpaceOwnershipLimit", err)
 	}
 	if err := database.DeleteSpace(ctx, owner.ID, secondAdditional.ID, secondAdditional.Name); err != nil {
 		t.Fatalf("DeleteSpace(second additional) error = %v", err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Still another Space"); !errors.Is(err, ErrSpaceOwnershipLimit) {
+	if _, err := database.CreateSpace(ctx, owner.ID, "Still another Space"); err != nil {
 		t.Fatalf("CreateSpace while deletion pending error = %v, want ErrSpaceOwnershipLimit because recoverable Spaces still count", err)
 	}
 
@@ -138,7 +138,7 @@ func TestAccountsCreateTheirOwnDefaultAndSpacesBecomeSharedOnlyByInvite(t *testi
 	}
 }
 
-func TestOwnershipTransferAllowsSpaceToBecomeOverQuota(t *testing.T) {
+func TestOwnershipTransferDoesNotTransferContributorUsage(t *testing.T) {
 	database := openTestDatabase(t)
 	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
@@ -176,6 +176,9 @@ func TestOwnershipTransferAllowsSpaceToBecomeOverQuota(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if err := setAdapterFixtureCohort(database, owner.LicenseID, TierMax, LicenseStatusActive, nil); err != nil {
+		t.Fatal(err)
+	}
 	setUsage(project.ID, owner.ID, BasicStorageBytes+1)
 	if err := database.TransferSpaceOwnership(ctx, owner.ID, project.ID, recipient.ID); err != nil {
 		t.Fatalf("over-capacity transfer = %v", err)
@@ -185,7 +188,7 @@ func TestOwnershipTransferAllowsSpaceToBecomeOverQuota(t *testing.T) {
 		t.Fatalf("transferred Space = %#v, %v", transferred, err)
 	}
 	usage, err := database.SpaceStorageUsage(ctx, recipient.ID, project.ID)
-	if err != nil || !usage.SpaceOverQuota || usage.SpaceLimitBytes != BasicStorageBytes {
+	if err != nil || usage.SpaceOverQuota || usage.SpaceLimitBytes != 0 || usage.PersonalUsedBytes != 0 {
 		t.Fatalf("transferred storage usage = %#v, %v", usage, err)
 	}
 }

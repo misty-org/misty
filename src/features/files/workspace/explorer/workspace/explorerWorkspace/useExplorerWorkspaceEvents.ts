@@ -20,9 +20,7 @@ export function useLegacyPluginTabMigration(options: {
   useEffect(() => {
     if (!homePath) return;
     const multi = (options.multiPanelStore ?? useMultiPanelStore).getState();
-    const legacyTabs = multi.tabs.filter(
-      (tab) => parsePluginTabPath(tab.path) || tab.path.startsWith("misty-transfers://"),
-    );
+    const legacyTabs = multi.tabs.filter((tab) => parsePluginTabPath(tab.path));
     for (const tab of legacyTabs) {
       multi.updateActiveTabPath(tab.activePaneId, homePath, "Files");
       multi.setTabPanelVisibility(tab.id, {
@@ -85,6 +83,11 @@ export function useExplorerKeyboardShortcuts(options: {
     };
     window.addEventListener("keydown", onKeyDown);
     const run = (commandId: string) => {
+      const multi = multiPanelStore.getState();
+      if (
+        multi.tabs.find((tab) => tab.id === multi.activeTabId)?.path === "misty-transfers://history"
+      )
+        return;
       const paneId = multiPanelStore.getState().activePaneId;
       if (!paneId) return;
       runExplorerCommand(commandId, paneId, navigate);

@@ -8,6 +8,11 @@
    so the Themes extension can preview and persist one coherent app palette. */
 :root {
   --misty-theme-workspace: #0f0f0f;
+  /* Window chrome sampled from the approved Polar tab reference. */
+  --workspace-tab-surface-top: #383838;
+  --workspace-tab-surface: #303030;
+  --workspace-tab-text: #c5c5c5;
+  --workspace-tab-muted: #ababab;
   --misty-theme-bg: #131313;
   --misty-theme-sidebar: #161616;
   --misty-theme-card: #191919;
@@ -84,6 +89,18 @@
   --color-sage-fg: var(--misty-theme-sage);
   --color-sage-bg: var(--misty-theme-sage-bg);
   --color-status-green: var(--misty-theme-sage);
+
+  /* Item-type glyph tones (see src/shared/ui/icons/itemTones.ts). Mixed toward
+     the theme text so they soften on dark themes and deepen on light ones. */
+  --color-tone-blue: color-mix(in srgb, #4f86e8 72%, var(--misty-theme-text));
+  --color-tone-red: color-mix(in srgb, #e5533d 72%, var(--misty-theme-text));
+  --color-tone-green: color-mix(in srgb, #3fa463 72%, var(--misty-theme-text));
+  --color-tone-orange: color-mix(in srgb, #e8833a 72%, var(--misty-theme-text));
+  --color-tone-violet: color-mix(in srgb, #8b5cf6 72%, var(--misty-theme-text));
+  --color-tone-pink: color-mix(in srgb, #e0559b 72%, var(--misty-theme-text));
+  --color-tone-amber: color-mix(in srgb, #d9a21b 72%, var(--misty-theme-text));
+  --color-tone-teal: color-mix(in srgb, #14a39a 72%, var(--misty-theme-text));
+  --color-tone-sand: color-mix(in srgb, #a88a5a 72%, var(--misty-theme-text));
 
   /* Gruvbox-inspired pastels, deterministically assigned per person so the
      app doesn't read as entirely monochrome. Kept soft (no neon) — these are

@@ -1,9 +1,19 @@
-import { History, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Checkbox, IconButton, ListRow, ListRowButton } from "@/shared/ui";
+import { Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Button,
+  Checkbox,
+  CollectionFilters,
+  IconButton,
+  ListRow,
+  ListRowButton,
+  CollectionSkeleton,
+  WorkspaceSectionLabel,
+} from "@/shared/ui";
 import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
 import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
+import { historySectionRange, historySections, type HistorySection } from "./historySections";
 
 const pageSize = 150;
 
@@ -33,6 +43,11 @@ function hostOf(url: string): string {
 
 export function HistoryPage(props: BrowserInternalPageProps) {
   const [text, setText] = useState("");
+  const [section, setSection] = useState<HistorySection>("all");
+  const requestId = useRef(0);
+  const invalidateRequests = useCallback(() => {
+    requestId.current++;
+  }, []);
   const [visits, setVisits] = useState<BrowserHistoryVisit[]>([]);
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,30 +56,47 @@ export function HistoryPage(props: BrowserInternalPageProps) {
 
   const load = useCallback(
     async (before?: number) => {
+      const id = ++requestId.current;
+      const range = historySectionRange(section);
       setLoading(true);
       try {
         const page = await browserLibrary.history({
           profileId: props.profileId,
           text,
-          before,
+          before: before ?? range.before,
           limit: pageSize,
         });
-        setVisits((current) => (before ? [...current, ...page] : page));
-        setMore(page.length === pageSize);
+        if (id !== requestId.current) return;
+        // Query from the section's upper bound, then stop paging at its lower bound.
+        // This also finds older history beyond the first page of recent visits.
+        const visible = page.filter(
+          (visit) => range.since === undefined || visit.visitedAt >= range.since,
+        );
+        setVisits((current) => (before ? [...current, ...visible] : visible));
+        setMore(page.length === pageSize && visible.length === page.length);
         setError(null);
       } catch (cause) {
+        if (id !== requestId.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
-        setLoading(false);
+        if (id === requestId.current) setLoading(false);
       }
     },
-    [props.profileId, text],
+    [props.profileId, text, section],
   );
 
   useEffect(() => {
+    setVisits([]);
+    setSelected(new Set());
+    setMore(false);
+    setError(null);
+    setLoading(true);
     const timer = window.setTimeout(() => void load(), text ? 150 : 0);
-    return () => window.clearTimeout(timer);
-  }, [load, text]);
+    return () => {
+      window.clearTimeout(timer);
+      invalidateRequests();
+    };
+  }, [invalidateRequests, load, text]);
 
   const groups = useMemo(() => {
     const byDay = new Map<string, BrowserHistoryVisit[]>();
@@ -96,35 +128,56 @@ export function HistoryPage(props: BrowserInternalPageProps) {
   return (
     <InternalPageFrame
       title="History"
-      icon={History}
       search={{ value: text, placeholder: "Search history", onChange: setText }}
       actions={
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-2">
           {selected.size ? (
-            <Button variant="toolbar" size="xs" onClick={() => void remove([...selected])}>
+            <Button variant="outline" onClick={() => void remove([...selected])}>
               Delete {selected.size} selected
             </Button>
           ) : null}
-          <Button variant="toolbar" size="xs" onClick={props.clearBrowsingData}>
+          <Button variant="outline" onClick={props.clearBrowsingData}>
             Clear browsing data…
           </Button>
         </div>
       }
+      toolbar={
+        <CollectionFilters
+          options={[...historySections]}
+          value={section}
+          onChange={(value) => setSection(value as HistorySection)}
+        />
+      }
     >
-      {error ? <p className="mb-3 text-xs text-red-300">{error}</p> : null}
-      {!loading && !visits.length ? (
+      {error ? (
+        <p role="alert" className="mb-3 text-sm text-cream-muted">
+          {error}
+        </p>
+      ) : null}
+      {loading && !visits.length ? (
+        <CollectionSkeleton label="Loading history" view="rows" />
+      ) : null}
+      {!loading && !error && !visits.length ? (
         <InternalPageEmpty
-          title={text ? "No matching pages" : "No history yet"}
+          title={
+            text
+              ? "No matching pages"
+              : section === "all"
+                ? "No history yet"
+                : "No history in this section"
+          }
           detail={
             text
               ? "Try a different word or part of the address."
-              : "Pages you visit in Misty's browser appear here. Pages Misty opens for agent work are not recorded."
+              : section === "all"
+                ? "Pages you visit in Misty's browser appear here. Pages Misty opens for agent work are not recorded."
+                : "Choose All to see your complete browsing history."
           }
         />
       ) : null}
       {groups.map(([label, dayVisits]) => (
         <section key={label} className="mb-5">
-          <h2 className="mb-1 px-2 text-xs font-medium text-cream-muted">{label}</h2>
+          <WorkspaceSectionLabel compact>{label}</WorkspaceSectionLabel>
           <ul className="grid">
             {dayVisits.map((visit) => (
               <ListRow key={visit.id}>
@@ -142,6 +195,7 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                 </span>
                 <SiteIcon url={visit.url} />
                 <ListRowButton
+                  className="flex-col gap-0.5 @min-[40rem]/browser-page:flex-row @min-[40rem]/browser-page:gap-2"
                   title={visit.url}
                   onClick={(event) =>
                     event.metaKey || event.ctrlKey
@@ -152,10 +206,10 @@ export function HistoryPage(props: BrowserInternalPageProps) {
                     if (event.button === 1) props.openInNewView(visit.url);
                   }}
                 >
-                  <span className="truncate text-sm text-cream-bright">
+                  <span className="max-w-full truncate text-sm text-cream-bright">
                     {visit.title || hostOf(visit.url)}
                   </span>
-                  <span className="shrink-0 truncate text-xs text-cream-muted">
+                  <span className="max-w-full truncate text-xs text-cream-muted">
                     {hostOf(visit.url)}
                   </span>
                 </ListRowButton>

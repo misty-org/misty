@@ -1,7 +1,7 @@
 {
   "repo_notes": [
     {
-      "content": "Describe Misty as the browser workspace in the current README.md: tabs, split panes, bookmarks, agents, and encrypted cross-device workspace sync, with Spaces for collaborative work. Cover the complete repository: the React frontend in src/, the Tauri/Rust host and workers in src-tauri/, the Go backend and TypeScript services in server/, and the Rust development/release CLI in cli/. Desktop development and sync currently target macOS and Windows; a separate web build has different capabilities. Mobile and tablet shells and build targets have been removed. Derive platform support from active entrypoints and platform gates rather than unused dependencies or historical plans."
+      "content": "Describe Misty as the browser workspace in the current README.md: tabs, split panes, bookmarks, agents, and encrypted cross-device workspace sync, with Spaces for collaborative work. Cover the complete repository: the React frontend in src/, the Tauri/Rust host and workers in src-tauri/, the Go backend and TypeScript services in server/, and the Rust development/release CLI in cli/. Misty is desktop-only. Desktop development and sync currently target macOS and Windows; the public/account website is a separate product. Derive platform support from active entrypoints and platform gates rather than unused dependencies or historical plans."
     },
     {
       "content": "Use the indexed branch's executable source, route registration, manifests, migrations, and tests as the authority. README.md, feature READMEs, DESIGN.md files, and docs/ provide context but can contain superseded checkpoints. Resolve contradictions by tracing current callers. State the difference between implemented behavior, automated test coverage, live platform verification, and remaining work. Cite source files for substantive claims and show end-to-end data flows across the frontend, native host, and server where relevant. Do not infer production deployment or universal browser-session compatibility from code or fixture tests."
@@ -10,10 +10,10 @@
       "content": "Prioritize the browser/device sync architecture, desktop companion, account isolation, current Scheduled tasks, settings profiles, and the consolidated server and CLI. Keep distinct the encrypted browser vault/tree protocol, settings-profile synchronization, Space collaboration, and peer file transport: they have different state owners, transports, permissions, and persistence. Also distinguish bookmarks using legacy group/website wire records from visible tab groups and saved tab groups; verify which metadata actually syncs rather than promising cross-device tab-group parity."
     },
     {
-      "content": "Retired installable apps/SDK, Activepieces workflows, the old user-routine scheduler, waitlist systems, and mobile targets are historical context, not current product architecture. Built-in tools compile with Misty; native workers are bundled with the desktop build. The current src/features/scheduled/ and server scheduled-task handlers are active and must be documented separately from retired routines. Migration archives and compatibility routes do not imply that a retired subsystem is available. Use .config/retired-repository-history.json and current runtime composition to explain relevant transitions briefly."
+      "content": "Retired installable apps/SDK, Activepieces workflows, the old user-routine scheduler, waitlist systems are historical context, not current product architecture. Built-in tools compile with Misty; native workers are bundled with the desktop build. The current src/features/scheduled/ and server scheduled-task handlers are active and must be documented separately from retired routines. Migration archives and compatibility routes do not imply that a retired subsystem is available. Use .config/retired-repository-history.json and current runtime composition to explain relevant transitions briefly."
     },
     {
-      "content": "Prefer reproducible setup and command examples from package.json, cli/README.md, cli/src/, .config/tooling.json, and server/README.md. Separate Vite-only frontend development from the signed native Tauri launcher, and separate starting containers from explicitly deploying collaboration Workers. Explain isolated desktop development profiles for two-device testing. Verify environment variable names against their owning configuration code; document their role and required/optional status without copying secrets or local environment values. Do not resurrect removed npm mobile commands."
+      "content": "Prefer reproducible setup and command examples from package.json, cli/README.md, cli/src/, .config/tooling.json, and server/README.md. Separate Vite-only frontend development from the signed native Tauri launcher, and separate starting containers from explicitly deploying collaboration Workers. Explain isolated desktop development profiles for two-device testing. Verify environment variable names against their owning configuration code; document their role and required/optional status without copying secrets or local environment values. Use only the supported desktop application commands."
     },
     {
       "content": "Document important trust boundaries as part of the architecture: renderer versus native secrets and browser data, account/deployment isolation, Space membership, authenticated device grants, run-scoped MCP authorization, tool approvals, and companion screen/input permissions. Explain teardown on logout, account switching, lock, cancellation, and loss of ownership where implemented. Show actual enforcement paths and failure behavior rather than asserting blanket security or platform guarantees."
@@ -28,7 +28,7 @@
   "pages": [
     {
       "title": "Misty — Project Overview",
-      "purpose": "Introduce Misty's browser workspace, supported desktop and web surfaces, collaborative Spaces, agents, and encrypted device sync. Map the frontend, native host, bundled workers, backend services, and CLI, and link to the major sections with a system-context diagram.",
+      "purpose": "Introduce Misty's browser workspace, supported desktop surfaces, collaborative Spaces, agents, and encrypted device sync. Map the frontend, native host, bundled workers, backend services, and CLI, and link to the major sections with a system-context diagram.",
       "page_notes": [
         {
           "content": "Start with README.md, package.json, src/app/, src-tauri/Cargo.toml, server/README.md, server/internal/README.md, and cli/README.md. Explain current product capabilities and limitations without presenting every historical Space feature or platform target as the primary product direction."
@@ -37,7 +37,7 @@
     },
     {
       "title": "Getting Started & Development Setup",
-      "purpose": "Provide the current local setup path: toolchain requirements, backend configuration and health checks, Cloudflare requirements for the development collaboration stack, desktop setup, native signing, web development, and two-profile device-sync testing.",
+      "purpose": "Provide the current local setup path: toolchain requirements, backend configuration and health checks, Cloudflare requirements for the development collaboration stack, desktop setup, native signing, desktop renderer development, and two-profile device-sync testing.",
       "parent": "Misty — Project Overview",
       "page_notes": [
         {
@@ -47,7 +47,7 @@
     },
     {
       "title": "CLI, Build Pipeline & Tool Configuration",
-      "purpose": "Explain the Rust CLI's workspace discovery and command families, the shared tool registry, TypeScript task runners, desktop/web Vite builds, configuration lookup, and environment ownership and precedence.",
+      "purpose": "Explain the Rust CLI's workspace discovery and command families, the shared tool registry, TypeScript task runners, desktop Vite builds, configuration lookup, and environment ownership and precedence.",
       "parent": "Misty — Project Overview",
       "page_notes": [
         {
@@ -67,10 +67,10 @@
     },
     {
       "title": "Frontend Architecture",
-      "purpose": "Describe the React/TypeScript application structure, feature ownership, host initialization, layout composition, Zustand state, native IPC boundary, domain API clients, and desktop versus web behavior.",
+      "purpose": "Describe the React/TypeScript application structure, feature ownership, host initialization, layout composition, Zustand state, native IPC boundary, domain API clients, and desktop host requirements.",
       "page_notes": [
         {
-          "content": "Trace src/app/App.tsx, src/app/PlatformLayout.tsx, src/app/layouts/, src/features/, src/native/, src/api/, src/shared/platform/, and src/tests/architecture/. Explain which built-in workspaces are rendered by the workspace surface layer and which routes render conventional pages. Keep implementation details for bootstrap, navigation, and settings in their child pages."
+          "content": "Trace src/app/App.tsx, src/app/layouts/DesktopLayout/index.tsx, src/app/layouts/, src/features/, src/native/, src/api/, src/shared/platform/, and src/tests/architecture/. Explain which built-in workspaces are rendered by the workspace surface layer and which routes render conventional pages. Keep implementation details for bootstrap, navigation, and settings in their child pages."
         }
       ]
     },
@@ -80,7 +80,7 @@
       "parent": "Frontend Architecture",
       "page_notes": [
         {
-          "content": "Use src/app/entry.ts, src/app/main.tsx, src/app/HostMain.tsx, src/app/cursorEntry.ts, src/app/routing/, src/features/auth/, src/api/deployment/, src/api/README.md, and src/api/client/. Follow current imports to locate bootstrap rather than assuming it still lives in main.tsx. Explain account/session generation guards, stale-response handling, native versus web authentication, and the different scopes of apiRequest, spaceRequest, and explicit external transfers."
+          "content": "Use src/app/entry.ts, src/app/main.tsx, src/app/HostMain.tsx, src/app/cursorEntry.ts, src/app/routing/, src/features/auth/, src/api/deployment/, src/api/README.md, and src/api/client/. Follow current imports to locate bootstrap rather than assuming it still lives in main.tsx. Explain account/session generation guards, stale-response handling, native authentication and website account handoff, and the different scopes of apiRequest, spaceRequest, and explicit external transfers."
         }
       ]
     },
@@ -315,7 +315,7 @@
       "parent": "Server Architecture & Service Boundaries",
       "page_notes": [
         {
-          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, server/scripts/release.sh, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, static web app, and external website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
+          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, server/scripts/release.sh, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, native desktop app, and external account website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
         }
       ]
     }

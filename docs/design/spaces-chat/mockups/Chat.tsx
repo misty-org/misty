@@ -48,15 +48,10 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
   Spinner,
 } from "@/shared/ui";
 import { ChatReplyBanner } from "@/features/spaces/chat/components/ChatReplyBanner";
-import { ConversationIcon, EmojiPicker, useNarrow } from "./controls";
+import { ConversationIcon, EmojiPicker } from "./controls";
 import { blankDraft, type Conversation, type Draft, type Message, type Scenario } from "./model";
 
 export type ChatProps = {
@@ -87,7 +82,6 @@ function Switcher({ p }: { p: ChatProps }) {
       movingToDialog.current = false;
     }
   };
-  const narrow = useNarrow();
   const trigger = (
     <Button
       variant="ghost"
@@ -160,16 +154,7 @@ function Switcher({ p }: { p: ChatProps }) {
       </CommandList>
     </Command>
   );
-  return narrow ? (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent side="bottom" className="p-0 pb-4 pt-12" onCloseAutoFocus={closeFocus}>
-        <SheetTitle className="sr-only">Switch conversation</SheetTitle>
-        <SheetDescription className="sr-only">Search chats in the family Space.</SheetDescription>
-        {content}
-      </SheetContent>
-    </Sheet>
-  ) : (
+  return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent align="start" className="w-[360px] p-0" onCloseAutoFocus={closeFocus}>

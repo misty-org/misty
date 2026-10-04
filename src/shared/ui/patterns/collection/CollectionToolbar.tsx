@@ -143,7 +143,7 @@ export function CollectionViewToggle({
           active={value === option}
           aria-pressed={value === option}
           disabled={disabled}
-          className="size-8 rounded-full p-0"
+          className="size-8 p-0"
           onClick={() => onChange(option)}
         >
           <Icon className="size-4" />
@@ -154,7 +154,7 @@ export function CollectionViewToggle({
           aria-label="Board view"
           title="Board view"
           disabled={disabled}
-          className="size-8 rounded-full p-0"
+          className="size-8 p-0"
           onClick={onBoardView}
         >
           <Columns3 className="size-4" />

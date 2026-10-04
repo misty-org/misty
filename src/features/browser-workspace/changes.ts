@@ -60,13 +60,15 @@ export function workspaceRecords(windows: WorkspaceWindow[], profileId: string):
       for (const pane of dockLeaves(tab.root))
         // A pane's content in the workspace UI is a synced view.
         pane.views.forEach((view, order) => {
-          if (!["browser", "files", "agents", "space", "home"].includes(view.surfaceId))
+          if (
+            !["browser", "files", "agents", "space", "home", "extensions"].includes(view.surfaceId)
+          )
             throw new Error("Retired workspace views must be migrated before enabling sync");
           const browser = view.surfaceId === "browser" ? parseBrowserViewState(view.state) : null;
           // Files paths remain device-local until their authorized device/root
           // references are resolved by the Files handoff adapter.
           const toolRoute =
-            view.surfaceId === "space"
+            view.surfaceId === "space" || view.surfaceId === "extensions"
               ? view.route
               : view.surfaceId === "agents"
                 ? view.route.replace(/^\/apps\/agents(?=[/?#]|$)/, "/agents")
@@ -77,7 +79,8 @@ export function workspaceRecords(windows: WorkspaceWindow[], profileId: string):
             kind: "view",
             id: view.id,
             fields: {
-              surface: view.surfaceId as "browser" | "files" | "agents" | "space" | "home",
+              surface: view.surfaceId as
+                "browser" | "files" | "agents" | "space" | "home" | "extensions",
               title: view.title,
               placement: { tab_id: tab.id, pane_id: pane.id, order },
               url: browser?.url ?? null,

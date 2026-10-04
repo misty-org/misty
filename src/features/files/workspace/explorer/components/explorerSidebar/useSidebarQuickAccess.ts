@@ -7,9 +7,17 @@ import {
   addHiddenQuickAccessPath,
   dedupePinnedPathsForQuickAccess,
   normalizeSidebarPath,
+  orderQuickAccessRows,
+  pinnedPathLabel,
   quickAccessPathHidden,
 } from "@/features/file-ui";
+import { reorderIds } from "@/shared/hooks/usePointerReorder";
 import { buildQuickAccessItems } from "./quickAccessItems";
+
+/** One Quick access row: a platform folder or a user pin, in display order. */
+export type QuickAccessRow =
+  | { kind: "builtIn"; path: string; label: string; icon: QuickAccessItem["icon"] }
+  | { kind: "pinned"; path: string; label: string };
 
 /**
  * The Quick access list, minus anything the user has hidden.
@@ -22,8 +30,16 @@ export function useSidebarQuickAccess(options: {
   items?: QuickAccessItem[];
   hiddenQuickAccessPaths: string[];
   setHiddenQuickAccessPaths: React.Dispatch<React.SetStateAction<string[]>>;
+  quickAccessOrder: string[];
+  setQuickAccessOrder: React.Dispatch<React.SetStateAction<string[]>>;
 }) {
-  const { sidebar, hiddenQuickAccessPaths, setHiddenQuickAccessPaths } = options;
+  const {
+    sidebar,
+    hiddenQuickAccessPaths,
+    setHiddenQuickAccessPaths,
+    quickAccessOrder,
+    setQuickAccessOrder,
+  } = options;
   const quickAccess = useMemo(
     () =>
       options.items ??
@@ -46,6 +62,31 @@ export function useSidebarQuickAccess(options: {
     () => quickAccess.filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),
     [hiddenQuickAccessPaths, quickAccess],
   );
+  const rows = useMemo<QuickAccessRow[]>(
+    () =>
+      orderQuickAccessRows(
+        [
+          ...visibleQuickAccess.map((item) => ({ kind: "builtIn" as const, ...item })),
+          ...visiblePinnedPaths.map((path) => ({
+            kind: "pinned" as const,
+            path,
+            label: pinnedPathLabel(path),
+          })),
+        ],
+        quickAccessOrder,
+      ),
+    [quickAccessOrder, visiblePinnedPaths, visibleQuickAccess],
+  );
+  /** Moves one row before or after another and remembers the whole visible order. */
+  const moveQuickAccessRow = (path: string, target: string, after: boolean) =>
+    setQuickAccessOrder(
+      reorderIds(
+        rows.map((row) => row.path),
+        [path],
+        target,
+        after,
+      ),
+    );
   const removeQuickAccessItem = (item: QuickAccessMenuItem) => {
     if (item.kind === "builtIn") {
       setHiddenQuickAccessPaths((paths) => addHiddenQuickAccessPath(paths, item.path));
@@ -77,6 +118,8 @@ export function useSidebarQuickAccess(options: {
     hideQuickAccessPath,
     visiblePinnedPaths,
     visibleQuickAccess,
+    rows,
+    moveQuickAccessRow,
     removeQuickAccessItem,
     resetQuickAccessDefaults,
     toggleQuickAccessDefault,

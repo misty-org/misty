@@ -40,7 +40,7 @@ describe("desktop dock store", () => {
     expect(findDockLeaf(empty.root, empty.focusedPaneId)?.activeViewId).toBeNull();
     const next = store.newTab();
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toMatchObject([
-      { id: next.id, surfaceId: "home", title: "Home", placeholder: true },
+      { id: next.id, surfaceId: "browser", title: "google.com", placeholder: true },
     ]);
   });
 
@@ -113,9 +113,9 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().closedItems[0]?.view.id).toBe(onlyTabInSecond.id);
   });
 
-  it("starts the global workspace on Home", () => {
+  it("starts the global workspace in Browser", () => {
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "home", title: "Home", route: "/home", placeholder: true },
+      { surfaceId: "browser", title: "google.com", route: "/browser", placeholder: true },
     ]);
   });
 
@@ -234,7 +234,7 @@ describe("desktop dock store", () => {
 
     useWorkspaceStore.getState().setScope("space:work");
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "home", title: "Home", route: "/home", placeholder: true },
+      { surfaceId: "browser", title: "google.com", route: "/browser", placeholder: true },
     ]);
 
     useWorkspaceStore.getState().setScope("space:family");
@@ -265,7 +265,7 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
   });
 
-  it("migrates a saved Transfers tab to Files", () => {
+  it("migrates a saved Transfers tab to the Files transfers view", () => {
     const legacyTab = {
       id: "tab:legacy",
       surfaceId: "transfers",
@@ -292,7 +292,7 @@ describe("desktop dock store", () => {
     const restored = dockTreeViews(useWorkspaceStore.getState().layout.root);
     expect(restored).toHaveLength(1);
     expect(restored[0].surfaceId).toBe("files");
-    expect(restored[0].route).toBe("/files");
+    expect(restored[0].route).toBe("/files?view=transfers");
     expect(restored[0].groupKey).toBe("tool:files");
   });
 
@@ -484,7 +484,7 @@ describe("desktop dock store", () => {
     expect(splitId).toBeTruthy();
     expect(leaves).toHaveLength(2);
     expect(leaves[0].views.map((tab) => tab.surfaceId)).toEqual([browser.surfaceId]);
-    expect(leaves[1].views).toMatchObject([{ placeholder: true, title: "Home" }]);
+    expect(leaves[1].views).toMatchObject([{ placeholder: true, title: "google.com" }]);
   });
 
   it("opens a tool tab into an empty split panel", () => {
@@ -543,7 +543,9 @@ describe("desktop dock store", () => {
     expect(leaves).toHaveLength(2);
     expect(leaves.flatMap((leaf) => leaf.views).map((tab) => tab.id)).toContain(browser.id);
     expect(leaves.every((leaf) => leaf.views.length > 0)).toBe(true);
-    expect(leaves.flatMap((leaf) => leaf.views).map((tab) => tab.surfaceId)).toContain("home");
+    expect(findDockLeaf(useWorkspaceStore.getState().layout.root, empty.id)?.views).toMatchObject([
+      { surfaceId: "browser", route: "/browser", placeholder: true },
+    ]);
   });
 
   it("rejects split geometry that would violate either widget minimum", () => {
@@ -623,10 +625,9 @@ describe("desktop dock store", () => {
       sourceViewId: first.id,
     });
     const tabs = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(tabs.filter((tab) => tab.surfaceId === "browser").map((tab) => tab.id)).toEqual([
-      first.id,
-      second.id,
-    ]);
+    const firstIndex = tabs.findIndex((tab) => tab.id === first.id);
+    expect(firstIndex).toBeGreaterThanOrEqual(0);
+    expect(tabs[firstIndex + 1].id).toBe(second.id);
     useWorkspaceStore
       .getState()
       .updateBrowserView(second.id, { url: "https://misty.com", title: "Misty" });

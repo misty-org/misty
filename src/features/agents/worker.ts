@@ -1,5 +1,4 @@
 import { subscribeAccountEvents } from "@/api/accountEvents";
-import { apiBlobRequest } from "@/api/client";
 import { mistyDeviceJobsEnabled } from "./flags";
 import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "./model/interfaces/types";
@@ -11,15 +10,29 @@ import {
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
 import { invoke } from "@tauri-apps/api/core";
-import { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
+import {
+  browserUncertainErrorCode,
+  isBrowserSnapshotStale,
+  deviceContentReference,
+  deviceWorkflowErrorCode,
+} from "./workerDeviceJobs";
+
+import {
+  browserAgentExecutionRequest,
+  browserDeviceRequest,
+  browserRuntimeIdForScope,
+  DeviceOperationNotAttempted,
+  registerRunBoundBrowserContext,
+  type ClaimedWorkflowNodeJob,
+} from "./workerBrowserJobs";
 
 export { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
-
-const browserRuntimeIdForScope = (scopeId: string) =>
-  invoke<string>("browser_runtime_for_scope", { scopeId });
+export { browserAgentExecutionRequest, browserDeviceRequest } from "./workerBrowserJobs";
+export type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
 const leaseHeartbeatMs = 20_000;
 const nodeExecutionTimeoutMs = 5 * 60_000;
+const jobReconciliationMs = 60_000;
 
 export class DesktopAgentJobWorker {
   private generation = 0;
@@ -34,6 +47,7 @@ export class DesktopAgentJobWorker {
   private presence?: ReturnType<typeof setInterval>;
   private refreshPresence?: () => Promise<unknown>;
   private presenceBusy = false;
+  private lastDiscoveryAt = 0;
 
   start(accountId: string): void {
     if (this.running || !mistyDeviceJobsEnabled()) return;
@@ -43,8 +57,9 @@ export class DesktopAgentJobWorker {
       if (event.topic === "reset" || event.topic === "jobs") this.wake();
     });
     this.wake();
-    // Presence keeps this device eligible for queued work; it is a liveness
-    // heartbeat, not a request to discover jobs or inspect their status.
+    // Notifications provide immediate delivery. A bounded claim reconciliation
+    // also recovers queued work if a feed handover or reconnect loses its wake.
+    // The server's existing claim lease remains the only execution authority.
     this.presence = setInterval(() => {
       if (this.presenceBusy || !this.refreshPresence) return;
       this.presenceBusy = true;
@@ -52,6 +67,7 @@ export class DesktopAgentJobWorker {
         .catch(() => {})
         .finally(() => {
           this.presenceBusy = false;
+          if (Date.now() - this.lastDiscoveryAt >= jobReconciliationMs) this.wake();
         });
     }, 30_000);
   }
@@ -89,6 +105,7 @@ export class DesktopAgentJobWorker {
           ? Promise.resolve()
           : heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
       while (current() && this.active.size < 8) {
+        this.lastDiscoveryAt = Date.now();
         const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id);
         if (!current()) return;
         this.failures = 0;
@@ -213,7 +230,9 @@ export class DesktopAgentJobWorker {
           job.id,
           {
             leaseToken: claim.leaseToken,
-            errorCode: uncertain ? "device_execution_uncertain" : deviceWorkflowErrorCode(error),
+            errorCode: uncertain
+              ? browserUncertainErrorCode(error)
+              : deviceWorkflowErrorCode(error),
           },
         );
     } finally {
@@ -303,6 +322,9 @@ async function executeWorkflowNodeOnDevice(
         },
       });
     } catch (error) {
+      // Let the coordinator request a new frame; no input was attempted and
+      // this is not a terminal desktop-control error for the user.
+      if (isBrowserSnapshotStale(error)) throw new DeviceOperationNotAttempted(error);
       if (job.operation.startsWith("browser.workspace.")) {
         window.dispatchEvent(
           new CustomEvent("misty:autopilot-error", {
@@ -315,8 +337,6 @@ async function executeWorkflowNodeOnDevice(
         if (job.operation === "browser.workspace.visual")
           throw new DeviceOperationNotAttempted(error);
       }
-      if (String(error).startsWith("browser_snapshot_stale:"))
-        throw new DeviceOperationNotAttempted(error);
       throw error;
     } finally {
       signal.removeEventListener("abort", cancel);
@@ -368,65 +388,6 @@ async function executeWorkflowNodeOnDevice(
   };
 }
 
-export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
-  const contextId = job.contextId;
-  if (!job.operation.startsWith("browser.") || !contextId || !job.scopeId) {
-    throw new Error("invalid_browser_grant");
-  }
-  const agentId =
-    job.config && typeof job.config === "object" && "agentId" in job.config
-      ? String(job.config.agentId)
-      : "";
-  if (!agentId) throw new Error("invalid_browser_grant");
-  return {
-    scopeId: job.scopeId,
-    grantId: `${contextId}:${job.id}`,
-    agentId,
-    operation: job.operation,
-    input: {
-      ...(job.input && typeof job.input === "object" ? job.input : {}),
-      __mistyTaskId:
-        job.config && typeof job.config === "object" && "taskId" in job.config
-          ? job.config.taskId
-          : undefined,
-    },
-  };
-}
-
-async function registerRunBoundBrowserContext(job: ClaimedWorkflowNodeJob["job"]): Promise<void> {
-  const contextId = job.contextId;
-  const config =
-    job.config && typeof job.config === "object" ? (job.config as Record<string, unknown>) : {};
-  const agentId = String(config.agentId || "");
-  const capabilities = Array.isArray(config.contextCapabilities)
-    ? config.contextCapabilities.map(String)
-    : [];
-  const expiresAt = String(config.contextExpiresAt || "");
-  if (!contextId || !agentId || !expiresAt || !capabilities.includes(job.operation)) {
-    throw new Error("invalid_browser_grant");
-  }
-  const runtimeId = await browserRuntimeIdForScope(job.scopeId).catch(() => null);
-  if (!runtimeId) throw new Error("browser_context_closed");
-  await invoke("browser_agent_grant_register", {
-    request: {
-      id: runtimeId,
-      scopeId: job.scopeId,
-      grantId: `${contextId}:${job.id}`,
-      agentId,
-      capabilities: [job.operation],
-      expiresAt: new Date(
-        Math.min(Date.parse(expiresAt), Date.parse(job.deadlineAt ?? "")),
-      ).toISOString(),
-    },
-  });
-}
-
-class DeviceOperationNotAttempted extends Error {
-  constructor(error: unknown) {
-    super(error instanceof Error ? error.message : String(error));
-  }
-}
-
 async function loadLocalAgentDevice(): Promise<AgentDevice> {
   const snapshot = await agentsDeviceSnapshot();
   if (!snapshot.device || snapshot.device.status === "revoked") {
@@ -446,74 +407,4 @@ function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
     if (signal.aborted) abort();
     operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
   });
-}
-
-export interface ClaimedWorkflowNodeJob {
-  job: {
-    spaceId?: string;
-    id: string;
-    runId: string;
-    nodeId: string;
-    scopeId: string;
-    operation: string;
-    contextId?: string;
-    attempt: number;
-    controlVersion?: number;
-    deadlineAt?: string;
-    leaseExpiresAt?: string | null;
-    cancelRequestedAt?: string | null;
-    input: unknown;
-    config: unknown;
-  };
-  leaseToken: string;
-  leaseExpiresAt?: string | null;
-}
-
-export async function browserDeviceRequest(job: ClaimedWorkflowNodeJob["job"]) {
-  const request = browserAgentExecutionRequest(job);
-  if (job.operation !== "browser.upload") return request;
-  const config = job.config as {
-    upload?: { id: string; name: string; mimeType: string; byteSize: number; sha256: string };
-    taskId?: string;
-    downloadUpload?: { downloadId: string; sourceScopeId: string };
-  };
-  const input = job.input as {
-    attachmentId?: string;
-    downloadId?: string;
-    sourceScopeId?: string;
-  };
-  if (input.downloadId || input.sourceScopeId || config.downloadUpload) {
-    const source = config.downloadUpload;
-    if (
-      !config.taskId ||
-      !source ||
-      input.attachmentId ||
-      config.upload ||
-      !source.downloadId ||
-      !source.sourceScopeId ||
-      source.downloadId !== input.downloadId ||
-      source.sourceScopeId !== input.sourceScopeId
-    )
-      throw new DeviceOperationNotAttempted("invalid_task_download");
-    // Native resolves the opaque receipt, verifies task ownership and checks
-    // its pinned hash. Never accept a model-supplied local path or file bytes.
-    return request;
-  }
-  const file = config.upload;
-  if (
-    !file ||
-    file.id !== (job.input as { attachmentId?: string })?.attachmentId ||
-    file.byteSize > 10 * 1024 * 1024
-  )
-    throw new DeviceOperationNotAttempted("invalid_task_file");
-  const blob = await apiBlobRequest(`/misty/attachments/${encodeURIComponent(file.id)}/content`);
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const hash = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-  if (bytes.length !== file.byteSize || hash !== file.sha256)
-    throw new DeviceOperationNotAttempted("task_file_changed");
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 8192)
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  return { ...request, input: { ...request.input, file: { ...file, base64: btoa(binary) } } };
 }

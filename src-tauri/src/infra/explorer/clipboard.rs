@@ -146,7 +146,8 @@ impl ExplorerService {
             );
             record.local_source_path = display_path(&source);
             record.local_dest_path = display_path(&destination);
-            record.total_bytes = local_item_size(&source, item.is_directory).await;
+            let total_bytes = local_item_size(&source, item.is_directory).await;
+            record.total_bytes = total_bytes;
             record.detail_message = "Transferring local item".to_string();
             if let Some(id) = if existing_transfer_id.is_some() {
                 existing_transfer_id
@@ -156,14 +157,39 @@ impl ExplorerService {
                 transfer_ids.push(id);
             }
 
+            let mut progress = transfer_ids.last().map(|id| {
+                super::transfer_progress::LocalTransferProgress::new(
+                    self.transfers.clone(),
+                    *id,
+                    total_bytes,
+                )
+            });
+            if let Some(id) = transfer_ids.last() {
+                let _ = self.transfers.reset_local_progress(*id, total_bytes).await;
+            }
             let result = match request.operation {
                 crate::domain::explorer::ClipboardOperation::Copy => {
-                    copy_local_path_cancellable(&source, &destination, cancellation).await
+                    copy_local_path_with_progress(
+                        &source,
+                        &destination,
+                        cancellation,
+                        progress.as_mut(),
+                    )
+                    .await
                 }
                 crate::domain::explorer::ClipboardOperation::Move => {
-                    move_local_path_cancellable(&source, &destination, cancellation).await
+                    move_local_path_with_progress(
+                        &source,
+                        &destination,
+                        cancellation,
+                        progress.as_mut(),
+                    )
+                    .await
                 }
             };
+            if let Some(progress) = progress.as_mut() {
+                progress.flush().await;
+            }
             let result = cleanup_partial_destination_on_cancel(
                 &destination,
                 source_metadata.is_dir() && !source_metadata.file_type().is_symlink(),

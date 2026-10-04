@@ -12,6 +12,14 @@ Durable Misty execution built with AI SDK 7 `WorkflowAgent`. The runtime has no 
 
 Tokens cannot be reused for another Misty run or Vercel Workflow run. During a rolling deployment, the runtime falls back to the signed legacy tool endpoint only when token discovery is unavailable and before any tool execution begins.
 
+## Tool calls
+
+- The model sees every tool in the run's catalog under its Misty name, with dots as underscores (`notes.search` is `notes_search`). There is no discovery tool or working set; Go decides what the catalog contains.
+- A call Misty rejected without effect, and any failed read, returns its error to the model, which corrects the call or picks another tool. Later calls from the same model response are reported as not attempted.
+- A write whose outcome is unknown, a denied approval, an unavailable device, a required sign-in, or a write repeated after the same rejection stops the run.
+- The model reports the outcome with `misty_finish_task`. `misty_browser_act` runs Midscene against the assigned browser when the native adapter is available.
+- `workflows/space-task-agent.ts` only orchestrates the run. Tool naming lives in `src/model-tools.ts`, call outcomes in `src/tool-outcomes.ts` and `src/tool-monitor.ts`, transport in `src/tool-calls.ts`, and lifecycle steps in `src/control-plane-steps.ts`.
+
 ## Worlds
 
 - Local development: omit `WORKFLOW_TARGET_WORLD` to use Workflow's local world.
@@ -74,6 +82,39 @@ direct OpenAI, Anthropic, Google, or OpenAI-compatible model with
 `MISTY_AGENT_MODEL_BASE_URL`. Configure the API and runtime consistently; a run
 pinned to a different model fails rather than silently switching provider.
 
-`InstanceModel` persists only the model ID at workflow boundaries and resolves
-operator credentials inside model execution. Never replace it with a serialized
+`InstanceModel` persists only public model/run/role identity at workflow boundaries
+and resolves credentials inside model execution. Never replace it with a serialized
 SDK model that contains resolved authorization headers.
+
+## Account provider settings
+
+Settings → Agents → Models manages account-owned OpenAI, Anthropic, Google,
+Vercel Gateway and custom OpenAI-compatible connections. Provider secrets are
+write-only, encrypted with the server's connection encryption key, and bound to
+one user/connection/provider. They are separate from synchronized preferences.
+Custom account endpoints must be public HTTPS; transports revalidate and pin DNS
+on each connection, reject private/reserved addresses and do not follow redirects.
+Operator environment configuration remains the default for unassigned tasks.
+
+Each supported task selects one connection/model/reasoning choice. The Models
+page limits connections by the implemented protocol: all five providers for
+SDK agent/vision calls; OpenAI and Gateway for follow-up routing and realtime;
+OpenAI, Gateway and OpenAI-compatible for Library, embeddings, transcription and
+speech. Realtime account connections use the server-owned WebSocket adapter.
+
+The signed `model-provider` callback validates the active runtime binding and
+its frozen role/model before resolving credentials inside the model step. No
+credential response is cached or serialized into workflow history. Main agent
+and visual planning turns are admitted and settled under their respective models.
+There is no implicit model/provider fallback. Optional Library second passes
+and transcription retries can be disabled or assigned explicitly.
+
+“Use OpenAI defaults” selects GPT-6 Luna with low reasoning, Realtime 2.1 Mini,
+text-embedding-3-small, gpt-4o-mini-transcribe and tts-1. It disables optional
+second passes; users review and save choices before they apply. Text embeddings
+index Library descriptions instead of raw images. Visual search needs a
+multimodal embedding route. Search excludes vectors from a different embedding
+model; switching models requires approved reindexing for existing files.
+
+Apply migration `20271004030000_ai_provider_settings.sql` and deploy API/runtime
+changes together before enabling the new settings UI.

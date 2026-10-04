@@ -1,6 +1,5 @@
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import { initializeHostLibraryRuntime } from "@/features/library/library";
-import { isWebBuild } from "@/shared/platform/buildTarget";
 import {
   configureMistyBrowserLinkOpener,
   installExternalLinkRouting,
@@ -10,19 +9,17 @@ import { analytics } from "@/telemetry/client";
 import { initializeAnalyticsLifecycle } from "@/telemetry/lifecycle";
 import { TelemetryErrorBoundary } from "@/telemetry/TelemetryErrorBoundary";
 import ReactDOM from "react-dom/client";
-if (!isWebBuild) {
-  configureMistyBrowserLinkOpener(async (url) => {
-    if (!hasTauriInternals())
-      throw new Error("Misty Browser is unavailable outside the desktop app.");
-    const { useWorkspaceStore } = await import("@/features/workspace");
-    if (
-      !useWorkspaceStore.getState().openBrowserView({
-        url,
-      })
-    )
-      throw new Error("Misty Browser could not open this link.");
-  });
-}
+configureMistyBrowserLinkOpener(async (url) => {
+  if (!hasTauriInternals())
+    throw new Error("Misty Browser is unavailable outside the desktop app.");
+  const { useWorkspaceStore } = await import("@/features/workspace");
+  if (
+    !useWorkspaceStore.getState().openBrowserView({
+      url,
+    })
+  )
+    throw new Error("Misty Browser could not open this link.");
+});
 installExternalLinkRouting();
 initializeHostLibraryRuntime();
 initializeHostAgentsRuntime();

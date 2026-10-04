@@ -11,7 +11,7 @@ description: A compact, input-first overlay within the established Misty workspa
 
 This guide covers the docked desktop Misty overlay, including its upper composer and detached bottom controls. Inherit tokens, shared primitives, and product constraints from the root [DESIGN.md](../../../DESIGN.md) and [PRODUCT.md](../../../PRODUCT.md). This is a scoped refinement of that system; the separate search launcher and Agents workspace keep their own composition.
 
-The overlay is an Operate surface. A person starts with the message field, switches the active agent from its name, and reveals thinking choices only when needed. The confirmed direction preserves the incumbent dark desktop identity and reduces setup around the input. It does not establish a replacement product identity or a native mobile layout.
+The overlay is an Operate surface. A person starts with the message field, switches the active agent from its name, and reveals thinking choices only when needed. The confirmed direction preserves the incumbent dark desktop identity and reduces setup around the input. It does not establish a replacement product identity.
 
 **Key Characteristics:**
 
@@ -78,6 +78,12 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 - **Don't** add visible Attach or Options text beside their compact icon triggers.
 - **Don't** apply this overlay composition as a new product-wide visual identity.
 
-The finish review used actual isolated component fixtures captured in `.impeccable/review/desktop.png`, `thinking.png`, `agents.png`, `microphone.png`, and `mobile.png`; disposition was ship, with no material fixes. The file named `mobile.png` is a (375px) narrow desktop-browser viewport, not native mobile or touch evidence. The authority was the precise refinement brief and incumbent design, with no approved comp. These captures do not verify the live full application, backend execution, native desktop capture, or native mobile behavior.
+The authority was the precise refinement brief and incumbent design, with no approved comp.
 
 Shared attachment drag/upload colors and recording/error colors are preserved local states, not new palette guidance. This scoped refresh inherits the root token frontmatter and sidecar; it does not regenerate either root artifact.
+
+## Shared lifecycle and bounded folder work
+
+The phase 1–2 extension preserves the input-first floating layout while sharing draft attachments, conversation and invocation identity with Agents and Talk to Companion. Typed follow-ups during a run queue into that invocation; queued feedback is shown only while work is active. Opening the popup never starts a new run or microphone session. Stop audio is independent of Stop task.
+
+Place the compact Organize folder control and receipt below the composer, after identity and input. Use the shared monochrome controls and neutral user message bubbles. File proposals show readable planned paths or access-recovery copy, never JSON. Receipts persist on the authorized device and explicitly distinguish verified effects, partial work and undo. Detailed functional limits and live versus automated evidence are in `docs/design/agent-workflows/IMPLEMENTATION.md`.

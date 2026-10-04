@@ -21,6 +21,7 @@ mod browser_pointer_guard_macos;
 #[cfg(desktop)]
 mod browser_scripts;
 pub mod browser_search_suggest;
+pub mod extensions;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
 mod browser_theme;
@@ -129,3 +130,6 @@ pub mod cursor_companion;
 pub mod browser_site_permissions;
 
 pub mod settings_profile_store;
+
+#[cfg(unix)]
+pub mod agent_files;

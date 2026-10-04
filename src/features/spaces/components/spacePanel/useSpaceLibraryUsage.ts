@@ -13,7 +13,7 @@ import {
 } from "../../store/usageCache";
 
 /**
- * Storage quota for the active Space, cached and rechecked when the Space's
+ * Account storage capacity with attribution for the active Space, refreshed when its
  * Library changes (its realtime events cover every member's uploads).
  */
 export function useSpaceLibraryUsage(options: {
@@ -76,25 +76,25 @@ export function useSpaceLibraryUsage(options: {
           ownerStorage?.remaining_bytes,
         overQuota: usage?.personal_over_quota,
       });
-    const space =
-      usage?.space ??
-      storageDimension({
-        used: usage?.space_used_bytes ?? spaceItem?.used_bytes,
-        reserved: usage?.space_reserved_bytes ?? spaceItem?.reserved_bytes,
-        // On older servers the flat limit represented the owner-plan pool.
-        limit: usage?.space_limit_bytes ?? usage?.limit_bytes ?? ownerStorage?.limit_bytes,
-        remaining: usage?.space_remaining_bytes ?? usage?.remaining_bytes,
-        overQuota: usage?.space_over_quota,
-      });
+    const space: StorageQuotaDimension = {
+      used_bytes: usage?.space?.used_bytes ?? usage?.space_used_bytes ?? spaceItem?.used_bytes ?? 0,
+      reserved_bytes:
+        usage?.space?.reserved_bytes ??
+        usage?.space_reserved_bytes ??
+        spaceItem?.reserved_bytes ??
+        0,
+      // Spaces retain attribution only. Their owner never supplies an allowance.
+      limit_bytes: 0,
+      remaining_bytes: 0,
+      over_quota: false,
+    };
 
     return {
       ...usage,
       space_id: activeSpaceId,
       personal,
       space,
-      storage_available:
-        usage?.storage_available ??
-        ((personal?.remaining_bytes ?? 1) > 0 && (space?.remaining_bytes ?? 1) > 0),
+      storage_available: usage?.storage_available ?? (personal?.remaining_bytes ?? 1) > 0,
     };
   }, [activeSpace, activeSpaceId, ownerStorage, usage]);
 }
@@ -114,7 +114,7 @@ function storageDimension(values: {
     used_bytes: used,
     reserved_bytes: reserved,
     limit_bytes: limit,
-    remaining_bytes: values.remaining ?? Math.max(0, limit - used - reserved),
-    over_quota: values.overQuota ?? used + reserved > limit,
+    remaining_bytes: values.remaining ?? 0,
+    over_quota: values.overQuota ?? false,
   };
 }

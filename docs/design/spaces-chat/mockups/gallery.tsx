@@ -14,8 +14,6 @@ const production = [
   ["production-all-favorites.jpg", "Production · Favorites"],
   ["production-edit.jpg", "Production · Inline editing"],
   ["production-narrow.jpg", "Production · Narrow workspace"],
-  ["production-mobile.jpg", "Production · Mobile messages"],
-  ["production-mobile-switcher.jpg", "Production · Mobile switcher"],
 ];
 const desktop = [
   ["chat-desktop.jpg", "Conversation"],
@@ -30,17 +28,6 @@ const desktop = [
   ["all-favorites.jpg", "All · Favorites"],
   ["chat-narrow.jpg", "A narrower workspace"],
   ["all-narrow-grid.jpg", "Collection grid"],
-];
-const mobile = [
-  ["chat-mobile.jpg", "Mobile chat"],
-  ["chat-mobile-switcher.jpg", "Conversation sheet"],
-  ["chat-mobile-reaction.jpg", "Mobile reactions"],
-  ["sidebar-mobile.jpg", "Space navigation"],
-  ["all-mobile.jpg", "Mobile collection"],
-  ["chat-empty.jpg", "First conversation"],
-  ["chat-loading.jpg", "Loading messages"],
-  ["chat-read-only.jpg", "Read-only conversation"],
-  ["chat-long-title-mobile.jpg", "Long conversation name"],
 ];
 function capture(file: string) {
   return new URL(`./screenshots/${file}`, import.meta.url).href;
@@ -106,10 +93,6 @@ function Gallery() {
       </p>
       <div className="grid gap-x-6 gap-y-10 lg:grid-cols-2">
         <Figures entries={desktop} />
-      </div>
-      <h2 className="mb-6 mt-16 text-xl font-medium">On a smaller screen</h2>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
-        <Figures entries={mobile} />
       </div>
     </main>
   );
