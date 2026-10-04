@@ -185,28 +185,3 @@ func (db *Database) DeleteOrClearSpaceConversation(ctx context.Context, userID, 
 		return err
 	})
 }
-
-func (db *Database) ClearEveryoneConversation(ctx context.Context, userID, spaceID string) error {
-	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
-			return err
-		}
-		rows, err := tx.QueryContext(ctx, `SELECT id FROM space_messages WHERE space_id=$1 AND conversation_id IS NULL FOR UPDATE`, spaceID)
-		if err != nil {
-			return err
-		}
-		ids := []string{}
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				rows.Close()
-				return err
-			}
-			ids = append(ids, id)
-		}
-		if err := rows.Close(); err != nil {
-			return err
-		}
-		return cleanupSpaceMessagesTx(ctx, tx, spaceID, ids)
-	})
-}

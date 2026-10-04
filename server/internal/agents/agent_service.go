@@ -34,20 +34,6 @@ const MaxToolRounds = 12
 // ErrToolRoundLimit is returned when a run exceeds MaxToolRounds.
 var ErrToolRoundLimit = errors.New("agent run exceeded its tool round limit")
 
-// CompleteWithToolsContext runs the same agent session/tool protocol used by
-// interactive chat, but dispatches each manifest-authorized request through a
-// server-owned executor. This is the bridge used by automated Agent tasks;
-// finite provider/tool limits remain enforced by the Session service.
-//
-// systemPrompt carries the selected Agent's identity and approved instructions.
-// It must not be folded into the user message: the prompt builder surfaces it
-// as agent_instructions_and_context, and the persona rule refuses to adopt any
-// identity that does not arrive through that field. Callers with no Agent
-// identity of their own pass an empty string.
-func (s *Service) CompleteWithToolsContext(ctx context.Context, userID, billingUserID, systemPrompt, prompt string, tier AgentTier, manifest ToolManifest, execute ToolExecutor) (ToolCompletion, error) {
-	return s.CompleteWithToolsForSpaceContext(ctx, userID, billingUserID, "", systemPrompt, prompt, tier, manifest, execute)
-}
-
 func (s *Service) CompleteWithToolsForSpaceContext(ctx context.Context, userID, billingUserID, spaceID, systemPrompt, prompt string, tier AgentTier, manifest ToolManifest, execute ToolExecutor) (ToolCompletion, error) {
 	spaceID = strings.TrimSpace(spaceID)
 	if spaceID != "" {
@@ -124,14 +110,6 @@ func (s *Service) CompleteWithToolsForSpaceContext(ctx context.Context, userID, 
 			return ToolCompletion{}, err
 		}
 	}
-}
-
-func (s *Service) Complete(userID, prompt, meterName string) (string, UsageSettlement, error) {
-	return s.CompleteWithTier(userID, prompt, meterName, TierLow)
-}
-
-func (s *Service) CompleteWithTier(userID, prompt, meterName string, tier AgentTier) (string, UsageSettlement, error) {
-	return s.CompleteWithTierContext(context.Background(), userID, prompt, meterName, tier)
 }
 
 func (s *Service) CompleteWithTierContext(ctx context.Context, userID, prompt, meterName string, tier AgentTier) (string, UsageSettlement, error) {
@@ -220,10 +198,6 @@ func NewService(store *SessionStore, provider ModelProvider, options ...ServiceO
 	return service
 }
 
-func (s *Service) Store() *SessionStore {
-	return s.store
-}
-
 func (s *Service) ProviderStatus() (string, string) {
 	return s.ProviderStatusForTier(TierLow)
 }
@@ -237,10 +211,6 @@ func TestingProviderStatus(provider ModelProvider) (string, string) {
 		return info.ProviderName(), info.ModelName()
 	}
 	return ProviderMock, "mock"
-}
-
-func (s *Service) CreateSession(userID string) *Session {
-	return s.store.Create(userID)
 }
 
 func (s *Service) CreateSessionWithBillingAndSpace(userID, billingUserID, spaceID string) *Session {
@@ -269,8 +239,4 @@ func (s *Service) SetSessionSystemPrompt(sessionID, userID, systemPrompt string)
 		session.SystemPrompt = strings.TrimSpace(systemPrompt)
 		return nil
 	})
-}
-
-func (s *Service) CreateSessionForJob(userID, billingUserID, jobID string) *Session {
-	return s.store.CreateWithBillingScope(userID, billingUserID, "agent-job:"+jobID)
 }

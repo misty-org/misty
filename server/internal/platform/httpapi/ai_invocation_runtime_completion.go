@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *http.Request) {
@@ -49,11 +48,6 @@ func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *
 			return
 		}
 	}
-	if record.SurfaceID == "routine" {
-		writeAgentError(w, db.ErrSpaceInvalid)
-		return
-	}
-
 	var eventErr error
 	appendEvent := func(event aiInvocationEvent) {
 		if eventErr != nil {
@@ -120,22 +114,6 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 	}
 	if body.Status != "success" && body.Status != "failed" && body.Status != "incomplete" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_completion_status"})
-		return
-	}
-	if existing, lookupErr := s.database.AIInvocationRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && existing.SurfaceID == "routine" {
-		if err := s.retireRemovedInvocation(r.Context(), existing); err != nil {
-			writeAgentError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"run_id": existing.ID, "accepted": true})
-		return
-	}
-	if existing, lookupErr := s.database.AIInvocationRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && existing.SurfaceID == "sdk" {
-		if err := s.completeSDKInvocation(r.Context(), existing, false); err != nil {
-			writeAgentError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"run_id": existing.ID, "accepted": true})
 		return
 	}
 	record, err := s.database.ValidateAIInvocationRuntime(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID)

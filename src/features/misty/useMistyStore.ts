@@ -32,7 +32,6 @@ import {
   globalAiContext,
   patchConversationMessage,
   replaceActiveGlobalInvocationStream,
-  stopGlobalAgentWatches,
   updateConversation,
 } from "@/features/global-search/globalSearchStoreHelpers";
 import { create } from "zustand";
@@ -41,13 +40,9 @@ import { requestHostContext } from "./contextBridge";
 import { resetMistyDraftAttachments } from "./draftAttachments";
 import { continueAfterScreenRequest } from "./screenRequests";
 import { createMistyConversationActions } from "./mistyConversationActions";
-import { createMistyProposalActions } from "./mistyProposalActions";
 import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
 
-export type {
-  GlobalSearchState,
-  MistySubmissionPresentation,
-} from "@/features/global-search/globalSearchState";
+export type { GlobalSearchState } from "@/features/global-search/globalSearchState";
 const uncertainAdmissions = new Map<string, string>();
 let steeringRequest:
   | { accountId: string; invocationId: string; text: string; key: string; pending?: Promise<void> }
@@ -65,7 +60,6 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     void stopAgentWindowTask().catch(() => {});
     void finishLocalExecution();
     replaceActiveGlobalInvocationStream();
-    stopGlobalAgentWatches();
     createGlobalSearchPanelState(set, get).setAccount(accountId);
     set({
       mode: "ask",
@@ -93,6 +87,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   search: (query) => executeGlobalSearch(set, get, query),
   visualSearch: (attachmentId, query) => executeGlobalVisualSearch(set, get, attachmentId, query),
   ...createMistyConversationActions(set, get),
+  submitAgentTask: async (prompt, _paneId, presentation = "panel") =>
+    get().submitAnswer(prompt, [], undefined, presentation),
   cancelResponse: async () => {
     advanceSubmissionEpoch();
     const accountId = get().accountId;
@@ -672,5 +668,4 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
     }
   },
-  ...createMistyProposalActions(set, get),
 }));

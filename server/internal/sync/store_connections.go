@@ -184,30 +184,6 @@ func (db *Store) BrowserSyncProgress(ctx context.Context, i SyncConnectionIdenti
 	return caughtUp, cloudusage.Commit(ctx, tx)
 }
 
-// BrowserSyncHeartbeat is the per-heartbeat liveness write used before
-// instance leases. It remains for callers that still refresh a connection.
-func (db *Store) BrowserSyncHeartbeat(ctx context.Context, i SyncConnectionIdentity, connectionID string, applied int64, ready bool, epochs ...string) error {
-	if !validSyncID(connectionID) || applied < 0 || applied > SyncMaxCounter {
-		return ErrSyncInvalid
-	}
-	result, err := db.Conn.ExecContext(ctx, `INSERT INTO browser_sync_connections(connection_id,vault_id,device_id,ready,applied_sequence)
- SELECT $4,w.vault_id,d.device_id,$6,$5 FROM browser_sync_vaults w JOIN browser_sync_devices d USING(vault_id)
- WHERE w.user_id=$1 AND w.vault_id=$2 AND d.device_id=$3 AND d.revoked_at IS NULL AND $5<=w.head_sequence
- ON CONFLICT(connection_id) DO UPDATE SET ready=EXCLUDED.ready,applied_sequence=EXCLUDED.applied_sequence,expires_at=clock_timestamp()+interval '45 seconds',last_seen_at=clock_timestamp()
- WHERE browser_sync_connections.vault_id=EXCLUDED.vault_id AND browser_sync_connections.device_id=EXCLUDED.device_id`, i.UserID, i.VaultID, i.DeviceID, connectionID, applied, ready)
-	if err != nil {
-		return err
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n != 1 {
-		return ErrSyncForbidden
-	}
-	return nil
-}
-
 // BrowserSyncDisconnect removes a closed socket's row and keeps the device's
 // last-seen time, so the table holds only open connections.
 func (db *Store) BrowserSyncDisconnect(ctx context.Context, i SyncConnectionIdentity, connectionID string) error {

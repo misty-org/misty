@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	agent "github.com/kannachi323/misty/server/internal/agents"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 // Routing is a read-only model decision. It cannot grant apps, activate a mode,
@@ -15,10 +14,6 @@ func (s *AIService) AgentFollowup() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)
 		if !ok {
-			return
-		}
-		if db.AppAuthorityFromContext(r.Context()) != nil {
-			http.Error(w, "host only", http.StatusForbidden)
 			return
 		}
 		var input struct {

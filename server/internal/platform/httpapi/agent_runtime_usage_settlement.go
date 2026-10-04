@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
@@ -171,9 +170,5 @@ func runtimeAdmissionUnits(raw json.RawMessage) map[string]int64 {
 
 // Keep usage identity aligned with the actual instance provider.
 func agentRuntimeUsageProvider() string {
-	config, err := envconfig.AgentModel()
-	if err == nil && config.Provider != "gateway" {
-		return config.Provider
-	}
 	return "ai-gateway"
 }

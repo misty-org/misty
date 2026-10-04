@@ -56,7 +56,7 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			return
 		}
 		node := "model:screen:" + job.ID + ":" + strconv.Itoa(call)
-		if err := s.meterAIInvocationRuntimeModel(r.Context(), record, node, "running", mustJSONRaw(map[string]any{"input_bytes": len(raw)})); err != nil {
+		if err := s.meterAIInvocationRuntimeModel(r.Context(), record, node, "running", TestingMustAPIRawJSON(map[string]any{"input_bytes": len(raw)})); err != nil {
 			writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": "screen_model_budget", "message": "The task's model allowance is used up."})
 			return
 		}
@@ -70,7 +70,7 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 		if err != nil {
 			completion = map[string]any{}
 		}
-		_ = s.meterAIInvocationRuntimeModel(context.WithoutCancel(r.Context()), record, node, "completed", mustJSONRaw(completion))
+		_ = s.meterAIInvocationRuntimeModel(context.WithoutCancel(r.Context()), record, node, "completed", TestingMustAPIRawJSON(completion))
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "screen_model_failed", "message": "The screen model could not answer. Try again."})
 			return

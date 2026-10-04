@@ -1,24 +1,11 @@
 import { useSettingsStore } from "@/features/settings";
 import { runtimeAssistantApi as assistantApi } from "@/features/agents/AgentsRuntime";
 import type {
-  GlobalAiActionProposal,
-  GlobalAiCitation,
-  GlobalAiContextRef,
   GlobalAiConversation,
-  GlobalAiMessage,
-  GlobalAiMode,
   GlobalSearchDocument,
   GlobalSearchFilters,
   GlobalSearchResult,
 } from "./types";
-
-interface TurnResponse {
-  conversation?: GlobalAiConversation;
-  message?: GlobalAiMessage;
-  text?: string;
-  citations?: GlobalAiCitation[];
-  action?: GlobalAiActionProposal;
-}
 
 export const globalMistyApi = {
   search: (query: string, filters?: GlobalSearchFilters, limit = 40) =>
@@ -39,17 +26,7 @@ export const globalMistyApi = {
   deleteConversation: assistantApi.deleteConversation,
   renameConversation: assistantApi.renameConversation,
   bindConversationSpace: assistantApi.bindConversationSpace,
-  turn: (
-    conversationId: string,
-    input: {
-      mode: Exclude<GlobalAiMode, "search">;
-      prompt: string;
-      context: GlobalAiContextRef[];
-    },
-  ) => assistantApi.turn<TurnResponse, GlobalAiContextRef>(conversationId, input),
   complete: assistantApi.complete,
-  decideProposal: (proposalId: string, approved: boolean) =>
-    assistantApi.decideProposal<GlobalAiActionProposal>(proposalId, approved),
 };
 
 function newConversationDefaults(): { model_id?: string; reasoning_effort?: string } {

@@ -9,41 +9,6 @@ import (
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
-func TestProviderOAuthAvailabilityCatalogReportsServerConfiguration(t *testing.T) {
-	for _, definition := range TestingProviderOAuthCatalog {
-		t.Setenv(definition.ClientIDEnv, "")
-		t.Setenv(definition.ClientSecretEnv, "")
-	}
-	t.Setenv("GITHUB_APP_ID", "gh-app")
-	t.Setenv("GITHUB_APP_SLUG", "gh-slug")
-	t.Setenv("GITHUB_APP_PRIVATE_KEY", "gh-key")
-	t.Setenv("GITHUB_WEBHOOK_SECRET", "gh-secret")
-
-	providers := TestingProviderOAuthAvailabilityCatalog()
-	if len(providers) != 1 {
-		t.Fatalf("provider availability count = %d, want 1", len(providers))
-	}
-	for index, provider := range providers {
-		if index > 0 && providers[index-1].Provider > provider.Provider {
-			t.Fatalf("provider availability is not sorted: %+v", providers)
-		}
-		if provider.Provider != "github" {
-			t.Fatalf("unexpected provider %q was advertised", provider.Provider)
-		}
-		if !provider.Configured {
-			t.Fatalf("github provider should be configured")
-		}
-	}
-}
-
-func TestProviderOAuthCatalogEmpty(t *testing.T) {
-	for _, forbidden := range []string{"google", "slack", "discord", "notion", "apple_calendar", "gmail", "outlook_mail", "outlook_calendar", "microsoft_teams", "google_drive", "onedrive", "sharepoint", "dropbox", "jira", "zoom", "webhook", "custom_webhook", "obsidian"} {
-		if _, exists := TestingProviderOAuthCatalog[forbidden]; exists {
-			t.Fatalf("forbidden provider %q is registered", forbidden)
-		}
-	}
-}
-
 func TestProviderReturnPathRejectsExternalAndHeaderInjection(t *testing.T) {
 	for _, valid := range []string{"", "/spaces/space-1/agents", "/oauth/complete?tab=connections"} {
 		if !TestingValidProviderReturnPath(valid) {

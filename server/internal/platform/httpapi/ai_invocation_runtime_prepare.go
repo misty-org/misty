@@ -12,7 +12,6 @@ import (
 )
 
 type preparedAIInvocationRuntime struct {
-	sdkRequest   *db.SDKInvocationRecord
 	body         aiInvocationInput
 	resolved     []aiResolvedContext
 	spaceID      string
@@ -34,20 +33,12 @@ type preparedAIInvocationRuntime struct {
 // prepareAIInvocationRuntime builds a chat run's context. Its tool list is the
 // run's resolved catalog; nothing about the request narrows it beforehand.
 func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *db.AIInvocationRecord) (*preparedAIInvocationRuntime, error) {
-	if record == nil || record.SurfaceID == "routine" || record.SurfaceID == "sdk" {
+	if record == nil {
 		return nil, db.ErrSpaceInvalid
 	}
 	var body aiInvocationInput
 	if json.Unmarshal(record.RequestPayload, &body) != nil {
 		return nil, db.ErrSpaceInvalid
-	}
-	var authorityErr error
-	ctx, authorityErr = db.ContextWithPersistedAppAuthority(ctx, record.RequestPayload)
-	if authorityErr != nil {
-		return nil, authorityErr
-	}
-	if err := s.database.ValidateAppExecutionAuthority(ctx, db.AppAuthorityFromContext(ctx), record.UserID, "", "ai.write"); err != nil {
-		return nil, err
 	}
 	if _, err := resolveInvocationMethod(ctx, s.database, record.UserID, &body); err != nil {
 		return nil, err
@@ -76,16 +67,6 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 		return nil, err
 	}
 	allowedTools := manifestToolNames(manifest)
-	if body.AgentID == "" {
-		var sdkTools []agenttools.Registration
-		if sdkTools, err = s.aiSDKRegistrations(ctx, record); err != nil {
-			return nil, err
-		}
-		allowedTools = withoutReplacedSDKTools(allowedTools, sdkTools)
-		for _, registration := range sdkTools {
-			allowedTools = append(allowedTools, registration.Descriptor.Name)
-		}
-	}
 	allowedTools = uniqueAgentToolNames(allowedTools)
 	methodGuidance, err := invocationMethodGuidance(ctx, s.database, record.UserID, &body, allowedTools)
 	if err != nil {
@@ -117,7 +98,7 @@ func (s *SpacesService) aiInvocationContext(ctx context.Context, record *db.AIIn
 			return resolved, nil
 		}
 	}
-	if body.AgentID != "" || db.AppAuthorityFromContext(ctx) != nil || (body.SurfaceID != "home" && body.SurfaceID != "activity" && body.SurfaceID != "global") || !shouldRetrieveAccountContext(body.Prompt) {
+	if body.AgentID != "" || (body.SurfaceID != "home" && body.SurfaceID != "activity" && body.SurfaceID != "global") || !shouldRetrieveAccountContext(body.Prompt) {
 		return resolved, nil
 	}
 	embedding, _ := s.globalSearchQueryEmbedding(ctx, record.UserID, body.Prompt)
@@ -132,9 +113,6 @@ func (s *SpacesService) aiInvocationContext(ctx context.Context, record *db.AIIn
 // conversation, prior write receipts and the request with its context.
 func (s *SpacesService) aiInvocationPrompt(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, resolved []aiResolvedContext) (string, error) {
 	prompt := compileAIInvocationPrompt(body, resolved)
-	if db.AppAuthorityFromContext(ctx) != nil {
-		return prompt, nil
-	}
 	memory, err := loadAgentMemoryContext(ctx, s.database, record.UserID, "", body.AgentID)
 	if err != nil {
 		return "", err

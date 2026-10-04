@@ -6,8 +6,6 @@ import type {
   SpaceMember,
   SpaceMessage,
   SpaceNode,
-  SpaceRun,
-  SpaceStudioResource,
   SpacesSnapshot,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpacePresenceViewer } from "../types/useSpacesBackendStore";
@@ -22,7 +20,6 @@ export interface SpacesStore {
   messageLoadingBySpace: Record<string, boolean>;
   messageErrorsBySpace: Record<string, string>;
   nodesBySpace: Record<string, SpaceNode[]>;
-  workflowsBySpace: Record<string, SpaceStudioResource[]>;
   presenceBySpace: Record<string, SpacePresenceViewer[]>;
   snapshotReady: boolean;
   referenceOnly: boolean;
@@ -36,7 +33,6 @@ export interface SpacesStore {
   loadMessages: (spaceId: string) => Promise<void>;
   loadNodes: (spaceId: string) => Promise<void>;
   loadMembers: (spaceId: string) => Promise<void>;
-  loadStudio: (spaceId: string, kind: "workflows") => Promise<void>;
   createSpace: (request: CreateSpaceRequest) => Promise<CreateSpaceResult>;
   renameSpace: (spaceId: string, name: string) => Promise<Space>;
   invite: (spaceId: string, email: string) => Promise<void>;
@@ -69,19 +65,6 @@ export interface SpacesStore {
   ) => Promise<void>;
   markRead: (spaceId: string, seq: number) => Promise<void>;
   openNode: (spaceId: string, nodeId: string, disposition?: "open" | "download") => Promise<void>;
-  saveStudio: (
-    spaceId: string,
-    kind: "workflows",
-    item: Partial<SpaceStudioResource>,
-  ) => Promise<SpaceStudioResource>;
-  deleteStudio: (spaceId: string, kind: "workflows", id: string) => Promise<void>;
-  runStudio: (
-    spaceId: string,
-    kind: "workflows",
-    id: string,
-    prompt?: string,
-    capabilityId?: string,
-  ) => Promise<SpaceRun>;
   connectRealtime: (accountId: string) => Promise<void>;
   disconnectRealtime: () => void;
   setViewingSpace: (spaceId: string) => void;

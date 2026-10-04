@@ -1,5 +1,10 @@
 # Traffic timer inventory
 
+> **October 4, 2026:** social messaging (its 2s queue), GitHub, Figma, MCP
+> connectors, the SDK provider system, Studio workflows, tool approvals and
+> self-hosting were removed. Rows for them are closed; their timers and queues no
+> longer exist.
+
 Companion to [the audit](traffic-control-audit.md), on the same `origin/main` baseline. Every directly declared recurring `setInterval`, Go ticker and Rust interval found by the scan below is classified. The additional table covers recursive timers, deadline loops and retry mechanisms; bounded process/UI waits are grouped by purpose. This does not claim to enumerate timers hidden inside dependencies or remote services.
 
 ## Direct recurring declarations

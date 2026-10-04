@@ -1,4 +1,3 @@
-import type { BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import type {
   BulkLibraryItemOptions,
   LibraryAssetStack,
@@ -159,8 +158,6 @@ export function createSpaceLibraryItemsApi(
       ),
     libraryUsage: (spaceId: string) =>
       spaceRequest<SpaceStorageUsage>(`/spaces/${encodeURIComponent(spaceId)}/library/usage`),
-    /** Account-wide AI usage; Space storage is fetched separately. */
-    agentUsage: () => spaceRequest<BillingUsage>("/billing/ai-usage", { cache: "no-store" }),
     libraryAssetStacks: (spaceId: string) =>
       spaceRequest<{ stacks: LibraryAssetStack[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks`,

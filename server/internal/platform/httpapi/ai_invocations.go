@@ -204,10 +204,6 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			http.Error(w, "execution window required", http.StatusBadRequest)
 			return
 		}
-		if db.AppAuthorityFromContext(r.Context()) != nil && body.ExecutionMode != "user" {
-			http.Error(w, "Only the host can activate agent execution", http.StatusForbidden)
-			return
-		}
 		var identity *db.AskIdentity
 		var identityErr error
 		if body.AgentID == "" {
@@ -366,13 +362,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 	}
 }
 
-func conversationSpaceChanged(boundSpaceID, requestedSpaceID string) bool {
-	return boundSpaceID != "" && requestedSpaceID != "" && boundSpaceID != requestedSpaceID
-}
 
-func TestingConversationSpaceChanged(boundSpaceID, requestedSpaceID string) bool {
-	return conversationSpaceChanged(boundSpaceID, requestedSpaceID)
-}
 
 func writeAIInvocationCreated(w http.ResponseWriter, record *aiInvocationRecord) {
 	writeJSON(w, http.StatusAccepted, map[string]any{

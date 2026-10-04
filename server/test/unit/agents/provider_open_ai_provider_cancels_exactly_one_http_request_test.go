@@ -12,8 +12,6 @@ import (
 	"time"
 
 	. "github.com/kannachi323/misty/server/internal/agents"
-
-	"golang.org/x/oauth2"
 )
 
 func TestOpenAIProviderCancelsExactlyOneHTTPRequest(t *testing.T) {
@@ -147,103 +145,5 @@ func TestGatewayAgentSchemaUsesPortableNonNullableFilePlan(t *testing.T) {
 	filePlan := properties["file_plan"].(map[string]any)
 	if filePlan["type"] != "object" {
 		t.Fatalf("file_plan schema type = %#v", filePlan["type"])
-	}
-}
-
-func TestGeminiProviderUsesInteractionsStructuredOutput(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/interactions" {
-			t.Fatalf("path = %q, want /interactions", r.URL.Path)
-		}
-		if got := r.Header.Get("X-Goog-Api-Key"); got != "test-key" {
-			t.Fatalf("X-Goog-Api-Key = %q", got)
-		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("request JSON error = %v", err)
-		}
-		if body["model"] != "gemini-test" {
-			t.Fatalf("model = %v, want gemini-test", body["model"])
-		}
-		if _, ok := body["max_output_tokens"]; ok {
-			t.Fatalf("Gemini request included OpenAI-only max_output_tokens: %#v", body)
-		}
-		generation, _ := body["generation_config"].(map[string]any)
-		if generation["max_output_tokens"] != float64(MaxModelOutputTokens) {
-			t.Fatalf("generation_config = %#v", generation)
-		}
-		format, _ := body["response_format"].(map[string]any)
-		if format["mime_type"] != "application/json" {
-			t.Fatalf("response_format = %#v", format)
-		}
-		if _, ok := format["schema"].(map[string]any); !ok {
-			t.Fatalf("missing response schema: %#v", format)
-		}
-		writeJSONResponse(t, w, map[string]any{
-			"output_text": `{"text":"Plan ready.","tool_requests":[],"file_plan":{"summary":"I will make a docs folder.","completion_summary":"Created the docs folder.","operations":[{"type":"mkdir","path":"Documents","reason":"Group docs."}],"warnings":[]}}`,
-		})
-	}))
-	defer server.Close()
-
-	provider := NewGeminiProvider(GeminiProviderConfig{
-		APIKey:  "test-key",
-		BaseURL: server.URL,
-		Model:   "gemini-test",
-		Client:  server.Client(),
-	})
-	response, err := provider.Next(ModelRequest{
-		SessionID:  "s",
-		UserID:     "u",
-		Mode:       ModeAuto,
-		ActiveRoot: "Desktop",
-		Messages:   []Message{{Role: "user", Content: "Organize this"}},
-	})
-	if err != nil {
-		t.Fatalf("Next() error = %v", err)
-	}
-	if response.FilePlan == nil || !strings.Contains(response.FilePlan.Summary, "docs") {
-		t.Fatalf("FilePlan = %#v", response.FilePlan)
-	}
-	if !strings.Contains(response.FilePlan.CompletionSummary, "Created") {
-		t.Fatalf("CompletionSummary = %q", response.FilePlan.CompletionSummary)
-	}
-	if len(response.FilePlan.Operations) != 1 || response.FilePlan.Operations[0].Type != "mkdir" {
-		t.Fatalf("Operations = %#v", response.FilePlan.Operations)
-	}
-}
-
-func TestGeminiProviderUsesADCTokenSourceWithoutAPIKey(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != "Bearer adc-token" {
-			t.Fatalf("Authorization = %q", got)
-		}
-		if got := r.Header.Get("X-Goog-Api-Key"); got != "" {
-			t.Fatalf("X-Goog-Api-Key = %q", got)
-		}
-		writeJSONResponse(t, w, map[string]any{
-			"output_text": `{"text":"Ready.","tool_requests":[],"file_plan":null}`,
-		})
-	}))
-	defer server.Close()
-
-	provider := NewGeminiProvider(GeminiProviderConfig{
-		BaseURL: server.URL,
-		Model:   "gemini-test",
-		TokenSource: staticTokenSource{
-			token: &oauth2.Token{AccessToken: "adc-token", TokenType: "Bearer"},
-		},
-		Client: server.Client(),
-	})
-	response, err := provider.Next(ModelRequest{
-		SessionID: "s",
-		UserID:    "u",
-		Mode:      ModeAuto,
-		Messages:  []Message{{Role: "user", Content: "Organize this"}},
-	})
-	if err != nil {
-		t.Fatalf("Next() error = %v", err)
-	}
-	if response.Text != "Ready." {
-		t.Fatalf("Text = %q", response.Text)
 	}
 }

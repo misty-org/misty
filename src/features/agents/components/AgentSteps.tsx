@@ -1,4 +1,4 @@
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { useId, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/shared/ui";
@@ -6,9 +6,6 @@ import { Button } from "@/shared/ui";
 export type AgentStep = {
   id: string;
   content: string;
-  action?: ReactNode;
-  /** Approvals and running work stay visible; everything else folds away. */
-  attention: boolean;
 };
 
 /**
@@ -18,7 +15,6 @@ export type AgentStep = {
 export function AgentSteps({ steps }: { steps: AgentStep[] }) {
   const [open, setOpen] = useState(false);
   const listId = useId();
-  const pinned = steps.filter((step) => step.attention && step.action);
   return (
     <div className="agent-steps">
       <Button
@@ -44,14 +40,10 @@ export function AgentSteps({ steps }: { steps: AgentStep[] }) {
                   <ReactMarkdown>{step.content}</ReactMarkdown>
                 </div>
               )}
-              {!step.attention && step.action}
             </li>
           ))}
         </ol>
       )}
-      {pinned.map((step) => (
-        <Fragment key={step.id}>{step.action}</Fragment>
-      ))}
     </div>
   );
 }

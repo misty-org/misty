@@ -1,8 +1,8 @@
 package agent
 
 import (
-	"context"
 	"strings"
+	"context"
 	"testing"
 )
 
@@ -13,6 +13,17 @@ type readOnlyInstructionProvider struct {
 func (p *readOnlyInstructionProvider) Next(request ModelRequest) (ModelResponse, error) {
 	p.request = request
 	return ModelResponse{Text: `{"route":"steer"}`}, nil
+}
+
+func TestPlainCompletionKeepsInstructionsEmpty(t *testing.T) {
+	provider := &readOnlyInstructionProvider{}
+	service := NewService(nil, provider)
+	if _, _, err := service.CompleteWithTierContext(context.Background(), "member", "hello", "automation_ai", TierLow); err != nil {
+		t.Fatal(err)
+	}
+	if provider.request.SystemPrompt != "" || provider.request.Messages[0].Content != "hello" {
+		t.Fatalf("plain request = %#v", provider.request)
+	}
 }
 
 func TestReadOnlyCompletionRetainsAuthoritativeInstructions(t *testing.T) {
@@ -31,18 +42,12 @@ func TestReadOnlyCompletionRetainsAuthoritativeInstructions(t *testing.T) {
 	if request.UserID != "member" || request.Mode != ModeAsk || len(request.Capabilities.Tools) != 0 {
 		t.Fatalf("read-only requesting-account scope changed: %#v", request)
 	}
-	if !strings.Contains(buildAgentPrompt(request), `"agent_instructions_and_context": "`+instructions+`"`) {
+	if !strings.Contains(promptText(request), `"agent_instructions_and_context": "`+instructions+`"`) {
 		t.Fatal("instructions missing from the canonical provider prompt")
 	}
 }
 
-func TestPlainCompletionKeepsInstructionsEmpty(t *testing.T) {
-	provider := &readOnlyInstructionProvider{}
-	service := NewService(nil, provider)
-	if _, _, err := service.CompleteWithTierContext(context.Background(), "member", "hello", "automation_ai", TierLow); err != nil {
-		t.Fatal(err)
-	}
-	if provider.request.SystemPrompt != "" || provider.request.Messages[0].Content != "hello" {
-		t.Fatalf("plain request = %#v", provider.request)
-	}
+func promptText(request ModelRequest) string {
+	prompt, _ := buildAgentPromptWithImages(request)
+	return prompt
 }

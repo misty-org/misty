@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kannachi323/misty/server/internal/agenttools"
 	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
@@ -101,31 +100,7 @@ func TestCreatorAgentCompletionRequiresExplicitTaskDone(t *testing.T) {
 	}
 }
 
-func TestBrowserCatalogDescriptors(t *testing.T) {
-	want := map[string]bool{"browser.inspect": true, "browser.navigate": true, "browser.click": true, "browser.downloads.list": true, "browser.request_user_action": true, "browser.interact": true, "browser.visual": true, "browser.workspace.visual": true, "browser.workspace.interact": true, "browser.upload": true, "browser.type": true, "browser.act": true}
-	for _, descriptor := range api.TestingPersonalAgentToolboxDescriptors() {
-		if !strings.HasPrefix(descriptor.Name, "browser.") {
-			continue
-		}
-		if !want[descriptor.Name] || descriptor.Locality != agenttools.LocalityDevice {
-			t.Fatalf("unexpected Browser descriptor: %#v", descriptor)
-		}
-		delete(want, descriptor.Name)
-	}
-	if len(want) != 0 {
-		t.Fatalf("missing Browser descriptors: %#v", want)
-	}
-}
 
-func TestCompanionToolboxIncludesAuthoritativeContextAndMemberResolution(t *testing.T) {
-	want := map[string]bool{"context.get": true, "members.list": true, "members.resolve": true}
-	for _, descriptor := range api.TestingPersonalAgentToolboxDescriptors() {
-		delete(want, descriptor.Name)
-	}
-	if len(want) != 0 {
-		t.Fatalf("missing foundational descriptors: %#v", want)
-	}
-}
 
 func TestAgentTaskDueDatesUseTheCreatorsTimezone(t *testing.T) {
 	if got := api.TestingAgentToolTimezone(`{"instruction":"create a task","timezone":"America/Los_Angeles"}`); got != "America/Los_Angeles" {

@@ -7,28 +7,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 )
 
 var _ serveragent.SessionPersistence = (*Database)(nil)
-
-// CreateAIConversation creates the durable user-facing thread used by the
-// Vercel WorkflowAgent runtime. It intentionally does not create a Go Agent
-// session: conversation turns are projected from ai_invocations and remain
-// portable across runtime restarts.
-func (db *Database) CreateAIConversation(ctx context.Context, userID string, requestedSpaceID ...string) (string, error) {
-	id := "conversation_" + uuid.NewString()
-	spaceID := ""
-	// requestedSpaceID remains accepted by legacy callers; it is not ownership.
-	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		_, err := tx.ExecContext(ctx, `INSERT INTO misty_ask_conversations(
-			id,user_id,state,active_until,retention_expires_at,space_id
-		) VALUES($1,$2,'{}'::jsonb,NOW()+INTERVAL '30 days',NOW()+INTERVAL '30 days',NULLIF($3,''))`, id, userID, spaceID)
-		return err
-	})
-	return id, err
-}
 
 // CreateAgentSession implements agent.SessionPersistence. Conversation state
 // is sanitized by the agent package before it crosses this boundary.
@@ -195,22 +177,6 @@ func (db *Database) BindAskSurfaceConversation(ctx context.Context, userID, conv
 	})
 }
 
-func (db *Database) LinkAgentRunConversation(ctx context.Context, userID, runID, invocationID string) (string, error) {
-	conversationID := ""
-	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `UPDATE space_runs AS run
-			SET source_agent_conversation_id=invocation.conversation_id
-			FROM ai_invocations AS invocation
-			WHERE run.id=$1 AND run.owner_user_id=$3 AND invocation.id=$2 AND invocation.user_id=$3
-				AND invocation.conversation_id IS NOT NULL
-			RETURNING invocation.conversation_id`, runID, invocationID, userID).Scan(&conversationID)
-	})
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	return conversationID, err
-}
-
 // AgentSessionContext is the Space and Agent a session was bound to when it was
 // created. It is read from the session row rather than taken from the request,
 // so a caller cannot point an existing session at a different Space.
@@ -297,19 +263,4 @@ func (db *Database) DeleteAgentConversation(ctx context.Context, userID, convers
 		_, err := tx.ExecContext(ctx, `DELETE FROM misty_ask_conversations WHERE id=$1 AND user_id=$2`, conversationID, userID)
 		return err
 	})
-}
-
-// PurgeExpiredAgentConversations is suitable for a periodic server task. It
-// intentionally runs as the service role because expiration spans accounts.
-func (db *Database) PurgeExpiredAgentConversations(ctx context.Context) (int64, error) {
-	var deleted int64
-	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `DELETE FROM misty_ask_conversations WHERE retention_expires_at <= NOW()`)
-		if err != nil {
-			return err
-		}
-		deleted, err = result.RowsAffected()
-		return err
-	})
-	return deleted, err
 }

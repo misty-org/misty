@@ -82,10 +82,6 @@ func (s *SmartLibraryService) Rescan() http.HandlerFunc {
 	}
 }
 
-func (s *SmartLibraryService) Search() http.HandlerFunc {
-	return s.searchHandler(true)
-}
-
 func (s *SmartLibraryService) GlobalSearch() http.HandlerFunc {
 	return s.searchHandler(false)
 }
@@ -139,7 +135,12 @@ func (s *SmartLibraryService) searchHandler(folderFromPath bool) http.HandlerFun
 				return
 			}
 		}
-		writeJSON(w, 200, map[string]any{"hits": hits, "queryModel": func() any { if !semanticAvailable { return nil }; return configuredEmbeddingModel(r.Context(), s.analyzer, userID) }(), "indexVersion": serveragent.SmartLibraryIndexVersion, "semanticAvailable": semanticAvailable})
+		writeJSON(w, 200, map[string]any{"hits": hits, "queryModel": func() any {
+			if !semanticAvailable {
+				return nil
+			}
+			return configuredEmbeddingModel(r.Context(), s.analyzer, userID)
+		}(), "indexVersion": serveragent.SmartLibraryIndexVersion, "semanticAvailable": semanticAvailable})
 	}
 }
 
@@ -153,25 +154,6 @@ func (s *SmartLibraryService) Delete() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-func (s *SmartLibraryService) IndexStatus() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := s.requireUser(w, r)
-		if !ok {
-			return
-		}
-		folderID := strings.TrimSpace(r.URL.Query().Get("folderId"))
-		if folderID != "" && !TestingValidOpaqueID(folderID, "slf_") {
-			http.Error(w, "invalid request", 400)
-			return
-		}
-		status, err := s.database.SmartLibraryIndexStatusForUser(userID, folderID, configuredEmbeddingModel(r.Context(), s.analyzer, userID), serveragent.SmartLibraryIndexVersion)
-		if !s.writeFolderError(w, err) {
-			return
-		}
-		writeJSON(w, 200, map[string]any{"currentVersion": status.CurrentVersion, "embeddingModel": status.EmbeddingModel, "outdatedAssets": status.OutdatedAssets, "failedAssets": status.FailedAssets, "upgradeNeeded": status.OutdatedAssets > 0})
 	}
 }
 

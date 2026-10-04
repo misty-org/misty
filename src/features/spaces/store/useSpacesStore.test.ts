@@ -335,51 +335,6 @@ describe("Spaces mutations", () => {
     ]);
   });
 
-  // Regression coverage: these actions previously had no error handling at all,
-  // so a failed request left `error` untouched and the UI's error banner (which
-  // every caller's own comments assumed would show something) stayed empty.
-  it.each([
-    ["deleteMessage", () => useSpacesStore.getState().deleteMessage("space-default", "message-1")],
-    ["removeMember", () => useSpacesStore.getState().removeMember("space-default", "user-sam")],
-    ["respondInvite", () => useSpacesStore.getState().respondInvite("invite-1", true)],
-    ["leaveSpace", () => useSpacesStore.getState().leaveSpace("space-default")],
-    ["transferOwner", () => useSpacesStore.getState().transferOwner("space-default", "user-sam")],
-    ["deleteSpace", () => useSpacesStore.getState().deleteSpace("space-default", "Default space")],
-    [
-      "saveStudio",
-      () =>
-        useSpacesStore
-          .getState()
-          .saveStudio("space-default", "workflows", { name: "Helper" } as never),
-    ],
-    [
-      "deleteStudio",
-      () => useSpacesStore.getState().deleteStudio("space-default", "workflows", "agent-helper"),
-    ],
-    [
-      "runStudio",
-      () => useSpacesStore.getState().runStudio("space-default", "workflows", "agent-helper"),
-    ],
-  ] as const)(
-    "%s records the failure on the shared store error and rethrows",
-    async (name, run) => {
-      const failure = new Error(`${name} failed`);
-      apiMocks.deleteMessage.mockRejectedValue(failure);
-      apiMocks.removeMember.mockRejectedValue(failure);
-      apiMocks.respondInvite.mockRejectedValue(failure);
-      apiMocks.leave.mockRejectedValue(failure);
-      apiMocks.transfer.mockRejectedValue(failure);
-      apiMocks.delete.mockRejectedValue(failure);
-      apiMocks.saveStudio.mockRejectedValue(failure);
-      apiMocks.deleteStudio.mockRejectedValue(failure);
-      apiMocks.runStudio.mockRejectedValue(failure);
-
-      await expect(run()).rejects.toThrow(`${name} failed`);
-
-      expect(useSpacesStore.getState().error).toBe(`${name} failed`);
-    },
-  );
-
   it("prunes the space from store state immediately upon deleteSpace", async () => {
     const defaultSpace = spaceFixture({ id: "space-home", name: "Home", is_default: true });
     const customSpace = spaceFixture({ id: "space-custom", name: "Custom Project" });

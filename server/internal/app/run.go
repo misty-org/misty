@@ -64,8 +64,6 @@ func Run() {
 		WorkerFunc(func(ctx context.Context) { runLibraryRenditionProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryIntelligenceProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runNoteControlProcessing(ctx, server) }),
-		WorkerFunc(func(ctx context.Context) { runSocialDeliveryProcessing(ctx, server) }),
-		WorkerFunc(func(ctx context.Context) { server.Spaces.RunDiscordSocialGateway(ctx) }),
 		WorkerFunc(func(ctx context.Context) { runAIEmbeddingProcessing(ctx, server) }),
 	)
 	// Domain gauges refresh on their own schedule so a scrape never holds a
@@ -79,13 +77,6 @@ func Run() {
 		panic(err)
 	}
 	log.Println("Misty server stopped")
-}
-
-func runSocialDeliveryProcessing(ctx context.Context, server *Server) {
-	if server.Spaces == nil || strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_SOCIAL_SEND_DISABLED")), "true") {
-		return
-	}
-	runDatabaseQueue(ctx, server, "social", func(ctx context.Context) (int, error) { return server.Spaces.ProcessSocialDelivery(ctx, 20) })
 }
 
 func runAIEmbeddingProcessing(ctx context.Context, server *Server) {

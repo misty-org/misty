@@ -17,7 +17,7 @@ export function unconfirmedToolResultReason(output: unknown): string {
   if (result.status === "failure" && typeof toolError?.message === "string" && toolError.message.trim())
     return toolError.message.slice(0, 500);
   if (result.status === "uncertain") return "The action may have happened, but its outcome could not be verified.";
-  if (["failure", "approval_required", "device_required", "user_intervention_required"].includes(String(result.status)))
+  if (["failure", "device_required", "user_intervention_required"].includes(String(result.status)))
     return "The requested action has not completed.";
   if (result.denied === true) return "The requested action was not approved.";
   if (result.unavailable === true) return "The device required for this action was unavailable.";

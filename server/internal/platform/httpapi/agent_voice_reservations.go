@@ -206,6 +206,6 @@ func voiceBillingEstimate(service *billingadapter.Service) func(context.Context,
 	}
 }
 
-func (b *voiceReservations) modelID() string { if b.model != "" { return b.model }; return agent.RealtimeModelID() }
+func (b *voiceReservations) modelID() string { if b.model != "" { return b.model }; return agent.AgentRealtimeModel }
 
-func voiceProviderModel(provider voiceProvider) string { if p, ok := provider.(interface{ ModelID() string }); ok { return p.ModelID() }; return agent.RealtimeModelID() }
+func voiceProviderModel(provider voiceProvider) string { if p, ok := provider.(interface{ ModelID() string }); ok { return p.ModelID() }; return agent.AgentRealtimeModel }

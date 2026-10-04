@@ -7,55 +7,14 @@ import { createGateway } from "ai";
 import type { RuntimeIdentity } from "./control-plane.js";
 
 type Environment = Record<string, string | undefined>;
-const directProviders = new Set(["openai", "anthropic", "google", "openai-compatible"]);
 
+/** Instance AI always bills the AI Gateway; accounts bring their own keys. */
 export function instanceModelConfig(env: Environment = process.env) {
-  const provider = env.MISTY_AGENT_MODEL_PROVIDER?.trim() || "gateway";
   const model = env.MISTY_AGENT_MODEL?.trim() || "";
-  const baseURL = env.MISTY_AGENT_MODEL_BASE_URL?.trim() || undefined;
-  const apiKey =
-    env.MISTY_AGENT_MODEL_API_KEY?.trim() ||
-    (provider === "openai" ? env.OPENAI_API_KEY?.trim() : undefined) ||
-    undefined;
-  if (provider !== "gateway" && !directProviders.has(provider)) {
-    throw new Error("Invalid MISTY_AGENT_MODEL_PROVIDER");
-  }
   if (model && (!/^[^\s/]+\/\S+$/.test(model) || model.length > 200)) {
     throw new Error("MISTY_AGENT_MODEL must be a provider/model ID");
   }
-  if (provider !== "gateway") {
-    if (!model.startsWith(`${provider}/`)) {
-      throw new Error("MISTY_AGENT_MODEL must use the configured provider prefix");
-    }
-    if (!apiKey && provider !== "openai-compatible") {
-      throw new Error("MISTY_AGENT_MODEL_API_KEY is required for the configured provider");
-    }
-    if (provider === "openai-compatible" && !baseURL) {
-      throw new Error("MISTY_AGENT_MODEL_BASE_URL is required for openai-compatible");
-    }
-  } else if (baseURL || apiKey) {
-    throw new Error("Gateway credentials use AI_GATEWAY_API_KEY and AI_GATEWAY_BASE_URL");
-  }
-  if (baseURL) {
-    let url: URL;
-    try {
-      url = new URL(baseURL);
-    } catch {
-      throw new Error("Invalid MISTY_AGENT_MODEL_BASE_URL");
-    }
-    if (
-      !["http:", "https:"].includes(url.protocol) ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash
-    ) {
-      throw new Error(
-        "MISTY_AGENT_MODEL_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment",
-      );
-    }
-  }
-  return { provider, model, baseURL, apiKey };
+  return { provider: "gateway", model };
 }
 
 export function resolveInstanceModel(
@@ -143,7 +102,7 @@ export function resolveProviderModel(
     };
   }
   if (modelId !== config.model)
-    throw new Error("Requested model is not configured for this instance");
+    throw new Error("Requested model is not configured for this connection");
   const nativeId = modelId.slice(config.provider.length + 1);
   const settings = { apiKey: config.apiKey, baseURL: config.baseURL, fetch: accountFetch };
   let model: LanguageModelV4;
@@ -164,11 +123,11 @@ export function resolveProviderModel(
         baseURL: config.baseURL!,
       })(nativeId);
   }
-  // A direct request never falls back to a different provider or Gateway bill.
+  // An account request never falls back to a different provider or Gateway bill.
   const { gateway: _gateway, ...providerOptions } = options.providerOptions ?? {};
-  if (accountFetch && config.provider === "openai" && config.reasoning)
+  if (config.provider === "openai" && config.reasoning)
     providerOptions.openai = { ...providerOptions.openai, reasoningEffort: config.reasoning };
-  if (accountFetch && config.provider === "openai-compatible" && config.reasoning)
+  if (config.provider === "openai-compatible" && config.reasoning)
     providerOptions.openaiCompatible = { reasoningEffort: config.reasoning };
   return {
     model,
@@ -185,13 +144,9 @@ export function resolveProviderModel(
           : options.tools,
       providerOptions,
       reasoning:
-        config.provider === "openai-compatible"
+        config.provider === "openai-compatible" || config.reasoning === "max"
           ? undefined
-          : ((accountFetch
-              ? config.reasoning === "max"
-                ? undefined
-                : config.reasoning || undefined
-              : options.reasoning) as LanguageModelV4CallOptions["reasoning"]),
+          : ((config.reasoning || undefined) as LanguageModelV4CallOptions["reasoning"]),
     },
   };
 }

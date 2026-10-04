@@ -13,7 +13,6 @@ import (
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
-	"github.com/kannachi323/misty/server/internal/browseractions"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -113,28 +112,6 @@ func (s *SpacesService) mcpServerForRuntime(ctx context.Context, access *mcpRunt
 		Name: "misty", Title: "Misty", Version: "1.0.0",
 		Description: "Run-scoped access to Misty's permissioned application tools.",
 	}, nil)
-	if access.record != nil && access.prepared.sdkRequest != nil {
-		registry, err := s.sdkRegistry(ctx, access.record)
-		if err != nil {
-			return server
-		}
-		for _, descriptor := range registry.Descriptors() {
-			descriptor := descriptor
-			server.AddTool(mcpToolDefinition(descriptor), func(toolCtx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				call := mcpRuntimeToolCall(access.claims.RuntimeRunID, descriptor.Name, request)
-				call.SupportsIntervention = access.claims.InterventionWaits
-				outcome, err := s.executeSDKRuntimeTool(toolCtx, access.record, call)
-				if err != nil {
-					return mcpSDKToolError(err), nil
-				}
-				if outcome.Approval != nil {
-					return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Approval is required."}}, Meta: mcp.Meta{"misty/approval": outcome.Approval}}, nil
-				}
-				return mcpStructuredResult(outcome.Result), nil
-			})
-		}
-		return server
-	}
 	if access.run != nil {
 		toolbox, invocation, authorize, err := s.resolvePersonalAgentRuntimeToolbox(ctx, access.run)
 		if err != nil {
@@ -151,35 +128,6 @@ func (s *SpacesService) mcpServerForRuntime(ctx context.Context, access *mcpRunt
 			})
 		}
 		return server
-	}
-	registrations, sdkErr := s.aiSDKRegistrations(ctx, access.record)
-	if sdkErr != nil {
-		return server
-	}
-	for _, registration := range registrations {
-		descriptor := registration.Descriptor
-		invocation := agenttools.Invocation{RunID: access.record.ID, UserID: access.record.UserID, SpaceID: access.prepared.spaceID, AgentID: ""}
-		if allowed, err := authorizeAgentSDKTool(ctx, s.database, invocation, descriptor); err != nil || !allowed {
-			continue
-		}
-		if allowed, err := authorizeAppRuntimeTool(ctx, s.database, invocation, descriptor); err != nil || !allowed {
-			continue
-		}
-		server.AddTool(mcpRunToolDefinition(descriptor), func(toolCtx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			call := mcpRuntimeToolCall(access.claims.RuntimeRunID, descriptor.Name, request)
-			call.SupportsIntervention = access.claims.InterventionWaits
-			outcome, err := s.executeAIProviderTool(toolCtx, access.record, call)
-			if err != nil {
-				return mcpSDKToolError(err), nil
-			}
-			if outcome.Approval != nil {
-				return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "User approval is required."}}, Meta: mcp.Meta{"misty/approval": outcome.Approval}}, nil
-			}
-			if len(outcome.ProviderOutcome) > 0 {
-				return mcpStructuredResult(outcome.ProviderOutcome), nil
-			}
-			return mcpStructuredResult(outcome.Result), nil
-		})
 	}
 	// Chat runs list exactly their resolved catalog; every call re-authorizes.
 	for _, descriptor := range access.prepared.toolbox.Descriptors() {
@@ -208,11 +156,7 @@ func allowedMCPDescriptors(ctx context.Context, toolbox *agenttools.Registry, in
 func mcpToolDefinition(descriptor agenttools.Descriptor) *mcp.Tool {
 	readOnly := descriptor.Risk == serveragent.RiskRead
 	destructive := descriptor.Risk == serveragent.RiskDangerous
-	openWorld := descriptor.Locality == agenttools.LocalityProvider || strings.HasPrefix(descriptor.Name, "browser.") || strings.HasPrefix(descriptor.Name, "mcp.")
-	semantic := ""
-	if descriptor.ProviderBinding != nil {
-		semantic = descriptor.ProviderBinding.Capability
-	}
+	openWorld := descriptor.Locality == agenttools.LocalityProvider || strings.HasPrefix(descriptor.Name, "browser.")
 	return &mcp.Tool{
 		Name: descriptor.Name, Title: descriptor.Name, Description: descriptor.Description,
 		InputSchema: descriptor.InputSchema, OutputSchema: descriptor.OutputSchema,
@@ -221,7 +165,7 @@ func mcpToolDefinition(descriptor agenttools.Descriptor) *mcp.Tool {
 			DestructiveHint: &destructive, OpenWorldHint: &openWorld,
 		},
 		Meta: mcp.Meta{
-			"misty/capability": semantic, "misty/risk": descriptor.Risk, "misty/approval": string(descriptor.Approval),
+			"misty/risk": descriptor.Risk, "misty/approval": string(descriptor.Approval),
 			"misty/locality": string(descriptor.Locality), "misty/version": descriptor.Version,
 		},
 	}
@@ -230,7 +174,7 @@ func mcpToolDefinition(descriptor agenttools.Descriptor) *mcp.Tool {
 func (s *SpacesService) callPersonalAgentMCPTool(ctx context.Context, access *mcpRuntimeAccess, descriptor agenttools.Descriptor, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// A lost wait response may be replayed while paused, but a pending wait
 	// never becomes permission to execute another tool from the same runtime.
-	if access.run.State == "awaiting_intervention" && descriptor.Name != "browser.request_user_action" && descriptor.ProviderBinding == nil {
+	if access.run.State == "awaiting_intervention" && descriptor.Name != "browser.request_user_action" {
 		return mcpToolError(db.ErrSpaceForbidden), nil
 	}
 	call := mcpRuntimeToolCall(access.claims.RuntimeRunID, descriptor.Name, request)
@@ -266,10 +210,6 @@ func (s *SpacesService) callAIInvocationMCPTool(ctx context.Context, access *mcp
 		if errors.Is(err, errAIInvocationDeviceWait) {
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Waiting for the original attached browser device."}}, Meta: mcp.Meta{"misty/device_wait": true}}, nil
 		}
-		var wait *browserApprovalRequired
-		if errors.As(err, &wait) {
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Review this browser action in Misty's Activity page."}}, Meta: mcp.Meta{"misty/approval": wait.approval}}, nil
-		}
 		return mcpToolError(err), nil
 	}
 	return mcpStructuredResult(result), nil
@@ -284,7 +224,6 @@ func mcpRuntimeToolCall(runtimeRunID, name string, request *mcp.CallToolRequest)
 		call.Arguments = append(json.RawMessage(nil), request.Params.Arguments...)
 	}
 	call.CallID = mcpMetaString(request.Params.Meta, "misty/call_id", call.CallID)
-	call.ApprovalHookToken = mcpMetaString(request.Params.Meta, "misty/approval_hook_token", "")
 	call.DeviceHookToken = mcpMetaString(request.Params.Meta, "misty/device_hook_token", "")
 	return call
 }
@@ -324,7 +263,7 @@ func mcpToolError(err error) *mcp.CallToolResult {
 	if errors.Is(err, errWorkspaceSnapshotStale) {
 		return mcpStructuredResult(json.RawMessage(`{"status":"failure","reason":"browser_snapshot_stale","attempted":false,"message":"The screenshot was consumed or became stale. No input was dispatched. Call browser_workspace_visual to capture the current control surface, then decide the next action with its new documentId. Capture again after every action, including clicking before typing."}`))
 	}
-	if errors.Is(err, browseractions.ErrStale) {
+	if errors.Is(err, errBrowserSnapshotStale) {
 		return mcpStructuredResult(json.RawMessage(`{"status":"failure","reason":"browser_snapshot_stale","attempted":false,"message":"The page changed or the inspection was already consumed. No action was dispatched. Call browser_inspect again and use its new references before deciding the next action."}`))
 	}
 	message := "Misty could not complete this tool call."

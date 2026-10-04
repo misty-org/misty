@@ -275,3 +275,26 @@ func TestVoiceConversationRejectsUnknownAndOversizedTools(t *testing.T) {
 		}
 	}
 }
+
+func voiceSent(t *testing.T, f *voiceFixture, want string) map[string]any {
+	t.Helper()
+	select {
+	case e := <-f.provider.sent:
+		if e["type"] != want {
+			t.Fatalf("wanted %s, got %v", want, e)
+		}
+		return e
+	case <-time.After(3 * time.Second):
+		t.Fatalf("missing provider event %s", want)
+	}
+	return nil
+}
+
+func voiceFinished(t *testing.T, f *voiceFixture) {
+	t.Helper()
+	select {
+	case <-f.finished:
+	case <-time.After(3 * time.Second):
+		t.Fatal("session did not finish")
+	}
+}

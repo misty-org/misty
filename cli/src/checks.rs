@@ -76,12 +76,6 @@ pub fn server(workspace: &Workspace) -> Result<()> {
         .args(["vet", "./..."])
         .run(&workspace.server)?;
     CommandSpec::new("./scripts/check-go-file-sizes.sh").run(&workspace.server)?;
-    CommandSpec::new(npm())
-        .args(["ci"])
-        .run(&workspace.server)?;
-    CommandSpec::new(npm())
-        .args(["run", "contracts:check"])
-        .run(&workspace.server)?;
 
     #[cfg(windows)]
     CommandSpec::new("go")

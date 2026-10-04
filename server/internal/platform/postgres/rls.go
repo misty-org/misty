@@ -10,19 +10,11 @@ import (
 )
 
 const (
-	rlsModeSetting         = "app.rls_mode"
-	rlsCurrentUserSetting  = "app.current_user_id"
-	rlsCurrentEmailSetting = "app.current_email"
-	rlsLicenseIDSetting    = "app.current_license_id"
-	rlsSessionHashSetting  = "app.current_session_token_hash"
+	rlsModeSetting = "app.rls_mode"
 )
 
 const (
-	rlsModeAnonymous    = "anonymous"
-	rlsModeRegistration = "registration"
-	rlsModeService      = "service"
-	rlsModeSession      = "session"
-	rlsModeUser         = "user"
+	rlsModeService = "service"
 )
 
 func (db *Database) TestingWithRLSContext(ctx context.Context, settings map[string]string, fn func(*sql.Tx) error) error {

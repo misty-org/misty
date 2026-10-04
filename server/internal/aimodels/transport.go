@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	mcp "github.com/kannachi323/misty/server/internal/integrations/mcp"
 	"net"
 	"net/http"
 	"net/url"
@@ -33,7 +32,7 @@ func DialEndpoint(base string) (func(context.Context, string, string) (net.Conn,
 			return nil, errors.New("provider endpoint unavailable")
 		}
 		for _, ip := range ips {
-			if !mcp.IsPublicEndpointIP(ip.IP) {
+			if !isPublicEndpointIP(ip.IP) {
 				return nil, errors.New("provider endpoint resolved to a private or reserved address")
 			}
 		}

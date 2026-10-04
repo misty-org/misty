@@ -337,7 +337,7 @@ Idle empty collections retain their table/grid surface without extra “No activ
 
 ## Phase 1–2 folder work and shared run controls
 
-The current functional extension is described in PRODUCT.md and the phase evidence in `docs/design/agent-workflows/IMPLEMENTATION.md`. Historical UI-only restrictions still apply to catalog editors, integrations and future window modes; they do not prohibit the newly implemented shared lifecycle and bounded native folder executor.
+The current functional extension is described in PRODUCT.md. Historical UI-only restrictions still apply to catalog editors, integrations and future window modes; they do not prohibit the newly implemented shared lifecycle and bounded native folder executor.
 
 Use the same small monochrome folder-work row in the workspace and floating composer. Keep folder selection below the popup's identity and message input. A collapsed receipt exposes verified counts; its disclosure shows source → destination and text status, with Stop changes, Resume verified plan and Undo verified changes only where applicable. An undone receipt counts undone operations. Folder proposal review uses readable paths rather than JSON, including when access is restoring or unavailable. Existing shared Button/IconButton styling and the simple sidebar remain authoritative.
 
@@ -348,7 +348,7 @@ The approved sidebar and catalog columns remain unchanged. Saved methods use qui
 
 ### Connected account summary — October 3, 2026
 
-The existing Context rows combine MCP connections and Composio Calendar accounts. Calendar rows name the account and show its current per-agent read grant and selected calendar, or state that access is not allowed, sign-in is pending, or the connection needs attention. These rows open the selected agent’s Integrations page; MCP rows and Manage connections keep their existing connection manager. Returning from Integrations refreshes the summary. A failed source does not hide rows loaded from the other source; retry and empty states remain distinct. Account and agent changes immediately hide the prior scope’s rows. New-agent setup displays account connection status without implying a Calendar grant to the new agent. Shared Button, Cable icon, typography, geometry and monochrome tokens are unchanged.
+The Context rows list the account's connected apps. Connected apps belong to the account and every agent can use them, so rows show only the app, its account alias and whether it is connected, waiting for sign-in or needs attention. Manage connections opens Apps. Retry and empty states remain distinct, and account changes immediately hide the prior account's rows. Shared Button, Cable icon, typography, geometry and monochrome tokens are unchanged.
 
 ## Conversation management — October 3
 

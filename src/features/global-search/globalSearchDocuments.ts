@@ -93,12 +93,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
     });
   }
 
-  for (const [spaceId, resources] of Object.entries(state.workflowsBySpace)) {
-    const space = spacesById.get(spaceId);
-    if (!space) continue;
-    for (const resource of resources)
-      documents.push(resourceDocument(accountId, spaceId, space.name, resource, "workflow"));
-  }
   for (const space of state.spaces) {
     if (space.permissions?.["tasks.create"] !== true) continue;
     documents.push({
@@ -115,28 +109,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
     });
   }
   return documents;
-}
-
-function resourceDocument(
-  accountId: string,
-  spaceId: string,
-  spaceName: string,
-  resource: { id: string; name: string; description?: string; updated_at: string },
-  kind: "agent" | "workflow",
-): GlobalSearchDocument {
-  return {
-    id: `${kind}:${resource.id}`,
-    accountId,
-    kind,
-    title: resource.name,
-    body: resource.description ?? "",
-    keywords: [spaceName, kind],
-    href: `/spaces/${encodeURIComponent(spaceId)}/assistant/studio/${kind === "agent" ? "agents" : "workflows"}`,
-    spaceId,
-    spaceName,
-    updatedAt: resource.updated_at,
-    source: "local",
-  };
 }
 
 export async function searchServerTasks(

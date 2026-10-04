@@ -72,5 +72,3 @@ export function base64FromBytes(bytes: number[]): string {
   }
   return window.btoa(binary);
 }
-
-export { CompareDiffLine, parentPath, joinLocalPath } from "./ComparePresentation";

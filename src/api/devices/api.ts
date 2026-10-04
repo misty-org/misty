@@ -14,16 +14,6 @@ const pairPath = (deviceId: string, pairId: string) =>
 const workflowJobPath = (deviceId: string, jobId: string) =>
   `${devicePath(deviceId)}/workflow-node-jobs/${encodeURIComponent(jobId)}`;
 
-export interface SpaceDevicePresenceInput {
-  endpointId: string;
-  addressing: Record<string, unknown>;
-  protocolVersion: "misty-device/2";
-  connectionHint: "unknown" | "direct" | "relay";
-}
-const spaceDevicePath = (deviceId: string, _spaceId: string) => {
-  return `${devicePath(deviceId)}/files`;
-};
-
 export const devicesApi = {
   request: managedAiRequest,
   list: <T>() => managedAiRequest<T>("/devices"),
@@ -42,42 +32,6 @@ export const devicesApi = {
     deviceId: string,
     body: unknown,
   ) => signed<T>(request, localId, `${devicePath(deviceId)}/peer-tickets`, "POST", body),
-  spacePresence: <T>(
-    request: SignedDeviceRequest,
-    localId: string,
-    deviceId: string,
-    spaceId: string,
-    body: SpaceDevicePresenceInput,
-  ) => signed<T>(request, localId, `${spaceDevicePath(deviceId, spaceId)}/presence`, "POST", body),
-  spacePeers: <T>(
-    request: SignedDeviceRequest,
-    localId: string,
-    deviceId: string,
-    spaceId: string,
-  ) => signed<T>(request, localId, `${spaceDevicePath(deviceId, spaceId)}/peers`, "GET"),
-  issueSpacePeerTicket: <T>(
-    request: SignedDeviceRequest,
-    localId: string,
-    deviceId: string,
-    spaceId: string,
-    targetDeviceId: string,
-  ) =>
-    signed<T>(request, localId, `${spaceDevicePath(deviceId, spaceId)}/peer-tickets`, "POST", {
-      targetDeviceId,
-      protocolVersion: "misty-device/2",
-    }),
-  registerPushSubscription: (
-    request: SignedDeviceRequest,
-    localId: string,
-    deviceId: string,
-    body: { mistyDeviceId: string; environment: "sandbox" | "production"; token: string },
-  ) => signed(request, localId, `${devicePath(deviceId)}/push-subscription`, "PUT", body),
-  deletePushSubscription: (
-    request: SignedDeviceRequest,
-    localId: string,
-    deviceId: string,
-    body: { mistyDeviceId: string; environment: "sandbox" | "production"; token: string },
-  ) => signed(request, localId, `${devicePath(deviceId)}/push-subscription`, "DELETE", body),
   createPairing: <T>(request: SignedDeviceRequest, localId: string, deviceId: string) =>
     signed<T>(request, localId, `${devicePath(deviceId)}/pairing-sessions`, "POST", {}),
   redeemPairing: <T>(

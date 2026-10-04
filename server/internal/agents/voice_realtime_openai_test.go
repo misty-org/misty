@@ -11,11 +11,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func TestDirectOpenAICompanionConfigurationToolsAndMeasuredUsage(t *testing.T) {
+func TestAccountOpenAICompanionConfigurationToolsAndMeasuredUsage(t *testing.T) {
 	commands := make(chan map[string]any, 8)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/realtime" || r.URL.Query().Get("model") != "gpt-realtime-2.1-mini" || r.Header.Get("Authorization") != "Bearer openai-fixture" || r.Header.Get("ai-gateway-auth-method") != "" {
-			t.Error("incorrect direct realtime route or credential")
+			t.Error("incorrect account realtime route or credential")
 			w.WriteHeader(401)
 			return
 		}
@@ -41,13 +41,7 @@ func TestDirectOpenAICompanionConfigurationToolsAndMeasuredUsage(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	t.Setenv("MISTY_AGENT_MODEL_PROVIDER", "openai")
-	t.Setenv("MISTY_AGENT_MODEL", "openai/gpt-6-luna")
-	t.Setenv("MISTY_AGENT_MODEL_API_KEY", "")
-	t.Setenv("MISTY_AGENT_MODEL_BASE_URL", server.URL)
-	t.Setenv("OPENAI_API_KEY", "openai-fixture")
-	a := &SmartLibraryAnalyzer{APIKey: "unused-gateway-fixture"}
-	voice, err := a.OpenVoiceRealtime(context.Background())
+	voice, err := openOpenAIRealtimeModel(context.Background(), server.URL, "openai-fixture", "openai/gpt-realtime-2.1-mini", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +91,7 @@ func TestDirectOpenAICompanionConfigurationToolsAndMeasuredUsage(t *testing.T) {
 	}
 }
 
-func TestDirectRealtimeAudioAndTruncationCodec(t *testing.T) {
+func TestOpenAIRealtimeAudioAndTruncationCodec(t *testing.T) {
 	for _, raw := range []string{
 		`{"type":"response.output_audio.delta","item_id":"item-1","delta":"AAAA"}`,
 		`{"type":"response.output_audio_transcript.delta","item_id":"item-1","delta":"Hello"}`,

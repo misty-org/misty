@@ -48,7 +48,6 @@ export interface PersonalAgentRunSummary {
   owner_user_id: string;
   initial_run_mode: AgentRunMode;
   effective_run_mode: AgentRunMode;
-  approval_state: "none" | "pending" | "approved" | "denied" | "expired";
   parent_run_id?: string;
   delegation_depth: number;
   context_bindings: Array<Record<string, unknown>>;
@@ -83,12 +82,4 @@ export interface PersonalAgentRunDetail {
   result: Record<string, unknown>;
   steps: PersonalAgentRunStep[];
   activity: PersonalAgentTaskActivity[];
-  approvals: Array<{
-    id: string;
-    run_id: string;
-    tool_name: string;
-    summary: string;
-    state: "pending" | "approved" | "denied" | "expired";
-    expires_at: string;
-  }>;
 }

@@ -5,9 +5,11 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
+
+
+import ()
 
 func TestLibraryEditRenditionReservationCompletionAndDownload(t *testing.T) {
 	database := openTestDatabase(t)
@@ -95,7 +97,7 @@ func TestExpiredLibraryRenditionReservationReleasesQuota(t *testing.T) {
 	owner, _ := database.CreateUser("Expired Rendition Owner", "expired-rendition@example.com", "password123")
 	spaceID := createTestSpace(t, database, ctx, owner.ID, "Expired renditions").ID
 	item := createPeopleTestImage(t, database, owner.ID, spaceID, "source.jpg", "9")
-	created, err := database.CreateLibraryEditVersion(ctx, owner.ID, spaceID, item.ID, item.Version, DefaultLibraryEditDefinition())
+	created, err := database.CreateLibraryEditVersion(ctx, owner.ID, spaceID, item.ID, item.Version, TestingDefaultLibraryEditDefinition())
 	if err != nil {
 		t.Fatal(err)
 	}

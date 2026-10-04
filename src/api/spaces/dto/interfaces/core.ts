@@ -1,5 +1,3 @@
-import type { WorkflowVersion } from "./agentArchitectureTypes";
-
 import type { MessageSpan, SpaceRole, SpaceTaskPriority, SpaceTaskStatus } from "../types/types";
 import type { SpaceTaskSourceRef } from "./agentTaskTypes";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
@@ -233,31 +231,6 @@ export interface SpaceEvent {
   entity_id?: string;
   payload: Record<string, unknown>;
   created_at: string;
-}
-
-export interface SpaceStudioResource {
-  id: string;
-  space_id: string;
-  creator_user_id: string;
-  kind: "agent" | "workflow";
-  name: string;
-  description?: string;
-  icon?: string;
-  model_mode?: "automatic" | "pinned";
-  model_id?: string;
-  instructions?: string;
-  definition?: Record<string, unknown>;
-  enabled: boolean;
-  status?: "available" | "disabled" | string;
-  runtime_kind?: "cloud" | "device" | string;
-  version: number;
-  schedules_enabled: boolean;
-  stable_identifier?: string;
-  active_workflow_version_id?: string;
-  active_workflow?: WorkflowVersion;
-  access_policy?: { mode: "space" | "selected"; allowedUserIds: string[] };
-  created_at: string;
-  updated_at: string;
 }
 
 export interface SpacesSnapshot {

@@ -24,8 +24,23 @@ export const createReadStream = unavailable("fs.createReadStream");
 export const createWriteStream = unavailable("fs.createWriteStream");
 export const promises = {};
 export default {
-  existsSync, mkdirSync, writeFileSync, appendFileSync, copyFileSync, renameSync, rmSync,
-  truncateSync, closeSync, openSync, readSync,
-  unlinkSync, mkdtempSync, readFileSync, readdirSync, statSync, createReadStream,
-  createWriteStream, promises,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  appendFileSync,
+  copyFileSync,
+  renameSync,
+  rmSync,
+  truncateSync,
+  closeSync,
+  openSync,
+  readSync,
+  unlinkSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  createReadStream,
+  createWriteStream,
+  promises,
 };

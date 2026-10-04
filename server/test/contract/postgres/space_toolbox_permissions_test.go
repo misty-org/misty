@@ -4,10 +4,12 @@ import (
 	"context"
 	"slices"
 	"testing"
-
-	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
+
+
+import ()
 
 func TestSpaceToolboxDropsWritesWhenPermissionIsRevoked(t *testing.T) {
 	database := openTestDatabase(t)
@@ -20,11 +22,11 @@ func TestSpaceToolboxDropsWritesWhenPermissionIsRevoked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Permission Toolbox")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Permission Toolbox")
 	if err != nil {
 		t.Fatal(err)
 	}
-	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, owner.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}

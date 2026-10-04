@@ -1,35 +1,16 @@
 export function createAgentsApi(
   apiRequest: <T = void>(path: string, init?: RequestInit) => Promise<T>,
-  apiBlobRequest: (path: string, init?: RequestInit) => Promise<Blob> = async () => {
-    throw new Error("Use the binary operation.");
-  },
 ) {
   return {
     realtimeVoiceTicket: (deviceId: string, signal?: AbortSignal) =>
-      apiRequest<{ ticket: string; expires_in: number; webrtc?: boolean }>(
-        "/agent-voice/realtime/ticket",
-        {
-          method: "POST",
-          signal,
-          body: JSON.stringify({ device_id: deviceId }),
-        },
-      ),
+      apiRequest<{ ticket: string; expires_in: number }>("/agent-voice/realtime/ticket", {
+        method: "POST",
+        signal,
+        body: JSON.stringify({ device_id: deviceId }),
+      }),
     run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
     cancelRun: <T>(runId: string) =>
       apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
-    retryRun: <T>(runId: string) =>
-      apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/retry`, { method: "POST" }),
-    decideApproval: <T>(runId: string, approvalId: string, decision: "approve" | "deny") =>
-      apiRequest<T>(
-        `/agent-runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}`,
-        { method: "POST", body: JSON.stringify({ decision }) },
-      ),
-    speech: (invocationId: string, signal?: AbortSignal) =>
-      apiBlobRequest("/agent-voice/speech", {
-        method: "POST",
-        signal,
-        body: JSON.stringify({ invocation_id: invocationId }),
-      }),
     transcribeVoice: async (audio: Blob, durationMs: number, signal?: AbortSignal) =>
       apiRequest<{ transcript: string; detected_language: string; duration_ms: number }>(
         "/agent-voice/transcriptions",

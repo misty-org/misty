@@ -16,5 +16,16 @@ export const readFile = unavailable("fs.readFile");
 export const stat = unavailable("fs.stat");
 export const open = unavailable("fs.open");
 export default {
-  writeFile, appendFile, mkdir, rename, unlink, rm, copyFile, cp, mkdtemp, readFile, stat, open,
+  writeFile,
+  appendFile,
+  mkdir,
+  rename,
+  unlink,
+  rm,
+  copyFile,
+  cp,
+  mkdtemp,
+  readFile,
+  stat,
+  open,
 };

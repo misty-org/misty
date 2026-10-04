@@ -28,7 +28,7 @@ export type ActivityTarget =
 export interface ActivityItem {
   id: string;
   accountId: string;
-  source: "spaces" | "invitation" | "device" | "capabilities" | "interventions";
+  source: "spaces" | "invitation" | "device" | "interventions";
   sourceId: string;
   deploymentScope?: string;
   spaceId?: string;

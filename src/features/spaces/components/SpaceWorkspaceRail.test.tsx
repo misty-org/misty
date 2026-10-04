@@ -21,7 +21,6 @@ vi.mock("../useSpacePersonalItems", () => ({
   useSpacePersonalItems: () => ({ items: [], ready: true, error: "", retry: vi.fn() }),
 }));
 vi.mock("../SpaceSectionView", () => ({ preloadSpaceSection: preload }));
-vi.mock("./spacePanel/useSpaceLibraryUsage", () => ({ useSpaceLibraryUsage: () => undefined }));
 vi.mock("../chat/sidebar/useSpaceConversations", () => ({
   useSpaceConversations: () => ({
     conversations: [],

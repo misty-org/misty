@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kannachi323/misty/server/internal/browseractions"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
@@ -23,7 +22,7 @@ func TestBrowserUnavailableMCPErrorPreservesPublicReason(t *testing.T) {
 
 func TestBrowserStaleMCPResultIsExplicitlyNotAttempted(t *testing.T) {
 	err := browserDeviceFailure("browser_snapshot_stale")
-	if !errors.Is(err, db.ErrAgentToolboxNotAttempted) || !errors.Is(err, browseractions.ErrStale) {
+	if !errors.Is(err, db.ErrAgentToolboxNotAttempted) || !errors.Is(err, errBrowserSnapshotStale) {
 		t.Fatalf("native pre-dispatch evidence lost before journaling: %v", err)
 	}
 	result := mcpToolError(err)
@@ -31,7 +30,7 @@ func TestBrowserStaleMCPResultIsExplicitlyNotAttempted(t *testing.T) {
 	if !ok || result.IsError || value["status"] != "failure" || value["attempted"] != false || value["reason"] != "browser_snapshot_stale" {
 		t.Fatalf("missing pre-dispatch rejection: %#v", result)
 	}
-	unknown := mcpToolError(errors.Join(browseractions.ErrStale, db.ErrAgentToolboxActionUnknown))
+	unknown := mcpToolError(errors.Join(errBrowserSnapshotStale, db.ErrAgentToolboxActionUnknown))
 	if unknown.StructuredContent.(map[string]any)["status"] != "uncertain" {
 		t.Fatal("uncertainty must take precedence over a stale reference")
 	}
@@ -47,7 +46,7 @@ func TestBrowserStaleMCPResultIsExplicitlyNotAttempted(t *testing.T) {
 
 func TestWorkspaceStaleMCPResultRequiresFreshWorkspaceCapture(t *testing.T) {
 	err := browserDeviceFailureForOperation("browser_snapshot_stale", "browser.workspace.interact")
-	if !errors.Is(err, db.ErrAgentToolboxNotAttempted) || !errors.Is(err, browseractions.ErrStale) {
+	if !errors.Is(err, db.ErrAgentToolboxNotAttempted) || !errors.Is(err, errBrowserSnapshotStale) {
 		t.Fatal("workspace pre-dispatch evidence lost")
 	}
 	result := mcpToolError(err)

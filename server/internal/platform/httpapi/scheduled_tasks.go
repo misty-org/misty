@@ -301,9 +301,6 @@ func (s *AIService) prepareScheduledMethod(ctx context.Context, user string, bod
 		}
 		return nil
 	}
-	if db.AppAuthorityFromContext(ctx) != nil {
-		return db.ErrSpaceForbidden
-	}
 	m, err := s.database.AgentMethodVersion(ctx, user, body.MethodVersionID)
 	if err != nil {
 		return err
