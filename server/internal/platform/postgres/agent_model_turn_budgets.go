@@ -77,7 +77,7 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		// itself already needed one.
 		if !ScreenPlanningNode(nodeID) {
 			var consumed int
-			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:screen:%' AND node_id NOT LIKE 'model:midscene:%'`, runID).Scan(&consumed); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:screen:%'`, runID).Scan(&consumed); err != nil {
 				return err
 			}
 			if consumed >= limit {
@@ -119,5 +119,5 @@ func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 // ScreenPlanningNode reports a model call made by a screen loop's planner
 // rather than by the agent itself.
 func ScreenPlanningNode(nodeID string) bool {
-	return strings.HasPrefix(nodeID, "model:screen:") || strings.HasPrefix(nodeID, "model:midscene:")
+	return strings.HasPrefix(nodeID, "model:screen:")
 }
