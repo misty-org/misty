@@ -140,8 +140,8 @@ export function ConversationView(props: {
             />
           ) : null}
           {message.appRequest ? (
-          <MistyAppRequestCard messageId={message.id} request={message.appRequest} />
-        ) : null}
+            <MistyAppRequestCard messageId={message.id} request={message.appRequest} />
+          ) : null}
           {message.screenRequest ? (
             <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
           ) : null}

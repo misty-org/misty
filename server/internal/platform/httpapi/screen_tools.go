@@ -11,7 +11,8 @@ import (
 )
 
 // Screens open on demand. A run started on the desktop can ask for one with
-// screen.open, or see the user's screen with screen.look. Either ends the run
+// screen.open (a browser, or the user's other apps with Misty's own cursor),
+// or see the user's screen with screen.look. Either ends the run
 // with a screen request; the desktop opens the screen where the account
 // setting says and continues the same conversation with it attached, through
 // the same lease and admission checks as any other screen task.
@@ -38,11 +39,14 @@ func (s *SpacesService) screenToolRegistrations(record *db.AIInvocationRecord) [
 	reason := map[string]any{"type": "string", "minLength": 3, "maxLength": 300, "description": "What the screen is for, in a few words the user will see"}
 	return []agenttools.Registration{
 		{Descriptor: screenDescriptor(screenOpenTool,
-			"Open a browser screen for this task when it needs a website or web app that no connected app or Misty tool covers. "+
-				"If a browser is already attached, use the browser tools with its scopeId instead. Otherwise this ends the current "+
-				"response; Misty opens the screen where the user prefers and continues this conversation with the browser attached. "+
-				"Do not ask the user where to work.",
-			map[string]any{"reason": reason, "url": map[string]any{"type": "string", "maxLength": 2048, "description": "Optional https page to open first"}}, "reason"),
+			"Open a screen for this task. Use target browser (the default) when it needs a website or web app that no connected app "+
+				"or Misty tool covers. Use target desktop when it needs another app on the user's Mac, such as Numbers, Finder or Mail; "+
+				"Misty works there with its own cursor after the user allows it, and the user keeps their own pointer. "+
+				"If such a screen is already attached, use browser_act with its scopeId instead. Otherwise this ends the current "+
+				"response; Misty opens the screen and continues this conversation with it attached. Do not ask the user where to work.",
+			map[string]any{"reason": reason,
+				"target": map[string]any{"type": "string", "enum": []string{"browser", "desktop"}, "description": "browser (default) or desktop"},
+				"url":    map[string]any{"type": "string", "maxLength": 2048, "description": "Optional https page to open first (browser only)"}}, "reason"),
 			Handler: s.screenRequestHandler(screenOpenTool)},
 		{Descriptor: screenDescriptor(screenLookTool,
 			"See what is on the user's screen right now, when the request refers to something visible there. "+
@@ -66,6 +70,7 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 		var input struct {
 			Reason string `json:"reason"`
 			URL    string `json:"url"`
+			Target string `json:"target"`
 		}
 		if json.Unmarshal(request.Arguments, &input) != nil || strings.TrimSpace(input.Reason) == "" {
 			return nil, serveragent.ErrInvalidRequest("Describe what the screen is for.")
@@ -81,10 +86,20 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 		if json.Unmarshal(record.RequestPayload, &body) != nil {
 			return nil, db.ErrSpaceInvalid
 		}
+		kind := strings.TrimPrefix(tool, "screen.")
 		if tool == screenOpenTool {
-			if screens, _ := aiInvocationBrowserGrants(ctx, s.database, invocation.UserID, invocation.RunID); len(screens) > 0 {
-				return json.Marshal(map[string]any{"status": "open", "screens": screens,
-					"message": "A browser is already attached to this task. Use the browser tools with its scopeId."})
+			desktop := input.Target == "desktop"
+			if desktop {
+				kind = "desktop"
+				input.URL = ""
+			} else if input.Target != "" && input.Target != "browser" {
+				return nil, serveragent.ErrInvalidRequest("target must be browser or desktop.")
+			}
+			if invocationHasDesktopControl(body) == desktop {
+				if screens, _ := aiInvocationBrowserGrants(ctx, s.database, invocation.UserID, invocation.RunID); len(screens) > 0 {
+					return json.Marshal(map[string]any{"status": "open", "screens": screens,
+						"message": "That screen is already attached to this task. Use browser_act with its scopeId."})
+				}
 			}
 		} else if len(body.DisplayCaptures) > 0 || body.Capture != nil {
 			return json.Marshal(map[string]any{"status": "open",
@@ -94,7 +109,7 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 		if err != nil {
 			return nil, err
 		}
-		screen := &screenRequest{Kind: strings.TrimPrefix(tool, "screen."), URL: input.URL, Reason: strings.TrimSpace(input.Reason), Location: settings.ScreenLocation}
+		screen := &screenRequest{Kind: kind, URL: input.URL, Reason: strings.TrimSpace(input.Reason), Location: settings.ScreenLocation}
 		if s.aiInvocations != nil {
 			if _, err := s.aiInvocations.restoreDurable(ctx, *record); err != nil {
 				return nil, err
