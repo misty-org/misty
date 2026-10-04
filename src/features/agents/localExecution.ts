@@ -11,7 +11,6 @@ import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import type { AiInvocationDeviceContext } from "@/features/ai-surface";
 import type { GlobalAiContextRef } from "@/features/global-search/types";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
-import { requestsScreenContext } from "./companion/companionIntent";
 import { lease, releaseLease, remoteLease } from "./executionLease";
 
 export const agentWorkerParameters = new URLSearchParams(
@@ -55,6 +54,8 @@ export async function startLocalExecution(
   options?: {
     normalTabs: boolean;
     openWhenMissing?: boolean;
+    /** The page a newly opened tab starts on. */
+    url?: string;
     desktopControl?: boolean;
     method?: Execution["method"];
   },
@@ -174,7 +175,7 @@ export async function startLocalExecution(
     if (options?.normalTabs) {
       const normal = await (
         await import("./companion/normalTabs")
-      ).companionBrowserContext(assertCurrent, options.openWhenMissing);
+      ).companionBrowserContext(assertCurrent, options.openWhenMissing, options.url);
       assertCurrent();
       execution.views = [];
       execution.context = normal.context;
@@ -382,8 +383,7 @@ export async function steerLocalExecution(prompt: string) {
     );
   } else if (
     useLocalExecution.getState().execution?.normalTabs ||
-    useLocalExecution.getState().execution?.desktopControl ||
-    requestsScreenContext(prompt)
+    useLocalExecution.getState().execution?.desktopControl
   ) {
     const companion = (await import("./companion/companionState")).useCompanionState.getState();
     if (!companion.submit || companion.accountId !== before.accountId)

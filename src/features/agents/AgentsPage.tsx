@@ -354,7 +354,7 @@ export default function NativeAgentsPage() {
               agent={profile}
               spaceId={conversationSpaceId}
               accountId={user?.id ?? ""}
-              showWorkLocation
+              showControlBar
               initialDraft={
                 !activeConversationId && draftSeed.agentId === profile?.id ? draftSeed.text : ""
               }

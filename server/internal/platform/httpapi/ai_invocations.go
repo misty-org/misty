@@ -101,7 +101,9 @@ type aiInvocationEvent struct {
 	Citation   *aiCitation `json:"citation,omitempty"`
 	Artifact   *aiArtifact `json:"artifact,omitempty"`
 	AppRequest *appRequest `json:"appRequest,omitempty"`
-	Error      string      `json:"error,omitempty"`
+	// ScreenRequest asks the desktop to open a screen and continue the task.
+	ScreenRequest *screenRequest `json:"screenRequest,omitempty"`
+	Error         string         `json:"error,omitempty"`
 }
 
 type aiArtifact struct {

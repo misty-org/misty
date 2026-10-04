@@ -202,5 +202,5 @@ func (s *conversationSession) dispatchTool() error {
 	if _, err := s.h.Tool(s.ctx, "get_task_status"); err != nil {
 		return err
 	}
-	return s.write(map[string]any{"type": "tool.call", "callId": s.pending.ID, "name": s.pending.Name, "instruction": s.pending.Instruction, "needsScreen": s.pending.NeedsScreen, "needsBrowser": s.pending.NeedsBrowser, "key": s.pending.Key, "invocationId": s.h.TaskID()})
+	return s.write(map[string]any{"type": "tool.call", "callId": s.pending.ID, "name": s.pending.Name, "instruction": s.pending.Instruction, "key": s.pending.Key, "invocationId": s.h.TaskID()})
 }

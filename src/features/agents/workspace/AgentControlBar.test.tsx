@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("../agentWindowHandoff", () => ({ showAgentWindow: mocks.show }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("../betaModes", () => ({ visibleAutopilotAvailable: () => true }));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: Object.assign(
     (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state),
@@ -23,13 +22,21 @@ vi.mock("@/features/misty/useMistyStore", () => ({
     },
   ),
 }));
-import { AgentWorkLocation } from "./AgentWorkLocation";
+import { AgentControlBar } from "./AgentControlBar";
+
+it("offers no work-location choice", () => {
+  render(<AgentControlBar />);
+  expect(
+    screen.queryByRole("button", { name: /this conversation|control this screen/i }),
+  ).toBeNull();
+});
+
 it("keeps an early Show window notice local without interrupting task admission", async () => {
   mocks.show.mockRejectedValue(
     new Error("Agent window: No agent window is open. Start a separate-window task first."),
   );
-  render(<AgentWorkLocation />);
-  fireEvent.click(screen.getByRole("button", { name: "Show agent window" }));
+  render(<AgentControlBar />);
+  fireEvent.click(screen.getAllByRole("button", { name: "Show agent window" })[0]);
   await waitFor(() =>
     expect(screen.getByRole("status").textContent).toContain("once the task starts"),
   );

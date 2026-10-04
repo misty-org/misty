@@ -18,11 +18,14 @@ import type {
 } from "./types";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 
+export type ScreenLocation = "separate" | "window" | "ask";
 export interface AiUserSettings {
   enabled: boolean;
   memory_enabled: boolean;
   /** Sends, shares, deletes and payments in connected apps wait for approval. */
   app_actions_ask: boolean;
+  /** Where agents open a screen when a task needs one. */
+  screen_location?: ScreenLocation;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
@@ -122,6 +125,11 @@ export const aiSurfaceApi = {
         retention_days: retentionDays,
         ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
       }),
+    }),
+  updateScreenLocation: (location: ScreenLocation) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/screen-location", {
+      method: "PUT",
+      body: JSON.stringify({ location }),
     }),
   updateAppActionsAsk: (ask: boolean) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {

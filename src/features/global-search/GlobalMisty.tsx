@@ -1,5 +1,4 @@
 import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
-import { useCompanionState, requestsScreenContext } from "@/features/agents/companion";
 import {
   MistyApprovalReview,
   MistyOverlayControls,
@@ -311,18 +310,6 @@ export function GlobalMistySurface(props: {
     if (open) onContentVisibilityChange?.(contentVisible);
   }, [contentVisible, onContentVisibilityChange, open]);
   const sendAnswer = async (prompt: string) => {
-    if (
-      !allowCapture &&
-      requestsScreenContext(prompt) &&
-      !registeredAiSelection &&
-      !attachments.length &&
-      !useCompanionState.getState().submit
-    ) {
-      setVoiceError(
-        "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there, or attach an image.",
-      );
-      return;
-    }
     if (docked && useMistyStore.getState().working && useMistyStore.getState().invocationId) {
       if (attachments.length) {
         setVoiceError("Keep attachments for the next task; follow-ups can contain text only.");
@@ -358,23 +345,8 @@ export function GlobalMistySurface(props: {
       }
       return;
     }
-    const companionSubmit = useCompanionState.getState().submit;
-    if (companionSubmit && !registeredAiSelection && requestsScreenContext(prompt)) {
-      // Like Clicky's panel dismissal, expose the referenced workspace before capture.
-      useController.getState().closePanel();
-      try {
-        await companionSubmit({
-          prompt,
-          attachments: attachmentState.attachments,
-          conversationId: useController.getState().activeConversationId,
-        });
-      } catch (error) {
-        setVoiceError(error instanceof Error ? error.message : String(error));
-        useController.getState().openPanel();
-      }
-    } else {
-      await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
-    }
+    // The task looks at the screen itself (screen_look) when the request needs it.
+    await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
     if (!useController.getState().query) attachmentState.consume();
   };
   const activateCandidate = (candidate?: UnifiedMistyCandidate) => {

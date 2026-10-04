@@ -11,7 +11,7 @@ import { Mic, Square, X } from "lucide-react";
 import { useEffect, useRef, useImperativeHandle, type Ref, type ReactNode } from "react";
 import { useCompanionState } from "../companion/companionState";
 import { AgentConversationView } from "./AgentConversationView";
-import { AgentWorkLocation } from "../workspace/AgentWorkLocation";
+import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
 export type AgentVoiceControl = { toggle(): void };
 export function AgentWorkspaceConversation({
@@ -19,7 +19,7 @@ export function AgentWorkspaceConversation({
   conversationId,
   emptyContent,
   initialDraft = "",
-  showWorkLocation = false,
+  showControlBar = false,
   spaceId: _legacySpaceId,
   accountId,
   onCreate,
@@ -31,7 +31,7 @@ export function AgentWorkspaceConversation({
   conversationId?: string;
   emptyContent?: ReactNode;
   initialDraft?: string;
-  showWorkLocation?: boolean;
+  showControlBar?: boolean;
   spaceId: string;
   accountId: string;
   onCreate: () => void;
@@ -229,20 +229,20 @@ export function AgentWorkspaceConversation({
           </p>
         )}
         <MistyContextBar />
-        {showWorkLocation && agent ? (
-          <AgentWorkLocation>
+        {showControlBar && agent ? (
+          <AgentControlBar>
             <MistyFolderWork accountId={accountId} disabled={state.working} />
             <AgentUsageControl
               draft={draft}
               model={conversation?.modelId}
               working={state.working}
             />
-          </AgentWorkLocation>
+          </AgentControlBar>
         ) : (
           <MistyFolderWork accountId={accountId} disabled={state.working} />
         )}
         <MistyComposer
-          hideUsageEstimate={showWorkLocation && Boolean(agent)}
+          hideUsageEstimate={showControlBar && Boolean(agent)}
           modelId={conversation?.modelId}
           layout="conversation"
           value={draft}

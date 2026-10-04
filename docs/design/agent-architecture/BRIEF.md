@@ -147,14 +147,26 @@ Each phase leaves the product working.
   official browser execution path. Remove it after Phase 4 retires the
   low-level browser tools.
 
-### Phase 3 — Screens on demand
+### Phase 3 — Screens on demand (implemented October 4, 2026; not yet verified)
 
-- `screen.*` calls return a durable surface wait. The desktop opens the screen
-  from the account setting "Where Misty works on screen: Separate window / This
-  window / Ask each time", attaches it and resumes the run.
-- Delete the work-location dropdown, up-front window and execution-mode
-  branching, `companionBrowserIntent.ts`, and the screen-context regex (replaced
-  by an on-demand capture tool).
+- Desktop runs get `screen_open` (a browser for the task, optionally at a URL)
+  and `screen_look` (the user's screen). Either call ends the response with a
+  `screen.request` event. The desktop opens the screen from the account setting
+  *Where Misty works on screen* (Separate window, the default / This window /
+  Ask each time, shown as a card in the chat), or captures the screen, then
+  continues the same conversation with it attached. The continuation shows no
+  new user turn.
+- Change from the approved wording: the run hands off to a continuation run
+  instead of pausing and resuming. The run's mode, task and window are frozen
+  at admission and checked in about a dozen places, including the device lease
+  and job authority. A continuation goes through those same tested checks; a
+  mid-run attach would have reopened all of them. The user sees one
+  conversation either way.
+- Deleted: the work-location dropdown, the stored per-agent mode, the voice
+  model's `needs_screen`/`needs_browser` flags, `companionBrowserIntent.ts` and
+  the screen-context regex. Typed and voice turns always start in the
+  conversation; `screen_look` continuations through the companion still capture
+  every display, so answers can point at the screen.
 
 ### Phase 4 — Midscene on the desktop
 

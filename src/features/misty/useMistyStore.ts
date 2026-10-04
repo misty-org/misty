@@ -1,13 +1,12 @@
 import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
 import { apiRequest } from "@/api/client";
-import { companionRequestsBrowser } from "./companionBrowserIntent";
 import {
   runtimeAiApi as aiSurfaceApi,
   searchAgents as executeGlobalSearch,
   visualSearchAgents as executeGlobalVisualSearch,
   subscribeAgentsInvocation as subscribeToAiInvocation,
 } from "@/features/agents/AgentsRuntime";
-import { betaExecutionMode, visibleAutopilotAvailable } from "@/features/agents/betaModes";
+import { visibleAutopilotAvailable } from "@/features/agents/betaModes";
 import {
   finishLocalExecution,
   isAgentWorkerWindow,
@@ -40,6 +39,7 @@ import { create } from "zustand";
 import { assertMistyAvailable } from "./availability";
 import { requestHostContext } from "./contextBridge";
 import { resetMistyDraftAttachments } from "./draftAttachments";
+import { continueAfterScreenRequest } from "./screenRequests";
 import { createMistyConversationActions } from "./mistyConversationActions";
 import { createMistyProposalActions } from "./mistyProposalActions";
 import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
@@ -55,8 +55,7 @@ let steeringRequest:
 export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   ...createGlobalSearchPanelState(set, get),
   mode: "ask",
-  executionMode: betaExecutionMode("user"),
-  executionModeByAgent: {},
+  executionMode: "user",
   setAccount: (accountId) => {
     if (get().accountId === accountId) return;
     resetMistyDraftAttachments(accountId);
@@ -71,7 +70,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     set({
       mode: "ask",
       selectedAgentId: undefined,
-      executionMode: betaExecutionMode("user"),
+      executionMode: "user",
       selectedSpaceId: "",
       targets: [],
       handoff: undefined,
@@ -209,9 +208,13 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       return;
     }
     const epoch = advanceSubmissionEpoch();
+    // Where work happens is decided per task: a screen opens only when the
+    // agent asks for one, and its continuation names the mode.
+    const executionMode = companion?.executionMode ?? "user";
     set({
       working: true,
       error: null,
+      executionMode,
       invocationId: undefined,
       invocationConversationId: undefined,
     });
@@ -257,12 +260,12 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       // A worker can inspect only its assigned browser; main-screen APIs reject it.
       // Separate work must also remain independent of main-window permissions.
       const external =
-        !isAgentWorkerWindow() && (companion?.executionMode ?? get().executionMode) !== "team"
+        !isAgentWorkerWindow() && executionMode !== "team"
           ? (await (await import("./screenContext")).screenStatus()).external
           : false;
       if (
         !isAgentWorkerWindow() &&
-        (companion?.executionMode ?? get().executionMode) !== "team" &&
+        executionMode !== "team" &&
         !origin &&
         !browserRequest &&
         !handoff?.selection &&
@@ -297,7 +300,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       if (
         !companion &&
         !isAgentWorkerWindow() &&
-        get().executionMode !== "team" &&
+        executionMode !== "team" &&
         !handoff?.selection &&
         !browserRequest &&
         (await (await import("./screenContext")).screenStatus()).external
@@ -317,12 +320,6 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         });
       return;
     }
-    if (!companion && get().executionMode !== betaExecutionMode(get().executionMode))
-      set({
-        executionMode: betaExecutionMode(get().executionMode),
-      });
-    const executionMode = companion?.executionMode ?? get().executionMode;
-    if (companion?.methodVersionId || companion?.executionMode === "team") set({ executionMode });
     let workerReceipt: { invocationId: string; eventsUrl: string } | undefined;
     let routedConversationId: string | undefined;
     if (executionMode === "team" && !isAgentWorkerWindow()) {
@@ -394,14 +391,10 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           spaceId,
           executionMode === "team" ? "team" : "agent",
           {
-            ...(executionMode === "agent" && visibleAutopilotAvailable() && !isAgentWorkerWindow()
-              ? { normalTabs: false, desktopControl: true }
-              : companion && !isAgentWorkerWindow()
-                ? {
-                    normalTabs: true,
-                    openWhenMissing:
-                      companion.interactionMode === "auto" || companionRequestsBrowser(normalized),
-                  }
+            ...(companion?.openScreen && !isAgentWorkerWindow()
+              ? { normalTabs: true, openWhenMissing: true, url: companion.openScreen.url }
+              : executionMode === "agent" && visibleAutopilotAvailable() && !isAgentWorkerWindow()
+                ? { normalTabs: false, desktopControl: true }
                 : { normalTabs: false }),
             method: companion?.methodVersionId
               ? {
@@ -487,7 +480,9 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       updatedAt: userMessage.createdAt,
       messages: [
         ...conversation.messages,
-        ...(companion?.idempotencyKey?.startsWith("voice-") ? [] : [userMessage]),
+        ...(companion?.idempotencyKey?.startsWith("voice-") || companion?.continuation
+          ? []
+          : [userMessage]),
         assistantMessage,
       ],
     }));
@@ -584,6 +579,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
             if (get().invocationId !== created.invocationId) return;
             applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event);
+            if (event.type === "invocation.completed")
+              continueAfterScreenRequest(set, get, conversationId, assistantMessage.id);
             if (
               executionTaskId &&
               event.type === "assistant.status" &&

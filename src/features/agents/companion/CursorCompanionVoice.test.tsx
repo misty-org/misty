@@ -151,14 +151,9 @@ it("delegates only on a tool request with its stable admission key", async () =>
   view.unmount();
   expect(mocks.cancel).not.toHaveBeenCalled();
 });
-it("captures fresh screen evidence only when the voice tool requests it", async () => {
+it("delegates screen questions without capturing the screen up front", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
-  const screen = { id: "fresh-screen", dataUrl: "data:image/jpeg;base64,fixture" };
-  const native = mocks.invoke.getMockImplementation()!;
-  mocks.invoke.mockImplementation((name, args) =>
-    name === "cursor_companion_capture" ? Promise.resolve([screen]) : native(name, args),
-  );
   await act(async () => {
     await mocks.conversationOptions!.tool(
       {
@@ -167,12 +162,12 @@ it("captures fresh screen evidence only when the voice tool requests it", async 
         key: "voice-1:screen",
         instruction: "Describe the screen without changing anything.",
         invocationId: "",
-        needsScreen: true,
       },
       "conversation",
     );
   });
-  expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 2 });
+  // The task calls screen_look when it needs the screen.
+  expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
   expect(mocks.submit).toHaveBeenCalledWith(
     "Describe the screen without changing anything.",
     [],
@@ -180,8 +175,9 @@ it("captures fresh screen evidence only when the voice tool requests it", async 
     "workspace",
     [],
     { conversationId: "conversation", context: [] },
-    expect.objectContaining({ displayCaptures: [screen], idempotencyKey: "voice-1:screen" }),
+    expect.objectContaining({ executionMode: "user", idempotencyKey: "voice-1:screen" }),
   );
+  expect(mocks.submit.mock.calls[0][6]).not.toHaveProperty("displayCaptures");
   view.unmount();
 });
 it("stops audio without canceling business actions", async () => {
@@ -287,75 +283,10 @@ it("speaks the saved result of delegated work without replaying the task", async
 });
 
 it.each(["user", "agent", "team"] as const)(
-  "keeps the chosen %s task destination when delegating voice work",
-  async (executionMode) => {
+  "delegates voice work in user mode after a %s task, leaving screens to the task",
+  async (previous) => {
     const view = await mounted();
-    mocks.state.executionMode = executionMode;
-    emit("shortcut", { turn: 2, held: true });
-    await act(async () => {
-      await mocks.conversationOptions!.tool(
-        {
-          name: "start_task",
-          callId: "location",
-          key: "voice-location:call",
-          instruction: "Research this topic",
-          invocationId: "",
-        },
-        "conversation",
-      );
-    });
-    expect(mocks.submit).toHaveBeenCalledWith(
-      "Research this topic",
-      [],
-      undefined,
-      "workspace",
-      [],
-      { conversationId: "conversation", context: [] },
-      expect.objectContaining({ executionMode }),
-    );
-    view.unmount();
-  },
-);
-
-it("never captures the main screen for separate-window work even if the voice model requests it", async () => {
-  const view = await mounted();
-  mocks.state.executionMode = "team";
-  emit("shortcut", { turn: 2, held: true });
-  await act(async () => {
-    await mocks.conversationOptions!.tool(
-      {
-        name: "start_task",
-        callId: "isolated",
-        key: "voice-isolated:call",
-        instruction: "Read example.com",
-        needsScreen: true,
-        invocationId: "",
-      },
-      "conversation",
-    );
-  });
-  expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
-  expect(mocks.submit).toHaveBeenCalledWith(
-    "Read example.com",
-    [],
-    undefined,
-    "workspace",
-    [],
-    { conversationId: "conversation", context: [] },
-    expect.objectContaining({ executionMode: "team", displayCaptures: [] }),
-  );
-  view.unmount();
-});
-
-it.each([
-  ["user", "team"],
-  ["team", "team"],
-  ["agent", "agent"],
-] as const)(
-  "routes browser work from %s to %s without rewriting the requested outcome",
-  async (selected, expected) => {
-    const view = await mounted();
-    mocks.state.executionMode = selected;
+    mocks.state.executionMode = previous;
     emit("shortcut", { turn: 2, held: true });
     const instruction = "Find this week's videos and create the requested playlist.";
     await act(async () => {
@@ -365,7 +296,6 @@ it.each([
           callId: "browser-task",
           key: "voice-browser:call",
           instruction,
-          needsBrowser: true,
           invocationId: "",
         },
         "conversation",
@@ -379,11 +309,7 @@ it.each([
       "workspace",
       [],
       { conversationId: "conversation", context: [] },
-      expect.objectContaining({
-        executionMode: expected,
-        displayCaptures: [],
-        idempotencyKey: "voice-browser:call",
-      }),
+      expect.objectContaining({ executionMode: "user", idempotencyKey: "voice-browser:call" }),
     );
     view.unmount();
   },

@@ -5,6 +5,10 @@ export interface CompanionSubmission {
   prompt: string;
   attachments?: Parameters<GlobalSearchState["submitAnswer"]>[1];
   conversationId: string;
+  /** Capture the displays first: the task asked to look at the screen. */
+  look?: boolean;
+  /** Continues an earlier response; shows no new user turn. */
+  continuation?: boolean;
 }
 export type CompanionControl =
   | {

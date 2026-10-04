@@ -25,6 +25,7 @@ interface ToolMonitorOptions {
 export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonitorOptions) {
   // Misty name of the observation the next turn must make before acting.
   let requiredInspection = "";
+  let handoff = "";
   const failures: Array<{ toolName: string; error: string }> = [];
   const rejectedWrites = new Map<string, number>();
 
@@ -38,6 +39,12 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
       if (name === requiredInspection) requiredInspection = "";
       // Native workspace input consumes its screenshot even on success.
       if (name === "browser.workspace.interact" && catalog.modelName("browser.workspace.visual")) requireInspection("browser.workspace.visual");
+      return;
+    }
+    if (outcome.kind === "handoff") {
+      // Nothing failed: the conversation continues once the screen is attached.
+      handoff ||= outcome.reason;
+      order.stop(outcome.reason);
       return;
     }
     if (outcome.kind === "retry") {
@@ -55,6 +62,8 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
 
   return {
     get requiredInspection() { return requiredInspection; },
+    /** Set when the run ended to open a screen. */
+    get handoff() { return handoff; },
     failures: () => failures,
     /** Every tool, or only the observation a stale or consumed screen needs. */
     activeTools(all: string[]): string[] {
@@ -79,7 +88,7 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
         success: event.success, output: event.output, error: event.error,
         readOnly: catalog.readOnly(toolCall.toolName), rejected: rejected.has(toolCall.toolCallId),
       });
-      const confirmed = outcome.kind === "confirmed";
+      const confirmed = outcome.kind === "confirmed" || outcome.kind === "handoff";
       const visible = confirmed ? "" : (event.success ? unconfirmedToolResultReason(event.output) : "") || visibleErrorMessage(event.error);
       if (stale) requireInspection(observation);
       else settle(name, toolCall, outcome, visible);

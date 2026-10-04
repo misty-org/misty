@@ -19,8 +19,8 @@ export interface GlobalSearchState {
   thinkingMode?: ThinkingMode;
   thinkingModeExplicit?: boolean;
   selectedAgentId?: string;
+  /** Where the current task works; set per task, never chosen up front. */
   executionMode?: "user" | "agent" | "team";
-  executionModeByAgent?: Record<string, "user" | "agent" | "team">;
   artifactPaneId?: string;
   artifactConversationId?: string;
   pendingArtifact?: AiArtifact;
@@ -94,6 +94,10 @@ export interface GlobalSearchState {
       skillVersionIds?: string[];
       displayCaptures?: DisplayCapture[];
       capture?: AiCaptureAttachment;
+      /** Continues the conversation after a screen opened; shows no new user turn. */
+      continuation?: boolean;
+      /** Opens a tab in this window for the task, at this page when given. */
+      openScreen?: { url?: string };
     },
   ) => Promise<void>;
   submitAgentTask: (

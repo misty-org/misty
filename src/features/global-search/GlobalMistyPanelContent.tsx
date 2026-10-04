@@ -29,6 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 import { AppRequestCard } from "@/features/agents";
+import { ScreenRequestCard } from "@/features/misty/ScreenRequestCard";
 import type { GlobalAiActionProposal, GlobalAiConversation } from "./types";
 import { MistyActivityStatus } from "./MistyActivityStatus";
 import { MistyMessageAttachments } from "./MistyMessageAttachments";
@@ -139,6 +140,9 @@ export function ConversationView(props: {
             />
           ) : null}
           {message.appRequest ? <AppRequestCard request={message.appRequest} /> : null}
+          {message.screenRequest ? (
+            <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
+          ) : null}
         </article>
       ))}
       {props.working ? (

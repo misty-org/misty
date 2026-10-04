@@ -281,6 +281,7 @@ func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 	s.Router.MethodFunc(http.MethodGet, prefix+"/settings", aiService.Settings())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/settings", aiService.Settings())
 	s.Router.Put(prefix+"/settings/app-actions", aiService.AppActionsSetting())
+	s.Router.Put(prefix+"/settings/screen-location", aiService.ScreenLocationSetting())
 	s.Router.Get(prefix+"/memories", aiService.Memories())
 	s.Router.Delete(prefix+"/memories/{memoryID}", aiService.Memory())
 	s.Router.Put(prefix+"/memories/{memoryID}", aiService.Memory())

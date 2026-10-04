@@ -26,12 +26,24 @@ export function unconfirmedToolResultReason(output: unknown): string {
 
 export type ToolOutcome =
   | { kind: "confirmed" }
+  /** The run hands off to a screen: Misty opens it and continues the conversation. */
+  | { kind: "handoff"; reason: string }
   /** The call had no effect; the model sees why and plans again. */
   | { kind: "retry"; reason: string }
   /** The run stops: the outcome needs the user, or the run lost its authority. */
   | { kind: "stop"; reason: string };
 
 const runEndingCodes = ["authorization_or_state_changed", "agent_execution_time_limit", "agent_model_turn_limit", "permission_denied"];
+
+/** The message for a screen request, or "" when the output is not one. */
+export function screenHandoffMessage(output: unknown): string {
+  if (!output || typeof output !== "object") return "";
+  const result = output as Record<string, unknown>;
+  if (result.status !== "screen_requested") return "";
+  return typeof result.message === "string" && result.message.trim()
+    ? result.message.slice(0, 300)
+    : "Misty is opening a screen and will continue this conversation with it attached.";
+}
 
 /** The run lost its authority or budget, or its tool sequence already stopped. */
 export function endsRun(message: string): boolean {
@@ -47,6 +59,8 @@ export function endsRun(message: string): boolean {
  */
 export function classifyToolOutcome(input: { success: boolean; output?: unknown; error?: unknown; readOnly: boolean; rejected: boolean }): ToolOutcome {
   if (input.success) {
+    const handoff = screenHandoffMessage(input.output);
+    if (handoff) return { kind: "handoff", reason: handoff };
     const reason = unconfirmedToolResultReason(input.output);
     if (!reason) return { kind: "confirmed" };
     const status = (input.output as Record<string, unknown> | undefined)?.status;

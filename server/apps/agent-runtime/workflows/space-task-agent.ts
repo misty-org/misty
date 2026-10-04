@@ -167,6 +167,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     return { mistyRunId: input.mistyRunId, text: completion.text, steps: result?.steps.length ?? 0, incomplete: completion.status !== "success" };
   };
   const stopped = (): HarnessCompletion => {
+    if (monitor.handoff) return { status: "success", text: monitor.handoff };
     const failures = monitor.failures();
     return {
       status: "incomplete", text: failures.length ? incompleteToolResultText(failures) : order.stoppedReason,

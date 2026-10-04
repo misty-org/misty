@@ -24,7 +24,7 @@ Create-agent setup has Identity, Context and Start steps. Context reviews accoun
 
 ## Implementation boundary
 
-AgentsPage.tsx, agentsWorkspace.css and the feature’s components, including `AgentWorkspaceConversation` and `workspace/AgentWorkspaceFrame`, `AgentWorkspaceCatalog`, `AgentWorkLocation` and their two stylesheets. Shared controls remain the source of button, input, popover, sheet and panel styling. Settings, Spaces and Scheduled are outside this task. The production-component review harness uses fixture account data, not live user records; visual verification does not establish live backend or native execution.
+AgentsPage.tsx, agentsWorkspace.css and the feature’s components, including `AgentWorkspaceConversation` and `workspace/AgentWorkspaceFrame`, `AgentWorkspaceCatalog`, `AgentControlBar` and their two stylesheets. Shared controls remain the source of button, input, popover, sheet and panel styling. Settings, Spaces and Scheduled are outside this task. The production-component review harness uses fixture account data, not live user records; visual verification does not establish live backend or native execution.
 
 ## Phase 1–2 functional extension — October 2
 

@@ -1,6 +1,4 @@
-import { companionRequestsBrowser } from "@/features/misty/companionBrowserIntent";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { requestsScreenContext } from "./companionIntent";
 import { companionStage } from "./companionStage";
 import type { CompanionSubmission } from "./companionState";
 import type { CursorCompanionSession } from "./cursorCompanionSession";
@@ -42,11 +40,7 @@ export class CursorCompanionTypedTurns {
       await useMistyStore.getState().steerResponse?.(request.prompt, request.conversationId);
       return;
     }
-    const selectedMode = current.executionMode ?? "user";
-    const executionMode =
-      selectedMode === "user" && companionRequestsBrowser(request.prompt) ? "team" : selectedMode;
-    const needsCapture = executionMode !== "team" && requestsScreenContext(request.prompt);
-    if (needsCapture && !s.nativeReady)
+    if (request.look && !s.nativeReady)
       throw new Error("The companion is starting. Try again in a moment.");
     const origin = {
       conversationId: request.conversationId,
@@ -63,12 +57,13 @@ export class CursorCompanionTypedTurns {
     const controller = new AbortController();
     s.abort = controller;
     try {
-      const screens = needsCapture ? await s.capture(generation, controller.signal) : [];
+      // Displays are captured only when the task asked to look (screen_look).
+      const screens = request.look ? await s.capture(generation, controller.signal) : [];
       if (!s.originIsCurrent(origin))
         throw new Error(
           "The conversation changed. Send your request again in the intended conversation.",
         );
-      await this.submitCaptured(request, generation, screens, controller.signal, executionMode);
+      await this.submitCaptured(request, generation, screens, controller.signal);
     } catch (error) {
       if (!controller.signal.aborted) s.fail(generation, error);
       throw error;
@@ -80,7 +75,6 @@ export class CursorCompanionTypedTurns {
     generation: number,
     screens: DisplayCapture[],
     signal: AbortSignal,
-    executionMode: "user" | "agent" | "team",
   ) {
     const s = this.s;
     if (!s.active(generation)) return;
@@ -97,10 +91,11 @@ export class CursorCompanionTypedTurns {
         { conversationId: request.conversationId, context: [] },
         {
           turn: generation,
-          executionMode,
+          executionMode: "user",
           interactionMode: s.state.mode,
-          displayCaptures: screens,
           model: s.state.model,
+          ...(screens.length ? { displayCaptures: screens } : {}),
+          continuation: request.continuation,
         },
       ),
       signal,

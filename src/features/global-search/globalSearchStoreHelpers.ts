@@ -140,6 +140,12 @@ export function applyGlobalInvocationEvent(
     patchConversationMessage(set, get, conversationId, messageId, { appRequest: event.appRequest });
     return;
   }
+  if (event.type === "screen.request") {
+    patchConversationMessage(set, get, conversationId, messageId, {
+      screenRequest: { ...event.screenRequest, state: "pending" },
+    });
+    return;
+  }
   if (event.type === "citation") {
     const current = get()
       .conversations.find((conversation) => conversation.id === conversationId)

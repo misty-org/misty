@@ -327,10 +327,9 @@ describe("GlobalMisty", () => {
     await act(async () => {
       useMistyStore.setState({
         panel: "closed",
-        working: false,
+        working: true,
         executionMode: "agent",
         selectedAgentId: "",
-        executionModeByAgent: {},
       });
       root.render(
         <MemoryRouter>
