@@ -20,6 +20,8 @@ export interface WorkflowRun {
   judgeReasons?: string[];
   routing: RoutingResult;
   error?: string;
+  /** Items the run created that the runner could not remove afterwards. */
+  undoFailures?: string[];
 }
 
 export interface RoutingResult {

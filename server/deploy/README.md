@@ -37,6 +37,9 @@ draw on its balance. Set the keys in the private
 AI_GATEWAY_API_KEY=<your AI Gateway API key>
 # Optional: OpenAI models use this key instead of the Gateway.
 OPENAI_API_KEY=<your OpenAI API key>
+# Web search for agents (serper.dev, about $1 per 1,000 searches); without it
+# agents have no web.search.
+MISTY_SERPER_API_KEY=<your Serper API key>
 # Optional: pin the default agent model (any Gateway provider/model ID).
 MISTY_AGENT_MODEL=openai/gpt-6-luna
 ```

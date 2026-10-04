@@ -34,7 +34,7 @@ type aiInvocationInput struct {
 	CollaborationMode string             `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
 	PermissionMode    string             `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
 	// CodingProject is the attached project a delegated coding run works in.
-	CodingProject         string                      `json:"coding_project,omitempty"`
+	CodingProject string `json:"coding_project,omitempty"`
 	// CodingTool is the coding tool the person picked for this chat; empty uses the Settings default.
 	CodingTool            string                      `json:"coding_tool,omitempty"`
 	WindowLabel           string                      `json:"window_label,omitempty"`
@@ -86,9 +86,11 @@ type aiInvocationEvent struct {
 	// Activity and DurationMS describe a tool call for the reply's timeline.
 	Activity   *aiToolActivity `json:"activity,omitempty"`
 	DurationMS int64           `json:"durationMs,omitempty"`
-	Citation   *aiCitation     `json:"citation,omitempty"`
-	Artifact   *aiArtifact     `json:"artifact,omitempty"`
-	AppRequest *appRequest     `json:"appRequest,omitempty"`
+	// Result is the raw tool result, sent only to local workflow evals.
+	Result     string      `json:"result,omitempty"`
+	Citation   *aiCitation `json:"citation,omitempty"`
+	Artifact   *aiArtifact `json:"artifact,omitempty"`
+	AppRequest *appRequest `json:"appRequest,omitempty"`
 	// ScreenRequest asks the desktop to open a screen and continue the task.
 	ScreenRequest *screenRequest `json:"screenRequest,omitempty"`
 	// Notebook is the run's plan and findings after a notebook write.

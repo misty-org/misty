@@ -6,63 +6,12 @@
 //   npx jiti evals/workflows/seed.ts
 //
 // Mail carries the "Misty eval" label and events say "Misty eval seed", for cleanup.
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { EvalClient } from "./client.js";
+import { composioFor, find } from "./composio.js";
 
-const serverDir = resolve(import.meta.dirname, "../../../..");
 const zone = "America/Los_Angeles";
-
-function envValue(names: string[], files: string[]): string {
-  for (const file of files) {
-    let text = "";
-    try {
-      text = readFileSync(resolve(serverDir, file), "utf8");
-    } catch {
-      continue;
-    }
-    for (const name of names) {
-      const line = text.split("\n").find((item) => item.startsWith(`${name}=`));
-      if (line) return line.slice(name.length + 1).replace(/^(['"])(.*)\1$/, "$2").trim();
-    }
-  }
-  return "";
-}
-
-const key = envValue(["MISTY_COMPOSIO_API_KEY", "COMPOSIO_API_KEY"], [".env/dev/integrations/composio.env", ".env/dev/composio.env"]);
-if (!key) throw new Error("No Composio key in server/.env/dev.");
-
 const client = await EvalClient.open();
-const me = await client.json<{ id: string }>("/me");
-if (!/^[a-f0-9-]{36}$/.test(me.id)) throw new Error("unexpected user id");
-const session = execFileSync("docker", [
-  "exec", process.env.MISTY_ACCEPTANCE_DB_CONTAINER ?? "misty-server-postgres-1", "psql", "-U", "misty", "-d", "misty_server", "-t", "-A",
-  "-c", `SELECT session_id FROM composio_sessions WHERE owner_user_id='${me.id}'`,
-]).toString().trim();
-if (!session) throw new Error("No Composio session; connect an app in Misty first.");
-
-async function run(slug: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const response = await fetch(`https://backend.composio.dev/api/v3.1/tool_router/session/${encodeURIComponent(session)}/execute`, {
-    method: "POST",
-    headers: { "x-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify({ tool_slug: slug, arguments: args }),
-  });
-  const body = (await response.json()) as { data?: Record<string, unknown>; error?: string | null };
-  if (!response.ok || body.error) throw new Error(`${slug}: ${response.status} ${String(body.error ?? JSON.stringify(body)).slice(0, 300)}`);
-  return body.data ?? {};
-}
-
-const find = (value: unknown, field: string): string => {
-  if (!value || typeof value !== "object") return "";
-  const record = value as Record<string, unknown>;
-  if (typeof record[field] === "string") return record[field] as string;
-  for (const item of Object.values(record)) {
-    const found = find(item, field);
-    if (found) return found;
-  }
-  return "";
-};
+const run = await composioFor(client);
 
 // --- Gmail -------------------------------------------------------------------
 const labels = await run("GMAIL_LIST_LABELS", { user_id: "me" });

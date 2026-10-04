@@ -13,6 +13,8 @@ import { judge } from "../browser/judge.js";
 import { serveSites } from "../browser/tasks.js";
 import { Budget } from "./budget.js";
 import { EvalClient } from "./client.js";
+import { composioFor } from "./composio.js";
+import { StateReader } from "./state.js";
 import { expectPassed, passed, report, routing, type WorkflowRun } from "./score.js";
 import { displayCapture, loadTasks, skipReason, type WorkflowTask } from "./tasks.js";
 
@@ -69,10 +71,18 @@ function request(task: WorkflowTask, model: string, agentId: string, siteBase: s
   return { ...base, mode: "drawer", surface_id: "global", ...tab };
 }
 
-async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, model: string, agentId: string, siteBase: string, contexts: unknown[]): Promise<WorkflowRun> {
+async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, model: string, agentId: string, siteBase: string, sign: () => Promise<unknown[]>, state: StateReader | undefined): Promise<WorkflowRun> {
   const before = budget.balance;
   const started = performance.now();
-  const result = await client.run(request(task, model, agentId, siteBase, contexts));
+  const startedAt = new Date();
+  // A fresh device grant per run, and one more try with a new one if the server refuses it.
+  let result;
+  try {
+    result = await client.run(request(task, model, agentId, siteBase, await sign()));
+  } catch (error) {
+    if (!String(error).includes("device_grant_required")) throw error;
+    result = await client.run(request(task, model, agentId, siteBase, await sign()));
+  }
   const run: WorkflowRun = {
     taskId: task.id, category: task.category, source: task.source, surface: task.surface, model,
     terminal: result.terminal, tools: result.tools, screenRequests: result.screenRequests,
@@ -85,12 +95,16 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
   // A run stopped at a screen hand-off has no answer to grade yet; its route still counts.
   const handedOff = result.screenRequests.length > 0 && !device;
   const textPassed = expectPassed(result.answer, task.expect);
+  // What the task changed in the person's apps, read back so the judge needn't trust the answer.
+  const endState = task.state?.length && state ? await state.read(task.state, startedAt) : "";
   if (!handedOff && task.rubric?.length) {
     try {
       const verdict = await judge({
         model: judgeModel, prompt: task.prompt, rubric: task.rubric,
         subject: "a personal assistant agent. Its web_search and web_fetch tools read the web in the background: they never open a browser or touch the person's screen. Only screen_open, screen_look, browser_* and desktop tools do",
-        answer: result.answer, pageMarkdown: "", toolCalls: result.tools, pagesRead: result.pagesRead,
+        // Raw tool results, when the server sends them, are fuller than the rows' titles.
+        answer: result.answer, toolCalls: result.tools, pagesRead: result.toolResults.length ? result.toolResults : result.pagesRead,
+        pageMarkdown: endState ? `End state read back from the person's apps after the run (this is the evidence for what was created, changed or sent):\n${endState}` : "",
         // The judge sees the screen the agent saw, so claims about it can be checked.
         ...(task.start?.screen ? { screenshot: { data: displayCapture(task.start.screen).data_url.split(",")[1] ?? "", mediaType: "image/png" } } : {}),
       });
@@ -102,6 +116,11 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
   } else if (!handedOff && textPassed !== undefined) {
     run.answerPassed = textPassed;
   }
+  // Remove what the run created, so the next run starts from the seeded state.
+  if (task.state?.length && state) {
+    const failures = await state.undo(task.state, startedAt);
+    if (failures.length) run.undoFailures = failures;
+  }
   run.costUsd = Number((await budget.since(before)).toFixed(4));
   return run;
 }
@@ -112,8 +131,9 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
   const agents = await client.json<{ agents: Array<{ id: string }> }>("/misty/agents");
   const agentId = agents.agents[0]?.id ?? "";
   const me = await client.json<{ id: string }>("/me");
-  // Signed once per pass; a run grant lasts six hours.
-  const contexts = await deviceContexts(me.id, agentId);
+  const sign = () => deviceContexts(me.id, agentId);
+  // Reads end state for account tasks; without connected apps those tasks are skipped anyway.
+  const state = accounts.size ? new StateReader(client, await composioFor(client)) : undefined;
   const tasks = loadTasks().filter(selected);
   const sites = await serveSites();
   const runs: WorkflowRun[] = [];
@@ -133,7 +153,17 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
           stopped = `budget: $${budget.spent.toFixed(2)} of $${budget.cap.toFixed(2)} spent`;
           break outer;
         }
-        const run = await runTask(client, budget, task, model, agentId, sites.base, contexts);
+        let run: WorkflowRun;
+        try {
+          run = await runTask(client, budget, task, model, agentId, sites.base, sign, state);
+        } catch (error) {
+          // One broken run never ends the pass; it is recorded as that task's error.
+          run = {
+            taskId: task.id, category: task.category, source: task.source, surface: task.surface, model, terminal: "error",
+            tools: [], screenRequests: [], answer: "", ms: 0, costUsd: 0, error: String(error).slice(0, 300),
+            routing: { passed: false, broken: ["the run could not start"], unavailable: [], runs: 0 },
+          };
+        }
         runs.push(run);
         refusedInARow = run.error && run.tools.length === 0 && run.ms < 3_000 ? refusedInARow + 1 : 0;
         if (refusedInARow >= 3) {

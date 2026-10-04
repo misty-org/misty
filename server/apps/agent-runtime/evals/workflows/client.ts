@@ -22,6 +22,8 @@ export interface EvalRun {
   events: string[];
   /** What tools reported reading: titles and sites from tool.detail events. */
   pagesRead: string[];
+  /** Each tool's raw result, when the local server sends them (MISTY_AI_TOOL_RESULT_EVENTS=1). */
+  toolResults: string[];
 }
 
 export class EvalClient {
@@ -73,7 +75,7 @@ export class EvalClient {
       headers: { "Idempotency-Key": key },
       body: JSON.stringify({ trigger: "message", context: [], execution_mode: "user", idempotency_key: key, timezone: "America/Los_Angeles", ...body }),
     });
-    const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [] };
+    const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [], toolResults: [] };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -98,7 +100,8 @@ export class EvalClient {
           if (event.type === "tool.started") run.tools.push(String(event.toolName).replace(/\./g, "_"));
           if (event.type === "tool.detail") {
             const rows = (event.activity as { rows?: Array<{ title?: string; meta?: string }> } | undefined)?.rows ?? [];
-            run.pagesRead.push(`${String(event.toolName)}: ${rows.map((row) => [row.title, row.meta].filter(Boolean).join(" · ")).join("; ")}`.slice(0, 2_000));
+            if (rows.length) run.pagesRead.push(`${String(event.toolName)}: ${rows.map((row) => [row.title, row.meta].filter(Boolean).join(" · ")).join("; ")}`.slice(0, 2_000));
+            if (typeof event.result === "string") run.toolResults.push(`${String(event.toolName)} → ${event.result.slice(0, 4_000)}`);
           }
           if (event.type === "screen.request") {
             const request = event.screenRequest as { kind?: string } | undefined;

@@ -21,6 +21,7 @@ pub(super) const FILES: &[FileSpec] = &[
             "MISTY_INSTANCE_NAME",
             "MISTY_PUBLIC_API_URL",
             "MISTY_DEVICE_JOBS_ENABLED",
+            "MISTY_AI_TOOL_RESULT_EVENTS",
             "MISTY_WEBSITE_URL",
             "PASSWORD_RESET_START_URL",
             "PASSWORD_RESET_URL",
@@ -85,6 +86,7 @@ pub(super) const FILES: &[FileSpec] = &[
         names: &[
             "AI_GATEWAY_API_KEY",
             "AI_GATEWAY_BASE_URL",
+            "MISTY_SERPER_API_KEY",
             "OPENAI_API_KEY",
             "ELEVENLABS_API_KEY",
             "MISTY_VOICE_ID",

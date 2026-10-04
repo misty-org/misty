@@ -107,13 +107,13 @@ func testLiveLimitsContract(t *testing.T, ctx context.Context, adapter Adapter) 
 		t.Fatalf("an unpriced model was admitted: %v", err)
 	}
 	search := Request{Version: 1, AccountID: "search-account", Operation: "web.search", OperationID: "s", Key: "s", CommandID: "s",
-		Usage: Usage{Provider: "parallel", Model: "google/gemini-2.5-flash-lite", Units: map[string]int64{"requests": 1, "input_bytes": 600, "output_tokens": 400}, Estimated: true}}
+		Usage: Usage{Provider: "serper", Units: map[string]int64{"requests": 1}}}
 	held, err := adapter.Do(ctx, "reserve", search)
 	if err != nil || held.ReservationID == "" {
 		t.Fatalf("web search reservation: %v", err)
 	}
 	search.ReservationID, search.Key = held.ReservationID, "s:settle"
-	search.Usage = Usage{Provider: "parallel", Model: "google/gemini-2.5-flash-lite", Units: map[string]int64{"requests": 1}}
+	search.Usage = Usage{Provider: "serper", Units: map[string]int64{"requests": 1}}
 	if _, err = adapter.Do(ctx, "settle", search); err != nil {
 		t.Fatalf("web search settlement: %v", err)
 	}
