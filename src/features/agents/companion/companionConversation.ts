@@ -18,8 +18,6 @@ export interface ConversationTool {
   callId: string;
   name: "start_task" | "steer_task" | "cancel_task";
   instruction: string;
-  needsScreen?: boolean;
-  needsBrowser?: boolean;
   key: string;
   invocationId: string;
 }

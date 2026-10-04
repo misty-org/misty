@@ -92,6 +92,33 @@ func (s *AIService) AppActionsSetting() http.HandlerFunc {
 	}
 }
 
+// ScreenLocationSetting changes only where agents open a screen when a task
+// needs one: a separate window, the user's Misty window, or ask each time.
+func (s *AIService) ScreenLocationSetting() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok {
+			return
+		}
+		var body struct {
+			Location string `json:"location"`
+		}
+		if decodeAIJSON(w, r, &body) != nil {
+			return
+		}
+		if err := s.database.SetAIScreenLocation(r.Context(), userID, body.Location); err != nil {
+			TestingWriteAIError(w, err)
+			return
+		}
+		settings, _, err := s.database.AISettings(r.Context(), userID)
+		if err != nil {
+			TestingWriteAIError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+	}
+}
+
 func (s *AIService) SurfacePreference() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)

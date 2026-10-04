@@ -81,8 +81,13 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 		}
 		guidance.WriteString(" Never enter passwords or MFA codes. Include source URLs when saving or sharing research.")
 	}
-	if !hasPrefix("browser.") {
-		guidance.WriteString("\n\nNo browser or screen is attached to this run. For website or on-screen work, say that it needs Misty's agent window: the user can choose Separate Misty window or Control this screen above the composer. Never claim to have visited a site.")
+	switch {
+	case has("screen.open") && !hasPrefix("browser."):
+		guidance.WriteString("\n\nScreens: no browser is attached yet. When the task needs a website or web app that no app or Misty tool covers, call screen_open; Misty opens a browser where the user prefers and continues this conversation with it attached. When the request refers to something on the user's screen, call screen_look. Either call ends this response, so call it only after finishing the work you can already do. Never claim to have visited a site or seen the screen before that.")
+	case has("screen.look"):
+		guidance.WriteString("\n\nScreens: when the request refers to something on the user's screen, call screen_look; it ends this response and Misty continues with the screen image attached.")
+	case !hasPrefix("browser."):
+		guidance.WriteString("\n\nNo browser or screen is available in this run; website and on-screen work need the Misty desktop app. Never claim to have visited a site.")
 	}
 	return guidance.String()
 }

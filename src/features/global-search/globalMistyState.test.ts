@@ -132,7 +132,7 @@ describe("Global Misty state", () => {
     expect(useMistyStore.getState().activeConversationId).toBe("new-response");
     expect(useMistyStore.getState().conversationsLoading).toBe(false);
   });
-  it("keeps legacy companion callers compatible without implicit page context", async () => {
+  it("runs companion calls in the mode they name, without implicit page context", async () => {
     const create = vi
       .spyOn(aiSurfaceApi, "createInvocation")
       .mockRejectedValueOnce(new Error("stop after admission"));
@@ -174,7 +174,8 @@ describe("Global Misty state", () => {
         context: [],
       }),
     );
-    expect(useMistyStore.getState().executionMode).toBe("agent");
+    // The mode belongs to the task, not to an earlier choice.
+    expect(useMistyStore.getState().executionMode).toBe("user");
   });
   it("does not admit a request stopped while availability was pending", async () => {
     let admit!: () => void;

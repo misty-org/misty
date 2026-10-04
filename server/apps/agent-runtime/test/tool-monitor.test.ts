@@ -9,6 +9,7 @@ const catalog = modelCatalog([
   { name: "notes.update", description: "", inputSchema: schema },
   { name: "browser.workspace.interact", description: "", inputSchema: schema },
   { name: "browser.workspace.visual", description: "", inputSchema: schema, readOnly: true },
+  { name: "screen.open", description: "", inputSchema: schema, readOnly: true },
 ], ["misty_finish_task"]);
 
 function setup(rejected = new Set<string>()) {
@@ -24,7 +25,7 @@ function setup(rejected = new Set<string>()) {
 
 describe("tool monitor", () => {
   it("shows the model Misty's tool names with dots as underscores", () => {
-    expect(catalog.tools.map((tool) => tool.modelName)).toEqual(["notes_search", "notes_update", "browser_workspace_interact", "browser_workspace_visual"]);
+    expect(catalog.tools.map((tool) => tool.modelName)).toEqual(["notes_search", "notes_update", "browser_workspace_interact", "browser_workspace_visual", "screen_open"]);
     expect(catalog.mistyName("notes_update")).toBe("notes.update");
     expect(catalog.readOnly("notes_search")).toBe(true);
     expect(modelCatalog([{ name: "misty.finish_task", description: "", inputSchema: schema }], ["misty_finish_task"]).tools[0]?.modelName).toBe("misty_finish_task_2");
@@ -47,6 +48,14 @@ describe("tool monitor", () => {
       expect(order.resume()).toBe(true);
     }
     expect(order.stoppedReason).toBe("");
+    expect(monitor.failures()).toHaveLength(0);
+  });
+
+  it("ends the response without a failure when it hands off to a screen", async () => {
+    const { order, monitor, call } = setup();
+    await call("screen", "screen_open", { success: true, output: { status: "screen_requested", message: "Opening a browser." } });
+    expect(order.stoppedReason).toBe("Opening a browser.");
+    expect(monitor.handoff).toBe("Opening a browser.");
     expect(monitor.failures()).toHaveLength(0);
   });
 

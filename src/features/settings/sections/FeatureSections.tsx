@@ -23,6 +23,7 @@ import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
+import { ScreenLocationSection } from "./ScreenLocationSection";
 export function PreferenceRow({ id }: { id: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
@@ -139,6 +140,7 @@ export function AgentConnectionsSection() {
   return (
     <>
       <AppActionsSection />
+      <ScreenLocationSection />
       <McpConnectionsView />
     </>
   );

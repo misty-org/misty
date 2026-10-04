@@ -7,7 +7,6 @@ import {
   selectedPersonalAgent,
 } from "@/features/agents/personalAgentsStore";
 import { finishLocalExecution, useLocalExecution } from "@/features/agents/localExecution";
-import { betaExecutionMode } from "@/features/agents/betaModes";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
 
@@ -43,7 +42,6 @@ export function MistyAgentPicker({ accountId }: { accountId: string }) {
       useMistyStore.setState({
         selectedAgentId: id,
         activeConversationId: "",
-        executionMode: betaExecutionMode("user"),
         context: [],
         handoff: undefined,
         browserRequest: undefined,

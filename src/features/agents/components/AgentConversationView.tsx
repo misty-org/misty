@@ -1,4 +1,5 @@
 import { AppRequestCard } from "../apps/AppRequestCard";
+import { ScreenRequestCard } from "@/features/misty/ScreenRequestCard";
 import { companionReply } from "../companion/companionReply";
 import type {
   GlobalAiActionProposal,
@@ -234,6 +235,9 @@ function AgentMessage(props: {
           />
         ) : null}
         {message.appRequest ? <AppRequestCard request={message.appRequest} /> : null}
+        {message.screenRequest ? (
+          <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
+        ) : null}
         <MessageFeedback
           message={message}
           retryPrompt={props.retryPrompt}

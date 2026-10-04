@@ -66,20 +66,8 @@ export class CursorCompanionVoice {
     if (tool.name === "start_task") {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
-      const selectedMode = current.executionMode ?? "user";
-      // Web tasks get an owned browser target; they do not acquire control of
-      // the user's current screen merely because the conversation has none.
-      const executionMode = tool.needsBrowser && selectedMode === "user" ? "team" : selectedMode;
-      // Screen capture and device authority are prepared only for delegated
-      // work, never for greetings or other ordinary conversation.
-      const controller = new AbortController();
-      const screens =
-        tool.needsScreen && executionMode !== "team"
-          ? await s.capture(generation, controller.signal)
-          : [];
-      if (!s.active(generation) || !s.originIsCurrent(origin))
-        throw new Error("Voice request interrupted.");
-      s.captures = screens;
+      // The task opens a screen or looks at the user's screen when it needs one.
+      s.captures = [];
       await current.submitAnswer(
         tool.instruction,
         [],
@@ -89,10 +77,9 @@ export class CursorCompanionVoice {
         { conversationId, context: [] },
         {
           turn: generation,
-          executionMode,
+          executionMode: "user",
           interactionMode: s.state.mode,
           model: s.state.model,
-          displayCaptures: screens,
           idempotencyKey: tool.key,
         },
       );

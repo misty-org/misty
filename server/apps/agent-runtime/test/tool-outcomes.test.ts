@@ -29,6 +29,12 @@ describe("tool outcome policy", () => {
     }
   });
 
+  it("hands the run off when it requests a screen", () => {
+    const outcome = classifyToolOutcome({ success: true, readOnly: true, rejected: false, output: { status: "screen_requested", message: "Opening a browser." } });
+    expect(outcome).toEqual({ kind: "handoff", reason: "Opening a browser." });
+    expect(classifyToolOutcome({ success: true, readOnly: true, rejected: false, output: { status: "open" } }).kind).toBe("confirmed");
+  });
+
   it("does not treat denied or unavailable actions as confirmed", () => {
     expect(unconfirmedToolResultReason({ denied: true })).toContain("not approved");
     expect(unconfirmedToolResultReason({ unavailable: true })).toContain("unavailable");
