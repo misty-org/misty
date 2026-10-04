@@ -8,6 +8,9 @@ import { navigatorRailWidth } from "./navigatorMode";
 
 export const dockingMetrics = {
   titlebar: 38,
+  tabStrip: 38,
+  /** Gap between a horizontal tab strip's outer edge and its connected tabs. */
+  tabInset: 3,
   rail: navigatorRailWidth,
   horizontalRail: 38,
   sideTabs: 200,
@@ -32,7 +35,9 @@ export function dockingGeometry({
   chromeLeft?: number;
   chromeRight?: number;
 }) {
-  const { titlebar, rail, gap } = dockingMetrics;
+  const { rail, gap } = dockingMetrics;
+  const titlebar =
+    tabs === "top" && shareTopBand ? dockingMetrics.tabStrip : dockingMetrics.titlebar;
   const side = isSideDock(position);
   const thickness = side ? rail : dockingMetrics.horizontalRail;
   const size = autoHide ? 0 : thickness;
@@ -45,6 +50,8 @@ export function dockingGeometry({
     gridTemplateRows: `${position === "top" ? size : titlebar}px 0px minmax(0, 1fr) ${position === "bottom" ? size : 0}px`,
     "--shell-titlebar": `${titlebar}px`,
     "--shell-side-tabs": `${dockingMetrics.sideTabs}px`,
+    "--shell-tab-strip-height": `${dockingMetrics.tabStrip}px`,
+    "--shell-tab-inset": `${dockingMetrics.tabInset}px`,
     "--shell-tab-height": `${dockingMetrics.tab}px`,
     "--shell-gap": `${gap}px`,
     "--shell-motion-duration": `${dockingMotion.duration}ms`,

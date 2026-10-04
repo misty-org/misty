@@ -24,7 +24,7 @@ export type CompanionControl =
       model: string;
     }
   | {
-      kind: "stop";
+      kind: "stop" | "stop_audio";
     }
   | {
       kind: "retry";

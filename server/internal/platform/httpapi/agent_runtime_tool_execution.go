@@ -82,18 +82,19 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 	mcpHandler := func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
 		return s.executeMCPAgentTool(toolCtx, run, tool, false, "space_conversation")
 	}
-	mcpRegistrations, _ := s.appendPersonalAgentMCPTools(ctx, run.OwnerUserID, run.AgentID, nil, nil, mcpHandler)
+	mcpRegistrations, _ := s.appendPersonalAgentMCPTools(ctx, run.OwnerUserID, run.AgentID, s.appsToolRegistrations(), nil, mcpHandler)
 	sdkRegistrations, err := s.agentSDKRegistrations(ctx, run)
 	if err != nil {
 		return nil, agenttools.Invocation{}, nil, err
 	}
 	mcpRegistrations = append(mcpRegistrations, sdkRegistrations...)
-	toolbox := spaceAgentToolboxWithBrowserProvidersAndExtra(s.database, browserTabs, browserCapabilities, providers, providerHandler, mcpRegistrations, delegationHandler)
+	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{
+		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
+		providers: providers, providerHandler: providerHandler, delegation: delegationHandler, extra: mcpRegistrations,
+	})
 	names := make([]string, 0, len(toolbox.Descriptors()))
-	explicit := map[string]bool{}
 	for _, descriptor := range toolbox.Descriptors() {
 		names = append(names, descriptor.Name)
-		explicit[descriptor.Name] = true
 	}
 	invocation := agenttools.Invocation{
 		UserID:                run.OwnerUserID,
@@ -103,7 +104,6 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 		Source:                "space_conversation",
 		Trigger:               "message",
 		OriginalInput:         string(run.Input),
-		ExplicitTools:         explicit,
 		DelegatedApproval:     true,
 		ConversationScopeKind: db.ConversationScopeEveryone,
 	}

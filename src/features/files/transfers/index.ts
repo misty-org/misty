@@ -1,0 +1,1 @@
+export { transfersPath } from "./transferModel";

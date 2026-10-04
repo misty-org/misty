@@ -83,8 +83,8 @@ it("binds explicit control to a task and stops on an account change", async () =
   expect(stop).toHaveBeenCalledOnce();
   dispose();
 });
-it("closes the other beta modes without changing non-native behavior", () => {
-  expect(betaExecutionMode("team")).toBe("agent");
+it("keeps the chosen work location on every platform", () => {
+  expect(betaExecutionMode("team")).toBe("team");
   Object.defineProperty(navigator, "platform", { configurable: true, value: "Linux" });
   expect(betaExecutionMode("user")).toBe("user");
 });

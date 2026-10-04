@@ -100,10 +100,11 @@ func (db *Database) SaveAgentSession(ctx context.Context, conversationID, userID
 // AgentSessionSummary is the listing shape: enough to render a session rail
 // without loading conversation state or events.
 type AgentSessionSummary struct {
-	AgentID string `json:"agent_id,omitempty"`
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Active  bool   `json:"active"`
+	HasLegacySession bool   `json:"-"`
+	AgentID          string `json:"agent_id,omitempty"`
+	ID               string `json:"id"`
+	Title            string `json:"title"`
+	Active           bool   `json:"active"`
 
 	SpaceID          string    `json:"space_id,omitempty"`
 	ConversationKind string    `json:"kind"`
@@ -125,7 +126,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id, title, active_until > NOW(), ''::text,
-				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,reasoning_effort,created_at,updated_at,COALESCE(agent_id,'')
+				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,reasoning_effort,created_at,updated_at,COALESCE(agent_id,''),state <> '{}'::jsonb
 			FROM misty_ask_conversations
 			WHERE user_id = $1 AND deleted_at IS NULL
 			ORDER BY updated_at DESC
@@ -136,7 +137,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 		defer rows.Close()
 		for rows.Next() {
 			var item AgentSessionSummary
-			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.SpaceID, &item.ConversationKind, &item.OriginSurface, &item.OriginHref, &item.PrivacyBoundary, &item.ModelID, &item.ReasoningEffort, &item.CreatedAt, &item.UpdatedAt, &item.AgentID); err != nil {
+			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.SpaceID, &item.ConversationKind, &item.OriginSurface, &item.OriginHref, &item.PrivacyBoundary, &item.ModelID, &item.ReasoningEffort, &item.CreatedAt, &item.UpdatedAt, &item.AgentID, &item.HasLegacySession); err != nil {
 				return err
 			}
 			items = append(items, item)

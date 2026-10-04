@@ -135,21 +135,62 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 	}
 	current, err := waitForDeviceJob(ctx, s.database, invocation.UserID, job.ID, job.DeadlineAt)
 	if err != nil {
-		return s.stopBrowserDeviceTool(invocation.UserID, job.ID)
+		return s.stopBrowserDeviceTool(invocation.UserID, job.ID, tool.Name)
 	}
 	switch current.State {
 	case "completed":
 		return current.Output, nil
 	case "uncertain":
+		if browserObservation(tool.Name) {
+			return nil, browserObservationFailure(current.ErrorCode)
+		}
 		return nil, db.ErrAgentToolboxActionUnknown
 	case "canceled":
 		return nil, errors.Join(db.ErrAgentToolboxNotAttempted, workflowv2.ErrDeviceUnavailable)
 	default:
-		return nil, browserDeviceFailure(current.ErrorCode)
+		return nil, browserDeviceFailureForOperation(current.ErrorCode, current.Operation)
 	}
 }
 
+var errBrowserWebviewUnavailable = errors.New("browser_webview_unavailable")
+var errDesktopAccessibilityRequired = errors.New("desktop_accessibility_required")
+var errDesktopScreenRecordingRequired = errors.New("desktop_screen_recording_required")
+
+var errWorkspaceSnapshotStale = errors.New("workspace_snapshot_stale")
+
+var errBrowserObservationFailed = errors.New("browser_observation_failed")
+
+// Observations have no external effect, so an interrupted one is a retryable
+// failure, never an uncertain effect that would end the run.
+func browserObservation(operation string) bool {
+	switch operation {
+	case "browser.inspect", "browser.visual", "browser.downloads.list", "browser.workspace.visual":
+		return true
+	}
+	return false
+}
+
+func browserObservationFailure(code string) error {
+	return errors.Join(errBrowserObservationFailed, errors.New(strings.TrimSpace(code)))
+}
+
+func browserDeviceFailureForOperation(code, operation string) error {
+	if code == "browser_snapshot_stale" && strings.HasPrefix(operation, "browser.workspace.") {
+		return errors.Join(db.ErrAgentToolboxNotAttempted, browseractions.ErrStale, errWorkspaceSnapshotStale)
+	}
+	return browserDeviceFailure(code)
+}
+
 func browserDeviceFailure(code string) error {
+	if code == "desktop_accessibility_required" {
+		return errDesktopAccessibilityRequired
+	}
+	if code == "desktop_screen_recording_required" {
+		return errDesktopScreenRecordingRequired
+	}
+	if code == "browser_webview_unavailable" {
+		return errBrowserWebviewUnavailable
+	}
 	if code == "browser_snapshot_stale" {
 		// Native code emits this only before dispatch. Preserve that evidence
 		// through the write journal so it does not become an uncertain effect.
@@ -180,9 +221,12 @@ func parseBrowserUploadSource(raw json.RawMessage) (browserUploadSource, error) 
 	return source, nil
 }
 
-func (s *SpacesService) stopBrowserDeviceTool(userID, jobID string) (json.RawMessage, error) {
+func (s *SpacesService) stopBrowserDeviceTool(userID, jobID, operation string) (json.RawMessage, error) {
 	job, err := s.database.StopWorkflowDeviceNodeJob(userID, jobID)
 	if err != nil {
+		if browserObservation(operation) {
+			return nil, errors.Join(errBrowserObservationFailed, err)
+		}
 		return nil, errors.Join(db.ErrAgentToolboxActionUnknown, err)
 	}
 	switch job.State {
@@ -191,8 +235,11 @@ func (s *SpacesService) stopBrowserDeviceTool(userID, jobID string) (json.RawMes
 	case "canceled":
 		return nil, errors.Join(db.ErrAgentToolboxNotAttempted, workflowv2.ErrDeviceUnavailable)
 	case "failed":
-		return nil, browserDeviceFailure(job.ErrorCode)
+		return nil, browserDeviceFailureForOperation(job.ErrorCode, job.Operation)
 	default:
+		if browserObservation(operation) {
+			return nil, browserObservationFailure(job.ErrorCode)
+		}
 		return nil, db.ErrAgentToolboxActionUnknown
 	}
 }

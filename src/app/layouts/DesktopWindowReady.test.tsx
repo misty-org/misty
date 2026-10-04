@@ -79,7 +79,7 @@ describe("main window readiness", () => {
     await act(async () => {
       await vi.runAllTimersAsync();
     });
-    expect(mocks.zoom).toHaveBeenCalledWith(1.54);
+    expect(mocks.zoom).toHaveBeenCalledWith(1.4);
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("matches the native background on launch and theme changes, then cleans up", async () => {
@@ -127,7 +127,7 @@ describe("main window readiness", () => {
     await act(async () => {
       fontsReady();
     });
-    expect(mocks.zoom).toHaveBeenCalledWith(1.54);
+    expect(mocks.zoom).toHaveBeenCalledWith(1.4);
     expect(mocks.reveal).not.toHaveBeenCalled();
     expect(onZoom).not.toHaveBeenCalled();
     await act(async () => {

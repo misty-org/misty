@@ -73,6 +73,7 @@ export * from "./feedback/StateView";
 // navigation
 export * from "./navigation/NavIsland";
 export * from "./navigation/NavigationMenu";
+export * from "./navigation/NavigationTray";
 export * from "./navigation/NavigationTree";
 
 // icons
@@ -80,6 +81,7 @@ export * from "./icons/AssetIcon";
 export * from "./icons/BrandIcon";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
+export * from "./icons/itemTones";
 
 // patterns
 export * from "./patterns/ComingSoonSurface";

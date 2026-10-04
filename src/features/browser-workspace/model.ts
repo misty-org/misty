@@ -40,7 +40,7 @@ export interface TabFields {
   tree: SplitTree;
 }
 export interface ViewFields {
-  surface: "browser" | "files" | "agents" | "space" | "home";
+  surface: "browser" | "files" | "agents" | "space" | "home" | "extensions";
   title: string;
   placement: {
     tab_id: string;

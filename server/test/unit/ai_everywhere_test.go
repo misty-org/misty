@@ -82,8 +82,8 @@ func TestWeatherToolUsesFixedHostsAndEscapedLocation(t *testing.T) {
 	}
 }
 
-func TestAIInvocationMCPAdvertisesWeatherWithTypedSchema(t *testing.T) {
-	descriptors := api.TestingAIInvocationMCPDescriptors("context.get", "weather.current")
+func TestAccountToolboxAdvertisesWeatherWithTypedSchema(t *testing.T) {
+	descriptors := api.TestingAccountAgentToolboxDescriptors()
 	var weatherName, weatherSchema string
 	for _, descriptor := range descriptors {
 		if descriptor.Name == "weather.current" {
@@ -92,7 +92,7 @@ func TestAIInvocationMCPAdvertisesWeatherWithTypedSchema(t *testing.T) {
 		}
 	}
 	if weatherName == "" {
-		t.Fatal("weather.current is allowed for AI invocations but missing from the MCP catalog")
+		t.Fatal("weather.current is missing from the account toolbox")
 	}
 	if !strings.Contains(weatherSchema, `"location"`) || !strings.Contains(weatherSchema, `"required"`) {
 		t.Fatalf("weather.current lost its typed MCP input contract: %s", weatherSchema)

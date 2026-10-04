@@ -12,7 +12,8 @@ export interface SpaceTaskContext {
   current_time: string;
   members: Array<{ user_id: string; name: string; role: string }>;
   model_id: string;
-  reasoning_effort?: "low" | "medium" | "high" | "xhigh" | "";
+  vision_model_id?: string;
+  reasoning_effort?: "none" | "low" | "medium" | "high" | "xhigh" | "max" | "";
   run_mode: "ask" | "auto" | "full";
   system: string;
   prompt: string;
@@ -48,11 +49,6 @@ export interface SpaceTaskContext {
   file_warnings: string;
   model_turn_limit?: number;
   allowed_tools: string[];
-  /**
-   * Write tools the control plane derived from the user's explicit request.
-   * A run must not report success until each one has a confirmed tool result.
-   */
-  required_tools?: string[];
   managed_misty?: boolean;
 }
 
@@ -71,9 +67,9 @@ export interface MCPRunAccess {
 }
 
 export interface MCPRemoteTool {
-  /** Semantic identity supplied by the trusted Misty registry, never page content. */
-  capability?: string;
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /** Misty's read-only annotation; a failed read is always safe to retry. */
+  readOnly?: boolean;
 }

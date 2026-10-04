@@ -15,7 +15,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   IconButton,
-  Spinner,
+  CollectionSkeleton,
+  itemTones,
 } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "../store/useSpacesStore";
@@ -75,6 +76,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
           ) : (
             <MessagesSquare />
           ),
+        tone: itemTones.chat,
         creator: creator(c.created_by_user_id),
         metadata: {
           Members: c.participants.length,
@@ -115,6 +117,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
     title: "Everyone",
     category: "Channels",
     icon: <Users />,
+    tone: itemTones.chat,
     creator: "Space members",
     metadata: { Members: members?.length ?? 0, Source: "Misty", Created: "—" },
     sortValues: { Created: NaN },
@@ -186,7 +189,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
         </div>
       )}
       {data.loading ? (
-        <Spinner label="Loading chats" />
+        <CollectionSkeleton label="Loading chats" view={view} />
       ) : (
         <CollectionItems
           columnSetId="chats"

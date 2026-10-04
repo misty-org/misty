@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isBrowserSnapshotStale } from "./workerDeviceJobs";
 import {
   browserAgentExecutionRequest,
   browserDeviceRequest,
@@ -75,6 +76,23 @@ describe("v2 device workflow node worker", () => {
   });
 
   it("returns stable coordinator error codes", () => {
+    expect(
+      deviceWorkflowErrorCode(new Error("runtime error: failed to send message to the webview")),
+    ).toBe("browser_webview_unavailable");
+    expect(
+      deviceWorkflowErrorCode(
+        new Error(
+          "Allow dev1 in System Settings → Privacy & Security → Accessibility to control the desktop, then retry.",
+        ),
+      ),
+    ).toBe("desktop_accessibility_required");
+    expect(
+      deviceWorkflowErrorCode(
+        new Error(
+          "Allow dev1 in System Settings → Privacy & Security → Screen Recording, then retry.",
+        ),
+      ),
+    ).toBe("desktop_screen_recording_required");
     expect(deviceWorkflowErrorCode(new Error("unsupported_content:image/png"))).toBe(
       "unsupported_content",
     );
@@ -143,4 +161,15 @@ it("bounds work by the acknowledged lease and refuses expired or revoked jobs", 
       job.deadlineAt,
     ),
   ).toThrow("stopped");
+});
+
+it("keeps native pre-dispatch stale frames recoverable without classifying uncertain failures", () => {
+  expect(isBrowserSnapshotStale("browser_snapshot_stale: inspect before acting")).toBe(true);
+  expect(isBrowserSnapshotStale(new Error("browser_snapshot_stale: foreground changed"))).toBe(
+    true,
+  );
+  expect(isBrowserSnapshotStale("device_execution_uncertain:browser_snapshot_stale")).toBe(false);
+  expect(isBrowserSnapshotStale(new Error("Desktop control stopped. You have control."))).toBe(
+    false,
+  );
 });

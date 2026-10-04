@@ -18,6 +18,8 @@ export function CollectionItems({
   columnSetId,
   showLastActivity = true,
   sortResetKey = "",
+  stickyActions = false,
+  gridLayout = "preview",
 }: {
   items: CollectionItem[];
   categoryLabel?: string;
@@ -30,6 +32,10 @@ export function CollectionItems({
   showLastActivity?: boolean;
   /** Reset a header sort when the owning surface changes its menu ordering or section. */
   sortResetKey?: string;
+  /** Keep operational controls visible when a wide table scrolls horizontally. */
+  stickyActions?: boolean;
+  /** Compact cards suit icon-based catalogs; preview cards emphasize artwork. */
+  gridLayout?: "preview" | "compact";
 }) {
   const hasActions = items.some((item) => item.actions);
   const hasCreators = items.some((item) => item.creator !== undefined);
@@ -123,6 +129,7 @@ export function CollectionItems({
         items={orderedItems}
         hasCreators={hasCreators}
         creatorLabel={creatorLabel}
+        layout={gridLayout}
       />
     );
   return (
@@ -131,6 +138,7 @@ export function CollectionItems({
       columns={visibleColumns}
       metadataColumns={visibleMetadataColumns}
       hasActions={hasActions}
+      stickyActions={stickyActions}
       sort={activeSort}
       onSort={(next: CollectionSort | null) => setSort(next && { ...next, scope })}
     />

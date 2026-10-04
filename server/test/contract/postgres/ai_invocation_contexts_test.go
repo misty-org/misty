@@ -162,7 +162,7 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	summary := "Family summer camp research found art and science programs. Source: " + sourceURL
 	if _, err := api.TestingExecuteAIInvocationSpaceTool(
 		ctx, database, user.ID, space.ID, invocation.ID, prompt, "messages.send",
-		json.RawMessage(`{"message":"`+summary+`"}`),
+		json.RawMessage(`{"message":"`+summary+`","audience":"space"}`),
 	); err != nil {
 		t.Fatalf("unified cited summary: %v", err)
 	}

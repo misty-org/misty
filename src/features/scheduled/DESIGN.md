@@ -18,7 +18,7 @@ Use the app's inherited font with a 14px workspace base. The roster heading is 1
 
 Fill the available workspace tab with the shared 240px task roster and fluid main region. With no task selected, `WorkspaceWelcome` presents concise suggestions in a centered region capped at 736px, with two suggestion columns. Selecting a task opens the existing `AgentWorkspaceConversation` transcript and composer with a compact identity header. Upcoming tasks sort by next run; Paused tasks form a separate group. The roster contains New task, search, and a status-filter dropdown, and its list scrolls independently.
 
-This is a desktop-only shell. The 240px roster remains visible beside the main region. When schedule details are shown, a 288px inspector with 16px padding holds a shared Card with 20px padding. There is no mobile task-list Sheet, responsive inspector Sheet, or breakpoint-based switching. Shared dialogs retain their existing focus and dismissal behavior.
+This is a desktop-only shell. The 240px roster remains visible beside the main region. When schedule details are shown, a 288px inspector with 16px padding holds a shared Card with 20px padding. The roster and inspector remain in the desktop layout at every window width. Shared dialogs retain their existing focus and dismissal behavior.
 
 ## Elevation & Depth
 
@@ -48,7 +48,7 @@ The inspector inherits the shared Card radius (12px). Task rows use shared ghost
 
 The roster uses standard shared New task and selection controls. Search uses the shared InputGroup composition; editor Input and OptionSelect controls use their standard shared radii. Secondary detail actions share a compact NavIsland, while Run now remains separate. All default shared styles on unrelated pages remain unchanged.
 
-Current desktop-shell authority is [Journal entry pages](../../../docs/design/journal-entry-pages/DESIGN.md). Historical mobile evidence in earlier review directories does not establish current direction.
+Current desktop-shell authority is [Journal entry pages](../../../docs/design/journal-entry-pages/DESIGN.md).
 
 ## Agents integration
 

@@ -197,9 +197,9 @@ func writeAgentError(w http.ResponseWriter, err error) {
 	case errors.Is(err, db.ErrSpaceInvalid), errors.Is(err, db.ErrLibraryInvalid):
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "invalid_tool_input", "message": "The requested values are not valid for this action."})
 	case errors.Is(err, db.ErrPersonalStorageQuota):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "storage_limit_reached", "reason": "personal_storage_limit_reached", "message": "Your personal storage limit has been reached."})
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "storage_limit_reached", "reason": "personal_storage_limit_reached", "message": "Your account has reached its cloud storage limit."})
 	case errors.Is(err, db.ErrSpaceStorageQuota):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "storage_limit_reached", "reason": "space_storage_limit_reached", "message": "This Space has reached its storage limit."})
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "storage_limit_reached", "reason": "personal_storage_limit_reached", "message": "Your account has reached its cloud storage limit."})
 	case errors.Is(err, db.ErrLibraryQuota):
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "storage_limit_reached", "message": "Storage quota has been reached."})
 	case errors.Is(err, db.ErrLibraryReauthentication):
@@ -233,19 +233,9 @@ func hostedAILimitScope(err error) (string, bool) {
 	return "", false
 }
 
-func hostedAILimitReason(scope string) string {
-	if scope == "space" {
-		return "space_ai_limit_reached"
-	}
-	return "personal_ai_limit_reached"
-}
+func hostedAILimitReason(_ string) string { return "personal_ai_limit_reached" }
 
-func hostedAILimitMessage(scope string) string {
-	if scope == "space" {
-		return "This Space has used all of its weekly AI agent usage."
-	}
-	return "Your weekly AI agent usage is fully used."
-}
+func hostedAILimitMessage(_ string) string { return "Your account has used its available AI budget." }
 
 func validText(value string, min, max int) bool {
 	length := utf8.RuneCountInString(strings.TrimSpace(value))

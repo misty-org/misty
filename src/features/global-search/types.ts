@@ -1,3 +1,5 @@
+import type { AppRequest } from "@/features/agents";
+import type { AiArtifact } from "@/features/ai-surface/types";
 import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask" | "action";
@@ -118,6 +120,8 @@ export interface GlobalAiActionProposal {
 }
 
 export interface GlobalAiMessage {
+  artifact?: AiArtifact;
+  invocationId?: string;
   id: string;
   role: "user" | "assistant";
   mode: Exclude<GlobalAiMode, "search">;
@@ -129,6 +133,8 @@ export interface GlobalAiMessage {
   attachments?: MistyImageAttachment[];
   citations?: GlobalAiCitation[];
   action?: GlobalAiActionProposal;
+  /** Something the agent needs from the user: connect an app or approve an action. */
+  appRequest?: AppRequest;
   /** Set on turns Misty started itself rather than the person typing them. */
   source?: "scheduled_task";
 }

@@ -72,19 +72,24 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		var consumed int
-		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1`, runID).Scan(&consumed); err != nil {
-			return err
-		}
-		if consumed >= limit {
-			return ErrAgentModelTurnLimit
+		// Midscene's per-action planning calls are metered as usage but do not
+		// spend the run's agent turns; each Midscene subtask already needs one.
+		if !strings.HasPrefix(nodeID, "model:midscene:") {
+			var consumed int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:midscene:%'`, runID).Scan(&consumed); err != nil {
+				return err
+			}
+			if consumed >= limit {
+				return ErrAgentModelTurnLimit
+			}
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO agent_model_turn_claims(run_id,user_id,runtime_run_id,node_id) VALUES($1,$2,$3,$4)`, runID, userID, runtimeID, nodeID)
 		return err
 	})
 }
 
-// Foreground personal agents need multiple inspection/action turns per UI step.
+// Native personal agents, including their separate team browser windows, need
+// multiple inspection/action turns per UI step.
 // Pin this allowance at admission; retries never rewrite an existing budget.
 func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvocationRecord) (int, error) {
 	const ordinaryLimit = 20
@@ -101,7 +106,7 @@ func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 	if err != nil {
 		return 0, err
 	}
-	if record.SurfaceID == "sdk" || record.SurfaceID == "routine" || authority != nil || AppAuthorityFromContext(ctx) != nil || (input.Mode != "agent" && input.Mode != "auto") || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" {
+	if record.SurfaceID == "sdk" || record.SurfaceID == "routine" || authority != nil || AppAuthorityFromContext(ctx) != nil || (input.Mode != "agent" && input.Mode != "auto" && input.Mode != "team") || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" {
 		return ordinaryLimit, nil
 	}
 	if err := validateNativeAgentExecutionTx(ctx, tx, record.UserID, record.SpaceID, record.RequestPayload); err != nil {

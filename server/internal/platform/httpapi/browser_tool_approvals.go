@@ -31,10 +31,15 @@ func nativeRoutineBrowserAction(body aiInvocationInput, name string, arguments j
 		return false
 	}
 	var input struct {
-		Consequential *bool `json:"consequential"`
+		Consequential *bool  `json:"consequential"`
+		Description   string `json:"description"`
 		Action        struct {
-			Kind string `json:"kind"`
-			Key  string `json:"key"`
+			Kind  string `json:"kind"`
+			Key   string `json:"key"`
+			Input struct {
+				Kind string `json:"kind"`
+				Key  string `json:"key"`
+			} `json:"input"`
 		} `json:"action"`
 	}
 	if json.Unmarshal(arguments, &input) != nil {
@@ -47,6 +52,21 @@ func nativeRoutineBrowserAction(body aiInvocationInput, name string, arguments j
 		return body.ExecutionMode == "agent" && body.WindowLabel == "main" && input.Consequential != nil && !*input.Consequential && !(input.Action.Kind == "key" && input.Action.Key == "Enter")
 	}
 	if name == "browser.interact" {
+		if input.Action.Kind == "native" {
+			if input.Consequential == nil || *input.Consequential || strings.TrimSpace(input.Description) == "" {
+				return false
+			}
+			switch input.Action.Input.Kind {
+			case "click", "drag", "type", "scroll":
+			case "key":
+				if input.Action.Input.Key == "Enter" {
+					return false
+				}
+			default:
+				return false
+			}
+			return routineBrowserLabel(input.Description)
+		}
 		switch input.Action.Kind {
 		case "fill", "select", "scroll":
 			return true
@@ -57,6 +77,10 @@ func nativeRoutineBrowserAction(body aiInvocationInput, name string, arguments j
 	if name != "browser.click" || input.Consequential == nil || *input.Consequential {
 		return false
 	}
+	return routineBrowserLabel(label)
+}
+
+func routineBrowserLabel(label string) bool {
 	if strings.TrimSpace(label) == "" {
 		return false
 	}

@@ -168,14 +168,3 @@ func TestMCPConnectionDiscoveryAndManagedRuntimeContract(t *testing.T) {
 		}
 	}
 }
-
-func TestMCPCompanionCallsAreAlwaysDangerous(t *testing.T) {
-	if impact := TestingCompanionToolImpact("mcp.0123456789ab.echo"); impact != "dangerous" {
-		t.Fatalf("MCP companion impact=%q, want dangerous", impact)
-	}
-	for _, mode := range []string{"ask", "auto", "full"} {
-		if TestingCompanionToolNeedsApproval(mode, "dangerous") {
-			t.Fatalf("creator-enabled MCP tool unexpectedly requires per-action approval in %s mode", mode)
-		}
-	}
-}

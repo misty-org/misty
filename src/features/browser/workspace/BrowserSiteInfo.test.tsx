@@ -115,6 +115,39 @@ describe("Browser site permissions", () => {
     expect(container.querySelector('[data-open="false"]')).not.toBeNull();
     expect(container.textContent).not.toContain("https://example.com");
   });
+  it("allows temporary camera and microphone choices and resets them to Ask", async () => {
+    const temporary = { ...info, persistent: false };
+    invoke
+      .mockResolvedValueOnce(temporary)
+      .mockResolvedValueOnce({
+        ...temporary,
+        permissions: { camera: "block", microphone: "ask" },
+      })
+      .mockResolvedValueOnce({
+        ...temporary,
+        permissions: { camera: "block", microphone: "allow" },
+      })
+      .mockResolvedValueOnce(temporary);
+    await open();
+    const reset = screen.getByRole<HTMLButtonElement>("button", { name: "Reset permissions" });
+    expect(reset.disabled).toBe(true);
+    await choosePermission("Camera", "Block");
+    expect(reset.disabled).toBe(false);
+    await choosePermission("Microphone", "Allow");
+    expect(invoke).toHaveBeenLastCalledWith("browser_site_permissions_set", {
+      id: "tab-one",
+      origin: temporary.origin,
+      permissions: { camera: "block", microphone: "allow" },
+    });
+    expect(container.textContent).toContain("Permissions apply only to this temporary session.");
+    await act(async () => fireEvent.click(reset));
+    expect(invoke).toHaveBeenLastCalledWith("browser_site_permissions_set", {
+      id: "tab-one",
+      origin: temporary.origin,
+      permissions: { camera: "ask", microphone: "ask" },
+    });
+    expect(reset.disabled).toBe(true);
+  });
   it("keeps the displayed decision unchanged when saving fails", async () => {
     invoke
       .mockResolvedValueOnce(info)

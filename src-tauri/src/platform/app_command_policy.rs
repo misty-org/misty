@@ -1,7 +1,11 @@
 //! Application commands have no implicit permission to run in content views.
 //! Plugin commands are separately checked by Tauri's per-WebView capabilities.
 pub fn allows(label: &str, command: &str) -> bool {
-    if command.starts_with("browser_sync_") || command.starts_with("browser_recovery_") {
+    if command.starts_with("agent_files_")
+        || command.starts_with("extensions_")
+        || command.starts_with("browser_sync_")
+        || command.starts_with("browser_recovery_")
+    {
         return label == "main";
     }
     match label {
@@ -54,6 +58,14 @@ mod tests {
     #[test]
     fn vault_commands_are_main_workspace_only() {
         for command in [
+            "agent_files_choose",
+            "agent_files_prepare",
+            "agent_files_apply",
+            "agent_files_undo",
+            "agent_files_revoke",
+            "extensions_prepare",
+            "extensions_action",
+            "extensions_reconcile",
             "browser_sync_availability",
             "browser_sync_restore_credentials",
             "browser_sync_capture_credentials",

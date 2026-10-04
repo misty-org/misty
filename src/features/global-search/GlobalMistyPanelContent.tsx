@@ -28,6 +28,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
+import { AppRequestCard } from "@/features/agents";
 import type { GlobalAiActionProposal, GlobalAiConversation } from "./types";
 import { MistyActivityStatus } from "./MistyActivityStatus";
 import { MistyMessageAttachments } from "./MistyMessageAttachments";
@@ -80,7 +81,7 @@ export function ConversationView(props: {
           className={cn(
             "text-sm leading-relaxed",
             message.role === "user"
-              ? "ml-auto w-fit max-w-[82%] rounded-xl border border-blue-300/15 bg-blue-500/15 px-3 py-2 text-blue-50"
+              ? "ml-auto w-fit max-w-[82%] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-cream"
               : "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3.5 text-cream shadow-[0_12px_36px_rgba(0,0,0,0.14)]",
           )}
         >
@@ -137,6 +138,7 @@ export function ConversationView(props: {
               onCancel={() => props.onCancel?.(message.action!.id)}
             />
           ) : null}
+          {message.appRequest ? <AppRequestCard request={message.appRequest} /> : null}
         </article>
       ))}
       {props.working ? (

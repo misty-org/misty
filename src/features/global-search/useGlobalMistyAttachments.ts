@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { deleteMistyImage, uploadMistyImage } from "./mistyImageAttachments";
 import type { GlobalAiMode, MistyImageAttachment } from "./types";
+import {
+  readMistyDraftAttachments,
+  updateMistyDraftAttachments,
+  useMistyDraftAttachments,
+} from "@/features/misty/draftAttachments";
 
 export function useGlobalMistyAttachments(input: {
   mode: GlobalAiMode;
@@ -8,13 +13,33 @@ export function useGlobalMistyAttachments(input: {
   newConversation: () => Promise<string>;
   setMode: (mode: GlobalAiMode) => void;
   onError: (message: string) => void;
+  sharedAccountId?: string;
 }) {
-  const [attachments, setAttachments] = useState<MistyImageAttachment[]>([]);
+  const [localAttachments, setLocalAttachments] = useState<MistyImageAttachment[]>([]);
+  const shared = useMistyDraftAttachments(() =>
+    readMistyDraftAttachments(input.sharedAccountId ?? "", input.activeConversationId),
+  );
+  const generation = useMistyDraftAttachments((state) => state.generation);
+  const currentAccount = () =>
+    !input.sharedAccountId ||
+    (useMistyDraftAttachments.getState().accountId === input.sharedAccountId &&
+      useMistyDraftAttachments.getState().generation === generation);
+  const attachments = input.sharedAccountId ? shared : localAttachments;
+  const setAttachments = (
+    update: (items: MistyImageAttachment[]) => MistyImageAttachment[],
+    conversationId = input.activeConversationId,
+  ) => {
+    if (input.sharedAccountId)
+      updateMistyDraftAttachments(input.sharedAccountId, conversationId, update, generation);
+    else setLocalAttachments(update);
+  };
   const addFiles = async (files: File[]) => {
     input.onError("");
     let conversationId = input.activeConversationId;
     if (input.mode === "ask" && !conversationId) conversationId = await input.newConversation();
+    if (!currentAccount()) return;
     for (const file of files) {
+      if (!currentAccount()) return;
       const draftId = `draft-${crypto.randomUUID()}`;
       const previewUrl = URL.createObjectURL(file);
       const placeholder: MistyImageAttachment = {
@@ -28,21 +53,31 @@ export function useGlobalMistyAttachments(input: {
         state: "uploading",
         progress: 0,
       };
-      setAttachments((items) => [...items, placeholder]);
+      setAttachments((items) => [...items, placeholder], conversationId);
       try {
         const uploaded = await uploadMistyImage(file, {
           scope: input.mode === "search" ? "visual_query" : "conversation",
           conversationId: input.mode === "ask" ? conversationId : undefined,
           onProgress: (progress) =>
-            setAttachments((items) =>
-              items.map((item) => (item.id === draftId ? { ...item, progress } : item)),
+            setAttachments(
+              (items) => items.map((item) => (item.id === draftId ? { ...item, progress } : item)),
+              conversationId,
             ),
         });
         URL.revokeObjectURL(previewUrl);
-        setAttachments((items) => items.map((item) => (item.id === draftId ? uploaded : item)));
+        setAttachments(
+          (items) => items.map((item) => (item.id === draftId ? uploaded : item)),
+          conversationId,
+        );
       } catch (error) {
-        setAttachments((items) =>
-          items.map((item) => (item.id === draftId ? { ...item, state: "failed" } : item)),
+        if (!currentAccount()) {
+          URL.revokeObjectURL(previewUrl);
+          return;
+        }
+        setAttachments(
+          (items) =>
+            items.map((item) => (item.id === draftId ? { ...item, state: "failed" } : item)),
+          conversationId,
         );
         input.onError(
           error instanceof Error ? error.message : "Misty could not upload that image.",
@@ -56,7 +91,7 @@ export function useGlobalMistyAttachments(input: {
   };
   const consume = () => {
     const sent = attachments;
-    setAttachments([]);
+    setAttachments(() => []);
     sent.forEach(
       (item) => item.previewUrl.startsWith("blob:") && URL.revokeObjectURL(item.previewUrl),
     );
@@ -65,7 +100,7 @@ export function useGlobalMistyAttachments(input: {
   const changeMode = (nextMode: GlobalAiMode) => {
     if (nextMode !== input.mode && attachments.length) {
       const stale = attachments;
-      setAttachments([]);
+      setAttachments(() => []);
       stale.forEach((attachment) => void deleteMistyImage(attachment).catch(() => undefined));
     }
     input.setMode(nextMode);

@@ -188,6 +188,14 @@ const FILES: &[FileSpec] = &[
         ],
     },
     FileSpec {
+        path: "composio.env",
+        names: &["COMPOSIO_API_KEY"],
+    },
+    FileSpec {
+        path: "integrations/composio.env",
+        names: &["MISTY_COMPOSIO_DEPLOYMENT", "MISTY_COMPOSIO_API_KEY"],
+    },
+    FileSpec {
         path: "integrations/discord.env",
         names: &[
             "DISCORD_BOT_TOKEN",
@@ -318,6 +326,10 @@ const DEPRECATED_NAMES: &[&str] = &[
     "MISTY_COLLAB_IMAGE",
     "MISTY_COLLAB_PUBLIC_URL",
     "MISTY_COLLAB_INTERNAL_SECRET",
+    // Composio Cloud sessions replaced the calendar-only adapter.
+    "MISTY_COMPOSIO_URL",
+    "MISTY_COMPOSIO_CALENDAR_AUTH_CONFIG",
+    "MISTY_COMPOSIO_CALENDAR_TOOL_VERSION",
 ];
 
 const DEPRECATED_CLI_NAMES: &[&str] = &[
@@ -1147,6 +1159,11 @@ mod tests {
         assert!(owners.len() > 80);
         assert_eq!(owners["DISCORD_BOT_TOKEN"], "integrations/discord.env");
         assert_eq!(owners["INSTAGRAM_APP_SECRET"], "integrations/instagram.env");
+        assert_eq!(owners["COMPOSIO_API_KEY"], "composio.env");
+        assert_eq!(
+            owners["MISTY_COMPOSIO_API_KEY"],
+            "integrations/composio.env"
+        );
 
         assert_eq!(owners["JOURNAL_COLLAB_ROOM_SALT"], "crypto/journal.env");
         assert_eq!(owners["MISTY_AUTH_SIGNING_KEY"], "crypto/services.env");
@@ -1154,6 +1171,63 @@ mod tests {
             owners["MISTY_AUTH_SIGNING_KEY_PREVIOUS"],
             "crypto/services.env"
         );
+    }
+
+    #[test]
+    fn composio_scoped_files_load_without_exposing_or_relocating_keys() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        for target in [Target::Dev, Target::Prod] {
+            let base = root(&workspace, target);
+            write_private(
+                &base.join("composio.env"),
+                b"COMPOSIO_API_KEY=private-fixture-key\n",
+            )
+            .unwrap();
+            write_private(
+                &base.join("integrations/composio.env"),
+                b"MISTY_COMPOSIO_DEPLOYMENT=cloud\nMISTY_COMPOSIO_URL=https://backend.composio.dev\nMISTY_COMPOSIO_CALENDAR_AUTH_CONFIG=ac_fixture\nMISTY_COMPOSIO_CALENDAR_TOOL_VERSION=20261001_00\n",
+            ).unwrap();
+            let values = read(&workspace, target).unwrap();
+            assert_eq!(values["COMPOSIO_API_KEY"], "private-fixture-key");
+            assert_eq!(values["MISTY_COMPOSIO_DEPLOYMENT"], "cloud");
+            // Retired calendar settings in older files never load.
+            assert!(!values.contains_key("MISTY_COMPOSIO_CALENDAR_AUTH_CONFIG"));
+            assert!(!values.contains_key("MISTY_COMPOSIO_URL"));
+            set(
+                &workspace,
+                target,
+                "MISTY_COMPOSIO_API_KEY",
+                "private-instance-key",
+            )
+            .unwrap();
+            assert_eq!(
+                read(&workspace, target).unwrap()["MISTY_COMPOSIO_API_KEY"],
+                "private-instance-key"
+            );
+            write_private(
+                &base.join("integrations/composio.env"),
+                b"COMPOSIO_API_KEY=private-misplaced-key\n",
+            )
+            .unwrap();
+            let error = read(&workspace, target).unwrap_err().to_string();
+            assert!(error.contains("belongs in"));
+            assert!(!error.contains("private-misplaced-key"));
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn composio_keys_require_private_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let workspace = fixture_workspace(tmp.path());
+        let path = root(&workspace, Target::Dev).join("composio.env");
+        write_private(&path, b"COMPOSIO_API_KEY=private-fixture-key\n").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        let error = read(&workspace, Target::Dev).unwrap_err().to_string();
+        assert!(error.contains("must not be accessible"));
+        assert!(!error.contains("private-fixture-key"));
     }
 
     #[test]

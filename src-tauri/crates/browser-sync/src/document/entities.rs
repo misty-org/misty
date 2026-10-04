@@ -32,6 +32,10 @@ pub enum Kind {
     /// One device's browsing history for one hour, or one part of it
     /// (`history` collection).
     HistoryBatch,
+    /// A single extension storage.sync key in a private encrypted collection.
+    ExtensionSyncKey,
+    /// Durable account removal; old offline writes cannot restore this generation.
+    ExtensionRemoval,
 }
 
 impl Kind {
@@ -49,6 +53,8 @@ impl Kind {
             Self::TabGroup => "tab_group",
             Self::SavedTabGroup => "saved_tab_group",
             Self::HistoryBatch => "history_batch",
+            Self::ExtensionSyncKey => "extension_sync_key",
+            Self::ExtensionRemoval => "extension_removal",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -246,6 +252,7 @@ pub enum Surface {
     Files,
     Agents,
     Space,
+    Extensions,
 }
 
 /// Moving a view is one field: concurrent moves cannot combine a tab from
@@ -361,6 +368,24 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             }
             order(v.order)?;
         }
+        Kind::ExtensionRemoval => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Removed { extension:String, generation:String }
+            let v:Removed=serde_json::from_value(value)?;
+            if v.extension.is_empty() || v.extension.len()>256 || uuid::Uuid::parse_str(&v.generation).is_err() { return Err(Error::Invalid); }
+        }
+        Kind::ExtensionSyncKey => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct ExtensionValue { extension: String, generation: String, key: String, change: Value }
+            let v: ExtensionValue = serde_json::from_value(value)?;
+            if v.extension.is_empty() || v.extension.len() > 256 || !valid_id(&v.generation)
+                || v.key.len() > 8192 || serde_json::to_vec(&v.change)?.len() + v.key.len() > 8192
+                || !v.change.as_object().is_some_and(|change|change.len()==1 && (change.get("deleted")==Some(&Value::Bool(true)) || change.contains_key("value"))) {
+                return Err(Error::Invalid);
+            }
+        }
         Kind::HistoryBatch => {
             let v: HistoryBatch = serde_json::from_value(value)?;
             if !valid_id(&v.origin) || v.hour < 0 || v.part > 64 || v.visits.len() > 2000 {
@@ -388,13 +413,14 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                 Surface::Browser => {
                     let url = v.url.as_deref().ok_or(Error::Invalid)?;
                     if url != "about:blank" {
-                        web_url(url)?;
+                        let extension=url::Url::parse(url).is_ok_and(|u|u.scheme()=="webkit-extension" && u.username().is_empty() && u.password().is_none() && u.port().is_none() && u.host_str().is_some_and(|host|uuid::Uuid::parse_str(host).is_ok()));
+                        if !extension { web_url(url)?; }
                     }
                     if !v.profile_id.as_deref().is_some_and(profile_id) || v.tool_route.is_some() {
                         return Err(Error::Invalid);
                     }
                 }
-                Surface::Home | Surface::Files | Surface::Agents | Surface::Space => {
+                Surface::Home | Surface::Files | Surface::Agents | Surface::Space | Surface::Extensions => {
                     if v.url.is_some() || v.profile_id.is_some() || v.bookmark_id.is_some() {
                         return Err(Error::Invalid);
                     }
@@ -405,6 +431,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                         Surface::Home => "/home",
                         Surface::Files => "/files",
                         Surface::Space => "/spaces",
+                        Surface::Extensions => "/extensions",
                         _ => "/agents",
                     };
                     if path != prefix && !path.starts_with(&format!("{prefix}/")) {

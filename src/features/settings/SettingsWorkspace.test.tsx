@@ -2,6 +2,7 @@ import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime
 import type * as AppShell from "@/features/app-shell";
 import type * as FileSearch from "@/features/files/workspace/search";
 import type { SettingsSection } from "@/features/settings";
+import type * as AIProvidersModule from "@/api/assistant/providers";
 import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -113,6 +114,30 @@ vi.mock("@/api/assistant/api", () => ({
     }),
   },
 }));
+vi.mock("@/api/assistant/providers", async (importOriginal) => {
+  const actual = await importOriginal<typeof AIProvidersModule>();
+  return {
+    ...actual,
+    aiProvidersApi: {
+      ...actual.aiProvidersApi,
+      settings: async () => ({
+        connections: [],
+        routes: [],
+        defaults: [],
+        roles: [
+          {
+            id: "agent",
+            name: "Agent work",
+            description: "Planning and tools",
+            providers: ["openai"],
+            reasoning: true,
+            optional: false,
+          },
+        ],
+      }),
+    },
+  };
+});
 initializeHostAgentsRuntime();
 describe("SettingsWorkspace", () => {
   let container: HTMLDivElement;
@@ -172,9 +197,9 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
     expect(container.querySelector("[aria-expanded]")).toBeNull();
   });
-  it("shows actual available models", async () => {
+  it("shows account provider and model controls", async () => {
     await render("models");
-    expect(container.querySelector("main")?.textContent).toContain("Available model");
+    expect(container.querySelector("main")?.textContent).toContain("Provider connections");
   });
   it("keeps system pages individually addressable", () => {
     for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])

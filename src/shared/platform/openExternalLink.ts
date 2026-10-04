@@ -20,10 +20,7 @@ export async function openExternalLink(url: string): Promise<void> {
     await openInMistyBrowser(href);
     return;
   }
-  if (hasTauriInternals()) {
-    throw new Error("Misty Browser is not ready. Try opening the link again.");
-  }
-  window.open(href, "_blank", "noopener,noreferrer");
+  throw new Error("Misty Browser is not ready. Try opening the link again.");
 }
 export async function openSystemExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
@@ -31,15 +28,7 @@ export async function openSystemExternalLink(url: string): Promise<void> {
 
   // All callers share the same web routing policy.
   if (isWebUrl(href)) return openExternalLink(href);
-  try {
-    await openNativeUrl(href);
-    return;
-  } catch (error) {
-    if (hasTauriInternals()) {
-      throw error;
-    }
-  }
-  window.open(href, "_blank", "noopener,noreferrer");
+  await openNativeUrl(href);
 }
 export async function openProviderAuthorizationLink(
   url: string,
@@ -52,7 +41,7 @@ export async function openProviderAuthorizationLink(
   const currentPlatform = nativePlatform();
   await openExternalLink(href);
   return {
-    strategy: openInMistyBrowser ? "misty-browser" : "window-open",
+    strategy: "misty-browser",
     platform: currentPlatform,
     attemptedAt,
   };
@@ -111,8 +100,8 @@ async function openNativeUrl(url: string): Promise<void> {
 }
 function nativePlatform(): string {
   try {
-    return hasTauriInternals() ? platform() : "browser";
+    return hasTauriInternals() ? platform() : "unknown";
   } catch {
-    return "browser";
+    return "unknown";
   }
 }

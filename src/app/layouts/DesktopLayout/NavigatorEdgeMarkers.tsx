@@ -35,7 +35,9 @@ export function NavigatorEdgeMarkers({
         }[position],
       );
       const next = Array.from(
-        nav.querySelectorAll<HTMLElement>("[data-navigation-destination], [data-spaces-toggle]"),
+        nav.querySelectorAll<HTMLElement>(
+          "[data-navigation-destination], [data-navigator-toggle], [data-spaces-toggle]",
+        ),
       )
         // Utility overlays never represent a navigation destination, even if
         // a shared control carries destination metadata.
@@ -60,7 +62,7 @@ export function NavigatorEdgeMarkers({
             }
             if (parent === nav) break;
           }
-          const active = element.hasAttribute("data-spaces-toggle")
+          const active = element.matches("[data-navigator-toggle], [data-spaces-toggle]")
             ? element.dataset.active === "true" && element.getAttribute("aria-expanded") === "false"
             : element.matches('[aria-current="page"], [aria-pressed="true"]');
           return {
@@ -97,7 +99,9 @@ export function NavigatorEdgeMarkers({
       resize.disconnect();
       resize.observe(nav);
       nav
-        .querySelectorAll("a, button, [data-spaces-stack], .misty-navigator-items")
+        .querySelectorAll(
+          "a, button, [data-navigator-stack], [data-spaces-stack], .misty-navigator-items",
+        )
         .forEach((element) => resize.observe(element));
     };
     const mutations = new MutationObserver((records) => {

@@ -24,3 +24,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   );
 }
 export const SettingsPage = SettingsWorkspace;
+
+export { useSettingsProfiles } from "./profiles/store";
+export { resolveSetting } from "./profiles/model";

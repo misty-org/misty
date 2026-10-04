@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Check,
@@ -28,11 +28,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
 } from "@/shared/ui";
 import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import { useSpaceConversations } from "../sidebar/useSpaceConversations";
@@ -59,25 +54,8 @@ export function ConversationSwitcher({
   const personal = useSpacePersonalItems(spaceId);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [narrow, setNarrow] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    const header = trigger.current?.closest("header");
-    if (header && typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver((entries) =>
-        setNarrow(entries[0].contentRect.width < 600),
-      );
-      observer.observe(header);
-      return () => observer.disconnect();
-    }
-    if (typeof matchMedia !== "function") return;
-    const media = matchMedia("(max-width: 700px)");
-    const update = () => setNarrow(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
   const itemKey = `chat:${conversation?.id || "everyone"}`;
   const starred = personal.items.some((i) => i.item_key === itemKey && i.favorite);
   const choose = (path: string) => {
@@ -172,37 +150,20 @@ export function ConversationSwitcher({
   return (
     <>
       <h1 className="min-w-0 flex-1 text-sm">
-        {narrow ? (
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>{button}</SheetTrigger>
-            <SheetContent
-              side="bottom"
-              className="p-3 pt-10"
-              onCloseAutoFocus={restoreFocus}
-              onOpenAutoFocus={(event) => {
-                event.preventDefault();
-                searchRef.current?.focus();
-              }}
-            >
-              <SheetTitle className="sr-only">Switch conversation</SheetTitle>
-              <SheetDescription className="sr-only">
-                Choose a conversation in the current Space.
-              </SheetDescription>
-              {list}
-            </SheetContent>
-          </Sheet>
-        ) : (
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>{button}</PopoverTrigger>
-            <PopoverContent
-              align="start"
-              className="w-[min(380px,calc(100vw-32px))] p-0"
-              onCloseAutoFocus={restoreFocus}
-            >
-              {list}
-            </PopoverContent>
-          </Popover>
-        )}
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>{button}</PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-[min(380px,calc(100vw-32px))] p-0"
+            onCloseAutoFocus={restoreFocus}
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              searchRef.current?.focus();
+            }}
+          >
+            {list}
+          </PopoverContent>
+        </Popover>
       </h1>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

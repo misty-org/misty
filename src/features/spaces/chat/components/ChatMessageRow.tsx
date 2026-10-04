@@ -48,8 +48,8 @@ export function ChatMessageRow({
       {dateLabel ? <ChatDateDivider label={dateLabel} /> : null}
       <article
         className={[
-          "group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
-          "transition-colors duration-150 hover:bg-charcoal-card focus-within:bg-charcoal-card focus-visible:outline-none",
+          "group/chat-message relative -mx-3 grid min-h-10 grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
+          "hover:bg-charcoal-card focus-within:bg-charcoal-card focus-visible:outline-none",
           // `first:` covers the message that opens a thread with no date
           // divider above it, whose top margin would double the scroller's.
           compact ? "" : "mt-4 first:mt-0",
@@ -72,7 +72,12 @@ export function ChatMessageRow({
 
         <div className={`col-start-1 flex justify-end ${rowClass}`}>
           {compact ? (
-            <time className="pt-1 text-[10px] tabular-nums text-cream-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+            <time
+              className={
+                "pt-1 text-[10px] tabular-nums text-cream-muted opacity-0 " +
+                "group-hover/chat-message:opacity-100 group-focus-within/chat-message:opacity-100"
+              }
+            >
               {formatChatMessageTime(message.created_at)}
             </time>
           ) : (

@@ -29,7 +29,9 @@ pub const BOOKMARKS: &str = "bookmarks";
 pub const TAB_GROUPS: &str = "tab_groups";
 /// Browsing history, in hourly batches written by the device that browsed.
 pub const HISTORY: &str = "history";
-pub const COLLECTIONS: [&str; 3] = [BOOKMARKS, TAB_GROUPS, HISTORY];
+/// Extension-owned declared sync settings. Native-only, never projected to a renderer.
+pub const EXTENSION_SYNC: &str = "extension_sync";
+pub const COLLECTIONS: [&str; 4] = [BOOKMARKS, TAB_GROUPS, HISTORY, EXTENSION_SYNC];
 
 fn known(collection: &str) -> Result<()> {
     if COLLECTIONS.contains(&collection) {

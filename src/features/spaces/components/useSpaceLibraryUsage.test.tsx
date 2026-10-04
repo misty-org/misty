@@ -91,7 +91,7 @@ describe("useSpaceLibraryUsage", () => {
 
     expect(spy).toHaveBeenCalledWith("space-1");
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-1:3000000/1000000000:500000/1000000000",
+      "space-1:3000000/1000000000:500000/0",
     );
   });
 
@@ -120,7 +120,7 @@ describe("useSpaceLibraryUsage", () => {
     });
 
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-2:3000000/1000000000:2500000/1000000000",
+      "space-2:3000000/1000000000:2500000/0",
     );
   });
 
@@ -143,11 +143,11 @@ describe("useSpaceLibraryUsage", () => {
     });
 
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-2:3000000/1000000000:2500000/1000000000",
+      "space-2:3000000/1000000000:2500000/0",
     );
   });
 
-  it("prefers explicit personal and Space dimensions from current servers", async () => {
+  it("uses the account allowance and keeps Space bytes as attribution", async () => {
     useSpacesStore.setState({ ownerStorage: null });
     vi.spyOn(spacesApi, "libraryUsage").mockResolvedValue({
       space_id: "space-1",
@@ -161,7 +161,7 @@ describe("useSpaceLibraryUsage", () => {
     await act(async () => await Promise.resolve());
 
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-1:900/1000:200/5000",
+      "space-1:900/1000:200/0",
     );
   });
 });

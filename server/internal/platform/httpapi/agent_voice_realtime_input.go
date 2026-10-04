@@ -20,11 +20,15 @@ type voiceProvider interface {
 	Read() (agent.VoiceRealtimeEvent, error)
 	Send(any) error
 	Configure() error
+	SetOutputLimit(int) error
 	Close()
 }
 
 type voiceSessionHooks struct {
 	OperationID string
+	Input       func(context.Context, int) error
+	Speech      func(context.Context, agent.RealtimeVoiceUsage) error
+	Advance     func(context.Context, agent.RealtimeVoiceUsage) error
 	Access      func(context.Context) error
 	Reply       func(context.Context, string) (string, error)
 	Checkpoint  func(context.Context, string, agent.RealtimeVoiceUsage) error

@@ -40,6 +40,8 @@ function draftFrom(task?: ScheduledTask): ScheduledTaskInput {
   return {
     title: task?.title ?? "",
     agent_id: task?.agent_id,
+    method_version_id: task?.method_version_id,
+    method_inputs: task?.method_inputs,
     prompt: task?.prompt ?? "",
     enabled: task?.enabled ?? true,
     cadence: task?.cadence ?? "daily",
@@ -117,8 +119,9 @@ export function ScheduledTaskEditor(props: {
       <DialogContent className="max-w-xl">
         <DialogTitle>{props.task ? "Edit scheduled task" : "New scheduled task"}</DialogTitle>
         <DialogDescription>
-          Misty runs this in the cloud, even when this computer is off, and posts each run to the
-          task’s conversation.
+          {props.task?.method_version_id
+            ? "This schedule keeps its saved workflow version and inputs. Browser work requires an interactive device and cannot run unattended yet."
+            : "Misty runs this in the cloud, even when this computer is off, and posts each run to the task’s conversation."}
         </DialogDescription>
         <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
           {!props.task && (
@@ -163,8 +166,16 @@ export function ScheduledTaskEditor(props: {
               onChange={(event) => set("title", event.target.value)}
             />
           </Field>
-          <Field label="Instructions" hint="Write it the way you would ask Misty in chat.">
+          <Field
+            label="Instructions"
+            hint={
+              props.task?.method_version_id
+                ? "Pinned to the saved workflow. Create a new schedule from Workflows to change its version or inputs."
+                : "Write it the way you would ask Misty in chat."
+            }
+          >
             <Textarea
+              readOnly={!!props.task?.method_version_id}
               value={draft.prompt}
               maxLength={8000}
               rows={5}

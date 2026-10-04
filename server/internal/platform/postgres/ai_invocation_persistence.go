@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+var ErrAIConversationBusy = errors.New("conversation already has an active invocation")
+
 type AIInvocationRecord struct {
 	ModelTurnLimit     int
 	DispatchRuntime    bool
@@ -80,6 +82,27 @@ func createAIInvocationRecordTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 		}
 		if !enabled {
 			return ErrSpaceForbidden
+		}
+		if record.ConversationID != "" {
+			// Serialize admission across every window/surface using the canonical
+			// conversation row. An idempotent retry still returns its original run.
+			var id string
+			if err := tx.QueryRowContext(ctx, `SELECT id FROM misty_ask_conversations WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL FOR UPDATE`, record.ConversationID, record.UserID).Scan(&id); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return ErrSpaceNotFound
+				}
+				return err
+			}
+			var busy, retry bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocations WHERE user_id=$1 AND conversation_id=$2 AND idempotency_key<>$3 AND state IN ('queued','running','awaiting_approval','awaiting_device','awaiting_intervention','awaiting_timer'))`, record.UserID, record.ConversationID, record.IdempotencyKey).Scan(&busy); err != nil {
+				return err
+			}
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocations WHERE user_id=$1 AND idempotency_key=$2)`, record.UserID, record.IdempotencyKey).Scan(&retry); err != nil {
+				return err
+			}
+			if busy && !retry {
+				return ErrAIConversationBusy
+			}
 		}
 		modelTurnLimit, err := invocationModelTurnLimitTx(ctx, tx, record)
 		if err != nil {
@@ -267,7 +290,7 @@ func (db *Database) AIConversationTurns(ctx context.Context, userID, conversatio
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT invocation.id,
-				COALESCE(invocation.request_payload->>'prompt',''),
+				CASE WHEN invocation.idempotency_key LIKE 'voice-%:%' THEN '' ELSE COALESCE(invocation.request_payload->>'prompt','') END,
 				invocation.state,
 				COALESCE(reply.payload->>'text',''),
 				COALESCE(status.payload->>'text',''),

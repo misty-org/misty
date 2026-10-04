@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { useLegacyPluginTabMigration } from "./useExplorerWorkspaceEvents";
 
 describe("retired extension tab recovery", () => {
-  it.each(["misty-plugin://panel?plugin=themes&panel=main", "misty-transfers://history"])(
+  it.each(["misty-plugin://panel?plugin=themes&panel=main"])(
     "restores %s to Files without changing ordinary tabs or focus",
     (legacyPath) => {
       const store = createMultiPanelStore({ idPrefix: "retired-extension" });
@@ -37,6 +37,19 @@ describe("retired extension tab recovery", () => {
       });
     },
   );
+
+  it("preserves the Transfers page", () => {
+    const store = createMultiPanelStore({ idPrefix: "transfers-recovery" });
+    store.getState().initialize("misty-transfers://history", "Transfers");
+    renderHook(() =>
+      useLegacyPluginTabMigration({
+        homePath: "/Users/test",
+        workspacePathSignature: "transfers",
+        multiPanelStore: store,
+      }),
+    );
+    expect(store.getState().tabs[0].path).toBe("misty-transfers://history");
+  });
 
   it("waits until the home folder is available", () => {
     const store = createMultiPanelStore({ idPrefix: "retired-extension-wait" });

@@ -27,6 +27,9 @@ const (
 	LocalityServer   Locality = "server"
 	LocalityDevice   Locality = "device"
 	LocalityProvider Locality = "provider"
+	// LocalityRouted tools delegate to another registry that authorizes and
+	// journals the effect, such as account tools routed into one Space.
+	LocalityRouted Locality = "routed"
 )
 
 var (
@@ -354,7 +357,7 @@ func validateRegistration(descriptor Descriptor, handler Handler) error {
 			return fmt.Errorf("%w: invalid approval policy for %s source %s", ErrInvalidRegistration, descriptor.Name, source)
 		}
 	}
-	if descriptor.Locality != LocalityServer && descriptor.Locality != LocalityDevice && descriptor.Locality != LocalityProvider {
+	if descriptor.Locality != LocalityServer && descriptor.Locality != LocalityDevice && descriptor.Locality != LocalityProvider && descriptor.Locality != LocalityRouted {
 		return fmt.Errorf("%w: invalid locality for %s", ErrInvalidRegistration, descriptor.Name)
 	}
 	if descriptor.Risk != serveragent.RiskRead && descriptor.AuditEvent == "" {

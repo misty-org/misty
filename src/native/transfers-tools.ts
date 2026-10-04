@@ -38,6 +38,30 @@ export function operationQueueSnapshot(): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_snapshot");
 }
 
+export function operationQueueCancel(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_cancel", { operationId });
+}
+
+export function operationQueueRetryTransfer(transferId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_retry_transfer", { transferId });
+}
+
+export function operationQueuePause(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_pause", { operationId });
+}
+
+export function operationQueueResume(operationId: number): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_resume", { operationId });
+}
+
+export function operationQueuePauseAll(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_pause_all");
+}
+
+export function operationQueueResumeAll(): Promise<OperationQueueSnapshot> {
+  return invoke("operation_queue_resume_all");
+}
+
 export function operationQueueUndo(undoTokenId: number): Promise<OperationQueueSnapshot> {
   return invoke("operation_queue_undo", { undoTokenId });
 }

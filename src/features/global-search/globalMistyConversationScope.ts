@@ -14,6 +14,9 @@ export async function conversationForGlobalPrompt(get: () => GlobalSearchState, 
     (current?.agentId
       ? current.agentId !== state.selectedAgentId
       : state.selectedAgentId !== defaultAgent);
-  if (!current || differentAgent) return state.newConversation();
+  if (!current || differentAgent)
+    return state.selectedAgentId
+      ? state.newConversation(undefined, state.selectedAgentId)
+      : state.newConversation();
   return current.id;
 }

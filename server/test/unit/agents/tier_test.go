@@ -78,7 +78,7 @@ func TestAgentJobSessionBillsRequesterWithJobIdempotency(t *testing.T) {
 	if meter.userID != "requester-user" {
 		t.Fatalf("job billed %q, want requester", meter.userID)
 	}
-	if meter.key != "agent-job:job_123:1" {
+	if meter.key != "agent-job:job_123:step:1" {
 		t.Fatalf("job billing key = %q", meter.key)
 	}
 }

@@ -1,4 +1,5 @@
 import { appZoomBaseline, appZoomFromStoredScale } from "@/shared/hooks/useAppZoom";
+import { workspaceDefaultViewIndex } from "@/features/workspace/workspaceDefaultView";
 import { booleanSetting, numberSetting, stringSetting } from "../SettingsControls";
 export const settingsBoolean = booleanSetting;
 export const settingsNumber = numberSetting;
@@ -89,7 +90,12 @@ export function selectGeneralPreferences(
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
     searchEngineIndex: settingsNumber(source, "general", "browser_search_engine_index", 0),
     startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
-    workspaceDefaultTabIndex: settingsNumber(source, "general", "workspace_default_tab_index", 0),
+    workspaceDefaultTabIndex: settingsNumber(
+      source,
+      "general",
+      "workspace_default_tab_index",
+      workspaceDefaultViewIndex,
+    ),
   };
 }
 export function selectShortcutPreferences(

@@ -61,19 +61,19 @@ describe("spaceErrorMessage", () => {
         "owner_storage_quota_exceeded",
         JSON.stringify({ reason: "space_storage_limit_reached" }),
       ),
-    ).toContain("Space’s storage is full");
+    ).toContain("account’s cloud storage is full");
     expect(
       spaceErrorMessage(
         "hosted_ai_limit_reached",
         JSON.stringify({ reason: "personal_ai_limit_reached" }),
       ),
-    ).toContain("Your personal weekly hosted AI allowance");
+    ).toContain("Your account’s weekly AI allowance");
     expect(
       spaceErrorMessage(
         "hosted_ai_limit_reached",
         JSON.stringify({ reason: "space_ai_limit_reached" }),
       ),
-    ).toContain("Its owner must upgrade");
+    ).toContain("Your account’s weekly AI allowance");
   });
 
   it("keeps the owned-Space limit message plan-neutral", () => {

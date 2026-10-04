@@ -21,3 +21,6 @@ export type { DisplayCapture } from "./companion/protocol";
 
 export { AgentAvatar } from "./components/AgentAvatar";
 export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
+
+export type { AppRequest } from "./apps/api";
+export { AppRequestCard } from "./apps/AppRequestCard";

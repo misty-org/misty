@@ -18,6 +18,9 @@ func AgentModel() (AgentModelConfig, error) {
 		c.Provider = "gateway"
 	}
 	key, base := strings.TrimSpace(Getenv("MISTY_AGENT_MODEL_API_KEY")), strings.TrimSpace(Getenv("MISTY_AGENT_MODEL_BASE_URL"))
+	if c.Provider == "openai" && key == "" {
+		key = strings.TrimSpace(Getenv("OPENAI_API_KEY"))
+	}
 	switch c.Provider {
 	case "gateway", "openai", "anthropic", "google", "openai-compatible":
 	default:

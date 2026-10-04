@@ -122,9 +122,6 @@ func executeAgentNoteTool(ctx context.Context, database *db.Database, actor spac
 			}
 			return nil, true, err
 		}
-		if err := requireAgentMutationTarget(ctx, database, actor, actor.originalPrompt, "note", current.ID); err != nil {
-			return nil, true, err
-		}
 		if strings.TrimSpace(input.Title) == "" {
 			input.Title = current.TitleProjection
 		}

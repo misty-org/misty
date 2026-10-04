@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui";
-import { RotateCcw, Square } from "lucide-react";
+import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
 import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
@@ -53,6 +53,17 @@ export function AgentCompanionPanel() {
       {active && (
         <div className="agent-companion-status">
           <span role="status">{status}</span>
+          {state.phase !== "idle" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!control}
+              onClick={() => act({ kind: "stop_audio" })}
+            >
+              <VolumeX size={16} />
+              Stop audio
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -60,7 +71,7 @@ export function AgentCompanionPanel() {
             onClick={() => act({ kind: "stop" })}
           >
             <Square size={16} />
-            Stop
+            Stop task
           </Button>
         </div>
       )}

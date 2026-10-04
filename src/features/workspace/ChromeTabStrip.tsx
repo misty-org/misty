@@ -65,6 +65,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
   const reorder = usePointerReorder({
     scope: `chrome-tabs:${props.dragScope ?? "workspace"}`,
     axis: "x",
+    animate: true,
     getDrag: (id) => {
       const tab = props.tabs.find((tab) => tab.id === id);
       return tab && !renamingTabId && (props.onReorderTab || props.onMoveTab)

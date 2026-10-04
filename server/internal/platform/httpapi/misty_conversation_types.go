@@ -1,15 +1,19 @@
 package api
 
+import "encoding/json"
+
 type mistyConversationMessage struct {
-	ID          string                        `json:"id"`
-	Role        string                        `json:"role"`
-	Mode        string                        `json:"mode"`
-	Content     string                        `json:"content"`
-	CreatedAt   string                        `json:"createdAt"`
-	State       string                        `json:"state"`
-	Retryable   bool                          `json:"retryable,omitempty"`
-	Action      *mistyConversationAction      `json:"action,omitempty"`
-	Attachments []mistyConversationAttachment `json:"attachments,omitempty"`
+	Artifact     json.RawMessage               `json:"artifact,omitempty"`
+	InvocationID string                        `json:"invocationId,omitempty"`
+	ID           string                        `json:"id"`
+	Role         string                        `json:"role"`
+	Mode         string                        `json:"mode"`
+	Content      string                        `json:"content"`
+	CreatedAt    string                        `json:"createdAt"`
+	State        string                        `json:"state"`
+	Retryable    bool                          `json:"retryable,omitempty"`
+	Action       *mistyConversationAction      `json:"action,omitempty"`
+	Attachments  []mistyConversationAttachment `json:"attachments,omitempty"`
 	// Source marks turns Misty started on its own, such as "scheduled_task".
 	Source string `json:"source,omitempty"`
 }

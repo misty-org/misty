@@ -11,5 +11,7 @@ it("keeps companion workers in their own browser on macOS", () => {
   expect(betaExecutionMode("team")).toBe("team");
   expect(betaExecutionMode("user")).toBe("user");
   window.history.replaceState(null, "", "/");
-  expect(betaExecutionMode("user")).toBe("agent");
+  expect(betaExecutionMode("user")).toBe("user");
+  expect(betaExecutionMode("team")).toBe("team");
+  expect(betaExecutionMode("agent")).toBe("agent");
 });

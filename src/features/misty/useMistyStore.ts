@@ -1,6 +1,7 @@
+import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
+import { apiRequest } from "@/api/client";
 import { companionRequestsBrowser } from "./companionBrowserIntent";
 import {
-  runtimeAgentsApi as agentsApi,
   runtimeAiApi as aiSurfaceApi,
   searchAgents as executeGlobalSearch,
   visualSearchAgents as executeGlobalVisualSearch,
@@ -22,7 +23,6 @@ import {
 import { thinkingEffort, thinkingMode } from "@/features/agents/thinkingMode";
 import type { AiCaptureAttachment } from "@/features/ai-surface/types";
 import { globalMistyError, globalMistyId } from "@/features/global-search/globalMistyActions";
-import { globalMistyApi } from "@/features/global-search/globalMistyApi";
 import { conversationForGlobalPrompt } from "@/features/global-search/globalMistyConversationScope";
 import { createGlobalSearchPanelState } from "@/features/global-search/globalSearchPanelState";
 import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
@@ -30,25 +30,28 @@ import {
   announceGlobalPanel,
   applyGlobalInvocationEvent,
   conversationMessage,
-  findProposal,
   globalAiContext,
-  normalizeConversation,
   patchConversationMessage,
-  patchProposal,
   replaceActiveGlobalInvocationStream,
-  resumeGlobalAgentWatches,
   stopGlobalAgentWatches,
   updateConversation,
 } from "@/features/global-search/globalSearchStoreHelpers";
 import { create } from "zustand";
 import { assertMistyAvailable } from "./availability";
 import { requestHostContext } from "./contextBridge";
+import { resetMistyDraftAttachments } from "./draftAttachments";
+import { createMistyConversationActions } from "./mistyConversationActions";
+import { createMistyProposalActions } from "./mistyProposalActions";
+import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
 
 export type {
   GlobalSearchState,
   MistySubmissionPresentation,
 } from "@/features/global-search/globalSearchState";
-let submissionEpoch = 0;
+const uncertainAdmissions = new Map<string, string>();
+let steeringRequest:
+  | { accountId: string; invocationId: string; text: string; key: string; pending?: Promise<void> }
+  | undefined;
 export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   ...createGlobalSearchPanelState(set, get),
   mode: "ask",
@@ -56,7 +59,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   executionModeByAgent: {},
   setAccount: (accountId) => {
     if (get().accountId === accountId) return;
-    submissionEpoch++;
+    resetMistyDraftAttachments(accountId);
+    advanceSubmissionEpoch();
+    steeringRequest = undefined;
+    uncertainAdmissions.clear();
+    void stopAgentWindowTask().catch(() => {});
     void finishLocalExecution();
     replaceActiveGlobalInvocationStream();
     stopGlobalAgentWatches();
@@ -71,8 +78,10 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       thinkingMode: "normal",
       thinkingModeExplicit: false,
       invocationId: undefined,
+      invocationConversationId: undefined,
       pendingArtifact: undefined,
       artifactPaneId: undefined,
+      artifactConversationId: undefined,
       screenLabel: undefined,
     });
   },
@@ -84,169 +93,16 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     }),
   search: (query) => executeGlobalSearch(set, get, query),
   visualSearch: (attachmentId, query) => executeGlobalVisualSearch(set, get, attachmentId, query),
-  loadConversations: async () => {
-    const epoch = submissionEpoch;
-    const accountId = get().accountId;
-    if (!accountId) return;
-    set({
-      conversationsLoading: true,
-    });
-    try {
-      const response = await globalMistyApi.conversations();
-      if (get().accountId !== accountId) return;
-      if (get().working || epoch !== submissionEpoch) {
-        set({
-          conversationsLoading: false,
-        });
-        return;
-      }
-      const conversations = response.conversations.map(normalizeConversation);
-      const activeConversationId =
-        get().activeConversationId || (get().selectedAgentId ? "" : conversations[0]?.id) || "";
-      set({
-        conversations,
-        activeConversationId,
-        selectedAgentId:
-          conversations.find((item) => item.id === activeConversationId)?.agentId ||
-          get().selectedAgentId,
-        conversationsLoading: false,
-      });
-      resumeGlobalAgentWatches(set, get, conversations);
-    } catch {
-      if (get().accountId === accountId)
-        set({
-          conversationsLoading: false,
-        });
-    }
-  },
-  newConversation: async (_legacySpaceId) => {
-    const accountId = get().accountId;
-    const conversation = normalizeConversation(
-      await globalMistyApi.createConversation(
-        "New conversation",
-        "",
-        get().selectedAgentId || selectedPersonalAgent("")?.id,
-      ),
-    );
-    // A browser handoff can await the server while the user switches accounts.
-    // Its response belongs to the original account, including local fallbacks.
-    if (get().accountId !== accountId) return conversation.id;
-    set({
-      conversations: [
-        conversation,
-        ...get().conversations.filter((item) => item.id !== conversation.id),
-      ],
-      activeConversationId: conversation.id,
-      mode: "ask",
-      panel: get().panel === "closed" ? "closed" : "answer",
-      query: "",
-      context: [],
-      browserRequest: undefined,
-      error: null,
-    });
-    return conversation.id;
-  },
-  // Retained for old entry points; context does not bind AI ownership.
-  bindConversationSpace: async () => {},
-  selectConversation: (activeConversationId) =>
-    set({
-      selectedAgentId: get().conversations.find((c) => c.id === activeConversationId)?.agentId,
-      browserRequest: undefined,
-      handoff: undefined,
-      targets: [],
-      selectedSpaceId: "",
-      activeConversationId,
-      mode: "ask",
-      panel: get().panel === "closed" ? "closed" : "answer",
-      query: "",
-      context: [],
-      error: null,
-    }),
-  deleteConversation: async (conversationId) => {
-    const requestAccount = get().accountId;
-    const existing = get().conversations.find((item) => item.id === conversationId);
-    if (!existing) return;
-    const previousConversations = get().conversations;
-    const previousActiveId = get().activeConversationId;
-    const previousAgentId = get().selectedAgentId;
-    const nextConversation = previousConversations.find((item) => item.id !== conversationId);
-    set({
-      conversations: previousConversations.filter((item) => item.id !== conversationId),
-      activeConversationId:
-        previousActiveId === conversationId ? (nextConversation?.id ?? "") : previousActiveId,
-      selectedAgentId:
-        previousActiveId === conversationId
-          ? (nextConversation?.agentId ?? previousAgentId)
-          : previousAgentId,
-      context: previousActiveId === conversationId ? [] : get().context,
-    });
-    if (!existing?.remote) return;
-    try {
-      await globalMistyApi.deleteConversation(conversationId);
-    } catch (error) {
-      if (get().accountId !== requestAccount) return;
-      set({
-        conversations: previousConversations,
-        activeConversationId: previousActiveId,
-        selectedAgentId: previousAgentId,
-        error: globalMistyError(error),
-      });
-    }
-  },
-  renameConversation: async (conversationId, title) => {
-    const requestAccount = get().accountId;
-    const normalized = title.trim().slice(0, 120);
-    const existing = get().conversations.find((item) => item.id === conversationId);
-    if (!existing || !normalized || normalized === existing.title) return;
-    set({
-      conversations: get().conversations.map((item) =>
-        item.id === conversationId
-          ? {
-              ...item,
-              title: normalized,
-            }
-          : item,
-      ),
-      error: null,
-    });
-    if (!existing.remote) return;
-    try {
-      const renamed = await globalMistyApi.renameConversation(conversationId, normalized);
-      if (get().accountId !== requestAccount) return;
-      set({
-        conversations: get().conversations.map((item) =>
-          item.id === conversationId
-            ? {
-                ...item,
-                title: renamed.title,
-              }
-            : item,
-        ),
-      });
-    } catch (error) {
-      if (get().accountId !== requestAccount) return;
-      if (get().accountId !== requestAccount) return;
-      set({
-        conversations: get().conversations.map((item) =>
-          item.id === conversationId
-            ? {
-                ...item,
-                title: existing.title,
-              }
-            : item,
-        ),
-        error: globalMistyError(error),
-      });
-    }
-  },
+  ...createMistyConversationActions(set, get),
   cancelResponse: async () => {
-    submissionEpoch++;
+    advanceSubmissionEpoch();
     const accountId = get().accountId;
     const invocationId = get().invocationId;
+    await stopAgentWindowTask().catch(() => {});
     await pauseLocalExecution();
     if (invocationId) await aiSurfaceApi.cancelInvocation(invocationId);
     if (get().accountId === accountId && get().invocationId === invocationId) {
-      const conversationId = get().activeConversationId;
+      const conversationId = get().invocationConversationId ?? get().activeConversationId;
       updateConversation(set, get, conversationId, (conversation) => ({
         ...conversation,
         messages: conversation.messages.map((message) =>
@@ -263,9 +119,61 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       set({
         working: false,
         invocationId: undefined,
+        invocationConversationId: undefined,
       });
       replaceActiveGlobalInvocationStream();
     }
+  },
+  steerResponse: async (text, conversationId = get().activeConversationId) => {
+    const state = get();
+    if (
+      !text.trim() ||
+      !state.working ||
+      !state.invocationId ||
+      conversationId !== (state.invocationConversationId ?? state.activeConversationId)
+    )
+      throw new Error("Open the active task conversation before sending a follow-up.");
+    if (
+      !steeringRequest ||
+      steeringRequest.accountId !== state.accountId ||
+      steeringRequest.invocationId !== state.invocationId ||
+      steeringRequest.text !== text
+    )
+      steeringRequest = {
+        accountId: state.accountId,
+        invocationId: state.invocationId,
+        text,
+        key: crypto.randomUUID(),
+      };
+    const request = steeringRequest;
+    if (request.pending) return request.pending;
+    request.pending = (async () => {
+      const receipt = await apiRequest<{ sequence: number }>(
+        `/ai/invocations/${encodeURIComponent(request.invocationId)}/steering`,
+        { method: "POST", body: JSON.stringify({ text, idempotencyKey: request.key }) },
+      );
+      if (get().accountId !== request.accountId) return;
+      const id = `${request.invocationId}-steering-${receipt.sequence}`;
+      updateConversation(set, get, conversationId, (conversation) => ({
+        ...conversation,
+        messages: conversation.messages.some((m) => m.id === id)
+          ? conversation.messages
+          : [
+              ...conversation.messages,
+              {
+                ...conversationMessage("user", "ask", text),
+                id,
+                state: "completed",
+                activity: "Queued for the next safe boundary",
+              },
+            ],
+      }));
+      if (get().query === text) set({ query: "", error: null });
+      if (steeringRequest === request) steeringRequest = undefined;
+    })().finally(() => {
+      request.pending = undefined;
+    });
+    return request.pending;
   },
   submit: async () => get().submitAnswer(get().query),
   submitAnswer: async (
@@ -277,13 +185,35 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     origin,
     companion,
   ) => {
+    const preparationStarted = performance.now();
+    const markPreparation = (stage: string) => {
+      if (companion)
+        console.debug(
+          "[companion preparation]",
+          stage,
+          Math.round(performance.now() - preparationStarted),
+        );
+    };
     const normalized = prompt.trim();
-    if ((!normalized && !attachments.length) || get().working) return;
-    const epoch = ++submissionEpoch;
+    if (!normalized && !attachments.length) return;
+    if (get().working) {
+      if (attachments.length) {
+        set({ error: "Keep attachments for the next task; follow-ups can contain text only." });
+        return;
+      }
+      try {
+        await get().steerResponse?.(normalized, origin?.conversationId);
+      } catch (error) {
+        set({ error: globalMistyError(error) });
+      }
+      return;
+    }
+    const epoch = advanceSubmissionEpoch();
     set({
       working: true,
       error: null,
       invocationId: undefined,
+      invocationConversationId: undefined,
     });
     const browserRequest = get().browserRequest;
     if (browserRequest && !origin) {
@@ -301,7 +231,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           activeConversationId: origin.conversationId,
         }
       : get();
-    const handoff = companion ? undefined : get().handoff;
+    let requestAgentId = requestState.selectedAgentId;
+    const handoff = companion && get().handoff?.surfaceId !== "files" ? undefined : get().handoff;
     let requestedThinking = thinkingMode(
       requestState.conversations.find((item) => item.id === requestState.activeConversationId)
         ?.reasoningEffort || thinkingEffort(requestState.thinkingMode ?? "normal"),
@@ -316,15 +247,22 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         !usePersonalAgentsStore.getState().agents.length
       )
         await usePersonalAgentsStore.getState().load(accountId);
-      if (get().accountId !== accountId || epoch !== submissionEpoch) return;
-      const agent = get().selectedAgentId || selectedPersonalAgent(spaceId || "")?.id;
+      if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
+      const agent = requestAgentId || selectedPersonalAgent(spaceId || "")?.id;
       if (!agent) throw new Error("Agents could not be loaded. Reopen Misty to retry.");
+      requestAgentId = agent;
       set({
         selectedAgentId: agent,
       });
-      const external = (await (await import("./screenContext")).screenStatus()).external;
+      // A worker can inspect only its assigned browser; main-screen APIs reject it.
+      // Separate work must also remain independent of main-window permissions.
+      const external =
+        !isAgentWorkerWindow() && (companion?.executionMode ?? get().executionMode) !== "team"
+          ? (await (await import("./screenContext")).screenStatus()).external
+          : false;
       if (
         !isAgentWorkerWindow() &&
+        (companion?.executionMode ?? get().executionMode) !== "team" &&
         !origin &&
         !browserRequest &&
         !handoff?.selection &&
@@ -341,12 +279,12 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       } else if (!companion && external && !handoff?.selection) requestContext = [];
       selection = handoff?.selection ?? selection;
       deviceContexts = handoff?.deviceContexts ?? deviceContexts;
-      if (get().accountId !== accountId || epoch !== submissionEpoch) return;
+      if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
       set({
         selectedSpaceId: spaceId,
       });
     } catch (error) {
-      if (get().accountId === accountId && epoch === submissionEpoch)
+      if (get().accountId === accountId && epoch === submissionEpoch())
         set({
           working: false,
           error: globalMistyError(error),
@@ -354,22 +292,25 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       return;
     }
     let capture: AiCaptureAttachment | undefined = companion?.capture ?? handoff?.capture;
+    markPreparation("context_ready");
     try {
       if (
         !companion &&
+        !isAgentWorkerWindow() &&
+        get().executionMode !== "team" &&
         !handoff?.selection &&
         !browserRequest &&
         (await (await import("./screenContext")).screenStatus()).external
       ) {
         const screen = await (await import("./screenContext")).captureMistyScreen();
         capture = screen.capture;
-        if (get().accountId !== accountId || epoch !== submissionEpoch) return;
+        if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
         set({
           screenLabel: screen.label,
         });
       }
     } catch (error) {
-      if (get().accountId === accountId && epoch === submissionEpoch)
+      if (get().accountId === accountId && epoch === submissionEpoch())
         set({
           working: false,
           error: globalMistyError(error),
@@ -381,12 +322,12 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         executionMode: betaExecutionMode(get().executionMode),
       });
     const executionMode = companion?.executionMode ?? get().executionMode;
-    if (!companion && executionMode === "team" && !isAgentWorkerWindow()) {
+    if (companion?.methodVersionId || companion?.executionMode === "team") set({ executionMode });
+    let workerReceipt: { invocationId: string; eventsUrl: string } | undefined;
+    let routedConversationId: string | undefined;
+    if (executionMode === "team" && !isAgentWorkerWindow()) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const agent = usePersonalAgentsStore
-          .getState()
-          .agents.find((a) => a.id === get().selectedAgentId);
+        const agent = usePersonalAgentsStore.getState().agents.find((a) => a.id === requestAgentId);
         if (!agent) throw new Error("Select an agent first.");
         const conversationId = await conversationForGlobalPrompt(
           () => ({
@@ -396,69 +337,90 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           }),
           normalized,
         );
-        if (get().accountId !== accountId || epoch !== submissionEpoch) return;
-        await invoke("agent_window_open", {
-          request: {
+        if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
+        const admission = JSON.stringify([
+          accountId,
+          conversationId,
+          normalized,
+          attachments.map((a) => a.id),
+        ]);
+        const key =
+          companion?.idempotencyKey ??
+          uncertainAdmissions.get(admission) ??
+          `agent-window-${globalMistyId()}`;
+        uncertainAdmissions.set(admission, key);
+        routedConversationId = conversationId;
+        workerReceipt = await openAgentWindow(
+          {
+            queueId: key,
             accountId,
             agentId: agent.id,
             spaceId,
-            name: agent.name,
-            task: {
-              accountId,
-              agentId: agent.id,
-              spaceId,
-              prompt: normalized,
-              attachments,
-              conversationId,
-              context: requestContext,
-              capture,
-              selection,
+            prompt: normalized,
+            attachments,
+            conversationId,
+            context: requestContext,
+            capture,
+            selection,
+            companion: {
+              ...companion,
+              executionMode: "team",
+              turn: undefined,
+              idempotencyKey: key,
             },
           },
-        });
-        if (get().accountId === accountId && epoch === submissionEpoch)
-          set({
-            working: false,
-            query: "",
-            error: null,
-            activeConversationId: conversationId,
-          });
+          agent.name,
+          () => {
+            if (get().accountId !== accountId || epoch !== submissionEpoch())
+              throw new Error("The task owner changed.");
+          },
+        );
+        uncertainAdmissions.delete(admission);
       } catch (error) {
-        if (get().accountId === accountId && epoch === submissionEpoch)
+        if (get().accountId === accountId && epoch === submissionEpoch())
           set({
             working: false,
             error: globalMistyError(error),
           });
+        return;
       }
-      return;
     }
     let executionTaskId: string | undefined;
-    if (executionMode !== "user") {
+    if (executionMode !== "user" && !workerReceipt) {
       try {
         const execution = await startLocalExecution(
           accountId,
-          get().selectedAgentId!,
+          requestAgentId!,
           spaceId,
           executionMode === "team" ? "team" : "agent",
-          visibleAutopilotAvailable() && !isAgentWorkerWindow()
-            ? { normalTabs: false, desktopControl: true }
-            : companion
+          {
+            ...(executionMode === "agent" && visibleAutopilotAvailable() && !isAgentWorkerWindow()
+              ? { normalTabs: false, desktopControl: true }
+              : companion && !isAgentWorkerWindow()
+                ? {
+                    normalTabs: true,
+                    openWhenMissing:
+                      companion.interactionMode === "auto" || companionRequestsBrowser(normalized),
+                  }
+                : { normalTabs: false }),
+            method: companion?.methodVersionId
               ? {
-                  normalTabs: true,
-                  openWhenMissing:
-                    companion.interactionMode === "auto" || companionRequestsBrowser(normalized),
+                  versionId: companion.methodVersionId,
+                  inputs: companion.methodInputs,
+                  skillVersionIds: companion.skillVersionIds,
                 }
               : undefined,
+          },
         );
         executionTaskId = execution.taskId;
-        if (companion?.turn !== undefined) {
+        if (companion?.turn !== undefined && !isAgentWorkerWindow()) {
           const { invoke } = await import("@tauri-apps/api/core");
           await invoke("cursor_companion_bind_task", {
             turn: companion.turn,
             taskId: execution.taskId,
           });
         }
-        if (get().accountId !== accountId || epoch !== submissionEpoch) {
+        if (get().accountId !== accountId || epoch !== submissionEpoch()) {
           await settleLocalExecution("paused", executionTaskId);
           return;
         }
@@ -478,28 +440,32 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       await settleLocalExecution("paused");
     }
     let conversationId: string;
+    markPreparation("execution_ready");
     try {
-      conversationId = await conversationForGlobalPrompt(
-        () => ({
-          ...requestState,
-          selectedAgentId: get().selectedAgentId,
-          context: requestContext,
-        }),
-        normalized,
-      );
+      conversationId =
+        routedConversationId ??
+        (await conversationForGlobalPrompt(
+          () => ({
+            ...requestState,
+            selectedAgentId: requestAgentId,
+            context: requestContext,
+          }),
+          normalized,
+        ));
     } catch (error) {
       if (executionTaskId) await settleLocalExecution("paused", executionTaskId);
-      if (get().accountId === accountId && epoch === submissionEpoch)
+      if (get().accountId === accountId && epoch === submissionEpoch())
         set({
           working: false,
           error: globalMistyError(error),
         });
       return;
     }
-    if (get().accountId !== accountId || epoch !== submissionEpoch) {
+    if (get().accountId !== accountId || epoch !== submissionEpoch()) {
       if (executionTaskId) await settleLocalExecution("paused", executionTaskId);
       return;
     }
+    markPreparation("conversation_ready");
     // A conversation's resolved defaults apply only when the composer has no
     // explicit choice. Existing conversation choices keep their precedence.
     if (!requestState.thinkingModeExplicit && requestedThinking !== "deep") {
@@ -519,7 +485,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       reasoningEffort: thinkingEffort(requestedThinking),
       title: conversation.messages.length ? conversation.title : normalized.slice(0, 56),
       updatedAt: userMessage.createdAt,
-      messages: [...conversation.messages, userMessage, assistantMessage],
+      messages: [
+        ...conversation.messages,
+        ...(companion?.idempotencyKey?.startsWith("voice-") ? [] : [userMessage]),
+        assistantMessage,
+      ],
     }));
     if (presentation === "workspace") announceGlobalPanel(false);
     set({
@@ -531,39 +501,56 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     });
     replaceActiveGlobalInvocationStream();
     try {
-      const created = await aiSurfaceApi.createInvocation({
-        agentId:
-          get().conversations.find((c) => c.id === conversationId)?.agentId ||
-          get().selectedAgentId,
-        taskId: executionTaskId,
-        executionMode: executionMode ?? "user",
-        windowLabel: (await import("@/shared/platform/tauri")).hasTauriInternals()
-          ? (await import("@tauri-apps/api/window")).getCurrentWindow().label
-          : undefined,
-        mode: companion ? "companion" : "drawer",
-        companionMode: companion?.interactionMode,
-        companionModel: companion?.model,
-        displayCaptures: companion?.displayCaptures,
-        surfaceId: handoff?.surfaceId ?? "global",
-        trigger: selection ? "selection" : "message",
-        requestedArtifactKind: handoff?.requestedArtifactKind,
-        prompt: normalized,
-        context: invocationContext,
-        attachmentIds: attachments.map((attachment) => attachment.id),
-        deviceContexts,
-        thinkingMode: requestedThinking,
-        selection,
-        capture,
-        ...(conversationId.startsWith("local-")
-          ? {}
-          : {
-              conversationId,
-            }),
-        idempotencyKey: `global-answer-${globalMistyId()}`,
-      });
+      const admission = JSON.stringify([
+        accountId,
+        conversationId,
+        normalized,
+        attachments.map((a) => a.id),
+      ]);
+      const idempotencyKey =
+        companion?.idempotencyKey ??
+        uncertainAdmissions.get(admission) ??
+        `global-answer-${globalMistyId()}`;
+      uncertainAdmissions.set(admission, idempotencyKey);
+      const created =
+        workerReceipt ??
+        (await aiSurfaceApi.createInvocation({
+          agentId:
+            get().conversations.find((c) => c.id === conversationId)?.agentId || requestAgentId,
+          taskId: executionTaskId,
+          executionMode: executionMode ?? "user",
+          windowLabel: (await import("@/shared/platform/tauri")).hasTauriInternals()
+            ? (await import("@tauri-apps/api/window")).getCurrentWindow().label
+            : undefined,
+          mode: companion ? "companion" : "drawer",
+          companionMode: companion?.interactionMode,
+          companionModel: companion?.model,
+          displayCaptures: companion?.displayCaptures,
+          methodVersionId: companion?.methodVersionId,
+          methodInputs: companion?.methodInputs,
+          skillVersionIds: companion?.skillVersionIds,
+          surfaceId: handoff?.surfaceId ?? "global",
+          trigger: selection ? "selection" : "message",
+          requestedArtifactKind: handoff?.requestedArtifactKind,
+          prompt: normalized,
+          context: invocationContext,
+          attachmentIds: attachments.map((attachment) => attachment.id),
+          deviceContexts,
+          thinkingMode: requestedThinking,
+          selection,
+          capture,
+          ...(conversationId.startsWith("local-")
+            ? {}
+            : {
+                conversationId,
+              }),
+          idempotencyKey,
+        }));
+      markPreparation("invocation_admitted");
+      uncertainAdmissions.delete(admission);
       if (
         get().accountId !== accountId ||
-        epoch !== submissionEpoch ||
+        epoch !== submissionEpoch() ||
         (executionTaskId &&
           (useLocalExecution.getState().execution?.taskId !== executionTaskId ||
             useLocalExecution.getState().execution?.state !== "running"))
@@ -571,13 +558,30 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         await aiSurfaceApi.cancelInvocation(created.invocationId).catch(() => {});
         return;
       }
+      if (executionTaskId) {
+        const execution = useLocalExecution.getState().execution;
+        if (execution?.taskId === executionTaskId)
+          useLocalExecution.setState({
+            execution: {
+              ...execution,
+              conversationId,
+              method: execution.method
+                ? { ...execution.method, invocationId: created.invocationId }
+                : undefined,
+            },
+          });
+      }
+      patchConversationMessage(set, get, conversationId, assistantMessage.id, {
+        invocationId: created.invocationId,
+      });
       set({
         invocationId: created.invocationId,
+        invocationConversationId: conversationId,
       });
       replaceActiveGlobalInvocationStream(
         subscribeToAiInvocation(created.eventsUrl, {
           onEvent: (event) => {
-            if (get().accountId !== accountId || epoch !== submissionEpoch) return;
+            if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
             if (get().invocationId !== created.invocationId) return;
             applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event);
             if (
@@ -604,11 +608,16 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
                 );
               void usePersonalAgentsStore.getState().load(accountId);
             }
-            if (event.type === "artifact.proposed" || event.type === "approval.required")
+            if (event.type === "artifact.proposed" || event.type === "approval.required") {
+              patchConversationMessage(set, get, conversationId, assistantMessage.id, {
+                artifact: event.artifact,
+              });
               set({
                 pendingArtifact: event.artifact,
                 artifactPaneId: sourcePaneId,
+                artifactConversationId: conversationId,
               });
+            }
             if (event.type === "effect.applied")
               set({
                 pendingArtifact: undefined,
@@ -629,7 +638,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           onError: (streamError) => {
             if (
               get().accountId !== accountId ||
-              epoch !== submissionEpoch ||
+              epoch !== submissionEpoch() ||
               get().invocationId !== created.invocationId
             )
               return;
@@ -640,11 +649,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
                   ?.messages.find((message) => message.id === assistantMessage.id)?.content ||
                 "Misty lost the response stream. Review the task before retrying.",
               state: "failed",
-              retryable: true,
-              activity: undefined,
+              retryable: false,
+              activity: "Connection lost; the task may still be running.",
             });
             set({
-              working: false,
+              working: true,
               error: streamError.message,
             });
             if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
@@ -652,7 +661,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         }),
       );
     } catch (error) {
-      if (get().accountId !== accountId || epoch !== submissionEpoch) return;
+      if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
       patchConversationMessage(set, get, conversationId, assistantMessage.id, {
         content: "Misty could not start this answer. Ordinary search is still available.",
         state: "failed",
@@ -666,87 +675,5 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
     }
   },
-  submitAgentTask: async (prompt, _paneId, presentation = "panel") =>
-    get().submitAnswer(prompt, [], undefined, presentation),
-  cancelAgentTask: async (proposalId) => {
-    const proposal = findProposal(get().conversations, proposalId);
-    if (!proposal?.runId) return;
-    try {
-      if (proposal.approvalId) {
-        await agentsApi.decideApproval(proposal.runId, proposal.approvalId, "deny");
-      } else {
-        await agentsApi.cancelRun(proposal.runId);
-      }
-      patchProposal(set, get, proposalId, {
-        state: "rejected",
-        error: undefined,
-      });
-    } catch (error) {
-      patchProposal(set, get, proposalId, {
-        error: globalMistyError(error),
-      });
-    }
-  },
-  approveAgentTask: async (proposalId) => {
-    const proposal = findProposal(get().conversations, proposalId);
-    if (!proposal?.runId || !proposal.approvalId) return;
-    try {
-      await agentsApi.decideApproval(proposal.runId, proposal.approvalId, "approve");
-      patchProposal(set, get, proposalId, {
-        state: "running",
-        approvalId: undefined,
-        error: undefined,
-      });
-    } catch (error) {
-      patchProposal(set, get, proposalId, {
-        error: globalMistyError(error),
-      });
-    }
-  },
-  confirmAction: async (proposalId) => {
-    const located = findProposal(get().conversations, proposalId);
-    if (!located) return;
-    patchProposal(set, get, proposalId, {
-      state: "running",
-      error: undefined,
-    });
-    set({
-      working: true,
-      error: null,
-    });
-    try {
-      await assertMistyAvailable(get().accountId, located.spaceId || get().selectedSpaceId || "");
-      if (located.runId && located.approvalId) {
-        await agentsApi.decideApproval(located.runId, located.approvalId, "approve");
-        patchProposal(set, get, proposalId, {
-          state: "running",
-        });
-      } else {
-        const completed = await globalMistyApi.decideProposal(proposalId, true);
-        patchProposal(set, get, proposalId, completed);
-      }
-    } catch (error) {
-      patchProposal(set, get, proposalId, {
-        state: "failed",
-        error: globalMistyError(error),
-      });
-    } finally {
-      set({
-        working: false,
-      });
-    }
-  },
-  rejectAction: (proposalId) => {
-    const located = findProposal(get().conversations, proposalId);
-    patchProposal(set, get, proposalId, {
-      state: "rejected",
-    });
-    if (located?.runId && located?.approvalId) {
-      void agentsApi
-        .decideApproval(located.runId, located.approvalId, "deny")
-        .catch(() => undefined);
-    } else {
-      void globalMistyApi.decideProposal(proposalId, false).catch(() => undefined);
-    }
-  },
+  ...createMistyProposalActions(set, get),
 }));

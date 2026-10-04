@@ -5,6 +5,8 @@ import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { CursorCompanionController } from "@/features/agents";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
+import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
+import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
 import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
@@ -63,6 +65,7 @@ export type {
 } from "@/app/layouts/model/types";
 
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
+  useExtensionsRuntime();
   const { user, refreshUser, transitioning } = useAuth();
   const {
     location,
@@ -342,6 +345,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   );
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
+      <ExtensionPermissionRequest />
       <main
         ref={shellRef}
         className={cn(

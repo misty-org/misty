@@ -30,6 +30,15 @@ func NewProviderFromEnv() ModelProvider {
 }
 
 func NewAgentProviderFromEnv() ModelProvider {
+	if config, err := envconfig.AgentModel(); err == nil && config.Provider == "openai" {
+		provider := NewOpenAIProvider(OpenAIProviderConfig{
+			APIKey:          firstEnv("MISTY_AGENT_MODEL_API_KEY", "OPENAI_API_KEY"),
+			BaseURL:         envOrDefault("MISTY_AGENT_MODEL_BASE_URL", defaultOpenAIBaseURL),
+			Model:           strings.TrimPrefix(config.Model, "openai/"),
+			ReasoningEffort: "low",
+		})
+		return NewAgentProviderRouter(provider, provider, provider)
+	}
 	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
 	if apiKey == "" {
 		return NewAgentProviderRouter(MockProvider{}, MockProvider{}, MockProvider{})

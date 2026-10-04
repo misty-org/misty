@@ -14,7 +14,12 @@ export function AgentSettingsModal(props: {
 }) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const title = props.mode === "create" ? "Create new agent" : "Companion";
+  const title =
+    props.mode === "create"
+      ? "Create new agent"
+      : props.activeTab === "companion"
+        ? "Companion"
+        : "Agent settings";
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange} modal={false}>
       <SheetContent

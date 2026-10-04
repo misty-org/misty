@@ -1,0 +1,19 @@
+{
+  "name": "misty-promo-walkthrough",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../node_modules/vite/bin/vite.js --config vite.config.mjs",
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "storyboard": "node scripts/render.mjs storyboard",
+    "rough": "node scripts/render.mjs rough",
+    "final": "node scripts/render.mjs final",
+    "audio": "node scripts/audio/build.mjs",
+    "mix": "node scripts/mix.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.62.1",
+    "sharp": "0.35.4"
+  }
+}

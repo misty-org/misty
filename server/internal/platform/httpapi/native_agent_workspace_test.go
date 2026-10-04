@@ -22,16 +22,17 @@ func TestNativeAgentWorkspaceManifestWithoutSpace(t *testing.T) {
 	}
 	ctx := context.Background()
 	actor := spaceConversationToolActor{userID: "owner", agentID: "agent", runID: "invocation_personal"}
-	_, _, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, actor, "Open the website", "", "")
+	_, _, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, actor, "Open the website")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"browser.inspect", "browser.navigate", "agents.list", "memory.list", "spaces.list", "spaces.tools", "spaces.execute"} {
+	// Agents inherit the owner's tools; Space data tools are routed by `space`.
+	for _, name := range []string{"browser.inspect", "browser.navigate", "agents.list", "memory.list", "spaces.list", "tasks.create", "notes.search", "messages.send", "weather.current"} {
 		if !agentManifestHasTool(manifest, name) {
 			t.Errorf("personal manifest missing %s", name)
 		}
 	}
-	for _, name := range []string{"tasks.create", "context.get", "browser.upload", "browser.workspace.interact"} {
+	for _, name := range []string{"context.get", "spaces.tools", "spaces.execute", "ask.delegate", "browser.upload", "browser.workspace.interact"} {
 		if agentManifestHasTool(manifest, name) {
 			t.Errorf("retired or ungranted tool admitted: %s", name)
 		}
@@ -39,7 +40,7 @@ func TestNativeAgentWorkspaceManifestWithoutSpace(t *testing.T) {
 	if _, err = database.Conn.Exec(`UPDATE misty_agent_execution_leases SET expires_at=NOW()-INTERVAL '1 minute'`); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, err = resolveAIInvocationSpaceToolbox(ctx, database, actor, "Open the website", "", "")
+	_, _, _, err = resolveAIInvocationSpaceToolbox(ctx, database, actor, "Open the website")
 	if err == nil {
 		t.Fatal("expired execution retained tool authority")
 	}

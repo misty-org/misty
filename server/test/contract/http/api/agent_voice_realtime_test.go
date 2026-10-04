@@ -102,6 +102,19 @@ func TestVoiceRealtimeTicketAccountDeviceAndReplay(t *testing.T) {
 		d := websocket.Dialer{HandshakeTimeout: 5 * time.Second, Subprotocols: []string{"misty-voice-v1", "misty-voice-auth." + token}}
 		return d.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/agent-voice/realtime", nil)
 	}
+	foreignConversation, err := database.CreateAIConversation(t.Context(), other.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreignDialer := websocket.Dialer{HandshakeTimeout: 5 * time.Second, Subprotocols: []string{"misty-voice-v1", "misty-voice-auth." + ticket()}}
+	foreignConn, foreignResponse, foreignErr := foreignDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/agent-voice/realtime?mode=conversation&conversation="+foreignConversation, nil)
+	if foreignConn != nil {
+		foreignConn.Close()
+	}
+	if foreignErr == nil || foreignResponse == nil || foreignResponse.StatusCode < 400 || providerCalls.Load() != 0 {
+		t.Fatal("foreign conversation reached provider")
+	}
+	foreignResponse.Body.Close()
 	conn, _, err := dial(issued)
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +234,17 @@ func serveVoiceGatewayFixture(t *testing.T, w http.ResponseWriter, r *http.Reque
 		_ = json.Unmarshal(event["type"], &kind)
 		switch kind {
 		case "session-update":
-			_ = conn.WriteJSON(agent.VoiceRealtimeEvent{Type: "session-updated", Raw: json.RawMessage(`{"session":{"audio":{"input":{"turn_detection":null}}}}`)})
+			var config struct {
+				ProviderOptions struct {
+					Limit int `json:"max_output_tokens"`
+				} `json:"providerOptions"`
+			}
+			if err := json.Unmarshal(event["config"], &config); err != nil {
+				t.Error(err)
+				return
+			}
+			raw, _ := json.Marshal(map[string]any{"session": map[string]any{"max_output_tokens": config.ProviderOptions.Limit, "audio": map[string]any{"input": map[string]any{"turn_detection": nil}}}})
+			_ = conn.WriteJSON(agent.VoiceRealtimeEvent{Type: "session-updated", Raw: raw})
 		case "conversation-item-create":
 			if !strings.Contains(string(event["item"]), "Blue lantern.") || strings.Contains(string(event["item"]), "POINT") {
 				t.Error("unexpected canonical reply")
