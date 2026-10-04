@@ -40,7 +40,9 @@ async function deviceContexts(userId: string, agentId: string): Promise<unknown[
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      apiBase: `${process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081"}/v1`.replace(/\/v1\/v1$/, "/v1"), accountId: userId,
+      // The API base the desktop signed in with (its session is kept per origin), which
+      // can differ from the address this runner uses for the same server.
+      apiBase: process.env.MISTY_WORKFLOW_EVAL_DEVICE_API_BASE || `${process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081"}/v1`, accountId: userId,
       grants: [{ targetDeviceId: deviceId, agentId, capabilities: workspaceCapabilities, scopes: [scope] }],
     }),
   });

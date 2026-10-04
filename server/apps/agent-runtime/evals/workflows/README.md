@@ -60,7 +60,7 @@ MISTY_WORKFLOW_EVAL=1 npm run eval:workflows
 | `MISTY_WORKFLOW_EVAL_TASKS` | Task ids, categories or sources (`polar`, `misty`) to run. |
 | `MISTY_WORKFLOW_EVAL_BUDGET` | Dollars of AI Gateway spend before the pass stops. Defaults to 7.50. |
 | `MISTY_WORKFLOW_EVAL_ACCOUNTS` | Connected test accounts, such as `gmail,google-calendar,github,slack,linkedin-signed-in`. Tasks needing others are skipped. |
-| `MISTY_WORKFLOW_EVAL_DEVICE` | Your desktop's agent-device id (`trusted_devices.id`, `device_…`). The desktop dev app must run signed in to your account with the eval bridge on (`MISTY_BROWSER_EVAL_BRIDGE_PORT` and `_TOKEN`, as in the browser suite); the runner asks it to sign the workspace grant a chat from it would carry, so device tools such as web.fetch run on it. Also set `MISTY_BROWSER_EVAL_BRIDGE` and `MISTY_BROWSER_EVAL_BRIDGE_TOKEN`. |
+| `MISTY_WORKFLOW_EVAL_DEVICE` | Your desktop's agent-device id (`trusted_devices.id`, `device_…`). The desktop dev app must run signed in to your account with the eval bridge on (`MISTY_BROWSER_EVAL_BRIDGE_PORT` and `_TOKEN`, as in the browser suite); the runner asks it to sign the workspace grant a chat from it would carry, so device tools such as web.fetch run on it. Also set `MISTY_BROWSER_EVAL_BRIDGE` and `MISTY_BROWSER_EVAL_BRIDGE_TOKEN`, and `MISTY_WORKFLOW_EVAL_DEVICE_API_BASE` when the app signed in through another address (such as `https://dev-api.mistysys.com/v1`). |
 | `MISTY_ACCEPTANCE_API` | The local API. Defaults to `http://127.0.0.1:8081`. |
 
 - **Budget.** The cap is read from the AI Gateway's own credit balance before every task, so
