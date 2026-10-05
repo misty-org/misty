@@ -86,6 +86,35 @@ pub(super) fn validate(input: &Value) -> Result<(), String> {
     }
 }
 
+/// Where an action puts the agent cursor, as a fraction of the viewport. Typing
+/// and keys act where the cursor already is, so they leave it in place.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(super) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
+    let (x, y) = match input["kind"].as_str()? {
+        "click" | "scroll" => ("x", "y"),
+        "drag" => ("toX", "toY"),
+        _ => return None,
+    };
+    Some((input[x].as_f64()?, input[y].as_f64()?))
+}
+
+/// Script that glides the agent's in-page cursor to a viewport point and keeps
+/// it there, so the next screenshot shows where the agent is pointing. It is a
+/// drawing only: the user's own pointer never moves.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(super) fn cursor_script(input: &Value, viewport: &Value) -> Option<String> {
+    let (x, y) = match input["kind"].as_str()? {
+        "drag" => (input["fromX"].as_f64()?, input["fromY"].as_f64()?),
+        _ => cursor_target(input)?,
+    };
+    let (width, height) = (viewport["width"].as_f64()?, viewport["height"].as_f64()?);
+    Some(format!(
+        "window[Symbol.for('misty.browser.agent.cursor')]?.move({:.1},{:.1},{{hold:true}});",
+        x * width,
+        y * height
+    ))
+}
+
 #[cfg(target_os = "macos")]
 unsafe extern "C" {
     fn misty_browser_native_action(
@@ -140,6 +169,12 @@ pub(super) async fn dispatch(
         )
         .map_err(|e| e.to_string())?;
         let url_view = webview.clone();
+        let target = cursor_target(input);
+        if let Some(script) = cursor_script(input, &observed["viewport"]) {
+            // Let the user watch the cursor arrive before the input lands.
+            let _ = webview.eval(script);
+            tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+        }
         let (send, receive) = tokio::sync::oneshot::channel();
         webview
             .with_webview(move |platform| {
@@ -181,6 +216,10 @@ pub(super) async fn dispatch(
                         if let Some(error) = result["error"].as_str() {
                             return Err(error.to_owned());
                         }
+                        let mut result = result;
+                        if let (Some((x, y)), Some(object)) = (target, result.as_object_mut()) {
+                            object.insert("cursor".into(), json!({"x": x, "y": y}));
+                        }
                         Ok(result)
                     }
                 })();
@@ -194,6 +233,29 @@ pub(super) async fn dispatch(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_agent_cursor_follows_pointer_actions_only() {
+        let viewport = json!({"width": 1000, "height": 500});
+        let click = json!({"kind": "click", "x": 0.25, "y": 0.5});
+        assert_eq!(cursor_target(&click), Some((0.25, 0.5)));
+        assert!(cursor_script(&click, &viewport)
+            .unwrap()
+            .contains("move(250.0,250.0,{hold:true})"));
+        let drag = json!({"kind": "drag", "fromX": 0.1, "fromY": 0.2, "toX": 0.9, "toY": 0.8});
+        assert_eq!(cursor_target(&drag), Some((0.9, 0.8)));
+        assert!(cursor_script(&drag, &viewport)
+            .unwrap()
+            .contains("move(100.0,100.0,"));
+        for input in [
+            json!({"kind": "type", "text": "hi"}),
+            json!({"kind": "key", "key": "Enter"}),
+        ] {
+            assert_eq!(cursor_target(&input), None);
+            assert_eq!(cursor_script(&input, &viewport), None);
+        }
+        assert_eq!(cursor_script(&click, &json!({})), None);
+    }
     #[test]
     fn input_bounds_and_key_names_are_enforced() {
         for input in [

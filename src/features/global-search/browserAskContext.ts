@@ -101,10 +101,9 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
         // submitted task and the existing run-bound native action checks.
         capabilities: [
           "browser.inspect",
+          "browser.visual",
           "browser.navigate",
-          "browser.click",
-          "browser.type",
-          "browser.interact",
+          "browser.act",
         ],
         metadata: {
           origin: new URL(source.href!).origin,

@@ -301,6 +301,10 @@ async function executeWorkflowNodeOnDevice(
   leaseExpiresAt: string | null | undefined,
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
+  if (job.operation === "browser.act") {
+    // One goal runs as a local loop: Midscene plans, Misty's native input acts.
+    return (await import("./screenAct/screenActJob")).runScreenAct(job, signal);
+  }
   if (job.operation.startsWith("browser.")) {
     const cancel = () => {
       void invoke("browser_agent_execution_cancel", {
