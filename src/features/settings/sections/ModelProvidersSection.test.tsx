@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { aiProvidersApi, type AIProviderSettings } from "@/api/assistant/providers";
 import type * as AIProvidersModule from "@/api/assistant/providers";
+import type * as SettingsControlsModule from "../SettingsControls";
 import { ModelProvidersSection } from "./ModelProvidersSection";
 
 vi.mock("@/api/assistant/providers", async (importOriginal) => {
@@ -17,6 +18,37 @@ vi.mock("@/api/assistant/providers", async (importOriginal) => {
     },
   };
 });
+// Section behavior is under test, not Radix Select's portal and pointer mechanics.
+vi.mock("../SettingsControls", async (importOriginal) => {
+  const actual = await importOriginal<typeof SettingsControlsModule>();
+  return {
+    ...actual,
+    DropdownControl: (props: {
+      value: string;
+      label?: string;
+      options: { value: string; label: string; disabled?: boolean }[];
+      disabled?: boolean;
+      onValueChange(value: string): void;
+    }) => (
+      <select
+        aria-label={props.label}
+        value={props.value}
+        disabled={props.disabled}
+        onChange={(event) => props.onValueChange(event.target.value)}
+      >
+        {props.options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    ),
+  };
+});
+const chooseForAllTasks = async (value: string) =>
+  fireEvent.change(await screen.findByLabelText("Connection for all tasks"), {
+    target: { value },
+  });
 const roles = [
   {
     id: "agent",
@@ -81,7 +113,7 @@ describe("account model provider settings", () => {
   });
   it("lets users review OpenAI defaults and disables optional extra calls before saving", async () => {
     render(<ModelProvidersSection />);
-    fireEvent.click(await screen.findByText("Use OpenAI defaults"));
+    await chooseForAllTasks("own-key");
     expect((screen.getByLabelText("Agent work model ID") as HTMLInputElement).value).toBe(
       "openai/gpt-6-luna",
     );
@@ -127,12 +159,47 @@ describe("account model provider settings", () => {
   it("keeps edits after a save failure and lets users retry", async () => {
     vi.mocked(aiProvidersApi.saveRoutes).mockRejectedValueOnce(new Error("Connection unavailable"));
     render(<ModelProvidersSection />);
-    fireEvent.click(await screen.findByText("Use OpenAI defaults"));
+    await chooseForAllTasks("own-key");
     fireEvent.click(screen.getByText("Save model choices"));
     expect((await screen.findByRole("alert")).textContent).toContain("Connection unavailable");
     expect((screen.getByLabelText("Agent work model ID") as HTMLInputElement).value).toBe(
       "openai/gpt-6-luna",
     );
     expect((screen.getByText("Save model choices") as HTMLButtonElement).disabled).toBe(false);
+  });
+  it("switches every supported task to one connection and back to Misty default", async () => {
+    vi.mocked(aiProvidersApi.settings).mockResolvedValue({
+      ...structuredClone(fixture),
+      connections: [
+        ...fixture.connections,
+        {
+          id: "claude",
+          name: "Personal Anthropic",
+          provider: "anthropic",
+          base_url: "https://api.anthropic.com/v1",
+        },
+      ],
+    });
+    render(<ModelProvidersSection />);
+    await chooseForAllTasks("claude");
+    expect(screen.getByRole("status").textContent).toContain(
+      "Personal Anthropic selected for 2 tasks; 3 it cannot run kept their choice",
+    );
+    fireEvent.change(screen.getByLabelText("Language model for all tasks"), {
+      target: { value: "anthropic/claude-test" },
+    });
+    expect((screen.getByLabelText("Agent work model ID") as HTMLInputElement).value).toBe(
+      "anthropic/claude-test",
+    );
+    expect((screen.getByLabelText("Visual interaction model ID") as HTMLInputElement).value).toBe(
+      "anthropic/claude-test",
+    );
+    expect((screen.getByLabelText("Connection for all tasks") as HTMLSelectElement).value).toBe(
+      "claude",
+    );
+    await chooseForAllTasks("server");
+    expect((screen.getByLabelText("Agent work model ID") as HTMLInputElement).value).toBe("");
+    // Every task is back on the saved Misty default, so nothing is left to save.
+    expect((screen.getByText("Save model choices") as HTMLButtonElement).disabled).toBe(true);
   });
 });

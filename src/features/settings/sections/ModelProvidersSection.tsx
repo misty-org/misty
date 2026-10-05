@@ -8,13 +8,14 @@ import {
   type AIProvider,
   type AIProviderSettings,
 } from "@/api/assistant/providers";
-import { Button, Input } from "@/shared/ui";
+import { Button, Input, SkeletonList } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "../components/DesktopSettingsUI";
 import { DropdownControl, SettingsNote } from "../SettingsControls";
+import { AllTasksSection } from "./AllTasksSection";
 
 function initialRoutes(settings: AIProviderSettings): AIModelRoute[] {
   return settings.roles.map(
@@ -86,12 +87,7 @@ export function ModelProvidersSection() {
       setWorking(false);
     }
   };
-  if (loading)
-    return (
-      <p role="status" className="text-sm text-cream-muted">
-        Loading provider settings…
-      </p>
-    );
+  if (loading) return <SkeletonList label="Provider settings" rows={4} leading="none" trailing />;
   if (!settings)
     return (
       <div className="grid justify-items-start gap-3">
@@ -143,32 +139,6 @@ export function ModelProvidersSection() {
             >
               <div className="grid min-w-0 gap-2">
                 <div className="flex flex-wrap justify-end gap-2 max-[760px]:justify-start">
-                  {connection.provider === "openai" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={disabled}
-                      onClick={() => {
-                        setRoutes((current) =>
-                          current.map((route) => {
-                            const role = settings.roles.find((item) => item.id === route.role)!;
-                            return role.providers.includes("openai")
-                              ? {
-                                  ...route,
-                                  connection_id: connection.id,
-                                  model: suggestedModel("openai", role.id),
-                                  reasoning: role.reasoning ? "low" : "",
-                                  enabled: !role.optional,
-                                }
-                              : route;
-                          }),
-                        );
-                        setStatus("OpenAI defaults selected. Save model choices to apply them.");
-                      }}
-                    >
-                      Use OpenAI defaults
-                    </Button>
-                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -285,7 +255,7 @@ export function ModelProvidersSection() {
               (current) =>
                 current && { ...current, connections: [...current.connections, connection] },
             );
-            setStatus("Connection saved. Choose it for the tasks below.");
+            setStatus("Connection saved. Choose it under All tasks or for individual tasks below.");
           });
         }}
       >
@@ -360,6 +330,13 @@ export function ModelProvidersSection() {
           </div>
         </Section>
       </form>
+      <AllTasksSection
+        settings={settings}
+        routes={routes}
+        disabled={disabled}
+        onRoutesChange={setRoutes}
+        onStatus={setStatus}
+      />
       {[
         { title: "Agent models", roles: settings.roles.slice(0, 4) },
         { title: "Library and media models", roles: settings.roles.slice(4) },
