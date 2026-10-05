@@ -81,7 +81,7 @@ func toolResultForEvals(result json.RawMessage) string {
 	if strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT")), "production") || strings.TrimSpace(envconfig.Getenv("MISTY_AI_TOOL_RESULT_EVENTS")) != "1" || len(result) == 0 {
 		return ""
 	}
-	return truncateAgentRuntimeText(string(result), 16_000)
+	return truncateAgentRuntimeText(string(result), 64_000)
 }
 
 // recordAIInvocationToolActivity adds what a finished call targeted and got

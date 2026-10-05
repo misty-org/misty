@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { compact } from "./state.js";
 
 export const api = (process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081").replace(/\/$/, "");
 const signInFile = process.env.MISTY_WORKFLOW_EVAL_SIGNIN ?? resolve(import.meta.dirname, "../../../../../.misty/acceptance/workflow-eval-signin.json");
@@ -24,6 +25,15 @@ export interface EvalRun {
   pagesRead: string[];
   /** Each tool's raw result, when the local server sends them (MISTY_AI_TOOL_RESULT_EVENTS=1). */
   toolResults: string[];
+}
+
+/** A tool result without what a judge can't use (raw MIME, links, avatars), as compact JSON. */
+function readable(result: string): string {
+  try {
+    return JSON.stringify(compact(JSON.parse(result)) ?? {});
+  } catch {
+    return result;
+  }
 }
 
 export class EvalClient {
@@ -68,13 +78,15 @@ export class EvalClient {
   }
 
   /** Starts one run and reads its events until it ends. */
-  async run(body: Record<string, unknown>, timeoutMs = 10 * 60_000): Promise<EvalRun> {
+  /** `approve` names the app actions (Composio slugs) whose approval cards the run may pass, because the task asked for them. */
+  async run(body: Record<string, unknown>, timeoutMs = 10 * 60_000, approve: string[] = []): Promise<EvalRun> {
     const key = `workflow-eval-${randomUUID()}`;
     const created = await this.json<{ eventsUrl: string }>("/ai/invocations", {
       method: "POST",
       headers: { "Idempotency-Key": key },
       body: JSON.stringify({ trigger: "message", context: [], execution_mode: "user", idempotency_key: key, timezone: "America/Los_Angeles", ...body }),
     });
+    const approved = new Set<string>();
     const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [], toolResults: [] };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -101,13 +113,24 @@ export class EvalClient {
           if (event.type === "tool.detail") {
             const rows = (event.activity as { rows?: Array<{ title?: string; meta?: string }> } | undefined)?.rows ?? [];
             if (rows.length) run.pagesRead.push(`${String(event.toolName)}: ${rows.map((row) => [row.title, row.meta].filter(Boolean).join(" · ")).join("; ")}`.slice(0, 2_000));
-            if (typeof event.result === "string") run.toolResults.push(`${String(event.toolName)} → ${event.result.slice(0, 4_000)}`);
+            if (typeof event.result === "string") run.toolResults.push(`${String(event.toolName)} → ${readable(event.result).slice(0, 8_000)}`);
           }
           if (event.type === "screen.request") {
             const request = event.screenRequest as { kind?: string } | undefined;
             run.screenRequests.push(request?.kind ?? "screen");
           }
-          // Nobody answers cards in an eval: record the card and stop the run
+          // An approval card for an action the task asked for is approved, as the person would.
+          // Misty re-sends a card when its state changes, so only a pending one is answered, once.
+          const card = event.appRequest as { id?: string; kind?: string; subject?: string; state?: string } | undefined;
+          if (event.type === "app.request" && card?.kind === "approve" && card.id && approve.includes(card.subject ?? "")) {
+            if (card.state === "pending" && !approved.has(card.id)) {
+              approved.add(card.id);
+              await this.json(`/me/app-requests/${encodeURIComponent(card.id)}`, { method: "POST", body: JSON.stringify({ decision: "continue" }) });
+              run.events.push(`approved:${card.subject}`);
+            }
+            continue;
+          }
+          // Nobody answers other cards in an eval: record the card and stop the run
           // rather than waiting out the timeout.
           if (event.type === "approval.required" || event.type === "app.request" || event.type === "agent.request") {
             run.terminal = `needs_person:${event.type}`;

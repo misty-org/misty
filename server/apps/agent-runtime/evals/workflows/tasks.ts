@@ -21,6 +21,10 @@ export interface WorkflowTask {
   tools?: { required?: string[]; forbidden?: string[]; maxCalls?: number; maxRuns?: number };
   /** What to read back after the run, for the judge (state.ts). */
   state?: StateCheck[];
+  /** The answer key the judge checks the rubric against. */
+  truth?: string;
+  /** App actions (Composio slugs) the task asks for, whose approval cards the runner approves. */
+  approve?: string[];
 }
 
 const here = resolve(import.meta.dirname);

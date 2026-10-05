@@ -10,7 +10,9 @@ import { find } from "./composio.js";
  * `since` keeps only items created or changed after the run started. `undo` runs once
  * per item the run created ({{item.field}} fills from it), so the next run starts clean;
  * a `misty` undo is "METHOD /path", and `skip` leaves items whose field matches a pattern
- * (another app's events, a join message).
+ * (another app's events, a join message). Items without a creation time are undone by
+ * `match` instead: every item whose fields match its patterns. `{{item.id|strip:event:}}`
+ * drops a prefix from a value.
  */
 export interface StateCheck {
   label: string;
@@ -18,7 +20,7 @@ export interface StateCheck {
   args?: Record<string, unknown>;
   misty?: string;
   since?: boolean;
-  undo?: { composio?: string; args?: Record<string, unknown>; misty?: string; skip?: Record<string, string> };
+  undo?: { composio?: string; args?: Record<string, unknown>; misty?: string; skip?: Record<string, string>; match?: Record<string, string> };
 }
 
 type Item = Record<string, unknown>;
@@ -81,6 +83,15 @@ function created(value: unknown, since: Date): Item[] {
   return found;
 }
 
+/** Every item, anywhere in the result, whose fields all match the patterns. */
+function matching(value: unknown, patterns: Array<readonly [string, RegExp]>): Item[] {
+  if (Array.isArray(value)) return value.flatMap((item) => matching(item, patterns));
+  if (!value || typeof value !== "object") return [];
+  const item = value as Item;
+  const self = patterns.every(([field, pattern]) => pattern.test(String(item[field] ?? ""))) ? [item] : [];
+  return [...self, ...Object.values(item).flatMap((child) => matching(child, patterns))];
+}
+
 /** Keeps only items created or changed after `since`. */
 function recent(value: unknown, since: Date): unknown {
   return lists(value, (items) => items.filter((item) => Math.max(time(item, createdFields) ?? 0, time(item, changedFields) ?? 0) >= since.getTime() - skewMs));
@@ -123,9 +134,11 @@ export class StateReader {
 
   private async fill(text: string, since: Date, item: Item = {}): Promise<string> {
     let out = text;
-    for (const match of text.matchAll(/\{\{([a-z_:.-]+)\}\}/gi)) {
+    for (const match of text.matchAll(/\{\{([a-z_:.|-]+)\}\}/gi)) {
       const name = match[1]!;
-      const value = name.startsWith("item.") ? String(item[name.slice(5)] ?? "") : await this.value(name, since);
+      const [field = "", strip] = name.slice(5).split("|strip:");
+      let value = name.startsWith("item.") ? String(item[field] ?? "") : await this.value(name, since);
+      if (strip && value.startsWith(strip)) value = value.slice(strip.length);
       out = out.replace(match[0], value);
     }
     return out;
@@ -170,7 +183,9 @@ export class StateReader {
       if (!check.undo) continue;
       try {
         const skip = Object.entries(check.undo.skip ?? {}).map(([field, pattern]) => [field, new RegExp(pattern)] as const);
-        for (const item of created(await this.fetch(check, since), since)) {
+        const match = Object.entries(check.undo.match ?? {}).map(([field, pattern]) => [field, new RegExp(pattern)] as const);
+        const result = await this.fetch(check, since);
+        for (const item of match.length ? matching(result, match) : created(result, since)) {
           if (skip.some(([field, pattern]) => pattern.test(String(item[field] ?? "")))) continue;
           try {
             if (check.undo.composio) await this.composio(check.undo.composio, await this.args(check.undo.args, since, item));

@@ -78,10 +78,10 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
   // A fresh device grant per run, and one more try with a new one if the server refuses it.
   let result;
   try {
-    result = await client.run(request(task, model, agentId, siteBase, await sign()));
+    result = await client.run(request(task, model, agentId, siteBase, await sign()), undefined, task.approve);
   } catch (error) {
     if (!String(error).includes("device_grant_required")) throw error;
-    result = await client.run(request(task, model, agentId, siteBase, await sign()));
+    result = await client.run(request(task, model, agentId, siteBase, await sign()), undefined, task.approve);
   }
   const run: WorkflowRun = {
     taskId: task.id, category: task.category, source: task.source, surface: task.surface, model,
@@ -100,10 +100,10 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
   if (!handedOff && task.rubric?.length) {
     try {
       const verdict = await judge({
-        model: judgeModel, prompt: task.prompt, rubric: task.rubric,
+        model: judgeModel, prompt: task.prompt, rubric: task.rubric, truth: task.truth,
         subject: "a personal assistant agent. Its web_search and web_fetch tools read the web in the background: they never open a browser or touch the person's screen. Only screen_open, screen_look, browser_* and desktop tools do",
         // Raw tool results, when the server sends them, are fuller than the rows' titles.
-        answer: result.answer, toolCalls: result.tools, pagesRead: result.toolResults.length ? result.toolResults : result.pagesRead,
+        answer: result.answer, toolCalls: result.tools, pagesRead: result.toolResults.length ? evenShares(result.toolResults) : result.pagesRead,
         pageMarkdown: endState ? `End state read back from the person's apps after the run (this is the evidence for what was created, changed or sent):\n${endState}` : "",
         // The judge sees the screen the agent saw, so claims about it can be checked.
         ...(task.start?.screen ? { screenshot: { data: displayCapture(task.start.screen).data_url.split(",")[1] ?? "", mediaType: "image/png" } } : {}),
@@ -123,6 +123,12 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
   }
   run.costUsd = Number((await budget.since(before)).toFixed(4));
   return run;
+}
+
+/** Each result's share of the judge's 60,000-character budget, so early reads aren't the ones dropped. */
+function evenShares(results: string[]): string[] {
+  const share = Math.max(1_500, Math.floor(58_000 / Math.max(results.length, 1)));
+  return results.map((item) => (item.length > share ? `${item.slice(0, share)}…` : item));
 }
 
 it.skipIf(!enabled)("runs workflow tasks within budget", async () => {

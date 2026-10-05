@@ -49,7 +49,7 @@ var uiLabels = []struct{ family, label string }{
 	{"memory.pref.", "Memory the person asks you to keep is memory_pref_*."},
 	{"memory.workflow.", "The Workflows page shows saved workflows (memory_workflow_*)."},
 	{"log.work.", "The Notebook card in the conversation shows log_work_*."},
-	{"event.", "The Calendar holds events (event_*)."},
+	{"event.", "A Space's own calendar holds Misty events (event_*). \"My calendar\" means the person's connected calendar app (Google Calendar or Outlook, through integration_*) whenever one is connected; use event_* only when they name a Space."},
 	{"integration.", "Integrations are the person's connected apps (integration_*)."},
 	{"folder.", "Shared folders are folders on the person's computer (folder_*)."},
 }

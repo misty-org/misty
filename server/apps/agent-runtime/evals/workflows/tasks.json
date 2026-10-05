@@ -1,5 +1,5 @@
 {
-  "note": "Workflow eval tasks: whole requests run through the full harness (every agent.tool and tool family), starting from the entry point named in `surface` (an agent.entry). Cursor tasks carry every display's screenshot from the start, as the cursor captures on every request; `start.screen` names the cursor display's fixture. Fixture tasks use the pages in ../browser/sites and the fixture search index; live tasks use real engines, sites and the accounts in `requires`. `expect` strings must all appear in the final answer; a rubric is graded by the judge. `tools.required` must each be called at least once and `tools.forbidden` never (a trailing * matches a family). `maxCalls` counts tool calls, `maxRuns` counts runs started for the request (screen hand-offs start new runs today). Tool names are the singular agent names from docs/plans/agent-harness.md as the model sees them (`agent_tool_use`, `memory_pref_*`, `memory_history_*`, `integration_*`); until phase 2 renames the tools, the runner translates them to today's names in its own table, since the plan keeps no aliases. Prompts keep the person's own words (\"my Space\", \"my note\"), which the agent must resolve through the glossary. `web_fetch` does not exist yet (docs/plans/agent-harness.md, phase 1); until it does, tasks that require it score as failures, which is the baseline. `state` lists what the runner reads back after an account task (a Composio tool or a Misty API path, with {{placeholders}}); the judge grades against that end state. A check with `since` shows only items created or changed during the run, and `undo` removes what the run created once it is graded, so every run starts from the seeded state.",
+  "note": "Workflow eval tasks: whole requests run through the full harness (every agent.tool and tool family), starting from the entry point named in `surface` (an agent.entry). Cursor tasks carry every display's screenshot from the start, as the cursor captures on every request; `start.screen` names the cursor display's fixture. Fixture tasks use the pages in ../browser/sites and the fixture search index; live tasks use real engines, sites and the accounts in `requires`. `expect` strings must all appear in the final answer; a rubric is graded by the judge. `tools.required` must each be called at least once and `tools.forbidden` never (a trailing * matches a family). `maxCalls` counts tool calls, `maxRuns` counts runs started for the request (screen hand-offs start new runs today). Tool names are the singular agent names from docs/plans/agent-harness.md as the model sees them (`agent_tool_use`, `memory_pref_*`, `memory_history_*`, `integration_*`); until phase 2 renames the tools, the runner translates them to today's names in its own table, since the plan keeps no aliases. Prompts keep the person's own words (\"my Space\", \"my note\"), which the agent must resolve through the glossary. `web_fetch` does not exist yet (docs/plans/agent-harness.md, phase 1); until it does, tasks that require it score as failures, which is the baseline. `state` lists what the runner reads back after an account task (a Composio tool or a Misty API path, with {{placeholders}}); the judge grades against that end state. `approve` lists app actions the task explicitly asks for; the runner approves their cards like the person would, and any other card still ends the run. `truth` is the answer key the judge gets: facts about the seeded data that the rubric is checked against. A check with `since` shows only items created or changed during the run, and `undo` removes what the run created once it is graded, so every run starts from the seeded state.",
   "tasks": [
     {
       "id": "quick-fact",
@@ -376,7 +376,8 @@
             }
           }
         }
-      ]
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. Katherine Johnson's email (Oct 15) is titled \"Bug: Export to CSV crashes on empty projects\". Steps: 1) create a project with no tasks, 2) open it and choose Export > CSV, 3) the app shows a blank screen. Console: TypeError: Cannot read properties of undefined (reading 'map'). Expected: a CSV with just the header row. Chrome 141 on macOS 15."
     },
     {
       "id": "outreach-drafts",
@@ -395,7 +396,7 @@
         "maxRuns": 1
       },
       "rubric": [
-        "Finds a real current finance leader with a source",
+        "Names a current finance leader at Pigment and cites where the name came from",
         "Creates a Gmail draft and does not send it"
       ],
       "state": [
@@ -426,7 +427,8 @@
           },
           "since": true
         }
-      ]
+      ],
+      "truth": "Pigment is a real company, so there is no seeded answer. A name is acceptable when at least one cited source names that person in a current finance leadership role at Pigment; the agent does not have to load the source page itself if a search result shows it, but it must say where the name came from."
     },
     {
       "id": "linkedin-account-research",
@@ -522,7 +524,7 @@
         "maxRuns": 1
       },
       "rubric": [
-        "Matches calendar interviews to sent mail correctly",
+        "Matches each interview to whether a follow-up was already sent",
         "Drafts only, one per candidate without a follow-up"
       ],
       "state": [
@@ -574,7 +576,8 @@
           },
           "since": true
         }
-      ]
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. This week's seeded interviews: Priya Nair (Tue Oct 13, 10:00), Diego Alvarez (Wed Oct 14, 14:00), Mei Chen (Thu Oct 15, 11:00), Pacific time. Priya already had a follow-up: \"Thanks for interviewing with us\", sent Oct 13 from the person's address me@misty-eval.example. It is a message in this Gmail mailbox (label Misty eval) but, because it was imported, Gmail does not list it in the Sent folder; finding it with any Gmail search (by Priya's address, subject or label) counts as a correct match. Diego and Mei have no follow-up anywhere in the mailbox. So the right result is two Gmail drafts, to Diego and Mei, saved as drafts (not only written in the answer) and not sent."
     },
     {
       "id": "competitor-watch",
@@ -664,6 +667,10 @@
             }
           }
         }
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The channel is #marketing-drafts in the connected Slack workspace. The task asks for the message to be posted there, about the new Spaces feature; posting is the requested action, not an unasked send.",
+      "approve": [
+        "SLACK_SEND_MESSAGE"
       ]
     },
     {
@@ -743,7 +750,8 @@
           },
           "since": true
         }
-      ]
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. Seeded orders: Northwind #4821 shipped Oct 3, no delivery notice; Kestrel #5190 shipped Oct 1, no delivery notice; Brightline #7730 shipped Oct 6 and was delivered Oct 9; Acme #9112 shipped Oct 13 (under a week ago). The correct orders are exactly #4821 and #5190, so drafts go only to orders@northwind.example and hello@kestrel.example. Searching beyond the seeded mail is fine; the person's real orders are not part of the task."
     },
     {
       "id": "board-triage",
@@ -806,7 +814,8 @@
             "max_results": 25
           }
         }
-      ]
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. Today's seeded mail that asks for a reply: Sam Lee, \"Q4 budget review\" (review the sheet and send comments by Friday) and Ada, \"Offsite dates?\" (is the offsite still Nov 6-7). Seeded mail that needs no reply: the \"This week in AI agents\" newsletter and the Streamly receipt. Other items may be mentioned separately as not needing a reply; they must not be listed as needing one."
     },
     {
       "id": "schedule-meeting",
@@ -853,8 +862,20 @@
               "id": "^reclaim"
             }
           }
+        },
+        {
+          "label": "Misty Space calendar, today and tomorrow (the task's event belongs in Google Calendar)",
+          "misty": "/spaces/{{space}}/agenda?from={{today_start}}&to={{tomorrow_end}}",
+          "undo": {
+            "misty": "DELETE /spaces/{{space}}/calendar/events/{{item.id|strip:event:}}?version={{item.version}}",
+            "match": {
+              "kind": "^event$",
+              "title": "Pigment"
+            }
+          }
         }
-      ]
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The person's calendar is their connected Google Calendar; a Misty Space calendar does not count. Tomorrow (Sat Oct 17, Pacific) has seeded busy blocks 12:00-14:00 (Team lunch and planning) and 14:30-15:30 (Design review). Free 30-minute afternoon slots include 14:00-14:30 and anything from 15:30 that doesn't overlap another event in the end state."
     },
     {
       "id": "space-task-from-notes",
@@ -883,7 +904,8 @@
             "misty": "DELETE /spaces/{{space}}/tasks/{{item.id}}?version={{item.version}}"
           }
         }
-      ]
+      ],
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The note \"Weekly sync\" is in the person's first Space and has three action items: \"Ada: send the offsite agenda by Monday\", \"Sam: finish the Q4 budget review\", \"Me: book the venue for Nov 6\". The Space had no tasks before the run."
     },
     {
       "id": "desktop-numbers",
