@@ -1,6 +1,6 @@
 ---
 name: "Misty Agents"
-description: "The existing Agents directory leading into a per-agent workspace, catalogs and the retained conversation."
+description: "Agents opens straight into the selected agent's New task conversation, with Activity, catalogs, Integrations and a floating task panel."
 colors:
   workspace: "var(--color-charcoal-workspace)"
   background: "var(--color-charcoal-bg)"
@@ -171,7 +171,7 @@ The current workspace paragraphs below supersede earlier selected-agent geometry
 
 The Agents root is a Journal-style collection with Agents, Conversations, and Activity sections, search, specific creation actions, and shared list/grid controls. Selecting an agent or conversation opens the existing conversation and its optional overview. Misty's shared monochrome controls, restrained text-control corners, utility capsules, and existing cloud identity assets remain authoritative.
 
-This scoped refresh supersedes the former roster-first entry while retaining conversation, profile, setup, account-access, and companion rules below. Source authority is `AgentsPage.tsx`, `components/AgentCollection.tsx`, `agentsWorkspace.css`, the existing overview/conversation components, and shared `CollectionWorkspace`, `Button`, and `NavIsland`. See [Journal entry pages](../../../docs/design/journal-entry-pages/DESIGN.md) for the shared entry system and current evidence; `PRODUCT.md` and `companion/DESIGN.md` retain their relevant product and companion constraints.
+This scoped refresh supersedes the former roster-first entry while retaining conversation, profile, setup, account-access, and companion rules below. Source authority is `AgentsPage.tsx`, `workspace/AgentWorkspaceFrame.tsx`, `agentsWorkspace.css`, the existing conversation components, and shared `CollectionWorkspace`, `Button`, and `NavIsland`. See [Journal entry pages](../../../docs/design/journal-entry-pages/DESIGN.md) for the shared entry system and current evidence; `PRODUCT.md` and `companion/DESIGN.md` retain their relevant product and companion constraints.
 
 **Key Characteristics:**
 
@@ -205,7 +205,7 @@ Muted section labels and compact overview metadata use 12px. History dates and f
 
 ## Layout
 
-**Current selected-agent workspace:** the primary sidebar is 240px and catalog secondary navigation 208px. Workflow/template content is bounded at 960px, connectors at 1088px, instructions at 768px, and the empty-conversation launch composer at 672px. The launch prompt and composer sit together in the upper central canvas; an active full conversation retains its bottom composer and optional right details. The sidebar includes New task, Workflows, Templates, Integrations, Recents, Agent settings and Float conversation. Root directory layout stays unchanged.
+**Current selected-agent workspace:** the primary sidebar is 240px and catalog secondary navigation 208px. Workflow/template content is bounded at 960px, connectors at 1088px, instructions at 768px, and the empty-conversation launch composer at 672px. The launch prompt and composer sit together in the upper central canvas; an active full conversation retains its bottom composer and optional right details. The sidebar includes New task, Activity, Workflows, Templates, Integrations and Recents. Agent settings open from the switcher and Float conversation from the conversation's ⋯ menu.
 
 At a workspace container width of 1100px or less, navigation becomes 190px/170px and catalogs use two columns. At 760px or less, primary navigation becomes a 58px icon rail, secondary navigation moves above content, cards use one column, skills stack and the overview is hidden. These defensive narrow layouts supersede earlier no-breakpoint rules; they do not add an overview Sheet. Floating uses the same mounted conversation in an in-workspace panel, 660px wide and bounded by the available canvas, with 24px inset (12px narrow). It is not an OS window.
 
@@ -324,7 +324,7 @@ Button groups are now unboxed. Shared `NavIsland` and selected-agent navigation 
 
 ### Agent switcher follow-up
 
-The conversation header’s agent name now opens a desktop Popover using shared Command search, matching the Chat switcher pattern. Show account agents and eight recent conversations; searching includes the full loaded conversation list. Mark the current agent and conversation with monochrome check icons. New agent and Browse all agents remain at the end. The separate panel icon still toggles the overview.
+The conversation header’s agent name now opens a desktop Popover using shared Command search, matching the Chat switcher pattern. Show account agents; conversations join the list only while searching, since the sidebar lists recents. Mark the current agent and conversation with monochrome check icons. New agent and the selected agent's settings remain at the end. The separate panel icon toggles the task panel.
 
 Opening or dismissing the switcher leaves the composer mounted. Selecting the current agent or conversation is a no-op. Selecting another goes through the existing draft/profile guard and is disabled during recording, uploads, saves or a running response. Accepted navigation updates the agent/conversation route and loads the selected history. Keep keyboard search, arrow/Enter selection, Escape dismissal and focus restoration. Use the existing shared controls and desktop interaction model.
 
@@ -356,7 +356,7 @@ Conversation collection rows, workspace recents, history rows and the open conve
 
 ## One owner per control — October 3
 
-Each workspace control appears once. The sidebar header holds Back to agents and the agent switcher (the workspace's only agent identity); it replaces the static avatar and name. Inside the workspace, the conversation header shows only the open conversation's title, its overflow menu and the panel toggle; Back, the switcher and New chat are not repeated there, since the sidebar carries them and New task. Outside the workspace (the cross-agent New chat chooser), the full header is unchanged.
+Each workspace control appears once. The sidebar header holds the agent switcher (the workspace's only agent identity); it replaces the static avatar and name. Inside the workspace, the conversation header shows only the open conversation's title, its overflow menu and the panel toggle; Back, the switcher and New chat are not repeated there, since the sidebar carries them and New task. Outside the workspace (the cross-agent New chat chooser), the full header is unchanged.
 
 The details panel starts with Status and no longer repeats the avatar and name, Talk (the composer's microphone does this) or Companion (the Computer row opens it). Its Conversations/Activity/Profile island is not shown inside the workspace: Recents and the switcher cover history, Recent activity has View all activity, and Agent settings opens the profile editor in the existing in-place sheet, titled Agent settings. In the panel, Context omits its explanatory line (available as the row's title), and activity titles clamp to two lines.
 
@@ -373,3 +373,16 @@ Each prompt's replies form one turn. Only the last visible reply renders as the 
 ## Composer control bar — October 3
 
 This supersedes the work-location row under the composer. A control bar now sits on top of the composer as a tab behind its top edge: 14px inset, 1px border without a bottom edge, top corners at `--radius-xl`, and the card surface at 55%. Its 28px controls use 12px muted text that brightens on hover or while open. Folder work starts on the left; while a task works in a separate window, Show agent window joins it. There is no work-location choice: screens open on demand (see docs/design/agent-architecture/BRIEF.md, Phase 3). Usage sits at the end: a 36px monochrome meter, the weekly percentage and, while drafting, "· ≈N% this message" (hidden below the 760px container width). The usage popover opens upward with Weekly AI usage (used of limit, reserved, reset date) and This message (billing's estimate, ceiling and explanation). Folder receipts, errors and window notices span the full width below the controls. The Agents composer omits its footer estimate (`hideUsageEstimate`); other composers keep it. Sources: `workspace/AgentControlBar.tsx`, `workspace/AgentUsageControl.tsx` and `useCommandUsageEstimate` in `global-search/CommandUsageEstimate.tsx`.
+
+## Conversation-first entry (2026-10-05)
+
+Supersedes the Agents collection. `/agents` opens the selected agent's New task conversation: the agent in the URL, else the last-used agent, else Misty, else the first agent. There is no directory page and no Back control.
+
+- **Sidebar:** the agent switcher, then New task, Activity, Workflows, Templates, Integrations and Recents. No footer.
+- **Switcher:** agents with a checkmark on the current one, conversations only while searching, then New agent and the selected agent's settings.
+- **Empty composer:** the launch prompt, the composer, a row of context chips (this computer, shared folders, connected apps with brand logos, apps needing attention) that open Integrations, then two columns on the composer's edges: recent work and templates. "Organize a folder" is the first template; the folder control appears above the composer only while a folder is in progress.
+- **Usage:** an 18px monochrome ring beside the mic that opens the usage popover.
+- **Header:** the conversation title, its ⋯ menu (Float conversation, Rename, Delete) and the task panel toggle only. Status never appears in the header.
+- **Task panel:** a floating card describing this conversation only: status, start and update times, device, and tool steps.
+- **Activity:** account-wide Recent and Scheduled tabs; legacy `?view=activity|automations|scheduled` links open it.
+- **Integrations › Apps:** Connected apps, Add an app, Shared folders and This computer on one scrolling page. Brand logos use the shared `BrandIcon` artwork; everything around them stays monochrome.

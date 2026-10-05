@@ -17,9 +17,12 @@ import "./folderWork.css";
 export function MistyFolderWork({
   accountId,
   disabled = false,
+  hideIdle = false,
 }: {
   accountId: string;
   disabled?: boolean;
+  /** Show nothing until a folder is chosen; the surface offers its own entry point. */
+  hideIdle?: boolean;
 }) {
   const state = useFolderOrganization();
   const [busy, setBusy] = useState(false);
@@ -30,6 +33,8 @@ export function MistyFolderWork({
   if (!hasTauriInternals() || !accountId || /Win/.test(navigator.platform)) return null;
   const snapshot = state.accountId === accountId ? state.snapshot : undefined;
   const manifest = state.accountId === accountId ? state.manifest : undefined;
+  const idle = !snapshot && (!manifest || manifest.state === "undone") && !state.applying;
+  if (hideIdle && idle && !error) return null;
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError("");

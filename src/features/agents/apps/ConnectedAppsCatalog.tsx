@@ -1,15 +1,18 @@
-import { Check, Plug, RefreshCw, Search } from "lucide-react";
+import { Check, CircleAlert, Plug, Plus, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, Input } from "@/shared/ui";
+import { BrandIcon, brandIconAsset, Button, IconButton, Input, SkeletonList } from "@/shared/ui";
 import { appsApi, type CatalogApp, type ConnectedApp } from "./api";
 
-const statusLabel: Record<ConnectedApp["status"], string> = {
-  active: "Connected",
-  pending: "Waiting for sign-in",
-  needs_attention: "Needs attention · Reconnect",
-};
+/** Official brand artwork when the shared registry has it; a monochrome plug otherwise. */
+export function AppLogo({ app, size = 24 }: { app: string; size?: number }) {
+  return brandIconAsset(app) ? (
+    <BrandIcon brand={app} size={size} />
+  ) : (
+    <Plug size={Math.round(size * 0.75)} className="text-cream-muted" aria-hidden="true" />
+  );
+}
 
 /** Account-wide connected apps. Every agent can use them; nothing is set per agent. */
 export function ConnectedAppsCatalog() {
@@ -70,7 +73,7 @@ export function ConnectedAppsCatalog() {
       setBusy(false);
     }
   }
-  const connect = (app: CatalogApp) =>
+  const connect = (app: { app: string; name: string }) =>
     act(async () => {
       const { url } = await appsApi.connect(app.app);
       await openExternalLink(url);
@@ -90,98 +93,118 @@ export function ConnectedAppsCatalog() {
     });
 
   return (
-    <section className="agent-studio-workflows" aria-label="Connected apps">
-      <div className="agent-studio-heading">
-        <div>
-          <h1>Connected apps</h1>
-          <p>
-            Agents use these accounts when you ask. Sends, shares, deletes and payments ask you
-            first.
+    <>
+      <section aria-labelledby="connected-apps-heading" className="agent-integrations-section">
+        <header>
+          <h2 id="connected-apps-heading">Connected apps</h2>
+          <IconButton label="Refresh apps" disabled={busy} onClick={() => void act(refresh)}>
+            <RefreshCw size={14} />
+          </IconButton>
+        </header>
+        {error ? (
+          <p role="alert" className="agent-integrations-description">
+            {error}
           </p>
-        </div>
-        <Button variant="outline" disabled={busy} onClick={() => void act(refresh)}>
-          <RefreshCw size={14} /> Refresh
-        </Button>
-      </div>
-      {error ? (
-        <p role="alert" className="mt-4 text-sm text-cream-muted">
-          {error}
-        </p>
-      ) : null}
-      {!available ? (
-        <p className="mt-6 text-sm text-cream-muted">
-          Connected apps are not set up on this Misty server.
-        </p>
-      ) : null}
-      {signingIn ? (
-        <p className="mt-4 text-sm text-cream-muted">
-          Finish signing in to {signingIn} in your browser, then refresh.
-        </p>
-      ) : null}
-      {apps === null && !error ? (
-        <p className="mt-6 text-sm text-cream-muted">Loading apps…</p>
-      ) : null}
-      {apps?.map((item) => (
-        <div
-          key={item.id}
-          className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-charcoal-border p-4"
-        >
-          <div className="flex min-w-0 items-center gap-3">
-            <Plug size={18} className="shrink-0 text-cream-muted" aria-hidden="true" />
-            <div className="min-w-0">
-              <h2 className="truncate font-medium">
-                {item.alias ? `${item.name} · ${item.alias}` : item.name}
-              </h2>
-              <p className="text-sm text-cream-muted">{statusLabel[item.status]}</p>
-            </div>
-          </div>
-          <Button variant="ghost" disabled={busy} onClick={() => void disconnect(item)}>
-            Disconnect
-          </Button>
-        </div>
-      ))}
-      {available ? (
-        <>
-          <label className="mt-8 flex max-w-md items-center gap-2 text-sm">
-            <Search size={14} className="text-cream-muted" aria-hidden="true" />
-            <Input
-              value={query}
-              maxLength={100}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Find an app, such as Gmail or Notion"
-              aria-label="Find an app"
-            />
-          </label>
-          <div className="mt-3 grid gap-2">
-            {results.map((app) => (
-              <div
-                key={app.app}
-                className="flex items-center justify-between gap-4 rounded-lg border border-charcoal-border px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-medium">{app.name}</h3>
-                  <p className="line-clamp-2 text-xs text-cream-muted">{app.description}</p>
+        ) : null}
+        {!available ? (
+          <p className="agent-integrations-description">
+            Connected apps are not set up on this Misty server.
+          </p>
+        ) : null}
+        {signingIn ? (
+          <p role="status" className="agent-integrations-description">
+            Finish signing in to {signingIn} in your browser, then refresh.
+          </p>
+        ) : null}
+        {apps === null && !error ? (
+          <SkeletonList
+            label="Connected apps"
+            rows={3}
+            leading="tile"
+            className="agent-integrations-list"
+          />
+        ) : apps?.length ? (
+          <div className="agent-integrations-list">
+            {apps.map((item) => (
+              <div key={item.id} className="agent-integrations-row">
+                <AppLogo app={item.app} size={26} />
+                <div className="agent-integrations-row-text">
+                  <strong>{item.alias ? `${item.name} · ${item.alias}` : item.name}</strong>
+                  {item.status === "needs_attention" ? (
+                    <span className="agent-integrations-attention">
+                      <CircleAlert size={13} aria-hidden="true" />
+                      Needs attention
+                    </span>
+                  ) : (
+                    <span>{item.status === "pending" ? "Waiting for sign-in" : "Connected"}</span>
+                  )}
                 </div>
-                {app.connected ? (
-                  <span className="flex shrink-0 items-center gap-1 text-xs text-cream-muted">
-                    <Check size={12} aria-hidden="true" /> Connected
-                  </span>
-                ) : (
+                {item.status === "needs_attention" && (
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={busy}
+                    onClick={() => void connect(item)}
+                  >
+                    Reconnect
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void disconnect(item)}
+                >
+                  Disconnect
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : apps ? (
+          <p className="agent-integrations-description">No apps connected yet.</p>
+        ) : null}
+      </section>
+      {available ? (
+        <section aria-labelledby="add-app-heading" className="agent-integrations-section">
+          <header>
+            <h2 id="add-app-heading">Add an app</h2>
+            <label className="agent-integrations-search">
+              <Search size={14} aria-hidden="true" />
+              <Input
+                variant="bare"
+                value={query}
+                maxLength={100}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find an app"
+                aria-label="Find an app"
+              />
+            </label>
+          </header>
+          <div className="agent-integrations-grid">
+            {results.map((app) => (
+              <div key={app.app} className="agent-integrations-tile" title={app.description}>
+                <AppLogo app={app.app} />
+                <div className="agent-integrations-row-text">
+                  <strong>{app.name}</strong>
+                  <span>{app.description}</span>
+                </div>
+                {app.connected ? (
+                  <Check size={14} aria-label="Connected" className="text-cream-muted" />
+                ) : (
+                  <IconButton
+                    label={`Connect ${app.name}`}
+                    disabled={busy}
                     onClick={() => void connect(app)}
                   >
-                    Connect
-                  </Button>
+                    <Plus size={16} />
+                  </IconButton>
                 )}
               </div>
             ))}
           </div>
-        </>
+        </section>
       ) : null}
-    </section>
+    </>
   );
 }
 

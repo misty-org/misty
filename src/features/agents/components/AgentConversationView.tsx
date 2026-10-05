@@ -54,6 +54,7 @@ export function AgentConversationView(props: {
                   {...handlers}
                 />
               )}
+              {turn.compacted && <SummarizedDivider />}
             </Fragment>
           );
         })}
@@ -86,6 +87,8 @@ type Turn = {
   replies: GlobalAiMessage[];
   answer?: GlobalAiMessage;
   steps: GlobalAiMessage[];
+  /** Misty now keeps this turn and everything before it as notes. */
+  compacted?: boolean;
 };
 
 /** A prompt and its replies. The last visible reply is the answer; earlier ones are steps. */
@@ -93,15 +96,16 @@ function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
   const turns: Turn[] = [];
   for (const message of messages) {
     if (message.role === "user") {
-      turns.push({ key: message.id, prompt: message, replies: [], steps: [] });
+      turns.push({ key: message.id, prompt: message, replies: [], steps: [], compacted: message.compactedAfter });
       continue;
     }
+    if (message.compactedAfter && turns.length) turns[turns.length - 1].compacted = true;
     const visible =
       visibleConversationContent(message.content, message.role) ||
       message.state === "pending" ||
       message.state === "streaming";
     if (!visible) continue;
-    if (!turns.length) turns.push({ key: message.id, replies: [], steps: [] });
+    if (!turns.length) turns.push({ key: message.id, replies: [], steps: [], compacted: message.compactedAfter });
     turns[turns.length - 1].replies.push(message);
   }
   for (const turn of turns) {
@@ -195,6 +199,22 @@ function AgentMessage(props: {
         />
       </div>
     </article>
+  );
+}
+
+/** Where the conversation Misty sees as notes ends and the verbatim part begins. */
+function SummarizedDivider() {
+  return (
+    <div
+      role="separator"
+      aria-label="Earlier messages summarized"
+      title="Misty keeps the messages above as summarized notes to stay within its context."
+      className="flex items-center gap-3 text-[11px] text-cream-muted"
+    >
+      <span aria-hidden className="h-px flex-1 bg-white/10" />
+      <span>Earlier messages summarized</span>
+      <span aria-hidden className="h-px flex-1 bg-white/10" />
+    </div>
   );
 }
 

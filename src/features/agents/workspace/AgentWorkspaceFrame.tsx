@@ -1,24 +1,15 @@
 import type { ReactNode } from "react";
-import {
-  ArrowLeft,
-  LayoutGrid,
-  Maximize2,
-  PanelTop,
-  Plug,
-  SlidersHorizontal,
-  SquarePen,
-  Workflow,
-  X,
-} from "lucide-react";
+import { Activity, LayoutGrid, Maximize2, Plug, SquarePen, Workflow, X } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import { Button, IconButton } from "@/shared/ui";
 import { AgentRecentConversations } from "./AgentRecentConversations";
 import { AgentAvatar } from "../components/AgentAvatar";
+import { AgentActivityPage } from "./AgentActivityPage";
 import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
-export type AgentWorkspacePage = "task" | "workflows" | "templates" | "integrations";
+export type AgentWorkspacePage = "task" | "activity" | "workflows" | "templates" | "integrations";
 type RecentConversation = { id: string; title?: string; updatedAt: string };
 
 /** Presentation only. Existing conversation and account actions remain owned by AgentsPage. */
@@ -31,14 +22,14 @@ export function AgentWorkspaceFrame({
   floating,
   identity,
   children,
+  activitySection,
   onPageChange,
-  onBack,
-  onProfile,
   onNewTask,
   onConversation,
   onUseTemplate,
   onStartWork,
   onFloatingChange,
+  onCompanion,
 }: {
   agent: AgentProfile;
   page: AgentWorkspacePage;
@@ -46,17 +37,17 @@ export function AgentWorkspaceFrame({
   conversationId: string;
   disabled: boolean;
   floating: boolean;
-  /** The agent switcher. The sidebar is the workspace's only agent identity. */
+  /** The agent switcher. It also holds New agent and this agent's settings. */
   identity: ReactNode;
   children: ReactNode;
+  activitySection?: "activity" | "scheduled";
   onPageChange(page: AgentWorkspacePage): void;
-  onBack(): void;
-  onProfile(): void;
   onNewTask(): void;
   onConversation(id: string): void;
   onUseTemplate(prompt: string): void;
   onStartWork(action: () => void): void;
   onFloatingChange(floating: boolean): void;
+  onCompanion(): void;
 }) {
   const recent = [...conversations]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -64,12 +55,7 @@ export function AgentWorkspaceFrame({
   return (
     <div className="agent-studio" data-page={page}>
       <aside className="agent-studio-sidebar" aria-label={`${agent.name} workspace`}>
-        <header>
-          <IconButton data-agent-navigation-control label="Back to agents" onClick={onBack}>
-            <ArrowLeft size={16} />
-          </IconButton>
-          {identity}
-        </header>
+        <header>{identity}</header>
         <nav aria-label="Agent workspace pages">
           <Button
             data-agent-navigation-control
@@ -85,6 +71,7 @@ export function AgentWorkspaceFrame({
           </Button>
           {(
             [
+              ["activity", "Activity", Activity],
               ["workflows", "Workflows", Workflow],
               ["templates", "Templates", LayoutGrid],
               ["integrations", "Integrations", Plug],
@@ -110,29 +97,6 @@ export function AgentWorkspaceFrame({
           disabled={disabled}
           onConversation={onConversation}
         />
-        <Button
-          data-agent-navigation-control
-          variant="ghost"
-          justify="start"
-          className="agent-studio-profile-action"
-          aria-label="Agent settings"
-          onClick={onProfile}
-        >
-          <SlidersHorizontal size={16} />
-          <span>Agent settings</span>
-        </Button>
-        <Button
-          data-agent-navigation-control
-          className="agent-studio-float-action"
-          variant="ghost"
-          justify="start"
-          aria-label={floating ? "Return to conversation" : "Float conversation"}
-          aria-pressed={floating}
-          onClick={() => onFloatingChange(!floating)}
-        >
-          <PanelTop size={16} />
-          <span>{floating ? "Return to conversation" : "Float conversation"}</span>
-        </Button>
       </aside>
       <div className="agent-studio-canvas">
         {/* Keep the live conversation mounted while browsing catalogs; its draft and voice state belong to it. */}
@@ -166,21 +130,26 @@ export function AgentWorkspaceFrame({
           {children}
         </div>
         <div className="agent-studio-catalog-host" hidden={page === "task"}>
-          <AgentWorkspaceCatalog
-            agentId={agent.id}
-            agentName={agent.name}
-            page={page === "task" ? "templates" : page}
-            onNavigate={(p) => (p === "new" ? onNewTask() : onPageChange(p))}
-            onUse={onUseTemplate}
-            onConversation={onConversation}
-            onStartWork={onStartWork}
-          />
+          {page === "activity" ? (
+            <AgentActivityPage initialSection={activitySection} />
+          ) : (
+            <AgentWorkspaceCatalog
+              agentId={agent.id}
+              agentName={agent.name}
+              page={page === "task" ? "templates" : page}
+              onNavigate={(p) => (p === "new" ? onNewTask() : onPageChange(p))}
+              onUse={onUseTemplate}
+              onConversation={onConversation}
+              onStartWork={onStartWork}
+              onCompanion={onCompanion}
+            />
+          )}
         </div>
         {page === "task" && floating && (
           <div className="agent-studio-floating-placeholder">
             <AgentAvatar agent={agent} />
             <h1>Your conversation is floating</h1>
-            <p>Browse this agent’s workflows and templates while keeping the conversation open.</p>
+            <p>Browse activity, workflows and templates while keeping the conversation open.</p>
             <Button variant="outline" onClick={() => onFloatingChange(false)}>
               Return to conversation
             </Button>

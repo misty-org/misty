@@ -1,8 +1,9 @@
 import {
+  chooseFromSwitcher,
   composer,
   conversation,
   fixture,
-  openCommunications,
+  openAgentSettings,
   renderAgentsPage,
   typeDraft,
 } from "./AgentsPage.testFixtures";
@@ -13,8 +14,7 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 
 it("edits a global agent without requiring a work Space", async () => {
   renderAgentsPage();
-  openCommunications();
-  fireEvent.click(screen.getByRole("button", { name: "Agent settings" }));
+  openAgentSettings();
   await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Launch coordinator" } });
   expect(screen.queryByLabelText("Agent work Space")).toBeNull();
@@ -25,7 +25,7 @@ it("edits a global agent without requiring a work Space", async () => {
 it("omits model and app permission setup for a new global agent", async () => {
   useWorkspaceStore.setState({ activeScopeKey: "global" });
   renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "New agent" }));
+  chooseFromSwitcher("New agent");
   fireEvent.click(screen.getByText("Instructions", { selector: "summary" }));
   expect(screen.queryByRole("group", { name: "Personal apps" })).toBeNull();
   expect(screen.queryByRole("checkbox", { name: "browser" })).toBeNull();
@@ -41,10 +41,9 @@ it("reopens historical conversations and starts new personal work without their 
     ],
   });
   renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
-  expect(screen.getByText("Launch draft")).toBeTruthy();
-  expect(screen.getByText("Other Space draft")).toBeTruthy();
-  fireEvent.click(screen.getByText("Other Space draft"));
+  const recents = screen.getByRole("region", { name: "Recent conversations" });
+  expect(within(recents).getByRole("button", { name: "Launch draft" })).toBeTruthy();
+  fireEvent.click(within(recents).getByRole("button", { name: "Other Space draft" }));
   typeDraft("Continue this conversation");
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
@@ -80,7 +79,6 @@ it("reopens historical conversations and starts new personal work without their 
 
 it("preserves an unsent message until a new task is explicitly confirmed", () => {
   renderAgentsPage();
-  openCommunications();
   typeDraft("Keep this message");
   fireEvent.click(screen.getByRole("button", { name: "New task" }));
   expect(screen.getByRole("alertdialog")).toBeTruthy();
@@ -94,8 +92,7 @@ it("preserves an unsent message until a new task is explicitly confirmed", () =>
 it("previews and saves a cloud avatar while preserving unrelated avatar metadata", async () => {
   fixture.agent.avatar = { emoji: "✏️", custom: "preserved" };
   renderAgentsPage();
-  openCommunications();
-  fireEvent.click(screen.getByRole("button", { name: "Agent settings" }));
+  openAgentSettings();
   await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
   fireEvent.click(screen.getByRole("button", { name: "Edit agent avatar" }));
   fireEvent.click(screen.getByRole("button", { name: "Lavender, Wink" }));
@@ -114,33 +111,30 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
   );
 });
 
-it("searches chat titles and clears the filter without changing the active conversation", () => {
+it("searches conversations from the switcher without changing the active conversation", () => {
   useMistyStore.setState({
     activeConversationId: "draft",
     conversations: [{ ...conversation("draft", "Launch draft"), remote: false }],
   });
   renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
-  const search = screen.getByRole("textbox", { name: "Search conversations" });
+  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
+  // Conversations join the switcher only while searching; the sidebar lists recents.
+  expect(screen.queryByRole("option", { name: /Launch draft/ })).toBeNull();
+  const search = screen.getByRole("combobox", { name: "Switch agent or conversation" });
   fireEvent.change(search, { target: { value: "launch" } });
-  expect(screen.getByText("Launch draft")).toBeTruthy();
+  expect(screen.getByRole("option", { name: /Launch draft/ })).toBeTruthy();
   fireEvent.change(search, { target: { value: "unmatched" } });
-  expect(screen.queryByText("No matching items")).toBeNull();
-  expect(screen.getAllByRole("row")).toHaveLength(1);
+  expect(screen.queryByRole("option", { name: /Launch draft/ })).toBeNull();
   expect(useMistyStore.getState().activeConversationId).toBe("draft");
-  fireEvent.keyDown(search, { key: "Escape" });
-  expect(screen.getByText("Launch draft")).toBeTruthy();
 });
 
-it("keeps recent conversations beside a draft and guards returning to the collection", () => {
+it("keeps recent conversations beside a draft and guards opening one", () => {
   useMistyStore.setState({ conversations: [conversation("draft", "Launch draft")] });
   renderAgentsPage();
-  openCommunications();
   typeDraft("Keep my draft");
   const recents = screen.getByRole("region", { name: "Recent conversations" });
-  expect(within(recents).getByRole("button", { name: "Launch draft" })).toBeTruthy();
   expect(screen.queryByRole("alertdialog")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Back to agents" }));
+  fireEvent.click(within(recents).getByRole("button", { name: "Launch draft" }));
   expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
   expect(composer().value).toBe("Keep my draft");
@@ -149,10 +143,9 @@ it("keeps recent conversations beside a draft and guards returning to the collec
 it("switches agents in place, guarding drafts and leaving the current agent untouched", async () => {
   fixture.includeSecond = true;
   renderAgentsPage();
-  openCommunications();
   typeDraft("Keep my work");
   fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  fireEvent.click(screen.getByRole("option", { name: /Communications/ }));
+  fireEvent.click(screen.getByRole("option", { name: /^Communications(?! settings)/ }));
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer().value).toBe("Keep my work");
   fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
@@ -180,7 +173,6 @@ it("finds and opens another agent's historical conversation through the switcher
     ],
   });
   renderAgentsPage();
-  openCommunications();
   fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Switch agent or conversation" }), {
     target: { value: "Solar" },
@@ -194,11 +186,11 @@ it("finds and opens another agent's historical conversation through the switcher
 it("prevents switching while a response is running", () => {
   fixture.includeSecond = true;
   renderAgentsPage();
-  openCommunications();
   act(() => useMistyStore.setState({ working: true }));
   fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
   const research = screen.getByRole("option", { name: "Research" });
   expect(research.getAttribute("aria-disabled")).toBe("true");
   fireEvent.click(research);
-  expect(useMistyStore.getState().selectedAgentId).toBe("communications");
+  expect(useMistyStore.getState().selectedAgentId).not.toBe("research");
+  expect(screen.getByRole("button", { name: "Switch agent: Communications" })).toBeTruthy();
 });

@@ -6,11 +6,7 @@ import { Button } from "@/shared/ui";
 import { useEffect, useId, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import "./agentsWorkspace.css";
-import { AgentNavigationIsland, type AgentSection } from "./components/AgentNavigationIsland";
 import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
-import { AgentCollection } from "./components/AgentCollection";
-import { AgentHistory } from "./components/AgentWorkspaceRoster";
-import { AgentOverviewPanel } from "./components/AgentOverviewPanel";
 import { AgentSetup } from "./components/AgentSetup";
 import { AgentSwitcher } from "./components/AgentSwitcher";
 import { useAgentAccess } from "./components/AgentAccess";
@@ -20,19 +16,22 @@ import {
 } from "./components/AgentWorkspaceConversation";
 import { MistyDashboard } from "./components/MistyDashboard";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
+import { AgentContextChips } from "./page/AgentContextChips";
 import { AgentConversationHeading } from "./page/AgentConversationHeading";
 import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
+import { AgentLanding } from "./page/AgentLanding";
 import { AgentNewChat } from "./page/AgentNewChat";
 import { AgentOverviewRail } from "./page/AgentOverviewRail";
 import { AgentProfileSection } from "./page/AgentProfileSection";
+import { AgentTaskPanel } from "./page/AgentTaskPanel";
 import { useAgentChangeGuard } from "./page/useAgentChangeGuard";
 import { AgentWorkspaceFrame, type AgentWorkspacePage } from "./workspace/AgentWorkspaceFrame";
 
 /*
- * THESIS: The existing Agents directory opens a focused workspace for each agent.
+ * THESIS: Agents opens straight into a conversation with the selected agent.
  * OWN-WORLD: Misty monochrome shared controls, 6px buttons, 8px islands, existing cloud avatars.
- * STORY: Start a task, browse reusable guidance, return to history, or float the same conversation.
- * FIRST VIEWPORT: Journal collection header, section and view islands, and shared item rows.
+ * STORY: Start a task, resume recent work, browse reusable guidance, or float the conversation.
+ * FIRST VIEWPORT: The New task composer, what the agent can reach, recent work and templates.
  * FORM: Polar's page columns and catalog density inside Misty; no Spaces navigation.
  * SIGNATURE: The conversation stays mounted across catalogs and floating presentation.
  * BOUNDARY: New workflow, skill, connector and window-execution UI has no backend actions.
@@ -49,21 +48,21 @@ export default function NativeAgentsPage() {
   const [newChat, setNewChat] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [params, setParams] = useSearchParams();
-  const [entryOpen, setEntryOpen] = useState(!params.has("agent"));
   const [islandVisible, setIslandVisible] = useState(false);
   const islandId = useId();
   const workspaceRef = useRef<HTMLElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef<HTMLButtonElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
-  const [activeSection, setActiveSection] = useState<AgentSection | undefined>(() =>
-    ["activity", "automations"].includes(params.get("view") ?? "") ? "activity" : undefined,
-  );
+  // Old collection links (?view=activity, automations, scheduled) open the Activity page.
+  const linkedView = params.get("view") ?? "";
+  const activitySection = linkedView === "scheduled" ? "scheduled" : "activity";
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
   const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
   const [chatRevision, setChatRevision] = useState(0);
-  const [workspacePage, setWorkspacePage] = useState<AgentWorkspacePage>("task");
+  const [workspacePage, setWorkspacePage] = useState<AgentWorkspacePage>(() =>
+    ["activity", "automations", "scheduled"].includes(linkedView) ? "activity" : "task",
+  );
   const [floating, setFloating] = useState(false);
   const [draftSeed, setDraftSeed] = useState({ agentId: "", text: "" });
   const working = useMistyStore((s) => s.working);
@@ -76,7 +75,6 @@ export default function NativeAgentsPage() {
     conversations.find((c) => c.id === activeConversationId)?.spaceId ?? "";
   useEffect(() => {
     setSelected(undefined);
-    setEntryOpen(true);
     setSettingsModalOpen(false);
     if (!user?.id) {
       void load("");
@@ -93,12 +91,10 @@ export default function NativeAgentsPage() {
   const linkedConversationId = params.get("conversation");
   useEffect(() => {
     if (!linkedAgentId) return;
-    setEntryOpen(false);
     setSelected(linkedAgentId);
     setNewChat(false);
     setWorkspacePage("task");
     setIslandVisible(Boolean(linkedConversationId));
-    setActiveSection(undefined);
     setChatRevision((n) => n + 1);
     const needsLoad =
       linkedConversationId &&
@@ -120,8 +116,12 @@ export default function NativeAgentsPage() {
     if (needsLoad && !current.working)
       void useMistyStore.getState().selectConversation(linkedConversationId);
   }, [linkedAgentId, linkedConversationId]);
+  // With no agent in the URL, reopen the last-used agent, then Misty, then the first agent.
   const profile =
-    agents.find((a) => a.id === selected) ?? agents.find((a) => a.system_managed) ?? agents[0];
+    agents.find((a) => a.id === selected) ??
+    agents.find((a) => a.id === workingAgentId) ??
+    agents.find((a) => a.system_managed) ??
+    agents[0];
   const access = useAgentAccess(
     user?.id ?? "",
     settingsModalOpen && settingsModalMode === "create" ? undefined : profile?.id,
@@ -142,19 +142,16 @@ export default function NativeAgentsPage() {
       setSettingsModalMode("edit");
       setSettingsModalTab(tab);
       setSettingsModalOpen(true);
-      setActiveSection(undefined);
     }, false);
   const select = (id: string, startNew = false, conversationId?: string, prompt = "") =>
     change(() => {
       setChatRevision((n) => n + 1);
-      setEntryOpen(false);
       setSelected(id);
       setVoiceState({ recording: false, busy: false });
       setNewChat(false);
       setWorkspacePage("task");
       setFloating(false);
       setDraftSeed({ agentId: id, text: prompt });
-      setActiveSection(undefined);
       setSettingsModalOpen(false);
       const nextConversationId = startNew ? "" : (conversationId ?? "");
       setIslandVisible(Boolean(nextConversationId));
@@ -179,31 +176,21 @@ export default function NativeAgentsPage() {
       setSettingsModalMode("create");
       setSettingsModalTab("settings");
       setSettingsModalOpen(true);
-      setActiveSection(undefined);
     });
   const beginNewChat = () =>
     change(() => {
-      setEntryOpen(false);
       setNewChat(true);
       setRecipientSearch("");
-      setActiveSection(undefined);
       setSettingsModalOpen(false);
     });
   const closeSettings = () => change(() => setSettingsModalOpen(false), false);
-  const openSection = (section?: AgentSection) =>
-    change(() => {
-      setActiveSection(section);
-      setSettingsModalOpen(false);
-    }, false);
   const toggleIsland = () =>
     change(() => {
-      setActiveSection(undefined);
       setIslandVisible(!islandVisible);
     }, false);
   const saveProfile = async (id: string, companion = false) => {
     await load(user?.id ?? "");
     setSelected(id);
-    setEntryOpen(false);
     if (settingsModalMode === "create") {
       setChatRevision((n) => n + 1);
       useMistyStore.setState({
@@ -217,24 +204,13 @@ export default function NativeAgentsPage() {
     setSettingsModalMode("edit");
     setSettingsModalTab(companion ? "companion" : "settings");
     setSettingsModalOpen(companion);
-    setActiveSection(undefined);
     guard.cancel();
   };
   const removeProfile = async () => {
     setSelected(undefined);
     setSettingsModalOpen(false);
-    setActiveSection(undefined);
     await load(user?.id ?? "");
   };
-  const browseAgents = () =>
-    change(() => {
-      setEntryOpen(true);
-      setActiveSection(undefined);
-      const next = new URLSearchParams(params);
-      next.delete("agent");
-      next.delete("conversation");
-      setParams(next, { replace: true });
-    });
   const disabled = working || guard.busy;
   const profileSection = (onDone: () => void) =>
     profile && (
@@ -251,29 +227,6 @@ export default function NativeAgentsPage() {
       />
     );
   const showWorkspace = !newChat && Boolean(profile);
-  const navigation = (
-    <AgentNavigationIsland
-      id={islandId}
-      activeSection={activeSection}
-      onSectionChange={openSection}
-      collisionBoundary={workspaceRef.current}
-      profileDisabled={!profile}
-      contentRef={dropdownRef}
-      dismissalBlocked={guard.pending}
-      restoreTriggerFocus={!settingsModalOpen}
-      conversations={
-        <AgentHistory
-          conversations={agentConversations}
-          activeId={activeConversationId}
-          disabled={disabled}
-          onSelect={(id) => profile && select(profile.id, false, id)}
-          onNewChat={() => profile && select(profile.id, true)}
-        />
-      }
-      activity={<MistyDashboard spaceId={spaceId} agentId={profile?.id} />}
-      profile={profileSection(() => openSection())}
-    />
-  );
   const switcher = {
     agents,
     conversations,
@@ -284,25 +237,34 @@ export default function NativeAgentsPage() {
     triggerRef: identityRef,
     onSelect: select,
     onCreate: create,
-    onBrowse: browseAgents,
+    onSettings: () => openSettingsModal("settings"),
   };
   const railOpen = !newChat && !settingsModalOpen && islandVisible && Boolean(profile);
   const openApps = () =>
     change(() => {
       setWorkspacePage("integrations");
-      setActiveSection(undefined);
     }, false);
   const overview = profile && (
-    <AgentOverviewPanel
-      key={`${user?.id}:${profile.id}`}
-      profile={profile}
-      access={access}
+    <AgentTaskPanel
+      accountId={user?.id ?? ""}
+      agentId={profile.id}
+      conversation={conversation}
       working={working && (workingAgentId === profile.id || Boolean(conversation))}
-      recording={voiceState.recording}
-      onCompanion={() => openSettingsModal("companion")}
-      onConnections={openApps}
+      deviceName={access.device?.device?.displayName}
     />
   );
+  const openActivity = () =>
+    change(() => {
+      setWorkspacePage("activity");
+    }, false);
+  const openTemplates = () =>
+    change(() => {
+      setWorkspacePage("templates");
+    }, false);
+  const float = () =>
+    change(() => {
+      setFloating(true);
+    }, false);
   const taskContent = (
     <>
       <div className="agents-main">
@@ -324,13 +286,12 @@ export default function NativeAgentsPage() {
           disabled={disabled}
           panelDisabled={!profile}
           panelVisible={islandVisible}
-          onBack={browseAgents}
           onRecipientSearch={setRecipientSearch}
           onCloseNewChat={() => setNewChat(false)}
           onNewChat={beginNewChat}
           onTogglePanel={toggleIsland}
+          onFloat={float}
         />
-        {!profile && activeSection && navigation}
         {/* The panel sits under the header, so the toggle stays above what it reveals. */}
         <div className="agents-body">
           {newChat ? (
@@ -360,6 +321,21 @@ export default function NativeAgentsPage() {
                   </div>
                 ) : undefined
               }
+              belowComposer={
+                showWorkspace && profile ? (
+                  <>
+                    <AgentContextChips access={access} onOpen={openApps} />
+                    <AgentLanding
+                      accountId={user?.id ?? ""}
+                      agentId={profile.id}
+                      onConversation={(id) => select(profile.id, false, id)}
+                      onUseTemplate={(prompt) => select(profile.id, true, undefined, prompt)}
+                      onActivity={openActivity}
+                      onTemplates={openTemplates}
+                    />
+                  </>
+                ) : undefined
+              }
               onCreate={create}
             />
           )}
@@ -376,20 +352,6 @@ export default function NativeAgentsPage() {
     <main ref={workspaceRef} className="agents-workspace" data-settings-open={settingsModalOpen}>
       {params.get("view") === "scheduled" && params.has("task") ? (
         <ScheduledPage embedded />
-      ) : entryOpen ? (
-        <AgentCollection
-          agents={agents}
-          conversations={conversations}
-          loading={loading}
-          error={error}
-          disabled={disabled}
-          workingAgentId={working ? workingAgentId : undefined}
-          onSelect={select}
-          onCreate={create}
-          onNewChat={beginNewChat}
-          onRetry={() => void load(user?.id ?? "")}
-          initialSection={params.get("view") === "activity" ? "activity" : "all"}
-        />
       ) : showWorkspace && profile ? (
         <AgentWorkspaceFrame
           key={`${user?.id}:${profile.id}`}
@@ -399,22 +361,11 @@ export default function NativeAgentsPage() {
           conversationId={activeConversationId}
           disabled={disabled}
           floating={floating}
+          activitySection={activitySection}
           identity={<AgentSwitcher {...switcher} className="agent-studio-identity" />}
           onPageChange={(page) =>
             change(() => {
-              setActiveSection(undefined);
               setWorkspacePage(page);
-            }, false)
-          }
-          onBack={browseAgents}
-          onProfile={() =>
-            change(() => {
-              setWorkspacePage("task");
-              setFloating(false);
-              setActiveSection(undefined);
-              setSettingsModalMode("edit");
-              setSettingsModalTab("settings");
-              setSettingsModalOpen(true);
             }, false)
           }
           onNewTask={() => select(profile.id, true)}
@@ -431,15 +382,15 @@ export default function NativeAgentsPage() {
           }
           onFloatingChange={(value) => {
             change(() => {
-              setActiveSection(undefined);
               setFloating(value);
               if (!value) setWorkspacePage("task");
             }, false);
           }}
+          onCompanion={() => openSettingsModal("companion")}
         >
           {taskContent}
         </AgentWorkspaceFrame>
-      ) : (
+      ) : loading && !profile ? null : (
         taskContent
       )}
       <AgentSettingsModal
@@ -454,7 +405,6 @@ export default function NativeAgentsPage() {
             key={`${user?.id}:create`}
             access={access}
             onConnections={openApps}
-            onCompanion={() => openSettingsModal("companion")}
             onStatusChange={setEditorStatus}
             onSaved={saveProfile}
           />
@@ -465,8 +415,7 @@ export default function NativeAgentsPage() {
         onCancel={guard.cancel}
         onDiscard={guard.discard}
         restoreFocus={() => {
-          if (dropdownRef.current?.isConnected) dropdownRef.current.focus();
-          else if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
+          if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
           else if (workspacePage !== "task")
             workspaceRef.current
               ?.querySelector<HTMLButtonElement>('.agent-studio-sidebar [aria-current="page"]')

@@ -12,83 +12,9 @@
   font-size: 14px;
   line-height: 1.5;
 }
-.agents-roster {
-  display: flex;
-  flex-direction: column;
-  width: 244px;
-  flex-shrink: 0;
-  min-height: 0;
-  padding: 0 8px;
-  background: var(--color-charcoal-sidebar);
-  border-right: 1px solid var(--color-charcoal-border);
-}
-.agents-roster-heading {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  height: 54px;
-  padding-inline: 4px;
-}
-.agents-roster-search {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.agents-roster-search > svg {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  margin-block: auto;
-  left: 10px;
-  color: var(--color-cream-muted);
-  pointer-events: none;
-}
-.agents-roster-search input {
-  padding-left: 34px;
-  font-size: 14px;
-}
-.agents-roster-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.agents-workspace .agent-roster-row {
-  width: 100%;
-  height: 64px;
-  gap: 12px;
-  padding: 8px 10px;
-  margin-bottom: 2px;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 400;
-}
-.agent-roster-row .agent-avatar {
-  width: 40px;
-  height: 40px;
-  font-size: 18px;
-}
-.agent-roster-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.agent-roster-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-cream-muted);
-  font-size: 12px;
-}
 .agents-list-note {
   padding: 12px 8px;
   color: var(--color-cream-muted);
-  font-size: 12px;
-}
-.agent-search-result {
-  width: 100%;
-  gap: 8px;
   font-size: 12px;
 }
 .agents-main {
@@ -107,7 +33,6 @@
   padding: 0 12px;
   flex-shrink: 0;
 }
-.agent-heading-start,
 .agent-heading-end {
   display: flex;
   flex: 1;
@@ -126,18 +51,6 @@
   width: 32px;
   height: 32px;
   font-size: 14px;
-}
-.agent-heading-chevron {
-  opacity: 0;
-}
-.agent-heading-identity:is(:hover, :focus-visible, [aria-expanded="true"]) .agent-heading-chevron {
-  opacity: 1;
-}
-.agent-heading-identity[aria-expanded="true"] .agent-heading-chevron {
-  transform: rotate(180deg);
-}
-.agents-roster-back {
-  display: none;
 }
 .agent-conversation,
 .agent-new-chat {
@@ -316,10 +229,6 @@
 .agent-recipient-input input {
   font-size: 14px;
 }
-.agent-conversation-heading:has(.agent-recipient-input) .agent-heading-start {
-  flex: 0;
-  min-width: 0;
-}
 .agent-recipient-results {
   position: absolute;
   top: 4px;
@@ -392,75 +301,6 @@
   display: grid;
   gap: 16px;
   padding-top: 16px;
-}
-/* Navigation stays in the chat; shared popovers render above it without resizing the pane. */
-.agent-navigation-island {
-  display: flex;
-  flex-shrink: 0;
-  align-self: center;
-  gap: 2px;
-  padding: 3px;
-  margin-bottom: 4px;
-  max-width: calc(100% - 24px);
-}
-.agent-navigation-dropdown {
-  width: 432px;
-  max-width: min(calc(100vw - 24px), var(--radix-popover-content-available-width));
-  max-height: min(580px, var(--radix-popover-content-available-height));
-  padding: 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.agent-history-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.agent-history-tools input {
-  flex: 1;
-  min-width: 0;
-}
-.agent-history-row {
-  width: 100%;
-  height: auto;
-  min-height: 64px;
-  padding: 12px;
-  margin-bottom: 4px;
-  white-space: normal;
-  text-align: left;
-}
-.agent-history-copy {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  gap: 6px;
-}
-.agent-history-copy > span {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-.agent-history-copy strong {
-  font-size: 14px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-.agent-history-copy time {
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--color-cream-muted);
-}
-.agent-history-copy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--color-cream-muted);
 }
 .agent-profile-form {
   display: grid;
@@ -620,11 +460,6 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
-.agent-activity-approval > div {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
 .agent-activity-details > button {
   justify-self: start;
 }
@@ -645,9 +480,9 @@
 }
 
 /*
- * Dot-inspired context sits under the header beside the conversation. The rail's
- * width opens and closes while its fixed-width content slides and fades, so the
- * conversation reflows smoothly instead of jumping.
+ * The task panel sits under the header beside the conversation. The rail's width
+ * opens and closes while its fixed-width card slides and fades, so the conversation
+ * reflows smoothly instead of jumping.
  */
 .agent-overview-rail {
   --agent-rail-width: 340px;
@@ -686,62 +521,4 @@
   .agent-overview-rail-content {
     transition: none;
   }
-}
-.agent-overview-rail .agent-navigation-island,
-[data-slot="sheet-content"] .agent-navigation-island {
-  margin: 0;
-  max-width: 100%;
-  align-self: stretch;
-  justify-content: space-between;
-}
-.agent-overview-rail .agent-activity-row {
-  /* Icons stay on the panel's text edge; the hover surface extends 8px either side. */
-  width: calc(100% + 16px);
-  min-height: 52px;
-  margin-inline: -8px;
-  padding: 8px;
-  gap: 8px;
-}
-.agent-overview-rail .agent-activity-row strong {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 13px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-.agent-overview-rail .agent-activity-row small {
-  font-size: 12px;
-}
-.agent-overview-rail .agent-activity-details {
-  padding: 0 0 12px;
-}
-.agent-overview-rail .agents-list-note {
-  padding: 4px 0;
-}
-.agent-overview-rail .agent-avatar--large {
-  width: 64px;
-  height: 64px;
-}
-.agent-welcome {
-  display: flex;
-  min-height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 40px 24px;
-  text-align: center;
-}
-.agent-welcome .agent-avatar {
-  width: 80px;
-  height: 80px;
-}
-.agent-welcome h1 {
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-.agent-welcome p {
-  max-width: 36ch;
-  color: var(--color-cream-muted);
 }

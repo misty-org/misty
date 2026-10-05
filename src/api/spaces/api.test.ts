@@ -168,9 +168,9 @@ describe("spaceRequest account isolation", () => {
         updated_at: "2026-07-26T00:00:00Z",
       },
       setup: {
-        selected_providers: ["google", "notion"],
+        selected_providers: ["google"],
         completed_providers: [],
-        pending_providers: ["google", "notion"],
+        pending_providers: ["google"],
       },
     };
     const fetchMock = vi
@@ -196,7 +196,7 @@ describe("spaceRequest account isolation", () => {
     const request: Parameters<typeof spacesApi.create>[0] = {
       name: "Research group",
       template_id: "research",
-      integration_providers: ["github"],
+      integration_providers: ["google"],
     };
 
     await expect(spacesApi.create(request)).rejects.toMatchObject({ status: 503 });

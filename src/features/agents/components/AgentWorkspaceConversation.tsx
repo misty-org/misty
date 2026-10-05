@@ -18,6 +18,7 @@ export function AgentWorkspaceConversation({
   agent,
   conversationId,
   emptyContent,
+  belowComposer,
   initialDraft = "",
   showControlBar = false,
   spaceId: _legacySpaceId,
@@ -30,6 +31,8 @@ export function AgentWorkspaceConversation({
   agent?: AgentProfile;
   conversationId?: string;
   emptyContent?: ReactNode;
+  /** Shown under the composer while the conversation is empty. */
+  belowComposer?: ReactNode;
   initialDraft?: string;
   showControlBar?: boolean;
   spaceId: string;
@@ -228,12 +231,7 @@ export function AgentWorkspaceConversation({
         <MistyContextBar />
         {showControlBar && agent ? (
           <AgentControlBar>
-            <MistyFolderWork accountId={accountId} disabled={state.working} />
-            <AgentUsageControl
-              draft={draft}
-              model={conversation?.modelId}
-              working={state.working}
-            />
+            <MistyFolderWork accountId={accountId} disabled={state.working} hideIdle />
           </AgentControlBar>
         ) : (
           <MistyFolderWork accountId={accountId} disabled={state.working} />
@@ -262,25 +260,34 @@ export function AgentWorkspaceConversation({
           disabled={!agent?.enabled || !accountId}
           busy={state.working && !draft.trim()}
           voiceControl={
-            <IconButton
-              label={voice.recording ? "Stop recording" : "Start voice input"}
-              disabled={
-                !agent?.enabled ||
-                !accountId ||
-                state.working ||
-                voice.requesting ||
-                voice.transcribing
-              }
-              onClick={() => (voice.recording ? voice.stop() : void voice.start())}
-            >
-              {voice.requesting || voice.transcribing ? (
-                <Spinner size="lg" label={false} />
-              ) : voice.recording ? (
-                <Square size={16} />
-              ) : (
-                <Mic size={18} />
+            <>
+              {showControlBar && agent && (
+                <AgentUsageControl
+                  draft={draft}
+                  model={conversation?.modelId}
+                  working={state.working}
+                />
               )}
-            </IconButton>
+              <IconButton
+                label={voice.recording ? "Stop recording" : "Start voice input"}
+                disabled={
+                  !agent?.enabled ||
+                  !accountId ||
+                  state.working ||
+                  voice.requesting ||
+                  voice.transcribing
+                }
+                onClick={() => (voice.recording ? voice.stop() : void voice.start())}
+              >
+                {voice.requesting || voice.transcribing ? (
+                  <Spinner size="lg" label={false} />
+                ) : voice.recording ? (
+                  <Square size={16} />
+                ) : (
+                  <Mic size={18} />
+                )}
+              </IconButton>
+            </>
           }
           trailingControl={
             state.working ? (
@@ -307,6 +314,7 @@ export function AgentWorkspaceConversation({
                 : `${agent?.name || "Misty"} is working…`}
           </p>
         )}
+        {!conversation?.messages.length && belowComposer}
       </div>
     </section>
   );

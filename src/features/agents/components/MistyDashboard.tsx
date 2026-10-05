@@ -1,6 +1,6 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { activityParent, type MistyActivityEntry } from "@/features/misty/activity";
-import { Button, CollectionItems } from "@/shared/ui";
+import { Button, CollectionItems, CollectionSkeleton, SkeletonList } from "@/shared/ui";
 import {
   CalendarClock,
   Check,
@@ -108,11 +108,13 @@ export function MistyDashboard({
         </div>
       )}
       {loading ? (
-        <p className="agents-list-note" role="status">
-          Loading activity…
-        </p>
+        collection ? (
+          <CollectionSkeleton label="Agent activity" view={collection.view} />
+        ) : (
+          <SkeletonList label="Agent activity" rows={4} leading="icon" />
+        )
       ) : null}
-      {collection && (
+      {collection && !loading && (
         <CollectionItems
           columnSetId="agent-activity"
           fields={["Type", "Events", "Delegation"]}
@@ -318,7 +320,7 @@ function ActivityDetails({
   return (
     <>
       {parentTitle && <p className="text-cream-muted">Delegated by {parentTitle}</p>}
-      {loading && <p role="status">Loading task details…</p>}
+      {loading && <SkeletonList label="Task details" rows={3} leading="none" />}
       {error && (
         <div role="alert">
           <p>{error}</p>
