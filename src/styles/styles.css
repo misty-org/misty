@@ -202,7 +202,8 @@
      mounted Browser surface. Toggling these full-window ancestors for every
      popup forced WebKit to clear and repaint its backing store, which appeared
      as a dark flash. Opaque tool surfaces and Browser chrome still paint their
-     own backgrounds normally. */
+     own backgrounds normally. Once a page reports its color, its host paints
+     it, so a live resize exposes the page color instead of the window's. */
   html:has([data-browser-page-host]),
   html:has([data-browser-page-host]) body,
   html:has([data-browser-page-host]) #root,
@@ -216,7 +217,7 @@
   html:has([data-browser-page-host]) [data-browser-page-container]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-browser-workspace-tab],
   html:has([data-browser-page-host]) [data-browser-page-stage],
-  html:has([data-browser-page-host]) [data-browser-page-host] {
+  html:has([data-browser-page-host]) [data-browser-page-host]:not([data-misty-browser-background]) {
     background-color: transparent !important;
   }
 

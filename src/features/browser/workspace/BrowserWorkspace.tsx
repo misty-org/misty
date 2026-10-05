@@ -725,7 +725,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
           )}
           style={{
             ...browserViewportFrameStyle(viewportSize),
-            backgroundColor: annotationsActive ? "transparent" : browserChromeBackground,
+            backgroundColor: annotationsActive
+              ? "transparent"
+              : internalPage || isOffline
+                ? browserChromeBackground
+                : `var(--browser-page-background, ${browserChromeBackground})`,
           }}
           data-browser-page-host
           data-browser-viewport={viewport}

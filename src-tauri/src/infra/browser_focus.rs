@@ -58,10 +58,58 @@ fn background_message(raw: &str) -> Option<BackgroundMessage> {
     Some(message)
 }
 
+/// WebKit fills area it has not painted yet, such as the strip a live window
+/// resize exposes before the page lays out again, with its under-page color.
+/// Match the page so that strip blends in instead of flashing gray.
+unsafe fn set_under_page_background(view: *mut Object, hex: &str) {
+    let channel = |start: usize| {
+        u8::from_str_radix(&hex[start..start + 2], 16).map_or(0.0, |value| f64::from(value) / 255.0)
+    };
+    let responds: BOOL = if view.is_null() {
+        objc::runtime::NO
+    } else {
+        msg_send![view, respondsToSelector: sel!(setUnderPageBackgroundColor:)]
+    };
+    if responds != YES {
+        return;
+    }
+    let color: *mut Object = msg_send![Class::get("NSColor").unwrap(), colorWithSRGBRed: channel(1) green: channel(3) blue: channel(5) alpha: 1.0f64];
+    let _: () = msg_send![view, setUnderPageBackgroundColor: color];
+}
+
+/// Each page's last reported color. Pages survive renderer reloads, but only
+/// report a color when it changes, so the shell replays it on reattachment.
+static PAGE_BACKGROUNDS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+fn page_backgrounds() -> &'static Mutex<HashMap<String, String>> {
+    PAGE_BACKGROUNDS.get_or_init(Mutex::default)
+}
+
+/// A new document reports its own color; never show the previous page's.
+pub(super) fn forget_page_background(id: &str) {
+    if let Ok(mut values) = page_backgrounds().lock() {
+        values.remove(id);
+    }
+}
+
+pub(super) fn replay_page_background(app: &AppHandle, id: &str) {
+    let color = page_backgrounds()
+        .lock()
+        .ok()
+        .and_then(|values| values.get(id).cloned());
+    if let Some(color) = color {
+        let _ = app.emit_to(
+            super::browser_owner_label(app, id),
+            "misty://browser-background",
+            json!({ "id": id, "color": color }),
+        );
+    }
+}
+
 pub(super) fn forget(id: &str) {
     if let Ok(mut values) = targets().lock() {
         values.retain(|_, (_, target)| target != id);
     }
+    forget_page_background(id);
 }
 extern "C" fn receive(this: &Object, _: Sel, _: *mut Object, message: *mut Object) {
     let target = targets()
@@ -98,6 +146,11 @@ extern "C" fn receive(this: &Object, _: Sel, _: *mut Object, message: *mut Objec
                 )
             {
                 return;
+            }
+            let view: *mut Object = msg_send![message, webView];
+            set_under_page_background(view, &background.background);
+            if let Ok(mut values) = page_backgrounds().lock() {
+                values.insert(id.clone(), background.background.clone());
             }
             let _ = app.emit_to(
                 super::browser_owner_label(&app, &id),
