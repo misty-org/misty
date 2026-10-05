@@ -384,5 +384,46 @@
   "linkedin": {
     "collection": "LinkedIn Brand Resources",
     "color": "#0A66C2"
+  },
+  "supabase": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/supabase-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "bitbucket": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/bitbucket.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "firecrawl": {
+    "url": "https://raw.githubusercontent.com/pheralb/svgl/main/static/library/firecrawl.svg",
+    "collection": "SVGL"
+  },
+  "google-tasks": {
+    "url": "https://www.gstatic.com/images/branding/productlogos/tasks_2026/v2/web/192px.svg",
+    "collection": "Google product assets"
+  },
+  "serpapi": {
+    "url": "https://serpapi.com/favicon.svg",
+    "collection": "SerpApi"
+  },
+  "cal": {
+    "url": "https://raw.githubusercontent.com/calcom/cal.com/main/apps/web/public/cal-com-icon.svg",
+    "collection": "Cal.com",
+    "brandSource": "https://design.cal.com/assets/logos"
+  },
+  "canvas": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/canvas.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.instructure.com/about/brand-guide/media-resources",
+    "hex": "E72429"
+  },
+  "wrike": {
+    "url": "https://www.wrike.com/tp/static/assets/img/header-v2/wrike-logo-light-v2.svg",
+    "collection": "Wrike",
+    "adaptation": "Check mark extracted from the header logo and cropped to a square; wordmark removed."
+  },
+  "composio": {
+    "url": "https://composio.dev/logos/composio-black.svg",
+    "collection": "Composio",
+    "adaptation": "Clip-path wrappers removed; BrandIcon paints the black mark white on dark surfaces."
   }
 }

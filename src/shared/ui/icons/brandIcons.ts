@@ -78,6 +78,15 @@ import brand76 from "./brand-icons/crunchyroll.svg?inline";
 import brand77 from "./brand-icons/prime-video.svg?inline";
 import brand78 from "./brand-icons/reddit.svg?inline";
 import brand79 from "./brand-icons/linkedin.svg?inline";
+import brand80 from "./brand-icons/supabase.svg?inline";
+import brand81 from "./brand-icons/bitbucket.svg?inline";
+import brand82 from "./brand-icons/firecrawl.svg?inline";
+import brand83 from "./brand-icons/google-tasks.svg?inline";
+import brand84 from "./brand-icons/serpapi.svg?inline";
+import brand85 from "./brand-icons/cal.svg?inline";
+import brand86 from "./brand-icons/canvas.svg?inline";
+import brand87 from "./brand-icons/wrike.svg?inline";
+import brand88 from "./brand-icons/composio.svg?inline";
 
 /** Canonical artwork shared by packages, navigation, tabs, Discover, and connections. */
 export const brandIcons = {
@@ -161,6 +170,15 @@ export const brandIcons = {
   "prime-video": brand77,
   reddit: brand78,
   linkedin: brand79,
+  supabase: brand80,
+  bitbucket: brand81,
+  firecrawl: brand82,
+  "google-tasks": brand83,
+  serpapi: brand84,
+  cal: brand85,
+  canvas: brand86,
+  wrike: brand87,
+  composio: brand88,
 } as const;
 
 export type BrandId = keyof typeof brandIcons;
@@ -200,6 +218,15 @@ const aliases: Record<string, BrandId> = {
   teams: "microsoft-teams",
   word: "microsoft-word",
   onenote: "microsoft-onenote",
+  twitter: "x",
+  perplexityai: "perplexity",
+  "perplexity-ai": "perplexity",
+  slackbot: "slack",
+  googletasks: "google-tasks",
+  googlephotos: "google-photos",
+  "one-drive": "onedrive",
+  calcom: "cal",
+  "composio-search": "composio",
 };
 
 export function brandIconAsset(value: string): { id: BrandId; src: string } | undefined {
