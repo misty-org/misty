@@ -14,7 +14,6 @@ import {
   AgentWorkspaceConversation,
   type AgentVoiceControl,
 } from "./components/AgentWorkspaceConversation";
-import { MistyDashboard } from "./components/MistyDashboard";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { AgentContextChips } from "./page/AgentContextChips";
 import { AgentConversationHeading } from "./page/AgentConversationHeading";
@@ -42,7 +41,7 @@ export default function NativeAgentsPage() {
   const { user } = useAuth();
   const spaceId = "";
   const voiceRef = useRef<AgentVoiceControl>(null);
-  const [voiceState, setVoiceState] = useState({ recording: false, busy: false });
+  const [, setVoiceState] = useState({ recording: false, busy: false });
   const { agents, loading, error, load } = usePersonalAgentsStore();
   const [selected, setSelected] = useState<string>();
   const [newChat, setNewChat] = useState(false);

@@ -104,10 +104,6 @@ function PlacesSection({ children, label }: { children: React.ReactNode; label: 
   );
 }
 
-function PlacesHint({ children }: { children: React.ReactNode }) {
-  return <p className="m-0 px-2 py-1 text-xs text-cream-muted">{children}</p>;
-}
-
 function PlaceRow({
   active,
   icon,
