@@ -282,13 +282,40 @@ States follow A2A: submitted, awaiting approval (A2A's auth-required),
 working, completed, failed, rejected and canceled.
 
 - **A2A endpoint.** `POST /a2a/spaces/{space}/agents/{agent}` speaks A2A's
-  JSON-RPC (`message/send`, `tasks/get`, `tasks/cancel`; no streaming or push
-  yet) and `GET …/.well-known/agent-card.json` describes the agent. It sends
-  every message through the same request service, so consent, approval,
-  billing and limits match `agents_request`. A repeated `messageId` returns
-  the same task. It authenticates with the member's Misty session; outside A2A
-  clients need account access tokens, which Misty does not issue yet. Requests
-  from it count toward the hourly limit, not the per-run limit.
+  JSON-RPC: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`,
+  `tasks/resubscribe` and `tasks/pushNotificationConfig/{set,get,list,delete}`.
+  `GET …/.well-known/agent-card.json` describes the agent. It sends every
+  message through the same request service, so consent, approval, billing and
+  limits match `agents_request`. A repeated `messageId` returns the same task.
+  Requests from it count toward the hourly limit, not the per-run limit.
+- **Only members' own agents (approved October 5, 2026).** Agents talk to
+  other members' agents from inside Misty; there are no outside A2A clients.
+  Every call carries the member's session cookie *and* a `Misty-Agent-Token`
+  header. The app mints the token from the session
+  (`POST /a2a/agents/{agent}/token`) for an enabled agent the member owns.
+  It lasts five minutes, is bound to the session that minted it (by hash), and
+  is signed with a key derived (HKDF) from the account signing key under its
+  own label, so session and agent tokens never verify as each other and rotate
+  together. Each call re-checks that the agent still exists, is enabled and
+  belongs to the member; long streams re-check the session and agent every
+  minute. Neither credential works alone, and the custom header stops
+  cross-site use of the cookie. Tasks and push configs are scoped to the agent
+  that sent them, not just the member.
+- **Streaming.** `message/stream` and `tasks/resubscribe` answer with
+  server-sent events: the Task, a `status-update` per state change, the reply
+  as an `artifact-update`, and a final `status-update`. Account events wake
+  the stream (a delegated run changing state now notifies the requester), with
+  a 5-second poll as fallback. A stream lasts at most 15 minutes; clients
+  resubscribe to keep waiting, for example on approval.
+- **Push notifications stay inside Misty.** A push config's `url` must be the
+  member's Misty inbox (`/a2a/push`); Misty never posts to other addresses, so
+  there is no webhook for SSRF or data to leave the app, and push
+  `authentication` is refused. The agent reads `GET /a2a/push` as a
+  server-sent event stream with the same two credentials; each event carries
+  the config id, its `token` and the Task. A state change is recorded before it
+  is written and released if the write fails, so it reaches one open inbox, or
+  the next to connect. At most 5 configs per task; finished configs are pruned
+  after a week.
 
 ### Catalog coverage (October 5, 2026)
 
