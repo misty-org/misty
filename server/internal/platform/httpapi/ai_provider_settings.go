@@ -340,7 +340,7 @@ func (s *AIService) accountAgentModel(ctx context.Context, user string) (string,
 
 func (s *SpacesService) runtimeModelBilling(ctx context.Context, user, run, node, fallback string) (string, string, error) {
 	role := "agent"
-	if strings.HasPrefix(node, "model:midscene:") {
+	if db.ScreenPlanningNode(node) {
 		role = "vision"
 	}
 	r, err := s.database.AIModelRunRoute(ctx, user, run, role)

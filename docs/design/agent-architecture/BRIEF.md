@@ -143,9 +143,11 @@ Each phase leaves the product working.
 - One account setting, *Ask before acting for you* (default on), covers sends,
   posts, shares, invites, payments, access changes and deletes in connected
   apps. Misty's own tools keep their current behavior.
-- The SDK provider capability system stays for now: it also carries the
-  official browser execution path. Remove it after Phase 4 retires the
-  low-level browser tools.
+- The SDK provider capability system stays for now. It is effectively unused
+  (no capability bindings are pinned in practice) but its official browser
+  providers are woven into the Planner provider and target resolution, and its
+  approval tables are shared with every runtime run. Removing it is a separate,
+  careful change.
 
 ### Phase 3 — Screens on demand (implemented and verified live October 4, 2026)
 
@@ -189,8 +191,12 @@ Each phase leaves the product working.
   user asked for exactly that.
 - Desktop browser grants no longer include `browser.click`, `browser.type` or
   `browser.interact`, so Misty-window tasks act only through `browser_act`.
-  The runtime's server-side planner (`misty_browser_act`) remains for paths
-  that still grant native input directly.
+  The runtime's server-side planner (`misty_browser_act`), its Midscene
+  dependency and the pinned SDK execution path were removed once no run could
+  grant native input directly.
+- Screen calls use the run's frozen *vision* route, which defaults to the run's
+  model. When the account points that route at its own provider connection,
+  calls go there with the account's key; billing meters the same route.
 - Midscene's Node-only helpers get browser stubs in the desktop build
   (`src/shared/platform/nodeShims`); reports and caches are not written.
 - Scope at first: Misty's own windows. Other Mac apps came next (below).

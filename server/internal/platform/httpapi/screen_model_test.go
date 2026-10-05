@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/kannachi323/misty/server/internal/aimodels"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,7 +19,7 @@ func TestScreenModelForwardsWithTheRunModelAndServerKey(t *testing.T) {
 	}))
 	defer gateway.Close()
 	useGatewayScreenModel(t, gateway.URL)
-	body, usage, err := forwardScreenModel(t.Context(), "openai/gpt-5", json.RawMessage(`[{"role":"user","content":"look"}]`))
+	body, usage, err := forwardTo(t, "openai/gpt-5", json.RawMessage(`[{"role":"user","content":"look"}]`))
 	if err != nil || usage.PromptTokens != 120 || usage.CompletionTokens != 30 || len(body) == 0 {
 		t.Fatalf("forward = %s %+v %v", body, usage, err)
 	}
@@ -50,14 +51,14 @@ func TestScreenModelUsesTheDeploymentsDirectProvider(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "openai-key")
 	t.Setenv("MISTY_AGENT_MODEL_BASE_URL", openai.URL+"/v1")
 	t.Setenv("AI_GATEWAY_API_KEY", "")
-	if _, _, err := forwardScreenModel(t.Context(), "openai/gpt-6-luna", json.RawMessage(`[{"role":"user","content":"look"}]`)); err != nil {
+	if _, _, err := forwardTo(t, "openai/gpt-6-luna", json.RawMessage(`[{"role":"user","content":"look"}]`)); err != nil {
 		t.Fatal(err)
 	}
 	if got["model"] != "gpt-6-luna" || got["reasoning_effort"] != "low" {
 		t.Fatalf("direct provider payload = %v", got)
 	}
 	// A model from another provider cannot be served directly; the deployment's model is used.
-	if _, _, err := forwardScreenModel(t.Context(), "anthropic/claude-x", json.RawMessage(`[]`)); err != nil || got["model"] != "gpt-6-luna" {
+	if _, _, err := forwardTo(t, "anthropic/claude-x", json.RawMessage(`[]`)); err != nil || got["model"] != "gpt-6-luna" {
 		t.Fatalf("foreign model = %v %v", got["model"], err)
 	}
 }
@@ -78,11 +79,36 @@ func TestScreenModelReportsGatewayFailures(t *testing.T) {
 	}))
 	defer gateway.Close()
 	useGatewayScreenModel(t, gateway.URL)
-	if _, _, err := forwardScreenModel(t.Context(), "openai/gpt-5", json.RawMessage(`[]`)); err == nil {
+	if _, _, err := forwardTo(t, "openai/gpt-5", json.RawMessage(`[]`)); err == nil {
 		t.Fatal("gateway failure was accepted")
 	}
 	t.Setenv("AI_GATEWAY_API_KEY", "")
-	if _, _, err := forwardScreenModel(t.Context(), "openai/gpt-5", json.RawMessage(`[]`)); err == nil {
+	if _, _, err := forwardTo(t, "openai/gpt-5", json.RawMessage(`[]`)); err == nil {
 		t.Fatal("forwarded without a gateway key")
+	}
+}
+
+func forwardTo(t *testing.T, model string, messages json.RawMessage) (json.RawMessage, screenModelUsage, error) {
+	t.Helper()
+	endpoint, err := resolveScreenModelEndpoint(model)
+	if err != nil {
+		return nil, screenModelUsage{}, err
+	}
+	return forwardScreenModel(t.Context(), endpoint, messages)
+}
+
+func TestScreenModelUsesTheAccountsOwnProvider(t *testing.T) {
+	for _, tc := range []struct {
+		provider, base, model, wantURL, wantModel string
+	}{
+		{"openai", "", "openai/gpt-6-luna", "https://api.openai.com/v1/chat/completions", "gpt-6-luna"},
+		{"gateway", "", "anthropic/claude-x", "https://ai-gateway.vercel.sh/v1/chat/completions", "anthropic/claude-x"},
+		{"google", "https://generativelanguage.googleapis.com/v1beta", "google/gemini-x", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-x"},
+		{"openai-compatible", "https://models.example.test/v1/", "local-model", "https://models.example.test/v1/chat/completions", "local-model"},
+	} {
+		endpoint, err := accountScreenModelEndpoint(aimodels.Resolved{Provider: tc.provider, BaseURL: tc.base, APIKey: "account-key"}, tc.model)
+		if err != nil || endpoint.url != tc.wantURL || endpoint.model != tc.wantModel || endpoint.key != "account-key" {
+			t.Fatalf("%s: %+v %v", tc.provider, endpoint, err)
+		}
 	}
 }

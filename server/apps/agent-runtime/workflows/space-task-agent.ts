@@ -1,5 +1,5 @@
 import { WorkflowAgent } from "@ai-sdk/workflow";
-import { isStepCount, tool, type LanguageModelUsage, type ModelMessage, type ToolSet } from "ai";
+import { isStepCount, tool, type ModelMessage, type ToolSet } from "ai";
 import { FatalError, getWorkflowMetadata } from "workflow";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
 import type { RuntimeIdentity } from "../src/control-plane.js";
@@ -7,11 +7,9 @@ import { activateRuntime, checkpoint, complete, fetchContext, fetchExecutionBudg
 import { MISTY_HARNESS_VERSION, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
 import { InstanceModel } from "../src/instance-model.js";
 import { discoverRemoteMCPTools } from "../src/mcp-runtime.js";
-import { midsceneAvailable, midsceneBrowserTool, midsceneInstructions, midsceneToolName } from "../src/midscene-tool.js";
 import { accumulateModelUsage, modelTimeout, modelTurnLimit } from "../src/model-budget.js";
 import { initialMessages } from "../src/model-input.js";
 import { catalogTools, modelCatalog } from "../src/model-tools.js";
-import { executePinnedCapability } from "../src/pinned-capability.js";
 import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
@@ -67,8 +65,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     });
     throw new FatalError("Misty's capability registry is unavailable.");
   }
-  const midscene = midsceneAvailable(mcpCatalog.tools);
-  const catalog = modelCatalog(mcpCatalog.tools, [taskCompletionTool, ...(midscene ? [midsceneToolName] : [])]);
+  const catalog = modelCatalog(mcpCatalog.tools, [taskCompletionTool]);
   const advertised = new Set(mcpCatalog.tools.map((descriptor) => descriptor.name));
   await execution.checkpoint({
     node_id: "mcp:catalog", state: "completed", phase: "tools_ready", progress: 8,
@@ -79,18 +76,6 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     },
   });
   if (context.routine_execution !== undefined) throw new FatalError("Retired automation execution cannot be resumed.");
-  if (context.sdk_execution) {
-    try {
-      await executePinnedCapability(context.sdk_execution, advertised, execution.executeCapability);
-      // Go derives completion from its protected effect journal, including
-      // denial and uncertainty. A successful transport is not proof of an effect.
-      await execution.complete({ status: "success", text: "" });
-    } catch (error) {
-      const failure = classifyRuntimeError(error);
-      await execution.complete({ status: "failed", text: "", error_code: failure.code, error_message: failure.message });
-    }
-    return;
-  }
 
   const explaining = context.companion_explanation === true;
   const order = serialToolLifecycle();
@@ -99,18 +84,11 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     const declined = order.declined(callId);
     if (declined) throw new Error(declined);
   };
-  let midsceneUsage: LanguageModelUsage | undefined;
   const tools: ToolSet = explaining ? {} : {
     ...catalogTools(catalog, async (callId, name, value) => {
       guard(callId);
       return await execution.executeCapability(callId, name, value);
     }),
-    ...(midscene ? {
-      [midsceneToolName]: midsceneBrowserTool({
-        identity, modelId: context.vision_model_id || context.model_id, execution, guard,
-        recordUsage: (usage) => { midsceneUsage = accumulateModelUsage(midsceneUsage, usage); },
-      }),
-    } : {}),
     [taskCompletionTool]: tool({
       description: "Report the final task outcome and user-facing answer. Call alone after completing all possible work, or when a real blocker prevents further progress. This records a report; it grants no capabilities and performs no external action.",
       inputSchema: taskCompletionSchema,
@@ -123,7 +101,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   const toolNames = Object.keys(tools);
   const instructions = explaining
     ? context.system
-    : [context.system, "", executionInstructions, taskCompletionInstructions, ...(midscene ? [midsceneInstructions] : [])].join("\n");
+    : [context.system, "", executionInstructions, taskCompletionInstructions].join("\n");
   let modelTurn = 0;
   const agent = new WorkflowAgent({
     id: "misty-space-task-agent",
@@ -188,9 +166,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       for (const message of steering.messages) messages.push({ role: "user", content: message.text });
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       const current = await agent.stream({ messages, ...shared, timeout: modelTimeout(budget, Date.now(), legacyDeadline) });
-      const turnUsage = midsceneUsage ? accumulateModelUsage(current.totalUsage, midsceneUsage) : current.totalUsage;
-      midsceneUsage = undefined;
-      result = { ...current, steps: [...(result?.steps ?? []), ...current.steps], totalUsage: accumulateModelUsage(result?.totalUsage, turnUsage) };
+      result = { ...current, steps: [...(result?.steps ?? []), ...current.steps], totalUsage: accumulateModelUsage(result?.totalUsage, current.totalUsage) };
       // WorkflowAgent returns the complete model transcript, including tool
       // results. Reinject our fixed system instructions once on the next call.
       messages = current.messages.filter((message) => message.role !== "system");
