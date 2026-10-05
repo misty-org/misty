@@ -18,6 +18,12 @@ describe("account provider transport", () => {
   ])("rejects private and reserved address %s", (address) => {
     expect(publicProviderAddress(address)).toBe(false);
   });
+  it.each(["172.66.0.243", "162.159.140.245", "8.8.8.8", "2606:4700::6810:84e5"])(
+    "accepts public address %s",
+    (address) => {
+      expect(publicProviderAddress(address)).toBe(true);
+    },
+  );
   it("rejects mixed public/private DNS before transmitting a credential", async () => {
     vi.mocked(lookup).mockResolvedValue([
       { address: "8.8.8.8", family: 4 },

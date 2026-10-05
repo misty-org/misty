@@ -3,7 +3,10 @@ import { request } from "node:https";
 import { BlockList, isIP } from "node:net";
 import { Readable } from "node:stream";
 
-const blocked = new BlockList();
+// Separate lists: Node checks IPv4 addresses against IPv6 rules too, so the
+// ::ffff:0:0/96 rule would otherwise block every IPv4 address.
+const blockedV4 = new BlockList();
+const blockedV6 = new BlockList();
 for (const [address, prefix] of [
   ["0.0.0.0", 8],
   ["10.0.0.0", 8],
@@ -20,7 +23,7 @@ for (const [address, prefix] of [
   ["224.0.0.0", 4],
   ["240.0.0.0", 4],
 ] as const)
-  blocked.addSubnet(address, prefix, "ipv4");
+  blockedV4.addSubnet(address, prefix, "ipv4");
 for (const [address, prefix] of [
   ["::", 96],
   ["::ffff:0:0", 96],
@@ -34,12 +37,13 @@ for (const [address, prefix] of [
   ["2001::", 32],
   ["2002::", 16],
 ] as const)
-  blocked.addSubnet(address, prefix, "ipv6");
-blocked.addAddress("::1", "ipv6");
+  blockedV6.addSubnet(address, prefix, "ipv6");
+blockedV6.addAddress("::1", "ipv6");
 
 export function publicProviderAddress(address: string): boolean {
   const family = isIP(address);
-  return family !== 0 && !blocked.check(address, family === 4 ? "ipv4" : "ipv6");
+  if (family === 4) return !blockedV4.check(address, "ipv4");
+  return family === 6 && !blockedV6.check(address, "ipv6");
 }
 
 /** Pin DNS to a public address for each request; never redirect credentials. */
