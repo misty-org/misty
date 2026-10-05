@@ -498,15 +498,15 @@
   color: var(--workspace-tab-text);
   background: transparent;
 }
-/* Inactive hover: as tall as the active tab, inset sideways to clear the
-   active shoulders and 1px off the pane seam so the seam stays visible. */
+/* Inactive hover: a pill shorter than the active tab, inset sideways to clear
+   the active shoulders and kept off the pane seam so the seam stays visible. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab:not([data-active="true"])::before {
   content: "";
   position: absolute;
-  inset: 0 4px 1px;
+  inset: 4px 4px 5px;
   z-index: -1;
-  border-radius: 10px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--workspace-tab-surface) 75%, transparent);
   opacity: 0;
   pointer-events: none;
@@ -538,7 +538,7 @@
 }
 .misty-workspace-tabs[data-tab-position="bottom"]
   .misty-workspace-tab:not([data-active="true"])::before {
-  inset: 1px 4px 0;
+  inset: 5px 4px 4px;
 }
 .misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab {
   padding: var(--tab-inset) 0 0;
