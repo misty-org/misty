@@ -60,7 +60,12 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": "screen_model_budget", "message": "The task's model allowance is used up."})
 			return
 		}
-		response, usage, err := forwardScreenModel(r.Context(), aiInvocationMeteredModel(record), body.Messages)
+		endpoint, err := s.screenModelRoute(r.Context(), record)
+		if err != nil {
+			writeAIProviderError(w, err)
+			return
+		}
+		response, usage, err := forwardScreenModel(r.Context(), endpoint, body.Messages)
 		completion := map[string]any{"usage": map[string]any{"inputTokens": usage.PromptTokens, "outputTokens": usage.CompletionTokens}}
 		if err != nil {
 			completion = map[string]any{}
@@ -80,14 +85,10 @@ type screenModelUsage struct {
 	CompletionTokens int64 `json:"completion_tokens"`
 }
 
-// forwardScreenModel calls the deployment's model provider with the run's
-// model. The client cannot choose the model or raise the output limit.
-func forwardScreenModel(ctx context.Context, model string, messages json.RawMessage) (json.RawMessage, screenModelUsage, error) {
+// forwardScreenModel calls the resolved provider. The client cannot choose
+// the model or raise the output limit.
+func forwardScreenModel(ctx context.Context, endpoint screenModelEndpoint, messages json.RawMessage) (json.RawMessage, screenModelUsage, error) {
 	var usage screenModelUsage
-	endpoint, err := resolveScreenModelEndpoint(model)
-	if err != nil {
-		return nil, usage, err
-	}
 	payload, err := json.Marshal(screenModelPayload(endpoint, messages))
 	if err != nil {
 		return nil, usage, err

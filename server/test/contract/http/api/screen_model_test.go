@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/kannachi323/misty/server/internal/aimodels"
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"github.com/kannachi323/misty/server/internal/platform/security"
@@ -66,6 +67,13 @@ func TestScreenModelPassThroughForALiveActJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := database.ActivateAIInvocationRuntime(ctx, run.ID, "vercel-workflow", "screen-runtime"); err != nil {
+		t.Fatal(err)
+	}
+	// Prepare freezes the run's routes; screen calls use its vision route.
+	if _, err := database.FreezeAIModelRoutes(ctx, user.ID, run.ID, []aimodels.Route{
+		{Role: "agent", Model: "openai/gpt-6-luna", Reasoning: "low", Enabled: true},
+		{Role: "vision", Model: "openai/gpt-6-luna", Reasoning: "low", Enabled: true},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	job, err := database.QueueAIInvocationDeviceNodeJob(ctx, user.ID, run.ID, "act-node", 1, "act-scope", "browser.act", "browser.act", json.RawMessage(`{"goal":"Draw a house"}`), json.RawMessage(`{}`), json.RawMessage(`{"type":"object"}`), json.RawMessage(`{"type":"object"}`))

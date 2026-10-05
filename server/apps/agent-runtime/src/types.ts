@@ -1,8 +1,6 @@
-import type { PinnedCapabilityExecution } from "./pinned-capability.js";
 export interface SpaceTaskContext {
  /** Only retained to reject stale routine submissions. */
  routine_execution?: unknown;
- sdk_execution?: PinnedCapabilityExecution;
   run_id: string;
   agent_id: string;
   space_id: string;
