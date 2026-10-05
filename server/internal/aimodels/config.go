@@ -24,7 +24,7 @@ type Role struct {
 var Roles = []Role{
 	{"agent", "Agent work", "Conversation, planning and tool calls.", []string{"gateway", "openai", "anthropic", "google", "openai-compatible"}, true, false},
 	{"vision", "Visual interaction", "Reads screenshots and plans browser actions. Choose a model that accepts images.", []string{"gateway", "openai", "anthropic", "google", "openai-compatible"}, true, false},
-	{"routing", "Task routing", "Classifies follow-ups and decides how to continue a task.", []string{"gateway", "openai"}, true, false},
+	{"routing", "Task routing", "Classifies follow-ups and decides how to continue a task.", []string{"gateway", "openai", "anthropic", "google", "openai-compatible"}, true, false},
 	{"realtime", "Companion voice", "Live speech and companion tool calls. Choose a realtime model.", []string{"gateway", "openai"}, false, false},
 	{"library", "Library analysis", "Describes files and images for search. Choose a vision model with structured output.", []string{"gateway", "openai", "openai-compatible"}, true, false},
 	{"library-fallback", "Library second pass", "Optional retry and visual entity audit. Disable to limit extra requests.", []string{"gateway", "openai", "openai-compatible"}, true, true},
