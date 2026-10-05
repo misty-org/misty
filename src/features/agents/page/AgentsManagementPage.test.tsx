@@ -11,6 +11,28 @@ vi.mock("../mcp/McpConnectionsSheet", () => ({
   McpConnectionsView: () => <aside aria-label="Tool connections sheet">Connections</aside>,
 }));
 
+// Agents opens straight into an agent's workspace, so the store needs one.
+vi.mock("../personalAgentsStore", () => ({
+  usePersonalAgentsStore: () => ({
+    agents: [
+      {
+        id: "misty",
+        name: "Misty",
+        role: "",
+        instructions: "",
+        avatar: {},
+        model_mode: "automatic",
+        model_id: "",
+        enabled: true,
+        system_managed: true,
+      },
+    ],
+    loading: false,
+    error: "",
+    load: async () => {},
+  }),
+}));
+
 vi.mock("../AgentsRuntime", async (original) => ({
   ...(await original<typeof AgentsRuntimeModule>()),
   useAgentsAuth: () => ({ user: { id: "owner" } }),
@@ -26,7 +48,7 @@ describe("Agents conversation page", () => {
     document.body.innerHTML = "";
   });
 
-  it("opens on the agent collection without a page tab strip", async () => {
+  it("opens straight into the New task conversation without a directory", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -38,11 +60,12 @@ describe("Agents conversation page", () => {
       ),
     );
 
-    expect(container.querySelector("h1")?.textContent).toBe("Agents");
-    expect(container.querySelector('[aria-label="Search all"]')).not.toBeNull();
-    expect(container.textContent).toContain("New agent");
-    expect(container.textContent).not.toContain("Definitions");
-    expect(container.textContent).not.toContain("Edit Scout");
+    const headings = [...container.querySelectorAll("h1")].map((h) => h.textContent);
+    expect(headings).toContain("What can I do for you?");
+    expect(headings).not.toContain("Agents");
+    expect(container.querySelector('[aria-label="Search all"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Agent workspace pages"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Browse all agents");
     expect(container.querySelector('[role="tablist"]')).toBeNull();
 
     await act(async () => root.unmount());
@@ -79,7 +102,8 @@ describe("Agents conversation page", () => {
       ),
     );
     expect(document.body.querySelector('[aria-label="Agent work"]')).not.toBeNull();
-    expect(document.body.textContent).not.toContain("Connect apps");
+    const pages = container.querySelector('[aria-label="Agent workspace pages"]');
+    expect(pages?.textContent).not.toContain("Connect");
     expect(document.body.querySelector('[aria-label="Tool connections sheet"]')).toBeNull();
     await act(async () => root.unmount());
   });

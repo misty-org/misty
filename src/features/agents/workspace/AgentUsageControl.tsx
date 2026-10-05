@@ -5,7 +5,14 @@ import {
   formatUsagePercent,
   useCommandUsageEstimate,
 } from "@/features/global-search/CommandUsageEstimate";
-import { Button, Popover, PopoverContent, PopoverTrigger, Progress } from "@/shared/ui";
+import {
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Progress,
+  Skeleton,
+} from "@/shared/ui";
 
 type AiMeter = {
   used: number;
@@ -16,8 +23,8 @@ type AiMeter = {
 };
 
 /**
- * The control bar's usage entry: the account's weekly AI meter, plus billing's estimate
- * for the current draft. Details open in a popover rather than spreading over the composer.
+ * The composer's usage ring: the account's weekly AI meter, plus billing's estimate for
+ * the current draft. Numbers live in the popover so the composer stays quiet.
  */
 export function AgentUsageControl({
   draft,
@@ -56,19 +63,12 @@ export function AgentUsageControl({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="agent-usage-trigger" aria-label="AI usage">
-          {meter && (
-            <span className="agent-usage-meter" aria-hidden="true">
-              <span style={{ width: `${used}%` }} />
-            </span>
-          )}
-          <span>{meter ? `${formatUsagePercent(used)}% weekly` : "Usage"}</span>
-          {command && (
-            <span className="agent-usage-draft">
-              · ≈{formatUsagePercent(command.estimated_percentage)}% this message
-            </span>
-          )}
-        </Button>
+        <IconButton
+          className="agent-usage-trigger"
+          label={meter ? `AI usage: ${formatUsagePercent(used)}% of weekly limit` : "AI usage"}
+        >
+          <UsageRing value={used} />
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent
         side="top"
@@ -100,10 +100,16 @@ export function AgentUsageControl({
                 </p>
               )}
             </>
-          ) : (
+          ) : current ? (
             <p role="status" className="text-xs text-cream-muted">
-              {current ? "Usage unavailable." : "Loading usage…"}
+              Usage unavailable.
             </p>
+          ) : (
+            <div role="status" aria-label="Usage" aria-busy="true" className="grid gap-2">
+              <Skeleton className="h-3 w-2/5" />
+              <Skeleton className="h-1.5 w-full rounded-full" />
+              <Skeleton className="h-2.5 w-1/3" />
+            </div>
           )}
         </section>
         <section aria-label="This message" className="mt-4 border-t border-charcoal-border pt-4">
@@ -132,5 +138,27 @@ export function AgentUsageControl({
         </section>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** An 18px ring: the track in the border tone, the used share in text color. */
+function UsageRing({ value }: { value: number }) {
+  const radius = 7;
+  const length = 2 * Math.PI * radius;
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className="agent-usage-ring">
+      <circle cx="9" cy="9" r={radius} fill="none" strokeWidth="2.25" />
+      <circle
+        cx="9"
+        cy="9"
+        r={radius}
+        fill="none"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeDasharray={`${(value / 100) * length} ${length}`}
+        transform="rotate(-90 9 9)"
+        opacity={value > 0 ? 1 : 0}
+      />
+    </svg>
   );
 }

@@ -36,7 +36,7 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-export type SpaceIntegrationProvider = "github";
+export type SpaceIntegrationProvider = "google";
 
 export interface SpaceTemplateSeedSummary {
   task_count: number;

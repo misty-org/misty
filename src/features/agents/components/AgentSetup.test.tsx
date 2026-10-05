@@ -20,7 +20,6 @@ const start = (onSaved = vi.fn(async () => {})) => {
     <AgentSetup
       access={access}
       onConnections={vi.fn()}
-      onCompanion={vi.fn()}
       onStatusChange={vi.fn()}
       onSaved={onSaved}
     />,
