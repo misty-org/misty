@@ -1,6 +1,6 @@
 /**
- * Glyph colors for item-type icons on content surfaces: the file explorer, collection rows and
- * cards, and the extensions rail. A tone says what an item is, never its state; tiles, hover,
+ * Glyph colors for item-type icons on content surfaces: the file explorer and collection rows
+ * and cards. A tone says what an item is, never its state; tiles, hover,
  * selection and focus stay monochrome. Navbar, sidebars and browser chrome stay uncolored.
  */
 export type ItemTone =

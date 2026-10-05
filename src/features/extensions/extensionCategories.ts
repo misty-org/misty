@@ -16,7 +16,6 @@ import {
   ShoppingCart,
   type LucideIcon,
 } from "lucide-react";
-import type { ItemTone } from "@/shared/ui";
 
 export type ExtensionCategory = { id: string; name: string; Icon: LucideIcon };
 
@@ -39,24 +38,6 @@ const categoryIcons: Record<string, LucideIcon> = {
   shopping: ShoppingCart,
   "social-communication": MessagesSquare,
   other: Shapes,
-};
-// The rail is the one sidebar whose icons carry item tones; see AGENTS.md.
-export const categoryTones: Record<string, ItemTone> = {
-  "privacy-security": "green",
-  tabs: "blue",
-  "web-development": "teal",
-  "feeds-news-blogging": "orange",
-  "alerts-updates": "amber",
-  appearance: "violet",
-  bookmarks: "red",
-  "download-management": "sand",
-  "games-entertainment": "pink",
-  "language-support": "blue",
-  "photos-music-videos": "violet",
-  "search-tools": "teal",
-  shopping: "amber",
-  "social-communication": "teal",
-  other: "sand",
 };
 
 /** Gives each category from the live list its icon. */
