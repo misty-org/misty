@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   IconButton,
+  Skeleton,
 } from "@/shared/ui";
 import { RotateCcw, ShieldCheck } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -137,15 +138,29 @@ export function MemberPermissionControls({
             />
           ) : null}
 
-          {!loaded ? (
+          {!loaded && loading ? (
+            <div
+              role="status"
+              aria-label="Permissions"
+              aria-busy="true"
+              className="grid items-start gap-3 md:grid-cols-2"
+            >
+              {[0, 1, 2, 3].map((group) => (
+                <Card key={group} className="grid gap-3 bg-charcoal-card p-4 shadow-none ring-0">
+                  <Skeleton className="h-3.5 w-1/3 bg-charcoal-border" />
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="flex items-center justify-between gap-4">
+                      <Skeleton className="h-3 w-1/2 bg-charcoal-border" />
+                      <Skeleton className="h-5 w-9 rounded-full bg-charcoal-border" />
+                    </div>
+                  ))}
+                </Card>
+              ))}
+            </div>
+          ) : !loaded ? (
             <Card className="grid min-h-56 place-items-center bg-charcoal-card shadow-none ring-0">
-              <Button
-                variant="outline"
-                type="button"
-                disabled={loading}
-                onClick={() => void loadPermissions()}
-              >
-                {loading ? "Loading…" : "Try again"}
+              <Button variant="outline" type="button" onClick={() => void loadPermissions()}>
+                Try again
               </Button>
             </Card>
           ) : (

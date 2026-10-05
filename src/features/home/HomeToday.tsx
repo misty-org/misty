@@ -42,7 +42,7 @@ function TodayRows(props: {
     return (
       <div className="grid gap-1.5 px-1" role="status" aria-label="Loading today’s agenda">
         {[0, 1, 2].map((row) => (
-          <div key={row} className="h-12 animate-pulse rounded-xl bg-charcoal-active/45" />
+          <div key={row} className="misty-skeleton h-12 rounded-xl bg-charcoal-active/45" />
         ))}
       </div>
     );

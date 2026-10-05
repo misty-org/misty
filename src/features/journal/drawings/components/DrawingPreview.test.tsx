@@ -43,7 +43,7 @@ describe("DrawingPreview", () => {
     expect(toolbar?.textContent).not.toContain("Save to…");
     expect(toolbar?.textContent).not.toContain("Find");
     expect(toolbar?.textContent).not.toContain("Help");
-    expect(container.textContent).toContain("Preparing preview…");
+    expect(container.querySelector('[role="status"][aria-label="Drawing preview"]')).not.toBeNull();
     const exportButton = Array.from(container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Export image"),
     );

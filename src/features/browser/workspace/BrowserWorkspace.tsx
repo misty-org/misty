@@ -20,7 +20,7 @@ import {
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, IconButton, Notification, toolbarIconProps } from "@/shared/ui";
+import { Button, cn, IconButton, Notification, toolbarIconProps, Skeleton } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight, Pencil, RotateCw, VenetianMask, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -79,8 +79,13 @@ export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
   const tab = props.tab ?? fallbackTab;
   if (hasTauriInternals() && !extensionsReady)
     return (
-      <div className="grid h-full place-items-center text-sm text-cream-muted" role="status">
-        Preparing browser…
+      <div role="status" aria-label="Browser" aria-busy="true" className="flex h-full flex-col">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-charcoal-border px-3">
+          <Skeleton className="size-5 rounded" />
+          <Skeleton className="size-5 rounded" />
+          <Skeleton className="h-6 flex-1 rounded-full" />
+        </div>
+        <div className="min-h-0 flex-1" />
       </div>
     );
   if (!tab) {

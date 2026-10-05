@@ -10,7 +10,7 @@ export const fileBrowserStyles = {
     "grid grid-cols-[minmax(240px,1fr)_220px_128px_128px] items-center gap-4 px-3.5",
   tableSkeletonHeader: "h-10 bg-charcoal-card",
   tableSkeletonRow: "h-12 [[data-compact-mode=true]_&]:h-10",
-  skeletonCell: "relative animate-pulse overflow-hidden rounded-md bg-charcoal-card",
+  skeletonCell: "misty-skeleton rounded-md bg-charcoal-card",
   tableSkeletonHeaderCell: "h-[13px]",
   tableSkeletonCell: "h-3 first:h-4",
   gridSkeleton: cn(

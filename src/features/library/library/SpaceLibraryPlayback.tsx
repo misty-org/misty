@@ -11,6 +11,7 @@ import {
   DialogTitle,
   IconButton,
   Pressable,
+  Skeleton,
 } from "@/shared/ui";
 
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
@@ -183,9 +184,16 @@ export function LibraryMemoryPlayback({
                   target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}/library` }}
                 />
               ) : null}
-              <div className="text-sm text-cream-bright/50">
-                {contentError ? "Open Activity for details." : "Loading…"}
-              </div>
+              {contentError ? (
+                <div className="text-sm text-cream-bright/50">Open Activity for details.</div>
+              ) : (
+                <Skeleton
+                  role="status"
+                  aria-label={item.display_name}
+                  aria-hidden={false}
+                  className="aspect-video w-[min(80%,960px)] rounded-lg bg-cream/10"
+                />
+              )}
             </>
           )}
           {items.length > 1 ? (

@@ -1,6 +1,14 @@
 import { PhotoEditorView } from "@/features/editor/PhotoEditorView";
 import { errorText } from "@/shared/lib/format";
-import { cn, Button, Dialog, DialogContent, DialogTitle, Spinner } from "@/shared/ui";
+import {
+  cn,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Spinner,
+  SkeletonDocument,
+} from "@/shared/ui";
 import { Copy, ExternalLink, FileQuestion, Save, X } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -207,13 +215,7 @@ export function GlobalPreviewDialogView(props: {
                 <div />
               )}
               <div className="min-h-0 overflow-auto">
-                {loading ? (
-                  <PreviewMessage
-                    icon={<Spinner size="lg" label={false} className="size-7" />}
-                    title="Preparing preview"
-                    detail="Loading the best available reader…"
-                  />
-                ) : null}
+                {loading ? <SkeletonDocument label="Preview" /> : null}
                 {!loading && loadError ? (
                   <PreviewMessage
                     icon={<FileQuestion size={34} />}

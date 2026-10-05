@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  Skeleton,
 } from "@/shared/ui";
 import { CheckCircle2, Copy, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -201,23 +202,32 @@ export function AddFilesToSpaceDialog({
         <div className="grid min-h-0 gap-4 overflow-hidden">
           <label className="grid gap-2 text-xs font-medium text-cream-muted">
             Destination Space
-            <Select
-              value={spaceId}
-              onValueChange={setSpaceId}
-              disabled={running || loading || readyCount > 0}
-            >
-              <SelectTrigger aria-label="Destination Space">
-                <SelectValue placeholder={loading ? "Loading Spaces…" : "Choose a Space"} />
-              </SelectTrigger>
-              <SelectContent>
-                {eligibleSpaces.map((space) => (
-                  <SelectItem key={space.id} value={space.id}>
-                    {spaceNavigationName(space)}
-                    {space.is_shared ? " · Shared" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {loading ? (
+              <Skeleton
+                role="status"
+                aria-label="Destination Space"
+                aria-hidden={false}
+                className="h-9 w-full"
+              />
+            ) : (
+              <Select
+                value={spaceId}
+                onValueChange={setSpaceId}
+                disabled={running || readyCount > 0}
+              >
+                <SelectTrigger aria-label="Destination Space">
+                  <SelectValue placeholder="Choose a Space" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleSpaces.map((space) => (
+                    <SelectItem key={space.id} value={space.id}>
+                      {spaceNavigationName(space)}
+                      {space.is_shared ? " · Shared" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </label>
 
           {!loading && eligibleSpaces.length === 0 ? (

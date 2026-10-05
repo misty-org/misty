@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/auth";
 import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
-import { Button, cn } from "@/shared/ui";
+import { Button, cn, Skeleton } from "@/shared/ui";
 import { Flame } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ContinueHero } from "./ContinueHero";
@@ -85,13 +85,18 @@ export function HomePage() {
                 className="flex items-center gap-2 text-sm font-semibold text-cream-bright"
               >
                 <Flame size={16} aria-hidden="true" />
-                {activity.state === "loading"
-                  ? "Loading activity…"
-                  : activity.state === "error"
-                    ? "Streak unavailable"
-                    : streak > 0
-                      ? `${streak}-day streak`
-                      : "Start your streak"}
+                {activity.state === "loading" ? (
+                  <>
+                    <Skeleton className="h-3.5 w-28" />
+                    <span className="sr-only">Streak</span>
+                  </>
+                ) : activity.state === "error" ? (
+                  "Streak unavailable"
+                ) : streak > 0 ? (
+                  `${streak}-day streak`
+                ) : (
+                  "Start your streak"
+                )}
               </h2>
               {activity.state === "error" ? (
                 <Button variant="link" size="none" className="text-xs" onClick={activity.retry}>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { appIcons, Button, WorkspaceSectionLabel } from "@/shared/ui";
+import { appIcons, Button, WorkspaceSectionLabel, SkeletonList } from "@/shared/ui";
 import { Images, MessagesSquare, Notebook, PencilRuler } from "lucide-react";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 import { useSpaceOverview } from "../useSpaceOverview";
@@ -66,13 +66,18 @@ export function SpaceRecentNavigation({
           </Button>
         </div>
       ) : (
-        !recent.length && (
-          <p className="px-3 py-2 text-xs text-cream-muted">
-            {data.loading || !personal.ready
-              ? "Loading recent items…"
-              : "Items you open appear here."}
-          </p>
-        )
+        !recent.length &&
+        (data.loading || !personal.ready ? (
+          <SkeletonList
+            label="Recent items"
+            rows={4}
+            leading="icon"
+            lines={1}
+            rowClassName="px-3"
+          />
+        ) : (
+          <p className="px-3 py-2 text-xs text-cream-muted">Items you open appear here.</p>
+        ))
       )}
       {recent.length > 5 && (
         <Button

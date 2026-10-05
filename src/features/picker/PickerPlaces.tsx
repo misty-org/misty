@@ -12,7 +12,7 @@ import {
   pinnedPathLabel,
   quickAccessPathHidden,
 } from "@/features/file-ui";
-import { cn, Pressable } from "@/shared/ui";
+import { cn, Pressable, SkeletonList } from "@/shared/ui";
 
 /**
  * The picker's locations rail: the explorer sidebar reduced to navigation only — no workspace
@@ -77,7 +77,7 @@ export function PickerPlaces(props: PickerPlacesProps) {
       {devices.length > 0 || props.devicesLoading ? (
         <PlacesSection label="Devices">
           {devices.length === 0 ? (
-            <PlacesHint>Loading…</PlacesHint>
+            <SkeletonList label="Devices" rows={2} leading="icon" lines={1} rowClassName="px-2" />
           ) : (
             devices.map((device) => (
               <PlaceRow

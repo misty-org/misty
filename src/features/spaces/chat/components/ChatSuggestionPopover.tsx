@@ -8,6 +8,7 @@ import {
   CommandList,
   CommandSeparator,
   PopoverContent,
+  SkeletonList,
 } from "@/shared/ui";
 import { LibraryBig, Paperclip, Users } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
@@ -81,7 +82,15 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
           {showEmpty ? (
             <CommandEmpty>No matching Agents, people, or Library items.</CommandEmpty>
           ) : null}
-          {props.loading ? <p className="p-3 text-sm text-cream-muted">Loading Library…</p> : null}
+          {props.loading ? (
+            <SkeletonList
+              label="Library suggestions"
+              rows={3}
+              leading="icon"
+              className="p-2"
+              rowClassName="px-2"
+            />
+          ) : null}
           {props.error ? (
             <SystemErrorActivity
               error={props.error}

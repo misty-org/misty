@@ -1,5 +1,5 @@
 import type { FileEntry } from "@/native/ipc";
-import { Button } from "@/shared/ui";
+import { Button, SkeletonList } from "@/shared/ui";
 import { Archive, FileText, Folder, Music } from "lucide-react";
 import type { LoadedInspectorPreview } from "../../model/interfaces/components/FileInspectorPreview";
 import { formatBytes, FileIcon } from "@/features/file-ui";
@@ -91,7 +91,7 @@ export function FolderContentsPreview(props: {
   onOpenEntry: (entry: FileEntry) => void;
 }) {
   if (props.loading)
-    return <span className={inspectorStyles.previewStatus}>Loading contents...</span>;
+    return <SkeletonList label="Folder contents" rows={5} leading="icon" lines={1} />;
   if (props.entries.length === 0) {
     return (
       <span className={inspectorStyles.previewStatus}>

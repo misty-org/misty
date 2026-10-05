@@ -28,6 +28,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  SkeletonList,
 } from "@/shared/ui";
 import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import { useSpaceConversations } from "../sidebar/useSpaceConversations";
@@ -82,7 +83,18 @@ export function ConversationSwitcher({
         aria-label="Find a chat"
       />
       <CommandList className="max-h-[min(65dvh,420px)]">
-        <CommandEmpty>{data.loading ? "Loading chats…" : "No matching chats."}</CommandEmpty>
+        {data.loading && !data.conversations.length ? (
+          <SkeletonList
+            label="Chats"
+            rows={4}
+            leading="icon"
+            lines={1}
+            className="p-2"
+            rowClassName="px-2"
+          />
+        ) : (
+          <CommandEmpty>No matching chats.</CommandEmpty>
+        )}
         {groupConversations(data.conversations)
           .filter((group) => group.everyone || group.conversations.length > 0)
           .map((group) => (

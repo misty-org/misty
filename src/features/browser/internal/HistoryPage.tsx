@@ -9,6 +9,7 @@ import {
   ListRowButton,
   CollectionSkeleton,
   WorkspaceSectionLabel,
+  SkeletonList,
 } from "@/shared/ui";
 import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
 import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
@@ -227,7 +228,9 @@ export function HistoryPage(props: BrowserInternalPageProps) {
           </ul>
         </section>
       ))}
-      {more ? (
+      {more && loading && visits.length ? (
+        <SkeletonList label="Older history" rows={4} leading="icon" lines={1} rowClassName="px-2" />
+      ) : more ? (
         <Button
           variant="toolbar"
           size="xs"
@@ -235,7 +238,7 @@ export function HistoryPage(props: BrowserInternalPageProps) {
           disabled={loading}
           onClick={() => void load(visits[visits.length - 1]?.visitedAt)}
         >
-          {loading ? "Loading…" : "Show older"}
+          Show older
         </Button>
       ) : null}
     </InternalPageFrame>
