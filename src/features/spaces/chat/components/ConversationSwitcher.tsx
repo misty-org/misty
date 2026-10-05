@@ -33,7 +33,7 @@ import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/interfaces
 import { useSpaceConversations } from "../sidebar/useSpaceConversations";
 import { conversationName, groupConversations } from "../sidebar/conversationGroups";
 import { CreateEditConversationDialog } from "../sidebar/CreateEditConversationDialog";
-import { socialConversationPath, socialProviderPath } from "../../social/socialRoute";
+import { spaceChatConversationPath, spaceChatPath } from "../chatRoute";
 import { useSpacePersonalItems } from "../../useSpacePersonalItems";
 
 export function ConversationSwitcher({
@@ -88,26 +88,18 @@ export function ConversationSwitcher({
           .map((group) => (
             <CommandGroup key={group.id} heading={group.title}>
               {group.everyone && (
-                <CommandItem
-                  value="Everyone"
-                  onSelect={() => choose(socialProviderPath(spaceId, "misty"))}
-                >
+                <CommandItem value="Everyone" onSelect={() => choose(spaceChatPath(spaceId))}>
                   <Users />
                   Everyone{!conversation && <Check className="ml-auto" />}
                 </CommandItem>
               )}
               {group.conversations.map((c) => {
-                const Icon =
-                  group.provider !== "misty"
-                    ? MessagesSquare
-                    : c.kind === "direct"
-                      ? UserRound
-                      : Hash;
+                const Icon = c.kind === "direct" ? UserRound : Hash;
                 return (
                   <CommandItem
                     key={c.id}
                     value={`${conversationName(c, currentUserId)} ${group.title} ${c.id}`}
-                    onSelect={() => choose(socialConversationPath(spaceId, group.provider, c.id))}
+                    onSelect={() => choose(spaceChatConversationPath(spaceId, c.id))}
                   >
                     <Icon />
                     <span className="truncate">{conversationName(c, currentUserId)}</span>
@@ -202,7 +194,7 @@ export function ConversationSwitcher({
         onSaved={(saved) => {
           data.upsert(saved);
           setCreating(false);
-          choose(socialConversationPath(spaceId, "misty", saved.id));
+          choose(spaceChatConversationPath(spaceId, saved.id));
         }}
       />
     </>

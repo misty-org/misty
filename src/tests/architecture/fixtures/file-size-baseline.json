@@ -52,7 +52,6 @@
   "src/features/planner/roadmap/SpaceRoadmapView.tsx": 587,
   "src/features/planner/roadmap/spaceRoadmap/RoadmapEditor.tsx": 727,
   "src/features/spaces/SpaceAgenda.test.tsx": 572,
-  "src/features/spaces/chat/SpaceChat.tsx": 599,
   "src/features/webviews/browserRuntime.ts": 785,
   "src/features/workspace/useWorkspaceStore.test.ts": 680,
   "src/features/workspace/useWorkspaceStore.ts": 995

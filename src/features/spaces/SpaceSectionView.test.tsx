@@ -41,14 +41,10 @@ vi.mock("@/features/library/library/SpaceLibrary", async () => {
 vi.mock("./chat/SpaceChat", async () => {
   const { useSocialAuth } = await import("./chat/SocialRuntime");
   return {
-    SpaceSocial: ({ spaceId, provider }: { spaceId: string; provider: string }) => {
+    SpaceSocial: ({ spaceId }: { spaceId: string }) => {
       const { user } = useSocialAuth();
       expect(user?.id).toBe("one");
-      return (
-        <div>
-          Chat in {spaceId} via {provider}
-        </div>
-      );
+      return <div>Chat in {spaceId}</div>;
     },
   };
 });

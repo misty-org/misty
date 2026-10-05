@@ -185,12 +185,7 @@ export function SpaceSectionView(props: {
         ) : section === "library" ? (
           <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
         ) : section === "social" || section === "chat" ? (
-          <Chat
-            spaceId={spaceId}
-            spaceName={space.name}
-            provider="misty"
-            workspaceTabId={props.workspaceTabId}
-          />
+          <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (
           <EmptyState
             className="h-full"

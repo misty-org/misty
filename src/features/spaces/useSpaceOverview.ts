@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import { useSpacePersonalItems } from "./useSpacePersonalItems";
 import { spaceItemKeyFromRoute } from "./spaceItemRoute";
-import { socialConversationPath, socialProvider } from "./social/socialRoute";
+import { spaceChatConversationPath } from "./chat/chatRoute";
 import { conversationName } from "./chat/sidebar/conversationGroups";
 import { notesApi } from "@/api/notes/api";
 import { drawingsApi } from "@/api/drawings/api";
@@ -178,11 +178,9 @@ function useSpaceOverviewData(
                 creatorUserId: c.created_by_user_id,
                 createdAt: c.created_at,
                 updatedAt: c.updated_at,
-                route: socialConversationPath(space.id, socialProvider(c.origin) ?? "misty", c.id),
+                route: spaceChatConversationPath(space.id, c.id),
                 rename:
-                  c.created_by_user_id === accountId &&
-                  c.kind !== "direct" &&
-                  (!c.origin || c.origin === "misty")
+                  c.created_by_user_id === accountId && c.kind !== "direct"
                     ? (title: string) =>
                         spacesApi.updateConversation(
                           space.id,
@@ -194,10 +192,9 @@ function useSpaceOverviewData(
                         )
                     : undefined,
                 remove:
-                  (space.role === "owner" ||
-                    c.created_by_user_id === accountId ||
-                    c.kind === "direct") &&
-                  (c.origin !== "discord" || c.integration_status === "disconnected")
+                  space.role === "owner" ||
+                  c.created_by_user_id === accountId ||
+                  c.kind === "direct"
                     ? () => spacesApi.deleteOrClearConversation(space.id, c.id)
                     : undefined,
               })),

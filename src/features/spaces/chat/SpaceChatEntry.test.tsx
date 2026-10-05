@@ -12,10 +12,9 @@ vi.mock("./sidebar/useSpaceConversations", () => ({
   useSpaceConversations: () => ({
     conversations: [
       {
-        id: "connected",
+        id: "design",
         title: "Design updates",
-        kind: "channel",
-        origin: "discord",
+        kind: "standard",
         participants: [],
         updated_at: "2026-09-30",
         created_by_user_id: "owner",
@@ -35,7 +34,7 @@ function Route() {
   );
 }
 afterEach(cleanup);
-it("filters connected chats and opens the provider conversation", () => {
+it("filters channel chats and opens the conversation", () => {
   useSpacesStore.setState({ membersBySpace: { test: [] }, spaces: [] });
   render(
     <MemoryRouter initialEntries={["/spaces/test/social"]}>
@@ -43,11 +42,12 @@ it("filters connected chats and opens the provider conversation", () => {
       <Route />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Connected" }));
-  expect(screen.queryByRole("button", { name: "Everyone" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Direct" }));
+  expect(screen.queryByRole("button", { name: "Design updates" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Channels" }));
   fireEvent.click(screen.getByRole("button", { name: "Design updates" }));
   expect(screen.getByTestId("route").textContent).toBe(
-    "/spaces/test/social/discord?conversation=connected",
+    "/spaces/test/social/misty?conversation=design",
   );
 });
 
