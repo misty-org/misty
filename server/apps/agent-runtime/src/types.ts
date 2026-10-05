@@ -46,6 +46,8 @@ export interface SpaceTaskContext {
   }>;
   file_warnings: string;
   model_turn_limit?: number;
+  /** The run model's context window in tokens, from the Gateway catalog. */
+  context_window_tokens?: number;
   allowed_tools: string[];
   managed_misty?: boolean;
 }

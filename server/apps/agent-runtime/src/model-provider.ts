@@ -2,7 +2,12 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV4, LanguageModelV4CallOptions } from "@ai-sdk/provider";
+import type {
+  EmbeddingModelV4,
+  LanguageModelV4,
+  LanguageModelV4CallOptions,
+  TranscriptionModelV4,
+} from "@ai-sdk/provider";
 import { createGateway } from "ai";
 import type { RuntimeIdentity } from "./control-plane.js";
 
@@ -48,23 +53,84 @@ export async function resolveRuntimeModel(
     { role, model: modelId },
     `${role}:provider`,
   );
+  return resolveConfiguredModel(modelId, options, config);
+}
+
+/** A route Go resolved: Misty's own Gateway ("instance") or an account connection. */
+export type ModelRoute = AccountModelConfig;
+
+/** Account requests reach only the account's public endpoint, with pinned DNS. */
+export async function accountFetch(config: AccountModelConfig): Promise<typeof fetch> {
+  const { providerFetch } = await import("./provider-fetch.js");
+  return providerFetch(
+    config.provider === "gateway" ? config.baseURL!.replace(/\/v1\/?$/, "/v4/ai") : config.baseURL!,
+  );
+}
+
+export async function resolveConfiguredModel(
+  modelId: string,
+  options: LanguageModelV4CallOptions,
+  config: ModelRoute,
+): Promise<{ model: LanguageModelV4; options: LanguageModelV4CallOptions }> {
   if (config.provider === "instance")
     return resolveInstanceModel(modelId, {
       ...options,
-      reasoning: config.reasoning as LanguageModelV4CallOptions["reasoning"],
+      reasoning: (config.reasoning || options.reasoning) as LanguageModelV4CallOptions["reasoning"],
     });
-  const { providerFetch } = await import("./provider-fetch.js");
-  return resolveProviderModel(
-    modelId,
-    options,
-    config,
-    {},
-    providerFetch(
-      config.provider === "gateway"
-        ? config.baseURL!.replace(/\/v1\/?$/, "/v4/ai")
-        : config.baseURL!,
-    ),
-  );
+  return resolveProviderModel(modelId, options, config, {}, await accountFetch(config));
+}
+
+function instanceGateway(env: Environment = process.env) {
+  return createGateway({
+    apiKey: env.AI_GATEWAY_API_KEY?.trim() || env.VERCEL_OIDC_TOKEN?.trim() || undefined,
+    baseURL: env.AI_GATEWAY_BASE_URL?.trim() || undefined,
+  });
+}
+
+function accountNativeId(config: AccountModelConfig, modelId: string): string {
+  if (modelId !== config.model)
+    throw new Error("Requested model is not configured for this connection");
+  return config.provider === "gateway" ? modelId : modelId.slice(config.provider.length + 1);
+}
+
+/** Embedding models never fall back from an account connection to Misty's Gateway. */
+export async function resolveEmbeddingModel(
+  modelId: string,
+  config: ModelRoute,
+): Promise<EmbeddingModelV4> {
+  if (config.provider === "instance") return instanceGateway().embeddingModel(modelId);
+  const fetch = await accountFetch(config);
+  const nativeId = accountNativeId(config, modelId);
+  const settings = { apiKey: config.apiKey, baseURL: config.baseURL, fetch };
+  switch (config.provider) {
+    case "gateway":
+      return createGateway({ ...settings, baseURL: config.baseURL!.replace(/\/v1\/?$/, "/v4/ai") }).embeddingModel(nativeId);
+    case "openai":
+      return createOpenAI(settings).embedding(nativeId);
+    case "openai-compatible":
+      return createOpenAICompatible({ ...settings, name: "openai-compatible", baseURL: config.baseURL! }).embeddingModel(nativeId);
+  }
+  throw new Error("This connection cannot create embeddings");
+}
+
+/** Transcription follows the same routing as embeddings. */
+export async function resolveTranscriptionModel(
+  modelId: string,
+  config: ModelRoute,
+): Promise<TranscriptionModelV4> {
+  if (config.provider === "instance") return instanceGateway().transcriptionModel(modelId);
+  const fetch = await accountFetch(config);
+  const nativeId = accountNativeId(config, modelId);
+  const settings = { apiKey: config.apiKey, baseURL: config.baseURL, fetch };
+  switch (config.provider) {
+    case "gateway":
+      return createGateway({ ...settings, baseURL: config.baseURL!.replace(/\/v1\/?$/, "/v4/ai") }).transcriptionModel(nativeId);
+    // OpenAI-compatible endpoints share OpenAI's /audio/transcriptions shape.
+    case "openai":
+    case "openai-compatible":
+      return createOpenAI(settings).transcription(nativeId);
+  }
+  throw new Error("This connection cannot transcribe audio");
 }
 
 export function resolveProviderModel(

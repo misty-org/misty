@@ -26,7 +26,7 @@ func (s *MediaSearchService) IndexChunk() http.HandlerFunc {
 			writeJSON(w, 503, map[string]any{"code": "media_search_disabled", "message": "Media Search is temporarily disabled."})
 			return
 		}
-		if s.analyzer == nil || (strings.TrimSpace(s.analyzer.APIKey) == "" && s.analyzer.ModelResolver == nil) {
+		if !s.analyzer.Available() {
 			writeJSON(w, 503, map[string]any{"code": "media_search_unavailable", "message": "Media Search is not configured."})
 			return
 		}

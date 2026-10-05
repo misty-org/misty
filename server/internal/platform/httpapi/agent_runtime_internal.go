@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
@@ -195,7 +196,8 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 			"run_id": run.ID, "agent_id": run.AgentID, "space_id": spaceID, "task": task, "run_mode": run.EffectiveRunMode,
 			"space_name": spaceName, "is_default": false, "timezone": timezone, "current_time": now.Format(time.RFC3339), "members": []any{},
 			"model_id": agentRoute.Model, "reasoning_effort": agentRoute.Reasoning, "vision_model_id": visionRoute.Model,
-			"system": system, "prompt": prompt, "attached_sources": sources, "file_warnings": fileWarnings,
+			"context_window_tokens": serveragent.ModelContextWindow(r.Context(), agentRoute.Model), "system": system,
+			"prompt": prompt, "attached_sources": sources, "file_warnings": fileWarnings,
 			"allowed_tools": allowedTools, "capture": capture, "display_captures": displayCaptures, "companion_mode": companionMode, "managed_misty": managedMisty,
 		})
 	}

@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+
 	"github.com/kannachi323/misty/server/internal/aimodels"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
 func (s *Service) SetModelResolver(resolve aimodels.Resolver) { s.modelResolver = resolve }
@@ -22,24 +24,28 @@ func (a *SmartLibraryAnalyzer) roleConfig(ctx context.Context, role string) (*ai
 	}
 	return a.ModelResolver(ctx, a.account, role)
 }
-func (a *SmartLibraryAnalyzer) forRole(ctx context.Context, role string) (*SmartLibraryAnalyzer, *aimodels.Resolved, error) {
-	c, err := a.roleConfig(ctx, role)
+
+// embeddingRoute is where this account's embeddings go and the model they use.
+func (a *SmartLibraryAnalyzer) embeddingRoute(ctx context.Context) (modelruntime.Route, string, error) {
+	c, err := a.roleConfig(ctx, "embedding")
 	if err != nil {
-		return nil, nil, err
+		return modelruntime.Route{}, "", err
 	}
-	if c == nil {
-		return a, nil, nil
+	if c != nil {
+		return modelruntime.For(c), c.Model, nil
+	}
+	return modelruntime.Instance(), a.embeddingModel(), nil
+}
+
+// forRealtime points the realtime voice socket at the account's own
+// connection. Realtime voice is the one model connection Go still opens.
+func (a *SmartLibraryAnalyzer) forRealtime(ctx context.Context) (*SmartLibraryAnalyzer, *aimodels.Resolved, error) {
+	c, err := a.roleConfig(ctx, "realtime")
+	if err != nil || c == nil {
+		return a, nil, err
 	}
 	clone := *a
 	clone.APIKey, clone.BaseURL = c.APIKey, c.BaseURL
-	clone.callProvider = c.Provider
-	clone.callReasoning = c.Reasoning
-	if c.Provider == "gateway" {
-		clone.callProvider = ""
-	}
-	if role == "embedding" {
-		clone.EmbeddingModel = c.Model
-	}
 	client, err := aimodels.HTTPClient(c.BaseURL)
 	if err != nil {
 		return nil, nil, err
@@ -61,21 +67,20 @@ func (a *SmartLibraryAnalyzer) AccountEmbeddingModel(ctx context.Context) (strin
 	return a.embeddingModel(), nil
 }
 
-func accountCompletionProvider(c *aimodels.Resolved) (ModelProvider, error) {
-	client, err := aimodels.HTTPClient(c.BaseURL)
-	if err != nil {
-		return nil, err
+func accountCompletionProvider(models *modelruntime.Client, c *aimodels.Resolved) (ModelProvider, error) {
+	if !models.Enabled() {
+		return nil, modelruntime.ErrUnavailable
 	}
 	provider := c.Provider
 	if provider == "gateway" {
 		provider = ProviderVercelAI
 	}
-	return NewBudgetedProvider(accountNamedProvider{ModelProvider: NewOpenAIProvider(OpenAIProviderConfig{APIKey: c.APIKey, BaseURL: c.BaseURL, Model: aimodels.NativeModel(c.Provider, c.Model), ReasoningEffort: c.Reasoning, ProviderName: provider, Client: client}), model: c.Model}, ProviderBudgetFromEnv()), nil
+	return NewBudgetedProvider(NewRuntimeProvider(models, modelruntime.For(c), c.Model, provider, c.Reasoning), ProviderBudgetFromEnv()), nil
 }
 
 func (a *SmartLibraryAnalyzer) ConfiguredRealtime(ctx context.Context, account string) (*SmartLibraryAnalyzer, bool, error) {
 	scoped := a.WithAIAccount(account)
-	configured, config, err := scoped.forRole(ctx, "realtime")
+	configured, config, err := scoped.forRealtime(ctx)
 	if err != nil {
 		return nil, false, err
 	}
@@ -89,10 +94,3 @@ func (a *SmartLibraryAnalyzer) selectedRealtimeModel() string {
 	}
 	return AgentRealtimeModel
 }
-
-type accountNamedProvider struct {
-	ModelProvider
-	model string
-}
-
-func (p accountNamedProvider) ModelName() string { return p.model }

@@ -24,7 +24,7 @@ func (s *SmartLibraryService) Approve(kind string) http.HandlerFunc {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "smart_library_disabled", "message": "Image analysis is temporarily disabled. Weekly usage was not charged."})
 			return
 		}
-		if s.analyzer == nil || (strings.TrimSpace(s.analyzer.APIKey) == "" && s.analyzer.ModelResolver == nil) {
+		if !s.analyzer.Available() {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "smart_library_unavailable", "message": "Image analysis is not configured. Weekly usage was not charged."})
 			return
 		}

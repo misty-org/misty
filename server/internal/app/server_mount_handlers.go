@@ -63,7 +63,7 @@ func (s *Server) MountHandlers() error {
 	aiService.SetEmbeddingAnalyzer(libraryAnalyzer)
 	aiService.SetAttachmentStore(s.LibraryStore)
 	s.Spaces.SetSearchAnalyzer(libraryAnalyzer)
-	intelligenceEnabled := libraryAnalyzer.APIKey != "" || libraryAnalyzer.ModelResolver != nil
+	intelligenceEnabled := libraryAnalyzer.Available()
 	s.Library.SetIntelligence(libraryAnalyzer, intelligenceEnabled)
 	smartLibraryService := api.NewSmartLibraryService(s.Database, libraryAnalyzer)
 	mediaSearchService := api.NewMediaSearchService(s.Database, libraryAnalyzer)

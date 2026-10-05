@@ -116,7 +116,6 @@ const FILES: &[FileSpec] = &[
         names: &[
             "AI_GATEWAY_API_KEY",
             "AI_GATEWAY_BASE_URL",
-            "AI_GATEWAY_EMBEDDING_BASE_URL",
             "AGENT_TRANSCRIPTION_MODEL",
             "MEDIA_SEARCH_EMERGENCY_DISABLE",
             "MEDIA_SEARCH_TRANSCRIPTION_MODEL",
@@ -247,6 +246,7 @@ const FILES: &[FileSpec] = &[
 // Accepted only when reading older environments; retired switches and settings
 // must not block startup or become active configuration again.
 const DEPRECATED_NAMES: &[&str] = &[
+    "AI_GATEWAY_EMBEDDING_BASE_URL",
     "MISTY_LOCAL_WEBSITE_ORIGIN",
     "MISTY_CLOUDFLARE_TUNNEL_ID",
     "MISTY_CONNECTED_DEVICES_ENABLED",

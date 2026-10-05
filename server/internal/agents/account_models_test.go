@@ -2,17 +2,18 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
-	"github.com/kannachi323/misty/server/internal/aimodels"
-	"io"
 	"net/http"
-	"strings"
 	"testing"
+
+	"github.com/kannachi323/misty/server/internal/aimodels"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
-func TestAccountLibraryUsesResponsesAndDisabledFallbackMakesNoCall(t *testing.T) {
-	calls := 0
-	analyzer := (&SmartLibraryAnalyzer{ModelResolver: func(ctx context.Context, user, role string) (*aimodels.Resolved, error) {
+func TestAccountLibraryUsesTheAccountRouteAndDisabledFallbackMakesNoCall(t *testing.T) {
+	runtime := modelruntime.TestingNewFake(t, func(call modelruntime.TestingCall) (int, any) {
+		return http.StatusOK, map[string]any{"text": `{"assets":[]}`, "object": map[string]any{"assets": []any{}}, "usage": map[string]int{"inputTokens": 3, "outputTokens": 2}}
+	})
+	analyzer := (&SmartLibraryAnalyzer{Models: runtime.Client, ModelResolver: func(ctx context.Context, user, role string) (*aimodels.Resolved, error) {
 		if user != "owner" {
 			t.Fatal("wrong account")
 		}
@@ -20,54 +21,48 @@ func TestAccountLibraryUsesResponsesAndDisabledFallbackMakesNoCall(t *testing.T)
 			return nil, aimodels.ErrDisabled
 		}
 		return &aimodels.Resolved{Provider: "openai", Model: "openai/gpt-6-luna", BaseURL: "https://api.openai.com/v1", APIKey: "fixture", Reasoning: "low"}, nil
-	}, Client: &http.Client{Transport: voiceTransport(func(r *http.Request) (*http.Response, error) {
-		calls++
-		if r.URL.String() != "https://api.openai.com/v1/responses" || r.Header.Get("Authorization") != "Bearer fixture" {
-			t.Fatal("wrong endpoint or credential")
-		}
-		var body map[string]any
-		if json.NewDecoder(r.Body).Decode(&body) != nil || body["model"] != "gpt-6-luna" {
-			t.Fatal("native model ID missing")
-		}
-		if body["reasoning"].(map[string]any)["effort"] != "low" {
-			t.Fatal("reasoning choice ignored")
-		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"output_text":"{\"assets\":[]}","usage":{"input_tokens":3,"output_tokens":2}}`)), Header: http.Header{}}, nil
-	})}}).WithAIAccount("owner")
+	}}).WithAIAccount("owner")
 	analysis, err := analyzer.Analyze(t.Context(), []SmartLibraryAsset{{AssetID: "asset", AssetKind: "text", ExtractedText: "hello"}})
-	if err != nil || calls != 1 || len(analysis.Failures) != 1 {
-		t.Fatal("disabled fallback made an extra attempt", calls, err)
+	calls := runtime.Calls()
+	if err != nil || len(calls) != 1 || len(analysis.Failures) != 1 {
+		t.Fatal("disabled fallback made an extra attempt", len(calls), err)
+	}
+	body := calls[0].Body
+	route := body["route"].(map[string]any)
+	if calls[0].Path != "/v1/models/text" || route["provider"] != "openai" || route["apiKey"] != "fixture" || route["reasoning"] != "low" || body["model"] != "openai/gpt-6-luna" {
+		t.Fatalf("account route ignored: %v", body)
+	}
+	if _, ok := body["reasoning"]; ok {
+		t.Fatal("Gateway reasoning overrode the account's choice")
+	}
+	if body["schema"].(map[string]any)["name"] != "smart_library_analysis_v2" {
+		t.Fatal("structured output schema missing")
 	}
 }
+
 func TestAccountEmbeddingUsesSelectedModelAndImageDescription(t *testing.T) {
-	calls := 0
-	analyzer := (&SmartLibraryAnalyzer{ModelResolver: func(ctx context.Context, user, role string) (*aimodels.Resolved, error) {
+	runtime := modelruntime.TestingNewFake(t, func(call modelruntime.TestingCall) (int, any) {
+		return http.StatusOK, map[string]any{"embeddings": [][]float64{make([]float64, SmartLibraryEmbeddingDims)}, "usage": map[string]int{"inputTokens": 3}}
+	})
+	analyzer := (&SmartLibraryAnalyzer{Models: runtime.Client, ModelResolver: func(ctx context.Context, user, role string) (*aimodels.Resolved, error) {
 		if user != "owner" || role != "embedding" {
 			t.Fatal("wrong embedding authority")
 		}
 		return &aimodels.Resolved{Provider: "openai", Model: "openai/text-embedding-3-small", BaseURL: "https://api.openai.com/v1", APIKey: "fixture"}, nil
-	}, Client: &http.Client{Transport: voiceTransport(func(r *http.Request) (*http.Response, error) {
-		calls++
-		if r.URL.Path != "/v1/embeddings" {
-			t.Fatal("wrong embedding endpoint")
-		}
-		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		if body["model"] != "text-embedding-3-small" || body["dimensions"] != float64(SmartLibraryEmbeddingDims) {
-			t.Fatal("embedding model or dimensions ignored")
-		}
-		input, ok := body["input"].([]any)
-		if !ok || len(input) != 1 {
-			t.Fatal("wrong input")
-		}
-		if _, ok = input[0].(string); !ok {
-			t.Fatal("image bytes sent to a text embedding model")
-		}
-		raw, _ := json.Marshal(map[string]any{"data": []any{map[string]any{"embedding": make([]float64, SmartLibraryEmbeddingDims)}}, "usage": map[string]int{"prompt_tokens": 3}})
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(raw))), Header: http.Header{}}, nil
-	})}}).WithAIAccount("owner")
+	}}).WithAIAccount("owner")
 	embeddings, _, err := analyzer.EmbedAssets(t.Context(), []SmartLibraryAsset{{AssetID: "asset", AssetKind: "image", MimeType: "image/png", Bytes: []byte("fixture-image")}}, map[string]SmartLibraryMetadata{"asset": {Description: "A red bicycle"}})
-	if err != nil || calls != 1 || len(embeddings) != 1 || embeddings[0].Model != "openai/text-embedding-3-small" {
+	calls := runtime.Calls()
+	if err != nil || len(calls) != 1 || len(embeddings) != 1 || embeddings[0].Model != "openai/text-embedding-3-small" {
 		t.Fatal("selected embedding model was not recorded", err)
+	}
+	body := calls[0].Body
+	if calls[0].Path != "/v1/models/embed" || body["model"] != "openai/text-embedding-3-small" || body["dimensions"] != float64(SmartLibraryEmbeddingDims) {
+		t.Fatalf("embedding model or dimensions ignored: %v", body)
+	}
+	if _, ok := body["images"]; ok {
+		t.Fatal("image bytes sent to a text embedding model")
+	}
+	if values := body["values"].([]any); len(values) != 1 {
+		t.Fatal("wrong input")
 	}
 }

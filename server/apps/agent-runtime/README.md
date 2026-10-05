@@ -20,6 +20,22 @@ Tokens cannot be reused for another Misty run or Vercel Workflow run. During a r
 - The model reports the outcome with `misty_finish_task`. `misty_browser_act` runs Midscene against the assigned browser when the native adapter is available.
 - `workflows/space-task-agent.ts` only orchestrates the run. Tool naming lives in `src/model-tools.ts`, call outcomes in `src/tool-outcomes.ts` and `src/tool-monitor.ts`, transport in `src/tool-calls.ts`, and lifecycle steps in `src/control-plane-steps.ts`.
 
+## Context management
+
+Before each model step the run keeps itself inside the model's context window
+(`src/context-compaction.ts`): past 60% it clears old tool results, past 80% it
+summarizes older steps with the run's own model (`src/compaction-step.ts`,
+metered as `model:compact:N`). See the agent architecture brief.
+
+## One-shot model calls
+
+The Go API sends every model call outside agent runs here, signed like the run
+routes: `POST /v1/models/text` (with an optional JSON schema), `/v1/models/embed`
+and `/v1/models/transcribe` in `src/model-calls.ts`. Go picks the route (Misty's
+Gateway, or an account connection with its key) and meters the call; the
+runtime only calls the model through the AI SDK and reports usage. Provider
+errors return a status, never the provider's response body.
+
 ## Worlds
 
 - Local development: omit `WORKFLOW_TARGET_WORLD` to use Workflow's local world.
