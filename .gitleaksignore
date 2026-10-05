@@ -32,3 +32,5 @@ da8b0aa403f351c852996524d098a1c6740f1ff8:src-tauri/src/core/clipboard/cache.rs:g
 9dcaeab305603eabc024c4de14788525bf1da22f:proxy/core/setup/default/commands.msy:generic-api-key:51
 # keyboard shortcut bindings
 72cd568a43b215f67379097802dd78a6570bfaa4:proxy/core/setup/default/commands.msy:generic-api-key:41
+# base64 of "secret-secret-secret-secret-secret" in a runtime-secret strength test
+3feafe4cdf8263a6b73b24f00fc04c420d705a6a:server/internal/modelruntime/client_test.go:generic-api-key:34
