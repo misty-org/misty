@@ -148,4 +148,18 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
     expect(request?.screenRequest?.kind).toBe("open");
     expect(request?.screenRequest?.url ?? "").toContain("example.com");
   });
+
+  it("phase 4: asks for the desktop to work in another Mac app", async () => {
+    const run = await ask(
+      "phase4-desktop-handoff",
+      "Add a row with Rent and 1200 to the budget sheet open in Numbers",
+      {
+        window_label: "main",
+      },
+    );
+    expect(run.terminal).toBe("invocation.completed");
+    const request = run.events.find((event) => event.type === "screen.request") as
+      { screenRequest?: { kind?: string } } | undefined;
+    expect(request?.screenRequest?.kind).toBe("desktop");
+  });
 });
