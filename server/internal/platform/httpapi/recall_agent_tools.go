@@ -108,7 +108,7 @@ func (s *SpacesService) recallSearch(ctx context.Context, user string, input rec
 	if limit <= 0 || limit > 20 {
 		limit = 8
 	}
-	embedding, _ := s.globalSearchQueryEmbedding(ctx, user, input.Query)
+	embedding, _ := s.agentQueryEmbedding(ctx, user, input.Query)
 	hits, err := s.database.SearchMemoryRetrieval(ctx, user, input.Query, embedding, limit, configuredEmbeddingModel(ctx, s.searchAnalyzer, user))
 	if err != nil {
 		return nil, err

@@ -59,9 +59,7 @@ func Run() {
 			}
 		}),
 		WorkerFunc(func(ctx context.Context) { runPersonalAgentTaskProcessing(ctx, server) }),
-		WorkerFunc(func(ctx context.Context) { runLibraryPeopleProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runLibraryRenditionProcessing(ctx, server) }),
-		WorkerFunc(func(ctx context.Context) { runLibraryIntelligenceProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runNoteControlProcessing(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) { runAIEmbeddingProcessing(ctx, server) }),
 	)

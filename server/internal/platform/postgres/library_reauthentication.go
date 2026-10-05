@@ -103,26 +103,3 @@ func (db *Database) SensitiveLibraryItemScope(ctx context.Context, userID, space
 	}
 	return scope, err
 }
-
-func (db *Database) SensitiveLibraryAssetStackScope(ctx context.Context, userID, spaceID, stackID string) (string, error) {
-	scope := ""
-	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
-			return err
-		}
-		var trashed, hidden bool
-		if err := tx.QueryRowContext(ctx, `SELECT bool_or(i.lifecycle_state='trash'),bool_or(i.hidden) FROM space_library_asset_stacks s JOIN space_library_asset_stack_members m ON m.stack_id=s.id JOIN space_library_items i ON i.id=m.space_library_item_id WHERE s.id=$1 AND s.space_id=$2 GROUP BY s.id`, stackID, spaceID).Scan(&trashed, &hidden); err != nil {
-			return err
-		}
-		if trashed {
-			scope = "recently_deleted"
-		} else if hidden {
-			scope = "hidden"
-		}
-		return nil
-	})
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", ErrLibraryNotFound
-	}
-	return scope, err
-}

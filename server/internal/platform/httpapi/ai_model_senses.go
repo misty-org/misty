@@ -213,7 +213,7 @@ func (s *SpacesService) AgentRuntimeModelProvider() http.HandlerFunc {
 			user = record.UserID
 			runID = record.ID
 		} else {
-			run, _, err := s.database.ValidatePersonalAgentTaskRuntime(r.Context(), runID, body.RuntimeRunID)
+			run, err := s.database.ValidatePersonalAgentTaskRuntime(r.Context(), runID, body.RuntimeRunID)
 			if err != nil {
 				writeAgentError(w, err)
 				return

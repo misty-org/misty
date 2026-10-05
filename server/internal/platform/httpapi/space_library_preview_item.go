@@ -217,14 +217,6 @@ func (s *SpaceLibraryService) validateSensitiveLibraryItem(r *http.Request, user
 	return s.validateLibraryReauthentication(r, userID, spaceID, scope)
 }
 
-func (s *SpaceLibraryService) validateSensitiveLibraryAssetStack(r *http.Request, userID, spaceID, stackID string) error {
-	scope, err := s.database.SensitiveLibraryAssetStackScope(r.Context(), userID, spaceID, stackID)
-	if err != nil || scope == "" {
-		return err
-	}
-	return s.validateLibraryReauthentication(r, userID, spaceID, scope)
-}
-
 func (s *SpaceLibraryService) DownloadAttachment() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUser(w, r, s.database)

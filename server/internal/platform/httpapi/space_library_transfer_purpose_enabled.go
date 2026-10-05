@@ -17,7 +17,6 @@ import (
 
 	"github.com/coregx/gxpdf"
 	"github.com/go-chi/chi/v5"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
@@ -267,46 +266,5 @@ func (s *SpaceLibraryService) Items() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
-func (s *SpaceLibraryService) Reauthenticate() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := authenticatedUser(w, r, s.database)
-		if !ok {
-			return
-		}
-		var body struct {
-			Password string `json:"password"`
-			Scope    string `json:"scope"`
-		}
-		if decodeJSON(w, r, &body) != nil {
-			return
-		}
-		valid, err := s.database.VerifyLibraryPassword(r.Context(), userID, body.Password)
-		if errors.Is(err, db.ErrLibraryPasswordNotSet) {
-			writeJSON(w, http.StatusConflict, map[string]string{"code": "library_password_not_set", "message": err.Error()})
-			return
-		}
-		if err != nil {
-			writeLibraryError(w, err)
-			return
-		}
-		if !valid {
-			_ = s.database.RecordLibraryReauthenticationDenied(r.Context(), userID, chi.URLParam(r, "spaceID"), body.Scope)
-			writeJSON(w, http.StatusForbidden, map[string]string{"code": "library_password_incorrect", "message": "Incorrect library password."})
-			return
-		}
-		token, err := security.GenerateSecureToken()
-		if err != nil {
-			writeLibraryError(w, err)
-			return
-		}
-		expiresAt, err := s.database.CreateLibraryReauthenticationGrant(r.Context(), userID, chi.URLParam(r, "spaceID"), body.Scope, security.HashToken(token), 5*time.Minute)
-		if err != nil {
-			writeLibraryError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"token": token, "scope": body.Scope, "expires_at": expiresAt})
 	}
 }

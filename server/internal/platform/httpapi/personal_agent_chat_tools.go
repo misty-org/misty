@@ -40,12 +40,6 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 	if result, handled, err := executeAgentDrawingTool(ctx, database, actor, tool); handled {
 		return result, err
 	}
-	if result, handled, err := executeAgentCalendarTool(ctx, database, actor, tool); handled {
-		return result, err
-	}
-	if result, handled, err := executeAgentRoadmapTool(ctx, database, actor, tool); handled {
-		return result, err
-	}
 	if result, handled, err := executeAgentLibraryTool(ctx, database, actor, tool); handled {
 		return result, err
 	}
@@ -61,7 +55,7 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 	if tool.Name == "space.search_messages" || tool.Name == "file.search" {
 		return executeSpaceSearchTool(ctx, database, actor, tool)
 	}
-	return executePermissionedSpaceTool(ctx, database, actor, originalPrompt, tool)
+	return nil, workflowv2.ErrCapabilityDenied
 }
 
 func agentSpaceRunSourceID(runID string) string {
@@ -162,14 +156,12 @@ func resolveAgentMembers(members []db.SpaceMember, query string) []db.SpaceMembe
 }
 
 func (s *SpacesService) explicitMessageFileContext(ctx context.Context, userID string, membership *db.AskExecutionContext, spaceID string, attachmentIDs, libraryItemIDs []string) (string, string, []workflowv2.ContentRef) {
-	refs := make([]explicitTaskSourceRef, 0, len(attachmentIDs)+len(libraryItemIDs))
+	refs := make([]explicitAttachmentRef, 0, len(attachmentIDs)+len(libraryItemIDs))
 	for _, id := range attachmentIDs {
-		refs = append(refs, explicitTaskSourceRef{Kind: "chat_attachment", ResourceID: id})
+		refs = append(refs, explicitAttachmentRef{Kind: "chat_attachment", ResourceID: id})
 	}
 	for _, id := range libraryItemIDs {
-		refs = append(refs, explicitTaskSourceRef{Kind: "library_item", ResourceID: id})
+		refs = append(refs, explicitAttachmentRef{Kind: "library_item", ResourceID: id})
 	}
-	raw, _ := json.Marshal(refs)
-	task := &db.SpaceTask{ID: "message", SpaceID: spaceID, SourceRefs: raw}
-	return s.explicitTaskFileContext(ctx, userID, task)
+	return s.explicitAttachmentContext(ctx, userID, spaceID, refs)
 }

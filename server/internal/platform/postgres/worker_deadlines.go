@@ -12,14 +12,6 @@ import (
 // The caller aliases library_processing_jobs as j; kind is an internal constant.
 func libraryJobEligibility(kind string) string {
 	switch kind {
-	case "ai":
-		return `EXISTS(SELECT 1 FROM space_library_items i JOIN library_files f ON f.id=i.file_id
-   JOIN library_blobs b ON b.id=f.blob_id WHERE i.id=j.target_id
-   AND i.lifecycle_state='ready' AND f.lifecycle_state='ready' AND b.lifecycle_state='ready')`
-	case "faces":
-		return `EXISTS(SELECT 1 FROM space_library_items i JOIN library_files f ON f.id=i.file_id
-   JOIN library_blobs b ON b.id=f.blob_id WHERE i.id=j.target_id
-   AND i.lifecycle_state='ready' AND b.lifecycle_state='ready')`
 	case "edit":
 		return `EXISTS(SELECT 1 FROM library_item_versions v JOIN space_library_items i ON i.id=v.space_library_item_id
    JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id
@@ -35,7 +27,7 @@ func libraryJobEligibility(kind string) string {
 func (db *Database) NextWorkerDelay(ctx context.Context, queue string) (time.Duration, bool, error) {
 	var deadline string
 	switch queue {
-	case "library-ai", "library-edit", "library-faces":
+	case "library-edit":
 		kind := queue[len("library-"):]
 		eligible := libraryJobEligibility(kind)
 		deadline = `SELECT min(due) FROM (

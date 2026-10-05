@@ -32,9 +32,6 @@ func TestAccountPortableExportIncludesAuthoredDataAndNoSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := fixture.database.SetSpaceMemberPermission(fixture.ctx, fixture.owner, fixture.spaceID, fixture.creator, PermissionAskRun, "allow"); err != nil {
-		t.Fatal(err)
-	}
 	digest := strings.Repeat("d", 64)
 	upload, err := fixture.database.CreateLibraryUpload(
 		fixture.ctx, fixture.creator, fixture.spaceID, "library",

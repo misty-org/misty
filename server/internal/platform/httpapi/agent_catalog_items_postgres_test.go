@@ -72,50 +72,9 @@ func TestAgentItemToolsPostgres(t *testing.T) {
 	}
 
 	// Deletes without an approval card for this account.
-	album, err := database.CreateLibraryAlbum(ctx, owner.ID, work.ID, "Old album", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	roadmap, err := database.CreateSpaceRoadmap(ctx, owner.ID, work.ID, "Old roadmap", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for kind, id := range map[string]string{"thread": thread.ID, "album": album.ID, "roadmap": roadmap.Roadmap.ID} {
-		call(service.executeItemDelete, invocation, `{"kind":"`+kind+`","id":"`+id+`","space":"`+work.ID+`"}`)
-	}
-	if _, err := database.LibraryAlbum(ctx, owner.ID, work.ID, album.ID); err == nil {
-		t.Fatal("album survived delete")
-	}
+	call(service.executeItemDelete, invocation, `{"kind":"thread","id":"`+thread.ID+`","space":"`+work.ID+`"}`)
 	if threads, _ := database.SpaceConversations(ctx, owner.ID, work.ID); len(threads) != 0 {
 		t.Fatalf("thread survived delete: %#v", threads)
-	}
-
-	// Roadmap canvas: a risk that blocks a goal, then unlinked and archived.
-	canvasRoadmap, _ := database.CreateSpaceRoadmap(ctx, owner.ID, work.ID, "Launch", "")
-	firstMilestone := canvasRoadmap.Milestones[0].ID
-	var goal struct {
-		Goal struct{ ID string } `json:"goal"`
-	}
-	_ = json.Unmarshal(call(roadmapPlanToolRegistration(database).Handler, inSpace, `{"action":"add_goal","roadmap_id":"`+canvasRoadmap.Roadmap.ID+`","milestone_id":"`+firstMilestone+`","title":"Ship beta"}`), &goal)
-	canvas := roadmapCanvasToolRegistration(database).Handler
-	var node struct {
-		Node struct{ ID string } `json:"node"`
-	}
-	_ = json.Unmarshal(call(canvas, inSpace, `{"action":"add_node","roadmap_id":"`+canvasRoadmap.Roadmap.ID+`","node_kind":"risk","title":"Vendor delay"}`), &node)
-	var edge struct {
-		Edge struct{ ID string } `json:"edge"`
-	}
-	_ = json.Unmarshal(call(canvas, inSpace, `{"action":"link","roadmap_id":"`+canvasRoadmap.Roadmap.ID+`","source":{"kind":"node","id":"`+node.Node.ID+`"},"target":{"kind":"goal","id":"`+goal.Goal.ID+`"},"edge_type":"blocks"}`), &edge)
-	if edge.Edge.ID == "" {
-		t.Fatal("risk was not linked to the goal")
-	}
-	if _, err := canvas(ctx, inSpace, agent.ToolRequest{ID: "bad-edge", Arguments: json.RawMessage(`{"action":"link","roadmap_id":"` + canvasRoadmap.Roadmap.ID + `","source":{"kind":"node","id":"` + node.Node.ID + `"},"target":{"kind":"goal","id":"` + goal.Goal.ID + `"},"edge_type":"measures"}`)}); err == nil {
-		t.Fatal("a risk was allowed to measure a goal")
-	}
-	call(canvas, inSpace, `{"action":"unlink","roadmap_id":"`+canvasRoadmap.Roadmap.ID+`","edge_id":"`+edge.Edge.ID+`"}`)
-	call(canvas, inSpace, `{"action":"archive_node","roadmap_id":"`+canvasRoadmap.Roadmap.ID+`","node_id":"`+node.Node.ID+`"}`)
-	if after, _ := database.SpaceRoadmap(ctx, owner.ID, work.ID, canvasRoadmap.Roadmap.ID); len(after.Nodes) != 0 || len(after.Edges) != 0 {
-		t.Fatalf("canvas after cleanup = %d nodes, %d edges", len(after.Nodes), len(after.Edges))
 	}
 
 	// Note tags in the Space.

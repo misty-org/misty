@@ -15,33 +15,12 @@ import (
 // the item's current version in the database.
 func (s *SpacesService) spaceDeleteTarget(ctx context.Context, userID, spaceID, kind, id string) (string, func() error, error) {
 	switch kind {
-	case "calendar_event":
-		event, err := s.database.NativeCalendarEvent(ctx, userID, spaceID, id)
-		if err != nil {
-			return "", nil, err
-		}
-		return event.Title, func() error { return s.database.ArchiveNativeCalendarEvent(ctx, userID, spaceID, id, event.Version) }, nil
 	case "thread":
 		thread, err := spaceThread(ctx, s.database, userID, spaceID, id)
 		if err != nil {
 			return "", nil, err
 		}
 		return thread.Title, func() error { return s.database.DeleteOrClearSpaceConversation(ctx, userID, spaceID, id) }, nil
-	case "album":
-		album, err := s.database.LibraryAlbum(ctx, userID, spaceID, id)
-		if err != nil {
-			return "", nil, err
-		}
-		return album.Name, func() error { return s.database.DeleteLibraryAlbum(ctx, userID, spaceID, id, album.Version) }, nil
-	case "roadmap":
-		roadmap, err := s.database.SpaceRoadmap(ctx, userID, spaceID, id)
-		if err != nil {
-			return "", nil, err
-		}
-		return roadmap.Roadmap.Name, func() error {
-			_, err := s.database.ArchiveSpaceRoadmap(ctx, userID, spaceID, id, roadmap.Roadmap.GraphVersion)
-			return err
-		}, nil
 	case "shared_file":
 		nodes, err := s.database.SpaceNodes(ctx, userID, spaceID)
 		if err != nil {
@@ -63,14 +42,7 @@ func (s *SpacesService) spaceDeleteTarget(ctx context.Context, userID, spaceID, 
 			return err
 		}, nil
 	}
-	task, err := s.database.SpaceTaskForMember(ctx, userID, spaceID, id)
-	if err != nil {
-		return "", nil, err
-	}
-	return task.Title, func() error {
-		_, err := s.database.ArchiveSpaceTask(ctx, userID, spaceID, id, task.Version)
-		return err
-	}, nil
+	return "", nil, db.ErrSpaceInvalid
 }
 
 func spaceThread(ctx context.Context, database *db.Database, userID, spaceID, id string) (*db.SpaceConversation, error) {

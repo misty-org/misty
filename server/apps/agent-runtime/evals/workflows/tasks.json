@@ -862,28 +862,17 @@
               "id": "^reclaim"
             }
           }
-        },
-        {
-          "label": "Misty Space calendar, today and tomorrow (the task's event belongs in Google Calendar)",
-          "misty": "/spaces/{{space}}/agenda?from={{today_start}}&to={{tomorrow_end}}",
-          "undo": {
-            "misty": "DELETE /spaces/{{space}}/calendar/events/{{item.id|strip:event:}}?version={{item.version}}",
-            "match": {
-              "kind": "^event$",
-              "title": "Pigment"
-            }
-          }
         }
       ],
-      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The person's calendar is their connected Google Calendar; a Misty Space calendar does not count. Tomorrow (Sat Oct 17, Pacific) has seeded busy blocks 12:00-14:00 (Team lunch and planning) and 14:30-15:30 (Design review). Free 30-minute afternoon slots include 14:00-14:30 and anything from 15:30 that doesn't overlap another event in the end state."
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The person's calendar is their connected Google Calendar; Tomorrow (Sat Oct 17, Pacific) has seeded busy blocks 12:00-14:00 (Team lunch and planning) and 14:30-15:30 (Design review). Free 30-minute afternoon slots include 14:00-14:30 and anything from 15:30 that doesn't overlap another event in the end state."
     },
     {
-      "id": "space-task-from-notes",
+      "id": "note-from-notes",
       "category": "personal",
       "source": "misty",
       "app": "fixture",
       "surface": "composer",
-      "prompt": "Turn the action items in my note 'Weekly sync' into tasks in the same Space.",
+      "prompt": "Make a note called 'Action items' in the same Space as my note 'Weekly sync', listing its action items one per line with who owns each.",
       "tools": {
         "forbidden": [
           "web_*",
@@ -893,19 +882,20 @@
         "maxRuns": 1
       },
       "rubric": [
-        "One task per action item, in the note's Space",
-        "No duplicates of existing tasks"
+        "One new note named Action items, in the Weekly sync note's Space",
+        "It lists every action item with its owner, and nothing invented"
       ],
       "state": [
         {
-          "label": "Tasks in the Space",
-          "misty": "/spaces/{{space}}/tasks",
+          "label": "Notes in the Space",
+          "misty": "/spaces/{{space}}/notes",
+          "since": true,
           "undo": {
-            "misty": "DELETE /spaces/{{space}}/tasks/{{item.id}}?version={{item.version}}"
+            "misty": "DELETE /spaces/{{space}}/notes/{{item.id}}"
           }
         }
       ],
-      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The note \"Weekly sync\" is in the person's first Space and has three action items: \"Ada: send the offsite agenda by Monday\", \"Sam: finish the Q4 budget review\", \"Me: book the venue for Nov 6\". The Space had no tasks before the run."
+      "truth": "The inbox and calendar are the person's real accounts plus seeded test data labeled \"Misty eval\". Grade against the seeded facts below; the person's other real mail and events are outside the task unless the agent acted on them wrongly. The note \"Weekly sync\" is in the person's first Space and has three action items: \"Ada: send the offsite agenda by Monday\", \"Sam: finish the Q4 budget review\", \"Me: book the venue for Nov 6\"."
     },
     {
       "id": "desktop-numbers",

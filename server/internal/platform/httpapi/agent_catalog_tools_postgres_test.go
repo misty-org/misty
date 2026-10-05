@@ -161,71 +161,6 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		t.Fatalf("unknown thread = %v", err)
 	}
 
-	// Library albums: create, list and rename in the Space.
-	albums := map[string]agenttools.Handler{}
-	for _, registration := range albumToolRegistrations(database) {
-		albums[registration.Descriptor.Name] = registration.Handler
-	}
-	album := func(name, arguments string) (json.RawMessage, error) {
-		return albums[name](ctx, spaceInvocation, agent.ToolRequest{ID: "album-" + arguments, Arguments: json.RawMessage(arguments)})
-	}
-	raw, err = album("file.organize", `{"action":"create","name":"Launch photos"}`)
-	var createdAlbum struct {
-		Album struct{ ID string } `json:"album"`
-	}
-	if err != nil || json.Unmarshal(raw, &createdAlbum) != nil || createdAlbum.Album.ID == "" {
-		t.Fatalf("file.organize create = %s, %v", raw, err)
-	}
-	if raw, err := album("file.organize", `{"action":"rename","album_id":"`+createdAlbum.Album.ID+`","name":"Launch day"}`); err != nil || !strings.Contains(string(raw), "Launch day") {
-		t.Fatalf("file.organize rename = %s, %v", raw, err)
-	}
-	if raw, err := album("file.album.list", `{}`); err != nil || !strings.Contains(string(raw), "Launch day") {
-		t.Fatalf("file.album.list = %s, %v", raw, err)
-	}
-	if _, err := album("file.album.list", `{"album_id":"missing"}`); !errors.As(err, &invalid) {
-		t.Fatalf("unknown album = %v", err)
-	}
-
-	// Roadmap plans: milestones and goals, completion and linked tasks.
-	roadmap, err := database.CreateSpaceRoadmap(ctx, owner.ID, work.ID, "Launch", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan := roadmapPlanToolRegistration(database).Handler
-	planCall := func(arguments string) json.RawMessage {
-		t.Helper()
-		raw, err := plan(ctx, spaceInvocation, agent.ToolRequest{ID: "plan-" + arguments, Arguments: json.RawMessage(arguments)})
-		if err != nil {
-			t.Fatalf("roadmap.plan %s = %v", arguments, err)
-		}
-		return raw
-	}
-	var milestone struct {
-		Milestone struct{ ID string } `json:"milestone"`
-	}
-	_ = json.Unmarshal(planCall(`{"action":"add_milestone","roadmap_id":"`+roadmap.Roadmap.ID+`","title":"Beta","target_date":"2026-11-01"}`), &milestone)
-	var goal struct {
-		Goal struct{ ID string } `json:"goal"`
-	}
-	_ = json.Unmarshal(planCall(`{"action":"add_goal","roadmap_id":"`+roadmap.Roadmap.ID+`","milestone_id":"`+milestone.Milestone.ID+`","title":"Invite testers"}`), &goal)
-	linked, err := database.CreateSpaceTask(ctx, owner.ID, db.SpaceTask{SpaceID: work.ID, Title: "Email testers", Status: "todo"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	planCall(`{"action":"update_goal","roadmap_id":"` + roadmap.Roadmap.ID + `","goal_id":"` + goal.Goal.ID + `","done":true}`)
-	planCall(`{"action":"update_goal","roadmap_id":"` + roadmap.Roadmap.ID + `","goal_id":"` + goal.Goal.ID + `","done":false}`)
-	planCall(`{"action":"set_goal_tasks","roadmap_id":"` + roadmap.Roadmap.ID + `","goal_id":"` + goal.Goal.ID + `","task_ids":["` + linked.ID + `"]}`)
-	if _, err := plan(ctx, spaceInvocation, agent.ToolRequest{ID: "done-with-tasks", Arguments: json.RawMessage(`{"action":"update_goal","roadmap_id":"` + roadmap.Roadmap.ID + `","goal_id":"` + goal.Goal.ID + `","done":true}`)}); !errors.As(err, &invalid) || !strings.Contains(err.Error(), "linked tasks") {
-		t.Fatalf("completing a goal with open tasks = %v", err)
-	}
-	updated, err := database.SpaceRoadmap(ctx, owner.ID, work.ID, roadmap.Roadmap.ID)
-	if err != nil || len(updated.Milestones) != 2 || len(updated.Goals) != 1 || updated.Goals[0].TaskTotal != 1 {
-		t.Fatalf("roadmap after plan edits = %#v, %v", updated, err)
-	}
-	if _, err := plan(ctx, spaceInvocation, agent.ToolRequest{ID: "bad-goal", Arguments: json.RawMessage(`{"action":"update_goal","roadmap_id":"` + roadmap.Roadmap.ID + `","goal_id":"missing"}`)}); !errors.As(err, &invalid) {
-		t.Fatalf("unknown goal = %v", err)
-	}
-
 	// Methods: list the agent's saved workflow and render it with inputs.
 	if _, err := database.SaveAgentMethod(ctx, owner.ID, db.AgentMethod{AgentID: identity.ID, Kind: "workflow", Enabled: true,
 		Definition: db.AgentMethodDefinition{Title: "Weekly brief", Instructions: "Summarize the week for the team.", Target: "cloud",
@@ -246,40 +181,20 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		t.Fatalf("missing required input = %v", err)
 	}
 
-	// item.delete removes a calendar event after approval.
-	event, err := database.CreateNativeCalendarEvent(ctx, owner.ID, db.SpaceCalendarEvent{SpaceID: work.ID, Title: "Standup",
-		StartsAt: time.Now().Add(time.Hour), EndsAt: time.Now().Add(2 * time.Hour)})
+	// item.delete removes a note only after the user approves.
+	note, err := database.CreateSpaceNote(ctx, owner.ID, work.ID, "Old notes")
 	if err != nil {
 		t.Fatal(err)
 	}
 	go func() {
-		_, err := call(service.executeItemDelete, `{"kind":"calendar_event","id":"`+event.ID+`","space":"`+work.ID+`"}`)
+		_, err := call(service.executeItemDelete, `{"kind":"note","id":"`+note.ID+`","space":"`+work.ID+`"}`)
 		done <- err
 	}()
 	decideNextApproval(t, database, owner.ID, "misty.items.delete", "approved")
 	if err := <-done; err != nil {
-		t.Fatalf("approved calendar delete = %v", err)
+		t.Fatalf("approved note delete = %v", err)
 	}
-	if _, err := database.NativeCalendarEvent(ctx, owner.ID, work.ID, event.ID); err == nil {
-		t.Fatal("calendar event still active after delete")
-	}
-
-	// item.delete archives a task only after the user approves.
-	task, err := database.CreateSpaceTask(ctx, owner.ID, db.SpaceTask{SpaceID: work.ID, Title: "Old chore", Status: "todo"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		_, err := call(service.executeItemDelete, `{"kind":"task","id":"`+task.ID+`","space":"`+work.ID+`"}`)
-		done <- err
-	}()
-	decideNextApproval(t, database, owner.ID, "misty.items.delete", "approved")
-	if err := <-done; err != nil {
-		t.Fatalf("approved task delete = %v", err)
-	}
-	if _, err := database.SpaceTaskForMember(ctx, owner.ID, work.ID, task.ID); err == nil {
-		if remaining, _ := database.SpaceTasks(ctx, owner.ID, work.ID, db.SpaceTaskQuery{Limit: 10}); len(remaining) != 0 {
-			t.Fatalf("task still active after delete: %#v", remaining)
-		}
+	if notes, _ := database.AccessibleSpaceNotes(ctx, owner.ID, work.ID); len(notes) != 0 {
+		t.Fatalf("note still active after delete: %#v", notes)
 	}
 }

@@ -74,10 +74,6 @@ func (s *Server) mountPublicProfileRoutes(prefix string, deps *mountDeps) {
 	s.Router.Put(prefix+"/me/device", api.UpdateDevice(s.Database))
 	s.Router.Get(prefix+"/me/settings", api.GetSettings(s.Database))
 	s.Router.Put(prefix+"/me/settings", api.UpdateSettings(s.Database))
-	s.Router.Get(prefix+"/me/space-templates", api.PersonalSpaceTemplates(s.Database))
-	s.Router.Post(prefix+"/me/space-templates", api.PersonalSpaceTemplates(s.Database))
-	s.Router.Put(prefix+"/me/space-templates/{templateID}", api.PersonalSpaceTemplates(s.Database))
-	s.Router.Delete(prefix+"/me/space-templates/{templateID}", api.PersonalSpaceTemplates(s.Database))
 	s.Router.Get(prefix+"/me/space-people", api.SpacePeople(s.Database))
 	s.Router.Get(prefix+"/me/agent-interventions", s.Spaces.AIUserInterventionControl())
 	s.Router.Post(prefix+"/me/agent-interventions/{waitID}", s.Spaces.AIUserInterventionControl())
@@ -97,8 +93,6 @@ func (s *Server) mountPublicBillingRoutes(prefix string, deps *mountDeps) {
 func (s *Server) mountPublicFeatureRoutes(prefix string, deps *mountDeps) {
 	s.mountAIRoutes(prefix+"/ai", deps.ai)
 	s.mountMistyRoutes(prefix, deps.ai)
-	s.mountSmartLibraryRoutes(prefix+"/ai/smart-library", deps.smartLibrary)
-	s.mountMediaSearchRoutes(prefix+"/ai/media-search", deps.mediaSearch)
 	s.mountAgentsRoutes(prefix, deps.agents)
 	s.mountSpacesRoutes(prefix, s.Spaces, s.Realtime)
 	if s.Library != nil {

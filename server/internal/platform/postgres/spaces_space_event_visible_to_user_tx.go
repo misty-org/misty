@@ -56,31 +56,6 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 			return false, err
 		}
 		permission = PermissionLibraryView
-	case strings.HasPrefix(event.EventType, "task."):
-		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_tasks", event.EntityID)
-		if err != nil || !visible {
-			return false, err
-		}
-		permission = PermissionTasksView
-	case strings.HasPrefix(event.EventType, "roadmap."):
-		roadmapID := event.EntityID
-		var payload struct {
-			RoadmapID string `json:"roadmap_id"`
-		}
-		if json.Unmarshal(event.Payload, &payload) == nil && payload.RoadmapID != "" {
-			roadmapID = payload.RoadmapID
-		}
-		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_roadmaps", roadmapID)
-		if err != nil || !visible {
-			return false, err
-		}
-		permission = PermissionTasksView
-	case strings.HasPrefix(event.EventType, "calendar."):
-		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_native_calendar_events", event.EntityID)
-		if err != nil || !visible {
-			return false, err
-		}
-		permission = PermissionTasksView
 	case strings.HasPrefix(event.EventType, "drawing."):
 		visible, err := resourceEntityAudienceVisibleTx(ctx, tx, userID, event.SpaceID, "space_drawings", event.EntityID)
 		if err != nil || !visible {
@@ -143,7 +118,7 @@ func humanConversationParticipantTx(ctx context.Context, tx *sql.Tx, userID, spa
 func resourceEntityAudienceVisibleTx(ctx context.Context, tx *sql.Tx, userID, spaceID, table, entityID string) (bool, error) {
 	// Table names are an internal closed set; values never come from requests.
 	switch table {
-	case "space_tasks", "space_roadmaps", "space_native_calendar_events", "space_library_items", "space_drawings":
+	case "space_library_items", "space_drawings":
 	default:
 		return false, ErrSpaceInvalid
 	}

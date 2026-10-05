@@ -88,7 +88,7 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"space.member.list", "task.query", "task.create", "browser.inspect", "browser.navigate", "note.create", "message.send"} {
+	for _, expected := range []string{"space.member.list", "browser.inspect", "browser.navigate", "note.create", "message.send"} {
 		found := false
 		for _, name := range toolNames {
 			found = found || name == expected
@@ -100,14 +100,6 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	membersRaw, err := api.TestingExecuteAIInvocationSpaceTool(ctx, database, user.ID, space.ID, invocation.ID, prompt, "space.member.list", json.RawMessage(`{}`))
 	if err != nil || !strings.Contains(string(membersRaw), `"count":2`) {
 		t.Fatalf("unified member inspection = %s, %v", membersRaw, err)
-	}
-	createdTask, err := api.TestingExecuteAIInvocationSpaceTool(ctx, database, user.ID, space.ID, invocation.ID, prompt, "task.create", json.RawMessage(`{"title":"Compare summer camps","status":"todo","priority":"medium"}`))
-	if err != nil || !strings.Contains(string(createdTask), "Compare summer camps") {
-		t.Fatalf("unified task creation = %s, %v", createdTask, err)
-	}
-	queriedTasks, err := api.TestingExecuteAIInvocationSpaceTool(ctx, database, user.ID, space.ID, invocation.ID, prompt, "task.query", json.RawMessage(`{"query":"summer camps"}`))
-	if err != nil || !strings.Contains(string(queriedTasks), "Compare summer camps") {
-		t.Fatalf("unified task query = %s, %v", queriedTasks, err)
 	}
 	type browserOutcome struct {
 		result json.RawMessage

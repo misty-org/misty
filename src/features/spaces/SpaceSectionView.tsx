@@ -13,9 +13,6 @@ const Notes = lazy(() =>
 const Drawings = lazy(() =>
   import("@/features/journal/drawings/SpaceDrawings").then((m) => ({ default: m.SpaceDrawings })),
 );
-const Planner = lazy(() =>
-  import("@/features/planner/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
-);
 // Configure host services before React renders the built-in tools.
 // Their runtime hooks deliberately fail if an entry point skips this setup.
 async function loadLibrary() {
@@ -39,9 +36,6 @@ export async function preloadSpaceSection(section: string) {
     case "social":
     case "chat":
       await loadChat();
-      break;
-    case "planner":
-      await import("@/features/planner/planner/SpacePlanner");
       break;
     case "notes":
       await import("@/features/journal/notes/SpaceNotes");
@@ -137,23 +131,6 @@ export function SpaceSectionView(props: {
     );
   }
 
-  const permission =
-    section === "social" || section === "chat"
-      ? "messages.read"
-      : section === "planner"
-        ? "tasks.view"
-        : section === "library"
-          ? "library.view"
-          : null;
-  if (permission && space.permissions?.[permission] === false)
-    return (
-      <PermissionState
-        className="h-full"
-        title="You don’t have access to this Space tool"
-        description="Ask a Space owner to update your permissions."
-      />
-    );
-
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
@@ -169,15 +146,6 @@ export function SpaceSectionView(props: {
           <Drawings
             spaceId={spaceId}
             drawingId={studioKind}
-            workspaceTabId={props.workspaceTabId}
-          />
-        ) : section === "planner" ? (
-          <Planner
-            spaceId={spaceId}
-            canManage={space.role === "owner" || space.permissions?.["tasks.manage"] === true}
-            canManageIntegrations={
-              space.role === "owner" || space.permissions?.["integrations.manage"] === true
-            }
             workspaceTabId={props.workspaceTabId}
           />
         ) : section === "library" ? (

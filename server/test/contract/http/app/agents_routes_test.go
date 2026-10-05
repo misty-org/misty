@@ -25,8 +25,7 @@ func TestAgentRoutesRequireAuthentication(t *testing.T) {
 	}
 	for _, path := range []string{
 		"/api/devices",
-		"/api/spaces/space-1/tasks",
-		"/api/spaces/space-1/calendar/sources",
+		"/api/spaces/space-1/notes",
 		"/api/ai/models",
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)

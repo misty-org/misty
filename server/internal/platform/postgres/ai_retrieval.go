@@ -129,10 +129,7 @@ func (db *Database) searchAIRetrieval(ctx context.Context, userID, query string,
 				    (d.privacy_class='private' AND d.owner_user_id=$4) OR
 				    (d.privacy_class IN ('shared','provider')
 				      AND misty_can_access_space_audience(d.space_id,d.audience_kind,d.audience_conversation_id)
-				      AND (d.privacy_class='shared' OR
-				        (d.source_kind='calendar' AND EXISTS(
-				          SELECT 1 FROM space_calendar_events e JOIN space_calendar_sources s ON s.id=e.source_id
-				          WHERE e.id=d.source_id AND e.removed_at IS NULL AND s.status='active'))))
+				      AND d.privacy_class='shared')
 				  )
 				  AND (c.lexical @@ q.value OR (c.embedding IS NOT NULL AND c.embedding_model=$6))
 				ORDER BY score DESC,d.updated_at DESC,d.id,c.ordinal LIMIT $3
@@ -148,10 +145,7 @@ func (db *Database) searchAIRetrieval(ctx context.Context, userID, query string,
 				    (d.privacy_class='private' AND d.owner_user_id=$3) OR
 				    (d.privacy_class IN ('shared','provider')
 				      AND misty_can_access_space_audience(d.space_id,d.audience_kind,d.audience_conversation_id)
-				      AND (d.privacy_class='shared' OR
-				        (d.source_kind='calendar' AND EXISTS(
-				          SELECT 1 FROM space_calendar_events e JOIN space_calendar_sources s ON s.id=e.source_id
-				          WHERE e.id=d.source_id AND e.removed_at IS NULL AND s.status='active'))))
+				      AND d.privacy_class='shared')
 				  )
 				  AND c.lexical @@ q.value
 				ORDER BY score DESC,d.updated_at DESC,d.id,c.ordinal LIMIT $2

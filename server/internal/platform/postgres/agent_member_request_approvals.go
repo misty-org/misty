@@ -7,7 +7,7 @@ import (
 )
 
 func queueMemberRequestRunTx(ctx context.Context, tx *sql.Tx, runID, spaceID, agentID string) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO agent_run_jobs(run_id,space_id,task_id,agent_id,trigger_kind) VALUES($1,$2,NULL,$3,'delegated')`, runID, spaceID, agentID)
+	_, err := tx.ExecContext(ctx, `INSERT INTO agent_run_jobs(run_id,space_id,agent_id,trigger_kind) VALUES($1,$2,$3,'delegated')`, runID, spaceID, agentID)
 	return err
 }
 

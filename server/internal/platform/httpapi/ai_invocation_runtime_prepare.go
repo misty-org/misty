@@ -111,7 +111,7 @@ func (s *SpacesService) aiInvocationContext(ctx context.Context, record *db.AIIn
 	if body.AgentID != "" || (body.SurfaceID != "activity" && body.SurfaceID != "global") || !shouldRetrieveAccountContext(body.Prompt) {
 		return resolved, nil
 	}
-	embedding, _ := s.globalSearchQueryEmbedding(ctx, record.UserID, body.Prompt)
+	embedding, _ := s.agentQueryEmbedding(ctx, record.UserID, body.Prompt)
 	retrieved, err := broker.retrieveAccount(ctx, record.UserID, body.Prompt, embedding, 4, "", configuredEmbeddingModel(ctx, s.searchAnalyzer, record.UserID))
 	if err != nil {
 		return nil, err

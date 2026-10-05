@@ -185,31 +185,6 @@ func firstConfigured(names ...string) string {
 	return ""
 }
 
-func (s *Server) mountMediaSearchRoutes(prefix string, service *api.MediaSearchService) {
-	s.Router.Post(prefix+"/chunks", service.IndexChunk())
-	s.Router.Post(prefix+"/search", service.Search())
-	s.Router.Get(prefix+"/status", service.Status())
-	s.Router.Delete(prefix+"/assets/{assetID}", service.DeleteAsset())
-	s.Router.Delete(prefix+"/devices/{deviceID}", service.DeleteDevice())
-	s.Router.Post(prefix+"/devices/{deviceID}/adopt-legacy", service.AdoptLegacyDevice())
-}
-
-func (s *Server) mountSmartLibraryRoutes(prefix string, service *api.SmartLibraryService) {
-	s.Router.Post(prefix+"/search", service.GlobalSearch())
-	s.Router.Post(prefix+"/reindex", service.PlanReindex())
-	s.Router.Post(prefix+"/reindex/{jobID}/complete", service.CompleteReindex())
-	s.Router.Post(prefix+"/folders", service.RegisterFolder())
-	s.Router.Post(prefix+"/folders/{folderID}/preflight", service.Preflight())
-	s.Router.Post(prefix+"/folders/{folderID}/sample", service.CreateSample())
-	s.Router.Post(prefix+"/folders/{folderID}/sample/approve", service.Approve("sample"))
-	s.Router.Post(prefix+"/folders/{folderID}/approve", service.Approve("full"))
-	s.Router.Get(prefix+"/folders/{folderID}/progress", service.Progress())
-	s.Router.Get(prefix+"/folders/{folderID}/results", service.Results())
-	s.Router.Put(prefix+"/folders/{folderID}/assets/{assetID}/tags", service.SetAssetTags())
-	s.Router.Post(prefix+"/folders/{folderID}/rescan", service.Rescan())
-	s.Router.Delete(prefix+"/folders/{folderID}", service.Delete())
-}
-
 func TestingAllowedCORSOrigins() []string {
 	origins := []string{
 		"tauri://localhost",

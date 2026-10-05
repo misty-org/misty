@@ -18,9 +18,6 @@ const (
 	toolboxContextGet     = "agent.context"
 	toolboxMembersList    = "space.member.list"
 	toolboxMembersResolve = "space.member.resolve"
-	toolboxTasksQuery     = "task.query"
-	toolboxTasksCreate    = "task.create"
-	toolboxTasksUpdate    = "task.update"
 	toolboxAgentsDelegate = "agent.background"
 )
 

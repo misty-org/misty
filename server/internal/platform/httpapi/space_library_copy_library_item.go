@@ -16,7 +16,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
-func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourceSpaceID, destinationSpaceID string, source db.LibraryTransferItem, recordImport bool) (*db.SpaceLibraryItem, error) {
+func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourceSpaceID, destinationSpaceID string, source db.LibraryTransferItem) (*db.SpaceLibraryItem, error) {
 	token, err := security.GenerateSecureToken()
 	if err != nil {
 		return nil, err
@@ -64,11 +64,7 @@ func (s *SpaceLibraryService) copyLibraryItem(ctx context.Context, userID, sourc
 	if completed.Item == nil {
 		return nil, db.ErrLibraryConflict
 	}
-	if recordImport {
-		if _, err := s.database.RecordLibraryImport(ctx, userID, sourceSpaceID, source.ItemID, destinationSpaceID, completed.Item.ID, upload.ID, source.ByteSize); err != nil {
-			return nil, err
-		}
-	} else if err := s.database.RecordLibraryDuplicate(ctx, userID, destinationSpaceID, source.ItemID, completed.Item.ID, source.ByteSize); err != nil {
+	if err := s.database.RecordLibraryDuplicate(ctx, userID, destinationSpaceID, source.ItemID, completed.Item.ID, source.ByteSize); err != nil {
 		return nil, err
 	}
 	return completed.Item, nil

@@ -42,12 +42,9 @@ func spaceDataToolDescriptors() []agenttools.Descriptor {
 	descriptors := []agenttools.Descriptor{
 		contextGetToolDescriptor(), membersListToolDescriptor(), membersResolveToolDescriptor(),
 		messagesSearchToolDescriptor(), messagesSendToolDescriptor(), librarySearchToolDescriptor(),
-		tasksQueryToolDescriptor(), calendarQueryToolDescriptor(), tasksCreateToolDescriptor(), tasksUpdateToolDescriptor(),
 	}
 	descriptors = append(descriptors, noteAgentToolDescriptors()...)
 	descriptors = append(descriptors, drawingAgentToolDescriptors()...)
-	descriptors = append(descriptors, calendarWriteToolDescriptors()...)
-	descriptors = append(descriptors, roadmapAgentToolDescriptors()...)
 	return append(descriptors, libraryMutationToolDescriptors()...)
 }
 

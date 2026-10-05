@@ -68,7 +68,7 @@ func (s *SpacesService) executeSpaceAdmin(ctx context.Context, invocation agentt
 		if strings.TrimSpace(input.Name) == "" {
 			return nil, serveragent.ErrInvalidRequest("create needs a name")
 		}
-		created, err := s.database.CreateSpaceWithTemplateIdempotent(ctx, invocation.UserID, input.Name, "blank", nil, "agent:"+invocation.RunID+":"+request.ID)
+		created, err := s.database.CreateSpace(ctx, invocation.UserID, input.Name, "agent:"+invocation.RunID+":"+request.ID)
 		if err != nil {
 			return nil, spaceAdminError(err)
 		}

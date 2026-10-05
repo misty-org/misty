@@ -23,7 +23,7 @@ func (s *SpacesService) deleteToolRegistration() agenttools.Registration {
 			Description: "Delete a note, drawing, calendar event, thread or Library album; move a Library item to the trash; or archive a task or roadmap. " +
 				"Use only when the user asked to delete that exact item; the user may see an approval card first. Every kind except notes and drawings also needs its Space.",
 			InputSchema: agentToolSchema(map[string]any{
-				"kind":  map[string]any{"type": "string", "enum": []string{"note", "task", "drawing", "calendar_event", "thread", "album", "roadmap", "library_item", "shared_file"}},
+				"kind":  map[string]any{"type": "string", "enum": []string{"note", "drawing", "thread", "library_item", "shared_file"}},
 				"id":    map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 				"space": map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 			}, []string{"kind", "id"}),

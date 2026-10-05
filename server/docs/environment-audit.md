@@ -250,21 +250,16 @@ variables and deliberate compatibility aliases are called out separately below.
 | `AI_GATEWAY_BASE_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` · `server/internal/agents/model_catalog_version.go` |
 | `MISTY_SERPER_API_KEY` | `integrations/ai.env` | `server/internal/platform/httpapi/web_search.go` |
 | `AGENT_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |
-| `MEDIA_SEARCH_EMERGENCY_DISABLE` | `integrations/ai.env` | `server/internal/platform/httpapi/media_search_index_chunk.go` |
 | `MEDIA_SEARCH_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |
 | `MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |
 | `SMART_LIBRARY_EMBEDDING_MODEL` | `integrations/ai.env` | `server/internal/agents/smart_library_analyzer_request_at.go` · `server/internal/platform/httpapi/smart_library_hosted_ai_weekly_ratio.go` |
 | `SMART_LIBRARY_PRIMARY_MODEL` | `integrations/ai.env` | `server/internal/agents/smart_library_analyzer_request_at.go` |
 | `SMART_LIBRARY_FALLBACK_MODEL` | `integrations/ai.env` | `server/internal/agents/smart_library_analyzer_request_at.go` |
-| `SMART_LIBRARY_EMERGENCY_DISABLE` | `integrations/ai.env` | `server/internal/platform/httpapi/smart_library_approve.go` · `server/internal/platform/httpapi/smart_library_complete_reindex.go` |
-| `SMART_LIBRARY_SEARCH_EMERGENCY_DISABLE` | `integrations/ai.env` | `server/internal/platform/httpapi/smart_library_set_asset_tags.go` |
 | `SMART_LIBRARY_SEARCH_DAILY_LIMIT` | `integrations/ai.env` | `server/internal/platform/httpapi/smart_library_hosted_ai_weekly_ratio.go` |
 | `MISTY_AI_LOW_MODEL` | `integrations/ai.env` | `server/internal/agents/provider_config.go` · `server/internal/agents/model_catalog_version.go` |
 | `MISTY_AI_MED_MODEL` | `integrations/ai.env` | `server/internal/agents/provider_config.go` · `server/internal/agents/model_catalog_version.go` |
 | `MISTY_AI_HIGH_MODEL` | `integrations/ai.env` | `server/internal/agents/provider_config.go` · `server/internal/agents/model_catalog_version.go` |
 | `MISTY_AI_MODEL_CATALOG_JSON` | `integrations/ai.env` | `server/internal/agents/model_catalog_version.go` |
-| `VISION_PROCESSOR_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` |
-| `VISION_PROCESSOR_TOKEN` | `integrations/ai.env` | `server/internal/app/server_core.go` |
 | `MISTY_COMPANION_TEACH_REASONING` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_cursor_companion.go` |
 | `MISTY_RECALL` | `integrations/ai.env` | `server/internal/platform/httpapi/memory_api.go` |
 | `MISTY_RECALL_BACKLOG_CAP` | `integrations/ai.env` | `server/internal/platform/httpapi/memory_api.go` |

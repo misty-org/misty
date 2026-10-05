@@ -1,37 +1,13 @@
 package unit
 
 import (
-	"encoding/json"
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
-
-func TestValidateSpaceTaskAgentAssignmentAndTypedSources(t *testing.T) {
-	valid := db.SpaceTask{
-		Title: "Review brief", Status: "todo", Priority: "medium", DueTimezone: "UTC",
-		AssigneeAgentID: "agent-a",
-		SourceRefs:      json.RawMessage(`[{"kind":"library_item","resource_id":"item-a"},{"kind":"task_attachment","resource_id":"attachment-a"}]`),
-	}
-	if err := db.TestingValidateSpaceTask(&valid); err != nil {
-		t.Fatalf("expected valid Agent task: %v", err)
-	}
-	both := valid
-	both.AssigneeUserID = "user-a"
-	if err := db.TestingValidateSpaceTask(&both); !errors.Is(err, db.ErrSpaceInvalid) {
-		t.Fatalf("expected mixed assignee types to fail, got %v", err)
-	}
-	invalidRef := valid
-	invalidRef.SourceRefs = json.RawMessage(`[{"kind":"note","resource_id":"note-a"}]`)
-	if err := db.TestingValidateSpaceTask(&invalidRef); !errors.Is(err, db.ErrSpaceInvalid) {
-		t.Fatalf("expected unsupported source ref to fail, got %v", err)
-	}
-}
 
 func TestMistyConversationProjectsDurableRunStates(t *testing.T) {
 	for state, want := range map[string]string{
@@ -58,7 +34,7 @@ func TestAccountAgentToolboxRoutesSpaceToolsWithoutDiscovery(t *testing.T) {
 	for _, descriptor := range api.TestingAccountAgentToolboxDescriptors() {
 		names[descriptor.Name] = true
 	}
-	for _, want := range []string{"space.list", "note.search", "note.create", "task.create", "message.send", "memory.pref.remember", "weather.current"} {
+	for _, want := range []string{"space.list", "note.search", "note.create", "message.send", "memory.pref.remember", "weather.current"} {
 		if !names[want] {
 			t.Fatalf("account toolbox is missing %s: %v", want, names)
 		}
@@ -123,7 +99,7 @@ func TestPrivateSpaceToolboxRegistrationsAreCompleteAndGuardWrites(t *testing.T)
 			t.Fatalf("write tool requires approval or lacks audit policy: %#v", descriptor)
 		}
 	}
-	want := []string{"agent.context", "space.member.list", "space.member.resolve", "message.search", "message.send", "file.search", "task.query", "event.query", "task.create", "task.update", "note.search", "note.read", "note.create", "note.update", "drawing.list", "drawing.read", "drawing.create", "drawing.apply", "event.create", "event.update", "roadmap.query", "roadmap.read", "roadmap.create", "roadmap.update", "file.read", "file.update", "file.promote_attachment", "thread.create", "thread.list", "thread.read", "thread.post", "file.album.list", "file.organize", "roadmap.plan", "roadmap.canvas", "note.tag", "search.all", "device.list", "memory.workflow.find", "memory.workflow.learn", "memory.workflow.save", "memory.workflow.list", "memory.workflow.use", "memory.pref.list", "memory.pref.update", "memory.pref.remember", "memory.pref.forget", "agent.list", "agent.configure"}
+	want := []string{"agent.context", "space.member.list", "space.member.resolve", "message.search", "message.send", "file.search", "note.search", "note.read", "note.create", "note.update", "drawing.list", "drawing.read", "drawing.create", "drawing.apply", "file.read", "file.update", "file.promote_attachment", "thread.create", "thread.list", "thread.read", "thread.post", "note.tag", "search.all", "device.list", "memory.workflow.find", "memory.workflow.learn", "memory.workflow.save", "memory.workflow.list", "memory.workflow.use", "memory.pref.list", "memory.pref.update", "memory.pref.remember", "memory.pref.forget", "agent.list", "agent.configure"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("Toolbox tools = %v, want %v", names, want)
 	}

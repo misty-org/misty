@@ -60,9 +60,6 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^POST /a2a/agents/\{agentID\}/token$`, why: "agent credentials are minted by the person's signed-in app"},
 	{pattern: `^POST /a2a/`, tool: "agent.request"},
 	{pattern: `^\S+ /space-invitations/`, why: "accepting an invitation is the invitee's choice"},
-	{pattern: `^POST /ai/(smart-library|media-search)/search$`, tool: "file.search"},
-	{pattern: `^POST /search/global/visual$`, tool: "search.all"},
-	{pattern: `^\S+ /ai/(smart-library|media-search)/`, why: "device indexing pipelines run by the desktop app"},
 	{pattern: `^\S+ /misty/attachments`, why: "chat attachments come from the person's files"},
 	{pattern: `^\S+ /misty/conversations`, why: "the person's own chat list"},
 	{pattern: `^\S+ /misty/conversation-folders`, why: "folders that arrange the person's own chat list"},
@@ -73,7 +70,6 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /ai/agent-methods`, tool: "memory.workflow.save"},
 	{pattern: `^\S+ /ai/memories/`, tool: "memory.pref.update"},
 	{pattern: `^POST /ai/artifacts/`, why: "a person's review of an agent's output"},
-	{pattern: `^\S+ /me/space-templates`, why: "personal Space templates are saved by the person from Space settings"},
 
 	// Spaces and members.
 	{pattern: `^POST /spaces$`, tool: "space.manage"},
@@ -84,7 +80,6 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^(POST|DELETE) /spaces/\{spaceID\}/invitations(/\{inviteID\})?$`, tool: "space.manage"},
 	{pattern: `^POST /spaces/\{spaceID\}/invitations/\{inviteID\}/resend$`, tool: "space.manage"},
 	{pattern: `^DELETE /spaces/\{spaceID\}/members/\{userID\}$`, tool: "space.manage"},
-	{pattern: `^PUT /spaces/\{spaceID\}/members/\{userID\}/permissions$`, why: "member permissions are access control set by the owner"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/agent-listings/`, why: "how an agent takes requests in its Space is its owner's consent"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/(read|item-state)$|/conversations/\{conversationID\}/read$`, why: "per-person read and pin state"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/integrations/`, why: "connecting an account needs the person to sign in"},
@@ -106,39 +101,18 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^PATCH /spaces/\{spaceID\}/drawings/\{drawingID\}$`, tool: "item.rename"},
 	{pattern: `^DELETE /spaces/\{spaceID\}/drawings/\{drawingID\}$`, tool: "item.delete"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/(notes|drawings)/\{\w+\}/(assets|collaboration-ticket)`, why: "editor uploads and live collaboration sessions"},
-	{pattern: `^POST /spaces/\{spaceID\}/tasks$`, tool: "task.create"},
-	{pattern: `^PATCH /spaces/\{spaceID\}/tasks/\{taskID\}$`, tool: "task.update"},
-	{pattern: `^DELETE /spaces/\{spaceID\}/tasks/\{taskID\}$`, tool: "item.delete"},
-	{pattern: `^POST /spaces/\{spaceID\}/tasks/\{taskID\}/move$`, why: "ordering cards on a board is visual arrangement; status changes go through task.update"},
 
 	// Calendar.
-	{pattern: `^POST /spaces/\{spaceID\}/calendar/events$`, tool: "event.create"},
-	{pattern: `^PATCH /spaces/\{spaceID\}/calendar/events/\{eventID\}$`, tool: "event.update"},
-	{pattern: `^DELETE /spaces/\{spaceID\}/calendar/events/\{eventID\}$`, tool: "item.delete"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/calendar/(sources|sync)`, why: "connecting calendars needs the person to sign in"},
 
 	// Library.
 	{pattern: `^PATCH /spaces/\{spaceID\}/library/items/\{itemID\}$`, tool: "file.update"},
 	{pattern: `^POST /spaces/\{spaceID\}/attachments/\{attachmentID\}/promote$`, tool: "file.promote_attachment"},
-	{pattern: `^(POST|PATCH) /spaces/\{spaceID\}/library/albums(/\{albumID\})?$`, tool: "file.organize"},
-	{pattern: `^(POST|DELETE) /spaces/\{spaceID\}/library/albums/\{albumID\}/items`, tool: "file.organize"},
-	{pattern: `^DELETE /spaces/\{spaceID\}/library/albums/\{albumID\}$`, tool: "item.delete"},
 	{pattern: `^POST /spaces/\{spaceID\}/library/items/\{itemID\}/trash$`, tool: "item.delete"},
-	{pattern: `^POST /spaces/\{spaceID\}/library/items/\{itemID\}/restore$`, tool: "file.organize"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/library/(albums/\{albumID\}/(order|organization)|album-folders|pins)`, why: "visual arrangement of the Library; agents change content, not layout"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/library/(grants|shared|reauthenticate)`, why: "sharing, access and re-authentication"},
+	{pattern: `^POST /spaces/\{spaceID\}/library/items/\{itemID\}/restore$`, why: "restoring from Recently Deleted is the person's own undo"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/library/(uploads|imports|items/\{itemID\}/provider-import)`, why: "files come from the person's device or accounts"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/library/people`, why: "face groups are biometric data; only people manage them"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/library/`, why: "photo edits, stacks, duplicate merges, bulk selections and Memories curation are visual decisions in the Library editor"},
 
 	// Roadmaps.
-	{pattern: `^POST /spaces/\{spaceID\}/roadmaps$`, tool: "roadmap.create"},
-	{pattern: `^PATCH /spaces/\{spaceID\}/roadmaps/\{roadmapID\}$`, tool: "roadmap.update"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/roadmaps/\{roadmapID\}/(milestones|goals)`, tool: "roadmap.plan"},
-	{pattern: `^DELETE /spaces/\{spaceID\}/roadmaps/\{roadmapID\}$`, tool: "item.delete"},
-	{pattern: `^PATCH /spaces/\{spaceID\}/roadmaps/\{roadmapID\}/layout$`, why: "visual arrangement of the roadmap canvas"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/roadmaps/\{roadmapID\}/(edges|nodes)`, tool: "roadmap.canvas"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/roadmap-node-definitions`, why: "custom node types and their fields are designed in the canvas editor"},
 
 	// Space files.
 	{pattern: `^DELETE /spaces/\{spaceID\}/nodes/\{nodeID\}$`, tool: "item.delete"},

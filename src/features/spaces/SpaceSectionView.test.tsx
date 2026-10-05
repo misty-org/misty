@@ -24,9 +24,6 @@ vi.mock("@/features/journal/notes/SpaceNotes", () => ({
 vi.mock("@/features/journal/drawings/SpaceDrawings", () => ({
   SpaceDrawings: ({ spaceId }: { spaceId: string }) => <div>Drawings in {spaceId}</div>,
 }));
-vi.mock("@/features/planner/planner/SpacePlanner", () => ({
-  SpacePlanner: ({ spaceId }: { spaceId: string }) => <div>Planner in {spaceId}</div>,
-}));
 // Keep the real runtime guards and host initializers: a shallow tool mock used
 // to hide missing service setup in the restored built-in entry point.
 vi.mock("@/features/library/library/SpaceLibrary", async () => {
@@ -57,7 +54,6 @@ it.each([
   ["home", "Chat"],
   ["notes", "Notes"],
   ["drawings", "Drawings"],
-  ["planner", "Planner"],
   ["library", "Library"],
   ["social", "Chat"],
 ])("opens %s directly without an installed app", async (section, label) => {
@@ -71,14 +67,4 @@ it.each([
   expect(
     await screen.findByText(new RegExp(`${label} in family`), {}, { timeout: 5000 }),
   ).toBeTruthy();
-});
-it("retains Space permissions for direct links", () => {
-  state.spaces[0].permissions = { "tasks.view": false };
-  render(
-    <MemoryRouter>
-      <SpaceSectionView spaceId="family" section="planner" />
-    </MemoryRouter>,
-  );
-  expect(screen.getByText("You don’t have access to this Space tool")).toBeTruthy();
-  expect(screen.queryByText("Planner in family")).toBeNull();
 });

@@ -99,7 +99,7 @@ func (s *SpacesService) authorizeMCPRuntimeClaims(r *http.Request, claims mcpAcc
 		access.record, access.prepared = record, prepared
 		return access, nil
 	}
-	run, _, err := s.database.ValidatePersonalAgentTaskRuntime(r.Context(), claims.RunID, claims.RuntimeRunID, true)
+	run, err := s.database.ValidatePersonalAgentTaskRuntime(r.Context(), claims.RunID, claims.RuntimeRunID, true)
 	if err != nil || run.OwnerUserID != claims.Subject {
 		return nil, errMCPAccessDenied
 	}

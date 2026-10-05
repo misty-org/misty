@@ -186,7 +186,6 @@ type SpaceRun struct {
 	AgentVersionID        string          `json:"agent_version_id,omitempty"`
 	Attempt               int             `json:"attempt"`
 	NextRetryAt           *time.Time      `json:"next_retry_at,omitempty"`
-	SourceTaskID          string          `json:"source_task_id,omitempty"`
 	RuntimeKind           string          `json:"runtime_kind,omitempty"`
 	RuntimeRunID          string          `json:"runtime_run_id,omitempty"`
 	RuntimePhase          string          `json:"runtime_phase,omitempty"`

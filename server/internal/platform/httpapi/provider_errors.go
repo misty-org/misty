@@ -12,16 +12,10 @@ func writeProviderFailure(w http.ResponseWriter, err error) {
 		writeSpaceError(w, err)
 		return
 	}
-	var googleErr *googleAPIError
 	var providerErr *providerAPIError
-	if errors.As(err, &googleErr) || errors.As(err, &providerErr) {
+	if errors.As(err, &providerErr) {
 		status := http.StatusBadGateway
-		providerStatus := 0
-		if googleErr != nil {
-			providerStatus = googleErr.Status
-		} else if providerErr != nil {
-			providerStatus = providerErr.Status
-		}
+		providerStatus := providerErr.Status
 		if providerStatus == http.StatusUnauthorized || providerStatus == http.StatusForbidden {
 			status = http.StatusFailedDependency
 		} else if providerStatus == http.StatusPreconditionFailed {
@@ -37,12 +31,9 @@ func providerErrorCode(err error) string {
 	if err == nil {
 		return ""
 	}
-	var googleErr *googleAPIError
 	var providerErr *providerAPIError
 	status := 0
-	if errors.As(err, &googleErr) {
-		status = googleErr.Status
-	} else if errors.As(err, &providerErr) {
+	if errors.As(err, &providerErr) {
 		status = providerErr.Status
 	}
 	switch status {

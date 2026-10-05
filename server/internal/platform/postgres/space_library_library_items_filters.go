@@ -18,9 +18,6 @@ func newLibraryItemFilter(spaceID, state, userID string) *libraryItemFilter {
 		args:       []any{spaceID, state},
 		conditions: []string{"i.space_id=$1", "i.lifecycle_state=$2"},
 	}
-	if state == "ready" {
-		filter.where("NOT EXISTS(SELECT 1 FROM space_library_asset_stack_members stack_member JOIN space_library_asset_stacks asset_stack ON asset_stack.id=stack_member.stack_id WHERE stack_member.space_library_item_id=i.id AND asset_stack.lifecycle_state='ready' AND asset_stack.cover_item_id<>i.id)")
-	}
 	viewerPlaceholder := filter.add(userID)
 	filter.where("(i.audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members audience_member WHERE audience_member.conversation_id=i.audience_conversation_id AND audience_member.actor_kind='person' AND audience_member.user_id=" + viewerPlaceholder + "))")
 	return filter
@@ -74,23 +71,6 @@ func (f *libraryItemFilter) applyMediaFilter(mediaType string) error {
 	return nil
 }
 
-// applyAlbumAndUtilityFilters adds the album, utility and structured album conditions. The
-// utility filters may replace the sort expressions, so the updated pair is returned.
-func (f *libraryItemFilter) applyAlbumAndUtilityFilters(query LibraryItemQuery, searchAlbum, userID, sortExpression, subquerySortExpression string) (string, string, error) {
-	if query.AlbumID != "" {
-		f.where("EXISTS(SELECT 1 FROM space_album_items album_item JOIN space_albums album ON album.id=album_item.album_id WHERE album_item.space_library_item_id=i.id AND album.id=" + f.add(query.AlbumID) + " AND album.space_id=i.space_id)")
-	}
-	sortExpression, subquerySortExpression, err := f.applyUtilityFilter(query.Utility, userID, sortExpression, subquerySortExpression)
-	if err != nil {
-		return "", "", err
-	}
-	if searchAlbum != "" {
-		placeholder := f.add(searchAlbum)
-		f.where("EXISTS(SELECT 1 FROM space_album_items search_album_item JOIN space_albums search_album ON search_album.id=search_album_item.album_id WHERE search_album_item.space_library_item_id=i.id AND search_album.space_id=i.space_id AND (search_album.id=" + placeholder + " OR lower(search_album.name)=lower(" + placeholder + ")))")
-	}
-	return sortExpression, subquerySortExpression, nil
-}
-
 // applyUtilityFilter adds the condition for a utility collection and returns the sort expressions it uses.
 func (f *libraryItemFilter) applyUtilityFilter(utility, userID, sortExpression, subquerySortExpression string) (string, string, error) {
 	switch utility {
@@ -104,24 +84,17 @@ func (f *libraryItemFilter) applyUtilityFilter(utility, userID, sortExpression, 
 		f.where("i.current_edit_version_id IS NOT NULL")
 		sortExpression, subquerySortExpression = "i.updated_at", "cursor_item.updated_at"
 	case "recently-shared":
-		f.where("(EXISTS(SELECT 1 FROM space_library_grants grant_record WHERE grant_record.source_space_id=i.space_id AND grant_record.source_item_id=i.id AND grant_record.state='active') OR EXISTS(SELECT 1 FROM space_message_library_references message_reference WHERE message_reference.space_id=i.space_id AND message_reference.space_library_item_id=i.id))")
+		f.where("EXISTS(SELECT 1 FROM space_message_library_references message_reference WHERE message_reference.space_id=i.space_id AND message_reference.space_library_item_id=i.id)")
 	case "recently-saved":
 		f.where("EXISTS(SELECT 1 FROM space_message_attachments saved_attachment WHERE saved_attachment.space_id=i.space_id AND saved_attachment.promoted_item_id=i.id)")
 		sortExpression, subquerySortExpression = "i.added_at", "cursor_item.added_at"
 	case "recovered":
 		f.where("EXISTS(SELECT 1 FROM space_library_audit_events recovery_event WHERE recovery_event.space_id=i.space_id AND recovery_event.target_kind='library_item' AND recovery_event.target_id=i.id AND recovery_event.action='library.item.restored' AND recovery_event.outcome='success')")
 		sortExpression, subquerySortExpression = "i.updated_at", "cursor_item.updated_at"
-	case "imports":
-		f.where("EXISTS(SELECT 1 FROM space_library_imports import_record WHERE import_record.destination_space_id=i.space_id AND import_record.destination_item_id=i.id AND import_record.state='ready')")
-	case "featured":
-		f.where("b.server_detected_mime_type LIKE 'image/%' AND (i.favorite OR EXISTS(SELECT 1 FROM library_derivatives featured_derivative WHERE featured_derivative.space_library_item_id=i.id AND featured_derivative.lifecycle_state='ready' AND featured_derivative.kind='ai_metadata' AND lower(featured_derivative.metadata::text) ~ '(featured|aesthetic|best shot|high quality)'))")
 	case "screenshots":
 		f.where("(lower(f.original_filename) LIKE '%screenshot%' OR lower(f.intrinsic_metadata::text) LIKE '%screenshot%')")
 	case "documents":
 		f.where("b.server_detected_mime_type NOT LIKE 'image/%' AND b.server_detected_mime_type NOT LIKE 'video/%' AND b.server_detected_mime_type NOT LIKE 'audio/%'")
-	case "receipts", "handwriting", "illustrations", "qr-codes":
-		keyword := map[string]string{"receipts": "receipt", "handwriting": "handwrit", "illustrations": "illustration", "qr-codes": "qr"}[utility]
-		f.where("EXISTS(SELECT 1 FROM library_derivatives intelligence WHERE intelligence.space_library_item_id=i.id AND intelligence.lifecycle_state='ready' AND intelligence.kind='ai_metadata' AND lower(intelligence.metadata::text) LIKE " + f.add("%"+keyword+"%") + ")")
 	default:
 		return "", "", ErrLibraryInvalid
 	}
