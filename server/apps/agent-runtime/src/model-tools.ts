@@ -58,7 +58,7 @@ const imageDataURL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$
 
 /** Screenshots return to the model as images rather than base64 text. */
 export function visualToolOutput(name: string, output: unknown): ModelToolOutput {
-  if ((name !== "browser.visual" && name !== "browser.workspace.visual") || !output || typeof output !== "object") {
+  if ((name !== "browser.visual" && name !== "browser.workspace.visual" && name !== "browser.act") || !output || typeof output !== "object") {
     return { type: "text", value: JSON.stringify(output) ?? "null" };
   }
   const result = output as Record<string, unknown>;
