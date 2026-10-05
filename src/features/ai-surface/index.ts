@@ -1,9 +1,7 @@
-export { AiPaneHost, useAiSurfaceActions, useAiSurfaceAdapter } from "./AiPaneHost";
+export { AiPaneHost } from "./AiPaneHost";
 export { AiSelectionMenu } from "./AiSelectionMenu";
 export { useAiVoiceRecorder } from "./useAiVoiceRecorder";
 export { VoiceInputMenu } from "./VoiceInputMenu";
-export type { AiVoiceInputDevice } from "./useAiVoiceRecorder";
-export { aiSurfaceApi, subscribeToAiInvocation } from "./api";
-export type { AiSurfacePreferenceRecord, AiUserSettings } from "./api";
+export { aiSurfaceApi } from "./api";
 export { useAiSurfaceStore, resetAiSurfaceAccountState } from "./store";
 export * from "./types";

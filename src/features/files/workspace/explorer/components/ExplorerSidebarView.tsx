@@ -28,7 +28,6 @@ import {
   visibleSmartFolderRules,
 } from "@/features/file-ui";
 export type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";
-export type { QuickAccessItem } from "../model/types/components/ExplorerSidebar";
 export const ExplorerSidebarView = memo(function ExplorerSidebarView(
   props: ExplorerSidebarProps & {
     runtime: ExplorerSidebarRuntime;

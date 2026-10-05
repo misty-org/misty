@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	GatewayModelCatalogVersion = "gateway-live-v2"
-	InitialSelectedModelID     = DefaultFrontierModelID
-	InitialSelectedModelName   = "GPT-6 Astra"
+	InitialSelectedModelID   = DefaultFrontierModelID
+	InitialSelectedModelName = "GPT-6 Astra"
 )
 
 var ErrModelUnavailable = errors.New("agent model unavailable")
@@ -35,12 +34,8 @@ var gatewayCatalogCache struct {
 }
 
 func GatewayModels(ctx context.Context) ([]GatewayModel, error) {
-	config, err := envconfig.AgentModel()
-	if err != nil {
+	if _, err := envconfig.AgentModel(); err != nil {
 		return nil, err
-	}
-	if config.Provider != "gateway" {
-		return []GatewayModel{{ID: config.Model, Name: strings.TrimPrefix(config.Model, config.Provider+"/"), Capabilities: []string{"chat", "tools", "vision", "reasoning"}}}, nil
 	}
 	gatewayCatalogCache.Lock()
 	if time.Now().Before(gatewayCatalogCache.expiresAt) && len(gatewayCatalogCache.models) > 0 {
@@ -106,19 +101,6 @@ func NewGatewayProviderForModelWithReasoning(modelID, reasoningEffort string) (M
 	modelID = strings.TrimSpace(modelID)
 	if modelID == "" || strings.ContainsAny(modelID, "\r\n\t ") || len(modelID) > 200 {
 		return nil, errors.New("invalid gateway model")
-	}
-	config, err := envconfig.AgentModel()
-	if err != nil {
-		return nil, err
-	}
-	if config.Provider == "openai" {
-		if modelID != config.Model {
-			return nil, ErrModelUnavailable
-		}
-		return NewOpenAIProvider(OpenAIProviderConfig{APIKey: firstEnv("MISTY_AGENT_MODEL_API_KEY", "OPENAI_API_KEY"), BaseURL: envOrDefault("MISTY_AGENT_MODEL_BASE_URL", defaultOpenAIBaseURL), Model: strings.TrimPrefix(modelID, "openai/"), ReasoningEffort: reasoningEffort}), nil
-	}
-	if config.Provider != "gateway" {
-		return nil, ErrModelUnavailable
 	}
 	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
 	if apiKey == "" {

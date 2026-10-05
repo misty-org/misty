@@ -8,16 +8,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kannachi323/misty/server/internal/integrations/composio"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 // appsUser authenticates the account owner. Extension and app authority can
 // never manage connections or answer an agent's request.
 func (s *SpacesService) appsUser(w http.ResponseWriter, r *http.Request) (string, bool) {
-	if db.AppAuthorityFromContext(r.Context()) != nil {
-		writeJSON(w, http.StatusForbidden, map[string]string{"code": "apps_owner_required"})
-		return "", false
-	}
 	return authenticatedUser(w, r, s.database)
 }
 

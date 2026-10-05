@@ -105,8 +105,4 @@ export interface GlobalSearchState {
     paneId?: string,
     presentation?: MistySubmissionPresentation,
   ) => Promise<void>;
-  approveAgentTask: (proposalId: string) => Promise<void>;
-  cancelAgentTask: (proposalId: string) => Promise<void>;
-  confirmAction: (proposalId: string) => Promise<void>;
-  rejectAction: (proposalId: string) => void;
 }

@@ -24,10 +24,6 @@ export function createSpacePlannerExpansionApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/agenda?${new URLSearchParams({ from, to })}`,
       ),
     roadmaps: (spaceId: string) => request<{ roadmaps: SpaceRoadmap[] }>(roadmapPath(spaceId)),
-    roadmapNodeDefinitions: (spaceId: string) =>
-      request<{ node_definitions: SpaceRoadmapNodeDefinition[] }>(
-        `/spaces/${encodeURIComponent(spaceId)}/roadmap-node-definitions`,
-      ),
     createRoadmapNodeDefinition: (
       spaceId: string,
       definition: Partial<SpaceRoadmapNodeDefinition>,

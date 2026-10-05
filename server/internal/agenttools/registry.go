@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
-	"github.com/kannachi323/misty/server/internal/capabilities"
 )
 
 type ApprovalPolicy string
@@ -42,7 +41,6 @@ var (
 )
 
 type Descriptor struct {
-	ProviderBinding    *ProviderBinding
 	Name               string
 	Version            int
 	Description        string
@@ -202,11 +200,7 @@ func (r *Registry) ExecuteWithMiddleware(ctx context.Context, invocation Invocat
 	if len(request.Arguments) == 0 {
 		request.Arguments = json.RawMessage(`{}`)
 	}
-	inputLimit := 256 << 10
-	if tool.descriptor.ProviderBinding != nil {
-		inputLimit = 512 << 10
-	}
-	if len(request.Arguments) > inputLimit || !matchesSchema(tool.inputSchema, request.Arguments) {
+	if len(request.Arguments) > 256<<10 || !matchesSchema(tool.inputSchema, request.Arguments) {
 		return nil, ErrArgumentsInvalid
 	}
 	request.Name = canonicalName
@@ -235,13 +229,13 @@ func (r *Registry) ExecuteWithMiddleware(ctx context.Context, invocation Invocat
 	return result, nil
 }
 
-// Compile once at registration. The same JSON Schema semantics apply to built-in
-// tools and independent SDK providers; the legacy graph validator is not extended.
+// Compile once at registration so every tool shares the same JSON Schema
+// semantics.
 func compileToolSchema(raw json.RawMessage) (*jsonschema.Resolved, error) {
 	if len(raw) == 0 {
 		raw = json.RawMessage(`{}`)
 	}
-	return capabilities.CompileSchema(raw)
+	return compileSchema(raw)
 }
 func matchesSchema(schema *jsonschema.Resolved, raw json.RawMessage) bool {
 	var value any
@@ -373,12 +367,6 @@ func validateRegistration(descriptor Descriptor, handler Handler) error {
 }
 
 func cloneDescriptor(descriptor Descriptor) Descriptor {
-	if descriptor.ProviderBinding != nil {
-		binding := *descriptor.ProviderBinding
-		binding.RequiredScopes = append([]string{}, binding.RequiredScopes...)
-		descriptor.ProviderBinding = &binding
-	}
-
 	descriptor.InputSchema = append(json.RawMessage(nil), descriptor.InputSchema...)
 	descriptor.OutputSchema = append(json.RawMessage(nil), descriptor.OutputSchema...)
 	descriptor.Aliases = append([]string(nil), descriptor.Aliases...)

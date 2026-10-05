@@ -21,7 +21,6 @@ import type { PlannerTaskRuntime } from "./spaceTasks/taskRuntime";
 import { useSpaceTaskActions } from "./spaceTasks/useSpaceTaskActions";
 import { useSpaceTasksData } from "./spaceTasks/useSpaceTasksData";
 import { useTaskFilterParams } from "./spaceTasks/useTaskFilterParams";
-export type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 export function SpaceTasksView({
   spaceId,
   canManage,

@@ -8,7 +8,6 @@ import {
   normalizeConversation,
   patchConversationMessage,
   replaceActiveGlobalInvocationStream,
-  resumeGlobalAgentWatches,
   type GlobalSearchGet,
   type GlobalSearchSet,
 } from "@/features/global-search/globalSearchStoreHelpers";
@@ -81,7 +80,6 @@ export function createMistyConversationActions(
             get().selectedAgentId,
           conversationsLoading: false,
         });
-        resumeGlobalAgentWatches(set, get, conversations);
         if (reconnect) {
           replaceActiveGlobalInvocationStream();
           set({

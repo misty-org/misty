@@ -55,9 +55,5 @@ export const useGlobalSearchStore = create<GlobalSearchState>((set, get) => {
     submit: () => handoff(get().query),
     submitAnswer: (prompt) => handoff(prompt),
     submitAgentTask: (prompt) => handoff(prompt),
-    approveAgentTask: async () => {},
-    cancelAgentTask: async () => {},
-    confirmAction: async () => {},
-    rejectAction: () => {},
   };
 });

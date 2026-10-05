@@ -28,10 +28,10 @@ func TestAgentMethodHTTPManualAndScheduledExecution(t *testing.T) {
 	}
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	t.Setenv("MISTY_AGENT_MODEL_PROVIDER", "openai")
 	t.Setenv("MISTY_AGENT_MODEL", "openai/gpt-6-astra")
-	t.Setenv("MISTY_AGENT_MODEL_API_KEY", "fixture-not-a-real-key")
-	t.Setenv("MISTY_AGENT_MODEL_BASE_URL", "")
+	t.Setenv("AI_GATEWAY_API_KEY", "fixture-not-a-real-key")
+	t.Setenv("AI_GATEWAY_BASE_URL", "http://127.0.0.1:1")
+	t.Setenv("MISTY_AI_MODEL_CATALOG_JSON", `[{"id":"openai/gpt-6-astra","name":"GPT-6 Astra","capabilities":["chat","tools","vision","reasoning"]}]`)
 	owner, err := database.CreateUser("Workflow execution", "workflow-execution@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)

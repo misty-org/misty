@@ -20,11 +20,9 @@ export async function requestMCPToolExecution(
   callId: string,
   name: string,
   input: unknown,
-  approvalHookToken: string,
   deviceHookToken: string,
 ): Promise<{
   result?: unknown;
-  approval?: { id: string; state: string };
   device_wait?: boolean;
   intervention_wait?: { id: string; action: string; reason: string };
   tool_error?: { code: string; message: string };
@@ -52,19 +50,13 @@ export async function requestMCPToolExecution(
       arguments: input as Record<string, unknown>,
       _meta: {
         "misty/call_id": callId,
-        "misty/approval_hook_token": approvalHookToken,
         "misty/device_hook_token": deviceHookToken,
       },
     });
     const meta = response._meta as Record<string, unknown> | undefined;
-    const waitCount = Number(Boolean(meta?.["misty/approval"])) + Number(meta?.["misty/device_wait"] === true) + Number(Boolean(meta?.["misty/intervention_wait"]));
+    const waitCount = Number(meta?.["misty/device_wait"] === true) + Number(Boolean(meta?.["misty/intervention_wait"]));
     if (waitCount > 1 || (waitCount > 0 && (response.isError || response.structuredContent !== undefined))) {
       return {tool_error:{code:"invalid_tool_outcome",message:"The tool returned contradictory wait or completion outcomes."}};
-    }
-    if (meta?.["misty/approval"]) {
-      return {
-        approval: meta["misty/approval"] as { id: string; state: string },
-      };
     }
     if (meta?.["misty/intervention_wait"]) return { intervention_wait: meta["misty/intervention_wait"] as {id:string;action:string;reason:string} };
     if (meta?.["misty/device_wait"] === true) return { device_wait: true };

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	agent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/billingadapter"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
@@ -54,7 +52,7 @@ func (s *AgentsService) AgentVoiceRealtimeTicket() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		writeJSON(w, http.StatusCreated, map[string]any{"ticket": token, "expires_in": 60, "webrtc": agent.VoiceWebRTCConfigured()})
+		writeJSON(w, http.StatusCreated, map[string]any{"ticket": token, "expires_in": 60 })
 	}
 }
 
@@ -101,18 +99,16 @@ func (s *AgentsService) AgentVoiceRealtimeConnect() http.HandlerFunc {
 			writeAgentError(w, err)
 			return
 		}
-		conversation, history := "", ""
-		if r.URL.Query().Get("mode") == "conversation" {
-			conversation = r.URL.Query().Get("conversation")
-			if conversation == "" || len(conversation) > 160 {
-				writeJSON(w, 400, map[string]string{"code": "invalid_voice_conversation"})
-				return
-			}
-			history, err = s.voiceConversationContext(r.Context(), user, conversation)
-			if err != nil {
-				writeAgentError(w, err)
-				return
-			}
+		// Voice is always a conversation; the single-turn relay was retired.
+		conversation := r.URL.Query().Get("conversation")
+		if r.URL.Query().Get("mode") != "conversation" || conversation == "" || len(conversation) > 160 {
+			writeJSON(w, 400, map[string]string{"code": "invalid_voice_conversation"})
+			return
+		}
+		history, err := s.voiceConversationContext(r.Context(), user, conversation)
+		if err != nil {
+			writeAgentError(w, err)
+			return
 		}
 		upgrader := websocket.Upgrader{Subprotocols: []string{"misty-voice-v1"}, CheckOrigin: func(*http.Request) bool { return true }}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -124,30 +120,15 @@ func (s *AgentsService) AgentVoiceRealtimeConnect() http.HandlerFunc {
 		defer cancel()
 		operation := "realtime-voice:" + uuid.NewString()
 		setupStarted := time.Now()
-		provider, err := s.openVoiceTransport(ctx, conn, conversation == "" && r.URL.Query().Get("transport") == "webrtc", user)
+		provider, err := s.openVoiceTransport(ctx, user)
 		if err != nil {
 			rejectVoiceSetup(conn, websocket.CloseInternalServerErr, "The realtime voice provider is unavailable. Please try again.")
 			return
 		}
 		defer provider.Close()
-		transport := "websocket"
-		if rtc, ok := provider.(interface{ WebRTC() bool }); ok && rtc.WebRTC() {
-			transport = "webrtc"
-		}
-		log.Printf("voice_transport operation_id=%q transport=%s setup_ms=%d", operation, transport, time.Since(setupStarted).Milliseconds())
-		if conversation != "" {
-			s.runVoiceConversation(ctx, conn, provider, operation, user, device, conversation, history)
-		} else {
-			s.runVoiceRealtime(ctx, conn, provider, operation, user, device)
-		}
+		log.Printf("voice_transport operation_id=%q setup_ms=%d", operation, time.Since(setupStarted).Milliseconds())
+		s.runVoiceConversation(ctx, conn, provider, operation, user, device, conversation, history)
 	}
-}
-
-func voiceAdmissionFailure(err error) (int, string) {
-	if errors.Is(err, billingadapter.ErrDenied) {
-		return websocket.ClosePolicyViolation, "Your account's AI allowance could not cover this voice session. Check your plan and usage in Settings."
-	}
-	return websocket.CloseInternalServerErr, "Voice could not check your account's AI allowance. Please try again later."
 }
 
 // Only used before runVoiceSession starts its reader. Finish the close handshake

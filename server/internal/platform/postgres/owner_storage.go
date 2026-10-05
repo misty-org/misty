@@ -39,9 +39,6 @@ type OwnerStorageUsage struct {
 	Personal           StorageQuotaDimension    `json:"personal"`
 }
 
-// PersonalStorageUsage is the preferred domain name for new callers.
-type PersonalStorageUsage = OwnerStorageUsage
-
 type OwnerSpaceStorageUsage struct {
 	SpaceID       string `json:"space_id"`
 	Name          string `json:"name"`
@@ -98,8 +95,4 @@ func (db *Database) OwnerStorageUsage(ctx context.Context, userID string) (*Owne
 		return rows.Err()
 	})
 	return &out, err
-}
-
-func (db *Database) PersonalStorageUsage(ctx context.Context, userID string) (*PersonalStorageUsage, error) {
-	return db.OwnerStorageUsage(ctx, userID)
 }

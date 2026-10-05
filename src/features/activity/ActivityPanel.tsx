@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { cn, Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
-import { CapabilityApprovalDetail } from "@/features/capability-approvals/CapabilityApprovals";
 import { AgentInterventions } from "@/features/agent-interventions/AgentInterventions";
 import { ActivityFeed } from "./ActivityFeed";
 import { closeActivityPanel, openActivityPanel, useActivityPanel } from "./activityPanelState";
@@ -58,10 +57,10 @@ export function ActivityPanel() {
             Activity
           </DialogTitle>
         </header>
-        {!panel.approvalId && !panel.interventionId && (
+        {!panel.interventionId && (
           <ActivityPanelToolbar view={view} counts={results.counts} onChange={setView} />
         )}
-        {panel.approvalId || panel.interventionId ? (
+        {panel.interventionId ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
             <Button
               variant="ghost"
@@ -71,13 +70,6 @@ export function ActivityPanel() {
             >
               Back to Activity
             </Button>
-            {user?.id && panel.approvalId ? (
-              <CapabilityApprovalDetail
-                key={`${user.id}:${panel.approvalId}`}
-                id={panel.approvalId}
-                onClose={() => openActivityPanel()}
-              />
-            ) : null}
             {user?.id && panel.interventionId ? (
               <AgentInterventions
                 key={`${user.id}:${panel.interventionId}`}

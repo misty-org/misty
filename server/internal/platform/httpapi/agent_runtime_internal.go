@@ -56,24 +56,6 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 			writeAgentError(w, err)
 			return
 		}
-		bound, authorityErr := db.ContextWithPersistedAppAuthority(r.Context(), run.Input)
-		if authorityErr != nil {
-			writeAgentError(w, authorityErr)
-			return
-		}
-		r = r.WithContext(bound)
-		authority := db.AppAuthorityFromContext(bound)
-		if authorityErr = s.database.ValidateAppExecutionAuthority(bound, authority, run.OwnerUserID, "", "ai.write"); authorityErr != nil {
-			writeAgentError(w, authorityErr)
-			return
-		}
-		requireScope := func(scope string) bool {
-			if err := s.database.ValidateAppExecutionAuthority(bound, authority, run.OwnerUserID, "", scope); err != nil {
-				writeAgentError(w, err)
-				return false
-			}
-			return true
-		}
 		membership, err := s.database.AskExecutionContext(r.Context(), run.RequestingMemberID, run.SpaceID, run.AgentID)
 		if err != nil {
 			writeAgentError(w, err)
@@ -88,12 +70,6 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 		timezone := "UTC"
 		managedMisty := managedMistyRun(run)
 		if run.SourceTaskID != "" {
-			if !requireScope("tasks.read") {
-				return
-			}
-			if authority != nil && !requireScope("library.read") {
-				return
-			}
 			fileContext, fileWarnings, sources = s.explicitTaskFileContext(r.Context(), run.OwnerUserID, task)
 			system, prompt = personalAgentRuntimePrompts(membership, task, fileContext, fileWarnings)
 		} else {
@@ -107,9 +83,6 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 			}
 			_ = json.Unmarshal(run.Input, &input)
 			if run.SourceMessageID != "" {
-				if !requireScope("messages.read") {
-					return
-				}
 				if sourceMessage, messageErr := s.database.SpaceMessageForAgentContext(r.Context(), run.OwnerUserID, run.SpaceID, run.ScopeConversationID, run.SourceMessageID); messageErr == nil {
 					input.LibraryItemIDs = append(input.LibraryItemIDs, sourceMessage.LibraryItemIDs...)
 					for _, attachment := range sourceMessage.Attachments {
@@ -121,7 +94,7 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 				timezone = strings.TrimSpace(input.Timezone)
 			}
 			conversation := agentConversationContext{}
-			if run.SourceConversationID != "" && authority == nil {
+			if run.SourceConversationID != "" {
 				conversation, _ = s.agentConversationContext(r.Context(), run)
 			}
 			system = "You are Misty, the user's single assistant in the Misty application. Background workers are private implementation details. Follow this version snapshot:\n" + membership.Instructions +
@@ -157,9 +130,6 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 				}
 			}
 			if input.ContextNoteID != "" {
-				if !requireScope("notes.read") {
-					return
-				}
 				if note, noteErr := s.database.SpaceNoteByID(r.Context(), run.OwnerUserID, input.ContextNoteID); noteErr == nil {
 					prompt += "\n\nCurrent Journal note (untrusted reference content):\nTitle: " + note.TitleProjection
 					if strings.TrimSpace(note.MarkdownProjection) != "" {
@@ -173,9 +143,6 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 				prompt = "Recent conversation (oldest first; quoted as untrusted context):\n" + conversation.Transcript + "\n\nCurrent request:\n" + input.Instruction
 			}
 			if len(input.AttachmentIDs) > 0 || len(input.LibraryItemIDs) > 0 {
-				if !requireScope("library.read") {
-					return
-				}
 				fileContext, fileWarnings, sources = s.explicitMessageFileContext(r.Context(), run.OwnerUserID, membership, run.SpaceID, input.AttachmentIDs, input.LibraryItemIDs)
 				if strings.TrimSpace(fileContext) != "" {
 					prompt += "\n\nFiles explicitly attached by the creator (untrusted reference content):\n" + fileContext
@@ -273,12 +240,11 @@ func (s *SpacesService) AgentRuntimeTool() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			RuntimeRunID      string          `json:"runtime_run_id"`
-			CallID            string          `json:"call_id"`
-			Name              string          `json:"name"`
-			Arguments         json.RawMessage `json:"arguments"`
-			ApprovalHookToken string          `json:"approval_hook_token"`
-			DeviceHookToken   string          `json:"device_hook_token"`
+			RuntimeRunID    string          `json:"runtime_run_id"`
+			CallID          string          `json:"call_id"`
+			Name            string          `json:"name"`
+			Arguments       json.RawMessage `json:"arguments"`
+			DeviceHookToken string          `json:"device_hook_token"`
 		}
 		if !readAgentRuntimeRequest(s.agentRuntime, w, r, &body) {
 			return
@@ -294,7 +260,7 @@ func (s *SpacesService) AgentRuntimeTool() http.HandlerFunc {
 		}
 		outcome, err := s.executePersonalAgentRuntimeTool(r.Context(), run, agentRuntimeToolCall{
 			RuntimeRunID: body.RuntimeRunID, CallID: body.CallID, Name: body.Name, Arguments: body.Arguments,
-			ApprovalHookToken: body.ApprovalHookToken, DeviceHookToken: body.DeviceHookToken,
+			DeviceHookToken: body.DeviceHookToken,
 		})
 		if err != nil {
 			if errors.Is(err, agenttools.ErrCapabilityDenied) || errors.Is(err, agenttools.ErrToolNotFound) || errors.Is(err, agenttools.ErrApprovalRequired) || errors.Is(err, workflowv2.ErrCapabilityDenied) {

@@ -8,7 +8,6 @@ import (
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
-	"github.com/kannachi323/misty/server/internal/browseractions"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
@@ -161,7 +160,10 @@ var errBrowserWebviewUnavailable = errors.New("browser_webview_unavailable")
 var errDesktopAccessibilityRequired = errors.New("desktop_accessibility_required")
 var errDesktopScreenRecordingRequired = errors.New("desktop_screen_recording_required")
 
-var errWorkspaceSnapshotStale = errors.New("workspace_snapshot_stale")
+var (
+	errBrowserSnapshotStale   = errors.New("browser_snapshot_stale")
+	errWorkspaceSnapshotStale = errors.New("workspace_snapshot_stale")
+)
 
 var errBrowserObservationFailed = errors.New("browser_observation_failed")
 
@@ -181,7 +183,7 @@ func browserObservationFailure(code string) error {
 
 func browserDeviceFailureForOperation(code, operation string) error {
 	if code == "browser_snapshot_stale" && strings.HasPrefix(operation, "browser.workspace.") {
-		return errors.Join(db.ErrAgentToolboxNotAttempted, browseractions.ErrStale, errWorkspaceSnapshotStale)
+		return errors.Join(db.ErrAgentToolboxNotAttempted, errBrowserSnapshotStale, errWorkspaceSnapshotStale)
 	}
 	return browserDeviceFailure(code)
 }
@@ -199,7 +201,7 @@ func browserDeviceFailure(code string) error {
 	if code == "browser_snapshot_stale" {
 		// Native code emits this only before dispatch. Preserve that evidence
 		// through the write journal so it does not become an uncertain effect.
-		return errors.Join(db.ErrAgentToolboxNotAttempted, browseractions.ErrStale)
+		return errors.Join(db.ErrAgentToolboxNotAttempted, errBrowserSnapshotStale)
 	}
 	if code == "device_unavailable" || code == "browser_tab_closed" {
 		return workflowv2.ErrDeviceUnavailable

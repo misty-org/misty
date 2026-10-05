@@ -2,7 +2,7 @@ import type { AppRequest } from "@/features/agents";
 import type { AiArtifact, ScreenRequest } from "@/features/ai-surface/types";
 import type { SearchResult } from "@/native/ipc";
 
-export type GlobalAiMode = "search" | "ask" | "action";
+export type GlobalAiMode = "search" | "ask";
 
 export type GlobalSearchKind =
   | "space"
@@ -18,7 +18,6 @@ export type GlobalSearchKind =
   | "folder"
   | "file"
   | "agent"
-  | "workflow"
   | "action";
 
 export interface GlobalSearchDocument {
@@ -102,23 +101,6 @@ export interface GlobalAiCitation {
   kind: GlobalSearchKind;
 }
 
-export interface GlobalAiActionProposal {
-  id: string;
-  title: string;
-  summary: string;
-  prompt: string;
-  risk: "read" | "write" | "dangerous";
-  state: "proposed" | "running" | "awaiting_approval" | "completed" | "failed" | "rejected";
-  requiresConfirmation: boolean;
-  agentName?: string;
-  spaceId?: string;
-  spaceName?: string;
-  runId?: string;
-  approvalId?: string;
-  resultHref?: string;
-  error?: string;
-}
-
 export interface GlobalAiMessage {
   artifact?: AiArtifact;
   invocationId?: string;
@@ -132,7 +114,6 @@ export interface GlobalAiMessage {
   activity?: string;
   attachments?: MistyImageAttachment[];
   citations?: GlobalAiCitation[];
-  action?: GlobalAiActionProposal;
   /** Something the agent needs from the user: connect an app or approve an action. */
   appRequest?: AppRequest;
   /** A screen the agent asked for; Misty continues once it opens. */

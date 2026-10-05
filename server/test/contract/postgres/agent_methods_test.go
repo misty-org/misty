@@ -3,10 +3,13 @@ package db
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"testing"
 	"time"
+	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
+
+
+import ()
 
 func TestAgentMethodVersionsOwnershipAndSchedulePin(t *testing.T) {
 	database := openTestDatabase(t)
@@ -97,7 +100,7 @@ func TestAgentMethodVersionsOwnershipAndSchedulePin(t *testing.T) {
 	if _, err := database.SaveAgentMethod(ctx, owner.ID, proposal, 0); err == nil {
 		t.Fatal("unfinished invocation accepted as a completed source")
 	}
-	if err := database.AppendAIInvocationEvent(ctx, owner.ID, one.ID, 1, "assistant.message", json.RawMessage(`{"text":"Verified brief"}`), "completed"); err != nil {
+	if err := database.TestingAppendAIInvocationEvent(ctx, owner.ID, one.ID, 1, "assistant.message", json.RawMessage(`{"text":"Verified brief"}`), "completed"); err != nil {
 		t.Fatal(err)
 	}
 	derived, err := database.SaveAgentMethod(ctx, owner.ID, proposal, 0)

@@ -330,28 +330,6 @@ function ActivityDetails({
         </div>
       )}
       {detail?.instruction && <p>{detail.instruction}</p>}
-      {detail?.approvals
-        .filter((approval) => approval.state === "pending")
-        .map((approval) => (
-          <div key={approval.id} className="agent-activity-approval">
-            <p>{approval.summary}</p>
-            <div>
-              {(["approve", "deny"] as const).map((decision) => (
-                <Button
-                  key={decision}
-                  variant={decision === "approve" ? "secondary" : "ghost"}
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void action(() => agents.decideApproval(entry.run_id, approval.id, decision))
-                  }
-                >
-                  {decision === "approve" ? "Approve" : "Deny"}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ))}
       {result && <p className="agent-activity-result">{result}</p>}
       <ToolActivity events={entry.events} />
       {!loading && !error && !detail?.instruction && !result && !entry.events.length && (

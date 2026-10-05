@@ -30,8 +30,6 @@ import {
 } from "./store";
 import type { CatalogEntry, CatalogPage, ExtensionReview, Installation } from "./types";
 
-export { plainDescription } from "./ExtensionIcon";
-
 export function ExtensionsWorkspace() {
   const location = useLocation();
   const navigate = useNavigate();

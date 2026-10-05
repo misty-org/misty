@@ -3,7 +3,7 @@ import { notesApi } from "@/api/notes/api";
 import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
 import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
-export type { NoteCollaborationRole, NoteCollaborationTicket } from "@/api/notes/api";
+export type { NoteCollaborationTicket } from "@/api/notes/api";
 export interface NoteCollaborationSession {
   key: string;
   spaceId: string;

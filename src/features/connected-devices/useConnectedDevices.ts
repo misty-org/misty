@@ -30,8 +30,6 @@ import { useFilesDeviceService } from "./useFilesDeviceService";
 export {
   connectedDevicesErrorMessage,
   peerIsOnline,
-  type PairingSession,
-  type PairingView,
   type ServerConnectedPeer,
 } from "./connectedDeviceModel";
 

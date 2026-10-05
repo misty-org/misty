@@ -3,7 +3,6 @@ export * from "./flags";
 export type { GlobalSpaceLibraryHit } from "./model/interfaces/personal";
 export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgentsStore";
 export {
-  browserDeviceSessionId,
   ensureServerAgentDevice,
   noteServerAgentDeviceSeen,
   signedAgentDeviceRequest,
@@ -14,7 +13,6 @@ export { companionReply } from "./companion/companionReply";
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
 export { CursorCompanionController } from "./companion/CursorCompanionController";
 
-export { McpConnectionsView } from "./mcp/McpConnectionsSheet";
 export type { AgentScope } from "./model/interfaces/types";
 
 export type { DisplayCapture } from "./companion/protocol";

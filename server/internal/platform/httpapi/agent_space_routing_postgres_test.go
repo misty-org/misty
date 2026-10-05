@@ -2,17 +2,19 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/kannachi323/misty/server/internal/agenttools"
+	"github.com/kannachi323/misty/server/test/testkit"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-
 	agent "github.com/kannachi323/misty/server/internal/agents"
-	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/test/testkit"
 )
+
+
+import ()
 
 func TestRoutedSpaceToolsPostgres(t *testing.T) {
 	if os.Getenv("TEST_DB_NAME") != "misty_global_agents_test" {
@@ -28,15 +30,15 @@ func TestRoutedSpaceToolsPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	origin, err := database.CreateSpace(ctx, owner.ID, "Work")
+	origin, err := database.TestingCreateSpace(ctx, owner.ID, "Work")
 	if err != nil {
 		t.Fatal(err)
 	}
-	destination, err := database.CreateSpace(ctx, owner.ID, "Family")
+	destination, err := database.TestingCreateSpace(ctx, owner.ID, "Family")
 	if err != nil {
 		t.Fatal(err)
 	}
-	foreign, err := database.CreateSpace(ctx, other.ID, "Private")
+	foreign, err := database.TestingCreateSpace(ctx, other.ID, "Private")
 	if err != nil {
 		t.Fatal(err)
 	}

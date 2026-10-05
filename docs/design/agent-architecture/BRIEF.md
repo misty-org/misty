@@ -1,11 +1,10 @@
 # Agent architecture — approved direction
 
-Approved by the owner on October 4, 2026. This brief supersedes the parts of
-[agent-workflows/PLAN.md](../agent-workflows/PLAN.md) that require a small
-enforced allowlist, an up-front work-location choice, a single explicitly
-selected Composio tool, and the single-step Midscene planner described in
-[agent-workflows/MIDSCENE.md](../agent-workflows/MIDSCENE.md). The security
-invariants listed below still apply.
+Approved by the owner on October 4, 2026. This brief replaces the earlier agent
+workflow plan: its small enforced allowlist, up-front work-location choice,
+single explicitly selected Composio tool and single-step server-side Midscene
+planner are gone. That plan's security invariants are listed below and still
+apply.
 
 ## Goal
 
@@ -143,11 +142,8 @@ Each phase leaves the product working.
 - One account setting, *Ask before acting for you* (default on), covers sends,
   posts, shares, invites, payments, access changes and deletes in connected
   apps. Misty's own tools keep their current behavior.
-- The SDK provider capability system stays for now. It is effectively unused
-  (no capability bindings are pinned in practice) but its official browser
-  providers are woven into the Planner provider and target resolution, and its
-  approval tables are shared with every runtime run. Removing it is a separate,
-  careful change.
+- The SDK provider capability system was removed afterwards; see *Retired
+  features* below.
 
 ### Phase 3 — Screens on demand (implemented and verified live October 4, 2026)
 
@@ -179,7 +175,7 @@ Each phase leaves the product working.
   happened, where the cursor stopped and the final screenshot.
 - Model calls go to `POST /me/screen-model/{jobID}`, a thin pass-through that
   accepts calls only while that act job runs, uses the run's model through the
-  deployment's provider (`MISTY_AGENT_MODEL_PROVIDER`), caps output, and meters
+  AI Gateway, caps output, and meters
   each call to the run without spending its agent turns. Inference stays at the
   provider; neither the server nor the Mac runs a model.
 - The agent cursor is Misty's in-page pointer, separate from the user's.
@@ -229,6 +225,27 @@ Each phase leaves the product working.
   and confirms the person's pointer did not move. It needs Accessibility for
   the terminal that runs it.
 
+### Retired features (removed October 4, 2026)
+
+These no longer exist in the app, server, runtime or database. Their tables
+were dropped by `20271004070000_retire_legacy_features.sql`.
+
+- The SDK provider capability system and installed-app execution authority.
+- MCP connectors (user-added MCP servers). Misty's own MCP server between the
+  gateway and the runtime remains; it is only transport.
+- Studio workflows, workflow versions, proposals and the tool-approval waits
+  (`approval.resume`). Connected-app confirmations are the *Ask before acting
+  for you* cards from Phase 2.
+- Native GitHub, Figma, Slack, Discord and Instagram integrations, social
+  messaging, provider-shared resources and the provider OAuth shell. Apps go
+  through Composio; Google, Microsoft and Dropbox account connections remain
+  for calendars and files.
+- Direct instance model providers (`OPENAI_API_KEY`,
+  `MISTY_AGENT_MODEL_PROVIDER`). Instance AI bills the AI Gateway; accounts
+  can still bring their own keys in Settings.
+- The single-turn voice relay and the WebRTC voice transport. Voice is always a
+  realtime conversation over the gateway WebSocket.
+
 ## Acceptance prompts
 
 Taken from real failed runs in October 2026. Each must complete or ask one
@@ -266,8 +283,7 @@ The first live run on October 4, 2026 found and fixed:
 
 - Screen-model calls were rejected: node IDs must start with `model:`, and
   current reasoning models reject `max_tokens` and `temperature: 0`. The
-  pass-through now follows `MISTY_AGENT_MODEL_PROVIDER` (gateway or a direct
-  provider), sends `max_completion_tokens` (6,000) and meters calls as
+  pass-through now sends `max_completion_tokens` (6,000) and meters calls as
   `model:screen:<job>:<n>`, which do not spend the run's agent turns.
 - The screen loop ended on one malformed planner reply or an empty reasoning
   reply; it now feeds the error back up to twice. It also stops after three

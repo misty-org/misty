@@ -13,26 +13,19 @@ import (
  "github.com/kannachi323/misty/server/internal/aimodels"
 
 	"github.com/gorilla/websocket"
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const AgentRealtimeModel = "openai/gpt-realtime-2.1"
 const AgentRealtimeTranscriptionModel = "gpt-4o-mini-transcribe"
 
 // The server owns provider credentials and translates provider events into the
-// same companion protocol for direct OpenAI and Gateway connections.
+// same companion protocol for account OpenAI and Gateway connections.
 type VoiceRealtime struct {
 	conn   *websocket.Conn
 	openAI bool
  model string
 }
 
-func RealtimeModelID() string {
-	if config, err := envconfig.AgentModel(); err == nil && config.Provider == "openai" {
-		return "openai/gpt-realtime-2.1-mini"
-	}
-	return AgentRealtimeModel
-}
 
 type VoiceRealtimeEvent struct {
 	Type       string          `json:"type"`
@@ -51,10 +44,6 @@ type VoiceRealtimeEvent struct {
 func (a *SmartLibraryAnalyzer) OpenVoiceRealtime(ctx context.Context) (*VoiceRealtime, error) {
  if a.realtimeConfig != nil {
   if a.realtimeConfig.Provider == "openai" { return openOpenAIRealtimeModel(ctx, a.realtimeConfig.BaseURL, a.realtimeConfig.APIKey, a.realtimeConfig.Model, true) }
- } else {
-  config, err := envconfig.AgentModel(); if err != nil { return nil, err }
-  if config.Provider == "openai" { return openOpenAIRealtime(ctx, envOrDefault("MISTY_AGENT_MODEL_BASE_URL", defaultOpenAIBaseURL), firstEnv("MISTY_AGENT_MODEL_API_KEY", "OPENAI_API_KEY")) }
-  if config.Provider != "gateway" { return nil, errors.New("choose an OpenAI or Gateway connection for companion voice") }
  }
  if strings.TrimSpace(a.APIKey) == "" { return nil, errors.New("realtime voice provider key is required") }
 	base, err := url.Parse(strings.TrimRight(a.embeddingBaseURL(), "/"))
@@ -119,7 +108,7 @@ func (a *SmartLibraryAnalyzer) OpenVoiceRealtime(ctx context.Context) (*VoiceRea
 	return &VoiceRealtime{conn: conn, model: a.selectedRealtimeModel()}, nil
 }
 
-func (v *VoiceRealtime) ModelID() string { if v.model != "" { return v.model }; return RealtimeModelID() }
+func (v *VoiceRealtime) ModelID() string { if v.model != "" { return v.model }; return AgentRealtimeModel }
 
 func (v *VoiceRealtime) Close() { _ = v.conn.Close() }
 func (v *VoiceRealtime) Read() (VoiceRealtimeEvent, error) {

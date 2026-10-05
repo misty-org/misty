@@ -3,7 +3,6 @@ import type {
   SpaceCalendarEvent,
   SpaceCalendarSource,
   SpaceTask,
-  SpaceTaskActivity,
   SpaceTaskMoveResult,
   SpaceTaskPage,
 } from "@/api/spaces/dto/interfaces/types";
@@ -72,10 +71,6 @@ export function createSpaceTasksApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}`,
         { method: "PATCH", body: JSON.stringify({ ...task, ...patch }) },
       ),
-    taskActivity: (spaceId: string, taskId: string) =>
-      request<{ activity: SpaceTaskActivity[] }>(
-        `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(taskId)}/activity`,
-      ),
     moveTask: (spaceId: string, task: SpaceTask, status: SpaceTaskStatus, beforeTaskId?: string) =>
       request<SpaceTaskMoveResult>(
         `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}/move`,
@@ -92,10 +87,6 @@ export function createSpaceTasksApi(request: SpaceRequest) {
       request<SpaceTask>(
         `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}?version=${task.version}`,
         { method: "DELETE" },
-      ),
-    calendarEvents: (spaceId: string, from: string, to: string) =>
-      request<{ events: SpaceCalendarEvent[] }>(
-        `/spaces/${encodeURIComponent(spaceId)}/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       ),
     createCalendarEvent: (
       spaceId: string,

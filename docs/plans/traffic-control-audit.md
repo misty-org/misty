@@ -1,5 +1,10 @@
 # Traffic audit and implementation plan
 
+> **October 4, 2026:** social messaging (its 2s queue), GitHub, Figma, MCP
+> connectors, the SDK provider system, Studio workflows, tool approvals and
+> self-hosting were removed. Rows for them are closed; their timers and queues no
+> longer exist.
+
 Date: 2026-09-30. Branch: `codex/traffic-control`, isolated worktree based on `origin/main` at `a1f6cf40766b5c31d01c26fc45fc3cd8b2da56a2`.
 
 This table records the original audit and implementation plan. Implementation has begun; see the progress section below for changes and validation. PR #212 is not included in this base. The original checkout's console/CLI and other uncommitted work is untouched. Before implementation, reconcile any overlapping changes once #212 lands; do not blindly replace its recovery/backoff behavior.

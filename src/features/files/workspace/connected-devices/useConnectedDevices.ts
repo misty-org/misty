@@ -1,8 +1,1 @@
-export {
-  connectedDevicesErrorMessage,
-  peerIsOnline,
-  useConnectedDevices,
-  type PairingSession,
-  type PairingView,
-  type ServerConnectedPeer,
-} from "@/features/connected-devices/useConnectedDevices";
+export { useConnectedDevices } from "@/features/connected-devices/useConnectedDevices";

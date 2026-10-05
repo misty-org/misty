@@ -34,15 +34,10 @@ import { CompareDiffLine, joinLocalPath, parentPath } from "./compareDialog/Comp
 import type { ComponentType } from "react";
 export type {
   CompareDialogSeed,
-  CompareImagePreview,
   CompareImageState,
-  CompareTextDiffRow,
   CompareTextDiffState,
 } from "../model/interfaces/workspace/ExplorerCompareDialog";
-export type {
-  CompareMode,
-  CompareTextDiffKind,
-} from "../model/types/workspace/ExplorerCompareDialog";
+export type { CompareMode } from "../model/types/workspace/ExplorerCompareDialog";
 
 export interface CompareDialogRuntime {
   compareFiles(request: { leftPath: string; rightPath: string }): Promise<CompareFilesResult>;

@@ -207,7 +207,6 @@ func (s *Server) mountSmartLibraryRoutes(prefix string, service *api.SmartLibrar
 	s.Router.Get(prefix+"/folders/{folderID}/results", service.Results())
 	s.Router.Put(prefix+"/folders/{folderID}/assets/{assetID}/tags", service.SetAssetTags())
 	s.Router.Post(prefix+"/folders/{folderID}/rescan", service.Rescan())
-	s.Router.Post(prefix+"/folders/{folderID}/search", service.Search())
 	s.Router.Delete(prefix+"/folders/{folderID}", service.Delete())
 }
 
@@ -286,10 +285,8 @@ func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 	s.Router.Delete(prefix+"/memories/{memoryID}", aiService.Memory())
 	s.Router.Put(prefix+"/memories/{memoryID}", aiService.Memory())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/preferences/{surfaceID}", aiService.SurfacePreference())
-	s.Router.Post(prefix+"/preferences/{surfaceID}/proactive-events", aiService.ProactiveEvent())
 	s.Router.Get(prefix+"/recaps", aiService.Recaps())
 	s.Router.Put(prefix+"/recaps/{surfaceID}", aiService.Recap())
-	s.Router.Post(prefix+"/recaps/{surfaceID}/seen", aiService.RecapSeen())
 	s.Router.Get(prefix+"/agent-methods", aiService.AgentMethods())
 	s.Router.Post(prefix+"/agent-methods", aiService.AgentMethods())
 	s.Router.Put(prefix+"/agent-methods/{methodID}", aiService.AgentMethods())
@@ -329,7 +326,6 @@ func (s *Server) mountMistyRoutes(prefix string, aiService *api.AIService) {
 	s.Router.MethodFunc(http.MethodPost, prefix+"/misty/conversations", aiService.MistyConversations())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/misty/conversations/{conversationID}", aiService.MistyConversation())
 	s.Router.MethodFunc(http.MethodPatch, prefix+"/misty/conversations/{conversationID}", aiService.MistyConversation())
-	s.Router.MethodFunc(http.MethodPost, prefix+"/misty/conversations/{conversationID}/turns", aiService.MistyConversationTurn())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/misty/attachments", aiService.MistyAttachments())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/misty/attachments/{attachmentID}/finalize", aiService.MistyAttachment())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/misty/attachments/{attachmentID}", aiService.MistyAttachment())

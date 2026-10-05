@@ -10,10 +10,7 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   transcribe: vi.fn(),
   speech: vi.fn(),
-  voiceClose: vi.fn(),
-  voiceOpen: vi.fn(),
   voiceAppend: vi.fn(),
-  voiceError: undefined as undefined | ((error: Error) => void),
   conversationOpen: vi.fn(),
   conversationBegin: vi.fn(),
   conversationCommit: vi.fn(),
@@ -59,38 +56,6 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
-}));
-vi.mock("./companionVoice", () => ({
-  CompanionVoice: class {
-    private finish?: () => void;
-    constructor(
-      private options: {
-        signal: AbortSignal;
-        onPlaying: () => void;
-        onError: (error: Error) => void;
-      },
-    ) {
-      mocks.voiceOpen();
-      mocks.voiceError = options.onError;
-    }
-    append = mocks.voiceAppend;
-    async commit() {
-      const value = await mocks.transcribe(undefined, undefined, this.options.signal);
-      return value.transcript;
-    }
-    async speak(id: string) {
-      await mocks.speech(id, this.options.signal);
-      if (this.options.signal.aborted) return;
-      this.options.onPlaying();
-      await new Promise<void>((resolve) => {
-        this.finish = resolve;
-      });
-    }
-    close() {
-      mocks.voiceClose();
-      this.finish?.();
-    }
-  },
 }));
 vi.mock("./companionConversation", () => ({
   CompanionConversation: class {

@@ -32,7 +32,7 @@ describe("Activity lifecycle", () => {
     const request = {
       ...mention("approval"),
       kind: "approval" as const,
-      source: "capabilities" as const,
+      source: "interventions" as const,
     };
     const entries = [mention("visible"), mention("hidden"), request];
     store().syncSources("one", entries);
@@ -54,7 +54,7 @@ describe("Activity lifecycle", () => {
   it("keeps requests counted after reading and bulk reading, and resolves only a complete snapshot", async () => {
     const request = {
       ...mention("approval"),
-      source: "capabilities" as const,
+      source: "interventions" as const,
       kind: "approval" as const,
     };
     store().syncSources("one", [mention(), request]);
@@ -63,20 +63,20 @@ describe("Activity lifecycle", () => {
     expect(store().attentionItems.map((item) => item.id)).toEqual(["approval"]);
     store().syncSources("one", []);
     expect(store().attentionCount).toBe(1);
-    store().syncSources("one", [], ["capabilities"]);
+    store().syncSources("one", [], ["interventions"]);
     expect(store().attentionCount).toBe(0);
     expect(store().allItems.find((item) => item.id === "approval")?.resolvedAt).toBeTruthy();
   });
   it("keeps a confirmed decision resolved even when paginated or stale results follow", () => {
     const request = {
       ...mention("approval"),
-      source: "capabilities" as const,
+      source: "interventions" as const,
       kind: "approval" as const,
     };
     store().syncSources("one", [request]);
-    store().resolveSourceRequest("two", "capabilities", "approval");
+    store().resolveSourceRequest("two", "interventions", "approval");
     expect(store().attentionCount).toBe(1);
-    store().resolveSourceRequest("one", "capabilities", "approval");
+    store().resolveSourceRequest("one", "interventions", "approval");
     store().syncSources("one", [request]);
     expect(store().attentionCount).toBe(0);
     expect(store().allItems[0].status).toBe("resolved");

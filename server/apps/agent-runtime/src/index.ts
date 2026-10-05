@@ -134,33 +134,6 @@ app.post(
   },
 );
 
-app.post("/v1/approvals/:hookToken", async (request: RawRequest, response) => {
-  if (!authorized(request))
-    return response.status(401).json({ code: "unauthorized" });
-  if (!request.header(signatureHeaders.idempotency))
-    return response.status(400).json({ code: "idempotency_key_required" });
-  const hookToken = Array.isArray(request.params.hookToken)
-    ? request.params.hookToken[0]
-    : request.params.hookToken;
-  if (
-    !hookToken ||
-    typeof request.body?.approved !== "boolean" ||
-    typeof request.body?.approval_id !== "string"
-  ) {
-    return response.status(400).json({ code: "invalid_approval_resume" });
-  }
-  try {
-    await harness.resume({ kind: "approval", token: hookToken, approved: request.body.approved, approvalId: request.body.approval_id });
-    return response.json({ resumed: true });
-  } catch (error) {
-    reportRuntimeRouteError("approval resumption", error);
-    return response.status(409).json({
-      code: "approval_resume_failed",
-      message: "This approval can no longer be resumed.",
-    });
-  }
-});
-
 app.post("/v1/devices/:hookToken", async (request: RawRequest, response) => {
   if (!authorized(request))
     return response.status(401).json({ code: "unauthorized" });

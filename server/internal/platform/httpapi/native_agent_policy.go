@@ -67,15 +67,11 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 	return true, allowed, err
 }
 
-// authorizeConnectedAgentTool checks tools that act through an installed
-// provider or an MCP connector. Misty's own tools and the owner's connected
-// apps need no check beyond the owner's permissions.
+// authorizeConnectedAgentTool checks tools that act through an MCP connector.
+// Misty's own tools and the owner's connected apps need no check beyond the
+// owner's permissions.
 func authorizeConnectedAgentTool(ctx context.Context, database *db.Database, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {
 	switch {
-	case descriptor.ProviderBinding != nil:
-		return authorizeAgentSDKTool(ctx, database, invocation, descriptor)
-	case strings.HasPrefix(descriptor.Name, "mcp."):
-		return authorizeMCPAgentTool(ctx, database, invocation, descriptor)
 	}
 	return true, nil
 }

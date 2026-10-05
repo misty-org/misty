@@ -7,11 +7,13 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
+
+
+import ()
 
 func TestPrivateSpaceConversationCreatesTaskThroughServerOwnedTool(t *testing.T) {
 	database := openTestDatabase(t)
@@ -20,7 +22,7 @@ func TestPrivateSpaceConversationCreatesTaskThroughServerOwnedTool(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Agentic Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Agentic Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,11 +64,11 @@ func TestPrivateSpaceConversationTaskWriteRechecksMemberPermission(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Permission Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Permission Space")
 	if err != nil {
 		t.Fatal(err)
 	}
-	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, owner.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +101,7 @@ func TestPrivateSpaceAgentSendsExactMessageThroughServerOwnedToolbox(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Message Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Message Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,11 +145,11 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Family")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Family")
 	if err != nil {
 		t.Fatal(err)
 	}
-	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, owner.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,11 +235,11 @@ func TestSpaceAgentResolvesMemberAndCreatesAssignedTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Family")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Family")
 	if err != nil {
 		t.Fatal(err)
 	}
-	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, owner.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +271,7 @@ func TestSpaceAgentInterpretsTaskTimestampInTheSuppliedTimezone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Date Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Date Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +306,7 @@ func TestFamilySpaceResearchCanBeSavedAndPostedWithCitations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Family Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Family Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +339,7 @@ func TestSpaceAgentCreatesQueriesAndUpdatesNativeCalendarEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Calendar Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Calendar Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +374,7 @@ func TestSpaceAgentInterpretsCalendarTimestampInTheSuppliedTimezone(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Calendar Date Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Calendar Date Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +395,7 @@ func TestSpaceAgentCreatesReadsAndUpdatesRoadmap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Roadmap Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Roadmap Space")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -42,16 +42,6 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 		registrations = append(registrations, registration)
 		requested = append(requested, registration.Descriptor.Name)
 	}
-	sdk, err := s.agentSDKRegistrations(ctx, run)
-	if err != nil {
-		return nil, agenttools.Invocation{}, serveragent.ToolManifest{}, err
-	}
-	for _, registration := range sdk {
-		registration.Descriptor.Sources = []string{"task_assignment"}
-		registration.Descriptor.Triggers = []string{"task_assignment"}
-		registrations = append(registrations, registration)
-		requested = append(requested, registration.Descriptor.Name)
-	}
 
 	if contexts, contextErr := s.database.AgentRunDeviceGrants(ctx, run.OwnerUserID, run.ID); contextErr == nil {
 		for _, descriptor := range browserToolDescriptors() {
@@ -64,10 +54,6 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 			requested = append(requested, descriptor.Name)
 		}
 	}
-	mcpHandler := func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
-		return s.executeMCPAgentTool(toolCtx, run, tool, false, "task_assignment")
-	}
-	registrations, requested = s.appendPersonalAgentMCPTools(ctx, run.RequestingMemberID, run.AgentID, registrations, requested, mcpHandler)
 	for _, registration := range s.appsToolRegistrations() {
 		registrations = append(registrations, registration)
 		requested = append(requested, registration.Descriptor.Name)
@@ -122,15 +108,6 @@ func assignedTaskActivityToolDescriptor() agenttools.Descriptor {
 
 func authorizePersonalAgentTaskTool(database *db.Database) agenttools.Authorizer {
 	return func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {
-		if allowed, err := authorizeAppRuntimeTool(ctx, database, invocation, descriptor); err != nil || !allowed {
-			return false, err
-		}
-		if strings.HasPrefix(descriptor.Name, "mcp.") {
-			return authorizeMCPAgentTool(ctx, database, invocation, descriptor)
-		}
-		if descriptor.ProviderBinding != nil {
-			return authorizeAgentSDKTool(ctx, database, invocation, descriptor)
-		}
 		if _, err := database.AskIdentityByID(ctx, invocation.UserID, invocation.AgentID); err != nil {
 			return false, err
 		}

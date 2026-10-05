@@ -10,13 +10,13 @@
       "content": "Prioritize the browser/device sync architecture, desktop companion, account isolation, current Scheduled tasks, settings profiles, and the consolidated server and CLI. Keep distinct the encrypted browser vault/tree protocol, settings-profile synchronization, Space collaboration, and peer file transport: they have different state owners, transports, permissions, and persistence. Also distinguish bookmarks using legacy group/website wire records from visible tab groups and saved tab groups; verify which metadata actually syncs rather than promising cross-device tab-group parity."
     },
     {
-      "content": "Retired installable apps/SDK, Activepieces workflows, the old user-routine scheduler, waitlist systems are historical context, not current product architecture. Built-in tools compile with Misty; native workers are bundled with the desktop build. The current src/features/scheduled/ and server scheduled-task handlers are active and must be documented separately from retired routines. Migration archives and compatibility routes do not imply that a retired subsystem is available. Use .config/retired-repository-history.json and current runtime composition to explain relevant transitions briefly."
+      "content": "Retired installable apps/SDK, MCP connectors, Studio workflows, tool approvals, native GitHub/Figma/Slack/Discord/Instagram integrations, Activepieces workflows, the old user-routine scheduler and waitlist systems are historical context, not current product architecture. Built-in tools compile with Misty; native workers are bundled with the desktop build. The current src/features/scheduled/ and server scheduled-task handlers are active and must be documented separately from retired routines. Migration archives and compatibility routes do not imply that a retired subsystem is available. Use .config/retired-repository-history.json and current runtime composition to explain relevant transitions briefly."
     },
     {
       "content": "Prefer reproducible setup and command examples from package.json, cli/README.md, cli/src/, .config/tooling.json, and server/README.md. Separate Vite-only frontend development from the signed native Tauri launcher, and separate starting containers from explicitly deploying collaboration Workers. Explain isolated desktop development profiles for two-device testing. Verify environment variable names against their owning configuration code; document their role and required/optional status without copying secrets or local environment values. Use only the supported desktop application commands."
     },
     {
-      "content": "Document important trust boundaries as part of the architecture: renderer versus native secrets and browser data, account/deployment isolation, Space membership, authenticated device grants, run-scoped MCP authorization, tool approvals, and companion screen/input permissions. Explain teardown on logout, account switching, lock, cancellation, and loss of ownership where implemented. Show actual enforcement paths and failure behavior rather than asserting blanket security or platform guarantees."
+      "content": "Document important trust boundaries as part of the architecture: renderer versus native secrets and browser data, account/deployment isolation, Space membership, authenticated device grants, run-scoped MCP authorization, and companion screen/input permissions. Explain teardown on logout, account switching, lock, cancellation, and loss of ownership where implemented. Show actual enforcement paths and failure behavior rather than asserting blanket security or platform guarantees."
     },
     {
       "content": "The public Go repository contains product services and an optional billing adapter; commercial billing policy lives in a separate private repository. The website and user documentation may live in misty-website or the GitHub wiki, outside this checkout. Explain those integration boundaries without inventing their internals. vendor/clicky is reference source for the companion, and src-tauri/vendor contains native dependency patches. Personal .agents/, .claude/, .codex/, and .impeccable/ directories are optional local tooling, not Misty runtime components or required build dependencies."
@@ -61,7 +61,7 @@
       "parent": "Misty — Project Overview",
       "page_notes": [
         {
-          "content": "Start with package.json, cli/src/checks.rs, cli/src/release/, cli/tasks/release/, .githooks/, src/tests/architecture/, server/test/, server/scripts/contracts/, and src/features/updater/. Explain npm run check versus misty check all and the per-commit and per-push git hook suites (there is no GitHub CI). Browser-sync live/native probes and OS credential-store tests have explicit prerequisites; report those separately from routine tests. Derive release gates from the current hooks and CLI, not an old readiness audit."
+          "content": "Start with package.json, cli/src/checks.rs, cli/src/release/, cli/tasks/release/, .githooks/, src/tests/architecture/, server/test/, and src/features/updater/. Explain npm run check versus misty check all and the per-commit and per-push git hook suites (there is no GitHub CI). Browser-sync live/native probes and OS credential-store tests have explicit prerequisites; report those separately from routine tests. Derive release gates from the current hooks and CLI, not an old readiness audit."
         }
       ]
     },
@@ -90,7 +90,7 @@
       "parent": "Frontend Architecture",
       "page_notes": [
         {
-          "content": "Start with src/app/layouts/DesktopLayout/, src/features/workspace/, src/features/bookmarks/, src/features/browser-workspace/navigation.ts, and src/features/navigation-names/. Read the current DESIGN.md files alongside runtime code. The retired saved-website Groups popup differs from bookmark folders and visible tab groups. Document local/account-bound group persistence and actual sync limits; legacy encrypted group/website names are compatibility details."
+          "content": "Start with src/app/layouts/DesktopLayout/, src/features/workspace/, src/features/bookmarks/, and src/features/navigation-names/. Read the current DESIGN.md files alongside runtime code. The retired saved-website Groups popup differs from bookmark folders and visible tab groups. Document local/account-bound group persistence and actual sync limits; legacy encrypted group/website names are compatibility details."
         }
       ]
     },
@@ -129,7 +129,7 @@
       "parent": "Browser & Device Sync",
       "page_notes": [
         {
-          "content": "Use src-tauri/crates/browser-sync/src/crypto.rs, src-tauri/crates/browser-sync/src/protocol.rs, src-tauri/crates/browser-sync/src/tree/, src-tauri/crates/browser-sync/src/store/, src-tauri/crates/browser-sync/src/secure_store/, src-tauri/crates/browser-sync/src/worker.rs, and server/internal/sync/. Include protocol fixtures/tests and the device-key store's separation of recovery and sync roots. Do not expose credential-bearing native snapshots as renderer state or confuse acknowledgments with verified browser restoration."
+          "content": "Use src-tauri/crates/browser-sync/src/crypto.rs, src-tauri/crates/browser-sync/src/protocol.rs, src-tauri/crates/browser-sync/src/store/, src-tauri/crates/browser-sync/src/secure_store/, src-tauri/crates/browser-sync/src/worker.rs, and server/internal/sync/. Include protocol fixtures/tests and the device-key store's separation of recovery and sync roots. Do not expose credential-bearing native snapshots as renderer state or confuse acknowledgments with verified browser restoration."
         }
       ]
     },
@@ -139,7 +139,7 @@
       "parent": "Browser & Device Sync",
       "page_notes": [
         {
-          "content": "Follow src/features/browser-workspace/BrowserSyncBridge.tsx, src/features/browser-workspace/controller.ts, src/features/browser-workspace/editJournal.ts, src/features/browser-workspace/treeControl.ts, src/features/browser-workspace/recovery.ts, src-tauri/src/infra/browser_sync/trees.rs, src-tauri/src/infra/browser_sync/handoff.rs, src-tauri/crates/browser-sync/src/tree/, and server/internal/sync/. Explain stale-owner rejection and durable retry semantics from current code. Use cli/README.md for two-profile testing without copying device IDs or databases."
+          "content": "Follow src/features/browser-workspace/BrowserSyncBridge.tsx, src/features/browser-workspace/controller.ts, src/features/browser-workspace/editJournal.ts, src/features/browser-workspace/recovery.ts, src-tauri/src/infra/browser_sync/handoff.rs, and server/internal/sync/. Explain stale-owner rejection and durable retry semantics from current code. Use cli/README.md for two-profile testing without copying device IDs or databases."
         }
       ]
     },
@@ -168,7 +168,7 @@
       "purpose": "Introduce Spaces as collaborative contexts with membership, permissions, invitations, navigation, chat, Journal, Planner, Library, drawings, and roadmaps. Explain how Space resources fit into the browser workspace and agent context.",
       "page_notes": [
         {
-          "content": "Use src/features/spaces/, src/features/spaces/components/spacePanel/, src/features/spaces/spaceRouteNormalization.ts, src/api/spaces/, server/internal/spaces/, and server/internal/app/server_mount_spaces_routes.go. Trace registered surfaces instead of assuming older SpacesShell or SpaceNavRail symbols remain current. Explain Space-scoped access and reference-only behavior, then link to the feature and server collaboration pages."
+          "content": "Use src/features/spaces/, src/features/spaces/components/spacePanel/, src/api/spaces/, server/internal/spaces/, and server/internal/app/server_mount_spaces_routes.go. Trace registered surfaces instead of assuming older SpacesShell or SpaceNavRail symbols remain current. Explain Space-scoped access and reference-only behavior, then link to the feature and server collaboration pages."
         }
       ]
     },
@@ -208,7 +208,7 @@
       "parent": "Spaces & Collaboration",
       "page_notes": [
         {
-          "content": "Use src/features/journal/drawings/, src/features/planner/roadmap/, src/api/drawings/, server/internal/app/server_mount_drawing_routes.go, server/internal/app/server_mount_figma_routes.go, and server/apps/journal-collab/src/drawing-scene.ts. Verify current exports and route registration before retaining older component names or claiming a provider import works. Explain how scene synchronization differs from roadmap API updates."
+          "content": "Use src/features/journal/drawings/, src/features/planner/roadmap/, src/api/drawings/, server/internal/app/server_mount_drawing_routes.go, and server/apps/journal-collab/src/drawing-scene.ts. Verify current exports and route registration before retaining older component names or claiming a provider import works. Explain how scene synchronization differs from roadmap API updates."
         }
       ]
     },
@@ -223,21 +223,21 @@
     },
     {
       "title": "Durable Agent Runtime & MCP",
-      "purpose": "Trace invocation activation, signed lifecycle calls, context/checkpoints, streaming, cancellation, approval resumption, completion, and run-scoped MCP discovery/execution. Explain local and production PostgreSQL workflow hosting, and the optional Vercel world.",
+      "purpose": "Trace invocation activation, signed lifecycle calls, context/checkpoints, streaming, cancellation, device and user-action resumption, completion, and run-scoped MCP discovery/execution. Explain local and production PostgreSQL workflow hosting, and the optional Vercel world.",
       "parent": "AI & Agent System",
       "page_notes": [
         {
-          "content": "Use server/apps/agent-runtime/README.md, server/apps/agent-runtime/, server/internal/workflows/, server/internal/app/server_mount_mcp_routes.go, server/internal/platform/httpapi/misty_mcp_server.go, server/internal/platform/httpapi/mcp_agent_runtime.go, and server/internal/platform/httpapi/mcp_access_token.go. The runtime has no direct Misty database access: trace the signed Go control plane and authenticated MCP tools. Derive token lifetime, refresh and fallback rules from source. Do not describe Vercel as hosting the browser frontend or the Go MCP server."
+          "content": "Use server/apps/agent-runtime/README.md, server/apps/agent-runtime/, server/internal/workflows/, server/internal/app/server_mount_mcp_routes.go, server/internal/platform/httpapi/misty_mcp_server.go, and server/internal/platform/httpapi/mcp_access_token.go. The runtime has no direct Misty database access: trace the signed Go control plane and authenticated MCP tools. Derive token lifetime, refresh and fallback rules from source. Do not describe Vercel as hosting the browser frontend or the Go MCP server."
         }
       ]
     },
     {
       "title": "Agent Tools, Integrations & Approvals",
-      "purpose": "Explain the canonical tool catalog and routing, native and remote execution, connected providers and MCP servers, browser/device authority, capability approvals and user interventions, audit records, and bounded delegation.",
+      "purpose": "Explain the canonical tool catalog and routing, native and remote execution, Composio connected apps, browser/device authority, user interventions, audit records, and bounded delegation.",
       "parent": "AI & Agent System",
       "page_notes": [
         {
-          "content": "Use server/internal/agenttools/, server/internal/capabilities/, server/internal/browseractions/, server/internal/integrations/, src/features/integrations/, src/features/agents/mcp/, src/features/capability-approvals/, src/features/agent-interventions/, and src/features/agents/AgentWorkerRoot.tsx. Trace current handlers and native executors for enforcement, tool annotations, connection credentials, scoped grants, and cancellation. Connected tools remain supported even though the installable app/SDK and Activepieces systems were retired."
+          "content": "Use server/internal/agenttools/, server/internal/integrations/, src/features/integrations/, src/features/agent-interventions/, and src/features/agents/AgentWorkerRoot.tsx. Trace current handlers and native executors for enforcement, tool annotations, connection credentials, scoped grants, and cancellation. Connected tools remain supported even though the installable app/SDK and Activepieces systems were retired."
         }
       ]
     },
@@ -247,7 +247,7 @@
       "parent": "AI & Agent System",
       "page_notes": [
         {
-          "content": "Trace src/features/agents/companion/, src/features/misty/screenContext.ts, src/app/cursorEntry.ts, src-tauri/src/infra/cursor_companion.rs, src-tauri/src/infra/cursor_companion/, src-tauri/native/macos/MistyDesktopCapture.m, src-tauri/native/macos/MistyDesktopControl.m, and server/internal/agents/voice_webrtc.go. Use docs/clicky-architecture.md and docs/clicky-integration-ledger.md for rationale and acceptance gaps, resolving historical Team/Auto and media-path descriptions against active code. Separate still context capture, live control sessions, provider completion, and playback completion. State current macOS takeover gates and Windows/older-macOS limitations without inferring live acceptance from fixtures."
+          "content": "Trace src/features/agents/companion/, src/features/misty/screenContext.ts, src/app/cursorEntry.ts, src-tauri/src/infra/cursor_companion.rs, src-tauri/src/infra/cursor_companion/, src-tauri/native/macos/MistyDesktopCapture.m, src-tauri/native/macos/MistyDesktopControl.m and src/features/agents/companion/DESIGN.md, resolving historical Team/Auto and media-path descriptions against active code. Separate still context capture, live control sessions, provider completion, and playback completion. State current macOS takeover gates and Windows/older-macOS limitations without inferring live acceptance from fixtures."
         }
       ]
     },
@@ -276,7 +276,7 @@
       "parent": "Native Runtime & Bundled Services",
       "page_notes": [
         {
-          "content": "Use src/features/files/, src/features/terminal/, src/features/editor/, src-tauri/src/infra/operation_queue.rs, src-tauri/src/infra/terminal.rs, src-tauri/src/infra/ssh_terminal.rs, src-tauri/src/infra/code_lsp.rs, src-tauri/services/file-operations/, src-tauri/services/terminal/, src-tauri/services/code-tools/, and src-tauri/services/backup-archive/. Follow current command registration for lifecycle and available operations. Explain the built-in compilation/bundling model and link to the peer/search and Library pages for those separate concerns."
+          "content": "Use src/features/files/, src/features/editor/, src-tauri/src/infra/operation_queue.rs. Follow current command registration for lifecycle and available operations. Explain the built-in compilation/bundling model and link to the peer/search and Library pages for those separate concerns."
         }
       ]
     },
@@ -295,7 +295,7 @@
       "parent": "Server Architecture & Service Boundaries",
       "page_notes": [
         {
-          "content": "Use server/internal/accounts/, server/internal/platform/security/, server/internal/platform/httpapi/, server/internal/platform/postgres/, server/internal/platform/postgres/migrations/, server/migration/, server/internal/billingadapter/, and server/scripts/goose.sh. Trace row-level security, application-role configuration, session/cookie safeguards, contract checks, and migration ownership from code and tests. Commercial charging policy is outside this repository; document only the public integration protocol and configured behavior. Preserve the distinction between archived retired data and live application tables."
+          "content": "Use server/internal/accounts/, server/internal/platform/security/, server/internal/platform/httpapi/, server/internal/platform/postgres/, server/internal/platform/postgres/migrations/, server/internal/billingadapter/, and server/scripts/goose.sh. Trace row-level security, application-role configuration, session/cookie safeguards, contract checks, and migration ownership from code and tests. Commercial charging policy is outside this repository; document only the public integration protocol and configured behavior. Preserve the distinction between archived retired data and live application tables."
         }
       ]
     },

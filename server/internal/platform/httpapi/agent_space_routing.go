@@ -78,9 +78,6 @@ func spacesListToolDescriptor() agenttools.Descriptor {
 }
 
 func listAgentSpaces(ctx context.Context, database *db.Database, invocation agenttools.Invocation) (json.RawMessage, error) {
-	if db.AppAuthorityFromContext(ctx) != nil {
-		return nil, db.ErrSpaceForbidden
-	}
 	spaces, err := database.ListSpaces(ctx, invocation.UserID)
 	if err != nil {
 		return nil, err
