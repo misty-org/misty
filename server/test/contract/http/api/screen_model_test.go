@@ -110,7 +110,16 @@ func TestScreenModelPassThroughForALiveActJob(t *testing.T) {
 	// More calls than the run's ordinary agent-turn allowance.
 	for n := range 25 {
 		response := call(strconv.Itoa(n))
-		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "<action>click</action>") || !strings.Contains(response.Body.String(), `"prompt_tokens":900`) {
+		var completion struct {
+			Choices []struct {
+				Message struct{ Content string } `json:"message"`
+			} `json:"choices"`
+			Usage struct {
+				PromptTokens int64 `json:"prompt_tokens"`
+			} `json:"usage"`
+		}
+		_ = json.Unmarshal(response.Body.Bytes(), &completion)
+		if response.Code != http.StatusOK || len(completion.Choices) != 1 || completion.Choices[0].Message.Content != "<action>click</action>" || completion.Usage.PromptTokens != 900 {
 			t.Fatalf("call %d: %d %s", n, response.Code, response.Body.String())
 		}
 	}
