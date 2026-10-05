@@ -72,3 +72,20 @@ func TestBrowserActIsTheOnlyWayToActOnAPage(t *testing.T) {
 		t.Fatal(guidance)
 	}
 }
+
+func TestDesktopScreensUseBrowserActWithMistysOwnCursor(t *testing.T) {
+	s := &SpacesService{}
+	got := s.screenToolRegistrations(screenRecord(t, map[string]any{"agent_id": "misty", "window_label": "main"}))
+	if len(got) == 0 || !strings.Contains(string(got[0].Descriptor.InputSchema), `"desktop"`) {
+		t.Fatal("screen_open cannot ask for the desktop")
+	}
+	desktop := agentCapabilityGuidance([]string{"browser.workspace.visual", "browser.act"}, true)
+	if !strings.Contains(desktop, "call browser_act with the desktop scopeId") || !strings.Contains(desktop, "own cursor") ||
+		strings.Contains(desktop, "browser_workspace_interact") || strings.Contains(desktop, "own mouse and keyboard") {
+		t.Fatal(desktop)
+	}
+	screens := agentCapabilityGuidance([]string{"screen.open", "screen.look"}, false)
+	if !strings.Contains(screens, "target desktop") {
+		t.Fatal(screens)
+	}
+}

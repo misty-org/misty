@@ -193,10 +193,35 @@ Each phase leaves the product working.
   that still grant native input directly.
 - Midscene's Node-only helpers get browser stubs in the desktop build
   (`src/shared/platform/nodeShims`); reports and caches are not written.
-- Scope: Misty's own windows. Other Mac apps would need the user's real
-  pointer, so desktop control keeps its existing workspace tools for now.
+- Scope at first: Misty's own windows. Other Mac apps came next (below).
 - The companion stays the teacher: `screen_look` through it captures every
   display, so answers can point at things on screen while the user clicks.
+
+### Other Mac apps with Misty's own cursor (implemented October 4, 2026)
+
+- `screen_open` takes `target: desktop` for work in another app (Numbers,
+  Finder, Mail). The run hands off, desktop control starts after the user
+  allows it (when *Ask* is on), and the conversation continues with the
+  desktop attached. Desktop and Misty-window screens grant
+  `browser.workspace.visual` and `browser_act`, so the model works in goals
+  there too; the act job grants itself the workspace input it needs.
+- The same local loop runs on these surfaces. Midscene plans single clicks,
+  typing, named keys and scrolling; dragging is not available, and the
+  planner is told so.
+- Misty's cursor on the desktop is a click-through overlay drawn with the
+  same arrow as the in-page and Misty-window cursors, kept visible in every
+  capture. Clicks press the control under it or focus the field through
+  Accessibility; text is inserted into that field; keys and scrolling go only
+  to the target app. The person's pointer never moves and their input is never
+  blocked; Escape and Stop still end the task. Misty refuses to operate its own
+  control strip.
+- Accessibility cannot press everything (canvas apps, custom controls). Those
+  steps report that nothing usable is at the point, and a goal that makes no
+  visible progress stops after three tries.
+- `npm run check:desktop-agent` is the live check: it opens a scratch text file
+  in TextEdit, clicks into it, types and selects through the agent pointer,
+  and confirms the person's pointer did not move. It needs Accessibility for
+  the terminal that runs it.
 
 ## Acceptance prompts
 

@@ -6,7 +6,8 @@ import type { AppRequest } from "@/features/agents";
  * opens it where the account setting says, then continues the conversation.
  */
 export interface ScreenRequest {
-  kind: "open" | "look";
+  /** A browser screen, a look at the user's screen, or the user's desktop apps. */
+  kind: "open" | "look" | "desktop";
   url?: string;
   reason: string;
   location: "separate" | "window" | "ask";

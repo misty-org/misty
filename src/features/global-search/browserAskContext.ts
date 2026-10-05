@@ -99,12 +99,7 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
         displayName: source.title,
         // A native menu supplies the source. Execution still requires the user's
         // submitted task and the existing run-bound native action checks.
-        capabilities: [
-          "browser.inspect",
-          "browser.visual",
-          "browser.navigate",
-          "browser.act",
-        ],
+        capabilities: ["browser.inspect", "browser.visual", "browser.navigate", "browser.act"],
         metadata: {
           origin: new URL(source.href!).origin,
           label: source.title,

@@ -67,6 +67,12 @@ export async function openScreenAndContinue(
   try {
     if (get().working) throw new Error("Another task is running. Try again when it finishes.");
     const look = request.kind === "look";
+    const desktop = request.kind === "desktop";
+    if (
+      desktop &&
+      !(await import("@/features/agents/workspaceAutopilot")).visibleAutopilotAvailable()
+    )
+      throw new Error("Using other apps needs the Misty app on a Mac.");
     const { useCompanionState } = await import("@/features/agents/companion/companionState");
     const companion = useCompanionState.getState();
     if (look && companion.submit && companion.accountId === get().accountId) {
@@ -88,10 +94,12 @@ export async function openScreenAndContinue(
       : undefined;
     const where = look
       ? "The user's screen is attached as an image."
-      : choice === "window"
-        ? "A browser tab in the user's Misty window is now attached."
-        : "A browser in a separate Misty window is now attached.";
-    const start = request.url && !look ? ` Start at ${request.url}.` : "";
+      : desktop
+        ? "Misty can now use the user's desktop apps with its own cursor."
+        : choice === "window"
+          ? "A browser tab in the user's Misty window is now attached."
+          : "A browser in a separate Misty window is now attached.";
+    const start = request.url && !look && !desktop ? ` Start at ${request.url}.` : "";
     await get().submitAnswer(
       `Continue the request above. ${where}${start}`,
       [],
@@ -100,10 +108,11 @@ export async function openScreenAndContinue(
       [],
       { conversationId, context: [] },
       {
-        executionMode: look ? "user" : choice === "window" ? "agent" : "team",
+        // Agent mode without a browser screen starts desktop control.
+        executionMode: look ? "user" : desktop || choice === "window" ? "agent" : "team",
         continuation: true,
         capture,
-        openScreen: !look && choice === "window" ? { url: request.url } : undefined,
+        openScreen: !look && !desktop && choice === "window" ? { url: request.url } : undefined,
       },
     );
     const error = get().error;

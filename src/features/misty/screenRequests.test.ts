@@ -3,12 +3,16 @@ import type { ScreenRequest } from "@/features/ai-surface/types";
 import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(async () => ({ capture: { id: "shot" }, label: "Window" })),
+  desktop: true,
   companion: {
     accountId: "",
     submit: undefined as undefined | ((request: unknown) => Promise<void>),
   },
 }));
 vi.mock("./screenContext", () => ({ captureMistyScreen: mocks.capture }));
+vi.mock("@/features/agents/workspaceAutopilot", () => ({
+  visibleAutopilotAvailable: () => mocks.desktop,
+}));
 vi.mock("@/features/agents/companion/companionState", () => ({
   useCompanionState: { getState: () => mocks.companion },
 }));
@@ -97,6 +101,34 @@ it("opens a tab in this window at the requested page", async () => {
     executionMode: "agent",
     openScreen: { url: "https://example.com" },
   });
+});
+
+it("starts desktop control with Misty's own cursor, whatever the screen location", async () => {
+  withRequest({
+    kind: "desktop",
+    reason: "Add a row in Numbers",
+    location: "ask",
+    state: "pending",
+  });
+  continueAfterScreenRequest(set, get, "chat", "reply");
+  await vi.waitFor(() => expect(current()?.state).toBe("opened"));
+  expect(submitAnswer.mock.calls[0][0]).toContain("desktop apps with its own cursor");
+  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
+    executionMode: "agent",
+    continuation: true,
+    openScreen: undefined,
+  });
+  mocks.desktop = false;
+  withRequest({
+    kind: "desktop",
+    reason: "Add a row in Numbers",
+    location: "separate",
+    state: "pending",
+  });
+  continueAfterScreenRequest(set, get, "chat", "reply");
+  await vi.waitFor(() => expect(current()?.state).toBe("failed"));
+  expect(current()?.error).toContain("needs the Misty app on a Mac");
+  mocks.desktop = true;
 });
 
 it("waits for the user's choice when the account asks each time", async () => {
