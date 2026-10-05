@@ -108,3 +108,29 @@ it("reports a failure before any input as not attempted", async () => {
     DeviceOperationNotAttempted,
   );
 });
+
+it("feeds a malformed planner reply back once instead of ending the goal", async () => {
+  mocks.plan
+    .mockRejectedValueOnce(new Error("XML parse error: Invalid parameters for action click"))
+    .mockResolvedValueOnce({ complete: true, message: "Done." });
+  const result = await runScreenAct(job, new AbortController().signal);
+  expect(result).toMatchObject({ status: "done", actions: 0 });
+  expect(mocks.plan.mock.calls.map((call) => call[1])).toEqual([0, 1]);
+  expect(mocks.plan.mock.calls[1][4][0]).toContain("Your last reply was invalid");
+});
+
+it("ends the goal when the page stops responding to its actions", async () => {
+  mocks.plan.mockResolvedValue({
+    action: { kind: "click", x: 0.3, y: 0.1 },
+    consequential: false,
+    description: "Click Save",
+    complete: false,
+    message: "",
+  });
+  const result = await runScreenAct(job, new AbortController().signal);
+  expect(result).toMatchObject({ status: "incomplete", actions: 3 });
+  expect(result.summary).toContain("did not respond after 3 tries at: Click Save");
+  expect(mocks.plan.mock.calls[2][4]).toContain(
+    'The screenshot did not change after "Click Save". Try something different or report that you cannot finish.',
+  );
+});

@@ -1,0 +1,12 @@
+<!doctype html>
+<title>Messages</title>
+<body style="font: 16px system-ui; padding: 48px">
+  <p>To: team@example.test</p>
+  <textarea rows="4" cols="50">The launch moved to Friday.</textarea><br />
+  <button id="send" style="font-size: 18px; margin-top: 12px">Send message</button>
+  <p id="state">Draft</p>
+  <script>
+    document.getElementById("send").onclick = () =>
+      (document.getElementById("state").textContent = "Sent");
+  </script>
+</body>

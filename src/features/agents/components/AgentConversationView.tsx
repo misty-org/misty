@@ -1,4 +1,4 @@
-import { AppRequestCard } from "../apps/AppRequestCard";
+import { MistyAppRequestCard } from "@/features/misty/MistyAppRequestCard";
 import { ScreenRequestCard } from "@/features/misty/ScreenRequestCard";
 import { companionReply } from "../companion/companionReply";
 import type {
@@ -234,7 +234,9 @@ function AgentMessage(props: {
             onCancel={() => props.onCancel(message.action!.id)}
           />
         ) : null}
-        {message.appRequest ? <AppRequestCard request={message.appRequest} /> : null}
+        {message.appRequest ? (
+          <MistyAppRequestCard messageId={message.id} request={message.appRequest} />
+        ) : null}
         {message.screenRequest ? (
           <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
         ) : null}

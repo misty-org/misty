@@ -35,6 +35,13 @@ describe("tool outcome policy", () => {
     expect(classifyToolOutcome({ success: true, readOnly: true, rejected: false, output: { status: "open" } }).kind).toBe("confirmed");
   });
 
+  it("hands the run off while an app card waits for the user", () => {
+    const connect = { status: "waiting_for_user", message: "for the model", user_message: "Connect Gmail with the card above." };
+    expect(classifyToolOutcome({ success: true, readOnly: false, rejected: false, output: connect })).toEqual({ kind: "handoff", reason: "Connect Gmail with the card above." });
+    const approval = classifyToolOutcome({ success: true, readOnly: false, rejected: false, output: { status: "awaiting_approval" } });
+    expect(approval).toEqual({ kind: "handoff", reason: expect.stringContaining("waiting for your approval") });
+  });
+
   it("does not treat denied or unavailable actions as confirmed", () => {
     expect(unconfirmedToolResultReason({ denied: true })).toContain("not approved");
     expect(unconfirmedToolResultReason({ unavailable: true })).toContain("unavailable");
