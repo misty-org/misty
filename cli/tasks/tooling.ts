@@ -7,6 +7,8 @@ export const toolingRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 type Tool = {
   package?: string;
+  /** The package's CLI entry when it differs from the tool name. */
+  bin?: string;
   executable?: string;
   config: string;
   requires?: string[];
@@ -85,8 +87,8 @@ export function toolCommand(name: string, args: string[], root = toolingRoot) {
     );
   }
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const entry = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[name];
-  if (!entry) throw new Error(`Package "${tool.package}" has no CLI entry for ${name}.`);
+  const entry = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[tool.bin ?? name];
+  if (!entry) throw new Error(`Package "${tool.package}" has no CLI entry for ${tool.bin ?? name}.`);
   return {
     program: process.execPath,
     args: [

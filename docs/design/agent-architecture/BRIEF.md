@@ -110,7 +110,7 @@ These invariants from the earlier plan remain:
 
 Each phase leaves the product working.
 
-### Phase 1 — Unblock the agent (implemented October 4, 2026; not yet verified)
+### Phase 1 — Unblock the agent (implemented and verified live October 4, 2026)
 
 - Delete keyword intent compilation, required-tool derivation, conversation
   focus and pending-action heuristics, send-overlap grounding, mutation-target
@@ -129,17 +129,17 @@ Each phase leaves the product working.
 - Read-only browser failures become retryable. Midscene planning no longer
   consumes the run's model-turn limit.
 
-### Phase 2 — Composio sessions (implemented October 4, 2026; not yet verified)
+### Phase 2 — Composio sessions (implemented and verified live October 4, 2026)
 
 - Gateway-owned Composio sessions reaching every toolkit, connect cards and
   policy on each tool slug. Done; see
   [deploy/composio/README.md](../../../server/deploy/composio/README.md).
 - The calendar-only adapter and its per-agent calendar binding are deleted.
   Connected apps belong to the account and every agent inherits them.
-- Connect and approval cards hold the calling tool for up to 40 seconds and the
-  model calls again to keep waiting. A durable wait would need the run state
-  machines that today only track browser devices; revisit if users routinely
-  take longer.
+- Connect and approval cards hold the calling tool for up to 40 seconds. If the
+  user has not answered by then, the run hands off with the card in the chat,
+  and the desktop continues the conversation once the app is connected or the
+  action approved (the card checks for a finished sign-in).
 - One account setting, *Ask before acting for you* (default on), covers sends,
   posts, shares, invites, payments, access changes and deletes in connected
   apps. Misty's own tools keep their current behavior.
@@ -147,7 +147,7 @@ Each phase leaves the product working.
   official browser execution path. Remove it after Phase 4 retires the
   low-level browser tools.
 
-### Phase 3 — Screens on demand (implemented October 4, 2026; not yet verified)
+### Phase 3 — Screens on demand (implemented and verified live October 4, 2026)
 
 - Desktop runs get `screen_open` (a browser for the task, optionally at a URL)
   and `screen_look` (the user's screen). Either call ends the response with a
@@ -168,7 +168,7 @@ Each phase leaves the product working.
   conversation; `screen_look` continuations through the companion still capture
   every display, so answers can point at the screen.
 
-### Phase 4 — Midscene on the desktop (implemented October 4, 2026; not yet verified)
+### Phase 4 — Midscene on the desktop (implemented and verified live October 4, 2026)
 
 - `browser_act(goal)` is one device job per goal. The desktop runs Midscene's
   planner locally in a bounded loop (24 actions, 4 minutes): capture the page,
@@ -176,9 +176,10 @@ Each phase leaves the product working.
   job, repeat. Leases, Stop and takeover apply to every action. It returns what
   happened, where the cursor stopped and the final screenshot.
 - Model calls go to `POST /me/screen-model/{jobID}`, a thin pass-through that
-  accepts calls only while that act job runs, uses the run's model and Misty's
-  gateway key, caps output, and meters each call as a model turn of the run.
-  Inference stays at the gateway; neither the server nor the Mac runs a model.
+  accepts calls only while that act job runs, uses the run's model through the
+  deployment's provider (`MISTY_AGENT_MODEL_PROVIDER`), caps output, and meters
+  each call to the run without spending its agent turns. Inference stays at the
+  provider; neither the server nor the Mac runs a model.
 - The agent cursor is Misty's in-page pointer, separate from the user's.
   Native input glides it to each target before acting and leaves it in place,
   so every screenshot shows where the agent points, and each result reports
@@ -212,3 +213,40 @@ useful question, never "I can't" because of a Misty-side gate.
 | "Research GothamChess's latest uploads" | Composio search, or a screen task | 2–3 |
 | "Open example.com and tell me the heading" | Screen task in the default chat | 3 |
 | "Draw a house in Excalidraw" | Midscene with a visible cursor | 4 |
+
+### Running them
+
+`npm run acceptance` runs every prompt live against the local development
+server (`misty server up`), with its runtime, model provider and Composio
+project. Each run registers a fresh test account with known notes, Spaces and a
+team chat; evidence for each case (tools, events, final text, screenshots) is
+written to the git-ignored `.misty/acceptance/`.
+
+- `src/tests/acceptance/agentPrompts.acceptance.ts`: Phases 1–3 through the
+  real API and event stream. Screen requests are checked at the
+  `screen.request` handoff.
+- `src/features/agents/screenAct/screenAct.acceptance.ts`: Phase 4. The shipped
+  `runScreenAct` loop and Midscene planner drive a headless Chromium that
+  answers the desktop's browser operations and draws the same agent cursor.
+  Model calls take the exact shape the server pass-through forwards. It covers
+  a form, a stop before a consequential send, and the Excalidraw house.
+
+The first live run on October 4, 2026 found and fixed:
+
+- Screen-model calls were rejected: node IDs must start with `model:`, and
+  current reasoning models reject `max_tokens` and `temperature: 0`. The
+  pass-through now follows `MISTY_AGENT_MODEL_PROVIDER` (gateway or a direct
+  provider), sends `max_completion_tokens` (6,000) and meters calls as
+  `model:screen:<job>:<n>`, which do not spend the run's agent turns.
+- The screen loop ended on one malformed planner reply or an empty reasoning
+  reply; it now feeds the error back up to twice. It also stops after three
+  actions that leave the screenshot unchanged instead of repeating them.
+- Saving the user's own edits counted as consequential. Only sending or
+  posting to other people, publishing, buying, deleting and access changes do.
+- `notes_read` omitted an empty body, so the model could not tell an empty
+  Note from a missing one; `notes_update` rewrote the whole body to add a line.
+  Reads now always include `markdown` and `empty`, and updates take `append`.
+- A Connect or approval card that outlived its 40-second hold ended the run as
+  failed. It now hands off like a screen request: the run ends with the card,
+  and the conversation continues once the app is connected or the action is
+  approved.

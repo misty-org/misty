@@ -197,6 +197,7 @@ func (s *SpacesService) AppRequestControl() http.HandlerFunc {
 				writeSpaceError(w, err)
 				return
 			}
+			request = s.refreshConnectRequest(r.Context(), user, request)
 			writeJSON(w, http.StatusOK, map[string]any{"request": appRequestView(request)})
 			return
 		}

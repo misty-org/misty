@@ -51,7 +51,8 @@ func (s *SpacesService) appsApproval(ctx context.Context, invocation agenttools.
 	case "pending":
 		return nil, TestingMustAPIRawJSON(map[string]any{
 			"status": "awaiting_approval", "request": pending.ID,
-			"message": "An approval card for “" + title + "” is showing in the chat. Call apps_execute again with the same tool_slug, arguments and account to keep waiting, or finish and tell the user what is waiting for approval.",
+			"message":      "An approval card for “" + title + "” is showing in the chat. This run ends here and Misty continues after the user decides.",
+			"user_message": "“" + title + "” is waiting for your approval above. Misty continues after you decide.",
 		}), nil
 	case "declined":
 		return nil, nil, serveragent.ErrInvalidRequest("The user declined “" + title + "”. Do not retry it; continue without it or ask the user.")

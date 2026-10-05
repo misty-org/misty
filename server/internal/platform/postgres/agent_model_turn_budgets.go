@@ -72,11 +72,12 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		// Midscene's per-action planning calls are metered as usage but do not
-		// spend the run's agent turns; each Midscene subtask already needs one.
-		if !strings.HasPrefix(nodeID, "model:midscene:") {
+		// Screen planning calls (one per action of a browser_act goal) are
+		// metered as usage but do not spend the run's agent turns; the goal
+		// itself already needed one.
+		if !ScreenPlanningNode(nodeID) {
 			var consumed int
-			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:midscene:%'`, runID).Scan(&consumed); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:screen:%' AND node_id NOT LIKE 'model:midscene:%'`, runID).Scan(&consumed); err != nil {
 				return err
 			}
 			if consumed >= limit {
@@ -113,4 +114,10 @@ func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 		return 0, err
 	}
 	return 120, nil
+}
+
+// ScreenPlanningNode reports a model call made by a screen loop's planner
+// rather than by the agent itself.
+func ScreenPlanningNode(nodeID string) bool {
+	return strings.HasPrefix(nodeID, "model:screen:") || strings.HasPrefix(nodeID, "model:midscene:")
 }
