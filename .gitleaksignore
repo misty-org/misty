@@ -1,0 +1,34 @@
+# Reviewed 2026-10-05: historical gitleaks findings that are not credentials.
+# Each line is a fingerprint (commit:file:rule:line). None of these values grant access.
+# synthetic billing secret in a CLI test
+61eecea9c5ca9e13a455d7de6e94578f4794bc1a:cli/src/environment.rs:generic-api-key:1281
+# expired JWT fixtures signed with the migration-test-only key
+19962e2160097278b8a3daa36c686e20e41d66fe:server/test/fixtures/compatibility/self-host-proofs.json:jwt:4
+# expired JWT fixtures signed with the migration-test-only key
+19962e2160097278b8a3daa36c686e20e41d66fe:server/test/fixtures/compatibility/self-host-proofs.json:jwt:6
+# expired JWT fixtures signed with the migration-test-only key
+1aea47506f0921a15b65916637304f1c50e5f9f9:docs/migration/fixtures/self-host-proofs.json:jwt:4
+# expired JWT fixtures signed with the migration-test-only key
+1aea47506f0921a15b65916637304f1c50e5f9f9:docs/migration/fixtures/self-host-proofs.json:jwt:6
+# false positive on a provider switch case
+8b79e6067a38563d75c92d8961e2dd7fa96528e0:internal/platform/httpapi/cloud_connections_cloud_authorization_callback.go:dropbox-api-token:115
+# false positive on a provider switch case
+0710252c19de05fcfef5f52f547023bbcc107531:server/internal/platform/httpapi/cloud_connections_cloud_authorization_callback.go:dropbox-api-token:115
+# test-only collaboration secret
+65f68a26320f86f1aa3e0abe5b500be64cc662ff:self-host/collab/control.test.mjs:generic-api-key:9
+# test-only collaboration secret
+408ab114a99db26e3ca231f825977d0653e2ec29:server/self-host/collab/control.test.mjs:generic-api-key:9
+# vendored rclone documentation text
+68594015a8f5ebd6e558e2323c515de015bf7413:service/backend/protondrive/protondrive.go:generic-api-key:100
+# vendored rclone documentation text
+68594015a8f5ebd6e558e2323c515de015bf7413:service/docs/content/protondrive.md:generic-api-key:185
+# redaction test fixture
+68594015a8f5ebd6e558e2323c515de015bf7413:src/analytics/redaction.test.ts:generic-api-key:8
+# clipboard cache test keys
+da8b0aa403f351c852996524d098a1c6740f1ff8:src-tauri/src/core/clipboard/cache.rs:generic-api-key:894
+# clipboard cache test keys
+da8b0aa403f351c852996524d098a1c6740f1ff8:src-tauri/src/core/clipboard/cache.rs:generic-api-key:895
+# keyboard shortcut bindings
+9dcaeab305603eabc024c4de14788525bf1da22f:proxy/core/setup/default/commands.msy:generic-api-key:51
+# keyboard shortcut bindings
+72cd568a43b215f67379097802dd78a6570bfaa4:proxy/core/setup/default/commands.msy:generic-api-key:41

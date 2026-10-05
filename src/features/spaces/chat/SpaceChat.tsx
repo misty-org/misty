@@ -1,15 +1,12 @@
 import { readApiSessionGeneration } from "@/api/client/session";
-import type { SocialProviderId } from "@/api/social";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
 import type { MistyPickerSource } from "@/features/picker";
 import {
-  openSocialAuthorization as openProviderAuthorizationLink,
   socialApi as spacesApi,
   useSocialAi as useAiSurfaceAdapter,
   useSocialAuth as useAuth,
-  useSocialConnections as useConnectionsStore,
   useSocialSetup as useNativeSessionStore,
   useSocialDraft as useSpaceChatDraft,
   useSocialTitle as useWorkspaceViewTitle,
@@ -18,12 +15,7 @@ import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import {
-  socialProvider as normalizeSocialProvider,
-  socialConversationPath,
-  socialProviderPath,
-} from "../social/socialRoute";
+import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { ConversationSwitcher } from "./components/ConversationSwitcher";
 import { ChatPresencePill } from "./components/ChatPresencePill";
@@ -42,12 +34,10 @@ import { spaceChatSuggestedActions } from "./spaceChatAiActions";
 export function SpaceSocial({
   spaceId,
   spaceName,
-  provider,
   workspaceTabId,
 }: {
   spaceId: string;
   spaceName: string;
-  provider: SocialProviderId;
   workspaceTabId?: string;
 }) {
   const [searchParams] = useSearchParams();
@@ -60,15 +50,11 @@ export function SpaceSocial({
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastReadReceiptRef = useRef("");
   const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
-  // Misty opens the Space's Everyone chat. Only external providers need a
-  // conversation selected before they can show their landing page.
-  const resolvesProviderLanding = provider !== "misty";
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(
     spaceId,
     conversationId,
     initialAccess.canReadMessages,
-    resolvesProviderLanding,
   );
   const scope = useSpaceChatScope({
     spaceId,
@@ -79,62 +65,7 @@ export function SpaceSocial({
     store,
   });
   const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
-  useWorkspaceViewTitle(workspaceTabId, `${spaceName} ${provider === "misty" ? "Chat" : "Social"}`);
-  const {
-    accountId: connectionsAccountId,
-    connections: accountConnections,
-    loading: connectionsLoading,
-    authorizingProvider,
-    error: connectionsError,
-    setAccount: setConnectionsAccount,
-    load: loadConnections,
-    beginAuthorization,
-    clearError: clearConnectionsError,
-  } = useConnectionsStore(
-    useShallow((state) => ({
-      accountId: state.accountId,
-      connections: state.connections,
-      loading: state.loading,
-      authorizingProvider: state.authorizingProvider,
-      error: state.error,
-      setAccount: state.setAccount,
-      load: state.load,
-      beginAuthorization: state.beginAuthorization,
-      clearError: state.clearError,
-    })),
-  );
-  const landingConversation = socialLandingConversation(provider, conversationChat.conversations);
-  const providerConnected =
-    provider !== "misty" &&
-    connectionsAccountId === user?.id &&
-    accountConnections.some(
-      (connection) => normalizeSocialProvider(connection.provider) === provider,
-    );
-  useEffect(() => {
-    if (conversationId || !resolvesProviderLanding || !landingConversation) return;
-    navigate(socialConversationPath(spaceId, provider, landingConversation.id), {
-      replace: true,
-    });
-  }, [conversationId, landingConversation, navigate, provider, resolvesProviderLanding, spaceId]);
-  useEffect(() => {
-    if (provider === "misty" || !user?.id) return;
-    setConnectionsAccount(user.id);
-    void loadConnections();
-  }, [loadConnections, provider, setConnectionsAccount, user?.id]);
-  const connectProvider = async () => {
-    if (provider === "misty") return;
-    clearConnectionsError();
-    try {
-      const authorizationUrl = await beginAuthorization(
-        provider,
-        ["social_read", "social_send", "social_automation"],
-        socialProviderPath(spaceId, provider),
-      );
-      await openProviderAuthorizationLink(authorizationUrl);
-    } catch {
-      // The connections store retains the user-safe failure message rendered below.
-    }
-  };
+  useWorkspaceViewTitle(workspaceTabId, `${spaceName} Chat`);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
   const suggestions = useChatSuggestions({
@@ -204,16 +135,12 @@ export function SpaceSocial({
   const messagesError = conversationId
     ? conversationChat.error
     : (store.messageErrorsBySpace[spaceId] ?? "");
-  const activeProviderConversation = shouldShowSocialConversation(
-    provider,
-    conversationId,
-    scope.activeConversation?.origin,
-  );
+  const conversationAvailable = !conversationId || Boolean(scope.activeConversation);
   const draftText = draft.text;
   const setDraftText = draft.setText;
   const setDraftReplyToMessageId = draft.setReplyToMessageId;
   const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
-    if (!activeProviderConversation) return null;
+    if (!conversationAvailable) return null;
     const scopeId = conversationId || "everyone";
     const messageDraft = (artifact: AiArtifact) => {
       if (artifact.kind !== "message_draft" || !access.canWriteMessages || draftText.trim()) {
@@ -251,8 +178,8 @@ export function SpaceSocial({
           privacy: "shared",
           spaceId,
           href: conversationId
-            ? socialConversationPath(spaceId, provider, conversationId)
-            : socialProviderPath(spaceId, provider),
+            ? spaceChatConversationPath(spaceId, conversationId)
+            : spaceChatPath(spaceId),
           revision: scope.messages[scope.messages.length - 1]?.seq ?? 0,
         },
       ],
@@ -271,10 +198,9 @@ export function SpaceSocial({
     };
   }, [
     access.canWriteMessages,
-    activeProviderConversation,
+    conversationAvailable,
     conversationId,
     draftText,
-    provider,
     scope.activeConversation?.title,
     scope.messages,
     setDraftReplyToMessageId,
@@ -310,7 +236,7 @@ export function SpaceSocial({
     user?.id,
   ]);
   useEffect(() => {
-    if (!activeProviderConversation) return;
+    if (!conversationAvailable) return;
     const last = scope.messages[scope.messages.length - 1];
     if (!last || store.referenceOnly) return;
     const receiptKey = `${spaceId}:${conversationId || "everyone"}:${last.seq}`;
@@ -323,101 +249,13 @@ export function SpaceSocial({
       if (lastReadReceiptRef.current === receiptKey) lastReadReceiptRef.current = "";
     });
   }, [
-    activeProviderConversation,
+    conversationAvailable,
     conversationId,
     markRead,
     scope.messages,
     spaceId,
     store.referenceOnly,
   ]);
-  if (!conversationId && resolvesProviderLanding) {
-    if (conversationChat.error) {
-      return (
-        <ErrorState
-          className="h-full bg-charcoal-bg"
-          title="Social couldn’t load"
-          description={conversationChat.error}
-          action={
-            <Button type="button" variant="outline" onClick={conversationChat.reload}>
-              Try again
-            </Button>
-          }
-        />
-      );
-    }
-    if (conversationChat.loading || landingConversation) {
-      return (
-        <LoadingState
-          className="h-full bg-charcoal-bg"
-          label={`Opening ${socialProviderLabel(provider)}`}
-          title={`Opening ${socialProviderLabel(provider)}`}
-        />
-      );
-    }
-    if (connectionsError) {
-      return (
-        <ErrorState
-          className="h-full bg-charcoal-bg"
-          title={`${socialProviderLabel(provider)} needs attention`}
-          description={connectionsError}
-          action={
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                void loadConnections({
-                  force: true,
-                })
-              }
-            >
-              Try again
-            </Button>
-          }
-        />
-      );
-    }
-    if (user?.id && (connectionsAccountId !== user.id || connectionsLoading)) {
-      return (
-        <LoadingState
-          className="h-full bg-charcoal-bg"
-          label={`Checking ${socialProviderLabel(provider)}`}
-          title={`Checking ${socialProviderLabel(provider)}`}
-        />
-      );
-    }
-    return (
-      <EmptyState
-        className="h-full bg-charcoal-bg"
-        title={
-          providerConnected
-            ? `No ${socialProviderLabel(provider)} conversations yet`
-            : `Connect ${socialProviderLabel(provider)}`
-        }
-        description={
-          providerConnected
-            ? "New synced conversations will open here when they arrive."
-            : `Connect your ${socialProviderLabel(provider)} account to bring its conversations into Social.`
-        }
-        action={
-          providerConnected ? (
-            <Button type="button" variant="outline" onClick={conversationChat.reload}>
-              Refresh
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled={authorizingProvider === provider}
-              onClick={() => void connectProvider()}
-            >
-              {authorizingProvider === provider
-                ? "Connecting…"
-                : `Connect ${socialProviderLabel(provider)}`}
-            </Button>
-          )
-        }
-      />
-    );
-  }
   if (conversationId && conversationChat.error && !scope.activeConversation) {
     return (
       <ErrorState
@@ -436,28 +274,28 @@ export function SpaceSocial({
     return (
       <LoadingState
         className="h-full bg-charcoal-bg"
-        label={`Opening ${socialProviderLabel(provider)} conversation`}
-        title={`Opening ${socialProviderLabel(provider)} conversation`}
+        label="Opening conversation"
+        title="Opening conversation"
       />
     );
   }
-  if (!activeProviderConversation) {
+  if (!conversationAvailable) {
     return (
       <EmptyState
         className="h-full bg-charcoal-bg"
-        title={`Conversation isn’t available in ${socialProviderLabel(provider)}`}
-        description={`Choose a ${socialProviderLabel(provider)} conversation from Social instead.`}
+        title="Conversation isn’t available"
+        description="Choose another conversation from Chat."
         action={
           <Button
             type="button"
             variant="outline"
             onClick={() =>
-              navigate(socialProviderPath(spaceId, provider), {
+              navigate(spaceChatPath(spaceId), {
                 replace: true,
               })
             }
           >
-            Back to {socialProviderLabel(provider)}
+            Back to Chat
           </Button>
         }
       />
@@ -568,30 +406,4 @@ export function SpaceSocial({
       />
     </div>
   );
-}
-export function shouldShowSocialConversation(
-  provider: SocialProviderId,
-  conversationId: string,
-  conversationProvider: string | undefined,
-): boolean {
-  if (!conversationId) return provider === "misty";
-  return conversationProvider === provider;
-}
-export function socialLandingConversation(
-  provider: SocialProviderId,
-  conversations: Array<{
-    id: string;
-    kind?: string;
-    origin?: string;
-    direct_agent_id?: string;
-  }>,
-) {
-  if (provider === "misty") return undefined;
-  return conversations.find(
-    (conversation) => conversation.origin === provider && !conversation.direct_agent_id,
-  );
-}
-function socialProviderLabel(provider: SocialProviderId): string {
-  if (provider === "x") return "X";
-  return provider.charAt(0).toUpperCase() + provider.slice(1);
 }

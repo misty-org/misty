@@ -1,6 +1,6 @@
 import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
-import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
+import { spaceChatPath, useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
@@ -33,12 +33,8 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
         kind: "message",
         title: message.sender_name || "Message",
         body,
-        keywords: [space.name, "social", "message", "instagram", "discord", "messenger", "x"],
-        href: socialProviderPath(
-          spaceId,
-          socialProvider(message.social_provider) ?? "misty",
-          new URLSearchParams({ message: message.id }),
-        ),
+        keywords: [space.name, "chat", "message"],
+        href: spaceChatPath(spaceId, new URLSearchParams({ message: message.id })),
         spaceId,
         spaceName: space.name,
         updatedAt: message.created_at,

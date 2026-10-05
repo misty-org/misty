@@ -81,6 +81,7 @@ ALTER TABLE misty_ask_conversations ADD COLUMN personal_agent_id text;
 ALTER TABLE misty_ask_identities RENAME TO personal_agents;
 ALTER TABLE misty_ask_identity_versions RENAME TO personal_agent_versions;
 CREATE TABLE personal_agent_mcp_tools(id text);
+CREATE TABLE object_deletion_jobs(object_key text PRIMARY KEY, not_before timestamptz, created_by_user_id text);
 ALTER TABLE misty_ask_conversations RENAME TO agent_conversations;
 ALTER TABLE misty_ask_conversation_events RENAME TO agent_conversation_events;`); err != nil {
 			return err

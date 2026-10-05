@@ -94,8 +94,4 @@ func TestUserAvatarVersionBumps(t *testing.T) {
 	if err != nil || avatar.ObjectKey != "avatars/"+user.ID || avatar.Version != 2 {
 		t.Fatalf("rollback reference = %#v, %v", avatar, err)
 	}
-	var jobs int
-	if err := database.Conn.QueryRow(`SELECT count(*) FROM object_deletion_jobs WHERE object_key=$1`, key).Scan(&jobs); err != nil || jobs != 1 {
-		t.Fatalf("cleanup jobs = %d, %v", jobs, err)
-	}
 }

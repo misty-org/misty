@@ -7,8 +7,7 @@ export { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 
 export { SpaceViewModeToggle } from "./components/SpaceViewModeToggle";
-export { InstagramBrandIcon } from "./social/InstagramBrandIcon";
-export { socialProvider, socialProviderPath } from "./social/socialRoute";
+export { spaceChatPath } from "./chat/chatRoute";
 export type * from "./model/stores/spaces/interfaces/useSpacesStore";
 export type * from "./model/stores/spaces/types/useSpacesBackendStore";
 export { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";

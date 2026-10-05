@@ -195,11 +195,6 @@ export interface SpaceMessage {
     author_avatar_url?: string;
     [key: string]: unknown;
   };
-  social_provider?: "misty" | "instagram" | "discord" | "messenger" | "x";
-  social_external_id?: string;
-  social_direction?: "inbound" | "outbound";
-  social_delivery_state?:
-    "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "cancelled";
   created_at: string;
 }
 export interface SpaceMessageReaction {
