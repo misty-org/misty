@@ -113,7 +113,7 @@ func (s *SmartLibraryService) searchHandler(folderFromPath bool) http.HandlerFun
 		var vector []float64
 		var semanticOperation *hostedSemanticQueryOperation
 		semanticAvailable := false
-		if s.analyzer != nil && (strings.TrimSpace(s.analyzer.APIKey) != "" || s.analyzer.ModelResolver != nil) && !strings.EqualFold(strings.TrimSpace(envconfig.Getenv("SMART_LIBRARY_SEARCH_EMERGENCY_DISABLE")), "true") {
+		if s.analyzer.Available() && !strings.EqualFold(strings.TrimSpace(envconfig.Getenv("SMART_LIBRARY_SEARCH_EMERGENCY_DISABLE")), "true") {
 			var embedErr error
 			vector, semanticOperation, embedErr = s.cachedQueryEmbedding(r.Context(), userID, body.Query)
 			if semanticOperation != nil {

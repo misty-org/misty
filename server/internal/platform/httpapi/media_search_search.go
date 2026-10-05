@@ -145,7 +145,7 @@ func (s *MediaSearchService) AdoptLegacyDevice() http.HandlerFunc {
 }
 
 func (s *MediaSearchService) TestingCachedEmbedding(ctx context.Context, userID, deviceID, query string) ([]float64, *hostedSemanticQueryOperation, error) {
-	if s.analyzer == nil || (strings.TrimSpace(s.analyzer.APIKey) == "" && s.analyzer.ModelResolver == nil) {
+	if !s.analyzer.Available() {
 		return nil, nil, errors.New("media semantic search is unavailable")
 	}
 	key := sha256.Sum256([]byte(userID + "\x00" + configuredEmbeddingModel(ctx, s.analyzer, userID) + "\x00" + deviceID + "\x00" + strings.ToLower(query)))

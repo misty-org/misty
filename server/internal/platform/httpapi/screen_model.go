@@ -1,22 +1,21 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
 // The desktop runs Midscene's screen loop for a browser.act job and sends its
-// model calls here. Misty keeps the gateway key, admits each call against the
-// run's model-turn budget and meters it to the run. Inference happens at the
-// model provider; this only forwards.
+// model calls here. Misty admits each call against the run's model-turn budget,
+// meters it to the run and makes it through the agent runtime, so the desktop
+// never holds a model key.
 const (
 	screenActTool        = "browser.act"
 	screenModelBodyLimit = 12 << 20
@@ -24,7 +23,7 @@ const (
 	screenModelMaxCalls  = 40
 )
 
-// ScreenModel forwards one OpenAI-style chat completion for a live act job.
+// ScreenModel answers one OpenAI-style chat completion for a live act job.
 func (s *SpacesService) ScreenModel() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.appsUser(w, r)
@@ -50,6 +49,11 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "screen_model_invalid", "message": "Invalid screen model request."})
 			return
 		}
+		system, messages, err := screenModelMessages(body.Messages)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "screen_model_invalid", "message": "Invalid screen model request."})
+			return
+		}
 		record, err := s.database.AIInvocationByID(r.Context(), user, job.RunID)
 		if err != nil {
 			writeSpaceError(w, err)
@@ -60,13 +64,17 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": "screen_model_budget", "message": "The task's model allowance is used up."})
 			return
 		}
-		endpoint, err := s.screenModelRoute(r.Context(), record)
+		route, model, err := s.screenModelRoute(r.Context(), record)
 		if err != nil {
 			writeAIProviderError(w, err)
 			return
 		}
-		response, usage, err := forwardScreenModel(r.Context(), endpoint, body.Messages)
-		completion := map[string]any{"usage": map[string]any{"inputTokens": usage.PromptTokens, "outputTokens": usage.CompletionTokens}}
+		callContext, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+		result, err := s.models.Text(callContext, modelruntime.TextRequest{
+			Route: route, Model: model, System: system, Messages: messages, MaxOutputTokens: screenModelMaxOutput,
+		})
+		cancel()
+		completion := map[string]any{"usage": map[string]any{"inputTokens": result.Usage.InputTokens, "outputTokens": result.Usage.OutputTokens}}
 		if err != nil {
 			completion = map[string]any{}
 		}
@@ -75,59 +83,12 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "screen_model_failed", "message": "The screen model could not answer. Try again."})
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(response)
+		// The planner reads an OpenAI chat completion.
+		writeJSON(w, http.StatusOK, map[string]any{
+			"object": "chat.completion", "model": model,
+			"choices": []map[string]any{{"index": 0, "message": map[string]any{"role": "assistant", "content": result.Text}, "finish_reason": "stop"}},
+			"usage": map[string]any{"prompt_tokens": result.Usage.InputTokens, "completion_tokens": result.Usage.OutputTokens,
+				"total_tokens": result.Usage.InputTokens + result.Usage.OutputTokens},
+		})
 	}
-}
-
-type screenModelUsage struct {
-	PromptTokens     int64 `json:"prompt_tokens"`
-	CompletionTokens int64 `json:"completion_tokens"`
-}
-
-// forwardScreenModel calls the resolved provider. The client cannot choose
-// the model or raise the output limit.
-func forwardScreenModel(ctx context.Context, endpoint screenModelEndpoint, messages json.RawMessage) (json.RawMessage, screenModelUsage, error) {
-	var usage screenModelUsage
-	payload, err := json.Marshal(screenModelPayload(endpoint, messages))
-	if err != nil {
-		return nil, usage, err
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, usage, err
-	}
-	if endpoint.key != "" {
-		request.Header.Set("Authorization", "Bearer "+endpoint.key)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, usage, err
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if err != nil {
-		return nil, usage, err
-	}
-	if response.StatusCode/100 != 2 {
-		return nil, usage, &screenModelError{status: response.StatusCode}
-	}
-	var decoded struct {
-		Usage screenModelUsage `json:"usage"`
-	}
-	if json.Unmarshal(body, &decoded) != nil {
-		return nil, usage, &screenModelError{status: response.StatusCode}
-	}
-	return body, decoded.Usage, nil
-}
-
-var errScreenModelUnconfigured = errors.New("screen model gateway is not configured")
-
-type screenModelError struct{ status int }
-
-func (e *screenModelError) Error() string {
-	return "screen model gateway status " + strconv.Itoa(e.status)
 }

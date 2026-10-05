@@ -35,7 +35,7 @@ func TestFetchGatewayModelsUsesPublicCatalogWithoutCredentials(t *testing.T) {
 		authorization = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[
-			{"id":"provider/chat","name":"Chat","type":"language","tags":["reasoning","tool-use"],"pricing":{"input":"0.000001","output":"0.000002"}},
+			{"id":"provider/chat","name":"Chat","type":"language","context_window":400000,"tags":["reasoning","tool-use"],"pricing":{"input":"0.000001","output":"0.000002"}},
 			{"id":"provider/free","name":"Free","type":"language","tags":[],"pricing":{"input":"0","output":"0"}},
 			{"id":"provider/search","name":"Search","type":"language","tags":["web-search"],"pricing":{}},
 			{"id":"provider/embed","name":"Embed","type":"embedding","tags":[],"pricing":{"input":"0.000001"}}
@@ -58,6 +58,9 @@ func TestFetchGatewayModelsUsesPublicCatalogWithoutCredentials(t *testing.T) {
 	}
 	if !gatewayModelSupportsToolsFrom(models[0]) {
 		t.Fatalf("tool-use tag was not normalized: %#v", models[0].Capabilities)
+	}
+	if models[0].ContextWindow != 400_000 || models[1].ContextWindow != 0 {
+		t.Fatalf("context windows = %d, %d", models[0].ContextWindow, models[1].ContextWindow)
 	}
 }
 

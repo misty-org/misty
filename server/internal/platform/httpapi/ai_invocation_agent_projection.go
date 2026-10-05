@@ -46,6 +46,10 @@ func (s *SpacesService) projectLinkedAIInvocationStarted(ctx context.Context, ru
 func (s *SpacesService) projectLinkedAIInvocationEvent(ctx context.Context, run *db.SpaceRun, nodeID, state, phase string, output json.RawMessage) {
 	if _, id := s.restoreLinkedAIInvocation(ctx, run); id == "" {
 		return
+	} else if db.CompactionNode(nodeID) {
+		if state == "running" {
+			s.aiInvocations.append(id, compactionStatusEvent())
+		}
 	} else if strings.HasPrefix(nodeID, "tool:") {
 		toolName := strings.TrimPrefix(phase, "using_")
 		toolName = strings.ReplaceAll(toolName, "_", ".")
@@ -96,4 +100,9 @@ func (s *SpacesService) completeLinkedAIInvocation(ctx context.Context, run *db.
 		return err
 	}
 	return s.finishAIInvocationRuntimeAnswer(record.UserID, id, prepared.body, strings.TrimSpace(text), prepared.resolved, prepared.prompt)
+}
+
+// compactionStatusEvent tells the person why a long task paused briefly.
+func compactionStatusEvent() aiInvocationEvent {
+	return aiInvocationEvent{Type: "assistant.status", Phase: "compacting", Text: "Summarizing earlier steps to stay within the model's context"}
 }

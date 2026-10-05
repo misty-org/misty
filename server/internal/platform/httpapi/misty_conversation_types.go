@@ -16,6 +16,8 @@ type mistyConversationMessage struct {
 	Attachments  []mistyConversationAttachment `json:"attachments,omitempty"`
 	// Source marks turns Misty started on its own, such as "scheduled_task".
 	Source string `json:"source,omitempty"`
+	// CompactedAfter marks the last message the model now sees only as notes.
+	CompactedAfter bool `json:"compactedAfter,omitempty"`
 }
 
 type mistyConversationAttachment struct {

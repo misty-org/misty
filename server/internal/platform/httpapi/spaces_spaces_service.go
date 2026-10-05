@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 	mistyemail "github.com/kannachi323/misty/server/internal/platform/email"
 )
 
@@ -42,7 +43,11 @@ type SpacesService struct {
 	searchEmbeddings        map[string]globalSearchEmbeddingCacheEntry
 	searchEmbeddingInflight map[string]*globalSearchEmbeddingFlight
 	usageMeter              serveragent.UsageMeter
+	models                  *modelruntime.Client
 }
+
+// SetModels sets where screen-planner model calls go.
+func (s *SpacesService) SetModels(models *modelruntime.Client) { s.models = models }
 
 func (s *SpacesService) SetAgentRuntime(config AgentRuntimeConfig) {
 	config.database = s.database
@@ -183,8 +188,6 @@ func writeSpaceError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"code": "invitee_not_found"})
 	case errors.Is(err, db.ErrSpaceForbidden), errors.Is(err, db.ErrLibraryForbidden):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "forbidden"})
-	case errors.Is(err, db.ErrWorkflowIntegrationRequired):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"code": "integration_required"})
 	case errors.Is(err, db.ErrSpaceLimit):
 		writeJSON(w, http.StatusConflict, map[string]string{"code": "space_limit_reached"})
 	case errors.Is(err, db.ErrSpaceOwnershipLimit):

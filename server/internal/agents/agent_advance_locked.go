@@ -42,7 +42,7 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		if GatewayModelSupportsReasoning(ctx, session.ModelID) {
 			effort = session.ReasoningEffort
 		}
-		selectedProvider, providerErr = NewGatewayProviderForModelWithReasoning(session.ModelID, effort)
+		selectedProvider, providerErr = NewGatewayProviderForModelWithReasoning(s.models, session.ModelID, effort)
 		if providerErr != nil {
 			return providerErr
 		}

@@ -135,6 +135,11 @@ app credentials, the social and SDK flags, and the old Activepieces, rate-card
 and frontier-catalog settings. The `integrations/{discord,figma,github,instagram}.env`
 files are no longer part of the contract.
 
+Removed on 2026-10-05: `AI_GATEWAY_EMBEDDING_BASE_URL`. The Go API no longer
+calls models over HTTP; the agent runtime makes every text, vision, embedding
+and transcription call with the AI SDK. The API keeps `AI_GATEWAY_API_KEY` and
+`AI_GATEWAY_BASE_URL` only for realtime voice sockets and the public model list.
+
 Container overrides are not proof that a setting has no consumer. In this checkout,
 `DB_HOST`, `DB_PORT`, `PORT`, `MISTY_PUBLIC_API_URL`, `MISTY_ALLOWED_ORIGINS`,
 `PARTYKIT_HOST`, and the Agent runtime URLs can have different effective Docker
@@ -242,8 +247,7 @@ variables and deliberate compatibility aliases are called out separately below.
 | `MISTY_RELEASE_CHANNEL` | `observability.env` | `src-tauri/build.rs` · `src-tauri/src/telemetry.rs` |
 | `MISTY_SERVER_VERSION` | `observability.env` | `server/internal/app/health.go` · `server/internal/platform/telemetry/client.go` |
 | `AI_GATEWAY_API_KEY` | `integrations/ai.env` | `server/internal/app/health.go` · `server/internal/app/server_core.go` |
-| `AI_GATEWAY_BASE_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` · `server/internal/agents/provider_config.go` |
-| `AI_GATEWAY_EMBEDDING_BASE_URL` | `integrations/ai.env` | `server/internal/agents/smart_library_analyzer_request_at.go` |
+| `AI_GATEWAY_BASE_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` · `server/internal/agents/model_catalog_version.go` |
 | `AGENT_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |
 | `MEDIA_SEARCH_EMERGENCY_DISABLE` | `integrations/ai.env` | `server/internal/platform/httpapi/media_search_index_chunk.go` |
 | `MEDIA_SEARCH_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |

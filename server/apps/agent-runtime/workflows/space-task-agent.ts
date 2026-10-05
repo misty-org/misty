@@ -2,6 +2,8 @@ import { WorkflowAgent } from "@ai-sdk/workflow";
 import { isStepCount, tool, type ModelMessage, type ToolSet } from "ai";
 import { FatalError, getWorkflowMetadata } from "workflow";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
+import { summarizeOlderSteps } from "../src/compaction-step.js";
+import { applyCompaction, CLEAR_AT, clearOldToolResults, COMPACT_AT, contextWindow, estimateInputTokens, messageBytes, planCompaction } from "../src/context-compaction.js";
 import type { RuntimeIdentity } from "../src/control-plane.js";
 import { activateRuntime, checkpoint, complete, fetchContext, fetchExecutionBudget, takeSteering } from "../src/control-plane-steps.js";
 import { MISTY_HARNESS_VERSION, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
@@ -161,11 +163,41 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       runtimeContext: { mistyRunId: input.mistyRunId },
     };
     let messages: ModelMessage[] = initialMessages(context);
+    const window = contextWindow(context.context_window_tokens);
+    let lastInputTokens = 0;
+    let lastSentBytes = 0;
+    let compactions = 0;
+    // Keeps the next call inside the model's window: clear old tool results
+    // first, then summarize older steps (see src/context-compaction.ts).
+    const manageContext = async () => {
+      let estimate = lastInputTokens > 0 ? estimateInputTokens(lastInputTokens, lastSentBytes, messages) : messageBytes(messages) / 4;
+      if (estimate > window * CLEAR_AT) {
+        const before = messageBytes(messages);
+        const cleared = clearOldToolResults(messages);
+        if (cleared.cleared) {
+          messages = cleared.messages;
+          estimate *= messageBytes(messages) / before;
+        }
+      }
+      if (estimate <= window * COMPACT_AT) return;
+      const plan = planCompaction(messages);
+      if (!plan) return;
+      try {
+        const summary = await summarizeOlderSteps(identity, context.model_id, plan.older, window, ++compactions);
+        messages = applyCompaction(plan, summary);
+      } catch (error) {
+        // A failed summary leaves the transcript as it was; the step may still fit.
+        console.error("[misty-agent-runtime] context compaction failed", error);
+      }
+    };
     for (; modelTurn < limit; modelTurn++) {
       const steering = await takeSteering(identity, `${modelTurn}:before`, false);
       for (const message of steering.messages) messages.push({ role: "user", content: message.text });
+      await manageContext();
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
+      lastSentBytes = messageBytes(messages);
       const current = await agent.stream({ messages, ...shared, timeout: modelTimeout(budget, Date.now(), legacyDeadline) });
+      lastInputTokens = current.steps.at(-1)?.usage?.inputTokens ?? 0;
       result = { ...current, steps: [...(result?.steps ?? []), ...current.steps], totalUsage: accumulateModelUsage(result?.totalUsage, current.totalUsage) };
       // WorkflowAgent returns the complete model transcript, including tool
       // results. Reinject our fixed system instructions once on the next call.

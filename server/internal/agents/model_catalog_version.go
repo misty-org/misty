@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
@@ -25,6 +26,27 @@ type GatewayModel struct {
 	ID           string   `json:"id"`
 	Name         string   `json:"name"`
 	Capabilities []string `json:"capabilities"`
+	// ContextWindow is the model's input limit in tokens, when the Gateway
+	// reports one.
+	ContextWindow int `json:"context_window,omitempty"`
+}
+
+// DefaultContextWindow is assumed for models whose window is unknown, such as
+// an account's own non-Gateway models. It is deliberately conservative.
+const DefaultContextWindow = 128_000
+
+// ModelContextWindow is the context window runs compact against.
+func ModelContextWindow(ctx context.Context, modelID string) int {
+	models, err := GatewayModels(ctx)
+	if err != nil {
+		return DefaultContextWindow
+	}
+	for _, model := range models {
+		if model.ID == strings.TrimSpace(modelID) && model.ContextWindow > 0 {
+			return model.ContextWindow
+		}
+	}
+	return DefaultContextWindow
 }
 
 var gatewayCatalogCache struct {
@@ -97,16 +119,15 @@ func GatewayModelSupportsReasoning(ctx context.Context, modelID string) bool {
 	return false
 }
 
-func NewGatewayProviderForModelWithReasoning(modelID, reasoningEffort string) (ModelProvider, error) {
+func NewGatewayProviderForModelWithReasoning(models *modelruntime.Client, modelID, reasoningEffort string) (ModelProvider, error) {
 	modelID = strings.TrimSpace(modelID)
 	if modelID == "" || strings.ContainsAny(modelID, "\r\n\t ") || len(modelID) > 200 {
 		return nil, errors.New("invalid gateway model")
 	}
-	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
-	if apiKey == "" {
-		return nil, errors.New("AI gateway is not configured")
+	if !models.Enabled() {
+		return nil, modelruntime.ErrUnavailable
 	}
-	return NewOpenAIProvider(OpenAIProviderConfig{APIKey: apiKey, BaseURL: envOrDefault("AI_GATEWAY_BASE_URL", TestingDefaultVercelAIBaseURL), Model: modelID, ProviderName: ProviderVercelAI, ReasoningEffort: strings.TrimSpace(reasoningEffort)}), nil
+	return NewRuntimeProvider(models, modelruntime.Instance(), modelID, ProviderVercelAI, reasoningEffort), nil
 }
 
 func configuredGatewayModels() []GatewayModel {
@@ -160,11 +181,12 @@ func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
 	}
 	var payload struct {
 		Data []struct {
-			ID           string          `json:"id"`
-			Name         string          `json:"name"`
-			Type         string          `json:"type"`
-			Tags         []string        `json:"tags"`
-			Capabilities json.RawMessage `json:"capabilities"`
+			ID            string          `json:"id"`
+			Name          string          `json:"name"`
+			Type          string          `json:"type"`
+			Tags          []string        `json:"tags"`
+			Capabilities  json.RawMessage `json:"capabilities"`
+			ContextWindow int             `json:"context_window"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -185,7 +207,7 @@ func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
 		// web search only) in the chat catalog.
 		capabilities = append(capabilities, "language")
 		models = append(models, GatewayModel{
-			ID: item.ID, Name: item.Name, Capabilities: normalizedCapabilities(capabilities),
+			ID: item.ID, Name: item.Name, Capabilities: normalizedCapabilities(capabilities), ContextWindow: item.ContextWindow,
 		})
 	}
 	return TestingFilterChatModels(models), nil

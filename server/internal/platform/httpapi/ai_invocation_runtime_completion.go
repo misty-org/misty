@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,9 @@ func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *
 		eventErr = s.aiInvocations.appendReceipt(record.ID, event, receipt)
 	}
 	if s.aiInvocations != nil {
+		if db.CompactionNode(body.NodeID) && body.State == "running" {
+			appendEvent(compactionStatusEvent())
+		}
 		if strings.HasPrefix(body.NodeID, "tool:") {
 			toolName := runtimeCheckpointToolName(body.Phase, body.Output)
 			eventType := "tool.completed"

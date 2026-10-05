@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -80,7 +79,7 @@ func Run() {
 }
 
 func runAIEmbeddingProcessing(ctx context.Context, server *Server) {
-	if server.AIAnalyzer == nil || strings.TrimSpace(server.AIAnalyzer.APIKey) == "" {
+	if !server.AIAnalyzer.Available() {
 		return
 	}
 	runDatabaseQueue(ctx, server, "embedding", func(ctx context.Context) (int, error) {

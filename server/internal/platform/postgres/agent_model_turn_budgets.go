@@ -54,12 +54,12 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		// Screen planning calls (one per action of a browser_act goal) are
-		// metered as usage but do not spend the run's agent turns; the goal
-		// itself already needed one.
-		if !ScreenPlanningNode(nodeID) {
+		// Screen planning calls (one per action of a browser_act goal) and
+		// context compaction summaries are metered as usage but do not spend
+		// the run's agent turns.
+		if !TurnFreeModelNode(nodeID) {
 			var consumed int
-			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:screen:%'`, runID).Scan(&consumed); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_model_turn_claims WHERE run_id=$1 AND node_id NOT LIKE 'model:screen:%' AND node_id NOT LIKE 'model:compact:%'`, runID).Scan(&consumed); err != nil {
 				return err
 			}
 			if consumed >= limit {
@@ -98,4 +98,16 @@ func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 // rather than by the agent itself.
 func ScreenPlanningNode(nodeID string) bool {
 	return strings.HasPrefix(nodeID, "model:screen:")
+}
+
+// CompactionNode reports a model call that summarized older steps of a run
+// to keep it within the model's context window.
+func CompactionNode(nodeID string) bool {
+	return strings.HasPrefix(nodeID, "model:compact:")
+}
+
+// TurnFreeModelNode reports a metered model call that does not spend one of
+// the run's model turns.
+func TurnFreeModelNode(nodeID string) bool {
+	return ScreenPlanningNode(nodeID) || CompactionNode(nodeID)
 }

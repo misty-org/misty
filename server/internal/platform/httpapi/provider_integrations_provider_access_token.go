@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -77,16 +76,8 @@ func providerRefreshDefinition(provider string) (providerOAuthDefinition, bool) 
 
 func refreshProviderToken(ctx context.Context, definition providerOAuthDefinition, refreshToken string) (providerTokenEnvelope, []byte, error) {
 	values := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "client_id": {TestingProviderOAuthClientID(definition)}, "client_secret": {TestingProviderOAuthClientSecret(definition)}}
-	var request *http.Request
-	if definition.ID == "notion" {
-		encoded, _ := json.Marshal(map[string]string{"grant_type": "refresh_token", "refresh_token": refreshToken})
-		request, _ = http.NewRequestWithContext(ctx, http.MethodPost, definition.TokenURL, bytes.NewReader(encoded))
-		request.Header.Set("Content-Type", "application/json")
-		request.SetBasicAuth(values.Get("client_id"), values.Get("client_secret"))
-	} else {
-		request, _ = http.NewRequestWithContext(ctx, http.MethodPost, definition.TokenURL, strings.NewReader(values.Encode()))
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	}
+	request, _ := http.NewRequestWithContext(ctx, http.MethodPost, definition.TokenURL, strings.NewReader(values.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Accept", "application/json")
 	response, err := (&http.Client{Timeout: 20 * time.Second}).Do(request)
 	if err != nil {
@@ -117,10 +108,6 @@ func firstProviderString(value map[string]any, keys ...string) string {
 	return ""
 }
 
-
-func TestingProviderCallbackURL(r *http.Request, provider string) string {
-	return requestPublicAPIBase(r) + "/oauth/providers/" + url.PathEscape(provider) + "/callback"
-}
 
 func configuredPublicAPIBase() string {
 	base := strings.TrimRight(strings.TrimSpace(envconfig.Getenv("MISTY_PUBLIC_API_URL")), "/")

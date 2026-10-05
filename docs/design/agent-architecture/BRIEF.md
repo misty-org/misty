@@ -246,6 +246,50 @@ were dropped by `20271004070000_retire_legacy_features.sql`.
 - The single-turn voice relay and the WebRTC voice transport. Voice is always a
   realtime conversation over the gateway WebSocket.
 
+### Every model call uses the AI SDK (October 5, 2026)
+
+The Go API no longer calls models over HTTP. Library analysis, embeddings,
+media and voice transcription, the screen planner and Go's own completions go
+to the agent runtime's signed `POST /v1/models/{text,embed,transcribe}` routes
+(`server/internal/modelruntime`), which call the model with the Vercel AI SDK
+(`generateText` with structured output, `embedMany`, `transcribe`). Go still
+resolves each call's route (Misty's Gateway, or the account's own connection
+and key, sent only over the signed channel) and meters it before and after.
+The runtime client never follows redirects, so a key cannot be resent
+elsewhere. Two things stay in Go: the realtime voice socket (the AI SDK has
+no server realtime voice API) and the public Gateway model list, which the
+SDK's model listing returns without the capability tags the model picker
+filters on.
+
+### Context management and compaction (October 5, 2026)
+
+Misty follows the pattern agent harnesses converged on (Claude Code, Codex,
+OpenCode, and the Anthropic and OpenAI compaction APIs), implemented once in
+the runtime so it works for every provider behind the Gateway.
+
+- **Measured in tokens against the model's window.** Go sends each run the
+  model's `context_window_tokens` from the Gateway catalog (128,000 when
+  unknown). The runtime estimates the next call as the model's last reported
+  input tokens plus what the transcript grew by.
+- **Inside a run** (`src/context-compaction.ts`): past 60% of the window, tool
+  results older than the last four are replaced with a placeholder (calls stay
+  paired; errors are kept, shortened). Past 80%, the older steps are rendered
+  as text and summarized into structured notes (task, done so far with every
+  change named, key facts quoted, problems, current state, next) by the run's
+  own model. The task, the person's messages and the latest steps stay
+  verbatim. Summary calls are `model:compact:N` nodes: metered, but they do not
+  spend a model turn. The person sees "Summarizing earlier steps…".
+- **Across turns** (`ai_conversation_compaction.go`): a Misty chat sends recent
+  turns verbatim within a fifth of the window (12,000–96,000 characters) and
+  everything older as running notes in `ai_conversation_summaries`, extended
+  rather than rebuilt as turns age out. After summarizing, the verbatim part is
+  trimmed to half its budget so the next summary is several turns away. Notes
+  use the account's own agent connection when it has one, are metered, and get
+  20 seconds before the turn proceeds without them and a background call
+  finishes them. The transcript shows "Earlier messages summarized" where the
+  notes end. Companion voice keeps its short last-turns history.
+- Notes and summaries are untrusted data, labeled as such, never system text.
+
 ### Agents for other members (approved October 4, 2026)
 
 A member's agent can ask another member's agent for work when both members

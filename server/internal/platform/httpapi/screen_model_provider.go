@@ -2,36 +2,21 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 
-	agent "github.com/kannachi323/misty/server/internal/agents"
-	"github.com/kannachi323/misty/server/internal/aimodels"
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// screenModelEndpoint is where a screen-planner call goes: the account's own
-// vision connection when it has one, otherwise the AI Gateway.
-type screenModelEndpoint struct {
-	url, key, model string
-	// Account OpenAI reasoning models spend output on reasoning first; keep
-	// it short like the server's own agent provider does.
-	reasoningEffort string
-}
-
-var screenModelBaseURLs = map[string]string{
-	"openai":    "https://api.openai.com/v1",
-	"anthropic": "https://api.anthropic.com/v1",
-	"google":    "https://generativelanguage.googleapis.com/v1beta/openai",
-}
-
 // screenModelRoute is the run's vision route, which the account can point at
 // its own provider; billing meters screen calls against the same route.
-func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvocationRecord) (screenModelEndpoint, error) {
+func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvocationRecord) (modelruntime.Route, string, error) {
 	route, err := s.database.AIModelRunRoute(ctx, record.UserID, record.ID, "vision")
 	if err != nil {
-		return screenModelEndpoint{}, err
+		return modelruntime.Route{}, "", err
 	}
 	model := route.Model
 	if model == "" {
@@ -39,61 +24,109 @@ func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvoc
 	}
 	account, err := s.resolveAIRoute(ctx, record.UserID, route)
 	if err != nil {
-		return screenModelEndpoint{}, err
+		return modelruntime.Route{}, "", err
 	}
-	if account == nil {
-		return resolveScreenModelEndpoint(model)
+	if account != nil {
+		model = account.Model
 	}
-	return accountScreenModelEndpoint(*account, model)
+	if model == "" {
+		return modelruntime.Route{}, "", errScreenModelUnconfigured
+	}
+	resolved := modelruntime.For(account)
+	if resolved.Provider == "openai" {
+		// Account OpenAI reasoning models spend output on reasoning first; keep
+		// it short like the server's own agent provider does.
+		resolved.Reasoning = "low"
+	}
+	return resolved, model, nil
 }
 
-// accountScreenModelEndpoint uses the account's own provider connection.
-func accountScreenModelEndpoint(account aimodels.Resolved, model string) (screenModelEndpoint, error) {
-	base := strings.TrimRight(account.BaseURL, "/")
-	switch {
-	case base == "" && account.Provider == "gateway":
-		base = agent.TestingDefaultVercelAIBaseURL
-	case base == "":
-		base = screenModelBaseURLs[account.Provider]
-	case account.Provider == "google" && !strings.HasSuffix(base, "/openai"):
-		base += "/openai"
+// screenModelMessages turns the planner's OpenAI-style chat messages into a
+// model call. System text becomes the system prompt; images must be inline
+// screenshots, never URLs the model provider would fetch.
+func screenModelMessages(raw json.RawMessage) (string, []modelruntime.Message, error) {
+	var input []struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
 	}
-	if base == "" || model == "" {
-		return screenModelEndpoint{}, errScreenModelUnconfigured
+	if err := json.Unmarshal(raw, &input); err != nil || len(input) == 0 || len(input) > 64 {
+		return "", nil, errScreenModelInvalid
 	}
-	endpoint := screenModelEndpoint{url: base + "/chat/completions", key: account.APIKey, model: model}
-	if account.Provider != "gateway" {
-		endpoint.model = strings.TrimPrefix(model, account.Provider+"/")
+	var system []string
+	messages := make([]modelruntime.Message, 0, len(input))
+	for _, message := range input {
+		parts, err := screenModelParts(message.Content)
+		if err != nil {
+			return "", nil, err
+		}
+		switch message.Role {
+		case "system", "developer":
+			for _, part := range parts {
+				if part.Type != "text" {
+					return "", nil, errScreenModelInvalid
+				}
+				system = append(system, part.Text)
+			}
+		case "user", "assistant":
+			if len(parts) > 0 {
+				messages = append(messages, modelruntime.Message{Role: message.Role, Content: parts})
+			}
+		default:
+			return "", nil, errScreenModelInvalid
+		}
 	}
-	if account.Provider == "openai" {
-		endpoint.reasoningEffort = "low"
+	if len(messages) == 0 {
+		return "", nil, errScreenModelInvalid
 	}
-	return endpoint, nil
+	return strings.Join(system, "\n\n"), messages, nil
 }
 
-func resolveScreenModelEndpoint(model string) (screenModelEndpoint, error) {
-	base := strings.TrimSpace(envconfig.Getenv("AI_GATEWAY_BASE_URL"))
-	if base == "" {
-		base = agent.TestingDefaultVercelAIBaseURL
+func screenModelParts(raw json.RawMessage) ([]modelruntime.Part, error) {
+	var text string
+	if json.Unmarshal(raw, &text) == nil {
+		if strings.TrimSpace(text) == "" {
+			return nil, nil
+		}
+		return []modelruntime.Part{modelruntime.Text(text)}, nil
 	}
-	key := strings.TrimSpace(envconfig.Getenv("AI_GATEWAY_API_KEY"))
-	if key == "" || model == "" {
-		return screenModelEndpoint{}, errScreenModelUnconfigured
+	var items []struct {
+		Type     string `json:"type"`
+		Text     string `json:"text"`
+		ImageURL struct {
+			URL string `json:"url"`
+		} `json:"image_url"`
 	}
-	return screenModelEndpoint{url: strings.TrimRight(base, "/") + "/chat/completions", key: key, model: model}, nil
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil, errScreenModelInvalid
+	}
+	parts := make([]modelruntime.Part, 0, len(items))
+	for _, item := range items {
+		switch item.Type {
+		case "text":
+			parts = append(parts, modelruntime.Text(item.Text))
+		case "image_url":
+			header, encoded, found := strings.Cut(strings.TrimPrefix(item.ImageURL.URL, "data:"), ",")
+			mediaType, isBase64 := strings.CutSuffix(header, ";base64")
+			if !found || !isBase64 || !strings.HasPrefix(item.ImageURL.URL, "data:") {
+				return nil, errScreenModelInvalid
+			}
+			switch mediaType {
+			case "image/png", "image/jpeg", "image/webp":
+			default:
+				return nil, errScreenModelInvalid
+			}
+			if _, err := base64.StdEncoding.DecodeString(encoded); err != nil {
+				return nil, errScreenModelInvalid
+			}
+			parts = append(parts, modelruntime.Part{Type: "image", MediaType: mediaType, Data: encoded})
+		default:
+			return nil, errScreenModelInvalid
+		}
+	}
+	return parts, nil
 }
 
-// screenModelPayload uses max_completion_tokens and the provider's default
-// temperature: current reasoning models reject max_tokens and temperature 0.
-func screenModelPayload(endpoint screenModelEndpoint, messages json.RawMessage) map[string]any {
-	payload := map[string]any{
-		"model":                 endpoint.model,
-		"messages":              messages,
-		"max_completion_tokens": screenModelMaxOutput,
-		"stream":                false,
-	}
-	if endpoint.reasoningEffort != "" {
-		payload["reasoning_effort"] = endpoint.reasoningEffort
-	}
-	return payload
-}
+var (
+	errScreenModelUnconfigured = errors.New("screen model is not configured")
+	errScreenModelInvalid      = errors.New("invalid screen model request")
+)

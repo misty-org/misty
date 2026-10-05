@@ -5,35 +5,29 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const (
-	ProviderMock     = "mock"
-	ProviderOpenAI   = "openai"
+	ProviderMock = "mock"
+	// ProviderVercelAI names Misty's own AI Gateway account in usage records.
 	ProviderVercelAI = "vercel_ai_gateway"
 
-	defaultOpenAIBaseURL                = "https://api.openai.com/v1"
-	defaultOpenAIModel                  = "gpt-5.5"
 	TestingDefaultVercelAIBaseURL       = "https://ai-gateway.vercel.sh/v1"
 	TestingDefaultAgentLowGatewayModel  = "google/gemini-2.5-flash-lite"
 	TestingDefaultAgentMedGatewayModel  = "google/gemini-2.5-flash"
 	TestingDefaultAgentHighGatewayModel = "google/gemini-3.5-flash"
 )
 
-func NewAgentProviderFromEnv() ModelProvider {
-	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
-	if apiKey == "" {
+// NewAgentProvider routes each tier to Misty's Gateway through the agent
+// runtime. Without a runtime there is no model, so the mock answers instead.
+func NewAgentProvider(models *modelruntime.Client) ModelProvider {
+	if !models.Enabled() {
 		return NewAgentProviderRouter(MockProvider{}, MockProvider{}, MockProvider{})
 	}
-	baseURL := envOrDefault("AI_GATEWAY_BASE_URL", TestingDefaultVercelAIBaseURL)
 	provider := func(modelKey, fallback string) ModelProvider {
-		return NewOpenAIProvider(OpenAIProviderConfig{
-			APIKey:       apiKey,
-			BaseURL:      baseURL,
-			Model:        envOrDefault(modelKey, fallback),
-			ProviderName: ProviderVercelAI,
-		})
+		return NewRuntimeProvider(models, modelruntime.Instance(), envOrDefault(modelKey, fallback), ProviderVercelAI, "")
 	}
 	return NewAgentProviderRouter(
 		provider("MISTY_AI_LOW_MODEL", TestingDefaultAgentLowGatewayModel),

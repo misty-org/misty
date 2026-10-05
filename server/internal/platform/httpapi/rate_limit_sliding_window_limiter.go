@@ -119,14 +119,11 @@ func NewAPIRateLimiter() *APIRateLimiter {
 			// Provider fan-out: each of these makes an upstream call on Misty's own
 			// credentials, so abuse burns third-party quota and can get the app
 			// rate limited or banned rather than merely costing us CPU.
-			"GET /spaces/{spaceID}/integrations/notion/sources": {Limit: 10, Window: time.Minute},
-			"GET /spaces/{spaceID}/integrations/notion/search":  {Limit: 20, Window: time.Minute},
-			"POST /spaces/{spaceID}/integrations/notion/pages":  {Limit: 20, Window: time.Minute},
-			"POST /spaces/{spaceID}/calendar/sync":              {Limit: 6, Window: time.Minute},
+			"POST /spaces/{spaceID}/calendar/sync": {Limit: 6, Window: time.Minute},
 
 			// OAuth start is cheap for us but creates state rows and drives users
 			// at a third-party consent screen.
-			"POST /spaces/{spaceID}/integrations/{provider}/authorize": {Limit: 10, Window: time.Minute},
+			"POST /connections/{provider}/authorize": {Limit: 10, Window: time.Minute},
 		},
 		TestingLimiters: make(map[string]*SlidingWindowLimiter),
 	}

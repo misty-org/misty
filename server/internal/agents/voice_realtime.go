@@ -46,7 +46,7 @@ func (a *SmartLibraryAnalyzer) OpenVoiceRealtime(ctx context.Context) (*VoiceRea
   if a.realtimeConfig.Provider == "openai" { return openOpenAIRealtimeModel(ctx, a.realtimeConfig.BaseURL, a.realtimeConfig.APIKey, a.realtimeConfig.Model, true) }
  }
  if strings.TrimSpace(a.APIKey) == "" { return nil, errors.New("realtime voice provider key is required") }
-	base, err := url.Parse(strings.TrimRight(a.embeddingBaseURL(), "/"))
+	base, err := url.Parse(strings.TrimRight(a.realtimeBaseURL(), "/"))
 	if err != nil || base.Host == "" {
 		return nil, errors.New("invalid realtime gateway URL")
 	}
