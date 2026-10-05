@@ -1,4 +1,4 @@
-import { AppWindow, Monitor, PanelsTopLeft } from "lucide-react";
+import { AppWindow, Monitor, MousePointer2, PanelsTopLeft } from "lucide-react";
 import type { ScreenRequest } from "@/features/ai-surface/types";
 import { Button, Spinner } from "@/shared/ui";
 import { declineScreenRequest, openScreenAndContinue, type ScreenChoice } from "./screenRequests";
@@ -6,6 +6,14 @@ import { useMistyStore } from "./useMistyStore";
 
 function status(request: ScreenRequest) {
   const look = request.kind === "look";
+  if (request.kind === "desktop")
+    return {
+      opening: "Starting desktop control…",
+      opened: "Continuing on your desktop",
+      declined: "Desktop not used",
+      failed: request.error || "Desktop control could not start.",
+      pending: "Starting desktop control…",
+    }[request.state ?? "pending"];
   switch (request.state) {
     case "opening":
       return look ? "Looking at your screen…" : "Opening a screen…";
@@ -49,10 +57,17 @@ export function ScreenRequestCard({
         choice,
       );
   };
-  const Icon = request.kind === "look" ? Monitor : AppWindow;
+  const Icon =
+    request.kind === "look" ? Monitor : request.kind === "desktop" ? MousePointer2 : AppWindow;
   return (
     <section
-      aria-label={request.kind === "look" ? "Screen look" : "Screen request"}
+      aria-label={
+        request.kind === "look"
+          ? "Screen look"
+          : request.kind === "desktop"
+            ? "Desktop request"
+            : "Screen request"
+      }
       className="mt-3 rounded-lg border border-charcoal-border bg-charcoal-card p-3"
     >
       <div className="flex items-center gap-2">

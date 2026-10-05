@@ -271,8 +271,10 @@ export async function startLocalExecution(
         kind: "browser_tab",
         opaqueRef: scopeId,
         displayName: execution.desktopControl ? "Desktop screen control" : "Browser workspace",
+        // Screens act through browser_act goals with Misty's own cursor; the
+        // act job grants itself the low-level input it needs.
         capabilities: execution.autopilot
-          ? ["browser.workspace.visual", "browser.workspace.interact"]
+          ? ["browser.workspace.visual", "browser.act"]
           : [
               "browser.inspect",
               "browser.visual",

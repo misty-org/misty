@@ -59,21 +59,26 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 		}
 		var body aiInvocationInput
 		_ = json.Unmarshal(record.RequestPayload, &body)
-		if strings.HasPrefix(tool.Name, "browser.workspace.") {
-			if body.ExecutionMode != "agent" || body.WindowLabel != "main" || body.TaskID == "" {
-				return nil, db.ErrSpaceForbidden
-			}
-			matched := false
-			for _, target := range body.DeviceContexts {
-				var metadata map[string]any
-				_ = json.Unmarshal(target.Metadata, &metadata)
-				if target.OpaqueRef == input.ScopeID && metadata["workspace_control"] == true {
-					matched = true
+		// A goal on a workspace scope runs on the Misty window, or on the desktop
+		// with Misty's own cursor; either needs the same foreground task.
+		surface := "browser"
+		for _, target := range body.DeviceContexts {
+			var metadata map[string]any
+			_ = json.Unmarshal(target.Metadata, &metadata)
+			if target.OpaqueRef == input.ScopeID && metadata["workspace_control"] == true {
+				surface = "workspace"
+				if metadata["desktop_control"] == true {
+					surface = "desktop"
 				}
 			}
-			if !matched {
+		}
+		if strings.HasPrefix(tool.Name, "browser.workspace.") || (tool.Name == screenActTool && surface != "browser") {
+			if body.ExecutionMode != "agent" || body.WindowLabel != "main" || body.TaskID == "" || surface == "browser" {
 				return nil, db.ErrSpaceForbidden
 			}
+		}
+		if tool.Name == screenActTool {
+			configData["surface"] = surface
 		}
 		configData["taskId"] = body.TaskID
 		if body.AgentID != "" {
