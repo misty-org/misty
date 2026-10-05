@@ -1,6 +1,6 @@
 import { ManagedAiRequestError } from "@/features/agents";
 import { describe, expect, it } from "vitest";
-import { pairingFailure } from "./ConnectedDevicePairingDialog";
+import { pairingFailure } from "./pairingFailure";
 
 describe("Connected Device pairing errors", () => {
   it.each([

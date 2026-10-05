@@ -62,6 +62,13 @@ export const devicesApi = {
     signed(request, localId, `${pairPath(deviceId, pairId)}/clipboard-consent`, "PUT", {
       enabled,
     }),
+  setFileWrites: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    pairId: string,
+    enabled: boolean,
+  ) => signed(request, localId, `${pairPath(deviceId, pairId)}/file-writes`, "PUT", { enabled }),
   renamePair: (
     request: SignedDeviceRequest,
     localId: string,

@@ -54,7 +54,11 @@ export const FileBrowserView = memo(function FileBrowserView(props: FileBrowserP
       id: `pane:${props.paneId}`,
       accepts: (payload: ExplorerDragPayload) =>
         destination
-          ? transferDropAcceptance(payload, destination)
+          ? transferDropAcceptance(payload, destination, {
+              writable:
+                props.listing?.location.kind !== "peer_device" ||
+                props.listing.location.peerWritable === true,
+            })
           : { valid: false, label: "Unavailable" },
       onDrop: (payload: ExplorerDragPayload, modifiers: ExplorerDragModifiers) => {
         if (!props.listing) return;

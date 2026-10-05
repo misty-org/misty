@@ -96,6 +96,8 @@ export function createExplorerDropTargetSpec(options: {
 export function dropKindForPath(path: string): TargetKind {
   if (path === "misty://trash") return "trash";
   if (path === "misty://library") return "library";
+  // The device itself refuses changes it has not allowed.
+  if (path.startsWith("misty://device/")) return "directory";
   if (path.startsWith("misty://")) return "invalid";
   return "directory";
 }

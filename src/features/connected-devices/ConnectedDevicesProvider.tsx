@@ -15,8 +15,12 @@ import { useConnectedDevices as useConnectedDevicesController } from "./useConne
 import { cn } from "@/shared/ui";
 type ConnectedDevicesController = ReturnType<typeof useConnectedDevicesController>;
 const ConnectedDevicesContext = createContext<ConnectedDevicesController | null>(null);
-export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
-  const controller = useConnectedDevicesController();
+/** `sessionDays` is the account's session length, from its settings. */
+export function ConnectedDevicesProvider({
+  children,
+  sessionDays,
+}: PropsWithChildren<{ sessionDays?: number }>) {
+  const controller = useConnectedDevicesController(sessionDays);
   const navigate = useNavigate();
   const [notice, setNotice] = useState("");
   useEffect(() => {
