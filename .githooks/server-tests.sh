@@ -10,9 +10,18 @@ password=misty-test-password
 container=$(docker run -d --rm -p 127.0.0.1::5432 --tmpfs /var/lib/postgresql/data:rw,size=2g \
   -e POSTGRES_USER=misty -e POSTGRES_PASSWORD=$password -e POSTGRES_DB=misty_test \
   "$image" -c checkpoint_timeout=30s -c fsync=off -c synchronous_commit=off -c full_page_writes=off)
-trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+trap 'docker rm -fv "$container" >/dev/null 2>&1 || true' EXIT
 port=$(docker port "$container" 5432/tcp | head -n 1 | sed 's/.*://')
-until docker exec "$container" pg_isready -U misty -d misty_test >/dev/null 2>&1; do sleep 1; done
+waited=0
+until docker exec "$container" pg_isready -U misty -d misty_test >/dev/null 2>&1; do
+  # A container that exits (for example, Docker out of disk) never becomes ready.
+  if [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" != true ] || ((++waited > 60)); then
+    echo "Test PostgreSQL did not start:" >&2
+    docker logs --tail 20 "$container" >&2 2>&1 || true
+    exit 1
+  fi
+  sleep 1
+done
 
 export DB_HOST=127.0.0.1 DB_PORT=$port DB_USER=misty DB_PASSWORD=$password DB_NAME=misty_test DB_SSLMODE=disable
 export TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=$port TEST_DB_USER=misty TEST_DB_PASSWORD=$password
