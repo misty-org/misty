@@ -8,9 +8,10 @@
    so the Themes extension can preview and persist one coherent app palette. */
 :root {
   --misty-theme-workspace: #0f0f0f;
-  /* Window chrome sampled from the approved Polar tab reference. */
-  --workspace-tab-surface-top: #383838;
-  --workspace-tab-surface: #303030;
+  /* Active tab and browser toolbar. Darker than the Polar reference so the
+     chrome sits closer to the black tab strip. */
+  --workspace-tab-surface-top: #222222;
+  --workspace-tab-surface: #1c1c1c;
   --workspace-tab-text: #c5c5c5;
   --workspace-tab-muted: #ababab;
   --misty-theme-bg: #131313;
