@@ -40,7 +40,6 @@ it("shows existing Everyone messages when opening Misty without a conversation s
       {
         id: "space-a",
         role: "member",
-        permissions: { "messages.write": false, "library.view": false },
       },
     ],
     referenceOnly: true,

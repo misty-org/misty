@@ -51,7 +51,7 @@ export function ConversationSwitcher({
   canWrite: boolean;
 }) {
   const navigate = useNavigate();
-  const data = useSpaceConversations(spaceId, true);
+  const data = useSpaceConversations(spaceId);
   const personal = useSpacePersonalItems(spaceId);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);

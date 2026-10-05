@@ -1,26 +1,15 @@
-import type { LibraryAssetStack } from "@/api/spaces/dto/entities";
 import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
-import { useEffect, useRef } from "react";
-
-const BOUNCE_STEP_SECONDS = 0.04;
+import { useRef } from "react";
 
 /**
- * Applies edit settings to the <video> element and drives the bounce effect.
- *
- * Trim, speed and mute are properties of the element rather than the source, so
- * they are re-applied on every timeupdate. Bounce is played by stepping the
- * clip backwards frame by frame once forward playback ends.
+ * Applies edit settings to the <video> element. Trim, speed and mute are
+ * properties of the element rather than the source, so they are re-applied on
+ * every timeupdate.
  */
-export function useLibraryViewerPlayback(options: {
-  appliedEdit: LibraryEditDefinition;
-  assetStack: LibraryAssetStack | null;
-}) {
-  const { appliedEdit, assetStack } = options;
+export function useLibraryViewerPlayback(options: { appliedEdit: LibraryEditDefinition }) {
+  const { appliedEdit } = options;
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const bounceFrameRef = useRef(0);
-
-  useEffect(() => () => window.cancelAnimationFrame(bounceFrameRef.current), []);
 
   const handleVideoTime = () => {
     const video = videoRef.current;
@@ -33,21 +22,5 @@ export function useLibraryViewerPlayback(options: {
     if (video.currentTime >= trim.end) video.pause();
   };
 
-  const handleVideoEnded = () => {
-    if (assetStack?.kind !== "live_photo" || assetStack.effect !== "bounce") return;
-    const reverse = () => {
-      const video = videoRef.current;
-      if (!video) return;
-      if (video.currentTime <= BOUNCE_STEP_SECONDS) {
-        video.currentTime = 0;
-        void video.play();
-        return;
-      }
-      video.currentTime = Math.max(0, video.currentTime - BOUNCE_STEP_SECONDS);
-      bounceFrameRef.current = window.requestAnimationFrame(reverse);
-    };
-    reverse();
-  };
-
-  return { videoRef, imageRef, handleVideoTime, handleVideoEnded };
+  return { videoRef, imageRef, handleVideoTime };
 }

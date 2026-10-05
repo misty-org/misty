@@ -13,12 +13,10 @@ import (
 
 const toolboxMessagesSend = "message.send"
 
-func permittedSpaceConversationRead(ctx context.Context, database *db.Database, userID, spaceID, agentID, permission string) (bool, error) {
-	allowed, err := database.HasSpacePermission(ctx, userID, spaceID, permission)
-	if err != nil || !allowed || agentID == "" {
-		return allowed, err
-	}
-	return database.EffectiveAgentSpacePermission(ctx, userID, spaceID, agentID, permission)
+// permittedSpaceConversationRead reports whether the person may read the
+// Space. Their agents read with the same access.
+func permittedSpaceConversationRead(ctx context.Context, database *db.Database, userID, spaceID, _ string, permission string) (bool, error) {
+	return database.HasSpacePermission(ctx, userID, spaceID, permission)
 }
 
 type spaceConversationToolActor struct {

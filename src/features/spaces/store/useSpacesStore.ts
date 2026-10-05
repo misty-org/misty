@@ -146,20 +146,6 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       return;
     }
     if (get().referenceOnly) return void set({ loading: false });
-    const canReadMessages = space.permissions?.["messages.read"] !== false;
-    if (!canReadMessages) {
-      set((state) => {
-        const messagesBySpace = { ...state.messagesBySpace };
-        const messageLoadingBySpace = { ...state.messageLoadingBySpace };
-        const messageErrorsBySpace = { ...state.messageErrorsBySpace };
-        const nodesBySpace = { ...state.nodesBySpace };
-        delete messagesBySpace[spaceId];
-        delete messageLoadingBySpace[spaceId];
-        delete messageErrorsBySpace[spaceId];
-        delete nodesBySpace[spaceId];
-        return { messagesBySpace, messageLoadingBySpace, messageErrorsBySpace, nodesBySpace };
-      });
-    }
     const tasks = [get().loadMembers(spaceId)];
     // Space home/settings only need membership. App runtimes load their own
     // content after checking installation and session permissions; prefetching

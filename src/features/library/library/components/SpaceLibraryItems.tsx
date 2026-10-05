@@ -1,5 +1,4 @@
-import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/entities";
-import { useDropZone, usePointerDrag } from "@/features/dnd";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import {
   Button,
   IconButton,
@@ -25,7 +24,6 @@ import { libraryFileTypeLabel, LibraryItemThumbnail } from "../SpaceLibraryPrimi
 const ITEM_ACTION_MENU_WIDTH = 224;
 const ITEM_ACTION_MENU_HEIGHT = 336;
 const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
-const LIBRARY_ITEM_DRAG_KIND = "library-item";
 function clampMenuPosition(left: number, top: number, anchor?: Element) {
   const pane = anchor?.closest<HTMLElement>("[data-workspace-pane]");
   const bounds = pane?.getBoundingClientRect() ?? {
@@ -39,23 +37,16 @@ function clampMenuPosition(left: number, top: number, anchor?: Element) {
     top: Math.max(bounds.top + 8, Math.min(top, bounds.bottom - ITEM_ACTION_MENU_HEIGHT - 8)),
   };
 }
-function assetStackLabel(assetStack: LibraryAssetStack) {
-  if (assetStack.kind === "live_photo") return "Live";
-  if (assetStack.kind === "raw_pair") return "RAW+";
-  return `${assetStack.members.length} burst`;
-}
 export function SpaceLibraryItems() {
   const {
     data: {
       spaceId,
       canEditLibrary,
-      canCopyLibrary,
       collection,
       setSelectedItemId,
       displayItems,
       sort,
       direction,
-      stackByItemID,
       libraryViewMode,
       libraryItemScale,
       selectedItemIds,
@@ -132,7 +123,7 @@ export function SpaceLibraryItems() {
                   <RotateCcw />
                   Restore
                 </Button>
-              ) : canEditLibrary || canCopyLibrary ? (
+              ) : (
                 <IconButton
                   label={`More actions for ${item.display_name}`}
                   data-state={itemMenu?.itemId === item.id ? "open" : "closed"}
@@ -148,7 +139,7 @@ export function SpaceLibraryItems() {
                 >
                   <EllipsisVertical />
                 </IconButton>
-              ) : undefined,
+              ),
           }))}
         />
         {nextAfter && loadingMore ? (
@@ -173,7 +164,6 @@ export function SpaceLibraryItems() {
         const dateGroup = libraryDateGroupLabel(item, sort);
         const previousDateGroup =
           itemIndex > 0 ? libraryDateGroupLabel(displayItems[itemIndex - 1], sort) : "";
-        const assetStack = stackByItemID.get(item.id);
         return (
           <Fragment key={item.id}>
             {dateGroup && dateGroup !== previousDateGroup ? (
@@ -182,7 +172,6 @@ export function SpaceLibraryItems() {
               </h4>
             ) : null}
             <LibraryItemCard
-              assetStack={assetStack}
               item={item}
               creator={creatorName(item.added_by_user_id)}
               onContextMenu={openItemContextMenu}
@@ -211,14 +200,12 @@ export function SpaceLibraryItems() {
   );
 }
 function LibraryItemCard({
-  assetStack,
   item,
   creator,
   onContextMenu,
   onShowMenu,
   selected,
 }: {
-  assetStack?: LibraryAssetStack;
   item: SpaceLibraryItem;
   creator: string;
   onContextMenu: (event: ReactMouseEvent, itemId: string) => void;
@@ -226,81 +213,33 @@ function LibraryItemCard({
   selected: boolean;
 }) {
   const {
-    data: {
-      spaceId,
-      canEditLibrary,
-      canCopyLibrary,
-      selectedItemIds,
-      itemMenu,
-      canReorderAlbum,
-      setDraggedAlbumItemId,
-      libraryViewerTriggerRef,
-      setSelectedItemId,
-      sensitiveCollectionToken,
-    },
+    data: { spaceId, canEditLibrary, itemMenu, libraryViewerTriggerRef, setSelectedItemId },
     itemActions: { toggleSelectedItem, updateItem },
-    collectionActions: { reorderAlbumItem },
   } = useSpaceLibraryContext();
-  const { startDrag, state } = usePointerDrag();
-  const reorderable = canReorderAlbum && selectedItemIds.length === 0;
-  const dragging = state.payload?.kind === LIBRARY_ITEM_DRAG_KIND && state.payload.id === item.id;
-  const dropZone = useDropZone({
-    id: `library-item:${item.id}`,
-    accepts: (payload) =>
-      reorderable && payload.kind === LIBRARY_ITEM_DRAG_KIND && payload.id !== item.id,
-    onDrop: (payload) => {
-      setDraggedAlbumItemId("");
-      void reorderAlbumItem(item.id, payload.id);
-    },
-  });
   const itemSelectionStyle = selected
     ? "inset-ring-2 inset-ring-charcoal-active"
     : "inset-ring-1 inset-ring-cream/10";
   return (
     <article
-      data-misty-window-drag-block={reorderable ? "true" : undefined}
-      data-pointer-drag-source={reorderable ? "true" : undefined}
       className={[
         "group relative min-w-0 rounded-xl bg-charcoal-card p-4",
         "transition-[background-color,box-shadow,opacity] hover:bg-charcoal-hover",
         "flex flex-col",
-        reorderable ? "cursor-grab" : "",
-        dragging ? "opacity-40" : "",
-        dropZone.active ? "ring-2 ring-charcoal-active" : itemSelectionStyle,
+        itemSelectionStyle,
       ].join(" ")}
-      ref={dropZone.ref}
       onContextMenu={(event) => onContextMenu(event, item.id)}
-      onPointerDown={(event) => {
-        if (!reorderable) return;
-        if ((event.target as HTMLElement).closest("button, input, [role='combobox']")) return;
-        startDrag(
-          event,
-          {
-            kind: LIBRARY_ITEM_DRAG_KIND,
-            id: item.id,
-          },
-          <LibraryItemDragPreview name={item.display_name} />,
-        );
-      }}
     >
       <div className="relative flex h-8 min-w-0 items-center gap-2">
         <CollectionCardTitle title={item.display_name} />
-        {canEditLibrary || canCopyLibrary ? (
-          <LibraryItemActions
-            item={item}
-            menuOpen={itemMenu?.itemId === item.id}
-            onShowMenu={onShowMenu}
-            updateItem={updateItem}
-            canEdit={canEditLibrary}
-          />
-        ) : null}
+        <LibraryItemActions
+          item={item}
+          menuOpen={itemMenu?.itemId === item.id}
+          onShowMenu={onShowMenu}
+          updateItem={updateItem}
+          canEdit={canEditLibrary}
+        />
       </div>
-      <LibraryItemPreview
-        assetStack={assetStack}
-        item={item}
-        selected={selected}
-        selectionAvailable={canEditLibrary || canCopyLibrary}
-      />
+      <LibraryItemPreview item={item} selected={selected} />
       <CollectionCardMetadata
         category={`${libraryFileTypeLabel(item)} · ${formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))}`}
         updated={formatTime(item.updated_at || item.added_at)}
@@ -309,17 +248,7 @@ function LibraryItemCard({
       />
     </article>
   );
-  function LibraryItemPreview({
-    assetStack,
-    item,
-    selected,
-    selectionAvailable,
-  }: {
-    assetStack?: LibraryAssetStack;
-    item: SpaceLibraryItem;
-    selected: boolean;
-    selectionAvailable: boolean;
-  }) {
+  function LibraryItemPreview({ item, selected }: { item: SpaceLibraryItem; selected: boolean }) {
     return (
       <div className="relative mt-2 w-full min-w-0 flex-1">
         <Pressable
@@ -330,31 +259,20 @@ function LibraryItemCard({
           }}
           aria-label={`Open ${item.display_name}`}
         >
-          <LibraryItemThumbnail
-            spaceId={spaceId}
-            item={item}
-            reauthenticationToken={sensitiveCollectionToken}
-          />
-          {assetStack ? (
-            <span className="absolute bottom-2 left-2 rounded-md bg-charcoal-workspace px-1.5 py-1 text-[10px] font-semibold capitalize text-cream-bright">
-              {assetStackLabel(assetStack)}
-            </span>
-          ) : null}
+          <LibraryItemThumbnail spaceId={spaceId} item={item} />
         </Pressable>
-        {selectionAvailable ? (
-          <Button
-            className={selectionToggleClassName(selected)}
-            type="button"
-            aria-label={`${selected ? "Deselect" : "Select"} ${item.display_name}`}
-            aria-pressed={selected}
-            onClick={(event) => {
-              event.stopPropagation();
-              toggleSelectedItem(item.id);
-            }}
-          >
-            <Check size={12} />
-          </Button>
-        ) : null}
+        <Button
+          className={selectionToggleClassName(selected)}
+          type="button"
+          aria-label={`${selected ? "Deselect" : "Select"} ${item.display_name}`}
+          aria-pressed={selected}
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleSelectedItem(item.id);
+          }}
+        >
+          <Check size={12} />
+        </Button>
       </div>
     );
   }
@@ -420,13 +338,6 @@ function LibraryItemActions({
       >
         <EllipsisVertical size={15} />
       </IconButton>
-    </div>
-  );
-}
-function LibraryItemDragPreview({ name }: { name: string }) {
-  return (
-    <div className="max-w-[240px] truncate rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-xs font-medium text-cream shadow-lg">
-      {name}
     </div>
   );
 }

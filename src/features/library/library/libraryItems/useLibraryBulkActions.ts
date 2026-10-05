@@ -10,7 +10,7 @@ export type MetadataDialogAction = "add_tags" | "remove_tags" | "set_date" | "se
 /** Actions that apply to the whole selection, including the bulk metadata dialog. */
 export function useLibraryBulkActions(data: SpaceLibraryData, reload: () => Promise<void>) {
   const { spaceId, canEditLibrary, selectedItems, setSelectedItemIds } = data;
-  const { bulkSaving, setBulkSaving, sensitiveCollectionToken, setLocalError } = data;
+  const { bulkSaving, setBulkSaving, setLocalError } = data;
   const { metadataDialogAction, setMetadataDialogAction, metadataTags, setMetadataTags } = data;
   const { metadataDate, setMetadataDate, metadataLocationName, setMetadataLocationName } = data;
   const { metadataLatitude, setMetadataLatitude, metadataLongitude, setMetadataLongitude } = data;
@@ -31,13 +31,7 @@ export function useLibraryBulkActions(data: SpaceLibraryData, reload: () => Prom
     setBulkSaving(true);
     setLocalError("");
     try {
-      await spacesApi.bulkLibraryItems(
-        spaceId,
-        selectedItems,
-        action,
-        options,
-        sensitiveCollectionToken,
-      );
+      await spacesApi.bulkLibraryItems(spaceId, selectedItems, action, options);
       setSelectedItemIds([]);
       await reload();
       return true;

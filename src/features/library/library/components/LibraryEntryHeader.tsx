@@ -8,38 +8,23 @@ import {
   CollectionSearch,
   CollectionFilterMenu,
   CollectionViewToggle,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
   IconButton,
   NavIsland,
 } from "@/shared/ui";
-import { MoreHorizontal, Plus, Upload, Minus } from "lucide-react";
+import { Plus, Upload, Minus } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { useLibraryUploadState } from "../librarySurfaces/useLibraryUploadState";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
 
-const sections = [
+const sections: { value: LibraryCollectionKind; label: string }[] = [
   { value: "recent", label: "All" },
   { value: "favorites", label: "Favorites" },
-  { value: "albums", label: "Albums" },
   { value: "deleted", label: "Trash" },
-];
-const more: { value: LibraryCollectionKind; label: string }[] = [
-  { value: "hidden", label: "Hidden" },
-  { value: "collections", label: "Collections" },
-  { value: "imports", label: "Imports" },
-  { value: "shared", label: "Shared references" },
-  { value: "duplicate", label: "Duplicates" },
-  { value: "months", label: "Months" },
-  { value: "years", label: "Years" },
 ];
 
 export function LibraryEntryHeader() {
   const { data, collectionActions } = useSpaceLibraryContext();
   const upload = useLibraryUploadState();
-  const extra = more.find((x) => x.value === data.collection);
   return (
     <>
       <CollectionHeading
@@ -54,35 +39,23 @@ export function LibraryEntryHeader() {
               onFocus={() => data.setSearchFocused(true)}
               onBlur={() => window.setTimeout(() => data.setSearchFocused(false), 120)}
             />
-            {data.collection === "albums" && !data.selectedCollectionId
-              ? data.canEditLibrary && (
-                  <Button
-                    variant="primary"
-                    className="px-4"
-                    onClick={collectionActions.openCreateAlbum}
-                  >
-                    <Plus />
-                    New album
-                  </Button>
-                )
-              : data.collection !== "deleted" &&
-                upload.uploadAvailable && (
-                  <Button
-                    variant="primary"
-                    className="px-4"
-                    disabled={upload.uploadDisabled || upload.uploading}
-                    onClick={upload.onUpload}
-                  >
-                    <Upload />
-                    {upload.uploading ? "Uploading…" : "Upload files"}
-                  </Button>
-                )}
+            {data.collection !== "deleted" && upload.uploadAvailable && (
+              <Button
+                variant="primary"
+                className="px-4"
+                disabled={upload.uploadDisabled || upload.uploading}
+                onClick={upload.onUpload}
+              >
+                <Upload />
+                {upload.uploading ? "Uploading…" : "Upload files"}
+              </Button>
+            )}
           </>
         }
       />
       <CollectionFilters
         collectionId="library"
-        options={extra ? [...sections, extra] : sections}
+        options={sections}
         value={data.collection}
         onChange={(value) => collectionActions.selectCollection(value as LibraryCollectionKind)}
         filterControl={
@@ -110,9 +83,7 @@ export function LibraryEntryHeader() {
                 kind: "sort",
                 submenu: true,
                 value: `${data.sort}:${data.direction}`,
-                options: data.currentAlbum
-                  ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions]
-                  : sortOptions,
+                options: sortOptions,
                 onChange: (value) => {
                   const [sort, direction] = value.split(":");
                   data.setSort(sort as NonNullable<LibraryItemQuery["sort"]>);
@@ -142,23 +113,6 @@ export function LibraryEntryHeader() {
                 </IconButton>
               </NavIsland>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton label="More Library sections">
-                  <MoreHorizontal />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {more.map((x) => (
-                  <DropdownMenuItem
-                    key={x.value}
-                    onSelect={() => collectionActions.selectCollection(x.value)}
-                  >
-                    {x.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
             <SpaceLibraryUploadTray jobs={data.uploadJobs} onClear={() => data.setUploadJobs([])} />
           </>
         }

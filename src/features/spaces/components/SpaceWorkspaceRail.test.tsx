@@ -96,34 +96,29 @@ it("opens a section in the owning Space tab after loading it", async () => {
     within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent),
-  ).toEqual(["Chat", "Planner", "Journal", "Library"]);
-  expect(within(nav).getByRole("link", { name: "Journal" }).getAttribute("aria-current")).toBe(
+  ).toEqual(["Chat", "Notes", "Drawings", "Files"]);
+  expect(within(nav).getByRole("link", { name: "Notes" }).getAttribute("aria-current")).toBe(
     "page",
   );
-  fireEvent.click(within(nav).getByRole("link", { name: "Planner" }));
+  fireEvent.click(within(nav).getByRole("link", { name: "Files" }));
   await waitFor(() =>
     expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe(
-      "/spaces/family/planner",
+      "/spaces/family/library",
     ),
   );
-  expect(preload).toHaveBeenCalledWith("planner");
+  expect(preload).toHaveBeenCalledWith("library");
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.id).toBe(before);
 });
 
-it("follows the focused Space and hides pages the user cannot access", () => {
+it("follows the focused Space", () => {
   useSpacesStore.setState({
-    spaces: [
-      space("family", "Family"),
-      { ...space("work", "Work"), permissions: { "tasks.view": false, "library.view": false } },
-    ],
+    spaces: [space("family", "Family"), { ...space("work", "Work") }],
   });
   mount();
   act(() => open("/spaces/work/social"));
   expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy();
   expect(screen.getByRole("region", { name: "Recent items" })).toBeTruthy();
   const nav = screen.getByRole("navigation", { name: "Space sections" });
-  expect(within(nav).queryByRole("link", { name: "Planner" })).toBeNull();
-  expect(within(nav).queryByRole("link", { name: "Library" })).toBeNull();
   expect(within(nav).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
 });
 
@@ -151,7 +146,7 @@ it("names the Space without a switcher and exposes management directly", async (
 it("keeps the current page on load failure and ignores loads after the pane route changes", async () => {
   mount();
   preload.mockRejectedValueOnce(new Error("offline"));
-  fireEvent.click(screen.getByRole("link", { name: "Planner" }));
+  fireEvent.click(screen.getByRole("link", { name: "Files" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/spaces/family/notes");
   let finish!: () => void;
@@ -161,24 +156,16 @@ it("keeps the current page on load failure and ignores loads after the pane rout
         finish = resolve;
       }),
   );
-  fireEvent.click(screen.getByRole("link", { name: "Planner" }));
+  fireEvent.click(screen.getByRole("link", { name: "Files" }));
   act(() => open("/agents"));
   await act(async () => finish());
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/agents");
 });
 
-it("keeps Library selected for Trash without duplicating Trash in the rail", () => {
+it("keeps Files selected for Trash without duplicating Trash in the rail", () => {
   open("/spaces/family/library?collection=deleted");
   mount();
   expect(screen.queryByRole("link", { name: "Trash" })).toBeNull();
   expect(screen.queryByRole("button", { name: "New item" })).toBeNull();
-  expect(screen.getByRole("link", { name: "Library" }).getAttribute("aria-current")).toBe("page");
-});
-
-it("hides Trash when Library access is denied", () => {
-  useSpacesStore.setState({
-    spaces: [{ ...space("family", "Family"), permissions: { "library.view": false } }],
-  });
-  mount();
-  expect(screen.queryByRole("link", { name: "Trash" })).toBeNull();
+  expect(screen.getByRole("link", { name: "Files" }).getAttribute("aria-current")).toBe("page");
 });

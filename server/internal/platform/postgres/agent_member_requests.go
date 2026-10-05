@@ -13,15 +13,15 @@ import (
 
 // Bounds for work a member asks of another member's agent. The work uses the
 // owner's agent on someone else's behalf, so a request gets fewer model turns
-// and less time than a run the owner starts themselves, and an unapproved
-// request expires.
+// and less time than a run the owner starts themselves, and an agent takes a
+// few requests at a time.
 const (
 	memberRequestModelTurns    = 12
 	memberRequestExecutionMS   = 10 * 60 * 1000
 	memberRequestsPerRun       = 5
 	memberRequestsPerUserHour  = 60
 	memberRequestMaxDepth      = 2
-	memberRequestApprovalTTL   = `INTERVAL '24 hours'`
+	memberRequestMaxOpen       = 3
 	memberRequestActiveRunList = `'queued','running','awaiting_device','awaiting_intervention','cooldown','retrying'`
 )
 
@@ -68,7 +68,6 @@ type AgentMemberRequest struct {
 	TargetOwnerUserID string          `json:"target_owner_user_id"`
 	TargetOwnerName   string          `json:"target_owner_name"`
 	ChildRunID        string          `json:"child_run_id"`
-	Approval          string          `json:"approval"`
 	Message           string          `json:"message"`
 	CreatedAt         time.Time       `json:"created_at"`
 	RunState          string          `json:"run_state"`
@@ -82,7 +81,7 @@ type AgentMemberRequest struct {
 }
 
 const agentMemberRequestSelect = `SELECT q.id,q.space_id,s.name,q.requester_user_id,COALESCE(ru.name,''),q.requester_agent_id,q.requester_run_id,
-	q.target_agent_id,COALESCE(a.name,''),q.target_owner_user_id,COALESCE(ou.name,''),q.child_run_id,q.approval,q.message,q.created_at,
+	q.target_agent_id,COALESCE(a.name,''),q.target_owner_user_id,COALESCE(ou.name,''),q.child_run_id,q.message,q.created_at,
 	r.state,r.result,COALESCE(r.error_message,''),COALESCE(q.source_message_id,''),COALESCE(q.source_conversation_id,'')
 	FROM agent_member_requests q JOIN spaces s ON s.id=q.space_id JOIN space_runs r ON r.id=q.child_run_id
 	LEFT JOIN misty_ask_identities a ON a.id=q.target_agent_id
@@ -90,17 +89,15 @@ const agentMemberRequestSelect = `SELECT q.id,q.space_id,s.name,q.requester_user
 
 func scanAgentMemberRequest(row interface{ Scan(...any) error }, out *AgentMemberRequest) error {
 	return row.Scan(&out.ID, &out.SpaceID, &out.SpaceName, &out.RequesterUserID, &out.RequesterName, &out.RequesterAgentID, &out.RequesterRunID,
-		&out.TargetAgentID, &out.TargetAgentName, &out.TargetOwnerUserID, &out.TargetOwnerName, &out.ChildRunID, &out.Approval, &out.Message, &out.CreatedAt,
+		&out.TargetAgentID, &out.TargetAgentName, &out.TargetOwnerUserID, &out.TargetOwnerName, &out.ChildRunID, &out.Message, &out.CreatedAt,
 		&out.RunState, &out.RunResult, &out.RunErrorMessage, &out.SourceMessageID, &out.SourceConversationID)
 }
 
-// CreateAgentMemberRequest sends work to an agent that lives in a Space, from
-// another agent's run or from a person @mentioning it in Space chat. The
-// delegated run acts as the target agent with its owner's permissions, only
-// in that Space, and is billed to the person who asked. A listing that asks
-// first waits for its owner to approve before anything runs or is charged;
-// otherwise it starts. A repeated idempotency key from the same run (or
-// message) returns the original request.
+// CreateAgentMemberRequest sends work to an agent in a Space, from another
+// agent's run or from a person @mentioning it in Space chat. The delegated run
+// acts as the target agent, only in that Space, and is billed to the person
+// who asked. It starts at once. A repeated idempotency key from the same run
+// (or message) returns the original request.
 func (db *Database) CreateAgentMemberRequest(ctx context.Context, input AgentMemberRequestInput) (*AgentMemberRequest, error) {
 	input.Message = strings.TrimSpace(input.Message)
 	input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
@@ -150,17 +147,12 @@ func (db *Database) CreateAgentMemberRequest(ctx context.Context, input AgentMem
 		if err != nil {
 			return err
 		}
-		if err := memberRequestLimitsTx(ctx, tx, input, target.maxOpen); err != nil {
+		if err := memberRequestLimitsTx(ctx, tx, input); err != nil {
 			return err
 		}
 		mode := target.defaultMode
 		if runModeRank(mode) > runModeRank("auto") {
 			mode = "auto"
-		}
-		// Owners never wait on themselves.
-		approval := "not_needed"
-		if target.policy == "ask" && target.ownerUserID != input.RequesterUserID {
-			approval = "pending"
 		}
 		snapshot := mustJSON(map[string]any{"id": input.TargetAgentID, "version": target.version, "version_id": target.versionID, "name": target.name,
 			"instructions": target.instructions, "model_id": target.modelID, "reasoning_effort": target.effort, "default_run_mode": target.defaultMode, "system_managed": false})
@@ -182,20 +174,18 @@ func (db *Database) CreateAgentMemberRequest(ctx context.Context, input AgentMem
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_member_requests(id,space_id,requester_user_id,requester_agent_id,requester_run_id,
-			target_agent_id,target_owner_user_id,child_run_id,message,idempotency_key,approval,source_message_id,source_conversation_id)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,''),NULLIF($13,''))`,
+			target_agent_id,target_owner_user_id,child_run_id,message,idempotency_key,source_message_id,source_conversation_id)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULLIF($11,''),NULLIF($12,''))`,
 			requestID, input.SpaceID, input.RequesterUserID, input.RequesterAgentID, input.RequesterRunID, input.TargetAgentID,
-			target.ownerUserID, runID, input.Message, input.IdempotencyKey, approval, sourceMessageID, input.SourceConversationID); err != nil {
+			target.ownerUserID, runID, input.Message, input.IdempotencyKey, sourceMessageID, input.SourceConversationID); err != nil {
 			return err
 		}
-		if approval == "not_needed" {
-			if err := queueMemberRequestRunTx(ctx, tx, runID, input.SpaceID, input.TargetAgentID); err != nil {
-				return err
-			}
+		if err := queueMemberRequestRunTx(ctx, tx, runID, input.SpaceID, input.TargetAgentID); err != nil {
+			return err
 		}
 		if _, err := recordSpaceEventTx(ctx, tx, input.SpaceID, input.RequesterUserID, "agent.request.created", requestID, map[string]any{
 			"request_id": requestID, "requester_agent_id": input.RequesterAgentID, "target_agent_id": input.TargetAgentID, "target_agent_name": target.name,
-			"target_owner_user_id": target.ownerUserID, "needs_approval": approval == "pending",
+			"target_owner_user_id": target.ownerUserID,
 		}); err != nil {
 			return err
 		}
@@ -258,25 +248,24 @@ func memberRequestParentTx(ctx context.Context, tx *sql.Tx, userID, agentID, run
 }
 
 type memberRequestTarget struct {
-	ownerUserID, name, instructions, modelID, effort, defaultMode, versionID, policy string
-	version                                                                          int64
-	maxOpen                                                                          int
+	ownerUserID, name, instructions, modelID, effort, defaultMode, versionID string
+	version                                                                  int64
 }
 
 func memberRequestTargetTx(ctx context.Context, tx *sql.Tx, input AgentMemberRequestInput) (memberRequestTarget, error) {
 	var target memberRequestTarget
-	err := tx.QueryRowContext(ctx, `SELECT l.owner_user_id,l.accept_policy,l.max_open_requests,a.name,a.instructions,a.model_id,a.reasoning_effort,a.default_run_mode,a.version,v.id`+
-		spaceAgentListingJoins+` JOIN misty_ask_identity_versions v ON v.agent_id=a.id AND v.version=a.version
-		WHERE l.space_id=$1 AND l.agent_id=$2 FOR SHARE OF l`, input.SpaceID, input.TargetAgentID).
-		Scan(&target.ownerUserID, &target.policy, &target.maxOpen, &target.name, &target.instructions, &target.modelID, &target.effort, &target.defaultMode, &target.version, &target.versionID)
-	if errors.Is(err, sql.ErrNoRows) || err == nil && target.policy == "off" {
-		return target, ErrAgentListingUnavailable
+	err := tx.QueryRowContext(ctx, `SELECT m.owner_user_id,a.name,a.instructions,a.model_id,a.reasoning_effort,a.default_run_mode,a.version,v.id`+
+		spaceAgentJoins+` JOIN misty_ask_identity_versions v ON v.agent_id=a.id AND v.version=a.version
+		WHERE m.space_id=$1 AND m.agent_id=$2 FOR SHARE OF m`, input.SpaceID, input.TargetAgentID).
+		Scan(&target.ownerUserID, &target.name, &target.instructions, &target.modelID, &target.effort, &target.defaultMode, &target.version, &target.versionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return target, ErrAgentNotInSpace
 	}
 	if err != nil {
 		return target, err
 	}
 	if input.RequesterAgentID != "" && input.RequesterAgentID == input.TargetAgentID {
-		return target, ErrAgentListingUnavailable
+		return target, ErrAgentNotInSpace
 	}
 	if !validAgentRunMode(target.defaultMode) {
 		target.defaultMode = "auto"
@@ -284,16 +273,8 @@ func memberRequestTargetTx(ctx context.Context, tx *sql.Tx, input AgentMemberReq
 	return target, nil
 }
 
-func memberRequestLimitsTx(ctx context.Context, tx *sql.Tx, input AgentMemberRequestInput, maxOpen int) error {
+func memberRequestLimitsTx(ctx context.Context, tx *sql.Tx, input AgentMemberRequestInput) error {
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "agent-member-request:"+input.TargetAgentID); err != nil {
-		return err
-	}
-	// Requests the owner never answered stop holding the agent's open slots.
-	if _, err := tx.ExecContext(ctx, `WITH expired AS (
-		UPDATE agent_member_requests SET approval='expired',decided_at=NOW()
-		WHERE target_agent_id=$1 AND approval='pending' AND created_at<NOW()-`+memberRequestApprovalTTL+` RETURNING child_run_id)
-		UPDATE space_runs r SET state='rejected',error_code='approval_expired',error_message='The request expired before its owner approved it.',
-		completed_at=NOW(),updated_at=NOW() FROM expired WHERE r.id=expired.child_run_id AND r.state='queued'`, input.TargetAgentID); err != nil {
 		return err
 	}
 	var open, perRun, lastHour int
@@ -304,7 +285,7 @@ func memberRequestLimitsTx(ctx context.Context, tx *sql.Tx, input AgentMemberReq
 		input.TargetAgentID, input.RequesterRunID, input.RequesterUserID).Scan(&open, &perRun, &lastHour); err != nil {
 		return err
 	}
-	if open >= maxOpen {
+	if open >= memberRequestMaxOpen {
 		return ErrAgentRequestBusy
 	}
 	external := strings.HasPrefix(input.RequesterRunID, ExternalAgentRequesterPrefix) || strings.HasPrefix(input.RequesterRunID, MentionRequesterPrefix)
@@ -363,7 +344,7 @@ func requireMentionMessageTx(ctx context.Context, tx *sql.Tx, input AgentMemberR
 		return err
 	}
 	if !ownerInChat {
-		return ErrAgentListingUnavailable
+		return ErrAgentNotInSpace
 	}
 	return nil
 }

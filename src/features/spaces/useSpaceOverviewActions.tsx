@@ -1,15 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowUpRight,
-  Archive,
-  MoreHorizontal,
-  Pencil,
-  Pin,
-  PinOff,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { ArrowUpRight, MoreHorizontal, Pencil, Pin, PinOff, Star, Trash2 } from "lucide-react";
 import {
   ContextMenuAction,
   DropdownMenu,
@@ -57,14 +48,10 @@ export function useSpaceOverviewActions(
     window.dispatchEvent(
       new CustomEvent(`misty:space-${kind}-event`, { detail: { space_id: spaceId } }),
     );
-    if (item.kind === "task")
-      window.dispatchEvent(
-        new CustomEvent("misty:space-coordination-event", { detail: { space_id: spaceId } }),
-      );
     refresh();
   };
   const removeLabel = (item: SpaceOverviewItem) =>
-    item.kind === "task" ? "Archive" : item.kind === "file" ? "Move to Trash" : "Delete";
+    item.kind === "file" ? "Move to Trash" : "Delete";
   const menu = (item: SpaceOverviewItem, context = false) => {
     const Action = context ? ContextMenuAction : MenuItem;
     const renameDisabled = readOnly || (!item.rename && !item.renameRoute);
@@ -114,7 +101,7 @@ export function useSpaceOverviewActions(
           }}
         />
         <Action
-          icon={item.kind === "task" ? <Archive /> : <Trash2 />}
+          icon={<Trash2 />}
           label={removeLabel(item)}
           destructive
           disabled={removeDisabled}
@@ -154,11 +141,9 @@ export function useSpaceOverviewActions(
         description={
           active.action === "rename"
             ? undefined
-            : active.item.kind === "task"
-              ? `“${active.item.title}” will be archived.`
-              : active.item.kind === "file"
-                ? `“${active.item.title}” will move to Trash, where it can be restored.`
-                : `“${active.item.title}” will be permanently deleted for everyone. This cannot be undone.`
+            : active.item.kind === "file"
+              ? `“${active.item.title}” will move to Trash, where it can be restored.`
+              : `“${active.item.title}” will be permanently deleted for everyone. This cannot be undone.`
         }
         actionLabel={active.action === "rename" ? "Save" : removeLabel(active.item)}
         onClose={() => setTarget(undefined)}

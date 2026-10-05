@@ -17,7 +17,6 @@ export interface Space {
   member_count: number;
   pending_count: number;
   is_shared: boolean;
-  permissions?: Record<string, boolean>;
   created_at: string;
   updated_at: string;
 }
@@ -36,42 +35,8 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-type SpaceIntegrationProvider = "google";
-
-interface SpaceTemplateSeedSummary {
-  task_count: number;
-  note_count: number;
-  collection_count: number;
-}
-
-/** Exactly what a template creates, shown before anything exists. */
-interface SpaceTemplateSeedPreview {
-  tasks: string[];
-  notes: string[];
-  collections: string[];
-}
-
-export interface SpaceTemplate {
-  /** Saved by the person from one of their Spaces. */
-  personal?: boolean;
-  id: string;
-  name: string;
-  description: string;
-  version: number;
-  /** A key the client maps to a monochrome glyph. */
-  icon: string;
-  /** Fills the name field until the person types their own; empty for Blank. */
-  suggested_name: string;
-  seed_summary: SpaceTemplateSeedSummary;
-  seed_preview: SpaceTemplateSeedPreview;
-}
-
 export interface CreateSpaceRequest {
   name: string;
-  template_id: string;
-  /** Copies this Space's structure instead of using a template. */
-  source_space_id?: string;
-  integration_providers: SpaceIntegrationProvider[];
 }
 
 /** Someone the person already shares a Space with. */
@@ -81,17 +46,8 @@ export interface SpacePerson {
   email: string;
 }
 
-export interface SpaceSetup {
-  selected_providers: SpaceIntegrationProvider[];
-  completed_providers: SpaceIntegrationProvider[];
-  pending_providers: SpaceIntegrationProvider[];
-}
-
 export interface CreateSpaceResult {
   space: Space;
-  setup: SpaceSetup;
-  /** The Space exists, but some starter notes could not be added. */
-  seed_incomplete?: boolean;
 }
 
 export interface SpaceInvitationPreview {

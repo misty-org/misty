@@ -98,7 +98,7 @@ func executeAgentsDirectory(ctx context.Context, database *db.Database, invocati
 	if json.Unmarshal(request.Arguments, &input) != nil {
 		return nil, agenttools.ErrArgumentsInvalid
 	}
-	listings, err := database.SpaceAgentListings(ctx, invocation.UserID, "")
+	listings, err := database.SpaceAgents(ctx, invocation.UserID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,6 @@ func executeAgentsDirectory(ctx context.Context, database *db.Database, invocati
 		items = append(items, map[string]any{
 			"agent_id": listing.AgentID, "name": listing.AgentName, "role": listing.AgentRole, "owner": listing.OwnerName,
 			"yours": listing.OwnerUserID == invocation.UserID, "space_id": listing.SpaceID, "space": listing.SpaceName,
-			"description": listing.Description, "accepting_requests": listing.AcceptPolicy != "off", "asks_owner_first": listing.AcceptPolicy == "ask",
 		})
 	}
 	return json.Marshal(map[string]any{"agents": items})
@@ -129,7 +128,7 @@ func executeAgentsRequest(ctx context.Context, database *db.Database, invocation
 	if strings.TrimSpace(invocation.RunID) == "" || strings.TrimSpace(request.ID) == "" {
 		return nil, serveragent.ErrInvalidRequest("agent_request is available only inside an agent run")
 	}
-	listings, err := database.SpaceAgentListings(ctx, invocation.UserID, "")
+	listings, err := database.SpaceAgents(ctx, invocation.UserID, "")
 	if err != nil {
 		return nil, errors.Join(db.ErrAgentToolboxNotAttempted, err)
 	}
@@ -208,13 +207,13 @@ func awaitAgentMemberRequest(ctx context.Context, database *db.Database, userID 
 	return agentRequestView(current), nil
 }
 
-func agentListingSpaceMatches(listing db.SpaceAgentListing, space string) bool {
+func agentListingSpaceMatches(listing db.SpaceAgent, space string) bool {
 	space = strings.TrimSpace(space)
 	return space == "" || listing.SpaceID == space || strings.EqualFold(strings.TrimSpace(listing.SpaceName), space)
 }
 
-func resolveAgentListing(listings []db.SpaceAgentListing, agent, space string) (db.SpaceAgentListing, error) {
-	matches := []db.SpaceAgentListing{}
+func resolveAgentListing(listings []db.SpaceAgent, agent, space string) (db.SpaceAgent, error) {
+	matches := []db.SpaceAgent{}
 	for _, listing := range listings {
 		if agentListingSpaceMatches(listing, space) && (listing.AgentID == agent || strings.EqualFold(strings.TrimSpace(listing.AgentName), agent)) {
 			matches = append(matches, listing)
@@ -224,19 +223,19 @@ func resolveAgentListing(listings []db.SpaceAgentListing, agent, space string) (
 	case 1:
 		return matches[0], nil
 	case 0:
-		return db.SpaceAgentListing{}, serveragent.ErrInvalidRequest("no agent " + strconv.Quote(agent) + " is in a Space you share; call agent_directory to see who you can ask")
+		return db.SpaceAgent{}, serveragent.ErrInvalidRequest("no agent " + strconv.Quote(agent) + " is in a Space you share; call agent_directory to see who you can ask")
 	}
 	choices := make([]string, 0, min(len(matches), 10))
 	for _, match := range matches[:min(len(matches), 10)] {
 		choices = append(choices, strconv.Quote(match.AgentName)+" by "+match.OwnerName+" in "+strconv.Quote(match.SpaceName)+" (agent "+match.AgentID+", space "+match.SpaceID+")")
 	}
-	return db.SpaceAgentListing{}, serveragent.ErrInvalidRequest("several agents match; pass agent and space ids: " + strings.Join(choices, "; "))
+	return db.SpaceAgent{}, serveragent.ErrInvalidRequest("several agents match; pass agent and space ids: " + strings.Join(choices, "; "))
 }
 
 // agentRequestError turns rejections into messages the model can act on.
-func agentRequestError(err error, target db.SpaceAgentListing) error {
+func agentRequestError(err error, target db.SpaceAgent) error {
 	switch {
-	case errors.Is(err, db.ErrAgentListingUnavailable):
+	case errors.Is(err, db.ErrAgentNotInSpace):
 		return serveragent.ErrInvalidRequest(target.AgentName + " is not accepting requests in " + target.SpaceName + " right now")
 	case errors.Is(err, db.ErrAgentRequestBusy):
 		return serveragent.ErrInvalidRequest(target.AgentName + " is busy with other requests; try again later")

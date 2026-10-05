@@ -39,10 +39,10 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceSocial>) 
 export function ChatCollection({ spaceId }: { spaceId: string }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const space = useSpacesStore((s) => s.spaces.find((x) => x.id === spaceId));
+  const referenceOnly = useSpacesStore((s) => s.referenceOnly);
   const members = useSpacesStore((s) => s.membersBySpace[spaceId]);
   const loadMembers = useSpacesStore((s) => s.loadMembers);
-  const data = useSpaceConversations(spaceId, space?.permissions?.["messages.read"] !== false);
+  const data = useSpaceConversations(spaceId);
   const creator = useSpaceItemCreator(spaceId);
   const [query, setQuery] = useState("");
   const [section, setSection] = useState("All");
@@ -143,7 +143,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            {space?.permissions?.["messages.write"] !== false && (
+            {!referenceOnly && (
               <Button variant="primary" className="px-4" onClick={() => setEditing(null)}>
                 <Plus />
                 New chat

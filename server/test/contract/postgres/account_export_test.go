@@ -2,12 +2,11 @@ package db
 
 import (
 	"encoding/json"
+	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"strings"
 	"testing"
 	"time"
-	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
-
 
 import ()
 
@@ -65,8 +64,7 @@ func TestAccountPortableExportIncludesAuthoredDataAndNoSecrets(t *testing.T) {
 		len(export.Journal) != 2 || len(export.Messages) != 1 ||
 		len(export.Assets) != 1 || export.Assets[0].Kind != "library" ||
 		len(export.Agents) != 1 || len(export.Agents[0].Versions) != 1 ||
-		len(export.Agents[0].Memberships) != 1 || export.Agents[0].SpaceID == "" ||
-		export.Agents[0].Memberships[0].SpaceID != export.Agents[0].SpaceID {
+		len(export.Agents[0].Memberships) != 1 || export.Agents[0].Memberships[0].SpaceID == "" {
 		t.Fatalf("portable export = %#v", export)
 	}
 	raw, err := json.Marshal(export)

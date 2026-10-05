@@ -20,18 +20,14 @@ import type {
   SpaceIntegration,
   SpaceInvitationPreview,
   SpaceNode,
-  SpaceSetup,
+  SpacePerson,
   SpacesSnapshot,
-  SpaceTemplate,
 } from "@/api/spaces/dto/entities";
 import { createSpaceMembersApi } from "@/api/spaces/members";
-import { createSpacePlannerExpansionApi } from "@/api/spaces/planner";
 import { createSpaceChatApi } from "./chat";
-import { createSpaceLibraryCollectionsApi } from "./library-collections";
 import { createSpaceLibraryEditsApi } from "./library-edits";
 import { createSpaceLibraryItemsApi } from "./library-items";
 import { fetchProtectedBlob } from "./library-upload";
-import { createSpaceTasksApi } from "./tasks";
 import type { SpaceRequestInit } from "./types";
 
 export class SpaceRequestError extends ApiRequestError {
@@ -170,15 +166,9 @@ function quotaReason(responseText: string): string | undefined {
 export const spacesApi = {
   snapshot: (onCached?: (value: SpacesSnapshot) => void) =>
     spaceRequest<SpacesSnapshot>("/spaces", { onCached }),
-  ...createSpacePlannerExpansionApi(spaceRequest),
-  templates: () =>
-    spaceRequest<{
-      templates: SpaceTemplate[];
-      providers?: ProviderConnectionAvailability[];
-    }>("/space-templates"),
   create: createSpaceRequest,
-  setup: (spaceId: string) =>
-    spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`),
+  /** People the person already shares a Space with. */
+  people: () => spaceRequest<{ people: SpacePerson[] }>("/me/space-people"),
   invitationPreview: (token: string) =>
     spaceRequest<SpaceInvitationPreview>(`/space-invitations/${encodeURIComponent(token)}`),
   redeemInvitation: (token: string) =>
@@ -199,7 +189,6 @@ export const spacesApi = {
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
   ...createSpaceConversationsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
-  ...createSpaceTasksApi(spaceRequest),
   integrations: (spaceId: string) =>
     spaceRequest<{
       integrations: SpaceIntegration[];
@@ -234,6 +223,5 @@ export const spacesApi = {
       allowWhileReferenceOnly: true,
     }),
   ...createSpaceLibraryItemsApi(spaceRequest),
-  ...createSpaceLibraryCollectionsApi(spaceRequest),
   ...createSpaceLibraryEditsApi(spaceRequest),
 };

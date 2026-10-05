@@ -9,8 +9,7 @@ import {
   Input,
   Separator,
 } from "@/shared/ui";
-import { Bookmark, Trash2 } from "lucide-react";
-import { SaveSpaceTemplateDialog } from "./SaveSpaceTemplateDialog";
+import { Trash2 } from "lucide-react";
 import type { SpaceSettingsController, SpaceSettingsSpace } from "./useSpaceSettingsController";
 
 export function SpaceSettingsGeneral({
@@ -34,8 +33,6 @@ export function SpaceSettingsGeneral({
     canDelete,
     leaveOpen,
     deleteOpen,
-    templateOpen,
-    setTemplateOpen,
     setLeaveOpen,
     setDeleteOpen,
     setDeleteConfirmation,
@@ -101,29 +98,6 @@ export function SpaceSettingsGeneral({
           ) : null}
         </CardContent>
       </Card>
-
-      <Card aria-labelledby="space-template-heading">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <p id="space-template-heading" className="m-0 text-sm font-medium">
-              Save as template
-            </p>
-            <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
-              Start future Spaces with this Space's tasks, note outlines and collections.
-            </p>
-          </div>
-          <Button variant="outline" type="button" onClick={() => setTemplateOpen(true)}>
-            <Bookmark className="size-4" />
-            Save as template
-          </Button>
-        </CardContent>
-      </Card>
-      <SaveSpaceTemplateDialog
-        spaceId={spaceId}
-        spaceName={space.name}
-        open={templateOpen}
-        onOpenChange={setTemplateOpen}
-      />
 
       {canDelete || canLeave ? (
         <Card className="ring-charcoal-active/20" aria-labelledby="space-danger-heading">

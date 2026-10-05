@@ -14,8 +14,10 @@ export function canManageSpaceLifecycle(
   action: "rename" | "invite" | "leave" | "delete" | "transfer",
 ): boolean {
   if (!space) return false;
+  // Owners manage the Space; everyone else may only leave it.
+  if (action === "leave") return space.role !== "owner";
   if (space.is_default && (action === "delete" || action === "transfer")) return false;
-  return space.permissions?.[`space.${action}`] !== false;
+  return space.role === "owner";
 }
 
 export function spaceNavigationName(space: Pick<Space, "name" | "is_default">): string {

@@ -63,8 +63,3 @@ export function libraryFileTypeLabel(item: SpaceLibraryItem): string {
 export function isLibraryRAW(filename: string): boolean {
   return RAW_PATTERN.test(filename);
 }
-
-/** Returns the grant token only while it is still valid, otherwise "". */
-export function activeSensitiveGrant(grant?: { token: string; expiresAt: string }): string {
-  return grant && new Date(grant.expiresAt).getTime() > Date.now() ? grant.token : "";
-}

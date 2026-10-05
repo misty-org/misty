@@ -1,59 +1,92 @@
+import { spaceAgentsApi } from "@/api/spaces/space-agents";
 import { useSpacesStore } from "@/features/spaces";
-import { Field, OptionSelect } from "@/shared/ui";
-import { useEffect, useMemo } from "react";
-
-/** The account's personal Space: its protected default, which it owns. */
-function personalSpaceId(spaces: { id: string; is_default: boolean; role: string }[]) {
-  return spaces.find((space) => space.is_default && space.role === "owner")?.id ?? "";
-}
+import { Button, Skeleton } from "@/shared/ui";
+import { Check } from "lucide-react";
+import { useEffect, useState } from "react";
 
 /**
- * Picks the one Space an agent lives in. Its files and outputs save there and
- * that Space's members can ask it for help. Misty's built-in agent stays in the
- * personal Space.
+ * The Spaces an agent is in. Anyone in a Space can @mention the agent there
+ * and ask it for work, which they pay for. It works only in that Space and
+ * never sees your private chats or apps.
  */
-export function AgentSpaceField({
-  value,
-  onChange,
-  locked,
-  moving,
-}: {
-  value: string;
-  onChange(spaceId: string): void;
-  locked: boolean;
-  /** The saved agent lives somewhere else, so saving moves it. */
-  moving: boolean;
-}) {
+export function AgentSpaceField({ agentId }: { agentId: string }) {
   const spaces = useSpacesStore((state) => state.spaces);
+  const [joined, setJoined] = useState<Set<string>>();
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
   useEffect(() => {
     if (!useSpacesStore.getState().spaces.length) void useSpacesStore.getState().load();
   }, []);
-  const personal = personalSpaceId(spaces);
-  const options = useMemo(
-    () =>
-      [...spaces]
-        .sort((a, b) => Number(b.id === personal) - Number(a.id === personal))
-        .map((space) => ({
-          value: space.id,
-          label: space.id === personal ? `${space.name} (personal)` : space.name,
-        })),
-    [personal, spaces],
-  );
-  const selected = value || personal;
-  const help = locked
-    ? "Misty always lives in your personal Space."
-    : moving
-      ? "Saving moves this agent. Files it already saved stay where they are."
-      : "Files and outputs from this agent save here, and the Space’s members can ask it for help.";
+  useEffect(() => {
+    const controller = new AbortController();
+    setJoined(undefined);
+    spaceAgentsApi
+      .mine(controller.signal)
+      .then(({ agents }) =>
+        setJoined(
+          new Set(agents.filter((item) => item.agent_id === agentId).map((item) => item.space_id)),
+        ),
+      )
+      .catch(() => !controller.signal.aborted && setError("This agent’s Spaces couldn’t load."));
+    return () => controller.abort();
+  }, [agentId]);
+  const toggle = async (spaceId: string) => {
+    if (!joined || busy) return;
+    const inSpace = joined.has(spaceId);
+    setBusy(spaceId);
+    setError("");
+    try {
+      if (inSpace) await spaceAgentsApi.remove(spaceId, agentId);
+      else await spaceAgentsApi.add(spaceId, agentId);
+      const next = new Set(joined);
+      if (inSpace) next.delete(spaceId);
+      else next.add(spaceId);
+      setJoined(next);
+    } catch {
+      setError("That change couldn’t be saved. Try again.");
+    } finally {
+      setBusy("");
+    }
+  };
   return (
-    <Field label="Space" hint={help}>
-      <OptionSelect
-        aria-label="Agent’s Space"
-        value={selected}
-        options={options}
-        disabled={locked || !options.length}
-        onValueChange={onChange}
-      />
-    </Field>
+    <section aria-label="Spaces" className="border-t border-charcoal-border pt-5">
+      <h3 className="m-0 text-sm font-medium">Spaces</h3>
+      <p className="mb-2 mt-1 text-xs text-cream-muted">
+        Anyone in these Spaces can @mention this agent and ask it for work, which they pay for. It
+        works only in that Space and never sees your private chats or apps.
+      </p>
+      {!joined && !error ? (
+        <Skeleton className="h-16 w-full" />
+      ) : (
+        <div className="grid gap-1" role="group" aria-label="Spaces this agent is in">
+          {spaces.map((space) => {
+            const checked = Boolean(joined?.has(space.id));
+            return (
+              <Button
+                key={space.id}
+                variant="ghost"
+                justify="start"
+                role="checkbox"
+                aria-checked={checked}
+                disabled={!joined || busy !== ""}
+                onClick={() => void toggle(space.id)}
+              >
+                <Check className={checked ? "" : "invisible"} />
+                <span className="truncate">
+                  {space.is_default && space.role === "owner"
+                    ? `${space.name} (personal)`
+                    : space.name}
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+      )}
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-cream-muted">
+          {error}
+        </p>
+      ) : null}
+    </section>
   );
 }

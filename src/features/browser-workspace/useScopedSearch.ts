@@ -19,7 +19,6 @@ import {
   searchEverythingInSpaces,
   searchSpaceChat,
   searchSpaceNotes,
-  searchSpaceTasks,
 } from "./scopedSources/spaceContent";
 export type { ScopedSearchResult } from "./scopedSearchSources";
 
@@ -36,7 +35,6 @@ const none: never[] = [];
 const sources: Partial<Record<SearchScope, Source>> = {
   spaces: searchEverythingInSpaces,
   notes: searchSpaceNotes,
-  tasks: searchSpaceTasks,
   chat: searchSpaceChat,
   bookmarks: searchBookmarkLibrary,
   history: searchBrowserHistory,
@@ -46,7 +44,7 @@ const sources: Partial<Record<SearchScope, Source>> = {
   extensions: searchExtensions,
 };
 
-const spaceScopes = new Set<SearchScope>(["spaces", "notes", "tasks", "chat"]);
+const spaceScopes = new Set<SearchScope>(["spaces", "notes", "chat"]);
 
 /**
  * The default scope is answered by the address bar's providers, not here.

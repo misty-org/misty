@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import type { LibraryEditDefinition } from "./common";
-import type { LibraryAssetStack, SpaceLibraryItem } from "./entities";
+import type { SpaceLibraryItem } from "./entities";
 
 export type LibraryItemMetadataPatch = Partial<
   Pick<SpaceLibraryItem, "display_name" | "caption" | "favorite" | "hidden" | "tags">
@@ -12,20 +12,10 @@ export interface LibraryItemViewerProps {
   item: SpaceLibraryItem | null;
   /** The paging set the arrow keys and chevrons walk through. */
   items: SpaceLibraryItem[];
-  /** Every loaded item, used to resolve stack members outside the paging set. */
-  allItems: SpaceLibraryItem[];
-  assetStack: LibraryAssetStack | null;
-  reauthenticationToken: string;
   canEdit: boolean;
   canCopy: boolean;
   returnFocusRef: RefObject<HTMLElement | null>;
   onCopyEdit: (definition: LibraryEditDefinition) => void;
-  onSetStackCover: (stack: LibraryAssetStack, coverItemID: string) => Promise<void>;
-  onSetStackEffect: (
-    stack: LibraryAssetStack,
-    effect: LibraryAssetStack["effect"],
-  ) => Promise<void>;
-  onUngroupStack: (stack: LibraryAssetStack) => Promise<void>;
   onClose: () => void;
   onSelect: (itemId: string) => void;
   onUpdate: (

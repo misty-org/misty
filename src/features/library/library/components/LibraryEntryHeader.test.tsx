@@ -7,12 +7,11 @@ const fixture = vi.hoisted(() => ({
   select: vi.fn(),
   restore: vi.fn(),
   picker: vi.fn(),
-  album: vi.fn(),
 }));
 vi.mock("../SpaceLibraryContext", () => ({
   useSpaceLibraryContext: () => ({
     data: fixture.data,
-    collectionActions: { selectCollection: fixture.select, openCreateAlbum: fixture.album },
+    collectionActions: { selectCollection: fixture.select },
     itemActions: { restoreItem: fixture.restore },
   }),
 }));
@@ -28,7 +27,6 @@ beforeEach(() => {
     setSearchFocused: vi.fn(),
     canUploadLibrary: true,
     canEditLibrary: true,
-    canCopyLibrary: true,
     uploadJobs: [],
     setUploadJobs: vi.fn(),
     setFilePickerOpen: fixture.picker,
@@ -70,11 +68,8 @@ it("restores a trashed item through the existing mutation", () => {
   fireEvent.click(screen.getByRole("button", { name: "Restore" }));
   expect(fixture.restore).toHaveBeenCalledWith((fixture.data.displayItems as unknown[])[0]);
 });
-it("respects upload permissions and exposes album creation separately", () => {
+it("hides upload while the Library is read-only", () => {
   fixture.data.canUploadLibrary = false;
-  fixture.data.collection = "albums";
   render(<LibraryEntryHeader />);
   expect(screen.queryByRole("button", { name: "Upload files" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "New album" }));
-  expect(fixture.album).toHaveBeenCalled();
 });

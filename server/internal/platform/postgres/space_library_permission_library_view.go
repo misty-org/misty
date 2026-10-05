@@ -34,7 +34,6 @@ const (
 	LibraryRecoveryWindow        = spaces.LibraryRecoveryWindow
 )
 
-
 // Upload purposes decide which Space permission an upload needs and which
 // maximum file size applies. The database enforces the maximum independently of
 // the API service so a misconfigured service cannot widen the limit.
@@ -61,8 +60,6 @@ func MaxUploadBytesForPurpose(purpose string) int64 { return spaces.MaxUploadByt
 func UploadPurposePermission(purpose string) (string, bool) {
 	return spaces.UploadPurposePermission(purpose)
 }
-
-var configurableSpacePermissions = spaces.ConfigurablePermissions()
 
 var (
 	ErrLibraryNotFound         = errors.New("library resource not found")

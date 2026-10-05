@@ -210,14 +210,13 @@ async function applyRealtimeEvent(
   if (accountId !== realtimeAccountId) return;
   const generation = readAccountGeneration();
   writeRealtimeCursor(accountId, event.id);
-  const permissions = get().spaces.find((space) => space.id === event.space_id)?.permissions;
   if (event.type === "apps.changed")
     window.dispatchEvent(
       new CustomEvent("misty:space-apps-changed", {
         detail: { accountId, spaceId: event.space_id },
       }),
     );
-  if (event.type.startsWith("message.") && permissions?.["messages.read"] !== false) {
+  if (event.type.startsWith("message.")) {
     const includedMessage = messageFromSpaceEvent(event);
     const conversationId =
       typeof event.payload.conversation_id === "string" ? event.payload.conversation_id : "";
@@ -240,7 +239,7 @@ async function applyRealtimeEvent(
       await coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id));
   } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
-  else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)
+  else if (event.type.startsWith("node."))
     await coalescedReload(`nodes:${event.space_id}`, () => get().loadNodes(event.space_id));
   else if (
     event.type.startsWith("member.") ||
@@ -255,20 +254,12 @@ async function applyRealtimeEvent(
     } catch (error) {
       if (!accessErrors.isInaccessibleSpaceError(error)) throw error;
     }
-  } else if (event.type.startsWith("library.") && permissions?.["library.view"] !== false)
+  } else if (event.type.startsWith("library."))
     window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
   else if (event.type.startsWith("note."))
     window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
   else if (event.type.startsWith("drawing."))
     window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
-  else if (event.type.startsWith("roadmap.") && permissions?.["tasks.view"] !== false) {
-    window.dispatchEvent(new CustomEvent("misty:space-roadmap-event", { detail: event }));
-    window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
-  } else if (
-    (event.type.startsWith("task.") || event.type.startsWith("calendar.")) &&
-    permissions?.["tasks.view"] !== false
-  )
-    window.dispatchEvent(new CustomEvent("misty:space-coordination-event", { detail: event }));
   set({ realtimeConnected: true });
 }
 

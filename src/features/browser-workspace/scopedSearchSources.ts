@@ -9,7 +9,6 @@ export type ScopedSearchKind =
   | "space"
   | "space-item"
   | "note"
-  | "task"
   | "message"
   | "agent"
   | "conversation"

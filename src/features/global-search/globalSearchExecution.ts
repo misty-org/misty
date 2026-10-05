@@ -1,12 +1,6 @@
-import { useSpacesStore } from "@/features/spaces";
 import { globalMistyError } from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
-import {
-  buildLocalIndex,
-  fuseRankedResults,
-  searchDocuments,
-  searchServerTasks,
-} from "./globalSearchDocuments";
+import { buildLocalIndex, fuseRankedResults, searchDocuments } from "./globalSearchDocuments";
 import { searchResultMatchesFilters } from "./globalSearchStoreHelpers";
 import type { GlobalSearchGet, GlobalSearchSet } from "./globalSearchStoreHelpers";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
@@ -36,14 +30,13 @@ export async function executeGlobalSearch(
     set({ searching: false });
     return;
   }
-  const spaces = useSpacesStore.getState().spaces;
   const requests: Array<Promise<GlobalSearchDocument[]>> = [];
   if (filters.source !== "device") {
     requests.push(
       globalMistyApi
         .search(trimmed, filters)
         .then((response) => response.hits)
-        .catch(() => searchServerTasks(accountId, trimmed, spaces)),
+        .catch(() => []),
     );
   }
   const settled = await Promise.allSettled(requests);

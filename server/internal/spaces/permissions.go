@@ -77,25 +77,3 @@ func UploadPurposePermission(purpose string) (string, bool) {
 		return "", false
 	}
 }
-
-var configurableSpacePermissions = []string{
-	PermissionMessagesRead, PermissionMessagesWrite,
-	PermissionLibraryView, PermissionLibraryUpload, PermissionAttachmentUpload,
-	PermissionLibraryAdd, PermissionLibraryEdit, PermissionLibraryDownload,
-	PermissionLibraryImport, PermissionStorageViewOwn, PermissionStorageViewMembers,
-	PermissionStorageManage, PermissionStudioView, PermissionStudioManage, PermissionAskRun,
-	PermissionTasksView, PermissionTasksManage, PermissionIntegrationsManage,
-}
-
-func ConfigurablePermissions() []string { return append([]string{}, configurableSpacePermissions...) }
-func ApplyPermissionDependencies(permissions map[string]bool) {
-	if !permissions[PermissionMessagesRead] {
-		permissions[PermissionMessagesWrite] = false
-	}
-	if !permissions[PermissionMessagesRead] || !permissions[PermissionMessagesWrite] {
-		permissions[PermissionAttachmentUpload] = false
-	}
-	if !permissions[PermissionTasksView] {
-		permissions[PermissionTasksManage] = false
-	}
-}

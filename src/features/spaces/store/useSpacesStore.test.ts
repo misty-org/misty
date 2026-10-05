@@ -157,7 +157,7 @@ describe("Space loading access boundary", () => {
 
   it("opens a Space without requesting content owned by optional apps", async () => {
     apiMocks.snapshot.mockResolvedValue({
-      spaces: [spaceFixture({ id: "space", permissions: { "messages.read": true } })],
+      spaces: [spaceFixture({ id: "space" })],
       invitations: [],
       limits: null,
     });

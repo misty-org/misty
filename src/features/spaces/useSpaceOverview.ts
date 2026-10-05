@@ -23,13 +23,10 @@ import {
 export type SpaceOverviewItem = {
   id: string;
   title: string;
-  area: "Chat" | "Planner" | "Journal" | "Library";
-  kind: "note" | "drawing" | "task" | "file" | "chat";
+  area: "Chat" | "Journal" | "Library";
+  kind: "note" | "drawing" | "file" | "chat";
   updatedAt: string;
   createdAt?: string;
-  dueAt?: string;
-  assigneeUserId?: string;
-  completed?: boolean;
   libraryItem?: SpaceLibraryItem;
   creatorUserId?: string;
   creatorAgentId?: string;
@@ -101,17 +98,8 @@ function useSpaceOverviewData(
   enabled: boolean,
   area?: "Journal",
 ) {
-  const canChat = !area && space.permissions?.["messages.read"] !== false;
-  const canPlan = !area && space.permissions?.["tasks.view"] !== false;
-  const canRead = !area && space.permissions?.["library.view"] !== false;
-  const scope = JSON.stringify([
-    readApiSessionGeneration(),
-    accountId,
-    space.id,
-    space.role,
-    space.permissions,
-    area,
-  ]);
+  const allAreas = !area;
+  const scope = JSON.stringify([readApiSessionGeneration(), accountId, space.id, space.role, area]);
   const [result, setResult] = useState<{
     scope: string;
     items: SpaceOverviewItem[];
@@ -168,7 +156,7 @@ function useSpaceOverviewData(
             })),
         ),
       ];
-      if (canChat)
+      if (allAreas)
         requests.push(
           spacesApi.conversations(space.id).then(({ conversations }) =>
             conversations
@@ -203,36 +191,7 @@ function useSpaceOverviewData(
               })),
           ),
         );
-      if (canPlan)
-        requests.push(
-          readAllTasks(space.id).then(({ tasks }) =>
-            tasks
-              .filter((t) => !t.archived_at)
-              .map((t) => ({
-                id: `task:${t.id}`,
-                title: t.title,
-                dueAt: t.due_at,
-                assigneeUserId: t.assignee_user_id,
-                completed: Boolean(t.completed_at) || t.status === "done",
-                area: "Planner",
-                kind: "task",
-                creatorUserId: t.created_by_user_id,
-                creatorAgentId: t.created_by_agent_id,
-                createdAt: t.created_at,
-                updatedAt: t.updated_at,
-                route: `${base}/planner/tasks/list?task=${encodeURIComponent(t.id)}`,
-                rename:
-                  space.role === "owner" || space.permissions?.["tasks.manage"] === true
-                    ? (title: string) => spacesApi.updateTask(space.id, t, { title })
-                    : undefined,
-                remove:
-                  space.role === "owner" || space.permissions?.["tasks.manage"] === true
-                    ? () => spacesApi.archiveTask(space.id, t)
-                    : undefined,
-              })),
-          ),
-        );
-      if (canRead)
+      if (allAreas)
         requests.push(
           Promise.all([
             readAllLibraryItems(space.id),
@@ -259,15 +218,9 @@ function useSpaceOverviewData(
                 createdAt: i.added_at,
                 updatedAt: i.updated_at,
                 route: `${base}/library?item=${encodeURIComponent(i.id)}`,
-                rename:
-                  space.permissions?.["library.edit"] !== false
-                    ? (title: string) =>
-                        spacesApi.updateLibraryItem(space.id, i, { display_name: title })
-                    : undefined,
-                remove:
-                  space.permissions?.["library.edit"] !== false
-                    ? () => spacesApi.trashLibraryItem(space.id, i.id)
-                    : undefined,
+                rename: (title: string) =>
+                  spacesApi.updateLibraryItem(space.id, i, { display_name: title }),
+                remove: () => spacesApi.trashLibraryItem(space.id, i.id),
               })),
           ),
         );
@@ -276,7 +229,7 @@ function useSpaceOverviewData(
       const items: SpaceOverviewItem[] = results.flatMap((r) =>
         r.status === "fulfilled" ? r.value : [],
       );
-      if (canChat)
+      if (allAreas)
         items.push({
           id: "chat:everyone",
           title: "Everyone",
@@ -297,7 +250,6 @@ function useSpaceOverviewData(
       "misty:refresh-focused-tool",
       "misty:space-note-event",
       "misty:space-drawing-event",
-      "misty:space-task-event",
       "misty:space-library-event",
       "misty:space-conversation-event",
     ];
@@ -306,18 +258,7 @@ function useSpaceOverviewData(
       active = false;
       events.forEach((name) => window.removeEventListener(name, refresh));
     };
-  }, [
-    scope,
-    enabled,
-    accountId,
-    space.id,
-    space.role,
-    space.permissions,
-    canChat,
-    canPlan,
-    canRead,
-    attempt,
-  ]);
+  }, [scope, enabled, accountId, space.id, space.role, allAreas, attempt]);
   return {
     items: result?.scope === scope ? result.items : [],
     loading: result?.scope !== scope,
@@ -326,19 +267,6 @@ function useSpaceOverviewData(
   };
 }
 
-async function readAllTasks(spaceId: string) {
-  const tasks: Awaited<ReturnType<typeof spacesApi.tasks>>["tasks"] = [];
-  let cursor: string | undefined;
-  const seen = new Set<string>();
-  do {
-    const page = await spacesApi.tasks(spaceId, { sort: "updated", limit: 200, cursor });
-    tasks.push(...page.tasks);
-    cursor = page.next_cursor;
-    if (cursor && seen.has(cursor)) throw new Error("Task pagination did not advance");
-    if (cursor) seen.add(cursor);
-  } while (cursor);
-  return { tasks };
-}
 async function readAllLibraryItems(spaceId: string) {
   const items: SpaceLibraryItem[] = [];
   let after: string | undefined;

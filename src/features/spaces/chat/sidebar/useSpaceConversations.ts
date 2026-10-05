@@ -7,13 +7,13 @@ import { useCallback, useEffect, useState } from "react";
  * The Space's conversations for the chat sidebar, kept in step with realtime events.
  * Fetched rather than read from the Spaces store, which only snapshots membership.
  */
-export function useSpaceConversations(spaceId: string, readable: boolean) {
+export function useSpaceConversations(spaceId: string) {
   const scope = `${readApiSessionGeneration()}:${spaceId}`;
   const [snapshot, setSnapshot] = useState<{ scope: string; items: SpaceConversation[] }>({
     scope,
     items: [],
   });
-  const conversations = readable && snapshot.scope === scope ? snapshot.items : [];
+  const conversations = snapshot.scope === scope ? snapshot.items : [];
   const setConversations = useCallback(
     (update: SpaceConversation[] | ((items: SpaceConversation[]) => SpaceConversation[])) =>
       setSnapshot((current) => ({
@@ -37,10 +37,6 @@ export function useSpaceConversations(spaceId: string, readable: boolean) {
     [spaceId],
   );
   useEffect(() => {
-    if (!readable) {
-      setConversations([]);
-      return;
-    }
     let active = true;
     setLoading(true);
     setError("");
@@ -62,7 +58,7 @@ export function useSpaceConversations(spaceId: string, readable: boolean) {
       active = false;
       window.removeEventListener("misty:space-conversation-event", onEvent);
     };
-  }, [readable, reload, spaceId, revision, setConversations]);
+  }, [reload, spaceId, revision, setConversations]);
   const upsert = (saved: SpaceConversation) =>
     setConversations((current) =>
       current.some((item) => item.id === saved.id)
@@ -73,7 +69,7 @@ export function useSpaceConversations(spaceId: string, readable: boolean) {
     setConversations((current) => current.filter((item) => item.id !== conversationId));
   return {
     conversations,
-    loading: readable && (loading || snapshot.scope !== scope),
+    loading: loading || snapshot.scope !== scope,
     error,
     retry: () => setRevision((value) => value + 1),
     upsert,

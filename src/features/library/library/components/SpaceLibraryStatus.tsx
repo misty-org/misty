@@ -7,9 +7,8 @@ import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";
 
 export function SpaceLibraryInlineStatus() {
-  const { data, itemActions, collectionActions } = useSpaceLibraryContext();
+  const { data, itemActions } = useSpaceLibraryContext();
   const {
-    canCopyLibrary,
     canEditLibrary,
     searchFocused,
     selectedItems,
@@ -19,19 +18,12 @@ export function SpaceLibraryInlineStatus() {
     localError,
   } = data;
   const { appendSearchFacet, copyItemsToClipboard, applyBulkAction } = itemActions;
-  const { selectCollection } = collectionActions;
 
   return (
     <>
-      {searchFocused ? (
-        <SpaceLibraryFacetSuggestions
-          onSelectCollection={selectCollection}
-          onAppendFacet={appendSearchFacet}
-        />
-      ) : null}
+      {searchFocused ? <SpaceLibraryFacetSuggestions onAppendFacet={appendSearchFacet} /> : null}
       {selectedItems.length > 0 ? (
         <SpaceLibrarySelectionToolbar
-          canCopy={canCopyLibrary}
           canEdit={canEditLibrary}
           bulkSaving={bulkSaving}
           collection={collection}
@@ -40,15 +32,9 @@ export function SpaceLibraryInlineStatus() {
           onFavorite={() =>
             void applyBulkAction(collection === "favorites" ? "unfavorite" : "favorite")
           }
-          onRemoveFromAlbum={() =>
-            void applyBulkAction("remove_from_album", {
-              albumId: data.selectedCollectionId,
-            })
-          }
           onRestore={() => void applyBulkAction("restore")}
           onTrash={() => void applyBulkAction("trash")}
           onClear={() => setSelectedItemIds([])}
-          showRemoveFromAlbum={collection === "albums" && Boolean(data.selectedCollectionId)}
         />
       ) : null}
       {localError ? (
@@ -64,19 +50,15 @@ export function SpaceLibraryInlineStatus() {
 
 function SpaceLibraryFacetSuggestions({
   onAppendFacet,
-  onSelectCollection,
 }: {
-  onAppendFacet: (key: "tag" | "type" | "album" | "year", value: string) => void;
-  onSelectCollection: (collection: "utility", id: string) => void;
+  onAppendFacet: (key: "tag" | "type" | "year", value: string) => void;
 }) {
   const { data } = useSpaceLibraryContext();
   const { searchFacets } = data;
   const hasFacets =
     searchFacets.tags.length > 0 ||
     searchFacets.media_types.length > 0 ||
-    searchFacets.years.length > 0 ||
-    searchFacets.albums.length > 0 ||
-    searchFacets.utilities.length > 0;
+    searchFacets.years.length > 0;
 
   if (!hasFacets) return null;
 
@@ -99,13 +81,6 @@ function SpaceLibraryFacetSuggestions({
           onSelect={(facet) => onAppendFacet("tag", facet.value)}
         />
       ) : null}
-      {searchFacets.albums.length > 0 ? (
-        <LibraryFacetGroup
-          label="Albums"
-          facets={searchFacets.albums}
-          onSelect={(facet) => onAppendFacet("album", facet.label)}
-        />
-      ) : null}
       {searchFacets.years.length > 0 ? (
         <LibraryFacetGroup
           label="Years"
@@ -113,40 +88,27 @@ function SpaceLibraryFacetSuggestions({
           onSelect={(facet) => onAppendFacet("year", facet.value)}
         />
       ) : null}
-      {searchFacets.utilities.length > 0 ? (
-        <LibraryFacetGroup
-          label="Utilities"
-          facets={searchFacets.utilities}
-          onSelect={(facet) => onSelectCollection("utility", facet.value)}
-        />
-      ) : null}
     </div>
   );
 }
 
 function SpaceLibrarySelectionToolbar({
-  canCopy,
   canEdit,
   bulkSaving,
   collection,
   selectedCount,
-  showRemoveFromAlbum,
   onCopy,
   onFavorite,
-  onRemoveFromAlbum,
   onRestore,
   onTrash,
   onClear,
 }: {
-  canCopy: boolean;
   canEdit: boolean;
   bulkSaving: boolean;
   collection: string;
   selectedCount: number;
-  showRemoveFromAlbum: boolean;
   onCopy: () => void;
   onFavorite: () => void;
-  onRemoveFromAlbum: () => void;
   onRestore: () => void;
   onTrash: () => void;
   onClear: () => void;
@@ -154,7 +116,7 @@ function SpaceLibrarySelectionToolbar({
   return (
     <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl bg-charcoal-card px-3 py-2">
       <span className="mr-1 text-xs font-medium">{selectedCount} selected</span>
-      {canCopy && collection !== "deleted" ? (
+      {collection !== "deleted" ? (
         <Button size="sm" variant="outline" type="button" disabled={bulkSaving} onClick={onCopy}>
           <ClipboardCopy size={12} />
           Copy
@@ -183,17 +145,6 @@ function SpaceLibrarySelectionToolbar({
               <Star size={12} />
               {collection === "favorites" ? "Unfavorite" : "Favorite"}
             </Button>
-            {showRemoveFromAlbum ? (
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                disabled={bulkSaving}
-                onClick={onRemoveFromAlbum}
-              >
-                Remove from album
-              </Button>
-            ) : null}
             <Button
               size="sm"
               variant="outline"

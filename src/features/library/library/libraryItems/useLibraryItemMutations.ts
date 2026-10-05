@@ -9,7 +9,7 @@ export type LibraryItemPatch = Partial<
 
 /** Single-item edits, trashing and restoring, plus grid selection helpers. */
 export function useLibraryItemMutations(data: SpaceLibraryData) {
-  const { spaceId, canEditLibrary, collection, sensitiveCollectionToken } = data;
+  const { spaceId, canEditLibrary, collection } = data;
   const { setItems, setVisibleItems, setSelectedItemId, setSelectedItemIds } = data;
   const { setSearchInput, setLocalError } = data;
 
@@ -25,21 +25,13 @@ export function useLibraryItemMutations(data: SpaceLibraryData) {
 
   /**
    * Saves a patch and drops the item from view if it no longer belongs there —
-   * unfavouriting inside Favorites, or unhiding inside Hidden.
+   * unfavouriting inside Favorites.
    */
   const updateItem = async (item: SpaceLibraryItem, patch: LibraryItemPatch) => {
     if (!canEditLibrary) return null;
     try {
-      const saved = await spacesApi.updateLibraryItem(
-        spaceId,
-        item,
-        patch,
-        sensitiveCollectionToken,
-      );
-      const remainsVisible =
-        collection === "hidden"
-          ? saved.hidden
-          : !saved.hidden && (collection !== "favorites" || saved.favorite);
+      const saved = await spacesApi.updateLibraryItem(spaceId, item, patch);
+      const remainsVisible = collection !== "favorites" || saved.favorite;
       if (remainsVisible) replaceItem(saved);
       else removeFromLists(saved.id);
       return saved;
@@ -53,7 +45,7 @@ export function useLibraryItemMutations(data: SpaceLibraryData) {
     if (!canEditLibrary) return false;
     if (!(await confirmAction(`Move “${item.display_name}” to Recently Deleted?`))) return false;
     try {
-      await spacesApi.trashLibraryItem(spaceId, item.id, sensitiveCollectionToken);
+      await spacesApi.trashLibraryItem(spaceId, item.id);
       removeFromLists(item.id);
       setSelectedItemId("");
       return true;
@@ -70,7 +62,7 @@ export function useLibraryItemMutations(data: SpaceLibraryData) {
   const restoreItem = async (item: SpaceLibraryItem) => {
     if (!canEditLibrary) return;
     try {
-      await spacesApi.restoreLibraryItem(spaceId, item.id, sensitiveCollectionToken);
+      await spacesApi.restoreLibraryItem(spaceId, item.id);
       removeFromLists(item.id);
       setSelectedItemId("");
     } catch (error) {
@@ -84,7 +76,7 @@ export function useLibraryItemMutations(data: SpaceLibraryData) {
     );
 
   /** Appends `key:value` to the search box, quoting values that contain spaces. */
-  const appendSearchFacet = (key: "tag" | "type" | "album" | "year", value: string) => {
+  const appendSearchFacet = (key: "tag" | "type" | "year", value: string) => {
     const escapedValue = /\s/.test(value) ? `"${value.replace(/"/g, "")}"` : value;
     setSearchInput((current) => `${current.trim()} ${key}:${escapedValue}`.trim());
   };

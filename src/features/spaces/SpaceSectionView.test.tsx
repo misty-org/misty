@@ -3,9 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { SpaceSectionView } from "./SpaceSectionView";
 const state = vi.hoisted(() => ({
-  spaces: [
-    { id: "family", name: "Family", role: "member", permissions: {} as Record<string, boolean> },
-  ],
+  spaces: [{ id: "family", name: "Family", role: "member" }],
   snapshotReady: true,
   loading: false,
   error: null,
@@ -48,7 +46,6 @@ vi.mock("./chat/SpaceChatEntry", async () => {
 vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
 afterEach(() => {
   cleanup();
-  state.spaces[0].permissions = {};
 });
 it.each([
   ["home", "Chat"],

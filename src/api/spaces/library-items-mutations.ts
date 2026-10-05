@@ -2,7 +2,6 @@ import type { BulkLibraryItemAction } from "@/api/spaces/dto/common";
 import type {
   BulkLibraryItemOptions,
   LibraryItemsResult,
-  LibrarySharedReference,
   SpaceLibraryItem,
 } from "@/api/spaces/dto/entities";
 
@@ -75,39 +74,10 @@ export function createLibraryItemMutationApi(spaceRequest: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/restore`,
         { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) },
       ),
-    setLibraryProviderImport: (
-      spaceId: string,
-      itemId: string,
-      source: {
-        provider: string;
-        remoteName: string;
-        remotePath: string;
-        connectionId?: string;
-        connectionSource?: "connected_account" | "legacy_cloud";
-      },
-    ) =>
-      spaceRequest<SpaceLibraryItem>(
-        `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/provider-import`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            provider: source.provider,
-            remote_name: source.remoteName,
-            remote_path: source.remotePath,
-            connection_id: source.connectionId ?? "",
-            connection_source: source.connectionSource ?? "device_remote",
-          }),
-        },
-      ),
     promoteAttachment: (spaceId: string, attachmentId: string) =>
       spaceRequest<SpaceLibraryItem>(
         `/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/promote`,
         { method: "POST" },
-      ),
-    revokeLibraryGrant: (spaceId: string, grant: LibrarySharedReference) =>
-      spaceRequest(
-        `/spaces/${encodeURIComponent(spaceId)}/library/grants/${encodeURIComponent(grant.grant_id)}?version=${grant.version}`,
-        { method: "DELETE" },
       ),
   };
 }

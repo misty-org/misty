@@ -1,10 +1,8 @@
-import type { Space } from "@/api/spaces/dto/entities";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpaceSectionNavigation } from "../components/SpaceSectionNavigation";
-import { useSpacesStore } from "../store/useSpacesStore";
 
 describe("SpaceSectionNavigation", () => {
   let container: HTMLDivElement;
@@ -21,183 +19,45 @@ describe("SpaceSectionNavigation", () => {
 
   afterEach(async () => {
     await act(async () => root.unmount());
-    useSpacesStore.setState({ spaces: [] });
     container.remove();
   });
 
-  it("renders the complete Space work surface menu vertically", async () => {
-    useSpacesStore.setState({ spaces: [spaceFixture()] });
-
+  async function renderAt(section: string) {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/library"]}>
-          <SpaceSectionNavigation spaceId="space-1" section="library" />
+        <MemoryRouter initialEntries={[`/spaces/space-1/${section}`]}>
+          <SpaceSectionNavigation spaceId="space-1" section={section} />
         </MemoryRouter>,
       );
     });
+    return [...container.querySelectorAll("a")];
+  }
 
-    const links = [...container.querySelectorAll("a")];
+  it("lists every primitive to every member", async () => {
+    const links = await renderAt("library");
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Chat",
-      "Planner",
-      "Journal",
-      "Library",
+      "Notes",
+      "Drawings",
+      "Files",
     ]);
     expect(container.querySelector("nav")?.className).toContain("grid");
-    expect(container.querySelector("nav")?.className).not.toContain("overflow-x-auto");
-    expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Library");
-    expect(links.find((link) => link.textContent?.trim() === "Planner")?.getAttribute("href")).toBe(
-      "/spaces/space-1/planner",
-    );
-  });
-
-  it("hides inaccessible sections", async () => {
-    useSpacesStore.setState({
-      spaces: [
-        spaceFixture({
-          permissions: {
-            "messages.read": false,
-            "tasks.view": false,
-            "library.view": true,
-          },
-        }),
-      ],
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/library"]}>
-          <SpaceSectionNavigation spaceId="space-1" section="library" />
-        </MemoryRouter>,
-      );
-    });
-
-    const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Journal", "Library"]);
+    expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Files");
+    expect(
+      links.find((link) => link.textContent?.trim() === "Drawings")?.getAttribute("href"),
+    ).toBe("/spaces/space-1/drawings");
   });
 
   it("keeps Space management out of the section menu", async () => {
-    useSpacesStore.setState({ spaces: [spaceFixture()] });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
-          <SpaceSectionNavigation spaceId="space-1" section="chat" />
-        </MemoryRouter>,
-      );
-    });
-
-    const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
+    const labels = (await renderAt("social")).map((link) => link.textContent?.trim());
     expect(labels).not.toContain("Members");
     expect(labels).not.toContain("Settings");
   });
 
-  it("hides Library when access is denied", async () => {
-    useSpacesStore.setState({
-      spaces: [spaceFixture({ permissions: { "library.view": false } })],
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
-          <SpaceSectionNavigation spaceId="space-1" section="chat" />
-        </MemoryRouter>,
-      );
-    });
-
-    const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toContain("Journal");
-    expect(labels).not.toContain("Library");
-  });
-
-  it("keeps Journal and Social when Planner and Library are denied", async () => {
-    useSpacesStore.setState({
-      spaces: [
-        spaceFixture({
-          id: "restricted",
-          permissions: {
-            "messages.read": true,
-            "tasks.view": false,
-            "library.view": false,
-          },
-        }),
-      ],
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/restricted/notes"]}>
-          <SpaceSectionNavigation spaceId="restricted" section="notes" />
-        </MemoryRouter>,
-      );
-    });
-
-    expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Chat",
-      "Journal",
-    ]);
-  });
-
-  it("shows every permitted work surface", async () => {
-    useSpacesStore.setState({
-      spaces: [
-        spaceFixture({
-          id: "space-full",
-          permissions: {
-            "messages.read": true,
-            "tasks.view": true,
-            "library.view": true,
-            "space.invite": true,
-          },
-        }),
-      ],
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/space-full/notes"]}>
-          <SpaceSectionNavigation spaceId="space-full" section="notes" />
-        </MemoryRouter>,
-      );
-    });
-
-    expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Chat",
-      "Planner",
-      "Journal",
-      "Library",
-    ]);
-  });
-
-  it("treats Notes and Drawings as Journal destinations", async () => {
-    useSpacesStore.setState({ spaces: [spaceFixture()] });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/drawings"]}>
-          <SpaceSectionNavigation spaceId="space-1" section="drawings" />
-        </MemoryRouter>,
-      );
-    });
-
+  it("marks Drawings on its own", async () => {
+    await renderAt("drawings");
     const active = container.querySelector('a[aria-current="page"]');
-    expect(active?.textContent).toContain("Journal");
-    expect(active?.getAttribute("href")).toBe("/spaces/space-1/notes");
+    expect(active?.textContent).toContain("Drawings");
+    expect(active?.getAttribute("href")).toBe("/spaces/space-1/drawings");
   });
 });
-
-function spaceFixture(patch: Partial<Space> = {}): Space {
-  return {
-    id: "space-1",
-    is_default: false,
-    owner_user_id: "owner",
-    name: "Design team",
-    role: "owner",
-    member_count: 1,
-    pending_count: 0,
-    is_shared: true,
-    created_at: "2026-07-19T00:00:00Z",
-    updated_at: "2026-07-19T00:00:00Z",
-    ...patch,
-  };
-}

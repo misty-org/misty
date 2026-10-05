@@ -193,7 +193,7 @@ describe("Spaces realtime account lifecycle", () => {
       const listener = vi.fn();
       apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-ticket", expires_in: 60 });
       useSpacesStore.setState({
-        spaces: [spaceFixture({ id: "space", permissions: { "library.view": true } })],
+        spaces: [spaceFixture({ id: "space" })],
       });
       window.addEventListener("misty:space-library-event", listener);
 
@@ -233,26 +233,6 @@ describe("Spaces realtime account lifecycle", () => {
     },
   );
 
-  it("does not announce Library events when Library visibility is denied", async () => {
-    const listener = vi.fn();
-    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-denied-ticket", expires_in: 60 });
-    useSpacesStore.setState({
-      spaces: [spaceFixture({ id: "space", permissions: { "library.view": false } })],
-    });
-    window.addEventListener("misty:space-library-event", listener);
-
-    await useSpacesStore.getState().connectRealtime("active-account");
-    FakeWebSocket.instances[0].open();
-    FakeWebSocket.instances[0].message({
-      type: "event",
-      event: spaceEventFixture({ type: "library.item.updated" }),
-    });
-    await Promise.resolve();
-
-    expect(listener).not.toHaveBeenCalled();
-    window.removeEventListener("misty:space-library-event", listener);
-  });
-
   it("does not reload members for realtime events from inaccessible spaces", async () => {
     apiMocks.realtimeTicket.mockResolvedValue({ ticket: "member-ticket", expires_in: 60 });
     apiMocks.snapshot.mockResolvedValue({ spaces: [], invitations: [], limits: null });
@@ -287,7 +267,7 @@ describe("Spaces realtime account lifecycle", () => {
     });
     apiMocks.realtimeTicket.mockResolvedValue({ ticket: "message-ticket", expires_in: 60 });
     useSpacesStore.setState({
-      spaces: [spaceFixture({ id: "space", permissions: { "messages.read": true } })],
+      spaces: [spaceFixture({ id: "space" })],
       messagesBySpace: { space: [optimistic] },
     });
 

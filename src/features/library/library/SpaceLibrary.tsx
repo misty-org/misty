@@ -3,21 +3,13 @@ import {
   useLibraryAi as useAiSurfaceAdapter,
   useLibraryTitle as useWorkspaceViewTitle,
 } from "./LibraryRuntime";
-import { CollectionPage, ComingSoonSurface } from "@/shared/ui";
+import { CollectionPage } from "@/shared/ui";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
 import { SpaceLibraryInlineStatus } from "./components/SpaceLibraryStatus";
 import { LibraryEntryHeader } from "./components/LibraryEntryHeader";
-import { AlbumsIndex } from "./librarySurfaces/AlbumsIndex";
-import { DateGroupIndex } from "./librarySurfaces/DateGroupIndex";
-import { DuplicatesIndex } from "./librarySurfaces/DuplicatesIndex";
-import { ImportHistoryIndex } from "./librarySurfaces/ImportHistoryIndex";
-import { LibraryCollectionHeader } from "./librarySurfaces/LibraryCollectionHeader";
 import { LibraryItemsRegion } from "./librarySurfaces/LibraryItemsRegion";
-import { MemoryControls } from "./librarySurfaces/MemoryControls";
-import { SharedReferencesIndex } from "./librarySurfaces/SharedReferencesIndex";
 import { SpaceLibraryProvider } from "./SpaceLibraryContext";
 import { LibraryCanEditContext } from "./SpaceLibraryPrimitives";
 import { useSpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionActions";
@@ -67,26 +59,12 @@ export function SpaceLibrary({
         {
           id: "library-synthesize",
           label: "Synthesize",
-          prompt:
-            "Synthesize the selected Library items from their authorized metadata and available intelligence. Cite each item used.",
-        },
-        {
-          id: "library-organize",
-          label: "Organize",
-          prompt:
-            "Suggest tags, captions, groupings, and album organization for the selected items. Do not change metadata.",
+          prompt: "Synthesize the selected files. Cite each file used.",
         },
         {
           id: "library-compare",
           label: "Compare",
-          prompt:
-            "Compare the selected items, noting relationships, duplicates, and meaningful differences.",
-        },
-        {
-          id: "library-find-related",
-          label: "Find related",
-          prompt:
-            "Describe semantic searches that would find related Library items and explain why.",
+          prompt: "Compare the selected files, noting relationships and meaningful differences.",
         },
       ],
     };
@@ -107,9 +85,6 @@ export function SpaceLibrary({
     });
     if (canUploadLibrary) setFilePickerOpen(true);
   }, [canUploadLibrary, searchParams, setFilePickerOpen, setSearchParams]);
-  if (data.collection === "memory") {
-    return <ComingSoonSurface feature="Library memories" />;
-  }
   return (
     <SpaceLibraryProvider
       value={{
@@ -124,14 +99,6 @@ export function SpaceLibrary({
             <LibraryEntryHeader />
             <SpaceLibraryInlineStatus />
             <div className="min-h-0">
-              <DateGroupIndex />
-              {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
-              <AlbumsIndex />
-              <ImportHistoryIndex />
-              <SharedReferencesIndex />
-              <DuplicatesIndex />
-              <LibraryCollectionHeader />
-              <MemoryControls />
               <LibraryItemsRegion />
             </div>
           </>
@@ -141,25 +108,10 @@ export function SpaceLibrary({
     </SpaceLibraryProvider>
   );
 }
-const collectionTitles: Partial<Record<string, string>> = {
+const collectionTitles: Record<string, string> = {
   recent: "Library",
-  months: "Months",
-  years: "Years",
-  "recent-days": "Recent days",
-  utility: "Utilities",
-  collections: "Collections",
   favorites: "Favorites",
-  hidden: "Hidden",
   deleted: "Recently deleted",
-  people: "People",
-  albums: "Albums",
-  groups: "Groups",
-  memory: "Memories",
-  trip: "Trips",
-  map: "Map",
-  duplicate: "Duplicates",
-  shared: "Shared references",
-  imports: "Imports",
 };
 function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): string {
   const displayItems = data.displayItems ?? [];
@@ -169,14 +121,5 @@ function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): st
   if (selectedItems.length === 1 && selectedItems[0].display_name.trim()) {
     return selectedItems[0].display_name.trim();
   }
-  return (
-    data.currentAlbum?.name?.trim() ||
-    data.currentAlbumFolder?.name?.trim() ||
-    data.currentGroup?.name?.trim() ||
-    data.currentPerson?.name?.trim() ||
-    data.currentDiscoveryGroup?.title?.trim() ||
-    data.currentDateGroup?.title?.trim() ||
-    collectionTitles[data.collection] ||
-    "Library"
-  );
+  return collectionTitles[data.collection] || "Library";
 }

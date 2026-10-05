@@ -33,14 +33,6 @@ export const mistyBangs: readonly ScopeBang[] = [
     placeholder: "Search your notes",
   }),
   scope({
-    trigger: "tasks",
-    aliases: ["task", "planner"],
-    scope: "tasks",
-    label: "Tasks",
-    description: "Planner tasks in your spaces",
-    placeholder: "Search your tasks",
-  }),
-  scope({
     trigger: "chat",
     aliases: ["c"],
     scope: "chat",

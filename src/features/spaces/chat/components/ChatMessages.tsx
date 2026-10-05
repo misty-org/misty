@@ -20,8 +20,6 @@ export interface SpaceChatMessagesProps {
   editSaving: boolean;
   nodes: SpaceNode[];
   libraryItems: SpaceLibraryItem[];
-  canCopyLibrary: boolean;
-  canAddToLibrary: boolean;
   spaceId: string;
   endRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;

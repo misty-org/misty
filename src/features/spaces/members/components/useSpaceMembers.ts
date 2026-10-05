@@ -27,7 +27,7 @@ export function useSpaceMembers(spaceId: string) {
   const members = store.membersBySpace[spaceId] ?? emptyMembers;
   const [membersLoading] = useMinimumSpin(store.loading && members.length === 0);
   const owner = space?.role === "owner";
-  const canManageMembers = space?.permissions?.["space.invite"] === true || owner;
+  const canManageMembers = owner;
 
   const loadPendingInvitations = useCallback(async () => {
     if (!canManageMembers) {

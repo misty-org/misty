@@ -1,5 +1,8 @@
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpaceMember } from "@/api/spaces/dto/entities";
+import type { SpaceAgent } from "@/api/spaces/space-agents";
+import { SpaceAgentRow } from "../agents/SpaceAgentRow";
+import { agentsByOwner } from "../agents/useSpaceAgentMembers";
 import type { MemberAction } from "./SpaceMembers";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
@@ -17,72 +20,82 @@ import {
   Skeleton,
 } from "@/shared/ui";
 import { Ellipsis, Mail, ShieldCheck, Trash2, Users } from "lucide-react";
-import { MemberPermissionControls } from "./MemberPermissionControls";
 
 const rowClass = "flex min-h-[72px] min-w-0 items-center gap-3 px-4 py-3";
 
+/** Each person in the Space, with the agents they brought under them. */
 export function MemberList({
   members,
+  agents,
   loading,
   owner,
   canTransferOwnership,
   currentUserId,
   onAction,
+  onRemoveAgent,
 }: {
   members: SpaceMember[];
+  agents: SpaceAgent[] | undefined;
   loading: boolean;
   owner: boolean;
   canTransferOwnership: boolean;
   currentUserId: string | undefined;
   onAction: (action: MemberAction) => void;
+  onRemoveAgent: (agentId: string) => void;
 }) {
+  const byOwner = agentsByOwner(agents);
   return (
     <Card className="overflow-hidden" aria-label="Space members">
       {loading ? (
         <MemberListSkeleton />
       ) : (
         members.map((member, index) => (
-          <div
-            className={`group ${rowClass} transition-colors hover:bg-charcoal-card ${index ? "border-t border-charcoal-border/60" : ""}`}
-            key={member.user_id}
-          >
-            <Avatar className="size-10 shrink-0">
-              <AvatarFallback
-                className={cn(
-                  "text-xs font-semibold",
-                  avatarColorClass(member.user_id),
-                  avatarInkClass,
-                )}
-              >
-                {personInitials(member.name)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
-                {member.user_id === currentUserId ? <Badge variant="secondary">You</Badge> : null}
+          <div className={index ? "border-t border-charcoal-border/60" : ""} key={member.user_id}>
+            <div className={`group ${rowClass} transition-colors hover:bg-charcoal-card`}>
+              <Avatar className="size-10 shrink-0">
+                <AvatarFallback
+                  className={cn(
+                    "text-xs font-semibold",
+                    avatarColorClass(member.user_id),
+                    avatarInkClass,
+                  )}
+                >
+                  {personInitials(member.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
+                  {member.user_id === currentUserId ? <Badge variant="secondary">You</Badge> : null}
+                </div>
+                <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
+                  <Mail className="size-3 shrink-0" /> {member.email}
+                </p>
               </div>
-              <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
-                <Mail className="size-3 shrink-0" /> {member.email}
-              </p>
+              <Badge className="hidden capitalize sm:inline-flex" variant="outline">
+                {member.role}
+              </Badge>
+              {owner && member.role !== "owner" ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  <MemberActionsMenu
+                    member={member}
+                    canTransferOwnership={canTransferOwnership}
+                    onAction={onAction}
+                  />
+                </div>
+              ) : null}
             </div>
-            <Badge className="hidden capitalize sm:inline-flex" variant="outline">
-              {member.role}
-            </Badge>
-            {owner && member.role !== "owner" ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <MemberPermissionControls
-                  spaceId={member.space_id}
-                  userId={member.user_id}
-                  memberName={member.name}
-                />
-                <MemberActionsMenu
-                  member={member}
-                  canTransferOwnership={canTransferOwnership}
-                  onAction={onAction}
-                />
-              </div>
-            ) : null}
+            {(byOwner.get(member.user_id) ?? []).map((agent) => (
+              <SpaceAgentRow
+                key={agent.agent_id}
+                agent={agent}
+                onRemove={
+                  owner || agent.owner_user_id === currentUserId
+                    ? () => onRemoveAgent(agent.agent_id)
+                    : undefined
+                }
+              />
+            ))}
           </div>
         ))
       )}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import type { Space } from "@/api/spaces/dto/entities";
-import { appIcons, Button, WorkspaceSectionLabel, SkeletonList } from "@/shared/ui";
+import { Button, WorkspaceSectionLabel, SkeletonList } from "@/shared/ui";
 import { Images, MessagesSquare, Notebook, PencilRuler } from "lucide-react";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 import { useSpaceOverview } from "../useSpaceOverview";
@@ -27,7 +27,6 @@ export function SpaceRecentNavigation({
     .filter((item) => item.opened_at && byId.has(item.item_key))
     .sort((a, b) => Date.parse(b.opened_at!) - Date.parse(a.opened_at!));
   const icons = {
-    task: appIcons.planner,
     file: Images,
     chat: MessagesSquare,
     drawing: PencilRuler,

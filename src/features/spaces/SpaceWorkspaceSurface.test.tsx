@@ -5,7 +5,7 @@ import type { WorkspaceView } from "@/features/workspace/core";
 import { SpaceWorkspaceSurface } from "./SpaceWorkspaceSurface";
 const state = vi.hoisted(() => ({
   user: { id: "one" } as { id: string } | null,
-  spaces: [{ id: "project", name: "Project", permissions: {} as Record<string, boolean> }],
+  spaces: [{ id: "project", name: "Project" }],
   snapshotReady: true,
   error: null as string | null,
   load: vi.fn(),

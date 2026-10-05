@@ -30,8 +30,8 @@ type agentToolboxOptions struct {
 	browserCapabilities map[string]bool
 	// delegation registers agent.background for runs that may start a worker.
 	delegation agenttools.Handler
-	// memberRequest builds the toolbox for work another member's agent asked
-	// for: Space data only, without the owner's memory or agent settings.
+	// memberRequest builds the toolbox for work someone else asked of an agent:
+	// Space data and the agent's own memory to read, without agent settings.
 	memberRequest bool
 	extra         []agenttools.Registration
 }
@@ -68,6 +68,12 @@ func buildAgentToolbox(database *db.Database, options agentToolboxOptions) *agen
 	}
 	registrations = append(registrations, searchAllToolRegistration(database))
 	if options.memberRequest {
+		// The agent keeps its memory, but a request from someone else never changes it.
+		for _, descriptor := range memoryAgentToolDescriptors() {
+			if descriptor.Risk == serveragent.RiskRead {
+				registrations = append(registrations, agenttools.Registration{Descriptor: withToolTriggers(descriptor, messageTriggers), Handler: legacyHandler})
+			}
+		}
 		return agenttools.MustNew(registrations...)
 	}
 	registrations = append(registrations, devicesListToolRegistration(database))

@@ -23,7 +23,6 @@ export function useSpaceSettingsController(spaceId: string) {
   const [saving, setSaving] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [templateOpen, setTemplateOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [dangerBusy, setDangerBusy] = useState(false);
   const isOwner = space?.role === "owner";
@@ -121,8 +120,6 @@ export function useSpaceSettingsController(spaceId: string) {
     setLeaveOpen,
     deleteOpen,
     setDeleteOpen,
-    templateOpen,
-    setTemplateOpen,
     deleteConfirmation,
     setDeleteConfirmation,
     dangerBusy,

@@ -17,7 +17,6 @@ import {
   RotateCcw,
   Search,
   Settings,
-  SquareCheck,
   Star,
   type LucideIcon,
 } from "lucide-react";
@@ -39,7 +38,6 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   space: LayoutGrid,
   "space-item": Library,
   note: NotebookPen,
-  task: SquareCheck,
   message: MessageSquare,
   agent: Bot,
   conversation: History,
@@ -57,7 +55,6 @@ const scopeIcons: Record<Exclude<SearchScope, "default">, LucideIcon> = {
   files: Folder,
   spaces: LayoutGrid,
   notes: NotebookPen,
-  tasks: SquareCheck,
   chat: MessageSquare,
   agents: Bot,
   bookmarks: Bookmark,

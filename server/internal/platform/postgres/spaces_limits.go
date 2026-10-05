@@ -33,18 +33,17 @@ var (
 )
 
 type Space struct {
-	ID               string          `json:"id"`
-	SecurityDomainID string          `json:"security_domain_id"`
-	OwnerUserID      string          `json:"owner_user_id"`
-	Name             string          `json:"name"`
-	IsDefault        bool            `json:"is_default"`
-	Role             string          `json:"role"`
-	MemberCount      int             `json:"member_count"`
-	PendingCount     int             `json:"pending_count"`
-	IsShared         bool            `json:"is_shared"`
-	Permissions      map[string]bool `json:"permissions"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
+	ID               string    `json:"id"`
+	SecurityDomainID string    `json:"security_domain_id"`
+	OwnerUserID      string    `json:"owner_user_id"`
+	Name             string    `json:"name"`
+	IsDefault        bool      `json:"is_default"`
+	Role             string    `json:"role"`
+	MemberCount      int       `json:"member_count"`
+	PendingCount     int       `json:"pending_count"`
+	IsShared         bool      `json:"is_shared"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type SpaceMember struct {

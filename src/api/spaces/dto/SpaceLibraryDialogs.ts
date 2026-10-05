@@ -1,8 +1,7 @@
 import type { Dispatch, FormEventHandler, SetStateAction } from "react";
-import type { SpaceLibraryItem } from "./entities";
 
 export type LibraryTextDialogState = {
-  kind: "create-folder" | "rename-folder" | "rename-memory" | "rename-item" | "edit-tags";
+  kind: "rename-item" | "edit-tags";
   title: string;
   primaryLabel: string;
   primaryValue: string;
@@ -13,39 +12,6 @@ export type LibraryTextDialogState = {
 
 export type LibraryMetadataDialogAction =
   "" | "add_tags" | "remove_tags" | "set_date" | "set_location";
-
-export type LibraryAlbumDialogMode = "" | "create" | "edit";
-
-export type LibraryPersonDialogMode = "" | "create" | "edit";
-
-export type LibraryUnlockScope = "" | "hidden" | "recently_deleted";
-
-export type AlbumDialogModel = {
-  mode: LibraryAlbumDialogMode;
-  name: string;
-  description: string;
-  coverItemId: string;
-  saving: boolean;
-  items: SpaceLibraryItem[];
-  setName: (value: string) => void;
-  setDescription: (value: string) => void;
-  setCoverItemId: (value: string) => void;
-  close: () => void;
-  submit: FormEventHandler<HTMLFormElement>;
-};
-
-export type PersonDialogModel = {
-  mode: LibraryPersonDialogMode;
-  kind: "person" | "pet";
-  name: string;
-  coverItemId: string;
-  saving: boolean;
-  items: SpaceLibraryItem[];
-  setName: (value: string) => void;
-  setCoverItemId: (value: string) => void;
-  close: () => void;
-  submit: FormEventHandler<HTMLFormElement>;
-};
 
 export type MetadataDialogModel = {
   action: LibraryMetadataDialogAction;
@@ -70,19 +36,6 @@ export type TextDialogModel = {
   saving: boolean;
   error: string;
   setState: Dispatch<SetStateAction<LibraryTextDialogState | null>>;
-  close: () => void;
-  submit: FormEventHandler<HTMLFormElement>;
-};
-
-export type UnlockDialogModel = {
-  configured: boolean | null;
-  confirmation: string;
-  setConfirmation: (confirmation: string) => void;
-  scope: LibraryUnlockScope;
-  password: string;
-  saving: boolean;
-  error: string;
-  setPassword: (value: string) => void;
   close: () => void;
   submit: FormEventHandler<HTMLFormElement>;
 };

@@ -4,7 +4,6 @@ export type SearchScope =
   | "files"
   | "spaces"
   | "notes"
-  | "tasks"
   | "chat"
   | "agents"
   | "bookmarks"

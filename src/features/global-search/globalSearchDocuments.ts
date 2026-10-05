@@ -1,6 +1,5 @@
 import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { spaceChatPath, useSpacesStore } from "@/features/spaces";
-import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
 let lastIndex:
@@ -44,7 +43,7 @@ function buildDocuments(
 
   for (const [spaceId, messages] of Object.entries(state.messagesBySpace)) {
     const space = spacesById.get(spaceId);
-    if (!space || space.permissions?.["messages.read"] !== true) continue;
+    if (!space) continue;
     for (const message of messages.slice(-80)) {
       const body = messageReplyPreviewText(message);
       if (!body) continue;
@@ -66,7 +65,7 @@ function buildDocuments(
 
   for (const [spaceId, nodes] of Object.entries(state.nodesBySpace)) {
     const space = spacesById.get(spaceId);
-    if (!space || space.permissions?.["library.view"] !== true) continue;
+    if (!space) continue;
     for (const node of nodes) {
       documents.push({
         id: `library:${node.id}`,
@@ -84,55 +83,7 @@ function buildDocuments(
     }
   }
 
-  for (const space of state.spaces) {
-    if (space.permissions?.["tasks.create"] !== true) continue;
-    documents.push({
-      id: `action:create-task:${space.id}`,
-      accountId,
-      kind: "action",
-      title: `Create a task in ${space.name}`,
-      body: "Ask Misty to create and assign a task.",
-      keywords: [space.name, "create", "task", "action"],
-      href: `/spaces/${encodeURIComponent(space.id)}/planner/tasks/board?create=task`,
-      spaceId: space.id,
-      spaceName: space.name,
-      source: "local",
-    });
-  }
   return documents;
-}
-
-export async function searchServerTasks(
-  accountId: string,
-  query: string,
-  spaces: ReturnType<typeof useSpacesStore.getState>["spaces"],
-): Promise<GlobalSearchDocument[]> {
-  const readable = spaces
-    .filter((space) => space.permissions?.["tasks.view"] === true)
-    .slice(0, 10);
-  const responses = await Promise.allSettled(
-    readable.map(async (space) => ({
-      space,
-      page: await spacesApi.tasks(space.id, { search: query, limit: 5, sort: "updated" }),
-    })),
-  );
-  return responses.flatMap((response) =>
-    response.status === "fulfilled"
-      ? response.value.page.tasks.map((task) => ({
-          id: `task:${task.id}`,
-          accountId,
-          kind: "task" as const,
-          title: task.title,
-          body: task.notes,
-          keywords: [task.task_key, task.status, task.priority, response.value.space.name],
-          href: `/spaces/${encodeURIComponent(task.space_id)}/planner/tasks/board?task=${encodeURIComponent(task.id)}`,
-          spaceId: task.space_id,
-          spaceName: response.value.space.name,
-          updatedAt: task.updated_at,
-          source: "server" as const,
-        }))
-      : [],
-  );
 }
 
 export function searchDocuments(

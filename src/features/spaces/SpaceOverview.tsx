@@ -8,7 +8,6 @@ import type { Space } from "@/api/spaces/dto/entities";
 import { useAuth } from "@/features/auth";
 import { Images, FileText, MessagesSquare, PencilRuler } from "lucide-react";
 import {
-  appIcons,
   Button,
   CollectionPage,
   CollectionHeading,
@@ -24,19 +23,16 @@ import { useSpaceItemCreator } from "./useSpaceItemCreator";
 import { useSpaceOverviewActions } from "./useSpaceOverviewActions";
 import { SpaceCreateMenu } from "./components/SpaceCreateMenu";
 import { useSpacePersonalItems } from "./useSpacePersonalItems";
-import { spaceSuggestions } from "./spaceSuggestions";
 
 const icons = {
   note: FileText,
   drawing: PencilRuler,
-  task: appIcons.planner,
   file: Images,
   chat: MessagesSquare,
 };
 const tones = {
   note: itemTones.note,
   drawing: itemTones.drawing,
-  task: itemTones.task,
   file: itemTones.image,
   chat: itemTones.chat,
 };
@@ -58,24 +54,20 @@ export function SpaceOverview({ space }: { space: Space }) {
       };
     }),
   };
-  const suggestions = spaceSuggestions(data.items, user?.id ?? "");
   const creatorName = useSpaceItemCreator(space.id);
   const itemActions = useSpaceOverviewActions(user?.id ?? "", space.id, data.items, data.retry);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState<"list" | "grid">("list");
-  const filtered =
-    filter === "suggested"
-      ? suggestions.map((s) => ({ ...s.item, route: s.route }))
-      : data.items.filter(
-          (item) =>
-            filter === "all" ||
-            (filter === "favorites"
-              ? item.favorite
-              : filter === "agents"
-                ? Boolean(item.creatorAgentId)
-                : item.creatorUserId === user?.id),
-        );
+  const filtered = data.items.filter(
+    (item) =>
+      filter === "all" ||
+      (filter === "favorites"
+        ? item.favorite
+        : filter === "agents"
+          ? Boolean(item.creatorAgentId)
+          : item.creatorUserId === user?.id),
+  );
   const searched = filtered.filter((item) =>
     item.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   );
@@ -83,14 +75,13 @@ export function SpaceOverview({ space }: { space: Space }) {
     label: "Filter items",
     title: (item) => item.title,
     date: (item) => item.updatedAt,
-    defaultOrderLabel: filter === "suggested" ? "Suggested order" : "Last activity",
+    defaultOrderLabel: "Last activity",
     facet: {
       label: "Item type",
       value: (item) => item.kind,
       options: [
         { value: "all", label: "All types" },
         { value: "chat", label: "Chats" },
-        { value: "task", label: "Tasks" },
         { value: "note", label: "Notes" },
         { value: "drawing", label: "Drawings" },
         { value: "file", label: "Files" },
@@ -120,7 +111,6 @@ export function SpaceOverview({ space }: { space: Space }) {
           { value: "all", label: "All" },
           { value: "yours", label: "Yours" },
           { value: "agents", label: "From agents" },
-          { value: "suggested", label: "Suggested" },
           { value: "favorites", label: "Favorites" },
         ]}
         value={filter}
@@ -158,9 +148,14 @@ export function SpaceOverview({ space }: { space: Space }) {
           fields={["Type", "Favorite", "Created"]}
           sortResetKey={refinement.sortKey}
           view={view}
-          creatorLabel={filter === "suggested" ? "Needs attention" : "Added by"}
+          creatorLabel="Added by"
           items={items.map((item) => {
             const Icon = icons[item.kind];
+            const madeBy = creatorName(
+              item.creatorUserId,
+              item.creatorAgentId,
+              item.creatorAgentName,
+            );
             return {
               ...item,
               ...itemActions.forItem(item),
@@ -186,20 +181,13 @@ export function SpaceOverview({ space }: { space: Space }) {
                   drawing: "Drawing",
                   file: "File",
                   chat: "Chat",
-                  task: "Task",
                 }[item.kind],
                 Favorite: item.favorite ? "Yes" : "No",
                 Created: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "—",
               },
               sortValues: { Created: item.createdAt ? Date.parse(item.createdAt) : undefined },
-              creator:
-                filter === "suggested"
-                  ? suggestions.find((s) => s.item.id === item.id)?.reason
-                  : creatorName(item.creatorUserId, item.creatorAgentId, item.creatorAgentName),
-              creatorDescription:
-                filter === "suggested"
-                  ? suggestions.find((s) => s.item.id === item.id)?.reason
-                  : `${item.kind === "file" ? "Added" : "Created"} by ${creatorName(item.creatorUserId, item.creatorAgentId, item.creatorAgentName)}`,
+              creator: madeBy,
+              creatorDescription: `${item.kind === "file" ? "Added" : "Created"} by ${madeBy}`,
               updated: item.updatedAt
                 ? new Date(item.updatedAt).toLocaleDateString(undefined, {
                     month: "short",

@@ -6,14 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kannachi323/misty/server/internal/spaces"
-
 	"github.com/google/uuid"
 )
-
-func applySpacePermissionDependencies(permissions map[string]bool) {
-	spaces.ApplyPermissionDependencies(permissions)
-}
 
 func hasSpacePermissionTx(ctx context.Context, tx *sql.Tx, userID, spaceID, permission string) (bool, error) {
 	role, err := requireSpaceMemberTx(ctx, tx, spaceID, userID)

@@ -1,7 +1,7 @@
 import { socialApi as spacesApi } from "../SocialRuntime";
 import type { SpaceLibraryItem, SpaceMember } from "@/api/spaces/dto/entities";
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/SpaceChat";
-import type { AgentListing } from "@/features/agent-member-requests/api";
+import type { SpaceAgent } from "@/api/spaces/space-agents";
 import { agentOwnerLabel } from "../../members/agents/useSpaceAgentMembers";
 import { useEffect, useMemo, useState } from "react";
 
@@ -17,7 +17,7 @@ const MAX_SUGGESTIONS = 24;
 export function useChatSuggestions(options: {
   spaceId: string;
   members: SpaceMember[];
-  agents?: AgentListing[];
+  agents?: SpaceAgent[];
   currentUserId: string | undefined;
   canBrowseLibrary: boolean;
   canReadLibrary: boolean;

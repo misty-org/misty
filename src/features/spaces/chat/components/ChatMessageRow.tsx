@@ -31,8 +31,6 @@ export interface ChatMessageRowProps {
  */
 /** The list fields a row renders; anything else on the list props never reaches a row. */
 const rowFields = [
-  "canAddToLibrary",
-  "canCopyLibrary",
   "canWrite",
   "currentUserId",
   "isOwner",
@@ -184,8 +182,6 @@ function ChatMessageRowView({
             message={message}
             nodes={props.nodes}
             libraryItems={props.libraryItems}
-            canCopyLibrary={props.canCopyLibrary}
-            canAddToLibrary={props.canAddToLibrary}
             spaceId={props.spaceId}
             onOpenNode={props.onOpenNode}
             onError={props.onError}

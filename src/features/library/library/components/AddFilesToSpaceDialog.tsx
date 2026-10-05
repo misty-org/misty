@@ -22,7 +22,7 @@ import {
   Skeleton,
 } from "@/shared/ui";
 import { CheckCircle2, Copy, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
@@ -56,10 +56,6 @@ export function AddFilesToSpaceDialog({
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState("");
   const controllerRef = useRef<AbortController | null>(null);
-  const eligibleSpaces = useMemo(
-    () => spaces.filter((space) => space.permissions?.["library.upload"] !== false),
-    [spaces],
-  );
   const readyCount = jobs.filter((job) => job.stage === "ready").length;
   const failedCount = jobs.filter(
     (job) => job.stage === "failed" || job.stage === "canceled",
@@ -162,7 +158,7 @@ export function AddFilesToSpaceDialog({
     }
     controllerRef.current = null;
     setRunning(false);
-    const destination = eligibleSpaces.find((space) => space.id === spaceId)?.name ?? "the Space";
+    const destination = spaces.find((space) => space.id === spaceId)?.name ?? "the Space";
     const summary = controller.signal.aborted
       ? "Upload canceled. You can retry the unfinished files."
       : failed
@@ -212,7 +208,7 @@ export function AddFilesToSpaceDialog({
                   <SelectValue placeholder="Choose a Space" />
                 </SelectTrigger>
                 <SelectContent>
-                  {eligibleSpaces.map((space) => (
+                  {spaces.map((space) => (
                     <SelectItem key={space.id} value={space.id}>
                       {spaceNavigationName(space)}
                       {space.is_shared ? " · Shared" : ""}
@@ -223,7 +219,7 @@ export function AddFilesToSpaceDialog({
             )}
           </label>
 
-          {!loading && eligibleSpaces.length === 0 ? (
+          {!loading && spaces.length === 0 ? (
             <p className="m-0 rounded-md bg-charcoal-card px-3 py-2 text-sm text-cream-muted">
               You do not have upload permission in any Space.
             </p>

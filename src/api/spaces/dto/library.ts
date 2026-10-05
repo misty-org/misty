@@ -135,7 +135,6 @@ export interface LibrarySearchFacets {
   tags: LibrarySearchFacet[];
   media_types: LibrarySearchFacet[];
   years: LibrarySearchFacet[];
-  albums: LibrarySearchFacet[];
   utilities: LibrarySearchFacet[];
 }
 

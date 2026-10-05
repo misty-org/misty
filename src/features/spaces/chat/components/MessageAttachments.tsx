@@ -8,8 +8,6 @@ export interface MessageAttachmentsProps {
   message: SpaceMessage;
   nodes: SpaceNode[];
   libraryItems: SpaceLibraryItem[];
-  canCopyLibrary: boolean;
-  canAddToLibrary: boolean;
   spaceId: string;
   onOpenNode: (nodeId: string) => void;
   onError: (message: string) => void;
@@ -52,10 +50,10 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
                 className="h-7 text-xs"
                 type="button"
                 key={itemId}
-                disabled={!item || !props.canCopyLibrary}
-                title={props.canCopyLibrary ? "Copy to clipboard" : "Copy permission required"}
+                disabled={!item}
+                title="Copy to clipboard"
                 onClick={() => {
-                  if (!item || !props.canCopyLibrary) return;
+                  if (!item) return;
                   void copyLibraryItemsToClipboard(props.spaceId, [item]).catch((error) =>
                     props.onError(
                       error instanceof Error
@@ -100,7 +98,7 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
                 <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
                   In Library
                 </Badge>
-              ) : props.canAddToLibrary ? (
+              ) : (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -115,7 +113,7 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
                 >
                   Add to Library
                 </Button>
-              ) : null}
+              )}
             </div>
           ))}
         </div>

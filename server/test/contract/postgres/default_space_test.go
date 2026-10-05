@@ -3,10 +3,9 @@ package db
 import (
 	"context"
 	"errors"
-	"testing"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
+	"testing"
 )
-
 
 import ()
 
@@ -25,20 +24,8 @@ func TestEveryAccountStartsWithAProtectedPersonalSpace(t *testing.T) {
 
 	first := &spaces[0]
 	first, err = database.SpaceByID(ctx, owner.ID, first.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, permission := range []string{
-		PermissionSpaceInvite, PermissionSpaceRename, PermissionStorageViewOwn,
-	} {
-		if !first.Permissions[permission] {
-			t.Fatalf("default Space lacks %s: %#v", permission, first.Permissions)
-		}
-	}
-	for _, permission := range []string{PermissionSpaceTransfer, PermissionSpaceDelete} {
-		if first.Permissions[permission] {
-			t.Fatalf("default Space unexpectedly grants %s: %#v", permission, first.Permissions)
-		}
+	if err != nil || first.Role != "owner" || !first.IsDefault {
+		t.Fatalf("SpaceByID(default) = %#v, %v", first, err)
 	}
 
 	renamed, err := database.RenameSpace(ctx, owner.ID, first.ID, "Personal")

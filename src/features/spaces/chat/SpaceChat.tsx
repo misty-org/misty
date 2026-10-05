@@ -28,7 +28,7 @@ import { useComposerInput } from "./hooks/useComposerInput";
 import { useMessageEditing } from "./hooks/useMessageEditing";
 import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
-import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
+import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 import { spaceChatSuggestedActions } from "./spaceChatAiActions";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
@@ -50,13 +50,8 @@ export function SpaceSocial({
   const chatRootRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastReadReceiptRef = useRef("");
-  const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
   const store = useSpaceChatStore();
-  const conversationChat = useSpaceConversationChat(
-    spaceId,
-    conversationId,
-    initialAccess.canReadMessages,
-  );
+  const conversationChat = useSpaceConversationChat(spaceId, conversationId);
   const scope = useSpaceChatScope({
     spaceId,
     conversationId,
@@ -65,7 +60,7 @@ export function SpaceSocial({
     conversationMessages: conversationChat.messages,
     store,
   });
-  const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
+  const access = useSpaceChatAccess(spaceId);
   useWorkspaceViewTitle(workspaceTabId, `${spaceName} Chat`);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
@@ -75,8 +70,8 @@ export function SpaceSocial({
     members: scope.members,
     agents,
     currentUserId: user?.id,
-    canBrowseLibrary: access.canBrowseLibrary,
-    canReadLibrary: access.permissions?.["library.view"] !== false,
+    canBrowseLibrary: access.canWriteMessages,
+    canReadLibrary: true,
     selectedLibraryIds: draft.selectedLibraryIds,
     attachmentSlotsLeft: draft.attachmentSlotsLeft,
   });
@@ -104,8 +99,8 @@ export function SpaceSocial({
     draft,
     suggestions,
     canWriteMessages: access.canWriteMessages,
-    canUploadAttachments: access.canUploadAttachments,
-    canBrowseLibrary: access.canBrowseLibrary,
+    canUploadAttachments: access.canWriteMessages,
+    canBrowseLibrary: access.canWriteMessages,
     openPicker,
   });
   const mentionNames = useMemo(
@@ -371,8 +366,8 @@ export function SpaceSocial({
           suggestions={suggestions}
           input={input}
           isConversation={Boolean(conversationId)}
-          canUploadAttachments={access.canUploadAttachments}
-          canBrowseLibrary={access.canBrowseLibrary}
+          canUploadAttachments={access.canWriteMessages}
+          canBrowseLibrary={access.canWriteMessages}
           mentionNames={mentionNames}
           replyToSenderName={
             scope.messages.find((item) => item.id === draft.replyToMessageId)?.sender_name ??
@@ -391,8 +386,8 @@ export function SpaceSocial({
           source={pickerSource}
           selectedLibraryIds={draft.selectedLibraryIds}
           pendingAttachmentCount={draft.pendingAttachments.length}
-          canBrowseLibrary={access.canBrowseLibrary}
-          canUploadAttachments={access.canUploadAttachments}
+          canBrowseLibrary={access.canWriteMessages}
+          canUploadAttachments={access.canWriteMessages}
           onClose={() => setPickerOpen(false)}
           onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
           onChooseLibraryItems={draft.setSelectedLibraryIds}

@@ -48,7 +48,6 @@ it("uses ownership filters without tool shortcuts", () => {
     is_shared: true,
     created_at: "2026-09-30T12:00:00Z",
     updated_at: "2026-09-30T12:00:00Z",
-    permissions: { "messages.read": false, "tasks.view": false, "library.view": false },
   };
   render(
     <MemoryRouter>
@@ -74,7 +73,6 @@ function renderOverview() {
   const space = {
     id: "one",
     name: "Personal",
-    permissions: {},
     is_default: true,
     owner_user_id: "user",
     role: "owner",
@@ -97,10 +95,10 @@ it("searches, filters, sorts and switches views over real item links", () => {
       id: "a",
       creatorUserId: "user",
       title: "Zebra plan",
-      area: "Planner",
-      kind: "task",
+      area: "Chat",
+      kind: "chat",
       updatedAt: "2026-09-30",
-      route: "/spaces/one/planner/tasks/list?task=a",
+      route: "/spaces/one/social?conversation=a",
     },
     {
       id: "b",
@@ -147,11 +145,4 @@ it("keeps filters available to recover from empty results and disables empty lay
   );
   for (const name of ["Grid view", "List view"])
     expect((ui.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
-});
-it("keeps an empty Suggested collection free of extra guidance", () => {
-  const ui = renderOverview();
-  fireEvent.click(ui.getByRole("button", { name: "Suggested" }));
-  expect(ui.queryByText("Nothing needs your attention")).toBeNull();
-  expect(ui.getAllByRole("row")).toHaveLength(1);
-  expect(ui.queryByRole("button", { name: "Recent" })).toBeNull();
 });

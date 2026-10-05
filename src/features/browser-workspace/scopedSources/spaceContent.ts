@@ -1,9 +1,5 @@
 import { notesApi, type ServerSpaceNote } from "@/api/notes/api";
-import {
-  buildLocalIndex,
-  searchDocuments,
-  searchServerTasks,
-} from "@/features/global-search/globalSearchDocuments";
+import { buildLocalIndex, searchDocuments } from "@/features/global-search/globalSearchDocuments";
 import type { useSpacesStore } from "@/features/spaces/core";
 import { resultLimit, searchSpaces, type ScopedSearchResult } from "../scopedSearchSources";
 
@@ -63,21 +59,6 @@ export async function searchSpaceNotes(
     }));
 }
 
-export async function searchSpaceTasks(
-  query: string,
-  spaces: readonly Space[],
-): Promise<ScopedSearchResult[]> {
-  if (!query.trim()) return [];
-  const tasks = await searchServerTasks("", query, [...spaces]).catch(() => []);
-  return tasks.slice(0, resultLimit).map((task) => ({
-    id: task.id,
-    kind: "task",
-    title: task.title,
-    subtitle: task.spaceName ?? "Task",
-    target: { kind: "route", route: task.href },
-  }));
-}
-
 /** Chat messages already on this device; spaces without read access are left out. */
 export function searchSpaceChat(query: string): ScopedSearchResult[] {
   if (!query.trim()) return [];
@@ -100,7 +81,7 @@ function interleave(lists: ScopedSearchResult[][]): ScopedSearchResult[] {
   return merged.slice(0, resultLimit);
 }
 
-/** `!spaces`: spaces and their libraries, notes, tasks and chat, ranked together. */
+/** `!spaces`: spaces and their notes and chat, ranked together. */
 export async function searchEverythingInSpaces(
   query: string,
   spaces: readonly Space[],
@@ -108,7 +89,6 @@ export async function searchEverythingInSpaces(
   const settled = await Promise.allSettled([
     searchSpaces(query, [...spaces]),
     searchSpaceNotes(query, spaces),
-    searchSpaceTasks(query, spaces),
     Promise.resolve(searchSpaceChat(query)),
   ]);
   return interleave(settled.map((result) => (result.status === "fulfilled" ? result.value : [])));

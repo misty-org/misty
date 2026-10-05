@@ -11,7 +11,6 @@ import { LibraryViewerToolbar } from "./libraryViewer/LibraryViewerToolbar";
 import { useLibraryEditActions } from "./libraryViewer/useLibraryEditActions";
 import { useLibraryEditVersions } from "./libraryViewer/useLibraryEditVersions";
 import { useLibraryItemContent } from "./libraryViewer/useLibraryItemContent";
-import { useLibraryStackMedia } from "./libraryViewer/useLibraryStackMedia";
 import { useLibraryViewerKeyboard } from "./libraryViewer/useLibraryViewerKeyboard";
 import { useLibraryViewerPlayback } from "./libraryViewer/useLibraryViewerPlayback";
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
@@ -27,7 +26,7 @@ function LibraryItemViewerContent(
     item: SpaceLibraryItem;
   },
 ) {
-  const { spaceId, item, items, allItems, assetStack, reauthenticationToken } = props;
+  const { spaceId, item, items } = props;
   const { canEdit, canCopy, onClose, onSelect } = props;
   const [editing, setEditing] = useState(false);
   const index = items.findIndex((candidate) => candidate.id === item.id);
@@ -37,35 +36,22 @@ function LibraryItemViewerContent(
   const versions = useLibraryEditVersions({
     spaceId,
     item,
-    reauthenticationToken,
     editable: isImage || isVideo,
     onRenditionReady: props.onRenditionReady,
   });
   const { activeEdit, editVersions, editDraft, setEditDraft } = versions;
   const appliedEdit = editing ? editDraft : normalizeLibraryEdit(activeEdit?.edit_definition);
   const renditionReady = activeEdit?.rendition_state === "ready";
-  const stack = useLibraryStackMedia({
-    item,
-    allItems,
-    assetStack,
-  });
   const content = useLibraryItemContent({
     spaceId,
     item,
-    assetStack,
-    reauthenticationToken,
     editing,
     itemIsImage: isImage,
-    stackMediaID: stack.stackMediaID,
-    stackMediaIsImage: stack.isImage,
-    stackMediaMIME: stack.stackMediaMIME,
-    stackMediaVersion: stack.stackMediaItem?.version,
     renditionState: activeEdit?.rendition_state,
   });
   const edits = useLibraryEditActions({
     spaceId,
     item,
-    reauthenticationToken,
     canEdit,
     isImage,
     editing,
@@ -77,10 +63,7 @@ function LibraryItemViewerContent(
     onReplaceItem: props.onReplaceItem,
     onRenditionReady: props.onRenditionReady,
   });
-  const playback = useLibraryViewerPlayback({
-    appliedEdit,
-    assetStack,
-  });
+  const playback = useLibraryViewerPlayback({ appliedEdit });
   const goPrevious = () => index > 0 && onSelect(items[index - 1].id);
   const goNext = () => index >= 0 && index < items.length - 1 && onSelect(items[index + 1].id);
   useLibraryViewerKeyboard({
@@ -95,7 +78,7 @@ function LibraryItemViewerContent(
     if (!canCopy) return;
     edits.setEditError("");
     try {
-      await copyLibraryItemsToClipboard(spaceId, [target], reauthenticationToken);
+      await copyLibraryItemsToClipboard(spaceId, [target]);
     } catch (error) {
       edits.setEditError(
         error instanceof Error ? error.message : "The Library item could not be copied.",
@@ -157,9 +140,6 @@ function LibraryItemViewerContent(
             {null}
             <LibraryViewerToolbar
               item={item}
-              assetStack={assetStack}
-              stackMediaID={stack.stackMediaID}
-              stackMemberRole={stack.stackMediaMember?.role}
               activeEdit={activeEdit}
               renditionReady={renditionReady}
               canEdit={canEdit}
@@ -167,21 +147,12 @@ function LibraryItemViewerContent(
               editing={editing}
               editSaving={edits.editSaving}
               editingAvailable={versions.editingAvailable}
-              onSetStackCover={() =>
-                assetStack && void props.onSetStackCover(assetStack, stack.stackMediaID)
-              }
-              onUngroupStack={() => assetStack && void props.onUngroupStack(assetStack)}
               onCopyEdit={() => props.onCopyEdit(normalizeLibraryEdit(activeEdit?.edit_definition))}
               onSaveAsCopy={() => void edits.saveAsCopy()}
               onSaveEdit={() => void edits.saveEdit()}
               onToggleFavorite={() =>
                 void props.onUpdate(item, {
                   favorite: !item.favorite,
-                })
-              }
-              onToggleHidden={() =>
-                void props.onUpdate(item, {
-                  hidden: !item.hidden,
                 })
               }
               onBeginEditing={() => {
@@ -197,32 +168,19 @@ function LibraryItemViewerContent(
         </header>
 
         <LibraryViewerStage
-          displayName={stack.displayName}
-          mimeType={stack.stackMediaMIME}
+          displayName={item.display_name}
+          mimeType={mimeType}
           contentUrl={content.contentUrl}
           contentLoading={content.contentLoading}
           contentError={content.contentError}
-          mediaStyle={
-            stack.stackMediaID === item.id && !(renditionReady && !editing)
-              ? libraryEditStyle(appliedEdit)
-              : undefined
-          }
-          assetStack={assetStack}
-          stackMediaID={stack.stackMediaID}
-          primaryItemID={item.id}
-          canEdit={canEdit}
-          canCopy={canCopy && Boolean(stack.stackMediaItem)}
+          mediaStyle={renditionReady && !editing ? undefined : libraryEditStyle(appliedEdit)}
+          canCopy={canCopy}
           index={index}
           itemCount={items.length}
           imageRef={playback.imageRef}
           videoRef={playback.videoRef}
-          onSelectStackMember={stack.setStackMemberID}
-          onSetStackEffect={(effect) =>
-            assetStack && void props.onSetStackEffect(assetStack, effect)
-          }
-          onVideoEnded={playback.handleVideoEnded}
           onVideoTime={playback.handleVideoTime}
-          onCopyStackMedia={() => void copyItem(stack.stackMediaItem ?? item)}
+          onCopy={() => void copyItem()}
           onPrevious={goPrevious}
           onNext={goNext}
         />

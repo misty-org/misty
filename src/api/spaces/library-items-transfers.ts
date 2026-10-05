@@ -33,10 +33,6 @@ export function createLibraryTransferApi(transfers: LibraryTransfers) {
       filename: string,
       options?: LibraryUploadOptions,
     ) => replaceLibraryItemContent(spaceId, item, blob, filename, options),
-    sharedReferenceContent: (spaceId: string, referenceId: string) =>
-      fetchProtectedBlob(
-        `/spaces/${encodeURIComponent(spaceId)}/library/shared/${encodeURIComponent(referenceId)}/download`,
-      ),
     libraryContent: (spaceId: string, itemId: string, reauthenticationToken = "") =>
       fetchProtectedBlob(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`,
