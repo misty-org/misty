@@ -194,9 +194,6 @@ export function AgentWorkspaceConversation({
           <AgentConversationView
             conversation={conversation}
             working={state.working}
-            onConfirm={(id) => void state.confirmAction(id)}
-            onReject={state.rejectAction}
-            onCancel={(id) => void state.cancelAgentTask(id)}
             onRetry={(prompt) => void send(prompt)}
           />
         ) : emptyContent ? (

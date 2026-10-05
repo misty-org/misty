@@ -15,11 +15,6 @@ import {
   extractDocumentText as readBuiltinDocument,
 } from "@/features/resource-preview";
 export { extractDocumentText, globalPreviewKindForSource } from "@/features/resource-preview";
-import { usePreviewResource } from "./usePreviewResource";
-export function useGlobalPreviewResource(source: GlobalPreviewSource) {
-  const load = useHostDocumentLoader();
-  return usePreviewResource(source, load);
-}
 const loadBuiltinPreview = (source: GlobalPreviewSource) => loadGlobalPreview(source);
 export function useHostDocumentLoader() {
   return loadBuiltinPreview;

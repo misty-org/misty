@@ -31,8 +31,6 @@ type agentToolboxOptions struct {
 	accountLevel        bool
 	browserTabs         []string
 	browserCapabilities map[string]bool
-	providers           []string
-	providerHandler     agenttools.Handler
 	// delegation registers ask.delegate for runs that may start a worker.
 	delegation agenttools.Handler
 	extra      []agenttools.Registration
@@ -86,33 +84,7 @@ func buildAgentToolbox(database *db.Database, options agentToolboxOptions) *agen
 			registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: browserHandler})
 		}
 	}
-	if options.providerHandler != nil {
-		for _, provider := range options.providers {
-			query := canonicalProviderToolDescriptor(provider, false)
-			query.Sources = agentToolboxSpaceSources
-			registrations = append(registrations, agenttools.Registration{Descriptor: query, Handler: options.providerHandler})
-			if providerSupportsWrite(provider) {
-				write := canonicalProviderToolDescriptor(provider, true)
-				write.Sources = agentToolboxSpaceSources
-				registrations = append(registrations, agenttools.Registration{Descriptor: write, Handler: options.providerHandler})
-			}
-		}
-	}
-	names := make([]string, 0, len(registrations))
-	for _, r := range registrations {
-		names = append(names, r.Descriptor.Name)
-	}
-	kept := map[string]bool{}
-	for _, name := range withoutReplacedSDKTools(names, options.extra) {
-		kept[name] = true
-	}
-	filtered := registrations[:0]
-	for _, r := range registrations {
-		if kept[r.Descriptor.Name] {
-			filtered = append(filtered, r)
-		}
-	}
-	return agenttools.MustNew(append(filtered, options.extra...)...)
+	return agenttools.MustNew(append(registrations, options.extra...)...)
 }
 
 func agentDelegationToolDescriptor() agenttools.Descriptor {
@@ -140,9 +112,6 @@ func withToolTriggers(descriptor agenttools.Descriptor, triggers []string) agent
 
 func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 	return func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {
-		if allowed, err := authorizeAppRuntimeTool(ctx, database, invocation, descriptor); err != nil || !allowed {
-			return false, err
-		}
 		// A Space-bound data tool needs a Space; account runs use its routed form.
 		if invocation.SpaceID == "" && (descriptor.OwnerOnly || descriptor.RequiredPermission != "") && spaceDataTool(descriptor.Name) {
 			return false, nil
@@ -161,12 +130,6 @@ func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 				return database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)
 			}
 			return true, nil
-		}
-		if descriptor.ProviderBinding != nil {
-			return authorizeAgentSDKTool(ctx, database, invocation, descriptor)
-		}
-		if strings.HasPrefix(descriptor.Name, "mcp.") {
-			return authorizeMCPAgentTool(ctx, database, invocation, descriptor)
 		}
 		if invocation.AgentID != "" {
 			_, err := database.AskExecutionContext(ctx, invocation.UserID, invocation.SpaceID, invocation.AgentID)

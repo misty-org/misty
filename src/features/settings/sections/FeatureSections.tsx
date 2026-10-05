@@ -3,7 +3,6 @@ import {
   agentsDeviceSnapshot,
   agentsRevokeFolderScope,
   CompanionAppearanceSettings,
-  McpConnectionsView,
 } from "@/features/agents";
 import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
 import { ConnectedDevicePairingDialog } from "@/features/files/workspace";
@@ -141,7 +140,6 @@ export function AgentConnectionsSection() {
     <>
       <AppActionsSection />
       <ScreenLocationSection />
-      <McpConnectionsView />
     </>
   );
 }

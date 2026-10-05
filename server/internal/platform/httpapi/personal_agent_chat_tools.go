@@ -2,14 +2,11 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"time"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
-	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
@@ -22,20 +19,6 @@ func permittedSpaceConversationRead(ctx context.Context, database *db.Database, 
 		return allowed, err
 	}
 	return database.EffectiveAgentSpacePermission(ctx, userID, spaceID, agentID, permission)
-}
-
-func TestingExecuteSpaceConversationTaskTool(ctx context.Context, database *db.Database, userID, spaceID, agentID, prompt, name string, arguments json.RawMessage) (json.RawMessage, error) {
-	return TestingExecuteSpaceConversationTool(ctx, database, userID, spaceID, agentID, prompt, name, arguments)
-}
-
-func TestingExecuteSpaceConversationTool(ctx context.Context, database *db.Database, userID, spaceID, agentID, prompt, name string, arguments json.RawMessage) (json.RawMessage, error) {
-	toolbox := spaceAgentToolbox(database)
-	invocation := agenttools.Invocation{
-		UserID: userID, SpaceID: spaceID, AgentID: agentID, Source: "space_conversation", Trigger: "message", OriginalInput: prompt,
-		SessionID: "testing:" + userID + ":" + spaceID,
-	}
-	digest := sha256.Sum256([]byte(prompt + "\x00" + name + "\x00" + string(arguments)))
-	return executeSpaceAgentToolbox(ctx, toolbox, invocation, database, serveragent.ToolRequest{ID: "test-" + hex.EncodeToString(digest[:]), Name: name, Arguments: arguments})
 }
 
 type spaceConversationToolActor struct {

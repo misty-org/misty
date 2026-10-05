@@ -10,8 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const CreditMeterMediaSearchMinute = "media_search_minute"
-
 const LegacyMediaSearchDeviceID = "device_00000000000000000000000000000000"
 
 type MediaSearchAsset struct {
@@ -184,7 +182,10 @@ func (db *Database) FailMediaSearchChunk(userID, deviceID, assetID string, chunk
 }
 
 func (db *Database) SearchMedia(userID, deviceID, query string, embedding []float64, limit int, embeddingModels ...string) ([]MediaSearchHit, error) {
- embeddingModel := "google/gemini-embedding-2"; if len(embeddingModels)>0 { embeddingModel=embeddingModels[0] }
+	embeddingModel := "google/gemini-embedding-2"
+	if len(embeddingModels) > 0 {
+		embeddingModel = embeddingModels[0]
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return []MediaSearchHit{}, nil

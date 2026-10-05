@@ -24,10 +24,6 @@ func (s *AIService) AgentMethods() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if db.AppAuthorityFromContext(r.Context()) != nil {
-			http.Error(w, "Host-only agent methods", http.StatusForbidden)
-			return
-		}
 		if r.Method == http.MethodGet {
 			agent := strings.TrimSpace(r.URL.Query().Get("agent_id"))
 			if _, err := s.database.AskIdentityByID(r.Context(), user, agent); err != nil {
@@ -66,10 +62,6 @@ func (s *AIService) InstantiateAgentMethod() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if db.AppAuthorityFromContext(r.Context()) != nil {
-			http.Error(w, "Host-only agent methods", http.StatusForbidden)
-			return
-		}
 		var body struct {
 			VersionID string         `json:"version_id"`
 			Inputs    map[string]any `json:"inputs"`
@@ -98,10 +90,6 @@ func (s *AIService) RunAgentMethod() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, ok := s.requireUser(w, r)
 		if !ok {
-			return
-		}
-		if db.AppAuthorityFromContext(r.Context()) != nil {
-			http.Error(w, "Host-only agent methods", http.StatusForbidden)
 			return
 		}
 		var body struct {
@@ -137,9 +125,6 @@ func resolveInvocationMethod(ctx context.Context, database *db.Database, user st
 		}
 		return nil, nil
 	}
-	if db.AppAuthorityFromContext(ctx) != nil {
-		return nil, db.ErrSpaceForbidden
-	}
 	m, err := database.AgentMethodVersion(ctx, user, body.MethodVersionID)
 	if err != nil {
 		return nil, err
@@ -170,10 +155,6 @@ func resolveInvocationMethod(ctx context.Context, database *db.Database, user st
 	return &m, nil
 }
 func pinInvocationSkills(ctx context.Context, database *db.Database, user string, body *aiInvocationInput) error {
-	if db.AppAuthorityFromContext(ctx) != nil {
-		body.SkillVersionIDs = nil
-		return nil
-	}
 	items, err := database.AgentMethods(ctx, user, body.AgentID)
 	if err != nil {
 		return err

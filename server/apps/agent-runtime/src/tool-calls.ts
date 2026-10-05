@@ -1,4 +1,3 @@
-import { agentToolApprovalHook } from "./approval.js";
 import { controlPlaneRequest } from "./control-plane.js";
 import { ControlPlaneError } from "./control-plane-error.js";
 import { agentDeviceHook } from "./device.js";
@@ -8,16 +7,14 @@ import { recoverableToolError, rethrowStepError } from "./runtime-errors.js";
 import { continueToolExecution, type ToolExecutionResponse } from "./tool-execution.js";
 import type { MCPRunAccess, RuntimeToolContext } from "./types.js";
 
-/** Runs one tool call in the workflow, holding approval and device waits on
+/** Runs one tool call in the workflow, holding device and user-action waits on
  * durable hooks. Every attempt keeps the call's effect identity. */
 export async function executeTool(context: RuntimeToolContext, callId: string, name: string, input: unknown): Promise<unknown> {
-  const approvalToken = (attempt: number) => `misty:${context.mistyRunId}:${callId}:wait:${attempt}`;
   const deviceToken = (attempt: number) => `misty-device:${context.mistyRunId}:${callId}:wait:${attempt}`;
   try {
     return await continueToolExecution({
       request: (attempt) =>
-        requestToolExecution(context, callId, name, input, approvalToken(attempt), deviceToken(attempt), `${context.mistyRunId}:tool:${callId}`),
-      approval: async (_approval, attempt) => (await agentToolApprovalHook.create({ token: approvalToken(attempt) })).approved,
+        requestToolExecution(context, callId, name, input, deviceToken(attempt), `${context.mistyRunId}:tool:${callId}`),
       // Engine wake tokens are opaque. Go owns the separate user-action wait
       // and requires a trusted user decision before sending this wake signal.
       intervention: async (attempt) => (await agentDeviceHook.create({ token: deviceToken(attempt) })).available,
@@ -34,7 +31,6 @@ async function requestToolExecution(
   callId: string,
   name: string,
   input: unknown,
-  approvalHookToken: string,
   deviceHookToken: string,
   idempotencyKey: string,
 ): Promise<ToolExecutionResponse> {
@@ -48,12 +44,12 @@ async function requestToolExecution(
       // deploy cannot duplicate a consequential action.
       if (error instanceof ControlPlaneError && (error.status === 404 || error.status === 405 || error.status === 501)) {
         return await controlPlaneRequest<ToolExecutionResponse>(context, "tools", {
-          call_id: callId, name, arguments: input, approval_hook_token: approvalHookToken, device_hook_token: deviceHookToken,
+          call_id: callId, name, arguments: input, device_hook_token: deviceHookToken,
         }, idempotencyKey);
       }
       throw error;
     }
-    return await requestMCPToolExecution(context, access, callId, name, input, approvalHookToken, deviceHookToken);
+    return await requestMCPToolExecution(context, access, callId, name, input, deviceHookToken);
   } catch (error) {
     const recoverable = recoverableToolError(error);
     if (recoverable) return { tool_error: recoverable };

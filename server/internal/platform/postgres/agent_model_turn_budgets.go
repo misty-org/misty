@@ -18,13 +18,12 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 	}
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		var state, spaceID, pinnedRuntime string
-		var payload json.RawMessage
 		var version, limit int
-		query := `SELECT state,COALESCE(space_id,''),input,COALESCE(runtime_run_id,''),model_budget_version,model_turn_limit FROM space_runs WHERE id=$1 AND owner_user_id=$2 FOR UPDATE`
+		query := `SELECT state,COALESCE(space_id,''),COALESCE(runtime_run_id,''),model_budget_version,model_turn_limit FROM space_runs WHERE id=$1 AND owner_user_id=$2 FOR UPDATE`
 		if strings.HasPrefix(runID, "invocation_") {
-			query = `SELECT state,COALESCE(space_id,''),request_payload,COALESCE(runtime_run_id,''),model_budget_version,model_turn_limit FROM ai_invocations WHERE id=$1 AND user_id=$2 AND COALESCE(agent_run_id,'')='' FOR UPDATE`
+			query = `SELECT state,COALESCE(space_id,''),COALESCE(runtime_run_id,''),model_budget_version,model_turn_limit FROM ai_invocations WHERE id=$1 AND user_id=$2 AND COALESCE(agent_run_id,'')='' FOR UPDATE`
 		}
-		if err := tx.QueryRowContext(ctx, query, runID, userID).Scan(&state, &spaceID, &payload, &pinnedRuntime, &version, &limit); err != nil {
+		if err := tx.QueryRowContext(ctx, query, runID, userID).Scan(&state, &spaceID, &pinnedRuntime, &version, &limit); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrSpaceForbidden
 			}
@@ -32,13 +31,6 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		}
 		if pinnedRuntime != runtimeID || state != "running" {
 			return ErrSpaceForbidden
-		}
-		authority, err := AppAuthorityFromPayload(payload)
-		if err != nil {
-			return err
-		}
-		if err := validateAppExecutionAuthorityTx(ctx, tx, authority, userID, spaceID, "ai.write"); err != nil {
-			return err
 		}
 		if spaceID != "" {
 			if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
@@ -48,21 +40,11 @@ func (db *Database) ReserveAgentModelTurn(ctx context.Context, userID, runID, ru
 		if _, err := agentRunExecutionBudgetTx(ctx, tx, runID, true); err != nil {
 			return err
 		}
-		var routineMarker struct {
-			Routine bool `json:"_misty_routine_execution"`
-		}
-		if json.Unmarshal(payload, &routineMarker) != nil {
-			return ErrSpaceInvalid
-		}
-		if routineMarker.Routine {
-			return ErrSpaceInvalid
-		}
-
 		if version == 0 {
 			return nil
 		}
 		var previousRuntime string
-		err = tx.QueryRowContext(ctx, `SELECT runtime_run_id FROM agent_model_turn_claims WHERE run_id=$1 AND user_id=$2 AND node_id=$3`, runID, userID, nodeID).Scan(&previousRuntime)
+		err := tx.QueryRowContext(ctx, `SELECT runtime_run_id FROM agent_model_turn_claims WHERE run_id=$1 AND user_id=$2 AND node_id=$3`, runID, userID, nodeID).Scan(&previousRuntime)
 		if err == nil {
 			if previousRuntime != runtimeID {
 				return ErrSpaceForbidden
@@ -103,11 +85,7 @@ func invocationModelTurnLimitTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 	if err := json.Unmarshal(record.RequestPayload, &input); err != nil {
 		return 0, err
 	}
-	authority, err := AppAuthorityFromPayload(record.RequestPayload)
-	if err != nil {
-		return 0, err
-	}
-	if record.SurfaceID == "sdk" || record.SurfaceID == "routine" || authority != nil || AppAuthorityFromContext(ctx) != nil || (input.Mode != "agent" && input.Mode != "auto" && input.Mode != "team") || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" {
+	if (input.Mode != "agent" && input.Mode != "auto" && input.Mode != "team") || input.AgentID == "" || input.TaskID == "" || input.WindowLabel == "" {
 		return ordinaryLimit, nil
 	}
 	if err := validateNativeAgentExecutionTx(ctx, tx, record.UserID, record.SpaceID, record.RequestPayload); err != nil {

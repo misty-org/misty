@@ -138,11 +138,6 @@ func TestAIInvocationValidationRejectsRawLocalPaths(t *testing.T) {
 	}
 }
 
-func TestAIInvocationJournalIsIdempotentAndOwnerScoped(t *testing.T) {
-	if !api.TestingAIInvocationJournalIsolation() {
-		t.Fatal("invocation journal duplicated work or crossed an owner boundary")
-	}
-}
 
 func TestAccountRetrievalHelpersRankAndBoundUntrustedContent(t *testing.T) {
 	if api.TestingAISearchScore("launch blockers", "Launch plan with two blockers") <= api.TestingAISearchScore("launch blockers", "Unrelated launch note") {

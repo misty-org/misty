@@ -7,17 +7,19 @@ import (
 	"sync"
 	"testing"
 	"time"
-
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
+
+import ()
+
 func joinQuotaTestSpace(t *testing.T, database *Database, ctx context.Context, owner User, member User, name string) Space {
 	t.Helper()
-	space, err := database.CreateSpace(ctx, owner.ID, name)
+	space, err := database.TestingCreateSpace(ctx, owner.ID, name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, owner.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}

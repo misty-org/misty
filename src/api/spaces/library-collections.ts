@@ -2,7 +2,6 @@ import type {
   LibraryAlbum,
   LibraryAlbumFolder,
   LibraryGroup,
-  LibraryGroupRule,
   LibraryIntelligencePolicy,
   LibraryPerson,
   SpaceLibraryItem,
@@ -109,11 +108,6 @@ export function createSpaceLibraryCollectionsApi(spaceRequest: SpaceRequest) {
       spaceRequest<{ groups: LibraryGroup[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/library/groups`,
       ),
-    createGroup: (spaceId: string, name: string, rules: LibraryGroupRule[]) =>
-      spaceRequest<LibraryGroup>(`/spaces/${encodeURIComponent(spaceId)}/library/groups`, {
-        method: "POST",
-        body: JSON.stringify({ name, rules: { all: rules } }),
-      }),
     groupItems: (spaceId: string, groupId: string) =>
       spaceRequest<{ items: SpaceLibraryItem[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/library/groups/${encodeURIComponent(groupId)}/items`,

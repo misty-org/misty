@@ -1,9 +1,5 @@
 import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
-import {
-  MistyApprovalReview,
-  MistyOverlayControls,
-  usePendingMistyApproval,
-} from "./MistyOverlayControls";
+import { MistyOverlayControls } from "./MistyOverlayControls";
 import { routeLocalFollowup, useLocalExecution } from "@/features/agents/localExecution";
 import { readOptionalSurfaceContext } from "./optionalSurfaceContext";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -78,7 +74,6 @@ export function GlobalMistySurface(props: {
     onVoiceActivityChange,
   } = props;
   const execution = useLocalExecution((s) => s.execution);
-  const pendingApproval = usePendingMistyApproval();
   const docked = props.controller === "misty";
   // Finished executions retain browser context for follow-ups, not an overlay lease.
   const taskSurface =
@@ -124,9 +119,6 @@ export function GlobalMistySurface(props: {
     visualSearch,
     submitAnswer,
     submitAgentTask,
-    rejectAction,
-    cancelAgentTask,
-    approveAgentTask,
   } = useController(
     useShallow((state) => ({
       panel: state.panel,
@@ -161,9 +153,6 @@ export function GlobalMistySurface(props: {
       visualSearch: state.visualSearch,
       submitAnswer: state.submitAnswer,
       submitAgentTask: state.submitAgentTask,
-      rejectAction: state.rejectAction,
-      cancelAgentTask: state.cancelAgentTask,
-      approveAgentTask: state.approveAgentTask,
     })),
   );
   const aiPaneId = props.activeWorkspacePaneId ?? props.activePaneId;
@@ -221,7 +210,7 @@ export function GlobalMistySurface(props: {
     candidates.findIndex((candidate) => candidate.id === selectedCandidateId),
   );
   const conversation = conversations.find((item) => item.id === activeConversationId);
-  const open = panel !== "closed" || taskSurface || (docked && !!pendingApproval);
+  const open = panel !== "closed" || taskSurface;
   const conversationActive = panel === "answer" || panel === "agent";
   const contentVisible = hasQuery || conversationActive;
   const wasOpenRef = useRef(false);
@@ -524,7 +513,6 @@ export function GlobalMistySurface(props: {
                   data-misty-top-controls
                 >
                   {composer}
-                  <MistyApprovalReview />
                   <MistyContextBar />
                   {followupNotice && working && (
                     <p role="status" className="px-4 pb-2 text-sm text-cream-muted">
@@ -568,14 +556,7 @@ export function GlobalMistySurface(props: {
                         className={docked ? "h-[min(320px,calc(100dvh-340px))]" : "h-full"}
                         data-misty-conversation-scroll
                       >
-                        <ConversationView
-                          conversation={conversation}
-                          approvalControlsInFooter={docked}
-                          working={working}
-                          onConfirm={(id) => void approveAgentTask(id)}
-                          onReject={rejectAction}
-                          onCancel={(id) => void cancelAgentTask(id)}
-                        />
+                        <ConversationView conversation={conversation} working={working} />
                       </ScrollArea>
                     </div>
                     {!docked && composer}

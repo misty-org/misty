@@ -38,33 +38,6 @@ type LibraryIntelligenceResult struct {
 	Version    int
 }
 
-func (db *Database) QueueLibraryIntelligenceForItem(ctx context.Context, userID, spaceID, itemID string) error {
-	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {
-			return err
-		}
-		var aiEnabled, semanticEnabled bool
-		if err := tx.QueryRowContext(ctx, `SELECT ai_enabled,semantic_search_enabled FROM space_library_intelligence_policies WHERE space_id=$1`, spaceID).Scan(&aiEnabled, &semanticEnabled); errors.Is(err, sql.ErrNoRows) {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		if !aiEnabled && !semanticEnabled {
-			return nil
-		}
-		var domainID string
-		if err := tx.QueryRowContext(ctx, `SELECT f.security_domain_id FROM space_library_items i JOIN library_files f ON f.id=i.file_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready'`, itemID, spaceID).Scan(&domainID); errors.Is(err, sql.ErrNoRows) {
-			return ErrLibraryNotFound
-		} else if err != nil {
-			return err
-		}
-		payload, _ := json.Marshal(map[string]bool{"ai": aiEnabled, "semantic": semanticEnabled})
-		_, err := tx.ExecContext(ctx, `INSERT INTO library_processing_jobs(id,security_domain_id,space_id,job_kind,target_kind,target_id,payload,priority,billing_user_id) VALUES($1,$2,$3,'ai','space_library_item',$4,$5,4,$6)
-			ON CONFLICT(job_kind,target_kind,target_id) DO UPDATE SET payload=EXCLUDED.payload,billing_user_id=EXCLUDED.billing_user_id,state=CASE WHEN library_processing_jobs.state IN ('leased','running') THEN library_processing_jobs.state ELSE 'queued' END,error_code=NULL,available_at=NOW(),updated_at=NOW()`, "job_"+uuid.NewString(), domainID, spaceID, itemID, payload, userID)
-		return err
-	})
-}
-
 func (db *Database) ClaimLibraryIntelligenceJob(ctx context.Context, workerID string, lease time.Duration) (*LibraryIntelligenceJob, error) {
 	if workerID == "" || lease < time.Second || lease > 10*time.Minute {
 		return nil, ErrLibraryInvalid
@@ -173,7 +146,10 @@ func (db *Database) SearchSpaceLibraryIntelligence(ctx context.Context, userID, 
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
-	embeddingModel := "google/gemini-embedding-2"; if len(embeddingModels) > 0 { embeddingModel = embeddingModels[0] }
+	embeddingModel := "google/gemini-embedding-2"
+	if len(embeddingModels) > 0 {
+		embeddingModel = embeddingModels[0]
+	}
 	items := []SpaceLibraryItem{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {

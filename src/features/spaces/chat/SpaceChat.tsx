@@ -39,7 +39,6 @@ import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 import { spaceChatSuggestedActions } from "./spaceChatAiActions";
-export type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
 export function SpaceSocial({
   spaceId,
   spaceName,
@@ -596,4 +595,3 @@ function socialProviderLabel(provider: SocialProviderId): string {
   if (provider === "x") return "X";
   return provider.charAt(0).toUpperCase() + provider.slice(1);
 }
-export const SpaceChat = SpaceSocial;

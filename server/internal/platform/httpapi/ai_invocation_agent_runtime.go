@@ -56,10 +56,6 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		writeAgentError(w, err)
 		return
 	}
-	if prepared.sdkRequest != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"run_id": record.ID, "allowed_tools": prepared.allowedTools, "prompt": prepared.prompt, "sdk_execution": map[string]any{"name": prepared.allowedTools[0], "call_id": prepared.sdkRequest.EffectID, "input": prepared.sdkRequest.Request.Input}})
-		return
-	}
 	if s.aiInvocations != nil {
 		for _, item := range prepared.resolved {
 			citation := item.Citation
@@ -103,12 +99,11 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 
 func (s *SpacesService) agentRuntimeToolAIInvocation(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ApprovalHookToken string          `json:"approval_hook_token"`
-		DeviceHookToken   string          `json:"device_hook_token"`
-		RuntimeRunID      string          `json:"runtime_run_id"`
-		CallID            string          `json:"call_id"`
-		Name              string          `json:"name"`
-		Arguments         json.RawMessage `json:"arguments"`
+		DeviceHookToken string          `json:"device_hook_token"`
+		RuntimeRunID    string          `json:"runtime_run_id"`
+		CallID          string          `json:"call_id"`
+		Name            string          `json:"name"`
+		Arguments       json.RawMessage `json:"arguments"`
 	}
 	if !readAgentRuntimeRequest(s.agentRuntime, w, r, &body) {
 		return
@@ -129,16 +124,13 @@ func (s *SpacesService) agentRuntimeToolAIInvocation(w http.ResponseWriter, r *h
 	}
 	// The legacy endpoint executes exactly like the MCP route.
 	access := &mcpRuntimeAccess{record: record, prepared: prepared, claims: mcpAccessClaims{RuntimeRunID: body.RuntimeRunID}}
-	result, err := s.executeAIInvocationMCPTool(r.Context(), access, agentRuntimeToolCall{RuntimeRunID: body.RuntimeRunID, CallID: body.CallID, Name: body.Name, Arguments: body.Arguments, ApprovalHookToken: body.ApprovalHookToken, DeviceHookToken: body.DeviceHookToken})
+	result, err := s.executeAIInvocationMCPTool(r.Context(), access, agentRuntimeToolCall{RuntimeRunID: body.RuntimeRunID, CallID: body.CallID, Name: body.Name, Arguments: body.Arguments, DeviceHookToken: body.DeviceHookToken})
 	var intervention *aiInterventionRequired
-	var wait *browserApprovalRequired
 	switch {
 	case errors.As(err, &intervention):
 		writeJSON(w, http.StatusAccepted, map[string]any{"intervention_wait": intervention.wait})
 	case errors.Is(err, errAIInvocationDeviceWait):
 		writeJSON(w, http.StatusAccepted, map[string]any{"device_wait": true})
-	case errors.As(err, &wait):
-		writeJSON(w, http.StatusAccepted, map[string]any{"approval": wait.approval})
 	case errors.Is(err, db.ErrSpaceForbidden), errors.Is(err, workflowv2.ErrCapabilityDenied):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "tool_denied"})
 	case err != nil:

@@ -3,9 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
-	"time"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
@@ -17,22 +15,13 @@ import (
 // context, the MCP server and every tool call use this same resolution.
 func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
 	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID}
-	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, s.aiInvocationConnectedTools(ctx, record, agentID)...)
+	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, s.aiInvocationConnectedTools(record)...)
 }
 
-// aiInvocationConnectedTools are the user's connected apps, plus an agent's
-// MCP connectors.
-func (s *SpacesService) aiInvocationConnectedTools(ctx context.Context, record *db.AIInvocationRecord, agentID string) []agenttools.Registration {
-	registrations := append(s.appsToolRegistrations(), s.screenToolRegistrations(record)...)
-	if agentID == "" {
-		return registrations
-	}
-	run := &db.SpaceRun{ID: record.ID, OwnerUserID: record.UserID, RequestingMemberID: record.UserID, AgentID: agentID}
-	mcpHandler := func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
-		return s.executeMCPAgentTool(toolCtx, run, tool, false, "space_conversation")
-	}
-	registrations, _ = s.appendPersonalAgentMCPTools(ctx, record.UserID, agentID, registrations, nil, mcpHandler)
-	return registrations
+// aiInvocationConnectedTools are the user's connected apps and, on the
+// desktop, the screen tools.
+func (s *SpacesService) aiInvocationConnectedTools(record *db.AIInvocationRecord) []agenttools.Registration {
+	return append(s.appsToolRegistrations(), s.screenToolRegistrations(record)...)
 }
 
 func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt string, connected ...agenttools.Registration) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
@@ -71,48 +60,6 @@ func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database,
 	}
 	manifest, err := toolbox.Resolve(ctx, invocation, names, authorizeSpaceAgentTool(database))
 	return toolbox, invocation, manifest, err
-}
-
-func TestingResolveAIInvocationSpaceToolNames(ctx context.Context, database *db.Database, userID, spaceID, invocationID, prompt string) ([]string, error) {
-	if err := testingAdmitToolInvocation(ctx, database, userID, spaceID, invocationID, prompt); err != nil {
-		return nil, err
-	}
-	_, _, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, spaceConversationToolActor{
-		userID: userID, spaceID: spaceID, runID: invocationID,
-	}, prompt)
-	return manifestToolNames(manifest), err
-}
-
-func TestingResolveAIInvocationSpaceToolNamesWithConversation(ctx context.Context, database *db.Database, userID, spaceID, conversationID, invocationID, prompt string) ([]string, error) {
-	if err := testingAdmitToolInvocation(ctx, database, userID, spaceID, invocationID, prompt); err != nil {
-		return nil, err
-	}
-	_, _, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, spaceConversationToolActor{
-		userID: userID, spaceID: spaceID, runID: invocationID, sessionID: conversationID,
-	}, prompt)
-	return manifestToolNames(manifest), err
-}
-
-func TestingExecuteAIInvocationSpaceTool(ctx context.Context, database *db.Database, userID, spaceID, invocationID, prompt, name string, arguments json.RawMessage) (json.RawMessage, error) {
-	return TestingExecuteAIInvocationSpaceToolWithConversation(ctx, database, userID, spaceID, "", invocationID, prompt, name, arguments)
-}
-
-func TestingExecuteAIInvocationSpaceToolWithConversation(ctx context.Context, database *db.Database, userID, spaceID, conversationID, invocationID, prompt, name string, arguments json.RawMessage) (json.RawMessage, error) {
-	if err := testingAdmitToolInvocation(ctx, database, userID, spaceID, invocationID, prompt); err != nil {
-		return nil, err
-	}
-	toolbox, invocation, manifest, err := resolveAIInvocationSpaceToolbox(ctx, database, spaceConversationToolActor{
-		userID: userID, spaceID: spaceID, runID: invocationID, sessionID: conversationID,
-	}, prompt)
-	if err != nil {
-		return nil, err
-	}
-	if !agentManifestHasTool(manifest, name) {
-		return nil, agenttools.ErrCapabilityDenied
-	}
-	return executeSpaceAgentToolbox(ctx, toolbox, invocation, database, serveragent.ToolRequest{
-		ID: "testing-" + name, Name: name, Arguments: arguments,
-	})
 }
 
 func aiInvocationBrowserGrants(ctx context.Context, database *db.Database, userID, invocationID string) ([]string, map[string]bool) {
@@ -154,25 +101,3 @@ func agentToolNameAllowed(allowed []string, name string) bool {
 	return false
 }
 
-func agentManifestHasTool(manifest serveragent.ToolManifest, name string) bool {
-	for _, tool := range manifest.Tools {
-		if tool.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-// Test adapters use admitted identities just like the public invocation path.
-func testingAdmitToolInvocation(ctx context.Context, database *db.Database, userID, spaceID, id, prompt string) error {
-	if database == nil || id == "" {
-		return nil
-	}
-	if _, err := database.AIInvocationByID(ctx, userID, id); err == nil {
-		return nil
-	} else if !errors.Is(err, db.ErrSpaceNotFound) {
-		return err
-	}
-	_, _, err := database.CreateAIInvocationRecord(ctx, db.AIInvocationRecord{ID: id, UserID: userID, SpaceID: spaceID, SurfaceID: "notes", Mode: "quick", Trigger: "selection", State: "running", IdempotencyKey: id, RequestPayload: TestingMustAPIRawJSON(map[string]any{"prompt": prompt}), ExpiresAt: time.Now().Add(time.Hour)})
-	return err
-}

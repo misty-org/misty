@@ -55,20 +55,5 @@ func (s *SpacesService) executeAIInvocationMCPTool(ctx context.Context, access *
 }
 
 func mcpRunToolDefinition(descriptor agenttools.Descriptor) *mcp.Tool {
-	definition := mcpToolDefinition(descriptor)
-	if descriptor.ProviderBinding != nil {
-		definition.OutputSchema = map[string]any{"oneOf": []any{
-			map[string]any{"type": "object", "required": []string{"status", "result", "evidence", "partial"}, "properties": map[string]any{"status": map[string]any{"const": "success"}, "result": descriptor.OutputSchema, "evidence": map[string]any{"type": "array"}, "partial": map[string]any{"type": "boolean"}}},
-			map[string]any{"type": "object", "required": []string{"status", "effectId", "reason", "evidence"}, "properties": map[string]any{"status": map[string]any{"const": "uncertain"}}},
-		}}
-	}
-	return definition
-}
-
-func mcpSDKToolError(err error) *mcp.CallToolResult {
-	var intervention *aiInterventionRequired
-	if errors.As(err, &intervention) {
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "User action is required in the original browser target."}}, Meta: mcp.Meta{"misty/intervention_wait": intervention.wait}}
-	}
-	return mcpToolError(err)
+	return mcpToolDefinition(descriptor)
 }

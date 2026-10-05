@@ -1,7 +1,6 @@
 import { ExplorerDeleteDialogView } from "./ExplorerDeleteDialogView";
 import { useExplorerStore } from "../store";
 import { BatchRenameDialogView } from "./BatchRenameDialogView";
-export type { BatchRenameCaseMode, BatchRenameOptions } from "./BatchRenameDialogView";
 
 export function ExplorerDialog() {
   const dialog = useExplorerStore((state) => state.dialog);

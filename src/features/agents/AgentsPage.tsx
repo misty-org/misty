@@ -4,7 +4,7 @@ import { useAuth } from "@/features/auth";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { Button } from "@/shared/ui";
 import { useEffect, useId, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import "./agentsWorkspace.css";
 import { AgentNavigationIsland, type AgentSection } from "./components/AgentNavigationIsland";
 import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
@@ -14,7 +14,6 @@ import { AgentOverviewPanel } from "./components/AgentOverviewPanel";
 import { AgentSetup } from "./components/AgentSetup";
 import { AgentSwitcher } from "./components/AgentSwitcher";
 import { useAgentAccess } from "./components/AgentAccess";
-import { McpConnectionsSheet } from "./mcp/McpConnectionsSheet";
 import {
   AgentWorkspaceConversation,
   type AgentVoiceControl,
@@ -43,8 +42,6 @@ import { AgentWorkspaceFrame, type AgentWorkspacePage } from "./workspace/AgentW
 export default function NativeAgentsPage() {
   const { user } = useAuth();
   const spaceId = "";
-  const navigate = useNavigate();
-  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const voiceRef = useRef<AgentVoiceControl>(null);
   const [voiceState, setVoiceState] = useState({ recording: false, busy: false });
   const { agents, loading, error, load } = usePersonalAgentsStore();
@@ -81,7 +78,6 @@ export default function NativeAgentsPage() {
     setSelected(undefined);
     setEntryOpen(true);
     setSettingsModalOpen(false);
-    setConnectionsOpen(false);
     if (!user?.id) {
       void load("");
       return;
@@ -291,24 +287,20 @@ export default function NativeAgentsPage() {
     onBrowse: browseAgents,
   };
   const railOpen = !newChat && !settingsModalOpen && islandVisible && Boolean(profile);
+  const openApps = () =>
+    change(() => {
+      setWorkspacePage("integrations");
+      setActiveSection(undefined);
+    }, false);
   const overview = profile && (
     <AgentOverviewPanel
       key={`${user?.id}:${profile.id}`}
       profile={profile}
       access={access}
-      conversations={agentConversations}
       working={working && (workingAgentId === profile.id || Boolean(conversation))}
       recording={voiceState.recording}
       onCompanion={() => openSettingsModal("companion")}
-      onConnections={(source) => {
-        if (source === "apps")
-          change(() => {
-            setWorkspacePage("integrations");
-            setActiveSection(undefined);
-          }, false);
-        else setConnectionsOpen(true);
-      }}
-      onOpenResult={(href) => change(() => navigate(href))}
+      onConnections={openApps}
     />
   );
   const taskContent = (
@@ -450,7 +442,6 @@ export default function NativeAgentsPage() {
       ) : (
         taskContent
       )}
-      <McpConnectionsSheet open={connectionsOpen} onOpenChange={setConnectionsOpen} />
       <AgentSettingsModal
         open={settingsModalOpen}
         onOpenChange={(open) => (open ? setSettingsModalOpen(true) : closeSettings())}
@@ -462,7 +453,7 @@ export default function NativeAgentsPage() {
           <AgentSetup
             key={`${user?.id}:create`}
             access={access}
-            onConnections={() => setConnectionsOpen(true)}
+            onConnections={openApps}
             onCompanion={() => openSettingsModal("companion")}
             onStatusChange={setEditorStatus}
             onSaved={saveProfile}

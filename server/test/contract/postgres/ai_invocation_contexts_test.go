@@ -10,10 +10,12 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
+
+
+import ()
 
 func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	database := openTestDatabase(t)
@@ -22,7 +24,7 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, user.ID, "Family Space")
+	space, err := database.TestingCreateSpace(ctx, user.ID, "Family Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +32,7 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	invite, err := database.InviteToSpace(ctx, user.ID, space.ID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, user.ID, space.ID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +88,7 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"members.list", "tasks.query", "tasks.create", "browser.inspect", "browser.navigate", "browser.interact", "notes.create", "messages.send"} {
+	for _, expected := range []string{"members.list", "tasks.query", "tasks.create", "browser.inspect", "browser.navigate", "notes.create", "messages.send"} {
 		found := false
 		for _, name := range toolNames {
 			found = found || name == expected

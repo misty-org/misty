@@ -137,17 +137,6 @@ func (c AgentRuntimeConfig) Status(ctx context.Context, runtimeID, mistyRunID st
 	return "", errors.New("runtime returned an invalid status")
 }
 
-func (c AgentRuntimeConfig) ResumeApproval(ctx context.Context, hookToken, runID, approvalID string, approved bool) error {
-	var err error
-	c, err = c.forRun(ctx, runID)
-	if err != nil {
-		return err
-	}
-	body, _ := json.Marshal(map[string]any{"approved": approved, "approval_id": approvalID})
-	path := "/v1/approvals/" + url.PathEscape(hookToken)
-	return c.request(ctx, http.MethodPost, path, runID+":approval:"+approvalID, body, nil)
-}
-
 func (c AgentRuntimeConfig) ResumeDevice(ctx context.Context, hookToken, runID string, available bool) error {
 	var err error
 	c, err = c.forRun(ctx, runID)

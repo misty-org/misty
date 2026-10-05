@@ -41,7 +41,6 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   messageLoadingBySpace: {},
   messageErrorsBySpace: {},
   nodesBySpace: {},
-  workflowsBySpace: {},
   presenceBySpace: {},
   snapshotReady: false,
   referenceOnly: false,
@@ -229,21 +228,6 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
-  loadStudio: async (spaceId, kind) => {
-    const generation = spacesAccountGeneration;
-    try {
-      const { resources } = await spacesApi.studio(spaceId, kind);
-      if (generation !== spacesAccountGeneration) return;
-      set((state) => ({
-        workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources },
-        error: null,
-      }));
-    } catch (error) {
-      if (generation !== spacesAccountGeneration) return;
-      set({ error: errorText(error) });
-    }
-  },
-
   createSpace: async (request) => {
     set({ error: null });
     try {
@@ -377,7 +361,6 @@ export function resetSpacesAccountState(): void {
     messageLoadingBySpace: {},
     messageErrorsBySpace: {},
     nodesBySpace: {},
-    workflowsBySpace: {},
     presenceBySpace: {},
     snapshotReady: false,
     referenceOnly: false,

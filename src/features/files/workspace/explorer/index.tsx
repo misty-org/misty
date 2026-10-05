@@ -11,7 +11,6 @@ export * from "./store";
 export * from "./utils/globalSearch";
 export * from "./utils/librarySearch";
 export * from "./utils/searchNavigation";
-export { filesMultiPanelStore } from "./workspace/explorerWorkspace/filesDockStores";
 
 const loadDesktopFilesPage = () => import("./workspace");
 const DesktopFilesPage = lazy(loadDesktopFilesPage);

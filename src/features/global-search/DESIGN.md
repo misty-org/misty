@@ -15,7 +15,7 @@ The overlay is an Operate surface. A person starts with the message field, switc
 
 **Key Characteristics:**
 
-- One upper shell for the composer, optional thinking row, approvals, and conversation.
+- One upper shell for the composer, optional thinking row and conversation.
 - An input-led hierarchy with quiet icon controls and a compact agent identity.
 - Automatic current-view context and a detached bar containing only execution controls.
 
@@ -45,7 +45,7 @@ The bottom bar is centered (16px) above the viewport edge, fits its controls, an
 
 ## Elevation & Depth
 
-Both surfaces float above the workspace and use the existing restrained shadow treatment. The upper shell owns its depth; the embedded composer removes its own border and shadow. Separate thinking options, approvals, and conversation with hairlines rather than nested cards. Menus use the shared floating-menu treatment. Preserve reduced-motion support for the overlay's opacity transition.
+Both surfaces float above the workspace and use the existing restrained shadow treatment. The upper shell owns its depth; the embedded composer removes its own border and shadow. Separate thinking options and conversation with hairlines rather than nested cards. Menus use the shared floating-menu treatment. Preserve reduced-motion support for the overlay's opacity transition.
 
 ## Shapes
 
@@ -58,7 +58,7 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 - **Thinking options:** Reuse shared buttons for only Normal and Deep thinking, with the selected choice exposed through `aria-pressed`. The compatibility component `MistyModelPicker` now presents thinking presets, not model or provider selection. Model choice remains server-managed; the presets map to high and xhigh effort. Keep those implementation labels out of the visible control. Disable changes while saving or working and show save failures beside the choices.
 - **Voice:** The microphone icon starts recording and changes to a stop control during recording. Its adjacent chevron opens the input-device menu; opening that menu must not start recording. Preserve recording, permission-request, and transcription restrictions, plus accessible names on both controls.
 - **Context and apps:** The overlay uses the current view automatically; users express another destination in the prompt. Do not add manual Space, screen, or workspace-context selectors. Installed and connected apps follow the automatic availability path, subject to existing capabilities and permissions; the overlay has no per-agent assignment setup. `MistyContextBar` is reserved for artifact review, undo, handoff notices, and errors, not context configuration.
-- **Approval review:** Show the proposed action, summary, and Approve/Deny actions in the upper surface. A pending approval keeps that surface available even when the conversation is closed. Approval errors stay beside the decision.
+- **Connected-app confirmations:** When *Ask before acting for you* is on, connect and confirm cards appear in the conversation. They are not a separate approval surface.
 - **Bottom controls:** Idle controls expose disabled resume/pause plus close. Active execution exposes show chat, resume, pause, and stop/done, with availability reflecting execution state. Preserve accessible names and the screen-reader status; do not add visible explanatory text.
 - **Failures:** Execution failures propagate through Misty's existing error/activity path. They do not grow a second message panel inside the bottom bar.
 
@@ -67,7 +67,7 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 ### Do:
 
 - **Do** reuse the established theme and shared primitives before introducing custom controls or values.
-- **Do** retain accessible action names, pressed/expanded states, working-state restrictions, and explicit approval decisions.
+- **Do** retain accessible action names, pressed/expanded states, working-state restrictions, and explicit artifact decisions.
 - **Do** keep agent switching in the header, thinking choices beneath their disclosure, and input-device selection beside the recording control.
 - **Do** keep the bottom bar at its content width with one background.
 

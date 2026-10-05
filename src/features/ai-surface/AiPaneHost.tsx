@@ -15,10 +15,8 @@ import "./aiSurface.css";
 
 export type {
   AiArtifact,
-  AiCaptureAttachment,
   AiCompanionAnchor,
   AiContextReference,
-  AiSelectionSnapshot,
   AiSuggestedAction,
   AiSurfaceAdapter,
   AiSurfaceId,

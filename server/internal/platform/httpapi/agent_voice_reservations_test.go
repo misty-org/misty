@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
-	"unicode/utf8"
 
 	agent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/billingadapter"
@@ -96,7 +94,7 @@ func TestVoiceInputReservationsExtendThenSettleBeforeSpeech(t *testing.T) {
 			t.Fatal("transcription hold survived settlement")
 		}
 	}
-	estimate, _ := voiceSpeechFacts("Hello.", 32, 0, 0, 550)
+	estimate := agent.RealtimeVoiceUsage{"context_bytes": 32, "speech_bytes": 6, "retained_audio_tokens": 550, "output_token_limit": 2048}
 	if err := f.budget.admit(ctx, "speech", estimate); err != nil {
 		t.Fatal(err)
 	}
@@ -144,40 +142,4 @@ func TestVoiceOverReservationUsageRequiresReconciliation(t *testing.T) {
 		t.Fatal(f.states, f.completions)
 	}
 }
-func TestVoiceSpeechChunksPreserveTextAndSizeAdmission(t *testing.T) {
-	for _, input := range []string{"", "Hello.", strings.Repeat("Sentence ends here. ", 100), strings.Repeat("你好，世界！", 150), strings.Repeat("x", 1300)} {
-		chunks := voiceSpeechChunks(input)
-		if strings.Join(chunks, "") != input {
-			t.Fatal("reply changed")
-		}
-		for _, chunk := range chunks {
-			if !utf8.ValidString(chunk) || len(chunk) > 320 {
-				t.Fatal("invalid chunk", chunk)
-			}
-		}
-	}
-	small, limit := voiceSpeechFacts("Hello.", 0, 0, 0, 0)
-	large, largeLimit := voiceSpeechFacts(strings.Repeat("x", 320), 50, 20, 48000, 100)
-	if limit != 2048 || largeLimit != limit || large["speech_bytes"] != 320 || large["audio_pcm_bytes"] != 48000 || large["retained_audio_tokens"] != 100 {
-		t.Fatal(small, large)
-	}
-	if _, ok := small["transcription_input_tokens"]; ok {
-		t.Fatal("speech reserves transcription")
-	}
-}
 
-func TestVoiceSpeechChunksPreferSentencesToMidSentenceSpaces(t *testing.T) {
-	first := strings.Repeat("word ", 40) + "finished."
-	second := " " + strings.Repeat("another ", 30) + "sentence."
-	chunks := voiceSpeechChunks(first + second)
-	if len(chunks) != 2 || chunks[0] != first || chunks[1] != second {
-		t.Fatalf("split a sentence despite an available sentence boundary: %q", chunks)
-	}
-	// Decimal punctuation is not a sentence ending. Text and quota bounds survive.
-	decimal := strings.Repeat("cost 3.14 dollars ", 40)
-	for _, chunk := range voiceSpeechChunks(decimal) {
-		if strings.HasSuffix(chunk, "3.") || len(chunk) > 320 {
-			t.Fatalf("invalid decimal boundary: %q", chunk)
-		}
-	}
-}

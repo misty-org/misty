@@ -79,10 +79,6 @@ export interface SpaceRun {
     | "connector"
     | "task";
   agent_id?: string;
-  workflow_identifier?: string;
-  workflow_version_id?: string;
-  workflow_version?: string;
-  capability_id?: string;
   progress: number;
   outputs: Record<string, unknown>;
   artifacts: unknown[];
@@ -92,38 +88,6 @@ export interface SpaceRun {
   updated_at: string;
   created_at: string;
   completed_at?: string;
-}
-
-export interface SpaceRunDetail {
-  run: SpaceRun;
-  actions: RunAction[];
-  approvals: RunApproval[];
-  steps: WorkflowRunStep[];
-}
-
-export interface RunAction {
-  id: string;
-  run_id: string;
-  action_kind: string;
-  summary: string;
-  details: Record<string, unknown>;
-  destructive: boolean;
-  state: string;
-  performed_at?: string;
-  created_at: string;
-}
-
-export interface RunApproval {
-  id: string;
-  run_id: string;
-  requested_from_user_id: string;
-  decided_by_user_id?: string;
-  action_summary: string;
-  proposed_actions: Array<Record<string, unknown>>;
-  state: "pending" | "approved" | "rejected" | "expired" | "canceled";
-  created_at: string;
-  decided_at?: string;
-  expires_at: string;
 }
 
 export interface WorkflowRunStep {

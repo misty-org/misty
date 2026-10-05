@@ -5,15 +5,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/kannachi323/misty/server/internal/billingadapter"
+	"github.com/kannachi323/misty/server/internal/cloudusage"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"github.com/kannachi323/misty/server/internal/billingadapter"
-	"github.com/kannachi323/misty/server/internal/cloudusage"
 )
+
+
+import ()
 
 func TestAccountCloudGrowthRollsBackAndShrinkSurvivesOutage(t *testing.T) {
 	database := openTestDatabase(t)
@@ -23,7 +25,7 @@ func TestAccountCloudGrowthRollsBackAndShrinkSurvivesOutage(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	space, e := database.CreateSpace(ctx, user.ID, "Cloud facts")
+	space, e := database.TestingCreateSpace(ctx, user.ID, "Cloud facts")
 	if e != nil {
 		t.Fatal(e)
 	}

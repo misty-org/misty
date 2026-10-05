@@ -32,10 +32,6 @@ import { breadcrumbSegments, cx, toolbarStyles } from "@/features/file-ui";
 import { ExplorerToolbarDragNavigationView } from "./ExplorerToolbarDragNavigationView";
 
 export { ExplorerPaneToolbarActions } from "./ExplorerPaneToolbarActions";
-export type {
-  ExplorerLocationResult,
-  ExplorerPaneToolbarActionsProps,
-} from "./ExplorerToolbarModel";
 
 export const ExplorerToolbarView = memo(function ExplorerToolbarView(
   props: ExplorerToolbarProps & { runtime: ExplorerToolbarRuntime },

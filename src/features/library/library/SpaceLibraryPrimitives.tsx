@@ -1,11 +1,3 @@
-/**
- * Shared Library building blocks.
- *
- * The implementations live in `libraryPrimitives/`; this file stays as the
- * single import path the Library surfaces already use.
- */
-export type { LibraryAssetStackInput } from "@/api/spaces/dto/types/SpaceLibraryPrimitives";
-
 export { AlbumCover } from "./libraryPrimitives/AlbumCover";
 export {
   buildLibraryAssetStack,

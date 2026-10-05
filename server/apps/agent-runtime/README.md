@@ -1,6 +1,6 @@
 # Misty Agent Runtime
 
-Durable Misty execution built with AI SDK 7 `WorkflowAgent`. The runtime has no Misty database access. Run activation, context, checkpoints, approval resumption, cancellation, and completion cross the signed Go control-plane API; application tools use Misty's authenticated MCP endpoint.
+Durable Misty execution built with AI SDK 7 `WorkflowAgent`. The runtime has no Misty database access. Run activation, context, checkpoints, device and user-action resumption, cancellation, and completion cross the signed Go control-plane API; application tools use Misty's authenticated MCP endpoint.
 
 ## Cloud-to-MCP flow
 
@@ -8,7 +8,7 @@ Durable Misty execution built with AI SDK 7 `WorkflowAgent`. The runtime has no 
 2. The workflow activates and reads its authoritative context.
 3. At run start, Vercel exchanges its signed runtime identity for a five-minute bearer, discovers the run-scoped MCP catalog, and turns connected remote JSON Schemas into model-visible tools.
 4. Immediately before each tool call, Vercel exchanges for a fresh bearer and the official TypeScript MCP client calls the Go SDK's stateless `POST /mcp` endpoint over the same HTTPS API base.
-5. Go revalidates the active runtime binding, user, Space capabilities, approval state, and device grants on every request, then executes through the canonical Agent Toolbox and audit journal.
+5. Go revalidates the active runtime binding, user, Space capabilities and device grants on every request, then executes through the canonical Agent Toolbox and audit journal.
 
 Tokens cannot be reused for another Misty run or Vercel Workflow run. During a rolling deployment, the runtime falls back to the signed legacy tool endpoint only when token discovery is unavailable and before any tool execution begins.
 
@@ -16,7 +16,7 @@ Tokens cannot be reused for another Misty run or Vercel Workflow run. During a r
 
 - The model sees every tool in the run's catalog under its Misty name, with dots as underscores (`notes.search` is `notes_search`). There is no discovery tool or working set; Go decides what the catalog contains.
 - A call Misty rejected without effect, and any failed read, returns its error to the model, which corrects the call or picks another tool. Later calls from the same model response are reported as not attempted.
-- A write whose outcome is unknown, a denied approval, an unavailable device, a required sign-in, or a write repeated after the same rejection stops the run.
+- A write whose outcome is unknown, a declined app confirmation, an unavailable device, a required sign-in, or a write repeated after the same rejection stops the run.
 - The model reports the outcome with `misty_finish_task`. `misty_browser_act` runs Midscene against the assigned browser when the native adapter is available.
 - `workflows/space-task-agent.ts` only orchestrates the run. Tool naming lives in `src/model-tools.ts`, call outcomes in `src/tool-outcomes.ts` and `src/tool-monitor.ts`, transport in `src/tool-calls.ts`, and lifecycle steps in `src/control-plane-steps.ts`.
 
@@ -74,13 +74,12 @@ The signed Go start request also carries
 `MISTY_INTERNAL_API_BASE` value is retained as a rolling-deployment fallback;
 set both to the same reachable API base.
 
-## Operator model provider
+## Instance model
 
-Models route through the AI Gateway by default. The operator can instead pin one
-direct OpenAI, Anthropic, Google, or OpenAI-compatible model with
-`MISTY_AGENT_MODEL_PROVIDER`, `MISTY_AGENT_MODEL`, `MISTY_AGENT_MODEL_API_KEY`, and
-`MISTY_AGENT_MODEL_BASE_URL`. Configure the API and runtime consistently; a run
-pinned to a different model fails rather than silently switching provider.
+Instance models always route through the AI Gateway (`AI_GATEWAY_API_KEY` or
+Vercel OIDC). `MISTY_AGENT_MODEL` optionally pins the default Gateway model;
+configure the API and runtime consistently. Account connections (below) are
+the only way to bring a provider key.
 
 `InstanceModel` persists only public model/run/role identity at workflow boundaries
 and resolves credentials inside model execution. Never replace it with a serialized
@@ -94,7 +93,7 @@ write-only, encrypted with the server's connection encryption key, and bound to
 one user/connection/provider. They are separate from synchronized preferences.
 Custom account endpoints must be public HTTPS; transports revalidate and pin DNS
 on each connection, reject private/reserved addresses and do not follow redirects.
-Operator environment configuration remains the default for unassigned tasks.
+The AI Gateway remains the default for unassigned tasks.
 
 Each supported task selects one connection/model/reasoning choice. The Models
 page limits connections by the implemented protocol: all five providers for

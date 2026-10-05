@@ -18,7 +18,6 @@ type agentRuntimeToolCall struct {
 	CallID               string
 	Name                 string
 	Arguments            json.RawMessage
-	ApprovalHookToken    string
 	DeviceHookToken      string
 }
 
@@ -75,22 +74,10 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 			browserCapabilities[descriptor.Name] = activeBrowserRuntimeCapability(contexts, descriptor.Name)
 		}
 	}
-	providers := s.companionRunProviders(ctx, run)
-	providerHandler := func(ctx context.Context, _ agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
-		return s.executeCompanionProviderTool(ctx, run, request)
-	}
-	mcpHandler := func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
-		return s.executeMCPAgentTool(toolCtx, run, tool, false, "space_conversation")
-	}
-	mcpRegistrations, _ := s.appendPersonalAgentMCPTools(ctx, run.OwnerUserID, run.AgentID, s.appsToolRegistrations(), nil, mcpHandler)
-	sdkRegistrations, err := s.agentSDKRegistrations(ctx, run)
-	if err != nil {
-		return nil, agenttools.Invocation{}, nil, err
-	}
-	mcpRegistrations = append(mcpRegistrations, sdkRegistrations...)
+	connected := s.appsToolRegistrations()
 	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{
 		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
-		providers: providers, providerHandler: providerHandler, delegation: delegationHandler, extra: mcpRegistrations,
+		delegation: delegationHandler, extra: connected,
 	})
 	names := make([]string, 0, len(toolbox.Descriptors()))
 	for _, descriptor := range toolbox.Descriptors() {
@@ -117,9 +104,6 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 func (s *SpacesService) executePersonalAgentRuntimeTool(ctx context.Context, run *db.SpaceRun, call agentRuntimeToolCall) (agentRuntimeToolOutcome, error) {
 	if run == nil || strings.TrimSpace(call.CallID) == "" || len(call.CallID) > 200 || len(call.Arguments) == 0 {
 		return agentRuntimeToolOutcome{}, db.ErrSpaceInvalid
-	}
-	if strings.HasPrefix(call.Name, "sdk.") {
-		return s.executeConversationalSDKTool(ctx, run, call)
 	}
 	if call.Name == "browser.request_user_action" && !call.SupportsIntervention {
 		return agentRuntimeToolOutcome{}, db.ErrSpaceForbidden
