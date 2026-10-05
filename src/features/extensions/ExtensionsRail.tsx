@@ -5,10 +5,9 @@ import {
   WorkspaceSidebar,
   WorkspaceSidebarHeading,
   cn,
-  itemToneClass,
   navigationMenuLinkClass,
 } from "@/shared/ui";
-import { categoryTones, type ExtensionCategory } from "./extensionCategories";
+import type { ExtensionCategory } from "./extensionCategories";
 
 /** The Extensions sidebar: Discover, Installed and the catalog's categories. */
 export function ExtensionsRail({
@@ -33,17 +32,15 @@ export function ExtensionsRail({
           name: "Discover",
           route: "/extensions",
           Icon: Compass,
-          tone: "blue" as const,
           active: !inInstalled && !category && !detailId,
         },
         {
           name: "Installed",
           route: "/extensions/installed",
           Icon: Download,
-          tone: "green" as const,
           active: inInstalled,
         },
-      ].map(({ name, route, Icon, tone, active }) => (
+      ].map(({ name, route, Icon, active }) => (
         <Button
           variant="ghost"
           key={name}
@@ -51,7 +48,7 @@ export function ExtensionsRail({
           aria-current={active ? "page" : undefined}
           onClick={() => go(route)}
         >
-          <Icon size={18} className={itemToneClass(tone)} />
+          <Icon size={18} />
           <span>{name}</span>
         </Button>
       ))}
@@ -64,7 +61,7 @@ export function ExtensionsRail({
           aria-current={category === id ? "page" : undefined}
           onClick={() => go(`/extensions?category=${id}`)}
         >
-          <Icon size={18} className={itemToneClass(categoryTones[id] ?? "sand")} />
+          <Icon size={18} />
           <span>{name}</span>
         </Button>
       ))}
