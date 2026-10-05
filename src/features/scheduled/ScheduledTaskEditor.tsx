@@ -12,6 +12,7 @@ import {
   Input,
   OptionSelect,
   Textarea,
+  Skeleton,
 } from "@/shared/ui";
 import { useState, type FormEvent } from "react";
 import { weekdayNames } from "./scheduleFormat";
@@ -129,15 +130,24 @@ export function ScheduledTaskEditor(props: {
               label="Agent"
               hint="This agent handles every run and follow-up in the task’s conversation."
             >
-              <OptionSelect
-                value={agentId ?? ""}
-                disabled={agentsLoading || !availableAgents.length}
-                placeholder={agentsLoading ? "Loading agents…" : "No available agents"}
-                options={agents
-                  .filter((a) => a.enabled)
-                  .map((a) => ({ value: a.id, label: a.name }))}
-                onValueChange={(value) => set("agent_id", value)}
-              />
+              {agentsLoading ? (
+                <Skeleton
+                  role="status"
+                  aria-label="Agents"
+                  aria-hidden={false}
+                  className="h-9 w-full"
+                />
+              ) : (
+                <OptionSelect
+                  value={agentId ?? ""}
+                  disabled={!availableAgents.length}
+                  placeholder="No available agents"
+                  options={agents
+                    .filter((a) => a.enabled)
+                    .map((a) => ({ value: a.id, label: a.name }))}
+                  onValueChange={(value) => set("agent_id", value)}
+                />
+              )}
             </Field>
           )}
           {!props.task && agentsError && (
