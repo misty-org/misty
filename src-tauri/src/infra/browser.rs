@@ -1070,6 +1070,8 @@ pub async fn browser_webview_create(
                     }
                     let _ = apply_shortcuts(&webview, &state);
                 }
+                #[cfg(target_os = "macos")]
+                focus_messages::forget_page_background(&page_id);
             }
             let phase = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "started",
@@ -1755,6 +1757,9 @@ pub fn browser_webview_reconcile(
     // Reconciliation owns geometry, visibility, and sibling order so a stale
     // frontend cache cannot leave the page detached from its Browser host.
     present_macos_webview(&webview)?;
+    // A reloaded shell forgot the page's color; the page will not resend it.
+    #[cfg(target_os = "macos")]
+    focus_messages::replay_page_background(&app, &request.id);
     Ok(true)
 }
 
