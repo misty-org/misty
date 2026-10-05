@@ -23,7 +23,8 @@ use app::commands::{
     media_search_set_asset_state, media_search_snapshot,
 };
 use app::commands::{
-    agents_device_snapshot, agents_prepare_scoped_document, agents_revoke_folder_scope,
+    agents_choose_folder_scope, agents_device_snapshot, agents_list_scoped_files,
+    agents_prepare_scoped_document, agents_revoke_folder_scope,
     app_snapshot, archive_create, archive_extract, archive_list, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
@@ -335,6 +336,8 @@ pub fn run() {
                     #[cfg(unix)]
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
+                    agents_choose_folder_scope,
+                    agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
                     agents_device_identity_load,

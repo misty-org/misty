@@ -1,4 +1,5 @@
 import { useAgentInterventions } from "@/features/agent-interventions/store";
+import { useAgentMemberRequests } from "@/features/agent-member-requests/store";
 import { readDeploymentScope } from "@/api/deployment/api";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -54,7 +55,7 @@ interface ActivityStore extends ActivityData {
   clearError(): void;
 }
 
-export type ActivityRefreshSource = "interventions";
+export type ActivityRefreshSource = "interventions" | "agent_requests";
 
 export const useActivityStore = create<ActivityStore>()(
   persist(
@@ -88,8 +89,14 @@ export const useActivityStore = create<ActivityStore>()(
         set({ loading: true, offline: false, error: null });
         try {
           const accountId = get().accountId;
-          const sources = [useAgentInterventions];
-          const selected = only ? sources.filter(() => only.includes("interventions")) : sources;
+          const named = [
+            ["interventions", useAgentInterventions],
+            ["agent_requests", useAgentMemberRequests],
+          ] as const;
+          const sources = named.map(([, source]) => source);
+          const selected = only
+            ? named.filter(([name]) => only.includes(name)).map(([, source]) => source)
+            : sources;
           await Promise.all(
             selected.map((source) => {
               const current = source.getState();

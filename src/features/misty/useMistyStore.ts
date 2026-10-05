@@ -1,4 +1,5 @@
 import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
+import { desktopDeviceGrants } from "@/features/agents/deviceGrants";
 import { apiRequest } from "@/api/client";
 import {
   runtimeAiApi as aiSurfaceApi,
@@ -503,6 +504,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         uncertainAdmissions.get(admission) ??
         `global-answer-${globalMistyId()}`;
       uncertainAdmissions.set(admission, idempotencyKey);
+      // Shared folders and the Misty browser travel with every desktop chat.
+      const grants = workerReceipt ? [] : await desktopDeviceGrants().catch(() => []);
       const created =
         workerReceipt ??
         (await aiSurfaceApi.createInvocation({
@@ -526,7 +529,12 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           prompt: normalized,
           context: invocationContext,
           attachmentIds: attachments.map((attachment) => attachment.id),
-          deviceContexts,
+          deviceContexts: [
+            ...deviceContexts,
+            ...grants.filter(
+              (grant) => !deviceContexts.some((c) => c.opaqueRef === grant.opaqueRef),
+            ),
+          ],
           thinkingMode: requestedThinking,
           selection,
           capture,
