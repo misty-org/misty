@@ -7,6 +7,7 @@ import { Bell } from "lucide-react";
 import { cn, Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
 import { AgentInterventions } from "@/features/agent-interventions/AgentInterventions";
+import { AgentMemberRequests } from "@/features/agent-member-requests/AgentMemberRequests";
 import { ActivityFeed } from "./ActivityFeed";
 import { closeActivityPanel, openActivityPanel, useActivityPanel } from "./activityPanelState";
 
@@ -57,10 +58,10 @@ export function ActivityPanel() {
             Activity
           </DialogTitle>
         </header>
-        {!panel.interventionId && (
+        {!panel.interventionId && !panel.agentRequestId && (
           <ActivityPanelToolbar view={view} counts={results.counts} onChange={setView} />
         )}
-        {panel.interventionId ? (
+        {panel.interventionId || panel.agentRequestId ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
             <Button
               variant="ghost"
@@ -76,6 +77,13 @@ export function ActivityPanel() {
                 accountId={user.id}
                 selectedId={panel.interventionId}
                 onCount={() => undefined}
+              />
+            ) : null}
+            {user?.id && panel.agentRequestId ? (
+              <AgentMemberRequests
+                key={`${user.id}:${panel.agentRequestId}`}
+                accountId={user.id}
+                selectedId={panel.agentRequestId}
               />
             ) : null}
           </div>

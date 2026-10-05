@@ -134,6 +134,53 @@ pub async fn agents_revoke_folder_scope(
     state.agents.revoke_folder_scope(scope_id).await
 }
 
+/// Shows the native folder picker and grants the chosen folder to agents on
+/// this device. A page can never name a path itself.
+#[tauri::command]
+pub async fn agents_choose_folder_scope(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Option<serde_json::Value>> {
+    use tauri_plugin_dialog::DialogExt;
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Open the main Misty window to share a folder with agents.".into(),
+        ));
+    }
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Choose a folder Misty agents can read")
+        .pick_folder(move |folder| {
+            let _ = send.send(folder);
+        });
+    let Some(folder) = receive
+        .await
+        .map_err(|_| crate::error::ApiError::Message("Folder selection was canceled.".into()))?
+    else {
+        return Ok(None);
+    };
+    let path = folder
+        .into_path()
+        .map_err(|_| crate::error::ApiError::Message("Choose a local folder.".into()))?;
+    state.agents.register_folder_scope(path).await.map(Some)
+}
+
+#[tauri::command]
+pub async fn agents_list_scoped_files(
+    webview: tauri::Webview,
+    request: crate::infra::agents::ListScopedFilesRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can process approved device scopes.".into(),
+        ));
+    }
+    state.agents.list_scoped_files(request).await
+}
+
 #[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn agents_prepare_document(

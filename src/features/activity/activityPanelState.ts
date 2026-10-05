@@ -3,6 +3,7 @@ import { create } from "zustand";
 export const useActivityPanel = create<{
   open: boolean;
   interventionId?: string;
+  agentRequestId?: string;
 }>(() => ({ open: false }));
 
 export function openActivityPanel(href = "/activity") {
@@ -10,9 +11,10 @@ export function openActivityPanel(href = "/activity") {
   useActivityPanel.setState({
     open: true,
     interventionId: params.get("intervention") || undefined,
+    agentRequestId: params.get("agent-request") || undefined,
   });
 }
 
 export function closeActivityPanel() {
-  useActivityPanel.setState({ open: false, interventionId: undefined });
+  useActivityPanel.setState({ open: false, interventionId: undefined, agentRequestId: undefined });
 }
