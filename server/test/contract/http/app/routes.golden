@@ -18,6 +18,7 @@ DELETE /api/misty/agents/{agentID}
 DELETE /api/misty/attachments/{attachmentID}
 DELETE /api/misty/conversations/{conversationID}
 DELETE /api/spaces/{spaceID}
+DELETE /api/spaces/{spaceID}/agent-listings/{agentID}
 DELETE /api/spaces/{spaceID}/calendar/events/{eventID}
 DELETE /api/spaces/{spaceID}/calendar/sources/{sourceID}
 DELETE /api/spaces/{spaceID}/conversations/{conversationID}
@@ -55,6 +56,7 @@ DELETE /misty/agents/{agentID}
 DELETE /misty/attachments/{attachmentID}
 DELETE /misty/conversations/{conversationID}
 DELETE /spaces/{spaceID}
+DELETE /spaces/{spaceID}/agent-listings/{agentID}
 DELETE /spaces/{spaceID}/calendar/events/{eventID}
 DELETE /spaces/{spaceID}/calendar/sources/{sourceID}
 DELETE /spaces/{spaceID}/conversations/{conversationID}
@@ -98,6 +100,7 @@ DELETE /v1/misty/agents/{agentID}
 DELETE /v1/misty/attachments/{attachmentID}
 DELETE /v1/misty/conversations/{conversationID}
 DELETE /v1/spaces/{spaceID}
+DELETE /v1/spaces/{spaceID}/agent-listings/{agentID}
 DELETE /v1/spaces/{spaceID}/calendar/events/{eventID}
 DELETE /v1/spaces/{spaceID}/calendar/sources/{sourceID}
 DELETE /v1/spaces/{spaceID}/conversations/{conversationID}
@@ -127,6 +130,8 @@ DELETE /v1/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}
 DELETE /v1/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}
 DELETE /v1/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 DELETE /v1/spaces/{spaceID}/tasks/{taskID}
+GET /a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
+GET /agent-requests/{requestID}
 GET /agent-runs/{runID}
 GET /agent-voice/realtime
 GET /ai/activity
@@ -145,6 +150,8 @@ GET /ai/settings
 GET /ai/smart-library/folders/{folderID}/progress
 GET /ai/smart-library/folders/{folderID}/results
 GET /ai/status
+GET /api/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
+GET /api/agent-requests/{requestID}
 GET /api/agent-runs/{runID}
 GET /api/agent-voice/realtime
 GET /api/ai/activity
@@ -177,6 +184,7 @@ GET /api/integrations/apps
 GET /api/integrations/apps/catalog
 GET /api/me
 GET /api/me/agent-interventions
+GET /api/me/agent-requests
 GET /api/me/app-requests/{requestID}
 GET /api/me/avatar
 GET /api/me/home
@@ -199,6 +207,7 @@ GET /api/spaces
 GET /api/spaces/resolve/{ticket}
 GET /api/spaces/{spaceID}
 GET /api/spaces/{spaceID}/agenda
+GET /api/spaces/{spaceID}/agent-listings
 GET /api/spaces/{spaceID}/attachments/{attachmentID}/download
 GET /api/spaces/{spaceID}/calendar/google/calendars
 GET /api/spaces/{spaceID}/calendar/sources
@@ -268,6 +277,7 @@ GET /integrations/apps
 GET /integrations/apps/catalog
 GET /me
 GET /me/agent-interventions
+GET /me/agent-requests
 GET /me/app-requests/{requestID}
 GET /me/avatar
 GET /me/home
@@ -290,6 +300,7 @@ GET /spaces
 GET /spaces/resolve/{ticket}
 GET /spaces/{spaceID}
 GET /spaces/{spaceID}/agenda
+GET /spaces/{spaceID}/agent-listings
 GET /spaces/{spaceID}/attachments/{attachmentID}/download
 GET /spaces/{spaceID}/calendar/google/calendars
 GET /spaces/{spaceID}/calendar/sources
@@ -345,6 +356,8 @@ GET /spaces/{spaceID}/tasks
 GET /sync/devices
 GET /sync/vault
 GET /sync/ws
+GET /v1/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
+GET /v1/agent-requests/{requestID}
 GET /v1/agent-runs/{runID}
 GET /v1/agent-voice/realtime
 GET /v1/ai/activity
@@ -377,6 +390,7 @@ GET /v1/integrations/apps
 GET /v1/integrations/apps/catalog
 GET /v1/me
 GET /v1/me/agent-interventions
+GET /v1/me/agent-requests
 GET /v1/me/app-requests/{requestID}
 GET /v1/me/avatar
 GET /v1/me/home
@@ -399,6 +413,7 @@ GET /v1/spaces
 GET /v1/spaces/resolve/{ticket}
 GET /v1/spaces/{spaceID}
 GET /v1/spaces/{spaceID}/agenda
+GET /v1/spaces/{spaceID}/agent-listings
 GET /v1/spaces/{spaceID}/attachments/{attachmentID}/download
 GET /v1/spaces/{spaceID}/calendar/google/calendars
 GET /v1/spaces/{spaceID}/calendar/sources
@@ -526,6 +541,9 @@ PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/layout
 PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}
 PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 PATCH /v1/spaces/{spaceID}/tasks/{taskID}
+POST /a2a/spaces/{spaceID}/agents/{agentID}
+POST /agent-requests/{requestID}/approve
+POST /agent-requests/{requestID}/decline
 POST /agent-runs/{runID}/cancel
 POST /agent-voice/realtime/ticket
 POST /agent-voice/transcriptions
@@ -554,6 +572,9 @@ POST /ai/smart-library/folders/{folderID}/sample/approve
 POST /ai/smart-library/reindex
 POST /ai/smart-library/reindex/{jobID}/complete
 POST /ai/smart-library/search
+POST /api/a2a/spaces/{spaceID}/agents/{agentID}
+POST /api/agent-requests/{requestID}/approve
+POST /api/agent-requests/{requestID}/decline
 POST /api/agent-runs/{runID}/cancel
 POST /api/agent-voice/realtime/ticket
 POST /api/agent-voice/transcriptions
@@ -781,6 +802,9 @@ POST /sync/devices
 POST /sync/restore/step
 POST /sync/ticket
 POST /sync/vault
+POST /v1/a2a/spaces/{spaceID}/agents/{agentID}
+POST /v1/agent-requests/{requestID}/approve
+POST /v1/agent-requests/{requestID}/decline
 POST /v1/agent-runs/{runID}/cancel
 POST /v1/agent-voice/realtime/ticket
 POST /v1/agent-voice/transcriptions
@@ -933,6 +957,7 @@ PUT /api/me/space-templates/{templateID}
 PUT /api/me/telemetry
 PUT /api/misty/agents/{agentID}
 PUT /api/misty/attachments/{attachmentID}/content
+PUT /api/spaces/{spaceID}/agent-listings/{agentID}
 PUT /api/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 PUT /api/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
 PUT /api/spaces/{spaceID}/library/albums/{albumID}/organization
@@ -952,6 +977,7 @@ PUT /me/space-templates/{templateID}
 PUT /me/telemetry
 PUT /misty/agents/{agentID}
 PUT /misty/attachments/{attachmentID}/content
+PUT /spaces/{spaceID}/agent-listings/{agentID}
 PUT /spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 PUT /spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
 PUT /spaces/{spaceID}/library/albums/{albumID}/organization
@@ -982,6 +1008,7 @@ PUT /v1/me/space-templates/{templateID}
 PUT /v1/me/telemetry
 PUT /v1/misty/agents/{agentID}
 PUT /v1/misty/attachments/{attachmentID}/content
+PUT /v1/spaces/{spaceID}/agent-listings/{agentID}
 PUT /v1/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 PUT /v1/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
 PUT /v1/spaces/{spaceID}/library/albums/{albumID}/organization

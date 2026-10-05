@@ -7,20 +7,22 @@ import (
 
 // Parent cancellation revokes descendants in the same account boundary and
 // queues runtime cancellation, including reservation and approval cleanup.
+// Work the account asked another member's agent to do stops with its
+// requester too, although that member owns and pays for it.
 func cancelMistyChildrenTx(ctx context.Context, tx *sql.Tx, userID, runID string) error {
 	rows, err := tx.QueryContext(ctx, `WITH RECURSIVE children AS (
- SELECT id,space_id FROM space_runs WHERE (parent_run_id=$1 OR input->>'parent_invocation_id'=$1) AND owner_user_id=$2
- UNION ALL SELECT r.id,r.space_id FROM space_runs r JOIN children c ON r.parent_run_id=c.id WHERE r.owner_user_id=$2
- ) SELECT r.id,COALESCE(r.runtime_run_id,'') FROM space_runs r JOIN children c ON c.id=r.id
+ SELECT id,space_id FROM space_runs WHERE (parent_run_id=$1 OR input->>'parent_invocation_id'=$1 OR input->>'requester_invocation_id'=$1) AND (owner_user_id=$2 OR initiated_by_user_id=$2)
+ UNION ALL SELECT r.id,r.space_id FROM space_runs r JOIN children c ON r.parent_run_id=c.id WHERE r.owner_user_id=$2 OR r.initiated_by_user_id=$2
+ ) SELECT r.id,COALESCE(r.runtime_run_id,''),r.owner_user_id FROM space_runs r JOIN children c ON c.id=r.id
  WHERE r.state IN ('queued','running','awaiting_approval','awaiting_device','awaiting_intervention') FOR UPDATE OF r`, runID, userID)
 	if err != nil {
 		return err
 	}
-	type child struct{ id, runtime string }
+	type child struct{ id, runtime, owner string }
 	children := []child{}
 	for rows.Next() {
 		var item child
-		if err := rows.Scan(&item.id, &item.runtime); err != nil {
+		if err := rows.Scan(&item.id, &item.runtime, &item.owner); err != nil {
 			rows.Close()
 			return err
 		}
@@ -32,7 +34,7 @@ func cancelMistyChildrenTx(ctx context.Context, tx *sql.Tx, userID, runID string
 		return err
 	}
 	for _, item := range children {
-		if err := cancelMistyRunTx(ctx, tx, userID, item.id, item.runtime); err != nil {
+		if err := cancelMistyRunTx(ctx, tx, item.owner, item.id, item.runtime); err != nil {
 			return err
 		}
 	}

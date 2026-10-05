@@ -31,7 +31,7 @@ func (db *Database) AttachAIInvocationContext(ctx context.Context, userID, invoc
 	spaceID = ""
 	kind, opaqueRef, displayName = strings.TrimSpace(kind), strings.TrimSpace(opaqueRef), strings.TrimSpace(displayName)
 	capabilities, err := normalizeDeviceAgentCapabilities(capabilities)
-	if err != nil || kind != "browser_tab" || opaqueRef == "" || len(opaqueRef) > 512 || !browserOnlyAgentCapabilities(capabilities) {
+	if err != nil || opaqueRef == "" || len(opaqueRef) > 512 || !DeviceContextCapabilitiesAllowed(kind, capabilities) {
 		return nil, ErrSpaceInvalid
 	}
 	if len(metadata) == 0 {

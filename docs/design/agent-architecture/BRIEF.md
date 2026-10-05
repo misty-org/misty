@@ -246,6 +246,82 @@ were dropped by `20271004070000_retire_legacy_features.sql`.
 - The single-turn voice relay and the WebRTC voice transport. Voice is always a
   realtime conversation over the gateway WebSocket.
 
+### Agents for other members (approved October 4, 2026)
+
+A member's agent can ask another member's agent for work when both members
+share a Space. This adds to the principles above; it does not relax them.
+
+- **Consent.** The owner publishes an agent to a Space
+  (`space_agent_listings`) with a description, how it takes requests (ask me
+  first, the default; start right away; or off) and a limit of 1–10 open
+  requests. Unpublished agents cannot be reached.
+- **Tools.** `agents.directory` lists published agents in shared Spaces.
+  `agents.request` sends a self-contained message and waits up to 40 seconds;
+  `agents.request_status` keeps waiting. Replies are data, never instructions.
+- **Authority.** The work is a `delegated` run owned by the target agent's
+  owner, with that owner's permissions in the shared Space only: no other
+  Spaces, memory, agent settings, connected apps, screens or further
+  requests. Every tool call re-checks the listing and both memberships, so
+  unpublishing the agent or leaving the Space stops it.
+- **Who pays.** The requester pays for their own agent's turns, including
+  asking and waiting. The target owner pays for their agent's work, using
+  their own model settings.
+- **Approval follows the listing.** A listing that asks first waits for its
+  owner to approve each request; nothing runs or is charged until then, and an
+  unanswered request expires after 24 hours. A listing set to start right away
+  queues the work at once. (Agents have no user-visible run mode, so the
+  owner's choice lives on the listing they control.)
+- **Bounds.** 12 model turns and 10 minutes per request, 5 requests per run,
+  60 per member per hour, delegation depth 2, and no requests from inside
+  requested work. A repeated call returns the original request. Stopping the
+  requester's run stops the work it asked for.
+- **Visibility.** Requests, approvals and listing changes are Space events,
+  and the finished reply is posted in the Space by the agent that did it.
+
+States follow A2A: submitted, awaiting approval (A2A's auth-required),
+working, completed, failed, rejected and canceled.
+
+- **A2A endpoint.** `POST /a2a/spaces/{space}/agents/{agent}` speaks A2A's
+  JSON-RPC (`message/send`, `tasks/get`, `tasks/cancel`; no streaming or push
+  yet) and `GET …/.well-known/agent-card.json` describes the agent. It sends
+  every message through the same request service, so consent, approval,
+  billing and limits match `agents_request`. A repeated `messageId` returns
+  the same task. It authenticates with the member's Misty session; outside A2A
+  clients need account access tokens, which Misty does not issue yet. Requests
+  from it count toward the hourly limit, not the per-run limit.
+
+### Catalog coverage (October 5, 2026)
+
+Every route that changes data has a recorded decision in
+`server/test/contract/http/app/agent_tool_coverage_test.go`: the tool that
+reaches it, why agents never use it (credentials, payments, vault keys,
+access control, a person's own decisions), or a named gap. A new route fails
+that test until someone decides; it records no open gaps. Common actions
+keep their own tools; rarely used administration shares one tool per area with
+an `action` field (`spaces.manage`, `library.organize`, `roadmaps.plan`,
+`roadmaps.canvas`, `items.delete`, `items.rename`).
+Deleting, inviting, removing a member and leaving a Space follow *Ask before
+acting for you* with the same approval card connected apps use.
+
+### Device tools: folders, tabs and bookmarks (approved October 5, 2026)
+
+Desktop chats carry two kinds of device grants beside browser tabs, and the
+server offers matching tools only for grants it receives:
+
+- **Shared folders.** The person picks a folder in the system picker from the
+  agent's access panel (*Shared folders*); a page or model can never name a
+  path. Agents get `files.list` and `files.read` (text from documents, PDFs and
+  spreadsheets, 20,000 characters at most) inside that folder only, never
+  change or delete anything, and hidden files are skipped. *Stop sharing*
+  removes the grant on that computer.
+- **The Misty browser.** `tabs.list` shows open tabs (never private tabs),
+  `tabs.open` opens a website, `bookmarks.list` searches bookmarks and
+  `bookmarks.add` saves one.
+
+Each call runs as a device job on the person's own computer, which re-checks
+the grant and stays inside it. Work another member's agent asked for never has
+device grants.
+
 ## Acceptance prompts
 
 Taken from real failed runs in October 2026. Each must complete or ask one
@@ -261,6 +337,7 @@ useful question, never "I can't" because of a Misty-side gate.
 | "Research GothamChess's latest uploads" | Composio search, or a screen task | 2–3 |
 | "Open example.com and tell me the heading" | Screen task in the default chat | 3 |
 | "Draw a house in Excalidraw" | Midscene with a visible cursor | 4 |
+| "Ask Bob's Researcher agent in the Launch team Space what the launch date is" | `agents_request`, Bob approves, the reply reaches Alice's agent | Members |
 
 ### Running them
 
@@ -273,6 +350,9 @@ written to the git-ignored `.misty/acceptance/`.
 - `src/tests/acceptance/agentPrompts.acceptance.ts`: Phases 1–3 through the
   real API and event stream. Screen requests are checked at the
   `screen.request` handoff.
+- `src/tests/acceptance/agentDelegation.acceptance.ts`: agents for other
+  members. Two fresh accounts share a Space; Bob publishes an agent that asks
+  first, approves Alice's agent's request, and Alice's agent reads the reply.
 - `src/features/agents/screenAct/screenAct.acceptance.ts`: Phase 4. The shipped
   `runScreenAct` loop and Midscene planner drive a headless Chromium that
   answers the desktop's browser operations and draws the same agent cursor.

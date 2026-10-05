@@ -47,6 +47,11 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 	if _, err := s.database.AskIdentityByID(ctx, run.OwnerUserID, run.AgentID); err != nil {
 		return nil, agenttools.Invocation{}, nil, err
 	}
+	if request, err := s.database.AgentMemberRequestForRun(ctx, run.ID); err == nil {
+		return s.memberRequestRuntimeToolbox(ctx, run, request)
+	} else if !errors.Is(err, db.ErrSpaceNotFound) {
+		return nil, agenttools.Invocation{}, nil, err
+	}
 	delegationHandler := func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 		var input struct {
 			Prompt string `json:"prompt"`
@@ -74,7 +79,8 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 			browserCapabilities[descriptor.Name] = activeBrowserRuntimeCapability(contexts, descriptor.Name)
 		}
 	}
-	connected := s.appsToolRegistrations()
+	connected := append(s.appsToolRegistrations(), agentMemberToolRegistrations(s.database)...)
+	connected = append(connected, s.accountAdminToolRegistrations()...)
 	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{
 		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
 		delegation: delegationHandler, extra: connected,
