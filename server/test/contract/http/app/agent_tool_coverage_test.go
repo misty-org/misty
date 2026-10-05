@@ -80,6 +80,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^POST /spaces/\{spaceID\}/invitations/\{inviteID\}/resend$`, tool: "space.manage"},
 	{pattern: `^DELETE /spaces/\{spaceID\}/members/\{userID\}$`, tool: "space.manage"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/agents/`, why: "bringing an agent into a Space or taking it out is its owner's choice"},
+	{pattern: `^\S+ /spaces/\{spaceID\}/code-projects`, why: "a project's files live on its owner's device; only the person links or unlinks it there"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/(read|item-state)$|/conversations/\{conversationID\}/read$`, why: "per-person read and pin state"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/integrations/`, why: "connecting an account needs the person to sign in"},
 

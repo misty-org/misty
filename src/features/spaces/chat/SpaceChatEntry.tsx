@@ -1,7 +1,7 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Hash, MoreHorizontal, Plus, User, Users } from "lucide-react";
+import { Bot, Hash, MoreHorizontal, Plus, User, Users } from "lucide-react";
 import {
   Button,
   CollectionPage,
@@ -21,7 +21,7 @@ import {
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { useSpaceItemCreator } from "../useSpaceItemCreator";
-import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
+import { conversationPath, spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { conversationName } from "./sidebar/conversationGroups";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
@@ -51,50 +51,46 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
   useEffect(() => {
     if (!members) void loadMembers(spaceId).catch(() => {});
   }, [members, loadMembers, spaceId]);
-  const rows = data.conversations
-    .filter((c) => !c.direct_agent_id)
-    .map((c) => {
-      const category = c.kind === "direct" ? "Direct" : "Channels";
-      const open = () => navigate(spaceChatConversationPath(spaceId, c.id));
-      return {
-        id: c.id,
-        title: conversationName(c, user?.id),
-        category,
-        icon: category === "Channels" ? <Hash /> : <User />,
-        tone: itemTones.chat,
-        creator: creator(c.created_by_user_id),
-        metadata: {
-          Members: c.participants.length,
-          Created: new Date(c.created_at).toLocaleDateString(),
-        },
-        sortValues: { Created: Date.parse(c.created_at) },
-        timestamp: c.updated_at,
-        ownership: c.created_by_user_id === user?.id ? "mine" : "others",
-        updatedAt: c.updated_at,
-        updated: new Date(c.updated_at).toLocaleDateString(undefined, {
-          month: "short",
-          day: "numeric",
-        }),
-        onOpen: open,
-        actions: (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <IconButton label={`More actions for ${conversationName(c, user?.id)}`}>
-                <MoreHorizontal />
-              </IconButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={open}>Open</DropdownMenuItem>
-              {c.created_by_user_id === user?.id && c.kind !== "direct" && (
-                <DropdownMenuItem onSelect={() => setEditing(c)}>
-                  Edit conversation
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      };
-    });
+  const rows = data.conversations.map((c) => {
+    const category = c.kind === "direct" ? "Direct" : "Channels";
+    const open = () => navigate(conversationPath(spaceId, c));
+    return {
+      id: c.id,
+      title: conversationName(c, user?.id),
+      category,
+      icon: c.direct_agent_id ? <Bot /> : category === "Channels" ? <Hash /> : <User />,
+      tone: itemTones.chat,
+      creator: creator(c.created_by_user_id),
+      metadata: {
+        Members: c.participants.length,
+        Created: new Date(c.created_at).toLocaleDateString(),
+      },
+      sortValues: { Created: Date.parse(c.created_at) },
+      timestamp: c.updated_at,
+      ownership: c.created_by_user_id === user?.id ? "mine" : "others",
+      updatedAt: c.updated_at,
+      updated: new Date(c.updated_at).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      onOpen: open,
+      actions: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton label={`More actions for ${conversationName(c, user?.id)}`}>
+              <MoreHorizontal />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={open}>Open</DropdownMenuItem>
+            {c.created_by_user_id === user?.id && c.kind !== "direct" && (
+              <DropdownMenuItem onSelect={() => setEditing(c)}>Edit conversation</DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  });
   rows.unshift({
     id: "everyone",
     title: "Everyone",

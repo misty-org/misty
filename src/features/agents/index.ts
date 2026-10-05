@@ -2,6 +2,9 @@ export { default as AgentsPage } from "./AgentsPage";
 export * from "./flags";
 export type { GlobalSpaceLibraryHit } from "./model/personal";
 export { agentsDeviceSnapshot, removeProject } from "./store/useAgentsStore";
+export { projectRemote } from "./store/projectGitHub";
+export { ProjectReviewSheet } from "./components/changes/ProjectReviewSheet";
+export { useProjectReview } from "./components/changes/useProjectReview";
 export {
   deviceAccount,
   ensureDeviceStarted,

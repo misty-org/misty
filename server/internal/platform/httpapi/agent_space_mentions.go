@@ -107,7 +107,35 @@ func (s *SpacesService) publishMentionReply(ctx context.Context, run *db.SpaceRu
 	if finishErr := s.database.FinishRunResponsePublication(ctx, actionID, state, details); finishErr != nil {
 		return finishErr
 	}
+	if publishErr == nil && run.State == "completed" {
+		s.startAgentReplyMentions(ctx, request, message, reply)
+	}
 	return publishErr
+}
+
+// startAgentReplyMentions lets agents talk to each other in the chat: when a
+// reply @mentions another agent in the Space, that agent picks the thread up,
+// visibly and billed to the person who asked first. It goes one hop deep.
+func (s *SpacesService) startAgentReplyMentions(ctx context.Context, request *db.AgentMemberRequest, message *db.SpaceMessage, reply string) {
+	agents, err := s.database.SpaceAgents(ctx, request.RequesterUserID, request.SpaceID)
+	if err != nil {
+		return
+	}
+	lower := strings.ToLower(reply)
+	started := 0
+	for _, agent := range agents {
+		if started >= 3 || agent.AgentID == request.TargetAgentID || !strings.Contains(lower, "@"+strings.ToLower(agent.AgentName)) {
+			continue
+		}
+		started++
+		if _, err := s.database.CreateAgentMemberRequest(ctx, db.AgentMemberRequestInput{
+			SpaceID: request.SpaceID, RequesterUserID: request.RequesterUserID, RequesterAgentID: request.TargetAgentID,
+			RequesterRunID: db.ReplyRequester(message.ID), TargetAgentID: agent.AgentID, Message: reply,
+			IdempotencyKey: agent.AgentID, SourceConversationID: request.SourceConversationID,
+		}); err != nil && !errors.Is(err, db.ErrAgentRequestLimit) {
+			log.Printf("agent reply mention: request to %s failed: %v", agent.AgentID, err)
+		}
+	}
 }
 
 func firstName(name, fallback string) string {

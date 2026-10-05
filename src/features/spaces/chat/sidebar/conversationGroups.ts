@@ -9,25 +9,26 @@ export interface ConversationGroup {
 }
 const byRecent = (left: SpaceConversation, right: SpaceConversation) =>
   right.updated_at.localeCompare(left.updated_at);
-/** Channels, then direct messages. */
+/** Channels, then direct messages with agents. */
 export function groupConversations(conversations: SpaceConversation[]): ConversationGroup[] {
-  const visible = conversations.filter((item) => !item.direct_agent_id).sort(byRecent);
+  const sorted = [...conversations].sort(byRecent);
   return [
     {
       id: "channels",
       title: "Channels",
       everyone: true,
-      conversations: visible.filter((item) => item.kind !== "direct"),
+      conversations: sorted.filter((item) => item.kind !== "direct"),
     },
     {
       id: "direct",
       title: "Direct messages",
-      conversations: visible.filter((item) => item.kind === "direct"),
+      conversations: sorted.filter((item) => item.kind === "direct"),
     },
   ];
 }
-/** Direct messages are titled by the other person; everything else by its own name. */
+/** A chat with an agent is titled by the chat; direct messages by the other person. */
 export function conversationName(conversation: SpaceConversation, currentUserId?: string) {
+  if (conversation.direct_agent_id) return conversation.title || "New chat";
   if (conversation.kind === "direct") {
     const other = conversation.participants.find((p) => p.user_id && p.user_id !== currentUserId);
     if (other?.name) return other.name;

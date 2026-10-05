@@ -106,6 +106,36 @@ func TestMentioningAnAgentInSpaceChatAsksItsOwner(t *testing.T) {
 		t.Fatalf("reply = %#v, %v, want Bob's agent answering under the message", reply, err)
 	}
 
+	// Bob's agent @mentions Alice's agent in its reply: Alice's agent picks up
+	// the thread, still billed to Alice, one hop deep.
+	if _, err := f.database.AddSpaceAgent(ctx, f.alice.ID, f.space.ID, f.aliceAgent.ID); err != nil {
+		t.Fatal(err)
+	}
+	handoff := AgentMemberRequestInput{SpaceID: f.space.ID, RequesterUserID: f.alice.ID, RequesterAgentID: f.bobAgent.ID,
+		RequesterRunID: ReplyRequester(reply.ID), TargetAgentID: f.aliceAgent.ID, Message: "@Planner can you add it to the plan?", IdempotencyKey: f.aliceAgent.ID}
+	next, err := f.database.CreateAgentMemberRequest(ctx, handoff)
+	if err != nil || next.SourceMessageID != reply.ID || next.RunState != "queued" {
+		t.Fatalf("agent-to-agent request = %#v, %v", next, err)
+	}
+	nextRun, err := f.database.SpaceRun(ctx, f.alice.ID, next.ChildRunID)
+	if err != nil || nextRun.BillingUserID != f.alice.ID || nextRun.ParentRunID != request.ChildRunID || nextRun.DelegationDepth != 2 {
+		t.Fatalf("agent-to-agent work = %#v, %v", nextRun, err)
+	}
+	if _, err := f.database.CreateAgentMemberRequest(ctx, AgentMemberRequestInput{SpaceID: f.space.ID, RequesterUserID: f.alice.ID,
+		RequesterAgentID: f.aliceAgent.ID, RequesterRunID: ReplyRequester(reply.ID), TargetAgentID: f.bobAgent.ID,
+		Message: "@Researcher", IdempotencyKey: "spoof"}); !errors.Is(err, ErrSpaceForbidden) {
+		t.Fatalf("a reply spoken for by another agent = %v", err)
+	}
+	second, err := f.database.CreateAgentMemberRequestMessage(ctx, next, "agent_member_reply", "Added. @Researcher anything else?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.database.CreateAgentMemberRequest(ctx, AgentMemberRequestInput{SpaceID: f.space.ID, RequesterUserID: f.alice.ID,
+		RequesterAgentID: f.aliceAgent.ID, RequesterRunID: ReplyRequester(second.ID), TargetAgentID: f.bobAgent.ID,
+		Message: "anything else?", IdempotencyKey: f.bobAgent.ID}); !errors.Is(err, ErrAgentRequestLimit) {
+		t.Fatalf("a second hop = %v, want the depth limit", err)
+	}
+
 	plain, _, err := f.database.TestingCreateSpaceMessage(ctx, f.alice.ID, f.space.ID, []MessageSpan{{Type: "text", Text: "No mention here"}}, nil)
 	if err != nil {
 		t.Fatal(err)

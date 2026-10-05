@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Bot,
   Check,
   ChevronDown,
   Hash,
@@ -34,7 +35,7 @@ import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/entities";
 import { useSpaceConversations } from "../sidebar/useSpaceConversations";
 import { conversationName, groupConversations } from "../sidebar/conversationGroups";
 import { CreateEditConversationDialog } from "../sidebar/CreateEditConversationDialog";
-import { spaceChatConversationPath, spaceChatPath } from "../chatRoute";
+import { conversationPath, spaceChatConversationPath, spaceChatPath } from "../chatRoute";
 import { useSpacePersonalItems } from "../../useSpacePersonalItems";
 
 export function ConversationSwitcher({
@@ -106,12 +107,12 @@ export function ConversationSwitcher({
                 </CommandItem>
               )}
               {group.conversations.map((c) => {
-                const Icon = c.kind === "direct" ? UserRound : Hash;
+                const Icon = c.direct_agent_id ? Bot : c.kind === "direct" ? UserRound : Hash;
                 return (
                   <CommandItem
                     key={c.id}
                     value={`${conversationName(c, currentUserId)} ${group.title} ${c.id}`}
-                    onSelect={() => choose(spaceChatConversationPath(spaceId, c.id))}
+                    onSelect={() => choose(conversationPath(spaceId, c))}
                   >
                     <Icon />
                     <span className="truncate">{conversationName(c, currentUserId)}</span>

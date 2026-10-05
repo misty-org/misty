@@ -1,5 +1,5 @@
 import { TooltipProvider } from "@/shared/ui";
-import { FolderOpen, MessagesSquare, Notebook, PenTool } from "lucide-react";
+import { FileCode2, FolderOpen, MessagesSquare, Notebook, PenTool } from "lucide-react";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
 // A Space's primitives. Management controls live at the bottom of the Space rail.
@@ -8,6 +8,7 @@ const sections = [
   { id: "notes", label: "Notes", icon: Notebook },
   { id: "drawings", label: "Drawings", icon: PenTool },
   { id: "library", label: "Files", icon: FolderOpen },
+  { id: "code", label: "Code", icon: FileCode2 },
 ] as const;
 
 export function SpaceSectionNavigation({

@@ -30,6 +30,7 @@ async function loadChat() {
   return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
+const Code = lazy(() => import("./code/SpaceCode").then((m) => ({ default: m.SpaceCode })));
 
 export async function preloadSpaceSection(section: string) {
   switch (section) {
@@ -45,6 +46,9 @@ export async function preloadSpaceSection(section: string) {
       break;
     case "library":
       await loadLibrary();
+      break;
+    case "code":
+      await import("./code/SpaceCode");
       break;
   }
 }
@@ -150,6 +154,8 @@ export function SpaceSectionView(props: {
           />
         ) : section === "library" ? (
           <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "code" ? (
+          <Code spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
         ) : section === "social" || section === "chat" ? (
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (

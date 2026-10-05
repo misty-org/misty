@@ -16,6 +16,7 @@ DELETE /api/misty/conversation-folders/{folderID}
 DELETE /api/misty/conversations/{conversationID}
 DELETE /api/spaces/{spaceID}
 DELETE /api/spaces/{spaceID}/agents/{agentID}
+DELETE /api/spaces/{spaceID}/code-projects/{projectID}
 DELETE /api/spaces/{spaceID}/conversations/{conversationID}
 DELETE /api/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 DELETE /api/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
@@ -41,6 +42,7 @@ DELETE /misty/conversation-folders/{folderID}
 DELETE /misty/conversations/{conversationID}
 DELETE /spaces/{spaceID}
 DELETE /spaces/{spaceID}/agents/{agentID}
+DELETE /spaces/{spaceID}/code-projects/{projectID}
 DELETE /spaces/{spaceID}/conversations/{conversationID}
 DELETE /spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 DELETE /spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
@@ -69,6 +71,7 @@ DELETE /v1/misty/conversation-folders/{folderID}
 DELETE /v1/misty/conversations/{conversationID}
 DELETE /v1/spaces/{spaceID}
 DELETE /v1/spaces/{spaceID}/agents/{agentID}
+DELETE /v1/spaces/{spaceID}/code-projects/{projectID}
 DELETE /v1/spaces/{spaceID}/conversations/{conversationID}
 DELETE /v1/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 DELETE /v1/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
@@ -156,6 +159,7 @@ GET /api/me/memory/export
 GET /api/me/memory/status
 GET /api/me/referral
 GET /api/me/settings
+GET /api/me/space-agents
 GET /api/me/space-people
 GET /api/me/voice/transcripts/{transcriptID}
 GET /api/misty/agents
@@ -174,6 +178,7 @@ GET /api/spaces/{spaceID}
 GET /api/spaces/{spaceID}/agent-artifacts
 GET /api/spaces/{spaceID}/agents
 GET /api/spaces/{spaceID}/attachments/{attachmentID}/download
+GET /api/spaces/{spaceID}/code-projects
 GET /api/spaces/{spaceID}/conversations
 GET /api/spaces/{spaceID}/conversations/{conversationID}/messages
 GET /api/spaces/{spaceID}/drawings
@@ -234,6 +239,7 @@ GET /me/memory/export
 GET /me/memory/status
 GET /me/referral
 GET /me/settings
+GET /me/space-agents
 GET /me/space-people
 GET /me/voice/transcripts/{transcriptID}
 GET /misty/agents
@@ -252,6 +258,7 @@ GET /spaces/{spaceID}
 GET /spaces/{spaceID}/agent-artifacts
 GET /spaces/{spaceID}/agents
 GET /spaces/{spaceID}/attachments/{attachmentID}/download
+GET /spaces/{spaceID}/code-projects
 GET /spaces/{spaceID}/conversations
 GET /spaces/{spaceID}/conversations/{conversationID}/messages
 GET /spaces/{spaceID}/drawings
@@ -333,6 +340,7 @@ GET /v1/me/memory/export
 GET /v1/me/memory/status
 GET /v1/me/referral
 GET /v1/me/settings
+GET /v1/me/space-agents
 GET /v1/me/space-people
 GET /v1/me/voice/transcripts/{transcriptID}
 GET /v1/misty/agents
@@ -351,6 +359,7 @@ GET /v1/spaces/{spaceID}
 GET /v1/spaces/{spaceID}/agent-artifacts
 GET /v1/spaces/{spaceID}/agents
 GET /v1/spaces/{spaceID}/attachments/{attachmentID}/download
+GET /v1/spaces/{spaceID}/code-projects
 GET /v1/spaces/{spaceID}/conversations
 GET /v1/spaces/{spaceID}/conversations/{conversationID}/messages
 GET /v1/spaces/{spaceID}/drawings
@@ -508,6 +517,7 @@ POST /api/register
 POST /api/space-invitations/{token}
 POST /api/spaces
 POST /api/spaces/{spaceID}/attachments/{attachmentID}/promote
+POST /api/spaces/{spaceID}/code-projects
 POST /api/spaces/{spaceID}/conversations
 POST /api/spaces/{spaceID}/conversations/{conversationID}/messages
 POST /api/spaces/{spaceID}/conversations/{conversationID}/read
@@ -615,6 +625,7 @@ POST /register
 POST /space-invitations/{token}
 POST /spaces
 POST /spaces/{spaceID}/attachments/{attachmentID}/promote
+POST /spaces/{spaceID}/code-projects
 POST /spaces/{spaceID}/conversations
 POST /spaces/{spaceID}/conversations/{conversationID}/messages
 POST /spaces/{spaceID}/conversations/{conversationID}/read
@@ -727,6 +738,7 @@ POST /v1/register
 POST /v1/space-invitations/{token}
 POST /v1/spaces
 POST /v1/spaces/{spaceID}/attachments/{attachmentID}/promote
+POST /v1/spaces/{spaceID}/code-projects
 POST /v1/spaces/{spaceID}/conversations
 POST /v1/spaces/{spaceID}/conversations/{conversationID}/messages
 POST /v1/spaces/{spaceID}/conversations/{conversationID}/read

@@ -10,7 +10,7 @@ export function useLibraryView() {
   const [librarySearchParams, setLibrarySearchParams] = useSearchParams();
   const [collection, setCollection] = useState<LibraryCollectionKind>("recent");
   const [mediaType, setMediaType] = useState<LibraryMediaType>("");
-  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("list");
+  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("grid");
   const [libraryItemScale, setLibraryItemScale] = useState(1);
   const [sort, setSort] = useState<NonNullable<LibraryItemQuery["sort"]>>("recently-added");
   const [direction, setDirection] = useState<NonNullable<LibraryItemQuery["direction"]>>("desc");

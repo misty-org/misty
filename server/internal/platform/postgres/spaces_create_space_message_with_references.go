@@ -28,6 +28,14 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 			if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
 				return err
 			}
+			// A chat with an agent is driven by its runs, not posted messages.
+			var agentChat bool
+			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_conversations WHERE id=$1 AND kind='direct')`, conversationID).Scan(&agentChat); err != nil {
+				return err
+			}
+			if agentChat {
+				return ErrSpaceInvalid
+			}
 		}
 		if len(out.LibraryItemIDs) > 0 {
 			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryView); err != nil {

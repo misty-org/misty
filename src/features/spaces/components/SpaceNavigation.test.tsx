@@ -40,6 +40,7 @@ describe("SpaceSectionNavigation", () => {
       "Notes",
       "Drawings",
       "Files",
+      "Code",
     ]);
     expect(container.querySelector("nav")?.className).toContain("grid");
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Files");

@@ -19,6 +19,7 @@ import {
 } from "../libraryFormat";
 import { FileNameIcon } from "@/features/file-ui";
 import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
+import { useAgentArtifactCredits } from "../libraryData/useAgentArtifactCredits";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { libraryFileTypeLabel, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
 const ITEM_ACTION_MENU_WIDTH = 224;
@@ -54,10 +55,15 @@ export function SpaceLibraryItems() {
       itemMenu,
       nextAfter,
       loadingMore,
+      reloadKey,
     },
     itemActions: { loadMore, restoreItem },
   } = useSpaceLibraryContext();
-  const creatorName = useSpaceItemCreator(spaceId);
+  const personName = useSpaceItemCreator(spaceId);
+  const agentCredits = useAgentArtifactCredits(spaceId, reloadKey);
+  /** Files an agent saved credit the agent; everything else the person who added it. */
+  const madeBy = (item: (typeof displayItems)[number]) =>
+    agentCredits.get(item.id) ?? personName(item.added_by_user_id);
   const showItemMenu = (itemId: string, left: number, top: number, anchor?: Element) => {
     setItemMenu({
       itemId,
@@ -89,7 +95,7 @@ export function SpaceLibraryItems() {
             title: item.display_name,
             icon: <FileNameIcon name={item.file.original_filename} size={18} />,
             category: libraryFileTypeLabel(item),
-            creator: creatorName(item.added_by_user_id),
+            creator: madeBy(item),
             metadata: {
               Size:
                 item.file.intrinsic_metadata.byte_size == null
@@ -110,9 +116,9 @@ export function SpaceLibraryItems() {
               "Recover until": item.recover_until ? Date.parse(item.recover_until) : undefined,
             },
             creatorDescription: [
-              `Added by ${creatorName(item.added_by_user_id)}`,
-              `Contributed by ${creatorName(item.contributing_user_id)}`,
-              `Uploaded by ${creatorName(item.file.uploader_user_id)}`,
+              `Added by ${madeBy(item)}`,
+              `Contributed by ${personName(item.contributing_user_id)}`,
+              `Uploaded by ${personName(item.file.uploader_user_id)}`,
             ].join(" · "),
             updatedAt: item.updated_at || item.added_at,
             updated: formatTime(item.updated_at || item.added_at),
@@ -173,7 +179,7 @@ export function SpaceLibraryItems() {
             ) : null}
             <LibraryItemCard
               item={item}
-              creator={creatorName(item.added_by_user_id)}
+              creator={madeBy(item)}
               onContextMenu={openItemContextMenu}
               onShowMenu={showItemMenu}
               selected={selectedItemIds.includes(item.id)}

@@ -40,6 +40,13 @@ const MentionRequesterPrefix = "message:"
 
 func MentionRequester(messageID string) string { return MentionRequesterPrefix + messageID }
 
+// ReplyRequesterPrefix marks requests an agent made by @mentioning another
+// agent in its chat reply. The reply stands in for the requesting run, the
+// work is billed to the person who asked first, and it goes one hop deep.
+const ReplyRequesterPrefix = "reply:"
+
+func ReplyRequester(messageID string) string { return ReplyRequesterPrefix + messageID }
+
 type AgentMemberRequestInput struct {
 	SpaceID          string
 	RequesterUserID  string
@@ -143,6 +150,9 @@ func (db *Database) CreateAgentMemberRequest(ctx context.Context, input AgentMem
 				return err
 			}
 		}
+		if strings.HasPrefix(input.RequesterRunID, ReplyRequesterPrefix) {
+			sourceMessageID = strings.TrimPrefix(input.RequesterRunID, ReplyRequesterPrefix)
+		}
 		target, err := memberRequestTargetTx(ctx, tx, input)
 		if err != nil {
 			return err
@@ -203,6 +213,24 @@ func memberRequestParentTx(ctx context.Context, tx *sql.Tx, userID, agentID, run
 			return "", "", 0, ErrSpaceForbidden
 		}
 		return "", "", 1, nil
+	}
+	if strings.HasPrefix(runID, ReplyRequesterPrefix) {
+		// An agent's chat reply, answering a request this person made, mentioned
+		// another agent. It continues that request's work one level deeper.
+		var parentAgentID string
+		var parentDepth int
+		err = tx.QueryRowContext(ctx, `SELECT q.child_run_id,q.target_agent_id,r.delegation_depth FROM space_messages m
+			JOIN agent_member_requests q ON q.id=m.origin->>'agent_request_id'
+			JOIN space_runs r ON r.id=q.child_run_id
+			WHERE m.id=$1 AND m.sender_kind='agent' AND m.sender_agent_id=q.target_agent_id AND q.requester_user_id=$2`,
+			strings.TrimPrefix(runID, ReplyRequesterPrefix), userID).Scan(&parentRunID, &parentAgentID, &parentDepth)
+		if err != nil || agentID == "" || agentID != parentAgentID {
+			return "", "", 0, ErrSpaceForbidden
+		}
+		if parentDepth+1 > memberRequestMaxDepth {
+			return "", "", 0, ErrAgentRequestLimit
+		}
+		return parentRunID, "", parentDepth + 1, nil
 	}
 	if strings.HasPrefix(runID, ExternalAgentRequesterPrefix) {
 		// An A2A caller is one of the signed-in member's own agents, outside
@@ -288,7 +316,8 @@ func memberRequestLimitsTx(ctx context.Context, tx *sql.Tx, input AgentMemberReq
 	if open >= memberRequestMaxOpen {
 		return ErrAgentRequestBusy
 	}
-	external := strings.HasPrefix(input.RequesterRunID, ExternalAgentRequesterPrefix) || strings.HasPrefix(input.RequesterRunID, MentionRequesterPrefix)
+	external := strings.HasPrefix(input.RequesterRunID, ExternalAgentRequesterPrefix) || strings.HasPrefix(input.RequesterRunID, MentionRequesterPrefix) ||
+		strings.HasPrefix(input.RequesterRunID, ReplyRequesterPrefix)
 	if (!external && perRun >= memberRequestsPerRun) || lastHour >= memberRequestsPerUserHour {
 		return ErrAgentRequestLimit
 	}

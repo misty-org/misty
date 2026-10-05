@@ -1,13 +1,6 @@
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace/core";
 
-const validSpaceSections = new Set([
-  "social",
-  "chat",
-  "planner",
-  "notes",
-  "drawings",
-  "library",
-]);
+const validSpaceSections = new Set(["social", "chat", "notes", "drawings", "library", "code"]);
 
 export function spaceLandingRoute(
   spaceId: string,

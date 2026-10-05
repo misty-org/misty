@@ -15,7 +15,7 @@ import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
+import { conversationPath, spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { ConversationSwitcher } from "./components/ConversationSwitcher";
 import { ChatPresencePill } from "./components/ChatPresencePill";
@@ -258,6 +258,11 @@ export function SpaceSocial({
     spaceId,
     store.referenceOnly,
   ]);
+  // A chat with an agent lives in the agent view; old links land there.
+  const agentChat = scope.activeConversation?.direct_agent_id ? scope.activeConversation : null;
+  useEffect(() => {
+    if (agentChat) navigate(conversationPath(spaceId, agentChat), { replace: true });
+  }, [agentChat, navigate, spaceId]);
   if (conversationId && conversationChat.error && !scope.activeConversation) {
     return (
       <ErrorState

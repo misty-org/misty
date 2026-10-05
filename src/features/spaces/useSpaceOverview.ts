@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import { useSpacePersonalItems } from "./useSpacePersonalItems";
 import { spaceItemKeyFromRoute } from "./spaceItemRoute";
-import { spaceChatConversationPath } from "./chat/chatRoute";
+import { conversationPath } from "./chat/chatRoute";
 import { conversationName } from "./chat/sidebar/conversationGroups";
 import { notesApi } from "@/api/notes/api";
 import { drawingsApi } from "@/api/drawings/api";
@@ -159,36 +159,32 @@ function useSpaceOverviewData(
       if (allAreas)
         requests.push(
           spacesApi.conversations(space.id).then(({ conversations }) =>
-            conversations
-              .filter((c) => !c.direct_agent_id)
-              .map((c) => ({
-                id: `chat:${c.id}`,
-                title: conversationName(c, accountId),
-                area: "Chat",
-                kind: "chat",
-                creatorUserId: c.created_by_user_id,
-                createdAt: c.created_at,
-                updatedAt: c.updated_at,
-                route: spaceChatConversationPath(space.id, c.id),
-                rename:
-                  c.created_by_user_id === accountId && c.kind !== "direct"
-                    ? (title: string) =>
-                        spacesApi.updateConversation(
-                          space.id,
-                          c.id,
-                          title,
-                          c.participants
-                            .filter((p) => p.user_id)
-                            .map((p) => ({ kind: "person", user_id: p.user_id! })),
-                        )
-                    : undefined,
-                remove:
-                  space.role === "owner" ||
-                  c.created_by_user_id === accountId ||
-                  c.kind === "direct"
-                    ? () => spacesApi.deleteOrClearConversation(space.id, c.id)
-                    : undefined,
-              })),
+            conversations.map((c) => ({
+              id: `chat:${c.id}`,
+              title: conversationName(c, accountId),
+              area: "Chat",
+              kind: "chat",
+              creatorUserId: c.created_by_user_id,
+              createdAt: c.created_at,
+              updatedAt: c.updated_at,
+              route: conversationPath(space.id, c),
+              rename:
+                c.created_by_user_id === accountId && c.kind !== "direct"
+                  ? (title: string) =>
+                      spacesApi.updateConversation(
+                        space.id,
+                        c.id,
+                        title,
+                        c.participants
+                          .filter((p) => p.user_id)
+                          .map((p) => ({ kind: "person", user_id: p.user_id! })),
+                      )
+                  : undefined,
+              remove:
+                space.role === "owner" || c.created_by_user_id === accountId || c.kind === "direct"
+                  ? () => spacesApi.deleteOrClearConversation(space.id, c.id)
+                  : undefined,
+            })),
           ),
         );
       if (allAreas)
