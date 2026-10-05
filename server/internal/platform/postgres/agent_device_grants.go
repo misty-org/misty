@@ -31,6 +31,32 @@ var deviceAgentCapabilities = map[string]bool{
 	"project.patch": true, "project.diff": true, "project.status": true, "project.checks": true, "git.commit": true, "git.push": true, "terminal.execute": true,
 	"browser.interact": true, "browser.inspect": true, "browser.visual": true, "browser.navigate": true, "browser.click": true, "browser.type": true, "browser.select": true, "browser.scroll": true,
 	"browser.downloads.list": true, "browser.upload": true, "browser.act": true, "browser.confirm_high_risk": true,
+	"tabs.list": true, "tabs.open": true, "bookmarks.list": true, "bookmarks.add": true,
+}
+
+// deviceContextCapabilities are what each kind of desktop grant may allow.
+var deviceContextCapabilities = map[string]map[string]bool{
+	"local_folder": {"files.list": true, "files.read": true},
+	"workspace":    {"tabs.list": true, "tabs.open": true, "bookmarks.list": true, "bookmarks.add": true},
+}
+
+// DeviceContextCapabilitiesAllowed reports whether a desktop grant asks only
+// for capabilities its kind can have.
+func DeviceContextCapabilitiesAllowed(kind string, raw json.RawMessage) bool {
+	if kind == "browser_tab" {
+		return browserOnlyAgentCapabilities(raw)
+	}
+	allowed := deviceContextCapabilities[kind]
+	var capabilities []string
+	if allowed == nil || json.Unmarshal(raw, &capabilities) != nil || len(capabilities) == 0 {
+		return false
+	}
+	for _, capability := range capabilities {
+		if !allowed[capability] {
+			return false
+		}
+	}
+	return true
 }
 
 func normalizeDeviceAgentCapabilities(raw json.RawMessage) (json.RawMessage, error) {

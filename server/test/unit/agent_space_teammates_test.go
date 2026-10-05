@@ -123,7 +123,7 @@ func TestPrivateSpaceToolboxRegistrationsAreCompleteAndGuardWrites(t *testing.T)
 			t.Fatalf("write tool requires approval or lacks audit policy: %#v", descriptor)
 		}
 	}
-	want := []string{"context.get", "members.list", "members.resolve", "messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "notes.search", "notes.read", "notes.create", "notes.update", "drawings.list", "drawings.read", "drawings.create", "drawings.apply", "calendar.create", "calendar.update", "roadmaps.query", "roadmaps.read", "roadmaps.create", "roadmaps.update", "library.read", "library.update", "library.promote_attachment", "memory.list", "memory.update", "memory.remember", "memory.forget", "agents.list", "agents.configure"}
+	want := []string{"context.get", "members.list", "members.resolve", "messages.search", "messages.send", "library.search", "tasks.query", "calendar.query", "tasks.create", "tasks.update", "notes.search", "notes.read", "notes.create", "notes.update", "drawings.list", "drawings.read", "drawings.create", "drawings.apply", "calendar.create", "calendar.update", "roadmaps.query", "roadmaps.read", "roadmaps.create", "roadmaps.update", "library.read", "library.update", "library.promote_attachment", "threads.create", "threads.list", "threads.read", "threads.post", "library.albums", "library.organize", "roadmaps.plan", "roadmaps.canvas", "notes.tags", "search.all", "devices.list", "methods.save", "methods.list", "methods.use", "memory.list", "memory.update", "memory.remember", "memory.forget", "agents.list", "agents.configure"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("Toolbox tools = %v, want %v", names, want)
 	}
