@@ -49,3 +49,16 @@ func TestCollectionTabOrderPreferences(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestExtensionPinPreferences(t *testing.T) {
+	for _, raw := range []string{`[]`, `[3,7]`} {
+		if err := ValidateProfilePatch(map[string]any{"extensions.pins": raw}, nil); err != nil {
+			t.Fatalf("rejected pins %s: %v", raw, err)
+		}
+	}
+	for _, raw := range []string{`{}`, `["3"]`, `[1.5]`, `[-1]`, `[{"id":3}]`} {
+		if ValidateProfilePatch(map[string]any{"extensions.pins": raw}, nil) == nil {
+			t.Fatalf("accepted invalid pins %s", raw)
+		}
+	}
+}
