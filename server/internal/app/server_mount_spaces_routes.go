@@ -67,6 +67,8 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Get(prefix+"/me/agent-requests", spaces.PendingAgentMemberRequests())
 	s.Router.Post(prefix+"/a2a/spaces/{spaceID}/agents/{agentID}", spaces.A2AAgent())
 	s.Router.Get(prefix+"/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json", spaces.A2AAgentCard())
+	s.Router.Post(prefix+"/a2a/agents/{agentID}/token", spaces.A2AAgentToken())
+	s.Router.Get(prefix+"/a2a/push", spaces.A2APushInbox())
 	s.Router.Post(prefix+"/agent-requests/{requestID}/approve", spaces.DecideAgentMemberRequest(true))
 	s.Router.Post(prefix+"/agent-requests/{requestID}/decline", spaces.DecideAgentMemberRequest(false))
 	s.Router.Get(prefix+"/spaces/{spaceID}/members/{userID}/avatar", spaces.MemberAvatar())

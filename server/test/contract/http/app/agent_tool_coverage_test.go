@@ -38,6 +38,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /(connections|integrations/apps/connections|provider-callbacks|oauth)/`, why: "connecting an account needs the person to sign in"},
 	{pattern: `^\S+ /(me/app-requests|me/agent-interventions)/`, why: "a person's answer to an agent's card"},
 	{pattern: `^POST /agent-requests/\{requestID\}/(approve|decline)$`, why: "the agent's owner decides; agents never approve themselves"},
+	{pattern: `^POST /a2a/agents/\{agentID\}/token$`, why: "agent credentials are minted by the person's signed-in app"},
 	{pattern: `^POST /a2a/`, tool: "agents.request"},
 	{pattern: `^\S+ /space-invitations/`, why: "accepting an invitation is the invitee's choice"},
 	{pattern: `^\S+ /me/home/apps$`, why: "personal home layout"},

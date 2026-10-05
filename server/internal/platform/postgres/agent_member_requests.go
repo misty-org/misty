@@ -25,11 +25,14 @@ const (
 	memberRequestActiveRunList = `'queued','running','awaiting_device','awaiting_intervention','cooldown','retrying'`
 )
 
-// ExternalAgentRequesterPrefix marks requests sent through the A2A endpoint
-// rather than from an agent run. They count only toward the hourly limit.
+// ExternalAgentRequesterPrefix marks requests one of the member's agents sent
+// through the A2A endpoint rather than from an agent run. They count only
+// toward the hourly limit.
 const ExternalAgentRequesterPrefix = "a2a:"
 
-func ExternalAgentRequester(userID string) string { return ExternalAgentRequesterPrefix + userID }
+func ExternalAgentRequester(userID, agentID string) string {
+	return ExternalAgentRequesterPrefix + userID + ":" + agentID
+}
 
 type AgentMemberRequestInput struct {
 	SpaceID          string
@@ -118,7 +121,7 @@ func (db *Database) CreateAgentMemberRequest(ctx context.Context, input AgentMem
 			}
 			return err
 		}
-		parentRunID, parentInvocationID, depth, err := memberRequestParentTx(ctx, tx, input.RequesterUserID, input.RequesterRunID)
+		parentRunID, parentInvocationID, depth, err := memberRequestParentTx(ctx, tx, input.RequesterUserID, input.RequesterAgentID, input.RequesterRunID)
 		if err != nil {
 			return err
 		}
@@ -180,11 +183,19 @@ func (db *Database) CreateAgentMemberRequest(ctx context.Context, input AgentMem
 
 // memberRequestParentTx proves the requester owns the live run asking for
 // help and bounds how deep delegated work can go.
-func memberRequestParentTx(ctx context.Context, tx *sql.Tx, userID, runID string) (parentRunID, parentInvocationID string, depth int, err error) {
+func memberRequestParentTx(ctx context.Context, tx *sql.Tx, userID, agentID, runID string) (parentRunID, parentInvocationID string, depth int, err error) {
 	if strings.HasPrefix(runID, ExternalAgentRequesterPrefix) {
-		// A2A clients act as the signed-in member outside any Misty run.
-		if runID != ExternalAgentRequester(userID) {
+		// An A2A caller is one of the signed-in member's own agents, outside
+		// any Misty run. The endpoint verified its agent token; this re-checks
+		// ownership in the same transaction that creates the request.
+		if agentID == "" || runID != ExternalAgentRequester(userID, agentID) {
 			return "", "", 0, ErrSpaceForbidden
+		}
+		if owned, err := requesterAgentActiveTx(ctx, tx, userID, agentID); err != nil || !owned {
+			if err == nil {
+				err = ErrSpaceForbidden
+			}
+			return "", "", 0, err
 		}
 		return "", "", 1, nil
 	}
