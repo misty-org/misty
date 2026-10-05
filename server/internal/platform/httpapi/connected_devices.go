@@ -200,6 +200,30 @@ func (s *AgentsService) ConnectedDeviceClipboardConsent() http.HandlerFunc {
 	}
 }
 
+// ConnectedDeviceFileWrites lets the calling device allow or stop the paired
+// device changing its files. Only the device that owns the files decides.
+func (s *AgentsService) ConnectedDeviceFileWrites() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := s.requireUser(w, r)
+		if !ok || !s.requireConnectedDevices(w) {
+			return
+		}
+		var body struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if decodeAIJSON(w, r, &body) != nil || body.Enabled == nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		err := s.database.SetDevicePairFileWrites(userID, chi.URLParam(r, "deviceID"), chi.URLParam(r, "pairID"), *body.Enabled)
+		if err != nil {
+			writeAgentError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": *body.Enabled})
+	}
+}
+
 func (s *AgentsService) RenameConnectedDevicePeer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)
@@ -265,6 +289,9 @@ func (s *AgentsService) IssueConnectedDeviceTicket() http.HandlerFunc {
 		}
 		if subject.ClipboardTargetToSource {
 			permissions = append(permissions, "clipboard:receive")
+		}
+		if subject.TargetAcceptsWrites {
+			permissions = append(permissions, "files:write")
 		}
 		now := time.Now().UTC()
 		claims := connectedDeviceTicketClaims{

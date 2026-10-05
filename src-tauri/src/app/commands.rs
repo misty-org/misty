@@ -464,6 +464,7 @@ pub async fn explorer_list_directory(
         let PeerResponse::Directory {
             entries,
             snapshot: _,
+            writable,
             ..
         } = response
         else {
@@ -475,6 +476,7 @@ pub async fn explorer_list_directory(
             parsed.device_id.clone(),
             parsed.root_id.clone(),
             parsed.relative_path.to_string_lossy().into_owned(),
+            writable,
         );
         let total_count = entries.len();
         let hidden_count = entries.iter().filter(|entry| entry.hidden).count();
@@ -503,7 +505,7 @@ pub async fn explorer_list_directory(
                     size_bytes: entry.size_bytes,
                     modified_ms: entry.modified_ms,
                     created_ms: None,
-                    readonly: true,
+                    readonly: entry.readonly,
                     hidden: entry.hidden,
                     is_deleted: false,
                     location: location.clone(),
@@ -740,7 +742,7 @@ async fn materialize_peer_paste_sources(
 ) -> ApiResult<()> {
     if request.destination_directory.starts_with("misty://device/") {
         return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
+            "Copy to a connected device through the transfer queue.".to_owned(),
         ));
     }
     let has_peer_source = request
@@ -1314,11 +1316,11 @@ pub async fn settings_remove_open_with_association(
 
 #[tauri::command]
 pub async fn explorer_queue_paste_items(
-    mut request: PasteItemsRequest,
+    request: PasteItemsRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    #[cfg(desktop)]
-    materialize_peer_paste_sources(&mut request, &state.connected_devices).await?;
+    // Connected-device sources and destinations are resolved per item when the
+    // queue runs, so remote moves and uploads keep their progress and conflicts.
     state.operation_queue.enqueue_paste_items(request).await
 }
 
@@ -1351,11 +1353,6 @@ pub async fn explorer_queue_create_item(
     request: CreateItemRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request.directory.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_create_item(request).await
 }
 
@@ -1364,11 +1361,6 @@ pub async fn explorer_queue_rename_item(
     request: RenameItemRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request.path.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_rename_item(request).await
 }
 
@@ -1377,15 +1369,6 @@ pub async fn explorer_queue_rename_items(
     request: RenameItemsRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request
-        .items
-        .iter()
-        .any(|item| item.path.starts_with("misty://device/"))
-    {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_rename_items(request).await
 }
 
@@ -1394,15 +1377,6 @@ pub async fn explorer_queue_delete_items(
     request: DeleteItemsRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request
-        .paths
-        .iter()
-        .any(|path| path.starts_with("misty://device/"))
-    {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_delete_items(request).await
 }
 
@@ -1592,6 +1566,57 @@ pub async fn connected_devices_open_workspace_route(
         .connected_devices
         .open_workspace_route(&device_id, request)
         .await
+}
+
+/// This device's id on Misty's server, which paired devices know it by.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn connected_devices_set_identity(
+    device_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.connected_devices.set_network_identity(device_id)
+}
+
+/// Every paired device and this device's consent toward it, from the account.
+/// Unlisted devices lose their sessions; an empty list ends them all.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn connected_devices_sync_pairs(
+    pairs: Vec<crate::infra::connected_devices::PairConsent>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.connected_devices.sync_pairs(pairs)
+}
+
+/// How many days a device session lasts after an explicit connect.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn connected_devices_configure(
+    session_days: u32,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.connected_devices.configure_sessions(session_days)
+}
+
+/// Reconnects sessions that have no live connection, preferring these addresses.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn connected_devices_resume_sessions(
+    addresses: std::collections::HashMap<String, serde_json::Value>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConnectedDevicesSnapshot> {
+    state.connected_devices.resume_sessions(addresses).await
+}
+
+/// Ends the session with a device on both sides, keeping the pair.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn connected_devices_end_session(
+    device_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConnectedDevicesSnapshot> {
+    state.connected_devices.end_session(&device_id).await
 }
 
 #[cfg(desktop)]

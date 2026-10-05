@@ -1,4 +1,5 @@
 import { ManagedAiRequestError } from "@/features/agents";
+import type { ConnectedDevicesSnapshot } from "@/native/ipc";
 
 export interface ServerConnectedPeer {
   pairId: string;
@@ -13,6 +14,10 @@ export interface ServerConnectedPeer {
   lastHeartbeatAt?: string | null;
   clipboardCanSend: boolean;
   clipboardCanReceive: boolean;
+  /** This device lets the peer change its files. */
+  filesAcceptWrites: boolean;
+  /** The peer lets this device change its files. */
+  filesCanWrite: boolean;
 }
 
 export interface PairingSession {
@@ -48,6 +53,50 @@ export function connectedDevicesErrorMessage(cause: unknown): string {
 export function peerIsOnline(peer: ServerConnectedPeer): boolean {
   const heartbeat = peer.lastHeartbeatAt ? Date.parse(peer.lastHeartbeatAt) : 0;
   return heartbeat > Date.now() - 90_000;
+}
+
+export type DeviceLinkState = "connected" | "reconnecting" | "ended" | "new" | "offline";
+
+/** How this device stands with a paired device. A session lasts the configured
+ * number of days after an explicit connect; within it the devices reconnect on
+ * their own, without Misty's server. */
+export function deviceLink(
+  peer: Pick<ServerConnectedPeer, "deviceId">,
+  snapshot: ConnectedDevicesSnapshot | null,
+): { state: DeviceLinkState; expiresAt: number | null } {
+  const connected = snapshot?.peers.some(
+    (native) => native.deviceId === peer.deviceId && native.state === "online",
+  );
+  const session = snapshot?.sessions?.find((item) => item.deviceId === peer.deviceId);
+  const expiresAt = session?.outgoingExpiresAt ? session.outgoingExpiresAt * 1000 : null;
+  if (connected) return { state: "connected", expiresAt };
+  if (!session) return { state: "new", expiresAt: null };
+  if (!expiresAt || expiresAt <= Date.now()) return { state: "ended", expiresAt: null };
+  return { state: "reconnecting", expiresAt };
+}
+
+/** A pair that has never had a session connects once on its own, right after
+ * pairing. Only one side starts it, so the two handshakes cannot cross. Ended
+ * or expired sessions wait for the user to connect again. */
+export function connectsAutomatically(
+  peer: ServerConnectedPeer,
+  snapshot: ConnectedDevicesSnapshot | null,
+  localServerDeviceId: string,
+): boolean {
+  return (
+    deviceLink(peer, snapshot).state === "new" &&
+    peerIsOnline(peer) &&
+    Boolean(peer.addressing) &&
+    localServerDeviceId < peer.deviceId
+  );
+}
+
+export function sessionRemainingLabel(expiresAt: number | null): string {
+  if (!expiresAt) return "";
+  const hours = Math.max(0, (expiresAt - Date.now()) / 3_600_000);
+  if (hours < 1) return "ends within an hour";
+  if (hours < 48) return `ends in ${Math.round(hours)} hours`;
+  return `ends in ${Math.round(hours / 24)} days`;
 }
 
 export function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unknown" {

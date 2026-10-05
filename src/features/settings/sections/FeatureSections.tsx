@@ -4,8 +4,6 @@ import {
   agentsRevokeFolderScope,
   CompanionAppearanceSettings,
 } from "@/features/agents";
-import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
-import { ConnectedDevicePairingDialog } from "@/features/files/workspace";
 import { useSpacesStore } from "@/features/spaces";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -19,6 +17,7 @@ import {
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
+import { DeviceControls } from "./DeviceControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
@@ -152,49 +151,6 @@ export function CompanionSection() {
 }
 export function DevicesSection() {
   return hasTauriInternals() ? <DeviceControls /> : <NativeAvailability feature="File sharing" />;
-}
-function DeviceControls() {
-  const devices = useConnectedDevices();
-  const [pairing, setPairing] = useState(false);
-  const [error, setError] = useState("");
-  return (
-    <Section title="Paired devices" description="Pair devices to send files between them.">
-      <div className="flex gap-2 p-4">
-        <Button variant="outline" onClick={() => setPairing(true)}>
-          Pair device
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => void devices.refresh().catch((e) => setError(String(e)))}
-        >
-          Refresh
-        </Button>
-      </div>
-      {devices.peers.map((peer) => (
-        <Row
-          key={peer.pairId}
-          label={peer.name}
-          description={peerIsOnline(peer) ? "Online" : "Offline"}
-        >
-          <Button
-            variant="outline"
-            onClick={() => void devices.unpair(peer).catch((e) => setError(String(e)))}
-          >
-            Disconnect
-          </Button>
-        </Row>
-      ))}
-      {!devices.peers.length && (
-        <p className="p-5 text-sm text-cream-muted">No devices paired for file sharing.</p>
-      )}
-      {(error || devices.error) && (
-        <p role="alert" className="p-5">
-          {error || devices.error}
-        </p>
-      )}
-      <ConnectedDevicePairingDialog controller={devices} open={pairing} onOpenChange={setPairing} />
-    </Section>
-  );
 }
 export function AgentPermissionsSection() {
   return hasTauriInternals() ? (

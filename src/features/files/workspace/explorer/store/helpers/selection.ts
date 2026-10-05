@@ -153,6 +153,8 @@ export function selectedBatchRenameItemsAcrossPanes(
     if (pane.listing?.path === "misty://trash") continue;
     for (const entry of H.selectedEntriesForPane(pane)) {
       if (!H.isFileMasterEntry(entry)) continue;
+      // Its device has not allowed changes from this one.
+      if (entry.location.kind === "peer_device" && entry.readonly) continue;
       const pathKey = H.normalizedPath(entry.path);
       if (seenPaths.has(pathKey)) continue;
       seenPaths.add(pathKey);
@@ -251,6 +253,9 @@ export function canCreateItemInPane(
   inlineEdit: ExplorerInlineEditState | null,
 ): boolean {
   if (inlineEdit || !pane?.listing) return false;
+  // A connected device says whether it lets this device change its files.
+  if (pane.listing.location.kind === "peer_device")
+    return pane.listing.location.peerWritable === true;
   if (pane.listing.path.startsWith("misty://")) return false;
   if (pane.listing.location.kind === "remote_provider") return false;
   return true;
@@ -279,9 +284,11 @@ export function selectedDeletePathsForPane(
   return pane.listing.entries
     .filter((entry) => {
       if (!selected.has(entry.id)) return false;
-      if (entry.readonly || entry.location.kind === "peer_device") return false;
+      if (entry.readonly) return false;
       if (inTrash) return permanent && entry.isDeleted;
-      return permanent ? !entry.isDeleted : !entry.isDeleted && entry.location.kind === "local";
+      // A connected device's Trash is its own Misty Trash.
+      const hasTrash = entry.location.kind === "local" || entry.location.kind === "peer_device";
+      return permanent ? !entry.isDeleted : !entry.isDeleted && hasTrash;
     })
     .map((entry) => entry.path);
 }

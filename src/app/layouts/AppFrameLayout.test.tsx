@@ -53,6 +53,7 @@ vi.mock("@/features/updater/UpdateNotices", () => ({
 
 vi.mock("@/features/connected-devices", () => ({
   ConnectedDevicesProvider: (props: { children: React.ReactNode }) => <>{props.children}</>,
+  DevicePairingLinkDialog: () => null,
 }));
 
 import { AppFrameLayout } from "./AppFrameLayout";

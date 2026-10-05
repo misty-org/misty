@@ -226,6 +226,9 @@ pub struct ExplorerLocation {
     pub remote_path: Option<String>,
     pub peer_device_id: Option<String>,
     pub peer_root_id: Option<String>,
+    /// For a connected device: whether it lets this device change its files.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_writable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -243,7 +246,12 @@ impl ExplorerLocation {
         Self::default()
     }
 
-    pub fn peer_device(device_id: String, root_id: String, relative_path: String) -> Self {
+    pub fn peer_device(
+        device_id: String,
+        root_id: String,
+        relative_path: String,
+        writable: bool,
+    ) -> Self {
         Self {
             kind: ExplorerLocationKind::PeerDevice,
             provider_type: None,
@@ -251,6 +259,7 @@ impl ExplorerLocation {
             remote_path: Some(relative_path),
             peer_device_id: Some(device_id),
             peer_root_id: Some(root_id),
+            peer_writable: Some(writable),
         }
     }
 }

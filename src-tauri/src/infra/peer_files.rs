@@ -15,6 +15,10 @@ use crate::{
     error::{ApiError, ApiResult},
 };
 
+#[path = "peer_files_entries.rs"]
+mod entries;
+use entries::{entry_from_metadata, metadata_snapshot, opaque_root_id, path_error};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PeerVirtualPath {
     pub device_id: String,
@@ -81,6 +85,36 @@ impl PeerVirtualPath {
             );
         }
         Ok(value)
+    }
+
+    pub fn is_peer_path(value: &str) -> bool {
+        value.starts_with("misty://device/")
+    }
+
+    /// The virtual path of `name` inside this directory.
+    pub fn child(&self, name: &str) -> ApiResult<String> {
+        validate_relative_component(name)?;
+        Self::format(
+            &self.device_id,
+            &self.root_id,
+            &self.relative_path.join(name),
+        )
+    }
+
+    /// The containing directory, or `None` for a shared root.
+    pub fn parent(&self) -> ApiResult<Option<String>> {
+        if self.relative_path.as_os_str().is_empty() {
+            return Ok(None);
+        }
+        let parent = self.relative_path.parent().unwrap_or_else(|| Path::new(""));
+        Self::format(&self.device_id, &self.root_id, parent).map(Some)
+    }
+
+    /// The decoded item name, or `None` for a shared root.
+    pub fn name(&self) -> Option<String> {
+        self.relative_path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
     }
 }
 
@@ -322,6 +356,36 @@ impl PeerRootRegistry {
         })
     }
 
+    /// An existing directory inside the root, for creating or receiving items.
+    pub fn resolve_directory(&self, root_id: &str, relative_path: &Path) -> ApiResult<PathBuf> {
+        let directory = self.resolve_existing(root_id, relative_path)?;
+        if !directory.is_dir() {
+            return Err(ApiError::Message(
+                "Remote path is not a directory.".to_owned(),
+            ));
+        }
+        Ok(directory)
+    }
+
+    /// An existing item to change. The parent is resolved, the item itself is
+    /// not, so a symbolic link is renamed or removed rather than its target.
+    /// Shared roots themselves can never be changed.
+    pub fn resolve_item(&self, root_id: &str, relative_path: &Path) -> ApiResult<PathBuf> {
+        let name = relative_path
+            .file_name()
+            .ok_or_else(|| ApiError::Message("A shared root cannot be changed.".to_owned()))?;
+        let parent = relative_path.parent().unwrap_or_else(|| Path::new(""));
+        let item = self.new_child(root_id, parent, &name.to_string_lossy())?;
+        fs::symlink_metadata(&item).map_err(path_error)?;
+        Ok(item)
+    }
+
+    /// Where a new item named `name` goes inside an existing directory.
+    pub fn new_child(&self, root_id: &str, directory: &Path, name: &str) -> ApiResult<PathBuf> {
+        validate_relative_component(name)?;
+        Ok(self.resolve_directory(root_id, directory)?.join(name))
+    }
+
     fn resolve_existing(&self, root_id: &str, relative_path: &Path) -> ApiResult<PathBuf> {
         validate_relative_path(relative_path)?;
         let root = self
@@ -368,77 +432,6 @@ impl OpenedPeerFile {
         let mut bytes = vec![0; length];
         self.file.read_exact(&mut bytes).map_err(path_error)?;
         Ok(bytes)
-    }
-}
-
-fn opaque_root_id(path: &Path) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(b"misty-peer-root-v1\0");
-    hasher.update(path.as_os_str().to_string_lossy().as_bytes());
-    format!("root_{}", hex::encode(&hasher.finalize()[..12]))
-}
-
-fn entry_from_metadata(
-    device_id: &str,
-    root_id: &str,
-    relative_path: PathBuf,
-    metadata: &fs::Metadata,
-) -> ApiResult<PeerEntry> {
-    let name = relative_path
-        .file_name()
-        .unwrap_or_else(|| OsStr::new(""))
-        .to_string_lossy()
-        .into_owned();
-    let kind = if metadata.file_type().is_symlink() {
-        PeerEntryKind::Symlink
-    } else if metadata.is_dir() {
-        PeerEntryKind::Directory
-    } else {
-        PeerEntryKind::File
-    };
-    let path = PeerVirtualPath::format(device_id, root_id, &relative_path)?;
-    Ok(PeerEntry {
-        name: name.clone(),
-        path,
-        kind,
-        size_bytes: metadata.is_file().then_some(metadata.len()),
-        modified_ms: metadata
-            .modified()
-            .ok()
-            .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
-            .map(|value| value.as_millis() as i64),
-        snapshot: metadata_snapshot(metadata),
-        readonly: true,
-        hidden: name.starts_with('.'),
-    })
-}
-
-fn metadata_snapshot(metadata: &fs::Metadata) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(metadata.len().to_be_bytes());
-    if let Ok(modified) = metadata.modified().and_then(|value| {
-        value
-            .duration_since(UNIX_EPOCH)
-            .map_err(std::io::Error::other)
-    }) {
-        hasher.update(modified.as_nanos().to_be_bytes());
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        hasher.update(metadata.dev().to_be_bytes());
-        hasher.update(metadata.ino().to_be_bytes());
-    }
-    format!("v1:{}", hex::encode(hasher.finalize()))
-}
-
-fn path_error(error: std::io::Error) -> ApiError {
-    match error.kind() {
-        std::io::ErrorKind::NotFound => ApiError::Message("Remote path was not found.".to_owned()),
-        std::io::ErrorKind::PermissionDenied => {
-            ApiError::Message("Misty is not allowed to read this remote path.".to_owned())
-        }
-        _ => ApiError::Message(format!("Could not read remote path: {error}")),
     }
 }
 

@@ -184,10 +184,16 @@ impl Transport {
             .map_err(|_| "Peer protocol is already selected.")?;
         self.endpoint
             .get_or_try_init(|| async {
+                // IPv4 only. Home networks often give each device a global IPv6
+                // address as well; iroh may move a connection onto it, and the
+                // LAN check would then refuse a peer on the same network.
                 Endpoint::builder(presets::Minimal)
                     .secret_key(SecretKey::from_bytes(&secret))
                     .relay_mode(relay)
                     .alpns(vec![alpn.to_vec()])
+                    .clear_ip_transports()
+                    .bind_addr("0.0.0.0:0")
+                    .map_err(|e| e.to_string())?
                     .bind()
                     .await
                     .map_err(|e| e.to_string())

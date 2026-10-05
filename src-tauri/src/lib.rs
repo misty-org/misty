@@ -56,9 +56,11 @@ use app::commands::{
 
 #[cfg(desktop)]
 use app::commands::{
-    connected_devices_connect, connected_devices_initialize, connected_devices_media_url,
-    connected_devices_prepare_clipboard_files, connected_devices_roots, connected_devices_snapshot,
-    connected_devices_subscribe_directory,
+    connected_devices_configure, connected_devices_connect, connected_devices_end_session,
+    connected_devices_initialize, connected_devices_media_url,
+    connected_devices_prepare_clipboard_files, connected_devices_resume_sessions,
+    connected_devices_roots, connected_devices_set_identity, connected_devices_snapshot,
+    connected_devices_subscribe_directory, connected_devices_sync_pairs,
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
@@ -353,6 +355,16 @@ pub fn run() {
                     connected_devices_connect,
                     #[cfg(desktop)]
                     connected_devices_roots,
+                    #[cfg(desktop)]
+                    connected_devices_set_identity,
+                    #[cfg(desktop)]
+                    connected_devices_sync_pairs,
+                    #[cfg(desktop)]
+                    connected_devices_configure,
+                    #[cfg(desktop)]
+                    connected_devices_resume_sessions,
+                    #[cfg(desktop)]
+                    connected_devices_end_session,
                     #[cfg(desktop)]
                     connected_devices_media_url,
                     #[cfg(desktop)]

@@ -157,6 +157,33 @@ pub(crate) fn search_process_command(
     permissions::search_process_command(executable, work, index)
 }
 
+/// A built-in Files instance as `builtin_service_open` creates it, for native
+/// integration tests that need real service leases.
+#[cfg(test)]
+pub(crate) fn insert_builtin_test_instance(
+    state: &MiniAppState,
+    label: &str,
+    account_id: &str,
+    purpose: &str,
+) {
+    let owner = NativeOwner {
+        account_id: account_id.into(),
+        space_id: None,
+        deployment: Some("https://misty.example/api".into()),
+        authority_generation: Some(1),
+    };
+    let root = PathBuf::from("misty-builtin/files");
+    let mut permissions = permissions::PermissionSet::builtin("files", purpose).unwrap();
+    permissions.owner_namespace = Some(owner.namespace(&root).unwrap());
+    permissions.native_owner = Some(owner);
+    permissions.account_owned = true;
+    state
+        .0
+        .lock()
+        .unwrap()
+        .insert(label.into(), Instance { root, permissions });
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod builtin_integration_tests {
     use super::*;
