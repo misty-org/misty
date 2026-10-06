@@ -311,6 +311,8 @@
   > div
   > div:first-child {
   grid-row: 2;
+  /* The shared lift centers the buttons on a one-line input; here they have their own row. */
+  margin-bottom: 0;
 }
 .agent-studio
   .agent-conversation[data-empty="true"]
@@ -319,6 +321,7 @@
   > div:last-child {
   grid-column: 3;
   grid-row: 2;
+  margin-bottom: 0;
 }
 /*
  * Control bar: a tab tucked behind the composer's top edge for active folder work and
