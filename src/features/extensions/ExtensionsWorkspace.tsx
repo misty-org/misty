@@ -55,7 +55,8 @@ export function ExtensionsWorkspace() {
     if (!detailId)
       collectionRoute.current = `${location.pathname}${location.search}${location.hash}`;
   }, [detailId, location.pathname, location.search, location.hash]);
-  const [query, setQuery] = useState("");
+  // `?q=` opens the catalog already searching (used by browser import).
+  const [query, setQuery] = useState(() => params.get("q") ?? "");
   const [sort, setSort] = useState("recommended");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);

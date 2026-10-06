@@ -21,7 +21,7 @@ fn history_url(value: &str) -> Option<String> {
     Some(url.to_string())
 }
 
-fn profile_key(profile_id: Option<String>) -> String {
+pub(crate) fn profile_key(profile_id: Option<String>) -> String {
     profile_id
         .filter(|value| !value.is_empty() && value.len() <= 128)
         .unwrap_or_else(|| "default".to_owned())

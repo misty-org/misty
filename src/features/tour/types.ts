@@ -1,5 +1,6 @@
 export type TourStep =
   | "welcome"
+  | "import"
   | "navigation"
   | "website-groups"
   | "canvas-tabs"

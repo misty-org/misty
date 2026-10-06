@@ -17,9 +17,10 @@ import {
 import {
   bookmarkUrl,
   createBookmarkFolder,
+  folderChoices,
+  otherBookmarksId,
   removeBookmark,
   saveBookmark,
-  unfiledFolderId,
   useBookmarkLibrary,
   type Bookmark,
 } from "./library";
@@ -32,13 +33,17 @@ export function BookmarkEditor(props: {
   folderId?: string;
   onClose(): void;
 }) {
-  const { folders } = useBookmarkLibrary();
+  const tree = useBookmarkLibrary();
   const [title, setTitle] = useState(props.bookmark?.title ?? props.title ?? "");
   const [url, setUrl] = useState(props.bookmark?.url ?? props.url ?? "");
   const [folderId, setFolderId] = useState(
-    props.bookmark?.folderId ?? props.folderId ?? unfiledFolderId,
+    props.bookmark?.folderId ?? props.folderId ?? otherBookmarksId,
   );
   const [folderName, setFolderName] = useState("");
+  // A new folder goes inside the folder that was chosen before "New folder…".
+  const [parentId, setParentId] = useState(
+    props.bookmark?.folderId ?? props.folderId ?? otherBookmarksId,
+  );
   const [error, setError] = useState("");
   return (
     <Dialog
@@ -56,7 +61,8 @@ export function BookmarkEditor(props: {
             e.preventDefault();
             try {
               bookmarkUrl(url);
-              const target = folderId === "__new__" ? createBookmarkFolder(folderName) : folderId;
+              const target =
+                folderId === "__new__" ? createBookmarkFolder(folderName, { parentId }) : folderId;
               saveBookmark({ id: props.bookmark?.id, title, url, folderId: target });
               props.onClose();
             } catch (failure) {
@@ -76,17 +82,20 @@ export function BookmarkEditor(props: {
             <Input value={url} required onChange={(e) => setUrl(e.target.value)} />
           </Field>
           <Field label="Folder">
-            <Select value={folderId} onValueChange={setFolderId}>
+            <Select
+              value={folderId}
+              onValueChange={(value) => {
+                if (folderId !== "__new__") setParentId(folderId);
+                setFolderId(value);
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {!folders.some((f) => f.id === unfiledFolderId) && (
-                  <SelectItem value={unfiledFolderId}>Bookmarks</SelectItem>
-                )}
-                {folders.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
+                {folderChoices(tree).map((choice) => (
+                  <SelectItem key={choice.id} value={choice.id}>
+                    {choice.label}
                   </SelectItem>
                 ))}
                 <SelectItem value="__new__">New folder…</SelectItem>

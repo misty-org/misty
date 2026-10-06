@@ -87,6 +87,15 @@ import brand85 from "./brand-icons/cal.svg?inline";
 import brand86 from "./brand-icons/canvas.svg?inline";
 import brand87 from "./brand-icons/wrike.svg?inline";
 import brand88 from "./brand-icons/composio.svg?inline";
+import brand89 from "./brand-icons/chrome.svg?inline";
+import brand90 from "./brand-icons/firefox.svg?inline";
+import brand91 from "./brand-icons/microsoft-edge.svg?inline";
+import brand92 from "./brand-icons/brave.svg?inline";
+import brand93 from "./brand-icons/arc.svg?inline";
+import brand94 from "./brand-icons/vivaldi.svg?inline";
+import brand95 from "./brand-icons/opera.svg?inline";
+import brand96 from "./brand-icons/safari.svg?inline";
+import brand97 from "./brand-icons/chromium.svg?inline";
 
 /** Canonical artwork shared by packages, navigation, tabs, Discover, and connections. */
 export const brandIcons = {
@@ -179,6 +188,15 @@ export const brandIcons = {
   canvas: brand86,
   wrike: brand87,
   composio: brand88,
+  chrome: brand89,
+  firefox: brand90,
+  "microsoft-edge": brand91,
+  brave: brand92,
+  arc: brand93,
+  vivaldi: brand94,
+  opera: brand95,
+  safari: brand96,
+  chromium: brand97,
 } as const;
 
 export type BrandId = keyof typeof brandIcons;

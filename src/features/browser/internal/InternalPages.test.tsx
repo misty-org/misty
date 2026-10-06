@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
@@ -25,15 +25,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("combines bookmark section selection and search without losing link actions", () => {
+it("opens folders with a breadcrumb and searches every folder without losing link actions", () => {
   const folderId = createBookmarkFolder("Research");
   saveBookmark({ title: "Reference", url: "https://example.com/reference", folderId });
   saveBookmark({ title: "Other", url: "https://example.com/other" });
   render(<BookmarksPage {...actions} />);
-  fireEvent.click(screen.getByRole("button", { name: "Research" }));
-  expect(screen.getByRole("button", { name: "Research" }).getAttribute("aria-pressed")).toBe(
+  expect(screen.getByRole("button", { name: "Other bookmarks" }).getAttribute("aria-pressed")).toBe(
     "true",
   );
+  fireEvent.click(screen.getByRole("button", { name: /^Research/ }));
+  expect(screen.getByRole("navigation", { name: "Folder path" }).textContent).toContain("Research");
   expect(screen.queryByText("Other")).toBeNull();
   fireEvent.change(screen.getByRole("searchbox", { name: "Search bookmarks" }), {
     target: { value: "missing" },
@@ -42,15 +43,15 @@ it("combines bookmark section selection and search without losing link actions",
   fireEvent.change(screen.getByRole("searchbox", { name: "Search bookmarks" }), {
     target: { value: "Reference" },
   });
+  expect(screen.getByText("Other bookmarks / Research")).toBeTruthy();
   fireEvent.click(screen.getByTitle("https://example.com/reference"), { metaKey: true });
   expect(actions.openInNewView).toHaveBeenCalledWith("https://example.com/reference");
   fireEvent.change(screen.getByRole("searchbox", { name: "Search bookmarks" }), {
     target: { value: "" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "All" }));
+  const path = screen.getByRole("navigation", { name: "Folder path" });
+  fireEvent.click(within(path).getByRole("button", { name: "Other bookmarks" }));
   expect(screen.getByText("Other")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Unfiled" }));
-  expect(screen.getByRole("button", { name: "Manage folder Unfiled" })).toBeTruthy();
   expect(screen.getAllByRole("heading").map((heading) => heading.textContent)).toEqual([
     "Bookmarks",
   ]);

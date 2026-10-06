@@ -50,6 +50,8 @@ export interface SyncState {
   collections?: Record<string, SharedRecord[]>;
   /** Every device runs a version that syncs tab groups; until then they stay local. */
   all_upgraded?: boolean;
+  /** Every device understands nested bookmark folders; until then folders stay flat. */
+  nested_bookmarks?: boolean;
   /** Records with changes the server has not confirmed yet, one per record. */
   unsynced?: UnsyncedRecord[];
   /** Edits an older version set aside unsent: kept on this device, never synced. */

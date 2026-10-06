@@ -307,6 +307,17 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "browser.bookmarksBar",
+    "label": "Show bookmarks bar",
+    "page": "browser",
+    "section": "general",
+    "key": "browser_bookmarks_bar",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "browser.statusBubble",
     "label": "Link and loading status",
     "page": "browser",

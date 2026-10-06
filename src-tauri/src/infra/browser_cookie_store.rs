@@ -118,7 +118,7 @@ fn export_cookie(native: &NSHTTPCookie) -> Result<Cookie> {
     Ok(cookie)
 }
 
-fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
+pub(crate) fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
     cookie.validate().map_err(|_| CookieStoreError::Invalid)?;
     if cookie.partition_key.is_some() {
         return Err(CookieStoreError::Unsupported);
