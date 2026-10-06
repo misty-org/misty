@@ -44,11 +44,11 @@ describe("browser workspace deep links", () => {
 });
 
 it("restores Space tools as split-capable surfaces in the current global workspace", () => {
-  expect(workspaceSurfaceFromRoute("/spaces/family/planner/tasks/board")).toMatchObject({
+  expect(workspaceSurfaceFromRoute("/spaces/family/library")).toMatchObject({
     surfaceId: "space",
-    groupKey: "space:family:planner",
+    groupKey: "space:family:library",
     scopeKey: "global",
-    route: "/spaces/family/planner/tasks/board",
+    route: "/spaces/family/library",
   });
   expect(workspaceSurfaceFromRoute("/spaces")).toMatchObject({ surfaceId: "space" });
 });

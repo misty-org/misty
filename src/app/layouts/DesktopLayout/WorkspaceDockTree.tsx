@@ -451,7 +451,6 @@ function aiSurfaceForView(tab: WorkspaceView): AiSurfaceId {
   if (tab.surfaceId !== "space") return tab.surfaceId;
   const parts = tab.route.split("?")[0].split("/").filter(Boolean);
   const section = parts[2] ?? "";
-  const view = parts[3] ?? "";
   if (section === "notes") return "notes";
   if (section === "drawings") return "drawings";
   if (section === "social" || section === "chat") return "space.chat";

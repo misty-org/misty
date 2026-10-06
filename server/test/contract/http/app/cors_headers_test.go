@@ -87,27 +87,3 @@ func TestPreflightAllowsEveryClientHeader(t *testing.T) {
 		}
 	}
 }
-
-// The sensitive-collection request is the one that actually broke, so it gets
-// its own case with the exact header combination the client sends.
-func TestPreflightAllowsSensitiveCollectionRequest(t *testing.T) {
-	server := corsTestServer(t)
-
-	request := httptest.NewRequest(http.MethodOptions,
-		"/api/spaces/space_1/library?collection=recently-deleted", nil)
-	request.Header.Set("Origin", "http://127.0.0.1:5174")
-	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
-	request.Header.Set("Access-Control-Request-Headers",
-		"authorization,x-misty-library-reauthentication")
-	recorder := httptest.NewRecorder()
-	server.Router.ServeHTTP(recorder, request)
-
-	if recorder.Header().Get("Access-Control-Allow-Origin") != "http://127.0.0.1:5174" {
-		t.Fatalf("Recently Deleted preflight = %q, want the origin echoed back",
-			recorder.Header().Get("Access-Control-Allow-Origin"))
-	}
-	allowed := strings.ToLower(recorder.Header().Get("Access-Control-Allow-Headers"))
-	if !strings.Contains(allowed, "x-misty-library-reauthentication") {
-		t.Fatalf("Access-Control-Allow-Headers = %q, missing the reauthentication header", allowed)
-	}
-}

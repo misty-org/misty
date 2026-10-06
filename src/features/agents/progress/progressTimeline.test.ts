@@ -101,7 +101,7 @@ describe("progress timeline", () => {
   it("names tools in plain words", () => {
     expect(toolLabel("browser.tab.list", false)).toBe("Listed tabs");
     expect(toolLabel("misty_notes_search", true)).toBe("Searching notes");
-    expect(toolLabel("event.query", false)).toBe("Checked calendar");
+    expect(toolLabel("note.query", false)).toBe("Checked notes");
     expect(toolLabel("weather.forecast", false)).toBe("Used weather forecast");
     expect(toolLabel("agent.finish", false)).toBe("Wrapped up");
   });
