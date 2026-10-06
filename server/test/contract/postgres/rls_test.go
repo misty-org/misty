@@ -63,7 +63,11 @@ func TestTablesHaveRowLevelSecurityEnabled(t *testing.T) {
 		"space_resolve_tickets",
 		"space_setup_integrations",
 		"space_creation_requests",
-		"scheduled_tasks",
+		"workflow_schedules",
+		"ai_conversation_modes",
+		"agent_question_sets",
+		"agent_plans",
+		"agent_goals",
 	}
 
 	for _, table := range tables {

@@ -1,10 +1,14 @@
 # Extensions
 
-Mode: Operate. Inherit the Spaces collection geometry, shared 224 px workspace rail,
-36 px search, list/grid controls, and monochrome palette. Rail icons stay grayscale
-like every other sidebar.
-Discover and Installed are independent routes in one Extensions workspace. Category links belong to the
-rail; visible collection sections must not be duplicated by a filter menu.
+Mode: Operate. Inherit the Spaces collection geometry, 36 px search, list/grid
+controls, and monochrome palette. There is no Extensions sidebar: the page is titled
+Extensions, and everything that used to live in a rail is a row of shared chips.
+The section chips are Discover, Popular, Recently updated (three orderings of the
+Firefox Add-ons catalog) and Installed; Installed is its own route
+(`/extensions/installed`). Beneath them a second chip row narrows the view: All plus
+the catalog's categories (`?category=`) under the catalog sections, or All, Enabled,
+Disabled and Needs attention under Installed. Category chips are text only. Visible
+sections must not be duplicated by a filter menu.
 
 Extension grids use compact collection cards with 32 px, uncropped icons. Keep
 names readable across two lines and place Install/Manage below the metadata,

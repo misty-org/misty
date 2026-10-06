@@ -71,12 +71,12 @@ func TestCallsAreSignedAndFailuresCarryOnlyStatus(t *testing.T) {
 	}
 }
 
-func TestRouteForAccountKeepsItsKeyAndInstanceHasNone(t *testing.T) {
-	if route := For(nil); route.Provider != "instance" || route.APIKey != "" || route.IsAccount() {
-		t.Fatalf("instance route = %+v", route)
+func TestRoutesAreAlwaysInstanceAndCarryOnlyReasoning(t *testing.T) {
+	if route := For(nil); route != Instance() {
+		t.Fatalf("default route = %+v", route)
 	}
-	route := For(&aimodels.Resolved{Provider: "openai", Model: "openai/x", BaseURL: "https://api.openai.com/v1", APIKey: "k", Reasoning: "low"})
-	if !route.IsAccount() || route.APIKey != "k" || route.Reasoning != "low" || route.Model != "openai/x" {
+	route := For(&aimodels.Resolved{Model: "openai/x", Reasoning: "low"})
+	if route.Provider != "instance" || route.Reasoning != "low" {
 		t.Fatalf("account route = %+v", route)
 	}
 }

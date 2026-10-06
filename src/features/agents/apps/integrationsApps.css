@@ -1,14 +1,15 @@
-/* Integrations › Apps: one cohesive page with small muted section headers. */
+/* Integrations: the shared page shell, then one tab per area. */
 .agent-integrations {
   display: grid;
-  gap: 40px;
-  width: 720px;
-  max-width: calc(100% - 48px);
-  margin: 40px auto 64px;
+  gap: 24px;
 }
-.agent-integrations-intro {
-  color: var(--color-cream-muted);
-  line-height: 1.5;
+.agent-integrations-panel {
+  display: grid;
+  gap: 40px;
+  margin-top: 8px;
+}
+.agent-integrations-panel[hidden] {
+  display: none;
 }
 .agent-integrations-section {
   display: grid;
@@ -42,8 +43,19 @@
   gap: 12px;
   padding: 12px 14px;
 }
-.agent-integrations-row + .agent-integrations-row {
+.agent-integrations-list > * + * {
   border-top: 1px solid var(--color-charcoal-border);
+}
+/* Accounts of one app sit under it, aligned with its name, without their own dividers. */
+.agent-integrations-group {
+  padding-bottom: 6px;
+}
+.agent-integrations-group > .agent-integrations-row:first-child {
+  padding-bottom: 6px;
+}
+.agent-integrations-account {
+  padding-block: 6px;
+  padding-left: 52px;
 }
 .agent-integrations-row > svg {
   flex-shrink: 0;

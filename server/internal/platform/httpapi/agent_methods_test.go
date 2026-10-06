@@ -71,13 +71,12 @@ func TestAgentMethodRuntimePinsAndTargetBoundaries(t *testing.T) {
 	if _, err := invocationMethodGuidance(ctx, database, owner.ID, &body, []string{"browser.inspect"}); err == nil {
 		t.Fatal("revoked skill remained usable")
 	}
-	// A scheduled device-dependent method remains pinned and cannot become cloud work.
-	service := &AIService{database: database}
-	schedule := scheduledTaskInput{MethodVersionID: m.VersionID, Title: "Observe", ScheduledTaskSchedule: db.ScheduledTaskSchedule{Cadence: "daily", LocalTime: "09:00", Weekday: 1, MonthDay: 1, Timezone: time.UTC.String()}}
-	if err := service.prepareScheduledMethod(ctx, owner.ID, &schedule); err != nil || schedule.AgentID != agent.ID {
+	// A device-dependent workflow can be scheduled, but a scheduled run cannot become cloud work.
+	timing := db.ScheduleTiming{Timezone: time.UTC.String(), Rules: []db.ScheduleRule{{Frequency: "daily", Times: []string{"09:00"}}}}
+	if _, err := saveWorkflowSchedule(ctx, database, owner.ID, m.ID, workflowScheduleInput{ScheduleTiming: timing}, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	scheduledBody := aiInvocationInput{AgentID: agent.ID, MethodVersionID: schedule.MethodVersionID}
+	scheduledBody := aiInvocationInput{AgentID: agent.ID, MethodVersionID: m.VersionID}
 	if _, err := resolveInvocationMethod(ctx, database, owner.ID, &scheduledBody); !errors.Is(err, db.ErrSpaceConflict) {
 		t.Fatal("scheduled device method silently fell back", err)
 	}

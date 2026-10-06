@@ -25,6 +25,8 @@ type preparedAIInvocationRuntime struct {
 	timezone     string
 	currentTime  time.Time
 	allowedTools []string
+	// collaboration is the run's Plan/Act mode with its conversation's plan and goal.
+	collaboration collaborationState
 	// toolbox is the run's resolved catalog; tool calls execute through it.
 	toolbox        *agenttools.Registry
 	toolInvocation agenttools.Invocation
@@ -62,12 +64,20 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 	if err != nil {
 		return nil, err
 	}
-	toolbox, toolInvocation, manifest, err := s.aiInvocationToolbox(ctx, record, body.AgentID, body.Prompt)
+	collaboration, err := s.aiInvocationCollaboration(ctx, record, body)
+	if err != nil {
+		return nil, err
+	}
+	toolbox, toolInvocation, manifest, err := s.aiInvocationToolbox(ctx, record, body.AgentID, body.Prompt, collaboration)
 	if err != nil {
 		return nil, err
 	}
 	allowedTools := manifestToolNames(manifest)
 	allowedTools = uniqueAgentToolNames(allowedTools)
+	if collaboration.planning() {
+		// Plan mode is read-only: write tools are neither listed nor executable.
+		allowedTools = planModeTools(toolbox, allowedTools)
+	}
 	methodGuidance, err := invocationMethodGuidance(ctx, s.database, record.UserID, &body, allowedTools)
 	if err != nil {
 		return nil, err
@@ -80,8 +90,8 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 	return &preparedAIInvocationRuntime{
 		body: body, resolved: resolved, spaceName: "Misty", spaceKind: "account", members: []map[string]string{},
 		modelID: modelID, reasoning: reasoning, prompt: prompt, timezone: body.Timezone, currentTime: now,
-		allowedTools: allowedTools, toolbox: toolbox, toolInvocation: toolInvocation,
-		system: aiInvocationSystem(aiSystemPromptInput{body: body, agent: agent, now: now, tools: allowedTools, methodGuidance: methodGuidance}),
+		allowedTools: allowedTools, toolbox: toolbox, toolInvocation: toolInvocation, collaboration: collaboration,
+		system: aiInvocationSystem(aiSystemPromptInput{body: body, agent: agent, now: now, tools: allowedTools, methodGuidance: methodGuidance}) + collaborationInstructions(collaboration),
 	}, nil
 }
 

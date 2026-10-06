@@ -66,8 +66,7 @@ func TestRuntimeProviderNeverFollowsRedirectsOrResends(t *testing.T) {
 	}))
 	defer server.Close()
 	models := modelruntime.New(server.URL, []byte(strings.Repeat("s", 32)), server.Client())
-	account := modelruntime.Route{Provider: "openai", Model: "openai/test", APIKey: "account-secret"}
-	provider := NewRuntimeProvider(models, account, "openai/test", "openai", "")
+	provider := NewRuntimeProvider(models, modelruntime.Instance(), "openai/test", "openai", "")
 	var failure *modelruntime.Error
 	if _, err := provider.Next(ModelRequest{SessionID: "s", UserID: "u", Messages: []Message{{Role: "user", Content: "once"}}}); !errors.As(err, &failure) || failure.Status != http.StatusTemporaryRedirect {
 		t.Fatalf("Next() error = %v, want a terminal 307", err)

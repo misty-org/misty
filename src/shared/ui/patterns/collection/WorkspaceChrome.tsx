@@ -51,11 +51,15 @@ export function WorkspaceSectionLabel({
     <div
       className={cn(
         "flex min-h-6 items-center justify-between gap-2 px-2",
-        !compact && "mb-2 mt-4",
+        // The label sits tight on the list it names; the space above separates the sections.
+        !compact && "mt-4",
         className,
       )}
     >
-      <h2 className="text-xs font-medium text-cream-muted">{children}</h2>
+      {/* Sidebar titles read lighter than the muted rows beneath them. */}
+      <h2 className={cn("text-xs font-medium", compact ? "text-cream-muted" : "text-cream")}>
+        {children}
+      </h2>
       {actions}
     </div>
   );

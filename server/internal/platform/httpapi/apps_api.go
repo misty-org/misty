@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kannachi323/misty/server/internal/integrations/composio"
@@ -30,11 +31,16 @@ func writeAppsError(w http.ResponseWriter, err error) {
 	}
 }
 
+// abandonedSignIn is how long an unfinished sign-in stays listed. Each
+// sign-in link starts a new account, so closed browser tabs leave these behind.
+const abandonedSignIn = 15 * time.Minute
+
 type connectedApp struct {
 	ID        string `json:"id"`
 	App       string `json:"app"`
 	Name      string `json:"name"`
 	Alias     string `json:"alias,omitempty"`
+	Account   string `json:"account,omitempty"`
 	Status    string `json:"status"`
 	CreatedAt string `json:"created_at"`
 }
@@ -52,6 +58,7 @@ func (s *SpacesService) ConnectedApps() http.HandlerFunc {
 		}
 		names := map[string]string{}
 		var accounts []composio.Account
+		var identities map[string]string
 		err := s.withAppsSession(r.Context(), user, func(client *composio.Client, session string) error {
 			toolkits, _, err := client.Toolkits(r.Context(), session, "", "", true)
 			if err != nil {
@@ -61,7 +68,11 @@ func (s *SpacesService) ConnectedApps() http.HandlerFunc {
 				names[toolkit.Slug] = toolkit.Name
 			}
 			accounts, err = client.Accounts(r.Context(), composio.UserID(user), "")
-			return err
+			if err != nil {
+				return err
+			}
+			identities = client.Identities(r.Context(), session, accounts)
+			return nil
 		})
 		if err != nil {
 			writeAppsError(w, err)
@@ -73,13 +84,16 @@ func (s *SpacesService) ConnectedApps() http.HandlerFunc {
 			if account.Active() {
 				status = "active"
 			} else if account.Status == "INITIATED" || account.Status == "INITIALIZING" {
+				if started, err := time.Parse(time.RFC3339, account.CreatedAt); err == nil && time.Since(started) > abandonedSignIn {
+					continue
+				}
 				status = "pending"
 			}
 			name := names[account.Toolkit.Slug]
 			if name == "" {
 				name = account.Toolkit.Slug
 			}
-			apps = append(apps, connectedApp{ID: account.ID, App: account.Toolkit.Slug, Name: name, Alias: account.Alias, Status: status, CreatedAt: account.CreatedAt})
+			apps = append(apps, connectedApp{ID: account.ID, App: account.Toolkit.Slug, Name: name, Alias: account.Alias, Account: identities[account.ID], Status: status, CreatedAt: account.CreatedAt})
 		}
 		sort.SliceStable(apps, func(i, j int) bool { return strings.ToLower(apps[i].Name) < strings.ToLower(apps[j].Name) })
 		writeJSON(w, http.StatusOK, map[string]any{"available": true, "apps": apps})

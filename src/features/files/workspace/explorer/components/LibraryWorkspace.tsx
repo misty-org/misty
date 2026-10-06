@@ -12,8 +12,6 @@ import {
   CollectionFilters,
   CollectionViewToggle,
   CollectionSkeleton,
-  NavIsland,
-  NavIslandItem,
   EmptyState,
 } from "@/shared/ui";
 import { BrainCircuit, Plus } from "lucide-react";
@@ -242,18 +240,24 @@ export function LibraryWorkspace(props: {
         </>
       )}
       {props.renderHeader && (
-        <NavIsland aria-label="Smart Library sections" className="self-start">
+        <div
+          role="group"
+          aria-label="Smart Library sections"
+          className="flex flex-wrap gap-1.5 self-start"
+        >
           {sectionOptions.map((option) => (
-            <NavIslandItem
+            <Button
               key={option.value}
-              active={tab === option.value}
+              variant="chip"
+              size="sm"
+              className="font-normal"
               aria-pressed={tab === option.value}
               onClick={() => setTab(option.value as LibraryTab)}
             >
               {option.label}
-            </NavIslandItem>
+            </Button>
           ))}
-        </NavIsland>
+        </div>
       )}
       {error && (
         <SystemErrorActivity

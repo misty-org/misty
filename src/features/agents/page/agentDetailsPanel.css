@@ -1,0 +1,123 @@
+/*
+ * The Details panel: a card floating just under the title bar's Details toggle, over the
+ * conversation. It fits its content up to the conversation's height, then its body
+ * scrolls. Closed, it stays mounted, invisible and inert, so opening and closing can grow
+ * it out of the toggle's corner and shrink it back.
+ */
+.agents-body {
+  position: relative;
+}
+.agent-details {
+  --agent-details-motion: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: absolute;
+  /* The 32px toggle sits centered in the 54px bar with 16px to its right. */
+  top: 46px;
+  right: 16px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 62px);
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.35);
+  transform-origin: top right;
+  opacity: 0;
+  scale: 0.96;
+  translate: 0 -4px;
+  visibility: hidden;
+  transition:
+    opacity var(--agent-details-motion),
+    scale var(--agent-details-motion),
+    translate var(--agent-details-motion),
+    visibility 0s var(--agent-details-motion);
+}
+.agent-details[data-open] {
+  opacity: 1;
+  scale: 1;
+  translate: 0;
+  visibility: visible;
+  transition:
+    opacity var(--agent-details-motion),
+    scale var(--agent-details-motion),
+    translate var(--agent-details-motion),
+    visibility 0s;
+}
+.agent-details-resizer {
+  position: absolute;
+  inset-block: 0;
+  left: -6px;
+  z-index: 1;
+  width: 12px;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+/* A hairline shows where the panel meets the conversation while dragging or focused. */
+.agent-details-resizer::after {
+  content: "";
+  position: absolute;
+  inset-block: 8px;
+  left: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-charcoal-active);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.agent-details-resizer:is(:hover, :focus-visible, :active)::after,
+.agent-details[data-dragging] .agent-details-resizer::after {
+  opacity: 1;
+}
+.agent-details-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+}
+.agent-details-chips {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.agent-details-chips::-webkit-scrollbar {
+  display: none;
+}
+.agent-details-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+/* Something needs a look: a plain exclamation point in the chip's own bright text. */
+.agent-details-issue {
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.agent-details-header > button {
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+}
+.agent-details-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-details,
+  .agent-details[data-open],
+  .agent-details-resizer::after {
+    scale: 1;
+    translate: 0;
+    transition: none;
+  }
+}

@@ -154,7 +154,44 @@ func configuredGatewayModels() []GatewayModel {
 	return out
 }
 
+// gatewayCatalogItem is one entry of the Gateway's public model list.
+type gatewayCatalogItem struct {
+	ID            string          `json:"id"`
+	Name          string          `json:"name"`
+	Type          string          `json:"type"`
+	Tags          []string        `json:"tags"`
+	Capabilities  json.RawMessage `json:"capabilities"`
+	ContextWindow int             `json:"context_window"`
+}
+
 func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
+	items, err := fetchGatewayCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	models := make([]GatewayModel, 0, len(items))
+	for _, item := range items {
+		itemType := strings.ToLower(strings.TrimSpace(item.Type))
+		if itemType != "" && !strings.Contains(itemType, "language") && !strings.Contains(itemType, "chat") && !strings.Contains(itemType, "text") {
+			continue
+		}
+		capabilities := TestingGatewayCapabilities(item.Capabilities)
+		if len(item.Tags) > 0 {
+			capabilities = append(capabilities, item.Tags...)
+		}
+		// The endpoint's type is authoritative. Adding it to the normalized
+		// capabilities keeps language models with specialized tags (for example
+		// web search only) in the chat catalog.
+		capabilities = append(capabilities, "language")
+		models = append(models, GatewayModel{
+			ID: item.ID, Name: item.Name, Capabilities: normalizedCapabilities(capabilities), ContextWindow: item.ContextWindow,
+		})
+	}
+	return TestingFilterChatModels(models), nil
+}
+
+// fetchGatewayCatalog reads the Gateway's full public model list.
+func fetchGatewayCatalog(ctx context.Context) ([]gatewayCatalogItem, error) {
 	apiKey := firstEnv("AI_GATEWAY_API_KEY", "VERCEL_OIDC_TOKEN")
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(envOrDefault("AI_GATEWAY_BASE_URL", TestingDefaultVercelAIBaseURL), "/")+"/models", nil)
 	if err != nil {
@@ -180,35 +217,10 @@ func TestingFetchGatewayModels(ctx context.Context) ([]GatewayModel, error) {
 		return nil, err
 	}
 	var payload struct {
-		Data []struct {
-			ID            string          `json:"id"`
-			Name          string          `json:"name"`
-			Type          string          `json:"type"`
-			Tags          []string        `json:"tags"`
-			Capabilities  json.RawMessage `json:"capabilities"`
-			ContextWindow int             `json:"context_window"`
-		} `json:"data"`
+		Data []gatewayCatalogItem `json:"data"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return nil, err
 	}
-	models := make([]GatewayModel, 0, len(payload.Data))
-	for _, item := range payload.Data {
-		itemType := strings.ToLower(strings.TrimSpace(item.Type))
-		if itemType != "" && !strings.Contains(itemType, "language") && !strings.Contains(itemType, "chat") && !strings.Contains(itemType, "text") {
-			continue
-		}
-		capabilities := TestingGatewayCapabilities(item.Capabilities)
-		if len(item.Tags) > 0 {
-			capabilities = append(capabilities, item.Tags...)
-		}
-		// The endpoint's type is authoritative. Adding it to the normalized
-		// capabilities keeps language models with specialized tags (for example
-		// web search only) in the chat catalog.
-		capabilities = append(capabilities, "language")
-		models = append(models, GatewayModel{
-			ID: item.ID, Name: item.Name, Capabilities: normalizedCapabilities(capabilities), ContextWindow: item.ContextWindow,
-		})
-	}
-	return TestingFilterChatModels(models), nil
+	return payload.Data, nil
 }

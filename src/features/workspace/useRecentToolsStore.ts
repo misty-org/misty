@@ -40,9 +40,10 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
   browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
   extensions: { id: "extensions", label: "Extensions", surfaceId: "extensions", icon: Puzzle },
   files: { id: "files", label: "Files", surfaceId: "files", icon: appIcons.files },
+  // The retired Scheduled tool opens Workflows; its id is a stored name.
   scheduled: {
     id: "scheduled",
-    label: "Scheduled",
+    label: "Workflows",
     surfaceId: "scheduled",
     icon: appIcons.scheduled,
   },

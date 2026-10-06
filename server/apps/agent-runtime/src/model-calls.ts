@@ -10,16 +10,13 @@ import {
 
 // One-shot model calls the Go API makes outside agent runs: Library analysis,
 // embeddings, transcription, the screen planner and short completions. Go
-// resolves the route and meters each call; the runtime only talks to models,
-// always through the AI SDK.
+// chooses the model and meters each call; the runtime only talks to models,
+// always through the AI SDK and always on Misty's own keys.
 
 const modelId = z.string().min(3).max(200).regex(/^[^\s/]+\/\S+$/);
 
 const route = z.object({
-  provider: z.enum(["instance", "gateway", "openai", "anthropic", "google", "openai-compatible"]),
-  model: z.string().max(200).optional().default(""),
-  baseURL: z.string().max(2048).optional(),
-  apiKey: z.string().max(4096).optional(),
+  provider: z.literal("instance"),
   reasoning: z.string().max(16).optional(),
 });
 
@@ -83,7 +80,7 @@ function parse<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {
   return result.data;
 }
 
-/** Routes each language-model call through Go's resolved connection. */
+/** Applies the reasoning Go admitted to each language-model call. */
 class RoutedModel implements LanguageModelV4 {
   readonly specificationVersion = "v4" as const;
   readonly provider = "misty.routed";
@@ -161,11 +158,9 @@ export async function embedCall(body: unknown, signal?: AbortSignal) {
   if (request.images && request.images.length !== request.values.length)
     throw new ModelCallError(400, "invalid_model_call", "Each image must match a value");
   const images = request.images?.some(Boolean) ? request.images : undefined;
-  if (images && request.route.provider !== "instance")
-    throw new ModelCallError(400, "visual_embeddings_unsupported", "Visual search needs a multimodal Gateway model");
   const dimensions = request.dimensions;
   const result = await embedMany({
-    model: await resolveEmbeddingModel(request.model, request.route),
+    model: await resolveEmbeddingModel(request.model),
     values: request.values,
     maxRetries: 1,
     abortSignal: signal,
@@ -185,7 +180,7 @@ export async function embedCall(body: unknown, signal?: AbortSignal) {
 export async function transcribeCall(body: unknown, signal?: AbortSignal) {
   const request = parse(transcribeRequest, body);
   const result = await transcribe({
-    model: await resolveTranscriptionModel(request.model, request.route),
+    model: await resolveTranscriptionModel(request.model),
     audio: Buffer.from(request.audio, "base64"),
     maxRetries: 1,
     abortSignal: signal,

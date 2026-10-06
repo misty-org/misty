@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Trash2, X } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -12,22 +12,54 @@ import {
   AlertDialogTitle,
   Button,
   IconButton,
+  Spinner,
 } from "@/shared/ui";
 import { AgentConversationActions } from "../components/AgentConversationActions";
+import {
+  activityStateIcon,
+  activityStateLabels,
+  formatActivityTime,
+} from "../page/useAgentActivity";
 
 type Recent = { id: string; title?: string };
+/** A conversation's latest run, for its row's status icon. */
+export type RecentStatus = { state: string; updatedAt: string };
+
+/**
+ * A row shows its latest run only when it is worth a look: still going, or did not end
+ * cleanly. Finished runs show nothing, so a quiet list means nothing needs attention.
+ */
+function RecentStatusIcon({ status }: { status?: RecentStatus }) {
+  if (!status || status.state === "completed") return null;
+  const Icon = activityStateIcon(status.state);
+  const label = `${activityStateLabels[status.state] ?? status.state.replace(/_/g, " ")} · ${formatActivityTime(status.updatedAt)}`;
+  return (
+    <span className="agent-studio-recent-status" title={label}>
+      {status.state === "running" ? (
+        <Spinner size="sm" label={false} />
+      ) : (
+        <Icon size={14} aria-hidden="true" />
+      )}
+      <span className="sr-only">, {label}</span>
+    </span>
+  );
+}
 
 /**
  * The sidebar's recent conversations. Cmd/Ctrl-click toggles a row and
  * Shift-click selects a range, as in Finder; a plain click just opens it.
  */
-export function AgentRecentConversations({
+/** Memoized: the open conversation's streaming updates must not re-render every row. */
+export const AgentRecentConversations = memo(function AgentRecentConversations({
   recent,
+  statuses,
   activeId,
   disabled,
   onConversation,
 }: {
   recent: Recent[];
+  /** Latest run per conversation id. */
+  statuses?: Record<string, RecentStatus>;
   activeId?: string;
   disabled: boolean;
   onConversation(id: string): void;
@@ -149,6 +181,7 @@ export function AgentRecentConversations({
             onClick={(event) => click(event, c.id)}
           >
             <span>{c.title || "Untitled conversation"}</span>
+            <RecentStatusIcon status={statuses?.[c.id]} />
           </Button>
           <AgentConversationActions conversation={c} disabled={disabled} />
         </div>
@@ -177,4 +210,4 @@ export function AgentRecentConversations({
       </AlertDialog>
     </section>
   );
-}
+});

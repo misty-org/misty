@@ -57,7 +57,7 @@ func (a *SmartLibraryAnalyzer) embedImageV1(ctx context.Context, text string, as
 	if err != nil {
 		return nil, ModelUsage{}, err
 	}
-	if route.IsAccount() || strings.HasPrefix(model, "openai/text-embedding-") {
+	if strings.HasPrefix(model, "openai/text-embedding-") {
 		return nil, ModelUsage{}, errors.New("this embedding model supports text search; use a multimodal Gateway model for visual search")
 	}
 	image := &modelruntime.EmbedImage{MediaType: asset.MimeType, Data: modelruntime.Image(asset.MimeType, asset.Bytes).Data}

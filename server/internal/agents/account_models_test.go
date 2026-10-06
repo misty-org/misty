@@ -9,7 +9,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
-func TestAccountLibraryUsesTheAccountRouteAndDisabledFallbackMakesNoCall(t *testing.T) {
+func TestAccountLibraryUsesTheChosenModelAndDisabledFallbackMakesNoCall(t *testing.T) {
 	runtime := modelruntime.TestingNewFake(t, func(call modelruntime.TestingCall) (int, any) {
 		return http.StatusOK, map[string]any{"text": `{"assets":[]}`, "object": map[string]any{"assets": []any{}}, "usage": map[string]int{"inputTokens": 3, "outputTokens": 2}}
 	})
@@ -20,7 +20,7 @@ func TestAccountLibraryUsesTheAccountRouteAndDisabledFallbackMakesNoCall(t *test
 		if role == "library-fallback" {
 			return nil, aimodels.ErrDisabled
 		}
-		return &aimodels.Resolved{Provider: "openai", Model: "openai/gpt-6-luna", BaseURL: "https://api.openai.com/v1", APIKey: "fixture", Reasoning: "low"}, nil
+		return &aimodels.Resolved{Model: "openai/gpt-6-luna", Reasoning: "low"}, nil
 	}}).WithAIAccount("owner")
 	analysis, err := analyzer.Analyze(t.Context(), []SmartLibraryAsset{{AssetID: "asset", AssetKind: "text", ExtractedText: "hello"}})
 	calls := runtime.Calls()
@@ -29,8 +29,11 @@ func TestAccountLibraryUsesTheAccountRouteAndDisabledFallbackMakesNoCall(t *test
 	}
 	body := calls[0].Body
 	route := body["route"].(map[string]any)
-	if calls[0].Path != "/v1/models/text" || route["provider"] != "openai" || route["apiKey"] != "fixture" || route["reasoning"] != "low" || body["model"] != "openai/gpt-6-luna" {
-		t.Fatalf("account route ignored: %v", body)
+	if calls[0].Path != "/v1/models/text" || route["provider"] != "instance" || route["reasoning"] != "low" || body["model"] != "openai/gpt-6-luna" {
+		t.Fatalf("account choice ignored: %v", body)
+	}
+	if _, ok := route["apiKey"]; ok {
+		t.Fatal("a key traveled with the route")
 	}
 	if _, ok := body["reasoning"]; ok {
 		t.Fatal("Gateway reasoning overrode the account's choice")
@@ -48,7 +51,7 @@ func TestAccountEmbeddingUsesSelectedModelAndImageDescription(t *testing.T) {
 		if user != "owner" || role != "embedding" {
 			t.Fatal("wrong embedding authority")
 		}
-		return &aimodels.Resolved{Provider: "openai", Model: "openai/text-embedding-3-small", BaseURL: "https://api.openai.com/v1", APIKey: "fixture"}, nil
+		return &aimodels.Resolved{Model: "openai/text-embedding-3-small"}, nil
 	}}).WithAIAccount("owner")
 	embeddings, _, err := analyzer.EmbedAssets(t.Context(), []SmartLibraryAsset{{AssetID: "asset", AssetKind: "image", MimeType: "image/png", Bytes: []byte("fixture-image")}}, map[string]SmartLibraryMetadata{"asset": {Description: "A red bicycle"}})
 	calls := runtime.Calls()

@@ -41,7 +41,7 @@ func TestAccountOpenAICompanionConfigurationToolsAndMeasuredUsage(t *testing.T) 
 		}
 	}))
 	defer server.Close()
-	voice, err := openOpenAIRealtimeModel(context.Background(), server.URL, "openai-fixture", "openai/gpt-realtime-2.1-mini", false)
+	voice, err := openOpenAIRealtimeModel(context.Background(), server.URL, "openai-fixture", "openai/gpt-realtime-2.1-mini")
 	if err != nil {
 		t.Fatal(err)
 	}

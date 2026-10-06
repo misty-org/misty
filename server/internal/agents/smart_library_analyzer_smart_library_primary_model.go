@@ -246,7 +246,7 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 	if len(assets) == 0 {
 		return nil, ModelUsage{}, nil
 	}
-	route, model, routeErr := a.embeddingRoute(ctx)
+	_, model, routeErr := a.embeddingRoute(ctx)
 	if routeErr != nil {
 		return nil, ModelUsage{}, routeErr
 	}
@@ -261,7 +261,7 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 		var usage ModelUsage
 		var err error
 		switch {
-		case !route.IsAccount() && !strings.HasPrefix(model, "openai/text-embedding-") && len(asset.Bytes) > 0 && (asset.MimeType == "image/jpeg" || asset.MimeType == "image/png"):
+		case !strings.HasPrefix(model, "openai/text-embedding-") && len(asset.Bytes) > 0 && (asset.MimeType == "image/jpeg" || asset.MimeType == "image/png"):
 			var vector []float64
 			vector, usage, err = a.embedImageV1(ctx, value, asset)
 			vectors = [][]float64{vector}

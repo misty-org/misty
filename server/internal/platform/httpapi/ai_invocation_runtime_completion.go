@@ -168,6 +168,9 @@ func (s *SpacesService) agentRuntimeCompleteAIInvocation(w http.ResponseWriter, 
 			body.Text = body.ErrorMessage
 		}
 	}
+	// Count the run against its conversation's goal and continue it when due.
+	// This waits for the invocation to settle on its own, after this callback.
+	s.afterAIInvocationGoalRun(record, body.Status, body.Usage)
 	if err := s.settleAIInvocationRuntimeUsage(record, body.Status, body.Usage); err != nil {
 		if !isHostedAILimitReached(err) {
 			writeAgentError(w, err)

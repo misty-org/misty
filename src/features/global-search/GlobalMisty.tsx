@@ -1,3 +1,8 @@
+import {
+  AgentQuestionCard,
+  pendingQuestionSet,
+  useConversationCollaboration,
+} from "@/features/agents/agentCollaboration";
 import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
 import { MistyOverlayControls } from "./MistyOverlayControls";
 import { routeLocalFollowup, useLocalExecution } from "@/features/agents/localExecution";
@@ -210,6 +215,12 @@ export function GlobalMistySurface(props: {
     candidates.findIndex((candidate) => candidate.id === selectedCandidateId),
   );
   const conversation = conversations.find((item) => item.id === activeConversationId);
+  // Questions an agent asked in this conversation wait above the composer here too.
+  const collaboration = useConversationCollaboration(
+    props.accountId,
+    activeConversationId || undefined,
+  );
+  const pendingQuestions = pendingQuestionSet(collaboration.state);
   const open = panel !== "closed" || taskSurface;
   const conversationActive = panel === "answer" || panel === "agent";
   const contentVisible = hasQuery || conversationActive;
@@ -389,6 +400,15 @@ export function GlobalMistySurface(props: {
 
   const composer = (
     <>
+      {pendingQuestions && mode !== "search" && (
+        <div className="px-3 pt-2">
+          <AgentQuestionCard
+            questionSet={pendingQuestions}
+            agentName="Misty"
+            onContinue={(prompt) => void submitAnswer(prompt, [], undefined)}
+          />
+        </div>
+      )}
       <GlobalMistyComposerBar
         headerControls={
           docked ? (

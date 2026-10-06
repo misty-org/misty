@@ -1,6 +1,8 @@
 import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
 import { desktopDeviceGrants } from "@/features/agents/deviceGrants";
 import { useAgentDeviceTargets } from "@/features/agents/devices";
+import { useCollaborationStore } from "@/features/agents/agentCollaboration";
+import { resolveSetting, useSettingsProfiles } from "@/features/settings";
 import { apiRequest } from "@/api/client";
 import {
   runtimeAiApi as aiSurfaceApi,
@@ -44,6 +46,11 @@ import { continueAfterScreenRequest } from "./screenRequests";
 import { createMistyConversationActions } from "./mistyConversationActions";
 import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
 
+const planDeepThinking = () => {
+  const profile = useSettingsProfiles.getState().state;
+  return Boolean(profile && resolveSetting(profile, "agents.plan_deep_thinking").value);
+};
+
 export type { GlobalSearchState } from "@/features/global-search/globalSearchState";
 const uncertainAdmissions = new Map<string, string>();
 let steeringRequest:
@@ -72,6 +79,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       handoff: undefined,
       thinkingMode: "normal",
       thinkingModeExplicit: false,
+      pendingModelOverride: undefined,
       invocationId: undefined,
       invocationConversationId: undefined,
       pendingArtifact: undefined,
@@ -466,6 +474,16 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       );
     }
     const invocationContext = globalAiContext(requestContext);
+    // Plan or Act: a conversation's loaded mode, or the composer's choice for a
+    // conversation that has no messages yet. Unknown leaves the server's saved mode.
+    const collaboration = useCollaborationStore.getState();
+    const startsConversation = !get().conversations.find((c) => c.id === conversationId)?.messages
+      .length;
+    const collaborationMode = collaboration.byConversation[conversationId]
+      ? collaboration.modeFor(conversationId)
+      : startsConversation
+        ? collaboration.draftMode
+        : undefined;
     const userMessage = {
       ...conversationMessage("user", "ask", normalized),
       attachments,
@@ -523,6 +541,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           mode: companion ? "companion" : "drawer",
           companionMode: companion?.interactionMode,
           companionModel: companion?.model,
+          modelOverride: companion ? undefined : requestState.pendingModelOverride,
           displayCaptures: companion?.displayCaptures,
           methodVersionId: companion?.methodVersionId,
           methodInputs: companion?.methodInputs,
@@ -539,7 +558,10 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
               (grant) => !deviceContexts.some((c) => c.opaqueRef === grant.opaqueRef),
             ),
           ],
-          thinkingMode: requestedThinking,
+          // Plan turns may think harder (Settings → Agents → Think harder while planning).
+          thinkingMode:
+            collaborationMode === "plan" && planDeepThinking() ? "deep" : requestedThinking,
+          collaborationMode,
           selection,
           capture,
           ...(conversationId.startsWith("local-")
@@ -577,9 +599,20 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       patchConversationMessage(set, get, conversationId, assistantMessage.id, {
         invocationId: created.invocationId,
       });
+      if (startsConversation) useCollaborationStore.getState().adoptDraftMode(conversationId);
+      // The server saved a model picked before this conversation existed.
+      const pinned = companion ? undefined : requestState.pendingModelOverride;
       set({
         invocationId: created.invocationId,
         invocationConversationId: conversationId,
+        ...(pinned
+          ? {
+              pendingModelOverride: undefined,
+              conversations: get().conversations.map((c) =>
+                c.id === conversationId ? { ...c, modelOverride: pinned, modelId: pinned } : c,
+              ),
+            }
+          : {}),
       });
       replaceActiveGlobalInvocationStream(
         subscribeToAiInvocation(created.eventsUrl, {
@@ -612,6 +645,12 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
                   executionTaskId,
                 );
               void usePersonalAgentsStore.getState().load(accountId);
+              // A pursued goal continues on the server; attach to its next run.
+              useCollaborationStore.getState().afterRunSettled(
+                conversationId,
+                () => void get().loadConversations(true),
+                () => get().working,
+              );
             }
             if (event.type === "artifact.proposed" || event.type === "approval.required") {
               patchConversationMessage(set, get, conversationId, assistantMessage.id, {

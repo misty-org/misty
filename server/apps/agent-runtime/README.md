@@ -31,10 +31,10 @@ metered as `model:compact:N`). See the agent architecture brief.
 
 The Go API sends every model call outside agent runs here, signed like the run
 routes: `POST /v1/models/text` (with an optional JSON schema), `/v1/models/embed`
-and `/v1/models/transcribe` in `src/model-calls.ts`. Go picks the route (Misty's
-Gateway, or an account connection with its key) and meters the call; the
-runtime only calls the model through the AI SDK and reports usage. Provider
-errors return a status, never the provider's response body.
+and `/v1/models/transcribe` in `src/model-calls.ts`. Go picks the model and
+meters the call; the runtime calls it through the AI SDK on Misty's own keys
+and reports usage. Provider errors return a status, never the provider's
+response body.
 
 ## Worlds
 
@@ -92,37 +92,24 @@ set both to the same reachable API base.
 
 ## Instance model
 
-Instance models always route through the AI Gateway (`AI_GATEWAY_API_KEY` or
-Vercel OIDC). `MISTY_AGENT_MODEL` optionally pins the default Gateway model;
-configure the API and runtime consistently. Account connections (below) are
-the only way to bring a provider key.
+Every model runs on Misty's own keys. OpenAI models (`openai/…`) call OpenAI
+directly when `OPENAI_API_KEY` is set; every other model, and OpenAI models
+without that key, route through the AI Gateway (`AI_GATEWAY_API_KEY` or Vercel
+OIDC). The Go API applies the same rule for billing and realtime voice, so
+configure both consistently. `MISTY_AGENT_MODEL` optionally pins the default
+model. Accounts cannot bring their own keys; Settings → Agents → Models only
+chooses a Gateway model per sense, and a conversation can pin its own Thinking
+model.
 
 `InstanceModel` persists only public model/run/role identity at workflow boundaries
 and resolves credentials inside model execution. Never replace it with a serialized
 SDK model that contains resolved authorization headers.
 
-## Account provider settings
-
-Settings → Agents → Models manages account-owned OpenAI, Anthropic, Google,
-Vercel Gateway and custom OpenAI-compatible connections. Provider secrets are
-write-only, encrypted with the server's connection encryption key, and bound to
-one user/connection/provider. They are separate from synchronized preferences.
-Custom account endpoints must be public HTTPS; transports revalidate and pin DNS
-on each connection, reject private/reserved addresses and do not follow redirects.
-The AI Gateway remains the default for unassigned tasks.
-
-Each supported task selects one connection/model/reasoning choice. The Models
-page limits connections by the implemented protocol: all five providers for
-SDK agent/vision calls; OpenAI and Gateway for follow-up routing and realtime;
-OpenAI, Gateway and OpenAI-compatible for Library, embeddings, transcription and
-speech. Realtime account connections use the server-owned WebSocket adapter.
-
 The signed `model-provider` callback validates the active runtime binding and
-its frozen role/model before resolving credentials inside the model step. No
-credential response is cached or serialized into workflow history. Main agent
+its frozen role/model and returns the run's reasoning; keys stay in the
+runtime's environment and never enter workflow history. Main agent
 and visual planning turns are admitted and settled under their respective models.
-There is no implicit model/provider fallback. Optional Library second passes
-and transcription retries can be disabled or assigned explicitly.
+There is no implicit model/provider fallback.
 
 “Use OpenAI defaults” selects GPT-6 Luna with low reasoning, Realtime 2.1 Mini,
 text-embedding-3-small, gpt-4o-mini-transcribe and tts-1. It disables optional

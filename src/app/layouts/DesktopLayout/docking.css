@@ -571,8 +571,10 @@
   > :is(button, .misty-tab-group-header) {
   margin-top: var(--tab-inset);
 }
+/* A clear gap after New tab, so it reads as part of the tabs and not the pane controls. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab-actions {
+  margin-left: 25px;
   color: var(--workspace-tab-muted);
 }
 /* Close and New tab share a 1.33px stroke and sit 12px either side of the

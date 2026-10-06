@@ -10,16 +10,17 @@ import (
 	"net/url"
 	"strings"
 	"time"
- "github.com/kannachi323/misty/server/internal/aimodels"
 
 	"github.com/gorilla/websocket"
+	"github.com/kannachi323/misty/server/internal/aimodels"
+	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
 const AgentRealtimeModel = "openai/gpt-realtime-2.1"
 const AgentRealtimeTranscriptionModel = "gpt-4o-mini-transcribe"
 
 // The server owns provider credentials and translates provider events into the
-// same companion protocol for account OpenAI and Gateway connections.
+// same companion protocol for direct OpenAI and Gateway voices.
 type VoiceRealtime struct {
 	conn   *websocket.Conn
 	openAI bool
@@ -42,10 +43,14 @@ type VoiceRealtimeEvent struct {
 }
 
 func (a *SmartLibraryAnalyzer) OpenVoiceRealtime(ctx context.Context) (*VoiceRealtime, error) {
- if a.realtimeConfig != nil {
-  if a.realtimeConfig.Provider == "openai" { return openOpenAIRealtimeModel(ctx, a.realtimeConfig.BaseURL, a.realtimeConfig.APIKey, a.realtimeConfig.Model, true) }
- }
- if strings.TrimSpace(a.APIKey) == "" { return nil, errors.New("realtime voice provider key is required") }
+	// OpenAI voices use the instance OpenAI key directly, like every other
+	// OpenAI model; other voices go through the Gateway.
+	if model := a.selectedRealtimeModel(); aimodels.DirectOpenAI(model) {
+		return openOpenAIRealtimeModel(ctx, openAIRealtimeBase, envconfig.OpenAIKey(), model)
+	}
+	if strings.TrimSpace(a.APIKey) == "" {
+		return nil, errors.New("realtime voice provider key is required")
+	}
 	base, err := url.Parse(strings.TrimRight(a.realtimeBaseURL(), "/"))
 	if err != nil || base.Host == "" {
 		return nil, errors.New("invalid realtime gateway URL")
@@ -94,9 +99,6 @@ func (a *SmartLibraryAnalyzer) OpenVoiceRealtime(ctx context.Context) (*VoiceRea
 	}
 	dialer := websocket.Dialer{HandshakeTimeout: 15 * time.Second, Proxy: http.ProxyFromEnvironment,
 		Subprotocols: []string{"ai-gateway-realtime.v1", "ai-gateway-auth." + secret.Token}}
-	if a.realtimeConfig != nil {
-  dial, dialErr := aimodels.DialEndpoint(a.realtimeConfig.BaseURL); if dialErr != nil { return nil, dialErr }; dialer.Proxy = nil; dialer.NetDialContext = dial
- }
 	conn, response, err := dialer.DialContext(setup, base.String(), nil)
 	if err != nil {
 		if response != nil {

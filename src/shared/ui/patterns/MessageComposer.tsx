@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useLayoutEffect,
   useRef,
   type ComponentProps,
@@ -34,26 +35,39 @@ export const MessageComposer = forwardRef<
 ) {
   const localRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = inputRef ?? localRef;
+  const measured = useRef<string | null>(null);
+  const resize = useCallback(() => {
+    const input = textareaRef.current;
+    if (!input) return;
+    input.style.height = "0px";
+    input.style.height = `${Math.min(160, Math.max(38, input.scrollHeight))}px`;
+    measured.current = input.value;
+  }, [textareaRef]);
   useLayoutEffect(() => {
     const input = textareaRef.current;
     if (!input) return;
-    const resize = () => {
-      input.style.height = "0px";
-      input.style.height = `${Math.min(160, Math.max(38, input.scrollHeight))}px`;
-    };
-    resize();
+    // Collapsing to 0px and re-measuring forces two layouts per keystroke. Appended text
+    // that still fits cannot change the height, so skip it.
+    if (
+      measured.current !== null &&
+      input.value.startsWith(measured.current) &&
+      input.scrollHeight <= input.clientHeight
+    )
+      measured.current = input.value;
+    else resize();
+  }, [inputProps.value, textareaRef, resize]);
+  useLayoutEffect(() => {
+    const input = textareaRef.current;
+    if (!input || typeof ResizeObserver === "undefined") return;
     let width = input.clientWidth;
-    const observer =
-      typeof ResizeObserver === "undefined"
-        ? undefined
-        : new ResizeObserver(() => {
-            if (width === input.clientWidth) return;
-            width = input.clientWidth;
-            resize();
-          });
-    observer?.observe(input);
-    return () => observer?.disconnect();
-  }, [inputProps.value, textareaRef]);
+    const observer = new ResizeObserver(() => {
+      if (width === input.clientWidth) return;
+      width = input.clientWidth;
+      resize();
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [textareaRef, resize]);
   return (
     <div
       ref={ref}

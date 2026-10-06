@@ -43,7 +43,7 @@ func (s *SpacesService) spaceAdminToolRegistration() agenttools.Registration {
 }
 
 // accountAdminToolRegistrations are account tools that need the service:
-// scheduled tasks, Space administration and deletes.
+// workflow schedules, Space administration and deletes.
 func (s *SpacesService) accountAdminToolRegistrations() []agenttools.Registration {
 	return append(s.scheduleToolRegistrations(), s.spaceAdminToolRegistration(), s.deleteToolRegistration(), s.renameToolRegistration())
 }

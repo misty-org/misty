@@ -10,7 +10,16 @@ export function StablePaneLayout({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(() => () => resizeCleanupRef.current?.(), []);
+  const observed = useRef<{ elements: Element[]; observer: ResizeObserver } | null>(null);
+  useEffect(
+    () => () => {
+      resizeCleanupRef.current?.();
+      observed.current?.observer.disconnect();
+      observed.current = null;
+    },
+    [],
+  );
+  // Runs after every commit because layout slots may be rebuilt by any render.
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -61,10 +70,21 @@ export function StablePaneLayout({
       if (changed) window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
     };
     position();
+    // Reuse the observer while the same slots and contents are mounted; rebuilding it on
+    // every render forced a fresh layout pass per observed element.
+    const elements = [...slots, ...contents.values()];
+    const previous = observed.current;
+    if (
+      previous &&
+      previous.elements.length === elements.length &&
+      previous.elements.every((element, index) => element === elements[index])
+    )
+      return;
+    previous?.observer.disconnect();
     const observer = new ResizeObserver(position);
     observer.observe(root);
     slots.forEach((slot) => observer.observe(slot));
-    return () => observer.disconnect();
+    observed.current = { elements, observer };
   });
   return (
     <div

@@ -94,6 +94,7 @@ type AgentSessionSummary struct {
 	OriginHref       string    `json:"origin_href,omitempty"`
 	PrivacyBoundary  string    `json:"-"`
 	ModelID          string    `json:"model_id,omitempty"`
+	ModelOverride    string    `json:"model_override,omitempty"`
 	ReasoningEffort  string    `json:"reasoning_effort,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -108,7 +109,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id, title, active_until > NOW(), ''::text,
-				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,reasoning_effort,created_at,updated_at,COALESCE(agent_id,''),state <> '{}'::jsonb
+				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,model_override,reasoning_effort,created_at,updated_at,COALESCE(agent_id,''),state <> '{}'::jsonb
 			FROM misty_ask_conversations
 			WHERE user_id = $1 AND deleted_at IS NULL
 			ORDER BY updated_at DESC
@@ -119,7 +120,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 		defer rows.Close()
 		for rows.Next() {
 			var item AgentSessionSummary
-			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.SpaceID, &item.ConversationKind, &item.OriginSurface, &item.OriginHref, &item.PrivacyBoundary, &item.ModelID, &item.ReasoningEffort, &item.CreatedAt, &item.UpdatedAt, &item.AgentID, &item.HasLegacySession); err != nil {
+			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.SpaceID, &item.ConversationKind, &item.OriginSurface, &item.OriginHref, &item.PrivacyBoundary, &item.ModelID, &item.ModelOverride, &item.ReasoningEffort, &item.CreatedAt, &item.UpdatedAt, &item.AgentID, &item.HasLegacySession); err != nil {
 				return err
 			}
 			items = append(items, item)
@@ -140,6 +141,23 @@ func (db *Database) UpdateMistyConversationModel(ctx context.Context, userID, co
 			return err
 		}
 		if rows == 0 {
+			return serveragent.ErrPersistedSessionNotFound
+		}
+		return nil
+	})
+}
+
+// SetMistyConversationModelOverride pins a conversation to a model, or with an
+// empty model returns it to the account's Thinking choice.
+func (db *Database) SetMistyConversationModelOverride(ctx context.Context, userID, conversationID, model string) error {
+	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+		result, err := tx.ExecContext(ctx, `UPDATE misty_ask_conversations SET model_override=$1,updated_at=NOW() WHERE id=$2 AND user_id=$3 AND deleted_at IS NULL`, model, conversationID, userID)
+		if err != nil {
+			return err
+		}
+		if rows, err := result.RowsAffected(); err != nil {
+			return err
+		} else if rows == 0 {
 			return serveragent.ErrPersistedSessionNotFound
 		}
 		return nil
@@ -185,14 +203,17 @@ type AgentSessionContext struct {
 	SpaceID         string
 	ModelID         string
 	ReasoningEffort string
+	// ModelOverride is the model the user picked for this conversation; empty
+	// follows the account's Thinking choice.
+	ModelOverride string
 }
 
 func (db *Database) AgentConversationIdentity(ctx context.Context, userID, conversationID string) (AgentSessionContext, error) {
 	var bound AgentSessionContext
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `SELECT COALESCE(space_id,''),model_id,reasoning_effort,COALESCE(agent_id,'')
+		err := tx.QueryRowContext(ctx, `SELECT COALESCE(space_id,''),model_id,reasoning_effort,COALESCE(agent_id,''),model_override
 			FROM misty_ask_conversations WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`, conversationID, userID).
-			Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort, &bound.AgentID)
+			Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort, &bound.AgentID, &bound.ModelOverride)
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}
@@ -216,10 +237,10 @@ func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conv
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		bound = AgentSessionContext{}
 		err := tx.QueryRowContext(ctx, `
-			SELECT COALESCE(space_id, ''), model_id, reasoning_effort,COALESCE(agent_id,'')
+			SELECT COALESCE(space_id, ''), model_id, reasoning_effort,COALESCE(agent_id,''),model_override
 			FROM misty_ask_conversations
 			WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		`, conversationID, userID).Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort, &bound.AgentID)
+		`, conversationID, userID).Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort, &bound.AgentID, &bound.ModelOverride)
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}
@@ -260,6 +281,12 @@ func (db *Database) RenameAgentSession(ctx context.Context, userID, conversation
 // cascade removes event data immediately rather than waiting for the sweeper.
 func (db *Database) DeleteAgentConversation(ctx context.Context, userID, conversationID string) error {
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
+		// Collaboration rows (mode, questions, plans, goals) go with their conversation.
+		for _, table := range []string{"ai_conversation_modes", "agent_question_sets", "agent_plans", "agent_goals"} {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE owner_user_id=$1 AND conversation_id=$2`, userID, conversationID); err != nil {
+				return err
+			}
+		}
 		_, err := tx.ExecContext(ctx, `DELETE FROM misty_ask_conversations WHERE id=$1 AND user_id=$2`, conversationID, userID)
 		return err
 	})

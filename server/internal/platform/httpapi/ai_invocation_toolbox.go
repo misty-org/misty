@@ -13,14 +13,15 @@ import (
 // aiInvocationToolbox resolves one chat run's complete catalog: Misty data
 // tools, attached browser tools and the agent's connected tools. The runtime
 // context, the MCP server and every tool call use this same resolution.
-func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
+func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string, collaboration collaborationState) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
 	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID}
 	connected := append(s.aiInvocationConnectedTools(record), s.deviceToolRegistrations(ctx, record)...)
+	connected = append(connected, s.collaborationToolRegistrations(record, collaboration)...)
 	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)
 }
 
 // aiInvocationConnectedTools are the user's connected apps, the screen tools
-// on the desktop, and account administration: scheduled tasks and Spaces.
+// on the desktop, and account administration: workflow schedules and Spaces.
 func (s *SpacesService) aiInvocationConnectedTools(record *db.AIInvocationRecord) []agenttools.Registration {
 	tools := append(s.appsToolRegistrations(), s.screenToolRegistrations(record)...)
 	return append(tools, s.accountAdminToolRegistrations()...)
