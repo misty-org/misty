@@ -19,6 +19,7 @@ import type { ComponentType } from "react";
 import type { SettingOwnership } from "./profiles/registry";
 import { AdvancedSection } from "./sections/AdvancedSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
+import { BrowserImportSettings } from "./sections/BrowserImportSettings";
 import { BrowserPermissionSettings } from "./sections/BrowserPermissionSettings";
 import { BrowserSection } from "./sections/BrowserSection";
 import {
@@ -115,6 +116,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "resource",
     true,
   ),
+  page("browser", "browser-import", "Other browsers", BrowserImportSettings, "resource", true),
   page(
     "browser",
     "browser-privacy",

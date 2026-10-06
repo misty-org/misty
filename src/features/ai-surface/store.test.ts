@@ -1,18 +1,26 @@
 const handoff = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/features/misty/handoff", () => ({ openMisty: handoff }));
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// The real module pulls in all of Misty; loading it cold on a busy machine took
+// longer than these tests wait for the handoff.
+vi.mock("@/features/misty/context", () => ({ mistyContextRef: (value: unknown) => value }));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAiSurfaceStore } from "./store";
 import { consumeInvocationEvent } from "./storeRuntime";
 import type { AiSurfaceAdapter } from "./types";
 
 describe("embodied Misty state", () => {
-  beforeEach(() =>
+  beforeEach(() => {
+    // Counts carry over between tests otherwise, and the waits below rely on them.
+    handoff.mockClear();
     useAiSurfaceStore.setState({
       sessions: {},
       registrations: {},
       companion: { phase: "home", completedCount: 0 },
-    }),
-  );
+    });
+  });
+  // Summoning loads Misty on demand. Finish those loads inside the test, so a
+  // stray call fails here instead of after the file's environment has closed.
+  afterEach(() => vi.dynamicImportSettled());
 
   it("keeps drafts isolated by account and pane", () => {
     const store = useAiSurfaceStore.getState();
@@ -78,10 +86,12 @@ describe("embodied Misty state", () => {
       paneId: "pane-generated",
     });
 
+    // Following already summons. Let that first on-demand load finish: two
+    // first-time loads of a mocked module in one tick can hand one the real Misty.
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(1));
     useAiSurfaceStore.getState().summon("account-a", "pane-generated");
-    await vi.waitFor(() =>
-      expect(handoff).toHaveBeenCalledWith(expect.objectContaining({ paneId: "pane-generated" })),
-    );
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
+    expect(handoff).toHaveBeenLastCalledWith(expect.objectContaining({ paneId: "pane-generated" }));
     expect(useAiSurfaceStore.getState().companion.phase).toBe("following");
     stop();
     element.remove();

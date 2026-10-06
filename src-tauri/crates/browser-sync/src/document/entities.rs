@@ -104,6 +104,14 @@ pub struct Folder {
     pub icon: String,
     pub order: f64,
     pub hidden: bool,
+    /// The folder this one sits in. Absent for the roots and for folders
+    /// directly in Other bookmarks, so records without nesting keep the shape
+    /// older versions accept (see `NESTED_BOOKMARK_FIELDS`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// When the folder was first added, in ms since the epoch (kept from imports).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added_at: Option<i64>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -115,6 +123,23 @@ pub struct Bookmark {
     pub url: String,
     pub order: f64,
     pub pinned: bool,
+    /// When the bookmark was first added, in ms since the epoch (kept from imports).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added_at: Option<i64>,
+}
+
+/// Bookmark tree fields. Versions before nested folders reject records that
+/// carry them, so they are only written once every device understands them
+/// (control version 2); until then sync drops them and folders stay flat.
+pub const NESTED_BOOKMARK_FIELDS: [&str; 2] = ["parent_id", "added_at"];
+/// Folders nest at most this deep below a root.
+pub const MAX_FOLDER_DEPTH: usize = 64;
+
+fn added_at(value: Option<i64>) -> Result<()> {
+    if value.is_some_and(|at| !(0..=10_000_000_000_000).contains(&at)) {
+        return Err(Error::Invalid);
+    }
+    Ok(())
 }
 
 /// Tab group colors, as named by the renderer.
@@ -322,6 +347,10 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             text(&v.label, 160, false)?;
             group_icon(&v.icon)?;
             order(v.order)?;
+            if v.parent_id.as_deref().is_some_and(|id| !valid_id(id)) {
+                return Err(Error::Invalid);
+            }
+            added_at(v.added_at)?;
         }
         Kind::Bookmark => {
             let v: Bookmark = serde_json::from_value(value)?;
@@ -331,6 +360,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             text(&v.title, 512, false)?;
             web_url(&v.url)?;
             order(v.order)?;
+            added_at(v.added_at)?;
         }
         Kind::Window => {
             let v: Window = serde_json::from_value(value)?;
@@ -442,4 +472,43 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod bookmark_tree_tests {
+    use super::*;
+
+    fn fields(value: Value) -> Fields {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn folders_without_a_parent_keep_the_shape_older_versions_accept() {
+        let flat = fields(serde_json::json!({
+            "label": "Work", "icon": "folder", "order": 1.0, "hidden": false
+        }));
+        validate(Kind::Folder, &flat).unwrap();
+        let folder: Folder = serde_json::from_value(serde_json::to_value(&flat).unwrap()).unwrap();
+        let written = serde_json::to_value(folder).unwrap();
+        assert!(written.get("parent_id").is_none() && written.get("added_at").is_none());
+    }
+
+    #[test]
+    fn nested_folders_and_dates_validate() {
+        let nested = fields(serde_json::json!({
+            "label": "Clients", "icon": "folder", "order": 0.0, "hidden": false,
+            "parent_id": "folder:work", "added_at": 1_700_000_000_000_i64
+        }));
+        validate(Kind::Folder, &nested).unwrap();
+        let bad_parent = fields(serde_json::json!({
+            "label": "Clients", "icon": "folder", "order": 0.0, "hidden": false,
+            "parent_id": "folder/../x"
+        }));
+        assert!(validate(Kind::Folder, &bad_parent).is_err());
+        let bad_date = fields(serde_json::json!({
+            "group_id": "group:bookmarks", "title": "A", "url": "https://a.example/",
+            "order": 0.0, "pinned": true, "added_at": -5
+        }));
+        assert!(validate(Kind::Bookmark, &bad_date).is_err());
+    }
 }

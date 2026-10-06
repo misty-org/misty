@@ -277,7 +277,7 @@ func (db *Database) RenameDevice(ctx context.Context, userID, targetID, name str
 			return err
 		}
 		if syncDevice.Valid && vault.Valid {
-			_, err = tx.ExecContext(ctx, `UPDATE browser_sync_devices SET display_name=$3,control_version=control_version+1 WHERE vault_id::text=$1 AND device_id::text=$2 AND revoked_at IS NULL`, vault.String, syncDevice.String, name)
+			_, err = tx.ExecContext(ctx, `UPDATE browser_sync_devices SET display_name=$3 WHERE vault_id::text=$1 AND device_id::text=$2 AND revoked_at IS NULL`, vault.String, syncDevice.String, name)
 		}
 		return err
 	})
