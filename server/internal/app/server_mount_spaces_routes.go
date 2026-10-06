@@ -178,26 +178,30 @@ func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 	s.Router.Get(prefix+"/agent-voice/realtime", service.AgentVoiceRealtimeConnect())
 	deviceJobsEnabled := serverFeatureEnabled("MISTY_DEVICE_JOBS_ENABLED")
 	connectedDevicesEnabled := serverConnectedDevicesConfigured()
-	if !deviceJobsEnabled && !connectedDevicesEnabled {
-		return
-	}
+	// Devices are always available: adding one is how sync, agents and LAN
+	// file sharing trust it.
 	s.Router.Post(prefix+"/devices", service.RegisterDevice())
 	s.Router.Get(prefix+"/devices", service.ListDevices())
+	// One device identity for sync, agents and LAN file sharing. Trust changes
+	// carry signatures the server verifies but cannot produce.
+	s.Router.Get(prefix+"/devices/trust", service.DeviceTrust())
+	s.Router.Get(prefix+"/devices/admission-requests", service.ListAdmissionRequests())
+	s.Router.Get(prefix+"/devices/channel", service.DeviceChannel())
+	s.Router.Post(prefix+"/devices/{deviceID}/channel-ticket", service.DeviceChannelTicket())
 	s.Router.Post(prefix+"/devices/{deviceID}/heartbeat", service.DeviceAuthenticated(service.HeartbeatDevice()))
-	s.Router.Post(prefix+"/devices/{deviceID}/revoke", service.RevokeDevice())
+	s.Router.Post(prefix+"/devices/{deviceID}/admit", service.DeviceAuthenticated(service.AdmitDevice()))
+	s.Router.Post(prefix+"/devices/{deviceID}/admission-requests", service.DeviceAuthenticated(service.CreateAdmissionRequest()))
+	s.Router.Get(prefix+"/devices/{deviceID}/admission-requests/{requestID}", service.DeviceAuthenticated(service.AdmissionRequest()))
+	s.Router.Post(prefix+"/devices/{deviceID}/admission-requests/{requestID}/challenge", service.DeviceAuthenticated(service.ChallengeAdmission()))
+	s.Router.Post(prefix+"/devices/{deviceID}/admission-requests/{requestID}/reveal", service.DeviceAuthenticated(service.RevealAdmission()))
+	s.Router.Post(prefix+"/devices/{deviceID}/admission-requests/{requestID}/approve", service.DeviceAuthenticated(service.ApproveAdmission()))
+	s.Router.Post(prefix+"/devices/{deviceID}/admission-requests/{requestID}/deny", service.DeviceAuthenticated(service.DenyAdmission()))
+	s.Router.Put(prefix+"/devices/{deviceID}/devices/{targetID}/name", service.DeviceAuthenticated(service.RenameDevice()))
+	s.Router.Put(prefix+"/devices/{deviceID}/policy", service.DeviceAuthenticated(service.StoreDevicePolicy()))
+	s.Router.Post(prefix+"/devices/{deviceID}/remove-device", service.DeviceAuthenticated(service.RemoveDevice()))
 	if connectedDevicesEnabled {
+		// Space peer sessions between accounts still verify server tickets.
 		s.Router.Get(prefix+"/devices/peer-ticket-keys", service.ConnectedDeviceTicketKeys())
-		s.Router.Post(prefix+"/devices/{deviceID}/pairing-sessions", service.DeviceAuthenticated(service.CreateDevicePairing()))
-		s.Router.Get(prefix+"/devices/{deviceID}/pairing-sessions/{sessionID}", service.DeviceAuthenticated(service.DevicePairingStatus()))
-		s.Router.Post(prefix+"/devices/{deviceID}/pairing-sessions/{sessionID}/confirm", service.DeviceAuthenticated(service.ConfirmDevicePairing()))
-		s.Router.Post(prefix+"/devices/{deviceID}/pairing/redeem", service.DeviceAuthenticated(service.RedeemDevicePairing()))
-		s.Router.Post(prefix+"/devices/{deviceID}/presence", service.DeviceAuthenticated(service.UpdateConnectedDevicePresence()))
-		s.Router.Get(prefix+"/devices/{deviceID}/peers", service.DeviceAuthenticated(service.ListConnectedDevicePeers()))
-		s.Router.Put(prefix+"/devices/{deviceID}/pairs/{pairID}/name", service.DeviceAuthenticated(service.RenameConnectedDevicePeer()))
-		s.Router.Put(prefix+"/devices/{deviceID}/pairs/{pairID}/clipboard-consent", service.DeviceAuthenticated(service.ConnectedDeviceClipboardConsent()))
-		s.Router.Put(prefix+"/devices/{deviceID}/pairs/{pairID}/file-writes", service.DeviceAuthenticated(service.ConnectedDeviceFileWrites()))
-		s.Router.Post(prefix+"/devices/{deviceID}/pairs/{pairID}/revoke", service.DeviceAuthenticated(service.RevokeConnectedDevicePair()))
-		s.Router.Post(prefix+"/devices/{deviceID}/peer-tickets", service.DeviceAuthenticated(service.IssueConnectedDeviceTicket()))
 	}
 	if !deviceJobsEnabled {
 		return

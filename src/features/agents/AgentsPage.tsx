@@ -16,6 +16,7 @@ import {
 } from "./components/AgentWorkspaceConversation";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { AgentContextChips } from "./page/AgentContextChips";
+import { AgentDeviceTargets } from "./page/AgentDeviceTargets";
 import { AgentConversationHeading } from "./page/AgentConversationHeading";
 import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
 import { AgentLanding } from "./page/AgentLanding";
@@ -324,6 +325,7 @@ export default function NativeAgentsPage() {
                 showWorkspace && profile ? (
                   <>
                     <AgentContextChips access={access} onOpen={openApps} />
+                    <AgentDeviceTargets />
                     <AgentLanding
                       accountId={user?.id ?? ""}
                       agentId={profile.id}

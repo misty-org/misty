@@ -26,8 +26,8 @@ use crate::error::{ApiError, ApiResult};
 use crate::infra::agents::PrepareScopedAgentDocumentRequest;
 use crate::infra::autostart::LaunchOnLoginSnapshot;
 use crate::infra::connected_devices::{
-    ConnectPeerRequest, ConnectedDevicesService, ConnectedDevicesSnapshot,
-    InitializeConnectedDevicesRequest, PeerPathRequest, PeerReadRequest,
+    ConnectedDevicesService, ConnectedDevicesSnapshot, InitializeConnectedDevicesRequest,
+    PeerPathRequest, PeerReadRequest,
 };
 use crate::infra::devices::{DeviceSnapshot, DeviceUnmountRequest};
 use crate::infra::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
@@ -237,21 +237,6 @@ pub async fn agents_prepare_scoped_document(
         path: target.to_string_lossy().into_owned(),
     })
     .await
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn agents_device_identity_load(local_device_id: String) -> ApiResult<Option<String>> {
-    crate::infra::agent_device_identity::load(&local_device_id)
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn agents_device_identity_store(
-    local_device_id: String,
-    encoded_identity: String,
-) -> ApiResult<()> {
-    crate::infra::agent_device_identity::store(&local_device_id, &encoded_identity)
 }
 
 #[tauri::command]
@@ -1548,15 +1533,6 @@ pub async fn connected_devices_subscribe_directory(
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn connected_devices_connect(
-    request: ConnectPeerRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    state.connected_devices.connect(request).await
-}
-
-#[cfg(desktop)]
-#[tauri::command]
 pub async fn connected_devices_open_workspace_route(
     device_id: String,
     request: crate::domain::connected_devices::OpenWorkspaceRouteRequest,
@@ -1576,47 +1552,6 @@ pub async fn connected_devices_set_identity(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<()> {
     state.connected_devices.set_network_identity(device_id)
-}
-
-/// Every paired device and this device's consent toward it, from the account.
-/// Unlisted devices lose their sessions; an empty list ends them all.
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn connected_devices_sync_pairs(
-    pairs: Vec<crate::infra::connected_devices::PairConsent>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.connected_devices.sync_pairs(pairs)
-}
-
-/// How many days a device session lasts after an explicit connect.
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn connected_devices_configure(
-    session_days: u32,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.connected_devices.configure_sessions(session_days)
-}
-
-/// Reconnects sessions that have no live connection, preferring these addresses.
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn connected_devices_resume_sessions(
-    addresses: std::collections::HashMap<String, serde_json::Value>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    state.connected_devices.resume_sessions(addresses).await
-}
-
-/// Ends the session with a device on both sides, keeping the pair.
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn connected_devices_end_session(
-    device_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    state.connected_devices.end_session(&device_id).await
 }
 
 #[cfg(desktop)]

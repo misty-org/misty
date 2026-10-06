@@ -28,6 +28,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /(auth/|login$|logout$|register$)`, why: "sign-in and credentials stay with the person"},
 	{pattern: `^\S+ /billing/`, why: "payments stay with the person"},
 	{pattern: `^\S+ /sync/`, why: "encrypted vault and device sync; agents never hold vault keys"},
+	{pattern: `^\S+ /devices(/|$)`, why: "adding, approving, naming and permitting devices is signed with device and vault keys agents never hold"},
 	{pattern: `^POST /me/screen-model/\{jobID\}$`, why: "the screen planner's model pass-through during browser.act"},
 	{pattern: `^\S+ /me/(deletion|export|library-lock|avatar|profile|device|telemetry)$`, why: "account identity and security"},
 	{pattern: `^\S+ /(realtime|agent-voice)/`, why: "live session transports"},

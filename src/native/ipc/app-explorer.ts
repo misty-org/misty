@@ -80,18 +80,11 @@ export interface MountedDevice {
 export interface DeviceSnapshot {
   devices: MountedDevice[];
 }
+/** A live LAN connection from this device to another of its devices. */
 export interface ConnectedPeerStatus {
   deviceId: string;
-  state: "online" | "authorization_expired" | "connecting" | "offline";
+  state: "online";
   connectionType: "direct" | "relay" | "unknown";
-  authorizationExpiresAt: number;
-}
-export interface DeviceSessionSummary {
-  deviceId: string;
-  /** Unix seconds when this device's access to the peer ends; 0 once ended. */
-  outgoingExpiresAt: number;
-  /** Unix seconds when the peer's access to this device ends; 0 once ended. */
-  incomingExpiresAt: number;
 }
 export interface ConnectedDevicesSnapshot {
   enabled: boolean;
@@ -99,8 +92,6 @@ export interface ConnectedDevicesSnapshot {
   addressing: unknown | null;
   relayPolicy: "managed" | "public-development" | "disabled" | "lan-only";
   peers: ConnectedPeerStatus[];
-  /** Local sessions with paired devices, live or ended. */
-  sessions: DeviceSessionSummary[];
   unavailableReason: string | null;
 }
 export interface PeerRoot {

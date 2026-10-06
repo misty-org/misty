@@ -52,6 +52,9 @@ export function deviceWorkflowErrorCode(error: unknown): string {
   if (message.includes("document service") || message.includes("processor"))
     return "document_service_unavailable";
   if (message.startsWith("browser_snapshot_stale:")) return "browser_snapshot_stale";
+  if (message.includes("device_grant_invalid")) return "device_grant_invalid";
+  if (message.includes("destination_unreachable")) return "destination_unreachable";
+  if (message.includes("destination_refused")) return "destination_refused";
   if (message.includes("unsupported_content")) return "unsupported_content";
   if (message.includes("invalid_device_scope") || message.includes("outside its device scope"))
     return "invalid_scope";
