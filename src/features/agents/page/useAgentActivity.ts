@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Check, CircleAlert, Clock, LoaderCircle, X } from "lucide-react";
 import { observeAccountChanges } from "@/api/accountEvents";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 import { runtimeAiApi } from "../AgentsRuntime";
@@ -60,3 +61,14 @@ export const formatActivityTime = (value: string) => {
     ? `Today, ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
     : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
+
+export const activityStateIcon = (state: string) =>
+  state === "completed"
+    ? Check
+    : state === "running"
+      ? LoaderCircle
+      : state === "queued" || state === "awaiting_device"
+        ? Clock
+        : state === "canceled"
+          ? X
+          : CircleAlert;

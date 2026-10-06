@@ -73,7 +73,10 @@ export function useAgentAccess(accountId: string, agentId = "") {
               ? apps.value.apps.map((app): AccessConnection => ({
                   id: app.id,
                   app: app.app,
-                  name: app.alias ? `${app.name} · ${app.alias}` : app.name,
+                  name:
+                    app.alias || app.account
+                      ? `${app.name} · ${app.alias || app.account}`
+                      : app.name,
                   status: app.status,
                   detail: appStatus[app.status],
                 }))

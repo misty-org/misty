@@ -52,6 +52,9 @@ pub fn up(workspace: &Workspace, detach: bool, build: bool, verbose: bool) -> Re
             &workspace.server.join(".misty/logs/workflow-migration.log"),
             &diagnostic_secrets(workspace)?,
         )?;
+    // The API meters every model turn through billing, so billing comes up first:
+    // its database, migrations and a rebuilt API, healthy before the server starts.
+    crate::billing::up(workspace, &workspace.server.join(".misty/logs/billing.log"))?;
     println!("Starting server containers…");
     let command = development_up_command(detach, build);
     let log = workspace.server.join(".misty/logs/startup.log");
@@ -203,7 +206,9 @@ fn remove_environment_name(contents: &str, name: &str) -> (String, bool) {
 }
 
 pub fn down(workspace: &Workspace, volumes: bool) -> Result<()> {
-    development_down_command(volumes).run(&workspace.server)
+    development_down_command(volumes).run(&workspace.server)?;
+    // --volumes clears only the server's data; billing's database is kept.
+    crate::billing::down(workspace)
 }
 
 pub fn url(workspace: &Workspace) -> Result<()> {
@@ -277,7 +282,11 @@ pub fn status(workspace: &Workspace) -> Result<()> {
         let status = if !health.is_empty() { health } else { state };
         println!("{service:<27} {status}");
     }
-    if rows.is_empty() {
+    let billing = crate::billing::status(workspace).unwrap_or_default();
+    for (service, status) in &billing {
+        println!("{service:<27} {status}");
+    }
+    if rows.is_empty() && billing.is_empty() {
         println!("No containers started. Run misty server up.");
     }
     Ok(())

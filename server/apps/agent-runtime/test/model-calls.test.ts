@@ -1,30 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const accountFetch = vi.fn<typeof fetch>();
-vi.mock("../src/provider-fetch.js", () => ({ providerFetch: () => accountFetch }));
-
 const { embedCall, generateTextCall, modelCallFailure, transcribeCall } = await import("../src/model-calls.js");
 
-const account = {
-  provider: "openai" as const,
-  model: "openai/gpt-6-luna",
-  apiKey: "account-fixture",
-  baseURL: "https://account.example/v1",
-  reasoning: "low",
-};
+// OpenAI models call OpenAI directly with the instance key, so these calls are
+// visible on the global fetch.
+const providerFetch = vi.fn<typeof fetch>();
+const route = { provider: "instance" as const, reasoning: "low" };
 
 function json(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 }
 
-beforeEach(() => accountFetch.mockReset());
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  providerFetch.mockReset();
+  vi.stubGlobal("fetch", providerFetch);
+  vi.stubEnv("OPENAI_API_KEY", "openai-fixture");
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("model calls", () => {
-  it("returns a structured object and usage through the account's own provider", async () => {
-    const globalFetch = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", globalFetch);
-    accountFetch.mockResolvedValue(
+  it("returns a structured object and usage from OpenAI with the instance key", async () => {
+    providerFetch.mockResolvedValue(
       json({
         id: "resp-1",
         created_at: 1,
@@ -46,7 +45,7 @@ describe("model calls", () => {
       }),
     );
     const result = await generateTextCall({
-      route: account,
+      route,
       model: "openai/gpt-6-luna",
       system: "Return only JSON.",
       messages: [
@@ -71,10 +70,9 @@ describe("model calls", () => {
     });
     expect(result.object).toEqual({ assets: [{ id: "a" }] });
     expect(result.usage).toEqual({ inputTokens: 120, cachedInputTokens: 20, outputTokens: 30, reasoningTokens: 5 });
-    expect(globalFetch).not.toHaveBeenCalled();
-    const [url, request] = accountFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://account.example/v1/responses");
-    expect(new Headers(request.headers).get("authorization")).toBe("Bearer account-fixture");
+    const [url, request] = providerFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.openai.com/v1/responses");
+    expect(new Headers(request.headers).get("authorization")).toBe("Bearer openai-fixture");
     const body = JSON.parse(request.body as string);
     expect(body.model).toBe("gpt-6-luna");
     expect(body.reasoning.effort).toBe("low");
@@ -83,49 +81,25 @@ describe("model calls", () => {
     expect(JSON.stringify(body.input)).toContain("input_image");
   });
 
-  it("refuses a model the connection was not configured for", async () => {
-    await expect(
-      generateTextCall({
-        route: account,
-        model: "openai/another-model",
-        messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
-        maxOutputTokens: 10,
-      }),
-    ).rejects.toThrow("not configured");
-    expect(accountFetch).not.toHaveBeenCalled();
-  });
-
   it("embeds with the requested dimensions and reports tokens", async () => {
-    accountFetch.mockResolvedValue(
+    providerFetch.mockResolvedValue(
       json({ data: [{ embedding: [0.1, 0.2] }, { embedding: [0.3, 0.4] }], usage: { prompt_tokens: 9 } }),
     );
     const result = await embedCall({
-      route: { ...account, model: "openai/text-embedding-3-small" },
+      route,
       model: "openai/text-embedding-3-small",
       values: ["first", "second"],
       dimensions: 768,
     });
     expect(result).toEqual({ embeddings: [[0.1, 0.2], [0.3, 0.4]], usage: { inputTokens: 9 } });
-    const [url, request] = accountFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://account.example/v1/embeddings");
+    const [url, request] = providerFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.openai.com/v1/embeddings");
     const body = JSON.parse(request.body as string);
     expect(body).toMatchObject({ model: "text-embedding-3-small", input: ["first", "second"], dimensions: 768 });
   });
 
-  it("keeps visual embeddings on Misty's own Gateway", async () => {
-    await expect(
-      embedCall({
-        route: { ...account, model: "openai/text-embedding-3-small" },
-        model: "openai/text-embedding-3-small",
-        values: ["query"],
-        images: [{ mediaType: "image/png", data: "cG5n" }],
-      }),
-    ).rejects.toMatchObject({ status: 400, code: "visual_embeddings_unsupported" });
-    expect(accountFetch).not.toHaveBeenCalled();
-  });
-
   it("transcribes audio into timed segments", async () => {
-    accountFetch.mockResolvedValue(
+    providerFetch.mockResolvedValue(
       json({
         text: "Hello there.",
         language: "english",
@@ -147,7 +121,7 @@ describe("model calls", () => {
       }),
     );
     const result = await transcribeCall({
-      route: { ...account, model: "openai/whisper-1" },
+      route,
       model: "openai/whisper-1",
       mediaType: "audio/webm",
       audio: Buffer.from("audio").toString("base64"),
@@ -155,20 +129,20 @@ describe("model calls", () => {
     expect(result.text).toBe("Hello there.");
     expect(result.segments).toEqual([{ start: 0, end: 2.4, text: "Hello there." }]);
     expect(result.durationInSeconds).toBe(2.5);
-    const [url] = accountFetch.mock.calls[0] as [string];
-    expect(url).toBe("https://account.example/v1/audio/transcriptions");
+    const [url] = providerFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.openai.com/v1/audio/transcriptions");
   });
 
   it("rejects malformed calls before any provider request", async () => {
     for (const body of [
       {},
-      { route: account, model: "no-slash", messages: [], maxOutputTokens: 1 },
-      { route: account, model: "openai/x", values: [], dimensions: 768 },
-      { route: { provider: "elsewhere" }, model: "openai/x", values: ["a"] },
+      { route, model: "no-slash", messages: [], maxOutputTokens: 1 },
+      { route, model: "openai/x", values: [], dimensions: 768 },
+      { route: { provider: "openai", apiKey: "account-key" }, model: "openai/x", values: ["a"] },
     ]) {
       await expect(embedCall(body)).rejects.toMatchObject({ status: 400 });
     }
-    expect(accountFetch).not.toHaveBeenCalled();
+    expect(providerFetch).not.toHaveBeenCalled();
   });
 
   it("reports provider failures without their response bodies", () => {

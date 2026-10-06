@@ -219,7 +219,20 @@ func (s *AIService) MistyConversation() http.HandlerFunc {
 				}
 				response["title"] = title
 			}
-			if body.ThinkingMode != nil || body.ModelID != nil || body.ReasoningEffort != nil {
+			if body.ModelID != nil {
+				// A conversation's own model; empty returns it to the account's choice.
+				model := strings.TrimSpace(*body.ModelID)
+				if model != "" && !agent.SenseModelAvailable(r.Context(), "thinking", model) {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_model", "message": "Choose an available model."})
+					return
+				}
+				if err := s.database.SetMistyConversationModelOverride(r.Context(), userID, conversationID, model); err != nil {
+					TestingWriteAIError(w, err)
+					return
+				}
+				response["model_override"] = model
+			}
+			if body.ThinkingMode != nil || body.ReasoningEffort != nil {
 				bound, err := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
 				if err != nil {
 					TestingWriteAIError(w, err)
@@ -349,10 +362,13 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 			markCompactedAfter(messages, notes.ThroughInvocationID)
 		}
 		modelID := agent.FrontierDefaultModelID()
+		if summary.ModelOverride != "" {
+			modelID = summary.ModelOverride
+		}
 		return mistyConversation{
 			ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
 			SpaceID: summary.SpaceID, Kind: summary.ConversationKind, OriginSurface: summary.OriginSurface,
-			OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: agent.ManagedReasoning("", summary.ReasoningEffort),
+			OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, ModelOverride: summary.ModelOverride, Reasoning: agent.ManagedReasoning("", summary.ReasoningEffort),
 			CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),
 			UpdatedAt: summary.UpdatedAt.UTC().Format(time.RFC3339Nano), Messages: messages, Remote: true,
 		}, nil
@@ -380,10 +396,13 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 		})
 	}
 	modelID := agent.FrontierDefaultModelID()
+	if summary.ModelOverride != "" {
+		modelID = summary.ModelOverride
+	}
 	return mistyConversation{
 		ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
 		SpaceID: summary.SpaceID, Kind: summary.ConversationKind, OriginSurface: summary.OriginSurface,
-		OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: agent.ManagedReasoning("", summary.ReasoningEffort),
+		OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, ModelOverride: summary.ModelOverride, Reasoning: agent.ManagedReasoning("", summary.ReasoningEffort),
 		CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt: summary.UpdatedAt.UTC().Format(time.RFC3339Nano), Messages: messages, Remote: true,
 	}, nil

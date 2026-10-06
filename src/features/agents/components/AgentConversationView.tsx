@@ -7,17 +7,27 @@ import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatu
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Button, cn, Spinner } from "@/shared/ui";
-import { CalendarClock, Check, Clipboard, RotateCcw } from "lucide-react";
-import { Fragment, useState } from "react";
+import { CalendarClock, Flag } from "lucide-react";
+import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
+import { Fragment, memo, useMemo, useState } from "react";
+import { AgentMessageActions } from "./AgentMessageActions";
+import { splitReplyQuote } from "./replyQuote";
 import { AgentSteps, type AgentStep } from "./AgentSteps";
-import ReactMarkdown from "react-markdown";
+import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import { Link } from "react-router-dom";
 
-export function AgentConversationView(props: {
+/** Memoized: typing in the composer must not re-render or re-parse the transcript. */
+export const AgentConversationView = memo(function AgentConversationView(props: {
   conversation?: GlobalAiConversation;
   working: boolean;
   onRetry: (prompt: string) => void;
+  /** Puts an earlier prompt back in the composer. */
+  onEdit?: (text: string) => void;
+  /** Quotes an answer, or the part of it the person selected, into the composer. */
+  onReply?: (quote: string) => void;
 }) {
+  const messages = props.conversation?.messages;
+  const turns = useMemo(() => conversationTurns(messages ?? []), [messages]);
   if (!props.conversation?.messages.length) {
     return (
       <div className="grid min-h-full place-items-center px-8 py-20 text-center">
@@ -39,9 +49,13 @@ export function AgentConversationView(props: {
   return (
     <div className="agent-transcript mx-auto w-full max-w-[760px] px-6 py-7 max-sm:px-4">
       <div className="space-y-7">
-        {conversationTurns(props.conversation.messages).map((turn) => {
+        {turns.map((turn) => {
           const handlers = {
+            conversationId: props.conversation?.id,
+            working: props.working,
             onRetry: props.onRetry,
+            onEdit: props.onEdit,
+            onReply: props.onReply,
           };
           return (
             <Fragment key={turn.key}>
@@ -64,13 +78,13 @@ export function AgentConversationView(props: {
             message.role === "assistant" &&
             (message.state === "pending" || message.state === "streaming"),
         ) ? (
-          <div className="flex items-start gap-3.5" role="status">
+          <div className="agent-message-assistant flex items-start gap-3.5" role="status">
             <MistyAvatar />
-            <div className="min-w-0 pt-1">
-              <div className="flex items-center gap-2 text-[13px] font-medium text-cream">
+            <div className="min-w-0">
+              <div className="agent-message-status gap-2 text-[13px] font-medium text-cream">
                 <Spinner size="sm" label={false} /> Misty is working
               </div>
-              <p className="mb-0 mt-1 text-xs text-cream-muted">
+              <p className="mb-0 text-xs text-cream-muted">
                 You can leave this conversation while the task continues.
               </p>
             </div>
@@ -79,7 +93,7 @@ export function AgentConversationView(props: {
       </div>
     </div>
   );
-}
+});
 
 type Turn = {
   key: string;
@@ -96,7 +110,13 @@ function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
   const turns: Turn[] = [];
   for (const message of messages) {
     if (message.role === "user") {
-      turns.push({ key: message.id, prompt: message, replies: [], steps: [], compacted: message.compactedAfter });
+      turns.push({
+        key: message.id,
+        prompt: message,
+        replies: [],
+        steps: [],
+        compacted: message.compactedAfter,
+      });
       continue;
     }
     if (message.compactedAfter && turns.length) turns[turns.length - 1].compacted = true;
@@ -105,7 +125,8 @@ function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
       message.state === "pending" ||
       message.state === "streaming";
     if (!visible) continue;
-    if (!turns.length) turns.push({ key: message.id, replies: [], steps: [], compacted: message.compactedAfter });
+    if (!turns.length)
+      turns.push({ key: message.id, replies: [], steps: [], compacted: message.compactedAfter });
     turns[turns.length - 1].replies.push(message);
   }
   for (const turn of turns) {
@@ -115,12 +136,34 @@ function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
   return turns;
 }
 
-function AgentMessage(props: {
+type AgentMessageProps = {
+  conversationId?: string;
   message: GlobalAiMessage;
   steps?: GlobalAiMessage[];
   retryPrompt?: string;
+  working: boolean;
   onRetry: (prompt: string) => void;
-}) {
+  onEdit?: (text: string) => void;
+  onReply?: (quote: string) => void;
+};
+
+/**
+ * Message objects keep their identity until patched, so while an answer streams only that
+ * message re-renders and re-parses its Markdown. Steps are rebuilt per render; compare items.
+ */
+const AgentMessage = memo(AgentMessageView, (previous, next) => {
+  const { steps: previousSteps, ...previousRest } = previous;
+  const { steps: nextSteps, ...nextRest } = next;
+  const keys = Object.keys(nextRest) as (keyof typeof nextRest)[];
+  return (
+    keys.length === Object.keys(previousRest).length &&
+    keys.every((key) => previousRest[key] === nextRest[key]) &&
+    (previousSteps?.length ?? 0) === (nextSteps?.length ?? 0) &&
+    (nextSteps ?? []).every((step, index) => previousSteps?.[index] === step)
+  );
+});
+
+function AgentMessageView(props: AgentMessageProps) {
   const message = props.message;
   const content = visibleConversationContent(message.content, message.role);
   if (
@@ -131,8 +174,17 @@ function AgentMessage(props: {
   )
     return null;
   if (message.role === "user") {
+    // Misty started this turn itself to keep working toward the goal.
+    if (message.source === "goal_continuation")
+      return (
+        <p className="agent-goal-continuation">
+          <Flag size={13} aria-hidden="true" />
+          Continued toward the goal
+        </p>
+      );
+    const reply = splitReplyQuote(content);
     return (
-      <div className="agent-message-user flex flex-col items-end gap-1.5">
+      <div className="agent-message-user group/message flex flex-col items-end gap-1.5">
         {message.source === "scheduled_task" ? (
           <span className="flex items-center gap-1.5 text-xs text-cream-muted">
             <CalendarClock size={13} aria-hidden="true" />
@@ -146,15 +198,29 @@ function AgentMessage(props: {
           )}
         >
           <MistyMessageAttachments attachments={message.attachments} />
-          <CollapsibleText text={content} />
+          {reply.quote ? (
+            <blockquote className="agent-message-quote">{reply.quote}</blockquote>
+          ) : null}
+          <CollapsibleText text={reply.body} />
         </div>
+        <AgentMessageActions
+          message={message}
+          text={content}
+          working={props.working}
+          resendable={content === message.content.trim() && !message.attachments?.length}
+          onRetry={props.onRetry}
+          onEdit={props.onEdit}
+        />
       </div>
     );
   }
   return (
-    <article className="group/message flex items-start gap-3.5">
+    <article
+      className="agent-message-assistant group/message flex items-start gap-3.5"
+      data-state={message.state}
+    >
       <MistyAvatar />
-      <div className="min-w-0 flex-1 pt-0.5">
+      <div className="min-w-0 flex-1">
         {props.steps?.length ? (
           <AgentSteps
             steps={props.steps.map((step): AgentStep => ({
@@ -165,24 +231,19 @@ function AgentMessage(props: {
         ) : null}
         {content ? (
           <div className="misty-markdown-message text-[14px] leading-6 text-cream">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <MistyMarkdown>{content}</MistyMarkdown>
           </div>
         ) : message.state === "pending" || message.state === "streaming" ? (
-          <MistyActivityStatus activity={message.activity} />
+          <div className="agent-message-status">
+            <MistyActivityStatus activity={message.activity} />
+          </div>
         ) : null}
         {message.citations?.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {message.citations.map((citation) => (
-              <Link
-                key={citation.id}
-                to={citation.href}
-                className={cn(
-                  "rounded-full border border-charcoal-border bg-charcoal-card px-2.5 py-1",
-                  "text-[10px] text-cream-muted transition-colors hover:text-cream",
-                )}
-              >
-                {citation.title}
-              </Link>
+              <Button key={citation.id} asChild variant="chip" size="chip" className="font-normal">
+                <Link to={citation.href}>{citation.title}</Link>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -192,10 +253,19 @@ function AgentMessage(props: {
         {message.screenRequest ? (
           <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
         ) : null}
-        <MessageFeedback
+        {props.conversationId ? (
+          <AgentAnsweredQuestions
+            conversationId={props.conversationId}
+            invocationId={message.invocationId}
+          />
+        ) : null}
+        <AgentMessageActions
           message={message}
+          text={content}
+          working={props.working}
           retryPrompt={props.retryPrompt}
           onRetry={props.onRetry}
+          onReply={props.onReply}
         />
       </div>
     </article>
@@ -250,54 +320,6 @@ function CollapsibleText({ text }: { text: string }) {
         </Button>
       ) : null}
     </>
-  );
-}
-
-function MessageFeedback(props: {
-  message: GlobalAiMessage;
-  retryPrompt?: string;
-  onRetry: (prompt: string) => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const completed = (props.message.state ?? "completed") === "completed";
-  const canRetry = props.message.state === "failed" && props.message.retryable && props.retryPrompt;
-  if (!completed && !canRetry) return null;
-  return (
-    <div className="mt-2 flex h-7 items-center gap-0.5 opacity-0 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
-      {completed ? (
-        <FeedbackButton
-          label="Copy response"
-          onClick={() =>
-            void navigator.clipboard.writeText(props.message.content).then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1200);
-            })
-          }
-        >
-          {copied ? <Check className="size-3.5" /> : <Clipboard className="size-3.5" />}
-        </FeedbackButton>
-      ) : null}
-      {canRetry ? (
-        <FeedbackButton label="Try again" onClick={() => props.onRetry(props.retryPrompt!)}>
-          <RotateCcw className="size-3.5" />
-        </FeedbackButton>
-      ) : null}
-    </div>
-  );
-}
-
-function FeedbackButton(props: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <Button
-      variant="ghost"
-
-      aria-label={props.label}
-      title={props.label}
-      onClick={props.onClick}
-      className={cn("grid size-7 place-items-center text-cream-muted", "hover:text-cream")}
-    >
-      {props.children}
-    </Button>
   );
 }
 

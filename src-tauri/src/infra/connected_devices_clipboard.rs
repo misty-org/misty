@@ -18,12 +18,13 @@ impl SharedClipboardClient for ConnectedDevicesService {
             let Ok(connections) = state.connections.read() else {
                 return false;
             };
-            // Each device decides on its own whether it shares its clipboard.
+            // Each device decides on its own whether it shares its clipboard,
+            // and the receiving device's policy must accept it.
             let peers = connections
                 .iter()
                 .filter(|(device_id, peer)| {
-                    peer.claims.exp > unix_now()
-                        && !connection_closed(&peer.connection)
+                    !connection_closed(&peer.connection)
+                        && has_permission(&peer.claims, "clipboard:receive")
                         && self.local.consent(device_id).shares_clipboard
                 })
                 .map(|(_, peer)| peer.connection.clone())

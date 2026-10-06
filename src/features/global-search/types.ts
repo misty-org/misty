@@ -119,7 +119,7 @@ export interface GlobalAiMessage {
   /** A screen the agent asked for; Misty continues once it opens. */
   screenRequest?: ScreenRequest;
   /** Set on turns Misty started itself rather than the person typing them. */
-  source?: "scheduled_task";
+  source?: "scheduled_task" | "goal_continuation";
   /** Misty sees this message and everything before it only as summarized notes. */
   compactedAfter?: boolean;
 }
@@ -154,6 +154,8 @@ export interface GlobalAiConversation {
   createdAt: string;
   updatedAt: string;
   modelId?: string;
+  /** The model picked for this conversation; empty follows the account's Thinking choice. */
+  modelOverride?: string;
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   messages: GlobalAiMessage[];
   remote: boolean;

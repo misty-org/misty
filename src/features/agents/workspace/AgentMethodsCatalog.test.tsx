@@ -7,18 +7,20 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   instantiate: vi.fn(),
   save: vi.fn(),
-  schedules: vi.fn(),
-  schedule: vi.fn(),
+  saveSchedule: vi.fn(),
   submit: vi.fn(),
   newConversation: vi.fn(),
   state: { accountId: "account", conversations: [], working: false, error: null },
 }));
 vi.mock("@/api/ai/agent-methods", () => ({
-  agentMethodsApi: { list: mocks.list, instantiate: mocks.instantiate, save: mocks.save },
+  agentMethodsApi: {
+    list: mocks.list,
+    instantiate: mocks.instantiate,
+    save: mocks.save,
+    saveSchedule: mocks.saveSchedule,
+  },
 }));
-vi.mock("@/api/scheduled/api", () => ({
-  scheduledTasksApi: { list: mocks.schedules, create: mocks.schedule },
-}));
+vi.mock("@/api/accountEvents", () => ({ observeAccountChanges: () => () => {} }));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: Object.assign((selector: (state: unknown) => unknown) => selector(mocks.state), {
     getState: () => ({
@@ -49,21 +51,12 @@ const method: AgentMethod = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.list.mockResolvedValue({ methods: [method] });
-  mocks.schedules.mockResolvedValue({ tasks: [] });
   mocks.instantiate.mockResolvedValue({ prompt: "Rendered instructions", method });
   mocks.newConversation.mockResolvedValue("conversation");
   mocks.submit.mockResolvedValue(undefined);
-  mocks.schedule.mockResolvedValue({
-    task: {
-      ...method,
-      id: "schedule",
-      title: "Brief",
-      method_version_id: "version4",
-      local_time: "09:00",
-      timezone: "America/Los_Angeles",
-      cadence: "daily",
-    },
-  });
+  mocks.saveSchedule.mockImplementation(async (methodId: string, schedule: object) => ({
+    schedule: { ...schedule, id: "schedule", method_id: methodId, state: "idle", run_count: 0 },
+  }));
 });
 function catalog(kind: "workflow" | "template" = "workflow") {
   const onUse = vi.fn();
@@ -83,7 +76,7 @@ function catalog(kind: "workflow" | "template" = "workflow") {
 }
 it("runs the selected immutable version with typed values through the shared invocation lifecycle", async () => {
   const { onConversation } = catalog();
-  fireEvent.click(await screen.findByRole("button", { name: "Run" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Run now" }));
   fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "Space exploration" } });
   fireEvent.click(screen.getByRole("button", { name: "Run workflow" }));
   await waitFor(() => expect(mocks.submit).toHaveBeenCalled());
@@ -107,22 +100,23 @@ it("instantiates a template into a draft without invoking an agent", async () =>
   expect(mocks.submit).not.toHaveBeenCalled();
   expect(mocks.newConversation).not.toHaveBeenCalled();
 });
-it("saves a schedule with a pinned version and inputs without starting a task", async () => {
+it("saves a schedule on the workflow with its rules and inputs without starting a task", async () => {
   catalog();
   fireEvent.click(await screen.findByRole("button", { name: "Schedule" }));
   fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "Weekly research" } });
   fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
   await waitFor(() =>
-    expect(mocks.schedule).toHaveBeenCalledWith(
+    expect(mocks.saveSchedule).toHaveBeenCalledWith(
+      "method",
       expect.objectContaining({
-        method_version_id: "version4",
-        method_inputs: { topic: "Weekly research" },
-        cadence: "daily",
-        local_time: "09:00",
+        inputs: { topic: "Weekly research" },
+        enabled: true,
+        rules: [expect.objectContaining({ frequency: "weekly", times: ["09:00"] })],
       }),
     ),
   );
   expect(mocks.submit).not.toHaveBeenCalled();
+  expect(await screen.findByRole("button", { name: "Edit schedule" })).toBeTruthy();
 });
 
 afterEach(cleanup);

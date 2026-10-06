@@ -116,6 +116,7 @@ const FILES: &[FileSpec] = &[
         names: &[
             "AI_GATEWAY_API_KEY",
             "AI_GATEWAY_BASE_URL",
+            "OPENAI_API_KEY",
             "AGENT_TRANSCRIPTION_MODEL",
             "MEDIA_SEARCH_EMERGENCY_DISABLE",
             "MEDIA_SEARCH_TRANSCRIPTION_MODEL",

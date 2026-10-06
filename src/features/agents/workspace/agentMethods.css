@@ -1,12 +1,18 @@
 .agent-method-catalog {
   max-width: 1060px;
 }
-.agent-method-catalog > input {
-  max-width: 420px;
+.agent-method-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-block: 8px 22px;
 }
-.agent-method-list,
-.agent-method-schedules {
+.agent-method-toolbar > input {
+  max-width: 420px;
+}
+.agent-method-list {
   margin-block: 16px 32px;
 }
 .agent-method-row {
@@ -43,10 +49,6 @@
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-.agent-method-schedules > h2 {
-  font-size: 16px;
-  font-weight: 500;
 }
 .agent-method-dialog {
   max-height: min(90vh, 900px);
@@ -135,4 +137,43 @@
   .agent-method-input-editor {
     grid-template-columns: 1fr;
   }
+}
+
+/* Workflow schedules: a stack of rule cards, each a few labeled rows. */
+.workflow-schedule-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+.workflow-schedule-rule {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+}
+.workflow-schedule-row,
+.workflow-schedule-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.workflow-schedule-inline {
+  display: flex !important;
+  align-items: center;
+  gap: 8px !important;
+  color: var(--color-cream-muted) !important;
+}
+.workflow-schedule-inline input[type="number"] {
+  width: 72px;
+}
+.workflow-schedule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-cream-muted);
+}
+.workflow-schedule-chip input {
+  width: auto;
 }

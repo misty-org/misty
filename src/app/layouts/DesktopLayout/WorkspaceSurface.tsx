@@ -1,4 +1,3 @@
-import { ScheduledPage } from "@/features/scheduled";
 import { ExtensionsWorkspace } from "@/features/extensions/ExtensionsWorkspace";
 import { SpaceWorkspaceSurface } from "@/features/spaces/SpaceWorkspaceSurface";
 import { FilesPage } from "@/features/files/workspace";
@@ -29,9 +28,7 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceView; a
             <ExtensionsWorkspace />
           ) : current.surfaceId === "space" ? (
             <SpaceWorkspaceSurface tab={current} />
-          ) : current.surfaceId === "scheduled" ? (
-            <ScheduledPage />
-          ) : current.surfaceId === "agents" ? (
+          ) : current.surfaceId === "agents" || current.surfaceId === "scheduled" ? (
             <AgentsPage />
           ) : current.surfaceId === "files" ? (
             <FilesPage

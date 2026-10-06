@@ -124,7 +124,13 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     const observer = new ResizeObserver(observeHostResize);
     if (host) observer.observe(host);
     window.addEventListener("resize", observeWindowResize);
-    window.addEventListener("scroll", schedule, true);
+    // Only an enclosing scroller can move or clip the host; scrolling other content
+    // (or the page inside a pane) must not re-measure every mounted webview.
+    const scrolled = (event: Event) => {
+      const current = input.hostRef.current;
+      if (!current || (event.target instanceof Node && event.target.contains(current))) schedule();
+    };
+    window.addEventListener("scroll", scrolled, true);
     window.addEventListener(browserRuntimeResumeEvent, schedule);
     window.addEventListener(appZoomChangedEvent, schedule);
     window.visualViewport?.addEventListener("resize", observeWindowResize);
@@ -145,7 +151,7 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       observer.disconnect();
       window.removeEventListener("misty:workspace-geometry-changed", recoverLayout);
       window.removeEventListener("resize", observeWindowResize);
-      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("scroll", scrolled, true);
       window.removeEventListener(browserRuntimeResumeEvent, schedule);
       window.removeEventListener(appZoomChangedEvent, schedule);
       window.visualViewport?.removeEventListener("resize", observeWindowResize);

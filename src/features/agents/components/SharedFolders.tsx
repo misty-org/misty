@@ -1,10 +1,13 @@
-import { invoke } from "@tauri-apps/api/core";
 import { Folder, FolderPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui";
 import type { AgentDeviceSnapshot, AgentScope } from "../model/interfaces/types";
-import { agentsDeviceSnapshot, agentsRevokeFolderScope } from "../store/useAgentsStore";
+import {
+  agentsChooseFolderScope,
+  agentsDeviceSnapshot,
+  agentsRevokeFolderScope,
+} from "../store/useAgentsStore";
 
 const description =
   "Agents can list and read files in these folders when you chat on this computer. They can’t " +
@@ -42,7 +45,7 @@ export function useSharedFolders() {
     busy,
     error,
     share: () =>
-      void run(() => invoke("agents_choose_folder_scope"), "That folder couldn’t be shared."),
+      void run(() => agentsChooseFolderScope(), "That folder couldn’t be shared."),
     revoke: (folder: AgentScope) =>
       void run(() => agentsRevokeFolderScope(folder.id), "That folder couldn’t be removed."),
   };

@@ -71,37 +71,38 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		t.Fatalf("search.all in an unknown Space = %v", err)
 	}
 
-	// Scheduled tasks: create and pause need no approval; delete asks first.
-	raw, err := call(service.executeScheduleCreate, `{"title":"Weekly review","prompt":"Summarize my week","cadence":"weekly","weekday":1,"local_time":"09:00","timezone":"America/Los_Angeles"}`)
+	// Workflow schedules: setting and pausing need no approval; removing asks first.
+	workflow, err := database.SaveAgentMethod(ctx, owner.ID, db.AgentMethod{AgentID: identity.ID, Kind: "workflow", Enabled: true, Definition: db.AgentMethodDefinition{Title: "Weekly review", Instructions: "Summarize my week", Inputs: []db.AgentMethodInput{}, Target: "cloud", RequiredTools: []string{}}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := call(service.executeWorkflowSchedule, `{"workflow_id":"`+workflow.ID+`","timezone":"America/Los_Angeles","rules":[{"frequency":"weekly","weekdays":[1],"times":["09:00"]},{"frequency":"monthly","nth_weekdays":[{"nth":1,"weekday":1}],"times":["08:00"]}]}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var created struct {
-		Task db.ScheduledTask `json:"task"`
+		Schedule db.WorkflowSchedule `json:"schedule"`
 	}
-	if json.Unmarshal(raw, &created) != nil || created.Task.ID == "" || created.Task.NextRunAt == nil {
-		t.Fatalf("schedules.create = %s", raw)
+	if json.Unmarshal(raw, &created) != nil || created.Schedule.ID == "" || created.Schedule.NextRunAt == nil {
+		t.Fatalf("workflows.schedule = %s", raw)
 	}
-	if _, err := call(service.executeScheduleCreate, `{"title":"Bad","prompt":"x","cadence":"weekly","local_time":"25:99","timezone":"UTC"}`); !errors.As(err, &invalid) {
+	if _, err := call(service.executeWorkflowSchedule, `{"workflow_id":"`+workflow.ID+`","timezone":"UTC","rules":[{"frequency":"weekly","times":["25:99"]}]}`); !errors.As(err, &invalid) {
 		t.Fatalf("invalid schedule = %v", err)
 	}
-	if raw, err := call(service.executeScheduleUpdate, `{"id":"`+created.Task.ID+`","enabled":false}`); err != nil || !strings.Contains(string(raw), `"enabled":false`) {
-		t.Fatalf("schedules.update = %s, %v", raw, err)
-	}
-	if raw, err := call(service.executeScheduleUpdate, `{"id":"`+created.Task.ID+`","enabled":true,"run_now":true}`); err != nil || !strings.Contains(string(raw), "starts within a minute") {
-		t.Fatalf("schedules.update run_now = %s, %v", raw, err)
+	if raw, err := call(service.executeWorkflowSchedule, `{"workflow_id":"`+workflow.ID+`","timezone":"UTC","rules":[{"frequency":"daily","times":["09:00"]}],"enabled":false}`); err != nil || !strings.Contains(string(raw), `"enabled":false`) {
+		t.Fatalf("workflows.schedule pause = %s, %v", raw, err)
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := call(service.executeScheduleDelete, `{"id":"`+created.Task.ID+`"}`)
+		_, err := call(service.executeWorkflowUnschedule, `{"workflow_id":"`+workflow.ID+`"}`)
 		done <- err
 	}()
-	decideNextApproval(t, database, owner.ID, "misty.schedules.delete", "approved")
+	decideNextApproval(t, database, owner.ID, "misty.workflows.unschedule", "approved")
 	if err := <-done; err != nil {
-		t.Fatalf("approved delete = %v", err)
+		t.Fatalf("approved unschedule = %v", err)
 	}
-	if items, err := database.ScheduledTasks(ctx, owner.ID); err != nil || len(items) != 0 {
-		t.Fatalf("scheduled tasks after delete = %#v, %v", items, err)
+	if items, err := database.WorkflowSchedules(ctx, owner.ID); err != nil || len(items) != 0 {
+		t.Fatalf("schedules after removal = %#v, %v", items, err)
 	}
 
 	// Space administration: rename directly; a declined invite changes nothing.

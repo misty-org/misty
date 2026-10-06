@@ -49,7 +49,7 @@ import {
 } from "../SocialRuntime";
 import { Button } from "@/shared/ui";
 import { CircleAlert, RefreshCw } from "lucide-react";
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
 import { ChatMessageRow } from "./ChatMessageRow";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
@@ -59,6 +59,11 @@ import { SpaceDirectMessageIntro } from "./DirectMessageIntro";
 export function SpaceChatMessages(props: SpaceChatMessagesProps) {
   const displayRows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
   const memberAvatarUrls = useMemberAvatarUrls(props.spaceId, props.messages);
+  const messagesById = useMemo(
+    () => new Map(props.messages.map((message) => [message.id, message])),
+    [props.messages],
+  );
+  const rowProps = useStableRowProps(props);
 
   const avatarFor = (message: {
     origin?: { author_avatar_url?: string };
@@ -115,7 +120,7 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
         ) : (
           displayRows.map(({ message, compact, dateLabel }) => {
             const repliedToMessage = message.reply_to_message_id
-              ? props.messages.find((item) => item.id === message.reply_to_message_id)
+              ? messagesById.get(message.reply_to_message_id)
               : undefined;
             return (
               <ChatMessageRow
@@ -126,7 +131,7 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
                 avatarUrl={avatarFor(message)}
                 repliedToMessage={repliedToMessage}
                 repliedToAvatarUrl={repliedToMessage ? avatarFor(repliedToMessage) : ""}
-                props={props}
+                props={rowProps}
               />
             );
           })
@@ -136,4 +141,35 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * The row callbacks get stable identities that call the latest props, so memoized rows can
+ * skip re-rendering while the composer draft changes without ever holding a stale handler.
+ */
+function useStableRowProps(props: SpaceChatMessagesProps): SpaceChatMessagesProps {
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const handlers = useMemo(
+    () => ({
+      onRetry: (message: SpaceMessage) => latest.current.onRetry?.(message),
+      onEditingText: (value: string) => latest.current.onEditingText(value),
+      onCancelEditing: (messageId: string) => latest.current.onCancelEditing(messageId),
+      onSaveEdited: (event: FormEvent, message: SpaceMessage) =>
+        latest.current.onSaveEdited(event, message),
+      onReply: (messageId: string) => latest.current.onReply(messageId),
+      onToggleReaction: (message: SpaceMessage, emoji: string, reacted: boolean) =>
+        latest.current.onToggleReaction(message, emoji, reacted),
+      onBeginEditing: (message: SpaceMessage) => latest.current.onBeginEditing(message),
+      onDelete: (message: SpaceMessage) => latest.current.onDelete(message),
+      onOpenNode: (nodeId: string) => latest.current.onOpenNode(nodeId),
+      onError: (message: string) => latest.current.onError(message),
+      onLibraryItem: (item: SpaceLibraryItem) => latest.current.onLibraryItem(item),
+      onReload: () => latest.current.onReload(),
+    }),
+    [],
+  );
+  return { ...props, ...handlers, onRetry: props.onRetry ? handlers.onRetry : undefined };
 }

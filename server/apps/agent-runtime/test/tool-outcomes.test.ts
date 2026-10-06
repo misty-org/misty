@@ -42,6 +42,15 @@ describe("tool outcome policy", () => {
     expect(approval).toEqual({ kind: "handoff", reason: expect.stringContaining("waiting for your approval") });
   });
 
+  it("hands the run off while questions or a proposed plan wait for the user", () => {
+    const asked = { status: "awaiting_answer", question_set: "question_1", user_message: "Answer the question above and Misty continues." };
+    expect(classifyToolOutcome({ success: true, readOnly: true, rejected: false, output: asked })).toEqual({ kind: "handoff", reason: "Answer the question above and Misty continues." });
+    const planned = classifyToolOutcome({ success: true, readOnly: true, rejected: false, output: { status: "plan_proposed", plan: "plan_1", version: 2 } });
+    expect(planned).toEqual({ kind: "handoff", reason: expect.stringContaining("Review the plan above") });
+    // Answers that arrived while the run waited are an ordinary confirmed result.
+    expect(classifyToolOutcome({ success: true, readOnly: true, rejected: false, output: { status: "answered", answers: [] } }).kind).toBe("confirmed");
+  });
+
   it("does not treat denied or unavailable actions as confirmed", () => {
     expect(unconfirmedToolResultReason({ denied: true })).toContain("not approved");
     expect(unconfirmedToolResultReason({ unavailable: true })).toContain("unavailable");

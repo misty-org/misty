@@ -6,8 +6,15 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::error::{ApiError, ApiResult};
 
-pub const DEVICE_ALPN: &[u8] = b"misty-device/1";
-pub const DEVICE_PROTOCOL_VERSION: &str = "misty-device/1";
+/// Same-account devices trust each other through the root-signed device list
+/// (docs/design/devices/BRIEF.md). Version 3 replaced pairing tickets and
+/// per-pair sessions; older peers cannot negotiate it.
+pub const DEVICE_ALPN: &[u8] = b"misty-device/3";
+pub const DEVICE_PROTOCOL_VERSION: &str = "misty-device/3";
+/// Server tickets remain only for Space peer sessions between accounts.
+pub const TICKET_PROTOCOL_VERSION: &str = "misty-device/1";
+/// Largest file one device delivers to another for an agent.
+pub const MAX_DELIVERED_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 // Clipboard images are deliberately capped at 10 MiB. Keep enough CBOR
 // envelope headroom while retaining a hard allocation bound for every frame.
 pub const MAX_CONTROL_FRAME_BYTES: usize = 12 * 1024 * 1024;
@@ -25,27 +32,26 @@ pub struct PeerRequestEnvelope {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum PeerRequest {
+    /// A Space peer session's first request, authorized by a server ticket.
     Hello {
         ticket: String,
     },
-    /// An explicit connect: authorized by a server ticket, it also starts a
-    /// local session. `session` is the token the receiver will present back.
-    /// `address` is where the receiver can reach the sender in return.
-    Connect {
-        ticket: String,
-        session: SessionOffer,
+    /// The first request between two of the account's added devices. Each side
+    /// shows its newest device list so removals spread device to device.
+    Join {
+        list_version: u64,
         #[serde(default)]
-        address: Option<serde_json::Value>,
+        list: Option<SignedRecord>,
     },
-    /// A reconnect within a local session, checked on the receiving device.
-    Resume {
-        device_id: String,
-        token: String,
-        #[serde(default)]
-        address: Option<serde_json::Value>,
+    /// Followed on the same stream by exactly `size` bytes. `grant` is the run
+    /// grant the receiving device signed for its own inbox.
+    DeliverFile {
+        grant: SignedRecord,
+        inbox_scope_id: String,
+        name: String,
+        size: u64,
+        sha256: String,
     },
-    /// The sender ended its session with the receiver, or unpaired.
-    EndSession,
     GetRoots,
     ListDirectory {
         path: String,
@@ -124,15 +130,21 @@ pub enum PeerResponse {
     Authorized {
         expires_at: i64,
     },
-    /// Answers `Connect` and `Resume`. `session` is set for `Connect`: the token
-    /// the sender presents on later reconnects. `writable` says whether the
-    /// receiver currently lets the sender change its files.
-    Connected {
-        expires_at: i64,
-        session: Option<SessionOffer>,
-        writable: bool,
+    /// Answers `Join`: the receiver's list, and what its own policy lets the
+    /// sender do there.
+    Joined {
+        list_version: u64,
+        #[serde(default)]
+        list: Option<SignedRecord>,
+        files: String,
+        clipboard: bool,
     },
-    SessionEnded,
+    /// The receiver kept the delivered file; only this receipt goes back.
+    Delivered {
+        name: String,
+        size: u64,
+        sha256: String,
+    },
     Roots {
         roots: Vec<PeerRoot>,
     },
@@ -180,11 +192,11 @@ pub enum PeerResponse {
     Deleted,
 }
 
+/// A signed device record as its exact signed bytes (base64) and signature.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionOffer {
-    pub token: String,
-    pub expires_at: i64,
+pub struct SignedRecord {
+    pub payload: String,
+    pub signature: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -444,8 +456,8 @@ pub fn verify_peer_ticket(
 ) -> ApiResult<PeerTicketClaims> {
     let claims: PeerTicketClaims = verify_signed_peer_ticket(ticket, keys)?;
     if claims.iss != "misty-api"
-        || claims.aud != DEVICE_PROTOCOL_VERSION
-        || claims.protocol_version != DEVICE_PROTOCOL_VERSION
+        || claims.aud != TICKET_PROTOCOL_VERSION
+        || claims.protocol_version != TICKET_PROTOCOL_VERSION
         || claims.source_endpoint_id != expected_source_endpoint
         || claims.target_endpoint_id != expected_target_endpoint
         || claims.iat > now_unix.saturating_add(30)

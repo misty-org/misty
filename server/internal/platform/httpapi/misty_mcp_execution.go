@@ -18,6 +18,10 @@ func (s *SpacesService) executeAIInvocationMCPTool(ctx context.Context, access *
 	if access == nil || access.record == nil || access.prepared == nil || !agentToolNameAllowed(access.prepared.allowedTools, call.Name) {
 		return nil, workflowv2.ErrCapabilityDenied
 	}
+	// Second line for Plan mode: even a stale catalog cannot run a write.
+	if access.prepared.collaboration.planning() && (access.prepared.toolbox == nil || len(planModeTools(access.prepared.toolbox, []string{call.Name})) != 1) {
+		return nil, serveragent.ErrInvalidRequest("Plan mode is read-only. Put this action in the plan as a step instead.")
+	}
 	ctx = withAgentExecutionRuntime(ctx, call.RuntimeRunID)
 	if call.Name == "browser.request_user_action" {
 		if !access.claims.InterventionWaits {

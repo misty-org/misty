@@ -33,6 +33,8 @@ export function MistyComposer(props: {
   onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onCapture?: () => void;
   voiceControl?: ReactNode;
+  /** Controls after Attach in the leading group, such as a conversation's mode. */
+  leadingControl?: ReactNode;
   modelControl?: ReactNode;
   trailingControl?: ReactNode;
   disabled?: boolean;
@@ -75,6 +77,11 @@ export function MistyComposer(props: {
   };
   const canSend = Boolean(
     props.value.trim() || props.attachments.some((item) => item.state === "ready"),
+  );
+  const showEstimate = props.mode !== "search" && !props.busy && !props.hideUsageEstimate;
+  // An empty footer would still add its bottom padding under the input row.
+  const hasFooter = Boolean(
+    props.onModeChange || props.mode === "search" || props.modelControl || showEstimate,
   );
   return (
     <MessageComposer
@@ -222,24 +229,25 @@ export function MistyComposer(props: {
               <Plus className="size-4" />
             </IconButton>
           )}
+          {props.leadingControl}
         </>
       }
       footer={
-        <div className="flex min-w-0 flex-col gap-2">
-          {props.onModeChange ? (
-            <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
-          ) : props.mode === "search" ? (
-            <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
-              <Search className="size-3.5" />
-              Search
-            </span>
-          ) : (
-            props.modelControl
-          )}
-          {props.mode !== "search" && !props.busy && !props.hideUsageEstimate && (
-            <CommandUsageEstimate text={props.value} model={props.modelId} />
-          )}
-        </div>
+        hasFooter && (
+          <div className="flex min-w-0 flex-col gap-2">
+            {props.onModeChange ? (
+              <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
+            ) : props.mode === "search" ? (
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
+                <Search className="size-3.5" />
+                Search
+              </span>
+            ) : (
+              props.modelControl
+            )}
+            {showEstimate && <CommandUsageEstimate text={props.value} model={props.modelId} />}
+          </div>
+        )
       }
       actions={
         <>

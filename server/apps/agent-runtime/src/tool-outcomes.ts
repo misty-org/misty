@@ -42,6 +42,10 @@ const handoffDefaults: Record<string, string> = {
   screen_requested: "Misty is opening a screen and will continue this conversation with it attached.",
   waiting_for_user: "Connect the app with the card above. Misty continues once it's connected.",
   awaiting_approval: "An action is waiting for your approval above. Misty continues after you decide.",
+  // The agent asked structured questions; the conversation continues with the answers.
+  awaiting_answer: "Answer the question above and Misty continues.",
+  // Plan mode ends its turn with a plan for the user to run, edit or refine.
+  plan_proposed: "Review the plan above. Run it, edit it, or keep planning.",
 };
 
 /** The user-facing message for a handoff result, or "" when the output is not one. */

@@ -549,6 +549,29 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "agents.collaboration_mode",
+    "label": "Start new conversations in",
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "default_collaboration_mode",
+    "default": "act",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["act", "plan"]
+  },
+  {
+    "id": "agents.plan_deep_thinking",
+    "label": "Think harder while planning",
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "plan_deep_thinking",
+    "default": false,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "agents.reasoning",
     "label": "Default reasoning",
     "page": "agents-defaults",

@@ -1,8 +1,7 @@
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
-import { ScheduledTasksBridge } from "@/features/scheduled";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
-import { CursorCompanionController } from "@/features/agents";
+import { CursorCompanionController, WorkflowSchedulesBridge } from "@/features/agents";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
@@ -487,7 +486,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             <BrowserRuntimeBridge />
             <BrowserContextMenuBridge />
             <ActivityBridge />
-            <ScheduledTasksBridge />
+            <WorkflowSchedulesBridge />
             <AgentJobWorker />
             <AppTour />
           </>

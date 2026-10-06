@@ -37,6 +37,8 @@ type AgentMethod struct {
 	Definition         AgentMethodDefinition `json:"definition"`
 	SourceInvocationID string                `json:"source_invocation_id,omitempty"`
 	UpdatedAt          time.Time             `json:"updated_at"`
+	// Schedule is when a workflow runs on its own; nil runs only when started.
+	Schedule *WorkflowSchedule `json:"schedule,omitempty"`
 }
 
 var methodKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
@@ -160,9 +162,35 @@ func (db *Database) AgentMethods(ctx context.Context, user, agent string) ([]Age
 			}
 			items = append(items, m)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		schedules, err := queryWorkflowSchedules(ctx, tx, `SELECT `+workflowScheduleColumns+` FROM workflow_schedules s
+			WHERE s.user_id=$1 AND s.method_id IN (SELECT id FROM agent_methods WHERE user_id=$1 AND agent_id=$2)`, user, agent)
+		if err != nil {
+			return err
+		}
+		for i := range items {
+			for j := range schedules {
+				if schedules[j].MethodID == items[i].ID {
+					items[i].Schedule = &schedules[j]
+				}
+			}
+		}
+		return nil
 	})
 	return items, err
+}
+
+// AgentMethodByID loads a method's latest version.
+func (db *Database) AgentMethodByID(ctx context.Context, user, id string) (AgentMethod, error) {
+	var m AgentMethod
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(user), func(tx *sql.Tx) error {
+		var e error
+		m, e = scanAgentMethod(tx.QueryRowContext(ctx, `SELECT `+methodColumns+` FROM agent_methods m JOIN agent_method_versions v ON v.method_id=m.id AND v.version=m.current_version WHERE m.user_id=$1 AND m.id=$2`, user, id))
+		return e
+	})
+	return m, err
 }
 func (db *Database) AgentMethodVersion(ctx context.Context, user, id string) (AgentMethod, error) {
 	var m AgentMethod

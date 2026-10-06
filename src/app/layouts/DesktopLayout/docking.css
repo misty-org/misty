@@ -426,7 +426,8 @@
    overlaps the pane's seam row by 1px so the tab can cover it, and the pane
    keeps the standard corners and seams from dockingGeometry. Everything in the
    strip shares the bar's center line with the traffic lights. Tabs fill the
-   strip below a small --tab-inset gap, and their content is centered in the tab. */
+   strip below a small --tab-inset gap, and their content is centered on the strip,
+   the same line as New tab and the pane controls. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"]) {
   /* Corner and shoulder radius; ConnectedTabShape and the drag preview read it. */
   --tab-shoulder: 14px;
@@ -499,12 +500,13 @@
   background: transparent;
 }
 /* Inactive hover: a pill shorter than the active tab, inset sideways to clear
-   the active shoulders and kept off the pane seam so the seam stays visible. */
+   the active shoulders, kept off the pane seam so the seam stays visible, and
+   centered on the tab's content. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab:not([data-active="true"])::before {
   content: "";
   position: absolute;
-  inset: 4px 4px 5px;
+  inset: 3px 4px 6px;
   z-index: -1;
   border-radius: 8px;
   background: color-mix(in srgb, var(--workspace-tab-surface) 75%, transparent);
@@ -538,7 +540,12 @@
 }
 .misty-workspace-tabs[data-tab-position="bottom"]
   .misty-workspace-tab:not([data-active="true"])::before {
-  inset: 5px 4px 4px;
+  inset: 6px 4px 3px;
+}
+/* The tab fills the strip minus the --tab-inset gap; padding the pane side by the
+   same gap centers its content on the strip, level with New tab and the controls. */
+.misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab {
+  padding: 0 0 var(--tab-inset);
 }
 .misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab {
   padding: var(--tab-inset) 0 0;
@@ -551,6 +558,9 @@
   align-self: center;
   margin-block: 0;
 }
+/* New tab and group headers sit in the tab list, which is inset from the strip;
+   the opposite margin puts them back on the strip's center line. The pane controls
+   sit outside the list and center on the strip directly. */
 .misty-workspace-tabs[data-tab-position="top"]
   .misty-workspace-tab-list
   > :is(button, .misty-tab-group-header) {
@@ -561,8 +571,10 @@
   > :is(button, .misty-tab-group-header) {
   margin-top: var(--tab-inset);
 }
+/* A clear gap after New tab, so it reads as part of the tabs and not the pane controls. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab-actions {
+  margin-left: 25px;
   color: var(--workspace-tab-muted);
 }
 /* Close and New tab share a 1.33px stroke and sit 12px either side of the

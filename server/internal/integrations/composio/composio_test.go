@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -165,5 +166,42 @@ func TestAccountsBelongToTheRequestingUser(t *testing.T) {
 	}
 	if err := client.DeleteAccount(context.Background(), owner, "ca_other"); !NotFound(err) {
 		t.Fatalf("delete other = %v", err)
+	}
+}
+
+func TestIdentitiesNameEachAccount(t *testing.T) {
+	executed := map[string]string{}
+	var mu sync.Mutex
+	client := testClient(t, func(r *http.Request) *http.Response {
+		var body struct {
+			Slug    string `json:"tool_slug"`
+			Account string `json:"account"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		executed[body.Account] = body.Slug
+		mu.Unlock()
+		if body.Slug == "DISCORD_GET_MY_USER" {
+			return respond(200, `{"data":{"username":"kannachi","email":"private@example.com"}}`)
+		}
+		return respond(200, `{"data":null,"error":"insufficient scopes"}`)
+	})
+	var accounts []Account
+	_ = json.Unmarshal([]byte(`[
+		{"id":"ca_mail","status":"ACTIVE","toolkit":{"slug":"gmail"},"state":{"val":{"displayName":"me@example.com","access_token":"secret"}}},
+		{"id":"ca_chat","status":"ACTIVE","toolkit":{"slug":"discord"}},
+		{"id":"ca_cal","status":"ACTIVE","toolkit":{"slug":"googlecalendar"}},
+		{"id":"ca_off","status":"EXPIRED","toolkit":{"slug":"discord"}},
+		{"id":"ca_doc","status":"ACTIVE","toolkit":{"slug":"notion"}}
+	]`), &accounts)
+	names := client.Identities(context.Background(), "session", accounts)
+	if len(names) != 2 || names["ca_mail"] != "me@example.com" || names["ca_chat"] != "kannachi" {
+		t.Fatalf("names = %v", names)
+	}
+	if len(executed) != 2 || executed["ca_chat"] != "DISCORD_GET_MY_USER" || executed["ca_cal"] != "GOOGLECALENDAR_EVENTS_LIST" {
+		t.Fatalf("executed = %v", executed)
+	}
+	if _, cached := identityCache.Load("ca_cal"); cached {
+		t.Fatal("a failed lookup was cached")
 	}
 }

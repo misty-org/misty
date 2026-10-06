@@ -80,15 +80,22 @@ export function useSpaceChatScope(options: {
     [store.nodesBySpace, spaceId],
   );
 
+  // A fresh array each render would re-run every memo and effect keyed on members.
+  const members = useMemo(
+    () =>
+      conversationId
+        ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
+        : allMembers,
+    [allMembers, allowedMemberIds, conversationId],
+  );
+
   return {
     allMembers,
     defaultMessages,
     activeConversation,
     directRecipient,
     nodes,
-    members: conversationId
-      ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
-      : allMembers,
+    members,
     messages: conversationId ? options.conversationMessages : defaultMessages,
   };
 }

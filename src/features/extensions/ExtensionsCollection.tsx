@@ -2,6 +2,8 @@ import { Button, CollectionItems, CollectionViewToggle } from "@/shared/ui";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
 import { AccountCollectionFilters } from "@/features/settings/AccountCollectionFilters";
+import type { ExtensionCategory } from "./extensionCategories";
+import { ExtensionsChipRow } from "./ExtensionsChipRow";
 import { ExtensionIcon } from "./ExtensionIcon";
 import { ExtensionLoading } from "./ExtensionLoading";
 import { extensionsNative } from "./native";
@@ -14,10 +16,12 @@ const installedFilters = [
   { value: "disabled", label: "Disabled" },
   { value: "attention", label: "Needs attention" },
 ];
-const catalogSorts = [
+// The section strip: three orderings of the catalog, then what this account installed.
+const sections = [
   { value: "recommended", label: "Discover" },
   { value: "users", label: "Popular" },
   { value: "updated", label: "Recently updated" },
+  { value: "installed", label: "Installed" },
 ];
 
 function status(item: Installation, state?: InstalledState) {
@@ -34,6 +38,8 @@ export function ExtensionsCollection(props: {
   sort: string;
   query: string;
   items: Array<Installation | CatalogEntry>;
+  categories: ExtensionCategory[];
+  category: string | null;
   installed: Installation[];
   states: InstalledState[];
   catalog: CatalogPage | null;
@@ -57,9 +63,13 @@ export function ExtensionsCollection(props: {
     <>
       <AccountCollectionFilters
         collectionId="extensions"
-        options={inInstalled ? installedFilters : catalogSorts}
-        value={inInstalled ? props.filter : props.sort}
-        onChange={inInstalled ? props.onFilter : props.onSort}
+        options={sections}
+        value={inInstalled ? "installed" : props.sort}
+        onChange={(value) => {
+          if (value === "installed") return props.go("/extensions/installed");
+          props.onSort(value);
+          if (inInstalled) props.go("/extensions");
+        }}
         actions={
           <CollectionViewToggle
             value={view}
@@ -67,6 +77,24 @@ export function ExtensionsCollection(props: {
           />
         }
       />
+      {inInstalled ? (
+        <ExtensionsChipRow
+          label="Installed extensions"
+          options={installedFilters}
+          value={props.filter}
+          onChange={props.onFilter}
+        />
+      ) : (
+        <ExtensionsChipRow
+          label="Categories"
+          options={[
+            { value: "", label: "All" },
+            ...props.categories.map((c) => ({ value: c.id, label: c.name })),
+          ]}
+          value={props.category ?? ""}
+          onChange={(id) => props.go(id ? `/extensions?category=${id}` : "/extensions")}
+        />
+      )}
       {inInstalled && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-cream-muted">

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { CalendarClock, Pencil, Plus, Workflow } from "lucide-react";
 import {
   agentMethodsApi,
@@ -8,9 +7,11 @@ import {
   type AgentMethodKind,
   type SaveAgentMethod,
 } from "@/api/ai/agent-methods";
-import { scheduledTasksApi, type ScheduledTask } from "@/api/scheduled/api";
+import { observeAccountChanges } from "@/api/accountEvents";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { Button, Input } from "@/shared/ui";
+import { Button, Input, SkeletonList } from "@/shared/ui";
+import { describeNextRun, describeSchedule } from "../workflows/scheduleSummary";
+import { WorkflowScheduleDialog } from "../workflows/WorkflowScheduleDialog";
 import {
   AgentMethodEditor,
   blankDefinition,
@@ -20,9 +21,28 @@ import {
 import { AgentMethodRunDialog } from "./AgentMethodRunDialog";
 import "./agentMethods.css";
 
+const copy: Record<AgentMethodKind, { title: string; description: string }> = {
+  workflow: {
+    title: "Workflows",
+    description:
+      "Repeat a method on a schedule or whenever you start it, with the inputs and work location you choose.",
+  },
+  template: {
+    title: "Templates",
+    description: "Start from a saved prompt. Review it before sending.",
+  },
+  skill: { title: "Skills", description: "Reusable guidance for this agent’s new tasks." },
+};
+
+/**
+ * An agent's saved methods of one kind. A workflow carries its own schedule; every
+ * scheduled run uses the workflow's latest version. Embedded catalogs drop the page
+ * heading for the tab that hosts them.
+ */
 export function AgentMethodsCatalog({
   agentId,
   kind,
+  embedded = false,
   onUse,
   onConversation,
   onStartWork,
@@ -30,25 +50,26 @@ export function AgentMethodsCatalog({
 }: {
   agentId: string;
   kind: AgentMethodKind;
+  embedded?: boolean;
   onUse(prompt: string): void;
   onConversation(id: string): void;
   onStartWork(action: () => void): void;
   children?: React.ReactNode;
 }) {
-  const navigate = useNavigate();
-  const [methods, setMethods] = useState<AgentMethod[]>([]);
-  const [schedules, setSchedules] = useState<ScheduledTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [methods, setMethods] = useState<AgentMethod[]>();
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [scheduledOnly, setScheduledOnly] = useState(false);
   const [editor, setEditor] = useState<{
     method?: AgentMethod;
     initial?: AgentMethodDefinition;
   } | null>(null);
-  const [action, setAction] = useState<{ method: AgentMethod; schedule?: boolean } | null>(null);
+  const [running, setRunning] = useState<AgentMethod | null>(null);
+  const [scheduling, setScheduling] = useState<AgentMethod | null>(null);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const generation = useRef(0);
+  const accountId = useMistyStore((s) => s.accountId);
   const conversations = useMistyStore((s) => s.conversations);
   const working = useMistyStore((s) => s.working);
   const sources = conversations
@@ -61,34 +82,39 @@ export function AgentMethodsCatalog({
           label: `${c.title || "Untitled task"} · ${new Date(m.createdAt).toLocaleDateString()}`,
         })),
     );
+  // Refreshes keep the current list on screen.
   const refresh = useCallback(async () => {
     const own = ++generation.current;
-    setLoading(true);
     setError("");
     try {
-      const [saved, tasks] = await Promise.all([
-        agentMethodsApi.list(agentId),
-        scheduledTasksApi.list(),
-      ]);
-      if (own !== generation.current) return;
-      setMethods(saved.methods);
-      setSchedules(tasks.tasks.filter((t) => t.agent_id === agentId && t.method_version_id));
+      const saved = await agentMethodsApi.list(agentId);
+      if (own === generation.current) setMethods(saved.methods);
     } catch (cause) {
       if (own === generation.current) setError(methodError(cause));
-    } finally {
-      if (own === generation.current) setLoading(false);
     }
   }, [agentId]);
-  const invalidateRequests = useCallback(() => {
-    generation.current++;
-  }, []);
   useEffect(() => {
     void refresh();
-    return invalidateRequests;
-  }, [refresh, invalidateRequests]);
+    const generations = generation;
+    return () => {
+      generations.current++;
+    };
+  }, [refresh]);
+  // Scheduled runs change a workflow's next and last run while the page is open.
+  useEffect(() => {
+    if (kind !== "workflow" || !accountId) return;
+    return observeAccountChanges(accountId, ["workflows"], refresh);
+  }, [kind, accountId, refresh]);
+  const replace = (method: AgentMethod) =>
+    setMethods((all = []) =>
+      all.some((m) => m.id === method.id)
+        ? all.map((m) => (m.id === method.id ? method : m))
+        : [method, ...all],
+    );
   const save = async (input: SaveAgentMethod) => {
     const { method } = await agentMethodsApi.save(input);
-    setMethods((all) => [method, ...all.filter((m) => m.id !== method.id)]);
+    const prior = methods?.find((m) => m.id === method.id);
+    replace({ ...method, schedule: method.schedule ?? prior?.schedule });
     setNotice(`Saved ${method.kind} version ${method.version}.`);
   };
   const toggle = async (method: AgentMethod) => {
@@ -103,68 +129,66 @@ export function AgentMethodsCatalog({
       setBusy("");
     }
   };
-  const scheduleAction = async (task: ScheduledTask, remove = false) => {
-    if (busy) return;
-    setBusy(task.id);
-    setError("");
-    try {
-      if (remove) {
-        await scheduledTasksApi.remove(task.id);
-        setSchedules((all) => all.filter((t) => t.id !== task.id));
-      } else {
-        const { task: updated } = await scheduledTasksApi.update(task.id, {
-          title: task.title,
-          prompt: task.prompt,
-          agent_id: task.agent_id,
-          method_version_id: task.method_version_id,
-          method_inputs: task.method_inputs,
-          cadence: task.cadence,
-          local_time: task.local_time,
-          weekday: task.weekday,
-          month_day: task.month_day,
-          run_on: task.run_on,
-          timezone: task.timezone,
-          enabled: !task.enabled,
-        });
-        setSchedules((all) => all.map((t) => (t.id === task.id ? updated : t)));
-      }
-    } catch (cause) {
-      setError(methodError(cause));
-    } finally {
-      setBusy("");
-    }
-  };
-  const visible = methods.filter(
+  const visible = (methods ?? []).filter(
     (m) =>
       m.kind === kind &&
+      (!scheduledOnly || m.schedule) &&
       `${m.definition.title} ${m.definition.description}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const { title, description } = copy[kind];
+  const create = (
+    <Button onClick={() => setEditor({})}>
+      <Plus size={14} />
+      New {kind}
+    </Button>
+  );
   return (
-    <div className="agent-studio-workflows agent-method-catalog">
-      <header className="agent-studio-heading">
-        <div>
-          <h1>{kind === "workflow" ? "Workflows" : kind === "template" ? "Tasks" : "Skills"}</h1>
-          <p>
-            {kind === "workflow"
-              ? "Repeat a method, with the inputs and work location you choose."
-              : kind === "template"
-                ? "Start from a saved prompt. Review it before sending."
-                : "Reusable guidance for this agent’s new tasks."}
-          </p>
+    <div
+      className={embedded ? "agent-method-catalog" : "agent-studio-workflows agent-method-catalog"}
+    >
+      {embedded ? (
+        <div className="agent-method-toolbar">
+          <p className="agent-method-hint">{description}</p>
+          {create}
         </div>
-        <Button onClick={() => setEditor({})}>
-          <Plus size={14} />
-          New {kind}
-        </Button>
-      </header>
-      <Input
-        aria-label={`Search ${kind}s`}
-        placeholder={`Search ${kind}s…`}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      ) : (
+        <header className="agent-studio-heading">
+          <div>
+            <h1>{title}</h1>
+            <p>{description}</p>
+          </div>
+          {create}
+        </header>
+      )}
+      <div className="agent-method-toolbar">
+        <Input
+          aria-label={`Search ${kind}s`}
+          placeholder={`Search ${kind}s…`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {kind === "workflow" && (
+          <div role="navigation" aria-label="Workflow sections" className="flex gap-1.5">
+            {[
+              { label: "All", scheduled: false },
+              { label: "Scheduled", scheduled: true },
+            ].map((option) => (
+              <Button
+                key={option.label}
+                variant="chip"
+                size="chip"
+                className="font-normal"
+                aria-pressed={scheduledOnly === option.scheduled}
+                onClick={() => setScheduledOnly(option.scheduled)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
       {error && (
         <div role="alert" className="agent-method-error">
           <p>{error}</p>
@@ -178,10 +202,8 @@ export function AgentMethodsCatalog({
           {notice}
         </p>
       )}
-      {loading ? (
-        <p role="status" className="agent-studio-catalog-empty">
-          Loading {kind}s…
-        </p>
+      {!methods && !error ? (
+        <SkeletonList label={title} rows={3} leading="none" trailing />
       ) : visible.length ? (
         <div className="agent-method-list">
           {visible.map((method) => (
@@ -189,10 +211,20 @@ export function AgentMethodsCatalog({
               <div>
                 <h2>{method.definition.title}</h2>
                 <p>{method.definition.description}</p>
+                {kind === "workflow" && (
+                  <span>
+                    {method.schedule
+                      ? `${describeSchedule(method.schedule)} · ${describeNextRun(method.schedule)}`
+                      : "Runs when you start it"}
+                  </span>
+                )}
                 <span>
-                  Version {method.version} · {method.enabled ? "Enabled" : "Disabled"} ·{" "}
+                  Version {method.version} · {method.enabled ? "On" : "Off"} ·{" "}
                   {methodTargets.find((t) => t.value === method.definition.target)?.label}
                 </span>
+                {method.schedule?.state === "failed" && method.schedule.last_error && (
+                  <p role="status">Last scheduled run failed: {method.schedule.last_error}</p>
+                )}
               </div>
               <div className="agent-method-actions">
                 <Button
@@ -210,26 +242,26 @@ export function AgentMethodsCatalog({
                   disabled={!!busy}
                   onClick={() => void toggle(method)}
                 >
-                  {method.enabled ? "Disable" : "Enable"}
+                  {method.enabled ? "Turn off" : "Turn on"}
                 </Button>
-                {kind !== "skill" && (
-                  <Button
-                    size="sm"
-                    disabled={!method.enabled || working || !!busy}
-                    onClick={() => setAction({ method })}
-                  >
-                    {kind === "template" ? "Use template" : "Run"}
-                  </Button>
-                )}
                 {kind === "workflow" && (
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!method.enabled || !!busy}
-                    onClick={() => setAction({ method, schedule: true })}
+                    disabled={!!busy}
+                    onClick={() => setScheduling(method)}
                   >
                     <CalendarClock size={13} />
-                    Schedule
+                    {method.schedule ? "Edit schedule" : "Schedule"}
+                  </Button>
+                )}
+                {kind !== "skill" && (
+                  <Button
+                    size="sm"
+                    disabled={!method.enabled || working || !!busy}
+                    onClick={() => setRunning(method)}
+                  >
+                    {kind === "template" ? "Use template" : "Run now"}
                   </Button>
                 )}
               </div>
@@ -239,65 +271,20 @@ export function AgentMethodsCatalog({
       ) : (
         <section className="agent-studio-workflow-empty">
           <Workflow size={28} />
-          <h2>{query ? "No matching methods" : `No ${kind}s yet`}</h2>
+          <h2>
+            {query
+              ? `No matching ${kind}s`
+              : scheduledOnly
+                ? "No scheduled workflows"
+                : `No ${kind}s yet`}
+          </h2>
           <p>
             {query
               ? "Try another search."
-              : "Start with your own instructions or save a method from a successful task."}
+              : scheduledOnly
+                ? "Open a workflow’s Schedule to have it run on its own."
+                : "Start with your own instructions or save a method from a successful task."}
           </p>
-        </section>
-      )}
-      {kind === "workflow" && schedules.length > 0 && (
-        <section className="agent-method-schedules">
-          <h2>Scheduled workflows</h2>
-          {schedules.map((task) => (
-            <article className="agent-method-row" key={task.id}>
-              <div>
-                <h3>{task.title}</h3>
-                <p>
-                  {task.cadence} at {task.local_time} · {task.timezone} ·{" "}
-                  {task.enabled ? task.state : "Paused"}
-                </p>
-                <span>
-                  {methods.find((m) => m.version_id === task.method_version_id)
-                    ? `Version ${methods.find((m) => m.version_id === task.method_version_id)!.version}`
-                    : "Saved earlier version"}{" "}
-                  ·{" "}
-                  {task.next_run_at
-                    ? `Next ${new Date(task.next_run_at).toLocaleString()}`
-                    : "No upcoming run"}
-                </span>
-                {task.last_error && <p role="status">{task.last_error}</p>}
-              </div>
-              <div className="agent-method-actions">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    navigate(`/agents?view=scheduled&task=${encodeURIComponent(task.id)}`)
-                  }
-                >
-                  Open schedule
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={!!busy}
-                  onClick={() => void scheduleAction(task)}
-                >
-                  {task.enabled ? "Pause" : "Resume"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={!!busy}
-                  onClick={() => void scheduleAction(task, true)}
-                >
-                  Remove schedule
-                </Button>
-              </div>
-            </article>
-          ))}
         </section>
       )}
       {children}
@@ -312,17 +299,24 @@ export function AgentMethodsCatalog({
           onSave={save}
         />
       )}
-      {action && (
+      {running && (
         <AgentMethodRunDialog
-          method={action.method}
-          schedule={!!action.schedule}
-          onClose={() => setAction(null)}
+          method={running}
+          onClose={() => setRunning(null)}
           onUse={onUse}
           onConversation={onConversation}
           onStartWork={onStartWork}
-          onScheduled={(task) => {
-            setSchedules((all) => [task, ...all]);
-            setNotice("Schedule saved. Its workflow version is pinned.");
+        />
+      )}
+      {scheduling && (
+        <WorkflowScheduleDialog
+          method={scheduling}
+          onClose={() => setScheduling(null)}
+          onSaved={(schedule) => {
+            replace({ ...scheduling, schedule });
+            setNotice(
+              schedule ? "Schedule saved. Runs use the latest version." : "Schedule removed.",
+            );
           }}
         />
       )}

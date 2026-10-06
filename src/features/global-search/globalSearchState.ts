@@ -18,6 +18,8 @@ export type MistySubmissionPresentation = "panel" | "workspace";
 export interface GlobalSearchState {
   thinkingMode?: ThinkingMode;
   thinkingModeExplicit?: boolean;
+  /** A model picked before the conversation exists; the first message carries it. */
+  pendingModelOverride?: string;
   selectedAgentId?: string;
   /** Where the current task works; set per task, never chosen up front. */
   executionMode?: "user" | "agent" | "team";

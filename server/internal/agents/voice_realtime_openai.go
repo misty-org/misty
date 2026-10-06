@@ -8,12 +8,13 @@ import (
 	"net/url"
 	"strings"
 	"time"
- "github.com/kannachi323/misty/server/internal/aimodels"
 
 	"github.com/gorilla/websocket"
 )
 
-func openOpenAIRealtimeModel(ctx context.Context, base, key, model string, publicEndpoint bool) (*VoiceRealtime, error) {
+const openAIRealtimeBase = "https://api.openai.com/v1"
+
+func openOpenAIRealtimeModel(ctx context.Context, base, key, model string) (*VoiceRealtime, error) {
 	endpoint, err := url.Parse(strings.TrimRight(base, "/") + "/realtime")
 	if err != nil || endpoint.Host == "" || key == "" {
 		return nil, errors.New("direct OpenAI realtime is not configured")
@@ -31,7 +32,6 @@ func openOpenAIRealtimeModel(ctx context.Context, base, key, model string, publi
 	setup, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	dialer := websocket.Dialer{HandshakeTimeout: 15 * time.Second, Proxy: http.ProxyFromEnvironment}
-	if publicEndpoint { dial, dialErr := aimodels.DialEndpoint(base); if dialErr != nil { return nil, dialErr }; dialer.Proxy = nil; dialer.NetDialContext = dial }
 	conn, response, err := dialer.DialContext(setup, endpoint.String(), http.Header{"Authorization": []string{"Bearer " + key}})
 	if err != nil {
 		if response != nil {

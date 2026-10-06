@@ -1,7 +1,3 @@
-import {
-  deliverDevicePairingLink,
-  isDevicePairingLink,
-} from "@/features/connected-devices/pairingLinks";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
@@ -22,10 +18,6 @@ export function installMistyDeepLinkHandler(
     if (source === "current" && signature === lastCurrentSignature) return;
     lastCurrentSignature = signature;
     for (const url of urls) {
-      if (isDevicePairingLink(url)) {
-        deliverDevicePairingLink(url);
-        return;
-      }
       const route = routeForMistyDeepLink(url, isRouteAllowed, resolveAuthRoute);
       if (route) {
         navigate(route);

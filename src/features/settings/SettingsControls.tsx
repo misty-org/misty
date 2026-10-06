@@ -237,6 +237,10 @@ export function TextControl(props: {
       onKeyDown={(event) => {
         if (event.key === "Enter") {
           event.currentTarget.blur();
+        } else if (event.key === "Escape") {
+          // Cancel: restore the saved value; blurring then commits nothing.
+          event.currentTarget.value = props.value;
+          event.currentTarget.blur();
         }
       }}
     />

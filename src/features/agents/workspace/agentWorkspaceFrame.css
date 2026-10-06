@@ -20,19 +20,23 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 48px;
-  margin-bottom: 12px;
+  min-height: 36px;
+  margin-bottom: 4px;
 }
+/* Spacing follows the Spaces sidebar: 32px rows 4px apart, 13px labels, compact section labels. */
+/* The switcher hugs its name instead of spanning the sidebar. */
 .agent-studio-identity {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  height: auto;
+  min-height: 36px;
   justify-content: flex-start;
-  padding-inline: 6px;
+  padding: 4px 8px 4px 4px;
   font-weight: 600;
 }
 .agent-studio-sidebar .agent-avatar {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
 }
 .agent-studio-sidebar nav {
@@ -42,10 +46,11 @@
 .agent-studio-sidebar nav > button,
 .agent-studio-recent-row > button:first-child {
   width: 100%;
-  min-height: 34px;
-  gap: 9px;
-  padding: 6px 10px;
-  font-size: 14px;
+  height: 32px;
+  min-height: 32px;
+  gap: 8px;
+  padding: 0 8px;
+  font-size: 13px;
   font-weight: 400;
 }
 .agent-studio-sidebar button[aria-current="page"] {
@@ -62,7 +67,10 @@
   text-overflow: ellipsis;
 }
 .agent-studio-recents {
-  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -71,12 +79,30 @@
   margin-right: -2px;
 }
 .agent-studio-recents h2 {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin: 0;
+  padding-inline: 8px;
   font-size: 12px;
-  font-weight: 400;
-  color: var(--color-cream-muted);
-  margin: 0 10px 10px;
+  font-weight: 500;
+  color: var(--color-cream);
 }
 .agent-studio-recent-row > button:first-child {
+  color: var(--color-cream-muted);
+}
+/* The title takes the row's width so a status icon sits at its end. */
+.agent-studio-recent-row > button:first-child > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+/* Status is an icon with a text label (tooltip and screen readers), never a color. */
+.agent-studio-recent-status {
+  display: inline-flex;
+  flex-shrink: 0;
   color: var(--color-cream-muted);
 }
 .agent-studio-canvas {
@@ -105,8 +131,9 @@
 .agent-studio .agent-conversation[data-empty="true"] {
   justify-content: flex-start;
   padding-top: clamp(40px, 18vh, 210px);
-  /* Recent work and templates sit under the composer, so a short window scrolls. */
-  overflow-y: auto;
+}
+.agent-studio .agents-body {
+  --agents-canvas: var(--color-charcoal-bg);
 }
 .agent-studio .agent-conversation[data-empty="true"] .agent-conversation-scroll {
   flex: 0 0 auto;
@@ -131,96 +158,12 @@
   padding: 0;
   flex-shrink: 0;
 }
-.agent-studio .agent-conversation[data-empty="true"] .agent-overview-rail {
-  display: none;
-}
-.agent-studio-task[data-floating="true"] {
-  position: absolute;
-  z-index: 20;
-  top: 24px;
-  right: 24px;
-  width: 660px;
-  max-width: calc(100% - 48px);
-  height: min(640px, calc(100% - 48px));
-  flex-direction: column;
-  background: var(--color-charcoal-bg);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 16px 48px #0005;
-  overflow: hidden;
-}
-.agent-studio-floating-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px 4px;
-  flex-shrink: 0;
-}
-.agent-studio-floating-bar .agent-avatar {
-  width: 32px;
-  height: 32px;
-}
-.agent-studio-floating-bar > span:not(.agent-avatar) {
-  flex: 1;
-}
-.agent-studio-floating-bar strong {
-  font-size: 14px;
-  font-weight: 600;
-}
-.agent-studio-task[data-floating="true"] .agent-conversation-heading,
-.agent-studio-task[data-floating="true"] .agent-overview-rail {
-  display: none;
-}
-.agent-studio-task[data-floating="true"] .agent-conversation {
-  padding: 0;
-  flex-direction: column-reverse;
-}
-.agent-studio-task[data-floating="true"] .agent-compose-area {
-  width: auto;
-  max-width: none;
-  margin: 0;
-  padding: 12px 16px;
-}
-.agent-studio-task[data-floating="true"] .agent-conversation-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.agent-studio-task[data-floating="true"] .agent-studio-welcome,
-.agent-studio-task[data-floating="true"] .agent-context-chips,
-.agent-studio-task[data-floating="true"] .agent-landing {
-  display: none;
-}
-.agent-studio-floating-placeholder {
-  max-width: 420px;
-  margin: 20vh auto 0;
-  text-align: center;
-  padding: 24px;
-}
-.agent-studio-floating-placeholder .agent-avatar {
-  width: 44px;
-  height: 44px;
-  margin: 0 auto 16px;
-}
-.agent-studio-floating-placeholder h1 {
-  font-size: 20px;
-  font-weight: 500;
-}
-.agent-studio-floating-placeholder p {
-  color: var(--color-cream-muted);
-  margin: 12px 0 24px;
-}
 @container agent-studio (max-width:1100px) {
   .agent-studio-sidebar {
     width: 190px;
   }
-  .agent-studio-subnav {
-    width: 170px;
-  }
   .agent-studio-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .agent-studio .agent-overview-rail {
-    --agent-rail-width: 260px;
   }
 }
 @container agent-studio (max-width:760px) {
@@ -242,24 +185,6 @@
     justify-content: center;
     padding: 8px;
   }
-  .agent-studio-pages {
-    flex-direction: column;
-  }
-  .agent-studio-subnav {
-    width: auto;
-    padding: 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-charcoal-border);
-  }
-  .agent-studio-subnav nav {
-    display: flex;
-  }
-  .agent-studio-subnav nav button {
-    width: auto;
-  }
-  .agent-studio-subnav h1 {
-    margin-bottom: 8px;
-  }
   .agent-studio-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -268,57 +193,44 @@
     max-width: calc(100% - 32px);
     margin-top: 24px;
   }
-  .agent-studio .agent-overview-rail {
-    display: none;
-  }
   .agent-studio-welcome h1 {
     font-size: 26px;
   }
-  .agent-studio-task[data-floating="true"] {
-    right: 12px;
-    top: 12px;
-    max-width: calc(100% - 24px);
-    height: calc(100% - 24px);
-  }
 }
-.agent-studio-subnav button[aria-current="page"] {
-  background: var(--color-charcoal-active);
-}
-.agent-studio
-  .agent-conversation[data-empty="true"]
-  [data-slot="message-composer"]
-  > div:has(textarea) {
+/*
+ * Every Agents composer has two rows: the text on top, and one toolbar under it with
+ * Attach and the mode on the left, the model, usage, voice and send on the right.
+ */
+.agent-studio .agent-conversation [data-slot="message-composer"] > div:has(textarea) {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: end;
+  row-gap: 6px;
   padding: 10px;
 }
-.agent-studio
-  .agent-conversation[data-empty="true"]
-  [data-slot="message-composer"]
-  > div
-  > div:has(> textarea) {
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:has(> textarea) {
   grid-column: 1 / -1;
   grid-row: 1;
 }
+/* Text starts where the + glyph starts: 10px card padding + 8px inset inside the 32px button. */
+.agent-studio .agent-conversation [data-slot="message-composer"] textarea {
+  padding-inline: 8px;
+}
+/* A new task's composer is roomier: a taller field in larger type. */
 .agent-studio .agent-conversation[data-empty="true"] [data-slot="message-composer"] textarea {
   min-height: 64px;
+  padding: 8px;
   font-size: 16px;
 }
-.agent-studio
-  .agent-conversation[data-empty="true"]
-  [data-slot="message-composer"]
-  > div
-  > div:first-child {
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:first-child {
   grid-row: 2;
+  /* The shared lift centers the buttons on a one-line input; here they have their own row. */
+  margin-bottom: 0;
 }
-.agent-studio
-  .agent-conversation[data-empty="true"]
-  [data-slot="message-composer"]
-  > div
-  > div:last-child {
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:last-child {
   grid-column: 3;
   grid-row: 2;
+  margin-bottom: 0;
 }
 /*
  * Control bar: a tab tucked behind the composer's top edge for active folder work and
@@ -429,9 +341,18 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.agent-conversation-heading[data-workspace] .agent-heading-end {
-  flex: 0 0 auto;
-  gap: 2px;
+/* The Working status and the Details toggle end the bar. */
+.agent-heading-details {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+.agent-heading-details > button:last-child {
+  color: var(--color-cream-muted);
+}
+.agent-heading-details > button:last-child[aria-pressed="true"] {
+  color: var(--color-cream-bright);
 }
 
 /* Folder work joins the bar's controls; its receipt and errors span the row below. */
@@ -467,8 +388,8 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 26px;
-  padding-left: 10px;
+  min-height: 24px;
+  padding-left: 8px;
   font-size: 12px;
   color: var(--color-cream-muted);
 }

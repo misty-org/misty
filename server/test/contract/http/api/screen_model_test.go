@@ -64,7 +64,7 @@ func TestScreenModelPassThroughForALiveActJob(t *testing.T) {
 	if _, err := database.FreezeAIModelRoutes(ctx, user.ID, run.ID, []aimodels.Route{
 		{Role: "agent", Model: "openai/gpt-6-luna", Reasoning: "low", Enabled: true},
 		{Role: "vision", Model: "openai/gpt-6-luna", Reasoning: "low", Enabled: true},
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatal(err)
 	}
 	job, err := database.QueueAIInvocationDeviceNodeJob(ctx, user.ID, run.ID, "act-node", 1, "act-scope", "browser.act", "browser.act", json.RawMessage(`{"goal":"Draw a house"}`), json.RawMessage(`{}`), json.RawMessage(`{"type":"object"}`), json.RawMessage(`{"type":"object"}`))

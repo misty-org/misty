@@ -1,25 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
-  deploymentStorageKey,
-  readDeploymentStorageItem,
-  resolveApiBase,
-} from "@/api/deployment/api";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { hostname, platform, version } from "@tauri-apps/plugin-os";
+import { getVersion } from "@tauri-apps/api/app";
+import { resolveApiBase } from "@/api/deployment/api";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { devicesApi } from "@/api/devices/api";
+import { useUserStore } from "@/features/auth/core";
+import { devicesNative, type DevicesView } from "@/native/devices";
 import { secureId } from "@/shared/platform/secureId";
 import type { AgentDevice } from "../model/interfaces/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
 
-const serverDevicePrefix = "misty:agents:server-device:";
-const localDeviceByServerId = new Map<string, string>();
-const identityCache = new Map<string, StoredDeviceIdentity>();
-const identityLoadAttempts = new Map<string, Promise<StoredDeviceIdentity>>();
+// One device identity (docs/design/devices/BRIEF.md). The device key lives in
+// native code only: this module never sees private key material. It asks the
+// native side to register the device and to sign each device request.
+
 const lastHeartbeatByServerId = new Map<string, number>();
-const heartbeatIntervalMs = 30_000;
-// A conflicting endpoint cannot be repaired by repeating registration. Keep
-// failures only for this deployment/account generation and exact identity.
-const registrationAttempts = new Map<string, Promise<ServerTrustedDevice>>();
-const registrationConflicts = new Map<string, ManagedAiRequestError>();
+let started: { key: string; promise: Promise<DevicesView> } | null = null;
 export let browserDeviceSessionId = secureId();
 
 export const agentDeviceCapabilities = {
@@ -34,147 +31,68 @@ export const agentDeviceCapabilities = {
   },
 } as const;
 
+/** The signed-in account and API base the native device commands act for. */
+export async function deviceAccount(): Promise<{ apiBase: string; accountId: string }> {
+  const accountId = useUserStore.getState().me?.id;
+  if (!accountId || isApiSessionTransitioning()) {
+    throw new ManagedAiRequestError("Sign in to use this device.", 401, "account_session_changed");
+  }
+  return { apiBase: await resolveApiBase(), accountId };
+}
+
+async function defaultDeviceName(): Promise<string> {
+  try {
+    const name = (await hostname())?.replace(/\.local$/i, "").trim();
+    if (name) return name.slice(0, 64);
+  } catch {
+    /* fall back below */
+  }
+  return "This Misty";
+}
+
+/** Registers this device (once per account session) and starts its channel,
+ * LAN discovery and trust. Only the main window starts it; other windows read
+ * the device the main window registered. */
+export async function ensureDeviceStarted(): Promise<DevicesView> {
+  const account = await deviceAccount();
+  const key = JSON.stringify([account.apiBase, account.accountId, readApiSessionGeneration()]);
+  if (getCurrentWindow().label !== "main") {
+    const view = await devicesNative.view(account.accountId);
+    if (!view.serverDeviceId) throw new Error("This device isn't registered with Misty yet.");
+    return view;
+  }
+  if (started?.key === key) return started.promise;
+  const promise = (async () =>
+    devicesNative.start(account, {
+      name: await defaultDeviceName(),
+      platform: platform(),
+      osVersion: String(version() ?? "").slice(0, 64),
+      appVersion: await getVersion().catch(() => ""),
+    }))();
+  started = { key, promise };
+  promise.catch(() => {
+    if (started?.promise === promise) started = null;
+  });
+  return promise;
+}
+
 /**
- * Returns the server-side execution identity for this local Misty device.
- * The opaque public identifier is stable per local device and contains no path
- * or host metadata. Account authentication still protects every device call.
+ * Returns the server identity of this device. `local` scopes the native
+ * keychain entry; the server id comes from the native registration.
  */
 export async function ensureServerAgentDevice(
   local: AgentDevice,
-  connected?: {
-    endpointId: string;
-    platform: "macos" | "windows" | "linux" | "unknown";
-    scope?: { assertCurrent(): void; signal: AbortSignal };
-  },
+  _connected?: unknown,
 ): Promise<ServerTrustedDevice> {
   if ("__TAURI_INTERNALS__" in window)
     browserDeviceSessionId = await invoke<string>("agent_browser_session_id");
-  connected?.scope?.assertCurrent();
-  let identity = await loadOrCreateDeviceIdentity(local.id);
-  connected?.scope?.assertCurrent();
-  let publicKey = identity.publicKey;
-
-  // Registration is an upsert. When Connected Devices starts, repeat it so
-  // the shared trusted-device record receives the separate iroh identity even
-  // if the Agent worker already registered this machine earlier in the session.
-  if (connected) {
-    const registered = await registerServerDevice(local, publicKey, connected);
-    connected.scope?.assertCurrent();
-    writeStorage(serverDevicePrefix + local.id, registered.id);
-    localDeviceByServerId.set(registered.id, local.id);
-    lastHeartbeatByServerId.set(registered.id, Date.now());
-    return registered;
-  }
-  const cachedId = readStorage(serverDevicePrefix + local.id);
-  if (cachedId) {
-    if (Date.now() - (lastHeartbeatByServerId.get(cachedId) ?? 0) < heartbeatIntervalMs) {
-      localDeviceByServerId.set(cachedId, local.id);
-      return { id: cachedId, name: local.displayName };
-    }
-    try {
-      localDeviceByServerId.set(cachedId, local.id);
-      const heartbeat = await heartbeatServerAgentDevice(cachedId, local.id);
-      return heartbeat;
-    } catch (error) {
-      if (
-        !(error instanceof ManagedAiRequestError) ||
-        (error.status !== 401 && error.status !== 404)
-      )
-        throw error;
-      if (error.status === 401) {
-        // A signed heartbeat can fail after the local credential files are restored,
-        // cleared, or contains a partial legacy identity. Prove account auth is
-        // still valid before rotating anything; otherwise preserve the binding
-        // and let the normal sign-in recovery handle the unauthorized session.
-        await devicesApi.list<ServerDeviceList>();
-      }
-      removeStorage(serverDevicePrefix + local.id);
-      localDeviceByServerId.delete(cachedId);
-      identity = await rotateDeviceIdentity(local.id);
-      publicKey = identity.publicKey;
-    }
-  }
-
-  const list = await devicesApi.list<ServerDeviceList>().catch(() => ({ devices: [] }));
-  const existing = list.devices.find(
-    (device) => device.publicKey === publicKey && !device.revokedAt,
-  );
-  if (existing) {
-    writeStorage(serverDevicePrefix + local.id, existing.id);
-    localDeviceByServerId.set(existing.id, local.id);
-    return heartbeatServerAgentDevice(existing.id, local.id);
-  }
-
-  const registered = await registerServerDevice(local, publicKey);
-  writeStorage(serverDevicePrefix + local.id, registered.id);
-  localDeviceByServerId.set(registered.id, local.id);
-  lastHeartbeatByServerId.set(registered.id, Date.now());
-  return registered;
+  const view = await ensureDeviceStarted();
+  if (!view.serverDeviceId) throw new Error("This device isn't registered with Misty yet.");
+  lastHeartbeatByServerId.set(view.serverDeviceId, Date.now());
+  return { id: view.serverDeviceId, name: local.displayName };
 }
 
-async function registerServerDevice(
-  local: AgentDevice,
-  publicKey: string,
-  connected?: {
-    endpointId: string;
-    platform: "macos" | "windows" | "linux" | "unknown";
-    scope?: { assertCurrent(): void; signal: AbortSignal };
-  },
-): Promise<ServerTrustedDevice> {
-  const generation = readApiSessionGeneration();
-  const apiBase = await resolveApiBase();
-  connected?.scope?.assertCurrent();
-  connected?.scope?.signal.throwIfAborted();
-  if (isApiSessionTransitioning() || generation !== readApiSessionGeneration()) {
-    throw new ManagedAiRequestError("Account session changed.", 401, "account_session_changed");
-  }
-  const registrationKey = JSON.stringify([
-    apiBase,
-    generation,
-    local.id,
-    publicKey,
-    connected?.endpointId ?? "",
-  ]);
-  const conflict = registrationConflicts.get(registrationKey);
-  if (conflict) throw conflict;
-  const pending = !connected?.scope && registrationAttempts.get(registrationKey);
-  if (pending) return pending;
-  const attempt = (async () => {
-    try {
-      return await devicesApi.register<ServerTrustedDevice>(
-        {
-          name: local.displayName || "This Misty",
-          publicKey,
-          keyAlgorithm: "ed25519",
-          platform: connected?.platform ?? "unknown",
-          p2pEndpointId: connected?.endpointId ?? "",
-          protocolVersions: connected ? ["misty-device/1"] : [],
-          capabilities: agentDeviceCapabilities,
-        },
-        connected?.scope?.signal,
-      );
-    } catch (error) {
-      if (
-        error instanceof ManagedAiRequestError &&
-        error.status === 409 &&
-        error.code === "device_identity_conflict"
-      ) {
-        registrationConflicts.set(registrationKey, error);
-      }
-      throw error;
-    }
-  })();
-  if (!connected?.scope) registrationAttempts.set(registrationKey, attempt);
-  try {
-    return await attempt;
-  } finally {
-    if (registrationAttempts.get(registrationKey) === attempt)
-      registrationAttempts.delete(registrationKey);
-  }
-}
-
-/** Records liveness the server confirmed through another call (Connected
- * Devices presence), so this device sends no second heartbeat. */
+/** Records liveness the server confirmed another way (the device channel). */
 export function noteServerAgentDeviceSeen(deviceId: string): void {
   lastHeartbeatByServerId.set(deviceId, Date.now());
 }
@@ -183,11 +101,18 @@ export function serverAgentDeviceSeenWithin(deviceId: string, ms: number): boole
   return Date.now() - (lastHeartbeatByServerId.get(deviceId) ?? 0) < ms;
 }
 
+/** Only needed while the device channel is down: the channel keeps the
+ * device's online window current on the server by itself. */
 export async function heartbeatServerAgentDevice(
   deviceId: string,
-  localDeviceId = localDeviceByServerId.get(deviceId),
+  localDeviceId = "",
 ): Promise<ServerTrustedDevice> {
-  if (!localDeviceId) throw new Error("Local device signing identity is unavailable.");
+  const account = await deviceAccount();
+  const view = await devicesNative.view(account.accountId).catch(() => null);
+  if (view?.channel.connected) {
+    lastHeartbeatByServerId.set(deviceId, Date.now());
+    return { id: deviceId, name: "" };
+  }
   const device = await devicesApi.heartbeat<ServerTrustedDevice>(
     signedAgentDeviceRequest,
     localDeviceId,
@@ -198,17 +123,16 @@ export async function heartbeatServerAgentDevice(
   return device;
 }
 
+/** Sends one request signed by this device's native key. */
 export async function signedAgentDeviceRequest<T>(
-  localDeviceId: string,
+  _localDeviceId: string,
   path: string,
   init: RequestInit,
   assertCurrent?: () => void,
 ): Promise<T> {
   assertCurrent?.();
   init.signal?.throwIfAborted();
-  const identity = await loadOrCreateDeviceIdentity(localDeviceId);
-  assertCurrent?.();
-  init.signal?.throwIfAborted();
+  const account = await deviceAccount();
   const method = (init.method || "GET").toUpperCase();
   const body = typeof init.body === "string" ? init.body : "";
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -218,73 +142,36 @@ export async function signedAgentDeviceRequest<T>(
   const bodyDigest = toHex(
     new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body))),
   );
-  const apiBasePath = new URL(await resolveApiBase()).pathname;
-  const canonical = deviceSignaturePayload(method, path, timestamp, nonce, bodyDigest, apiBasePath);
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    fromBase64(identity.privateKey).buffer as ArrayBuffer,
-    { name: "Ed25519" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "Ed25519",
-    privateKey,
-    new TextEncoder().encode(canonical),
-  );
+  const apiBasePath = new URL(account.apiBase).pathname;
+  const signature = await devicesNative.signRequest(account, {
+    method,
+    path: canonicalDevicePath(path, apiBasePath),
+    timestamp,
+    nonce,
+    bodyDigest,
+  });
+  assertCurrent?.();
+  init.signal?.throwIfAborted();
   const headers = new Headers(init.headers);
   headers.set("X-Misty-Device-Timestamp", timestamp);
   headers.set("X-Misty-Device-Nonce", nonce);
-  headers.set("X-Misty-Device-Signature", toBase64(new Uint8Array(signature)));
+  headers.set("X-Misty-Device-Signature", signature);
   const signedInit: RequestInit = { ...init, headers };
   if (init.body == null) delete signedInit.body;
   else signedInit.body = body;
-  assertCurrent?.();
-  init.signal?.throwIfAborted();
   const result = await devicesApi.request<T>(path, signedInit);
   assertCurrent?.();
   return result;
 }
 
-async function loadOrCreateDeviceIdentity(localDeviceId: string): Promise<StoredDeviceIdentity> {
-  const cached = identityCache.get(localDeviceId);
-  if (cached) return cached;
-  const pending = identityLoadAttempts.get(localDeviceId);
-  if (pending) return pending;
-  const attempt = (async () => {
-    const stored = await invoke<string | null>("agents_device_identity_load", {
-      localDeviceId,
-    });
-    if (stored) {
-      const parsed = JSON.parse(stored) as StoredDeviceIdentity;
-      if (parsed.publicKey && parsed.privateKey) {
-        identityCache.set(localDeviceId, parsed);
-        return parsed;
-      }
-    }
-    return rotateDeviceIdentity(localDeviceId);
-  })();
-  // Keep a rejected attempt for the rest of this app session. The background
-  // job poller must not repeat a failed credential read every few seconds
-  // after the user denies or dismisses it. Restarting Misty is the retry path.
-  identityLoadAttempts.set(localDeviceId, attempt);
-  return attempt;
+/** The full server path a device request is signed over. */
+export function canonicalDevicePath(path: string, apiBasePath = "/api"): string {
+  const pathname = path.split("?", 1)[0] || "/";
+  const basePath = `/${apiBasePath}`.replace(/\/{2,}/g, "/").replace(/\/$/, "");
+  return `${basePath}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 }
 
-async function rotateDeviceIdentity(localDeviceId: string): Promise<StoredDeviceIdentity> {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
-  const identity: StoredDeviceIdentity = {
-    publicKey: toBase64(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey))),
-    privateKey: toBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey))),
-  };
-  await invoke("agents_device_identity_store", {
-    localDeviceId,
-    encodedIdentity: JSON.stringify(identity),
-  });
-  identityCache.set(localDeviceId, identity);
-  return identity;
-}
-
+/** The canonical request a device signs (kept for tests and diagnostics). */
 export function deviceSignaturePayload(
   method: string,
   path: string,
@@ -293,10 +180,7 @@ export function deviceSignaturePayload(
   bodyDigest: string,
   apiBasePath = "/api",
 ): string {
-  const pathname = path.split("?", 1)[0] || "/";
-  const basePath = `/${apiBasePath}`.replace(/\/{2,}/g, "/").replace(/\/$/, "");
-  const canonicalPath = `${basePath}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
-  return `${method.toUpperCase()}\n${canonicalPath}\n${timestamp}\n${nonce}\n${bodyDigest.toLowerCase()}`;
+  return `${method.toUpperCase()}\n${canonicalDevicePath(path, apiBasePath)}\n${timestamp}\n${nonce}\n${bodyDigest.toLowerCase()}`;
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -305,37 +189,8 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function fromBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function readStorage(key: string): string | null {
-  try {
-    return readDeploymentStorageItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key: string, value: string): void {
-  try {
-    localStorage.setItem(deploymentStorageKey(key), value);
-  } catch {
-    /* non-secret registration hint */
-  }
-}
-
-function removeStorage(key: string): void {
-  try {
-    localStorage.removeItem(deploymentStorageKey(key));
-  } catch {
-    /* no-op */
-  }
 }
 
 export interface ServerTrustedDevice {
@@ -350,9 +205,4 @@ export interface ServerTrustedDevice {
 
 export interface ServerDeviceList {
   devices: ServerTrustedDevice[];
-}
-
-export interface StoredDeviceIdentity {
-  publicKey: string;
-  privateKey: string;
 }
