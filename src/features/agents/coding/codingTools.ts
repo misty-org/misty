@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest, type CachedRequestOptions } from "@/api/cache/cachedRequest";
 import { invoke } from "@tauri-apps/api/core";
 
 /** A coding tool Misty can hand work to, and what it can do. */
@@ -60,13 +60,16 @@ export const detectCodingTools = () => invoke<CodingToolStatus[]>("coding_engine
 /** The account's coding allowance, from the server. Basic plans have none. */
 export interface CodingAllowance {
   available: boolean;
+  /** Whether the plan includes coding at all: Pro and above. */
+  coding?: boolean;
   plan: string;
   allowanceTokens: number;
   usedTokens: number;
   resetsAt?: string;
 }
 
-export const codingAllowance = () => cachedRequest<CodingAllowance>("/me/coding/allowance");
+export const codingAllowance = (options?: CachedRequestOptions<CodingAllowance>) =>
+  cachedRequest<CodingAllowance>("/me/coding/allowance", options);
 
 /** One line on what a tool can do and whether it's ready. */
 export function codingToolStatusText(tool: CodingTool, status?: CodingToolStatus) {

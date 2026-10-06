@@ -78,10 +78,10 @@ export function CodingToolsSection() {
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      {allowance && !allowance.available ? (
+      {allowance && !(allowance.coding ?? allowance.available) ? (
         <DesktopSettingsNotice>
-          Coding through your own tools is part of paid Misty plans. Upgrade to let your agents hand
-          coding to them.
+          Coding is part of Misty Pro and above. Upgrade to let your agents hand coding to these
+          tools.
         </DesktopSettingsNotice>
       ) : null}
       <Section

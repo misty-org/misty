@@ -10,6 +10,17 @@ interface ResponseHead {
   url: string;
 }
 
+/**
+ * Tells the server when this window is driven by WebDriver, so it can keep
+ * outside agents away from coding.
+ */
+function requestHeaders(request: Request): Headers {
+  const headers = new Headers(request.headers);
+  if (typeof navigator !== "undefined" && navigator.webdriver)
+    headers.set("X-Misty-Automation", "webdriver");
+  return headers;
+}
+
 /** Keeps cookie headers inside Rust, with streamed responses and cancellation. */
 export async function nativeAccountFetch(
   input: RequestInfo | URL,
@@ -49,7 +60,7 @@ export async function nativeAccountFetch(
               requestId,
               url: request.url,
               method: request.method,
-              headers: Array.from(request.headers.entries()),
+              headers: Array.from(requestHeaders(request).entries()),
               hasBody,
               progress,
             }),

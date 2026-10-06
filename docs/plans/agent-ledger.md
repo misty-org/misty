@@ -15,9 +15,9 @@ Every later change is judged by these, and single runs flip between pass and fai
 
 | ID | Work | Where | Size |
 |---|---|---|---|
-| E1 | Run each task N times (default 3) and report a pass rate per task, model and category, with the spread of calls, time and cost | `evals/workflows/workflow.eval.ts`, `score.ts` | S |
-| E2 | Three-model baseline: Haiku 5.5, GPT-6 Luna, Gemini Flash-Lite. Account tasks at N=3, the full suite at N=1. Budget about $2 against the $3.86 Gateway balance | runner config | S |
-| E3 | Report prompt caching per run: input tokens billed at the cached rate versus full price, from the billing receipts' `cached_input_tokens` | `client.ts`, report | S |
+| E1 | **Done (9ce2be21).** Run each task N times (default 3) and report a pass rate per task, model and category, with the spread of calls, time and cost | `evals/workflows/workflow.eval.ts`, `score.ts` | S |
+| E2 | **Done for account tasks (9ce2be21): Haiku 19/24, Luna 15/24, Gemini 7/15 before the cap.** Three-model baseline: Haiku 5.5, GPT-6 Luna, Gemini Flash-Lite. Account tasks at N=3, the full suite at N=1. Budget about $2 against the $3.86 Gateway balance | runner config | S |
+| E3 | **Done (9ce2be21): Haiku 77%, Luna 87%, Gemini 55% of input cached.** Report prompt caching per run: input tokens billed at the cached rate versus full price, from the billing receipts' `cached_input_tokens` | `client.ts`, report | S |
 | E4 | Cold and warm runs: the same workflow twice, comparing calls, time and cost (needs W1) | runner | S |
 | E5 | Relabel run: rename UI labels in the glossary and check that the scores hold (the reason for agent names over UI labels) | runner + `agent_entry_glossary.go` | S |
 | E6 | Tasks for the untested entries: `agent.entry.email`, `agent.entry.integration.slack` and voice. Today it's 27 composer, 4 cursor and 2 schedule tasks | `tasks.json` | M |
@@ -29,10 +29,35 @@ Every later change is judged by these, and single runs flip between pass and fai
 
 | ID | Work | Where | Size |
 |---|---|---|---|
-| A1 | Scoped answers: when the person asks for a filtered set (what needs a reply, which orders), list only what meets it; anything else gets one line at most. One general rule, not a triage prompt. Fixes inbox-triage | system prompt (moves into P1 below) | S |
+| A1 | **Done.** Scoped answers: when the person asks for a filtered set (what needs a reply, which orders), list only what meets it; anything else gets one line at most. One general rule, not a triage prompt. Fixes inbox-triage | system prompt (moves into P1 below) | S |
 | A2 | Read the whole message before deciding whether an email asks for something; triage decided from previews | `integration` guidance | S |
-| A3 | Re-tune the finish check from the E2 results: false refusals on chat-only drafts, missed claims | `src/finish-check.ts` | S |
-| A4 | Gemini family note, from Gemini's E2 baseline runs. The current line is a guess | `src/model-family.ts` | S |
+| A3 | **Done:** a second unbacked finish becomes partial when the request named an app; confirmation questions are refused. Re-tune the finish check from E2: models get past it by calling agent_finish again (5 of the write-task failures). No second chance when the request names an app (Gmail, Slack, GitHub, an issue, a calendar), and a second unbacked "completed" becomes "partial" | `src/finish-check.ts` | S |
+| A4 | **Dropped (October 16): one house model, Haiku 5.5, with no model or effort choice for users.** Family notes from E2: Luna ends runs by asking the person to confirm what they already asked for (`conversation_ask_user`, 3 runs); Gemini saved an email as a Misty note instead of a Gmail draft, and costs about 4× Haiku per run ($0.09, one run $0.53) | `src/model-family.ts` | S |
+
+## 2b. One house model
+
+Decided October 16: agents run on one model, Haiku 5.5, which users never see or choose (no
+model, effort or per-agent model settings). The AI SDK and Gateway stay, so switching is a
+config change. Evals run Haiku only. Bake-off after A1 and A3: Haiku 20/24 (83%); Luna 1/3 on
+issue-from-mail before a network drop ended the pass, after 15/24 in the baseline.
+
+| ID | Work | Where | Size |
+|---|---|---|---|
+| H1 | Default agent model `anthropic/claude-haiku-5.5` with one fixed effort; dev currently defaults to GPT-6 Luna | `server/.env/*/integrations/ai.env`, `provider_config.go` | S |
+| H2 | Remove model choice: Settings › Agents › Models, the composer's model and effort controls, per-agent models; the server ignores client overrides except a dev-only switch for evals | `src/features/agents/models`, `settingsRegistry.tsx`, composer, `ai_model_senses.go` | M |
+| H3 | A Gateway fallback model for provider outages | runtime `providerOptions.gateway.models` | S |
+| H4 | Background jobs (titles, dictation cleanup, day summaries) stay on the cheapest model, or move on-device | `ai_model_senses.go` | S |
+
+## 2c. Free plan funded by paying users ([pricing-v2](pricing-v2.md), decided October 16)
+
+| ID | Work | Where | Size |
+|---|---|---|---|
+| F1 | **Done (billing 98d2dc7).** Basic gets no recurring AI: weekly and monthly AI caps of 0 in the plan defaults and policy example | misty-billing `internal/policy/account.go`, `config/account-policy.example.json` | S |
+| F2 | **Done (98d2dc7), from active subscriptions' monthly net, not Stripe payments.** The free pool: 5% of paid revenue collected in the last 31 days (from Stripe payments), recomputed daily; free AI draws from it, and nothing is admitted once it is used up | misty-billing store + payments | M |
+| F3 | **Done (98d2dc7); one per account, verified-account abuse checks still to do in the server.** The one-time agent taste: 200k weighted tokens per account, once, admitted only while the pool has room; one per verified account (abuse) | misty-billing policy, server sign-up | M |
+| F4 | **Done (98d2dc7): one-time credits per paying referral, skipping the pool.** Referral bonuses work on Basic as the taste does, funded by the referred subscription | misty-billing referrals | S |
+| F5 | Plain-language states: "Free tries are full this month; they refill on …", and the upgrade path; the usage panel shows the taste as a count of tries left | app usage panel, composer | S |
+| F6 | Pricing page and plan copy: free browser + a taste of agents; agents and coding (Pro and above) for real use are paid | misty-website | S |
 
 ## 3. Workflow memory that works (plan P7)
 

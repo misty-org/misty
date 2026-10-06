@@ -31,6 +31,15 @@ The report keeps answer quality and routing apart, so a correct answer reached t
 shows as a routing failure, not a pass. It also records model turns, tokens, cost and wall time
 per task, and compares models side by side like the browser suite.
 
+Every task runs `MISTY_WORKFLOW_EVAL_REPEAT` times (3 by default), because one run can't tell an
+improvement from luck. The report gives each model, category and task a pass rate and the spread
+(least, median, most) of tool calls and seconds, and the pass ends with a table of them.
+
+Each run's model turns and tokens come from the local billing ledger, which settles every turn
+with its measured input, cached-input and output tokens. The report shows the share of input
+billed at the cached price and what caching saved in dollars, priced from the AI Gateway's model
+list, so a change that breaks prompt caching shows up as cost.
+
 A relabel run repeats the suite with every UI label in the agent's glossary replaced by an
 invented word (Spaces becomes, say, "Orbits", and the prompts say "my Orbit"). Routing must
 score the same; a drop means a tool name, description or prompt still leans on a UI label.
@@ -58,6 +67,8 @@ MISTY_WORKFLOW_EVAL=1 npm run eval:workflows
 | `MISTY_WORKFLOW_EVAL_MODELS` | Models to compare. Defaults to `anthropic/claude-haiku-5.5`, `openai/gpt-6-luna`, `google/gemini-3.5-flash-lite`. |
 | `MISTY_WORKFLOW_EVAL_JUDGE` | The rubric judge. Defaults to `anthropic/claude-haiku-5.5`. |
 | `MISTY_WORKFLOW_EVAL_TASKS` | Task ids, categories or sources (`polar`, `misty`) to run. |
+| `MISTY_WORKFLOW_EVAL_REPEAT` | Runs per task, 1 to 10. Defaults to 3. |
+| `MISTY_BILLING_DB_CONTAINER` | The local billing database's container, for token usage. Defaults to `misty-billing-postgres-1`. |
 | `MISTY_WORKFLOW_EVAL_BUDGET` | Dollars of AI Gateway spend before the pass stops. Defaults to 7.50. |
 | `MISTY_WORKFLOW_EVAL_ACCOUNTS` | Connected test accounts, such as `gmail,google-calendar,github,slack,linkedin-signed-in`. Tasks needing others are skipped. |
 | `MISTY_WORKFLOW_EVAL_DEVICE` | Your desktop's agent-device id (`trusted_devices.id`, `device_…`). The desktop dev app must run signed in to your account with the eval bridge on (`MISTY_BROWSER_EVAL_BRIDGE_PORT` and `_TOKEN`, as in the browser suite); the runner asks it to sign the workspace grant a chat from it would carry, so device tools such as web.fetch run on it. Also set `MISTY_BROWSER_EVAL_BRIDGE` and `MISTY_BROWSER_EVAL_BRIDGE_TOKEN`, and `MISTY_WORKFLOW_EVAL_DEVICE_API_BASE` when the app signed in through another address (such as `https://dev-api.mistysys.com/v1`). |

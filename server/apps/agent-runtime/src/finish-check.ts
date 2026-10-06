@@ -11,6 +11,8 @@ const requestedAction =
 // The report saying, in the first person, that it made or changed something.
 const claimedAction =
   /\bI(?:'ve| have)?\s+(created|drafted|saved|posted|sent|scheduled|booked|added|filed|opened|made|put|labeled|invited|replied)\b/i;
+// The request naming where the thing belongs, so text in the answer can't stand in for it.
+const namedPlace = /\b(gmail|e-?mail|inbox|slack|channel|github|issue|calendar|linkedin|notion|drive|jira|linear)\b/i;
 // Composio actions that only read.
 const readAction = /_(FETCH|LIST|GET|SEARCH|FIND|READ|QUERY|RETRIEVE|DOWNLOAD|CHECK|LOOKUP|DESCRIBE|COUNT)(_|$)/;
 // Bookkeeping tools that change nothing the person asked for.
@@ -57,6 +59,29 @@ export function successfulWrites(messages: ModelMessage[], readOnly: (name: stri
   return [...writes.values()].filter(Boolean).length;
 }
 
+/** The person's own words in the run. */
+function requestText(messages: ModelMessage[]): string {
+  return messages.filter((message) => message.role === "user").map(textOf).join("\n");
+}
+
+/**
+ * A second unbacked completed report, after the first was refused. When the request
+ * named an app, the text in the answer can't be what was wanted, so the outcome becomes
+ * partial; otherwise the agent decided the person only wanted the text, and it stands.
+ */
+export function afterRefusal<T extends { outcome: string; remaining: Array<{ requirement: string; reason: string }> }>(
+  report: T,
+  messages: ModelMessage[],
+  readOnly: (name: string) => boolean,
+): T {
+  if (report.outcome !== "completed" || successfulWrites(messages, readOnly) > 0 || !namedPlace.test(requestText(messages))) return report;
+  return {
+    ...report,
+    outcome: "partial",
+    remaining: [...report.remaining, { requirement: "Make what was asked for in the app the request named", reason: "No tool call in this run created or changed it" }],
+  };
+}
+
 /** The reason to refuse a completed report, or undefined when it may stand. */
 export function unbackedCompletion(
   report: { outcome: string; summary: string },
@@ -64,11 +89,11 @@ export function unbackedCompletion(
   readOnly: (name: string) => boolean,
 ): string | undefined {
   if (report.outcome !== "completed") return undefined;
-  const request = messages.filter((message) => message.role === "user").map(textOf).join("\n");
+  const request = requestText(messages);
   if (!requestedAction.test(request) && !claimedAction.test(report.summary)) return undefined;
   if (successfulWrites(messages, readOnly) > 0) return undefined;
   return "No tool call in this run created or changed anything, but the request asks for that or your summary says it happened. " +
     "Writing a draft, post, event or task into your answer does not make it. An email, event, post or task belongs in the person's connected app when one exists: " +
     "load connected apps with agent_tool_load (integration) and check integration_connected before deciding none is available. Call the tool that makes it, then finish; " +
-    "or finish with outcome partial and say what is missing. If the person only wanted the text in your answer, call agent_finish again with the same report.";
+    "or finish with outcome partial and say what is missing. If the person only wanted the text in your answer (they named no app), call agent_finish again with the same report.";
 }

@@ -15,14 +15,17 @@ import { Budget } from "./budget.js";
 import { EvalClient } from "./client.js";
 import { composioFor } from "./composio.js";
 import { StateReader } from "./state.js";
-import { expectPassed, passed, report, routing, type WorkflowRun } from "./score.js";
+import { expectPassed, passed, report, routing, table, type WorkflowRun } from "./score.js";
 import { displayCapture, loadTasks, skipReason, type WorkflowTask } from "./tasks.js";
+import { runUsage } from "./usage.js";
 
 const here = resolve(import.meta.dirname);
 const list = (value: string | undefined) => (value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 // The cheapest current model of each provider's line.
 const models = list(process.env.MISTY_WORKFLOW_EVAL_MODELS || "anthropic/claude-haiku-5.5,openai/gpt-6-luna,google/gemini-3.5-flash-lite");
 const judgeModel = process.env.MISTY_WORKFLOW_EVAL_JUDGE?.trim() || "anthropic/claude-haiku-5.5";
+// One run can't tell an improvement from luck, so each task runs this many times.
+const repeat = Math.max(1, Math.min(10, Number(process.env.MISTY_WORKFLOW_EVAL_REPEAT || 3)));
 const only = new Set(list(process.env.MISTY_WORKFLOW_EVAL_TASKS));
 const accounts = new Set(list(process.env.MISTY_WORKFLOW_EVAL_ACCOUNTS));
 // The person's own computer, by its agent-device id (trusted_devices.id): runs carry the
@@ -88,6 +91,7 @@ async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, m
     terminal: result.terminal, tools: result.tools, screenRequests: result.screenRequests,
     answer: result.answer.slice(0, 4_000), ms: performance.now() - started, costUsd: 0,
     routing: routing(task, result.tools, result.screenRequests),
+    usage: await runUsage(result.invocationId).catch(() => undefined),
   };
   // A run that ended incomplete but answered is graded on its answer; only a
   // run with nothing to show is an error.
@@ -149,13 +153,20 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
   let refusedInARow = 0;
   try {
     outer: for (const model of models) {
-      for (const task of tasks) {
+      for (const task of tasks) for (let attempt = 1; attempt <= repeat; attempt++) {
         const reason = skipReason(task, accounts, device);
         if (reason) {
           skipped[task.id] = reason;
-          continue;
+          break;
         }
-        if (!(await budget.allows())) {
+        let allowed: boolean;
+        try {
+          allowed = await budget.allows();
+        } catch (error) {
+          stopped = `the AI Gateway balance could not be read: ${String(error).slice(0, 120)}`;
+          break outer;
+        }
+        if (!allowed) {
           stopped = `budget: $${budget.spent.toFixed(2)} of $${budget.cap.toFixed(2)} spent`;
           break outer;
         }
@@ -170,6 +181,7 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
             routing: { passed: false, broken: ["the run could not start"], unavailable: [], runs: 0 },
           };
         }
+        run.attempt = attempt;
         runs.push(run);
         refusedInARow = run.error && run.tools.length === 0 && run.ms < 3_000 ? refusedInARow + 1 : 0;
         if (refusedInARow >= 3) {
@@ -177,7 +189,7 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
           break outer;
         }
         const verdict = passed(run) ? "PASS" : run.routing.passed ? "FAIL answer" : "FAIL route";
-        process.stderr.write(`${verdict} ${model} ${task.id} ${(run.ms / 1000).toFixed(1)}s ${run.tools.length} tools ${run.routing.runs} runs $${run.costUsd.toFixed(3)}${run.routing.broken.length ? ` — ${run.routing.broken.join("; ")}` : ""}${run.error ? ` — ${run.error}` : ""}\n`);
+        process.stderr.write(`${verdict} ${model} ${task.id}#${attempt} ${(run.ms / 1000).toFixed(1)}s ${run.tools.length} tools ${run.routing.runs} runs $${run.costUsd.toFixed(3)}${run.routing.broken.length ? ` — ${run.routing.broken.join("; ")}` : ""}${run.error ? ` — ${run.error}` : ""}\n`);
       }
     }
   } finally {
@@ -186,7 +198,8 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
   const dir = join(here, "reports");
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
-  writeFileSync(file, JSON.stringify({ models, judgeModel, spentUsd: Number(budget.spent.toFixed(4)), balanceUsd: budget.balance, stopped, summary: report(runs), skipped, runs }, null, 2));
+  writeFileSync(file, JSON.stringify({ models, judgeModel, repeat, spentUsd: Number(budget.spent.toFixed(4)), balanceUsd: budget.balance, stopped, summary: report(runs), skipped, runs }, null, 2));
+  if (runs.length) process.stderr.write(`\n${table(runs)}\n`);
   process.stderr.write(`\nSpent $${budget.spent.toFixed(2)} (balance $${budget.balance.toFixed(2)})${stopped ? ` — stopped, ${stopped}` : ""}\nReport: ${file}\n`);
   expect(runs.length + Object.keys(skipped).length).toBeGreaterThan(0);
 });

@@ -22,7 +22,7 @@ func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIIn
 	// The run notebook, and sub-agents for runs that are not sub-agents themselves.
 	connected = append(connected, s.notebookToolRegistrations(record, body)...)
 	connected = append(connected, s.delegationToolRegistrations(record, body)...)
-	connected = append(connected, s.codeDelegationToolRegistrations(record, body, s.attachedProjects(ctx, record), collaboration)...)
+	connected = append(connected, s.codeDelegationToolRegistrations(ctx, record, body, s.attachedProjects(ctx, record), collaboration)...)
 	// web.fetch from the attached device, or the isolated Worker without one.
 	connected = withWebFetch(connected)
 	toolbox, invocation, manifest, err := resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)

@@ -12,7 +12,7 @@ import (
 // model never looks for a capability it was promised but does not have.
 // Model-visible tool names replace dots with underscores; prompts use that form.
 
-const agentExecutionGuidance = "Work like a capable assistant: plan the steps a request needs, carry them out with your tools, verify the results, then answer. Search before concluding that something does not exist. Ask one focused question only when a missing choice would change the result. If a needed app connection or screen is genuinely unavailable, name it and say what the user can do."
+const agentExecutionGuidance = "Work like a capable assistant: plan the steps a request needs, carry them out with your tools, verify the results, then answer. Search before concluding that something does not exist. Ask one focused question only when a missing choice would change the result. If a needed app connection or screen is genuinely unavailable, name it and say what the user can do. When the person asks you to do something, do it: their request is the go-ahead, so don't ask them to confirm it. When they ask for a filtered set (what needs a reply, which orders, which candidates), list only what meets it, each with why; mention anything else in one line at most and never as meeting the filter."
 
 type aiSystemPromptInput struct {
 	body           aiInvocationInput

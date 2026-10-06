@@ -170,6 +170,9 @@ func (s *SpacesService) GitHubRepos() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if !requireCoding(w, r, s.database, user, "projects.github") {
+			return
+		}
 		w.Header().Set("Cache-Control", "no-store")
 		var body struct {
 			Name        string `json:"name"`

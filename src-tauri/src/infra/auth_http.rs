@@ -94,7 +94,7 @@ pub async fn auth_http_start(
     for (name, value) in headers {
         if matches!(
             name.to_ascii_lowercase().as_str(),
-            "cookie" | "authorization" | "host" | "content-length" | "connection"
+            "cookie" | "authorization" | "host" | "content-length" | "connection" | "user-agent"
         ) {
             continue;
         }

@@ -21,6 +21,9 @@ func (s *SpacesService) CodingApproval() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if !requireCoding(w, r, s.database, user, "coding.approval") {
+			return
+		}
 		var body struct {
 			LeaseID string `json:"lease_id"`
 			Token   string `json:"token"`
@@ -104,6 +107,9 @@ func (s *SpacesService) CodingEnginesReport() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if !requireCoding(w, r, s.database, user, "coding.engines") {
+			return
+		}
 		var body struct {
 			DeviceID string            `json:"device_id"`
 			Engines  []db.CodingEngine `json:"engines"`
@@ -147,7 +153,7 @@ func (s *SpacesService) CodingAllowance() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"available": entitlements.WeeklyExternalCodingAllowance > 0, "plan": entitlements.Plan,
+			"available": entitlements.Coding && entitlements.WeeklyExternalCodingAllowance > 0, "coding": entitlements.Coding, "plan": entitlements.Plan,
 			"allowanceTokens": entitlements.WeeklyExternalCodingAllowance, "usedTokens": used, "resetsAt": codingWeekResets(),
 		})
 	}

@@ -45,6 +45,9 @@ func (s *SpacesService) CodingEvents() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if !requireCoding(w, r, s.database, user, "coding.events") {
+			return
+		}
 		var body struct {
 			DeviceID string        `json:"device_id"`
 			LeaseID  string        `json:"lease_id"`

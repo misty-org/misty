@@ -15,6 +15,8 @@ function assertLocal() {
 }
 
 export interface EvalRun {
+  /** The invocation's id, for reading its usage from the billing ledger. */
+  invocationId: string;
   terminal: string;
   answer: string;
   /** Tool calls in order, model-visible names. */
@@ -87,7 +89,7 @@ export class EvalClient {
       body: JSON.stringify({ trigger: "message", context: [], execution_mode: "user", idempotency_key: key, timezone: "America/Los_Angeles", ...body }),
     });
     const approved = new Set<string>();
-    const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [], toolResults: [] };
+    const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [], toolResults: [], invocationId: created.eventsUrl.split("/").at(-2) ?? "" };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {

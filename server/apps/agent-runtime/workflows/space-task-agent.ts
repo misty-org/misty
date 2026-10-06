@@ -19,7 +19,7 @@ import { runBrowserReplay, validReplay } from "../src/browser-replay.js";
 import { catalogTools, modelCatalog } from "../src/model-tools.js";
 import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
-import { unbackedCompletion } from "../src/finish-check.js";
+import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
 import { executeTool } from "../src/tool-calls.js";
 import { rejectedWithoutEffect } from "../src/tool-execution.js";
@@ -110,7 +110,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       execute: async (report, options) => {
         guard(options.toolCallId);
         // Refused once when it claims work no tool did (src/finish-check.ts); the model sees why.
-        const refusal = finishRefused ? undefined : unbackedCompletion(report, options.messages ?? [], catalog.readOnly);
+        const messages = options.messages ?? [];
+        if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
+        const refusal = unbackedCompletion(report, messages, catalog.readOnly);
         if (refusal) {
           finishRefused = true;
           return { status: "failure", tool_error: { message: refusal } };

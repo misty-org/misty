@@ -18,6 +18,9 @@ func (s *SpacesService) AgentProjectGrants() http.HandlerFunc {
 		if !ok {
 			return
 		}
+		if !requireCoding(w, r, s.database, user, "projects.grants") {
+			return
+		}
 		var body struct {
 			ScopeID string   `json:"scope_id"`
 			Actions []string `json:"actions"`

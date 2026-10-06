@@ -20,6 +20,9 @@ type PlanEntitlements struct {
 	// allowance (in universal tokens) that coding through the person's own
 	// tools may use. Basic plans have none.
 	WeeklyExternalCodingAllowance int64 `json:"external_coding_allowance"`
+	// Coding is whether the plan includes coding at all: projects, coding
+	// runs and pushes. Pro and above; always on without a billing service.
+	Coding bool `json:"coding"`
 
 	// Compatibility fields retained for clients that have not yet adopted the
 	// explicit personal-vs-Space entitlement names. SpaceLimit now means owned
@@ -52,6 +55,7 @@ func entitlementsForUserTx(ctx context.Context, _ *sql.Tx, userID string, _ time
 		// Without a billing service (development and tests) coding through
 		// the person's own tools has a finite allowance of its own.
 		limits.WeeklyExternalCodingAllowance = DevelopmentExternalCodingAllowance
+		limits.Coding = true
 		return limits, nil
 	}
 	readCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -70,8 +74,9 @@ func entitlementsForUserTx(ctx context.Context, _ *sql.Tx, userID string, _ time
 	if limits.MaxOwnedSpaces < 0 || limits.PersonalStorageLimitBytes < 0 || limits.SpaceStorageLimitBytes < 0 || limits.PersonalStorageLimitBytes >= 9007199254740991 || limits.SpaceStorageLimitBytes >= 9007199254740991 {
 		return PlanEntitlements{}, billingadapter.ErrUnavailable
 	}
-	if limits.Plan == TierBasic || limits.WeeklyExternalCodingAllowance < 0 {
-		// Coding through the person's own tools is a paid feature.
+	// Coding is a Pro-and-above feature, whatever the billing answer says.
+	limits.Coding = limits.Plan.IncludesCoding()
+	if !limits.Coding || limits.WeeklyExternalCodingAllowance < 0 {
 		limits.WeeklyExternalCodingAllowance = 0
 	}
 	limits.BillingAvailable = true

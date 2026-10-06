@@ -29,7 +29,7 @@ func (s *SpacesService) collaborationToolRegistrations(record *db.AIInvocationRe
 	}
 	if state.canAsk {
 		registrations = append(registrations, agenttools.Registration{Descriptor: collaborationDescriptor(collaborationAskUser,
-			"Ask the user 1-4 structured questions and wait for their answers. Use only for a decision that materially changes the result, an important assumption, or a fact no tool can find; explore with read tools first. Each question has a short header, a full question and 2-4 distinct options; put the recommended option first and add \"(Recommended)\" to its label. Do not add an Other option: the user can always write their own answer. Never ask whether to proceed.",
+			"Ask the user 1-4 structured questions and wait for their answers. Use only for a decision that materially changes the result, an important assumption, or a fact no tool can find; explore with read tools first. Each question has a short header, a full question and 2-4 distinct options; put the recommended option first and add \"(Recommended)\" to its label. Do not add an Other option: the user can always write their own answer. Never ask whether to proceed or to confirm what the person already asked for; Misty shows its own approval card when one is needed.",
 			map[string]any{"questions": map[string]any{"type": "array", "minItems": 1, "maxItems": db.MaxAgentQuestions, "items": map[string]any{
 				"type": "object", "additionalProperties": false, "required": []string{"header", "question", "options"},
 				"properties": map[string]any{
@@ -131,6 +131,12 @@ func (s *SpacesService) askUserHandler(record *db.AIInvocationRecord) agenttools
 		}
 		if json.Unmarshal(request.Arguments, &input) != nil {
 			return nil, agenttools.ErrArgumentsInvalid
+		}
+		for _, question := range input.Questions {
+			if confirmationQuestion(question) {
+				// A failed result, not an error: the model reads why and carries on.
+				return json.Marshal(map[string]any{"status": "failure", "tool_error": map[string]string{"message": confirmationRefused}})
+			}
 		}
 		set, err := s.database.OpenAgentQuestionSet(ctx, record.UserID, record.ID, request.ID, record.ConversationID, input.Questions, questionTTL)
 		if errors.Is(err, db.ErrSpaceInvalid) {

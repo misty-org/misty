@@ -20,11 +20,16 @@ const github = vi.hoisted(() => ({
 }));
 vi.mock("../store/projectGitHub", () => github);
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
+const access = vi.hoisted(() => ({ included: true as boolean | null }));
+vi.mock("../coding/useCodingIncluded", () => ({ useCodingIncluded: () => access.included }));
 
 import { useConversationProject } from "../store/useConversationProject";
 import { AgentProjectMenu } from "./AgentProjectMenu";
 
-beforeEach(() => useConversationProject.setState({ byConversation: {}, draft: null }));
+beforeEach(() => {
+  access.included = true;
+  useConversationProject.setState({ byConversation: {}, draft: null });
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();

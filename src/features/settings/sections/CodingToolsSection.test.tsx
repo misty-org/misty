@@ -35,7 +35,7 @@ it("lists the tools found with what each can do, and the allowance", async () =>
   expect(screen.getByText(/75% of this week’s coding allowance is left/)).toBeTruthy();
 });
 
-it("tells Basic plans coding through their tools is a paid feature", async () => {
+it("tells Basic plans coding is part of Pro and above", async () => {
   mocks.detect.mockResolvedValueOnce([]);
   mocks.allowance.mockResolvedValueOnce({
     available: false,
@@ -45,6 +45,6 @@ it("tells Basic plans coding through their tools is a paid feature", async () =>
   });
   render(<CodingToolsSection />);
   await act(async () => {});
-  expect(screen.getByRole("alert").textContent).toMatch(/part of paid Misty plans/);
+  expect(screen.getByRole("alert").textContent).toMatch(/part of Misty Pro and above/);
   expect(screen.getByText("No coding tools found")).toBeTruthy();
 });

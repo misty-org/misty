@@ -133,7 +133,7 @@ export function UsageSection(_props: SettingsContentProps) {
       <SettingsSectionBlock title="Plan">
         <SettingsRow
           label="Current plan"
-          description="Every plan has every feature. Higher plans add more AI, smarter models and more storage."
+          description="Coding needs Pro or above. Higher plans add more AI, smarter models and more storage."
         >
           <span className="flex items-center gap-3">
             {plan ? (

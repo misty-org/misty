@@ -55,6 +55,8 @@ export {
   detectCodingTools,
 } from "./coding/codingTools";
 export type { CodingAllowance, CodingTool, CodingToolStatus } from "./coding/codingTools";
+export { CodingUpgradeNote } from "./coding/CodingUpgradeNote";
+export { useCodingIncluded } from "./coding/useCodingIncluded";
 // Dictation hands "Hey <agent>, …" to an agent through the cursor session.
 export { useCompanionState } from "./companion/companionState";
 export { routeLocalFollowup, useLocalExecution } from "./localExecution";

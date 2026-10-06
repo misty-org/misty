@@ -22,8 +22,6 @@ const (
 	codingLeaseTTL   = 30 * time.Minute
 )
 
-var errCodingNotIncluded = errors.New("coding_not_included")
-
 // codingRun is a delegated coding run the person owns, with what it needs.
 type codingRun struct {
 	record *db.AIInvocationRecord
@@ -78,13 +76,16 @@ func (s *SpacesService) codingGrants(ctx context.Context, run *codingRun, repo s
 }
 
 // CodingLease issues a budget for the next turn: POST /me/coding/{invocationID}/lease
-// {device_id, engine, model, repo}. It refuses Basic plans, a spent allowance,
-// and Grok or DeepSeek Shell unless the chat is in Auto with edits, installs
-// and pushes remembered.
+// {device_id, engine, model, repo}. It refuses plans without coding, outside
+// agents, a spent allowance, and Grok or DeepSeek Shell unless the chat is in
+// Auto with edits, installs and pushes remembered.
 func (s *SpacesService) CodingLease() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.appsUser(w, r)
 		if !ok {
+			return
+		}
+		if !requireCoding(w, r, s.database, user, "coding.lease") {
 			return
 		}
 		var body struct {
@@ -111,9 +112,8 @@ func (s *SpacesService) CodingLease() http.HandlerFunc {
 			return
 		}
 		budget, err := s.codingBudget(r.Context(), user)
-		if errors.Is(err, errCodingNotIncluded) {
-			writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": "coding_not_included",
-				"message": "Coding through your own tools is part of paid Misty plans."})
+		if errors.Is(err, errPlanUpgradeRequired) {
+			writeJSON(w, http.StatusPaymentRequired, map[string]string{"code": codePlanUpgradeRequired, "message": planUpgradeMessage})
 			return
 		}
 		if err != nil {
@@ -154,14 +154,14 @@ func codingUsageKey(invocationID, leaseID string) string {
 }
 
 // codingBudget is the next lease's size: what is left of the weekly coding
-// allowance, at most one chunk. Basic plans have none.
+// allowance, at most one chunk. Plans without coding have none.
 func (s *SpacesService) codingBudget(ctx context.Context, user string) (int64, error) {
 	entitlements, err := s.database.EntitlementsForUser(ctx, user)
 	if err != nil {
 		return 0, err
 	}
-	if entitlements.WeeklyExternalCodingAllowance <= 0 {
-		return 0, errCodingNotIncluded
+	if !entitlements.Coding || entitlements.WeeklyExternalCodingAllowance <= 0 {
+		return 0, errPlanUpgradeRequired
 	}
 	used, err := s.database.WeeklyCodingUsed(ctx, user)
 	if err != nil {

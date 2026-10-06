@@ -1,6 +1,6 @@
 import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
-import { isWrite, successfulWrites, unbackedCompletion } from "../src/finish-check.js";
+import { afterRefusal, isWrite, successfulWrites, unbackedCompletion } from "../src/finish-check.js";
 
 const readOnly = (name: string) => name.endsWith("_query") || name.endsWith("_search");
 
@@ -40,5 +40,13 @@ describe("finish check", () => {
     expect(unbackedCompletion(done("Two emails need a reply."), messages, readOnly)).toBeUndefined();
     expect(unbackedCompletion({ outcome: "partial", summary: "I could not save the drafts." }, [ask("Draft them.")], readOnly)).toBeUndefined();
     expect(unbackedCompletion(done("I've created the event."), [ask("Is tomorrow free?")], readOnly)).toMatch(/does not make it/);
+  });
+
+  it("turns a second unbacked report into partial when the request named an app", () => {
+    const report = { outcome: "completed", summary: "Draft below.", remaining: [] as Array<{ requirement: string; reason: string }> };
+    const named = afterRefusal(report, [ask("Draft a short intro email to their CFO.")], readOnly);
+    expect(named.outcome).toBe("partial");
+    expect(named.remaining).toHaveLength(1);
+    expect(afterRefusal(report, [ask("Draft a thank-you note I can paste.")], readOnly).outcome).toBe("completed");
   });
 });

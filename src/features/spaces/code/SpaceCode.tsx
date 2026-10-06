@@ -1,5 +1,10 @@
 import { useAuth } from "@/features/auth";
-import { ProjectReviewSheet, useProjectReview } from "@/features/agents";
+import {
+  CodingUpgradeNote,
+  ProjectReviewSheet,
+  useCodingIncluded,
+  useProjectReview,
+} from "@/features/agents";
 import { useWorkspaceViewTitle } from "@/features/workspace";
 import { openInNewBrowserTab } from "@/features/browser-workspace/searchTargets";
 import { useNavigate } from "react-router-dom";
@@ -38,6 +43,8 @@ export function SpaceCode({
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const code = useSpaceCodeProjects(spaceId);
   const openReview = useProjectReview((state) => state.open);
+  // Linking a project is coding, which is Pro and above; seeing the Space's projects is not.
+  const codingIncluded = useCodingIncluded();
   useWorkspaceViewTitle(workspaceTabId, `${space?.name ?? "Space"} Code`);
   const linked = new Set(
     (code.projects ?? [])
@@ -104,7 +111,7 @@ export function SpaceCode({
       <CollectionHeading
         title="Code"
         actions={
-          linkable.length ? (
+          linkable.length || codingIncluded === false ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="primary" className="px-4">
@@ -112,12 +119,16 @@ export function SpaceCode({
                   Link a project
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {linkable.map((scope) => (
-                  <DropdownMenuItem key={scope.id} onSelect={() => void code.link(scope)}>
-                    {scope.displayName}
-                  </DropdownMenuItem>
-                ))}
+              <DropdownMenuContent align="end" className={codingIncluded === false ? "w-72" : ""}>
+                {codingIncluded === false ? (
+                  <CodingUpgradeNote />
+                ) : (
+                  linkable.map((scope) => (
+                    <DropdownMenuItem key={scope.id} onSelect={() => void code.link(scope)}>
+                      {scope.displayName}
+                    </DropdownMenuItem>
+                  ))
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null
