@@ -183,3 +183,46 @@ func TestRuntimeEndedWithoutUsageReleasesItsHolds(t *testing.T) {
 		t.Fatalf("the unsettled hold was not released: %+v", store.entries)
 	}
 }
+
+// admissionStore keeps admissions in memory.
+type admissionStore struct{ billingadapter.DurableStore }
+
+func (admissionStore) Reservation(context.Context, billingadapter.Request) (*billingadapter.Reservation, error) {
+	return nil, nil
+}
+func (admissionStore) BeginAdmission(context.Context, billingadapter.Request) error { return nil }
+func (admissionStore) SaveReservation(context.Context, billingadapter.Reservation) error {
+	return nil
+}
+
+// recordingAdapter admits every request and remembers it.
+type recordingAdapter struct{ requests []billingadapter.Request }
+
+func (a *recordingAdapter) Enabled() bool { return true }
+func (a *recordingAdapter) Do(_ context.Context, _ string, req billingadapter.Request) (billingadapter.Decision, error) {
+	a.requests = append(a.requests, req)
+	return billingadapter.Decision{Allowed: true, ReservationID: "reservation-" + req.Key}, nil
+}
+
+func TestTitlesAndNotesAreBackgroundWork(t *testing.T) {
+	adapter := &recordingAdapter{}
+	meter := BillingMeter{Service: &billingadapter.Service{Adapter: adapter, Store: admissionStore{}}}
+	units := map[string]int64{"input_bytes": 100, "output_tokens": 50}
+	for _, tc := range []struct {
+		key, command string
+		background   bool
+	}{
+		{conversationTitleKeyPrefix + "1", "", true},
+		{conversationSummaryKeyPrefix + "1", "", true},
+		{"agent-runtime:run:model:node", "agent-job:job", true},
+		{"agent-runtime:run:model:node", "", false},
+		{"dictation-cleanup:1", "", false},
+	} {
+		if _, err := ReserveMeasuredUsage(meter, "account", tc.key, ProviderVercelAI, "model", units, tc.command); err != nil {
+			t.Fatalf("%s: %v", tc.key, err)
+		}
+		if got := adapter.requests[len(adapter.requests)-1].Background; got != tc.background {
+			t.Errorf("%s (command %q): background = %v, want %v", tc.key, tc.command, got, tc.background)
+		}
+	}
+}

@@ -137,7 +137,7 @@ function ItemIcon({ item }: { item: SearchListItem }) {
 
   if (item.type === "ask")
     return (
-      <span className="inline-flex size-4 shrink-0">
+      <span className="inline-flex size-4 shrink-0 [&_.agent-avatar]:!size-4 [&_.agent-avatar]:!text-[11px]">
         <AgentAvatar agent={item.agent} />
       </span>
     );
