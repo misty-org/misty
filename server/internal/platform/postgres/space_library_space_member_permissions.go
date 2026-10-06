@@ -27,8 +27,7 @@ func fixedMemberPermission(permission string) bool {
 	case PermissionMessagesRead, PermissionMessagesWrite, PermissionAttachmentUpload,
 		PermissionLibraryView, PermissionLibraryUpload, PermissionLibraryAdd,
 		PermissionLibraryEdit, PermissionLibraryDownload, PermissionLibraryImport,
-		PermissionStorageViewOwn, PermissionStudioView, PermissionAskRun,
-		PermissionTasksView, PermissionTasksManage:
+		PermissionStorageViewOwn, PermissionStudioView, PermissionAskRun:
 		return true
 	default:
 		return false

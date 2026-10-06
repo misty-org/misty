@@ -13,12 +13,3 @@ export interface SpaceMember {
   joined_at: string;
   read_message_seq: number;
 }
-type SpaceTaskSourceRefKind = "library_item" | "task_attachment" | "chat_attachment";
-
-export interface SpaceTaskSourceRef {
-  kind: SpaceTaskSourceRefKind;
-  resource_id: string;
-  display_name?: string;
-  version?: number;
-  [key: string]: unknown;
-}

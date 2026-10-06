@@ -47,8 +47,6 @@ func (s *Server) mountPublicAccountRoutes(prefix string, deps *mountDeps) {
 	s.Router.Post(prefix+"/me/email/verify", deps.verification.Resend())
 	s.Router.Get(prefix+"/me/referral", deps.verification.Referral())
 	s.Router.Post(prefix+"/me/referral/claim", deps.verification.ClaimReferral())
-	s.Router.Get(prefix+"/me/library-lock", api.LibraryLockPassword(s.Database))
-	s.Router.Post(prefix+"/me/library-lock", api.LibraryLockPassword(s.Database))
 }
 
 // mountPublicSyncRoutes registers the browser sync vault, device, and restore routes.

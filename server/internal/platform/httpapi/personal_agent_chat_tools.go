@@ -56,13 +56,6 @@ func executeSpaceConversationTool(ctx context.Context, database *db.Database, ac
 	return nil, workflowv2.ErrCapabilityDenied
 }
 
-func agentSpaceRunSourceID(runID string) string {
-	if isAIInvocationRuntimeID(runID) {
-		return ""
-	}
-	return runID
-}
-
 func agentToolTimezone(originalInput string) string {
 	var envelope struct {
 		Timezone string `json:"timezone"`

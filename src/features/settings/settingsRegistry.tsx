@@ -33,7 +33,6 @@ import {
   DevicesSection,
   ManageSpacesSection,
   ModelsSection,
-  SpaceAgendaSection,
   SpaceDefaultsSection,
 } from "./sections/FeatureSections";
 import { GeneralSection } from "./sections/GeneralSection";
@@ -126,7 +125,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "account",
   ),
   page("spaces", "spaces-defaults", "Defaults", SpaceDefaultsSection),
-  page("spaces", "spaces-agenda", "Agenda", SpaceAgendaSection),
   page("spaces", "spaces-manage", "Manage spaces", ManageSpacesSection, "resource"),
   page("agents", "agents-defaults", "Defaults", AgentDefaultsSection),
   page("agents", "models", "Models", ModelsSection, "account"),
@@ -166,7 +164,6 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
         "browser-handoff": "sync",
         social: "spaces-defaults",
         journal: "spaces-defaults",
-        planner: "spaces-agenda",
         library: "spaces-manage",
         terminal: "general",
         code: "general",

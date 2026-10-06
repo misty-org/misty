@@ -141,12 +141,10 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     malware_detected: "This upload was rejected because it matched a malware signature.",
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
-    library_reauthentication_required: "Unlock this protected Library collection again.",
     offline_reference_only: "Spaces are unavailable while Misty reconnects.",
     agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
-    reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
     internal_error: "Misty could not load this Space right now. Try again in a moment.",

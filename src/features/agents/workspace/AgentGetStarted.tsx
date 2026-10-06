@@ -84,7 +84,7 @@ export function AgentGetStarted({
   if (apps === undefined || recorded === undefined) return null;
   const steps = [
     { label: "Run your first task", done: hasTask, onSelect: onNewTask },
-    { label: "Ask Misty on any page", done: recorded.includes("page_ask"), onSelect: askOnPage },
+    { label: "Ask an agent on any page", done: recorded.includes("page_ask"), onSelect: askOnPage },
     { label: "Connect an app", done: apps, onSelect: onIntegrations },
     { label: "Run a workflow", done: recorded.includes("workflow_run"), onSelect: onWorkflows },
   ];

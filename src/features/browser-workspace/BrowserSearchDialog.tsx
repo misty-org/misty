@@ -1,4 +1,7 @@
-import { accountScopeWillResetEvent } from "@/features/auth";
+import { accountScopeWillResetEvent, useAuth } from "@/features/auth";
+import { useAppStore } from "@/features/app-shell";
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
+import { askAgent } from "@/features/misty/askAgent";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ArrowUpRight } from "lucide-react";
@@ -20,7 +23,7 @@ import { bangDestination, parseBang, parseLeadingBang } from "./bangs/parse";
 import type { Bang } from "./bangs/types";
 import { browserSearchDestination, useBrowserSearchStore, type SearchAnchor } from "./search";
 import { SearchResultList, type SearchListItem } from "./SearchResultList";
-import { openInNewBrowserTab, openMatch, openResult } from "./searchTargets";
+import { openInNewBrowserTab, openMatch, openResult, openTargetBeside } from "./searchTargets";
 import { useSearchItems } from "./useSearchItems";
 
 /** Margins that put the panel's top-left corner where the address bar was. */
@@ -40,7 +43,14 @@ export function BrowserSearchDialog() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { items, bangs, loading } = useSearchItems(bang, query, open);
+  // Asking needs the person's agents.
+  useEffect(() => {
+    if (!open || !user?.id) return;
+    const agents = usePersonalAgentsStore.getState();
+    if (agents.accountId !== user.id || !agents.agents.length) void agents.load(user.id);
+  }, [open, user?.id]);
   const engine = browserSearchEngine().name;
 
   useEffect(() => {
@@ -99,8 +109,46 @@ export function BrowserSearchDialog() {
     }
   };
 
+  /** Asks the agent; with no message, opens its chats instead. */
+  const askNow = (item: Extract<SearchListItem, { type: "ask" }>, beside: boolean) => {
+    if (!item.prompt.trim()) {
+      run(() => void navigate(`/agents?agent=${encodeURIComponent(item.agent.id)}`));
+      return;
+    }
+    close();
+    void askAgent(item.agent.id, item.prompt, beside).catch((reason: unknown) =>
+      useAppStore
+        .getState()
+        .setError(reason instanceof Error ? reason.message : "The agent couldn’t be asked."),
+    );
+  };
+
+  /** ⌘⏎: the choice opens beside the current pane; an ask opens in the side panel. */
+  const chooseBeside = (item: SearchListItem | undefined) => {
+    if (!item) {
+      const url = browserSearchDestination(query);
+      if (url) run(() => openTargetBeside({ url }));
+      return;
+    }
+    if (item.type === "ask") return askNow(item, true);
+    if (item.type === "match" && item.match.target.type === "navigate")
+      return run(() => openTargetBeside({ url: item.match.target.url }));
+    if (item.type === "match" && item.match.target.type === "open-in-app")
+      return run(() => openTargetBeside({ route: item.match.target.url }));
+    if (item.type === "result" && item.result.target.kind === "route") {
+      const { route } = item.result.target;
+      return run(() => openTargetBeside({ route }));
+    }
+    if (item.type === "result" && item.result.target.kind === "url") {
+      const { url } = item.result.target;
+      return run(() => openTargetBeside({ url }));
+    }
+    choose(item);
+  };
+
   const choose = (item: SearchListItem) => {
-    if (item.type === "bang") pickBang(item.bang, item.query);
+    if (item.type === "ask") askNow(item, false);
+    else if (item.type === "bang") pickBang(item.bang, item.query);
     else if (item.type === "match") {
       const target = item.match.target;
       if (anchor && target.type !== "switch-tab" && target.type !== "open-in-app")
@@ -125,7 +173,10 @@ export function BrowserSearchDialog() {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Backspace" && !query && bang) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      chooseBeside(bang || query.trim() || activeIndex > 0 ? items[active] : undefined);
+    } else if (event.key === "Backspace" && !query && bang) {
       event.preventDefault();
       setBang(null);
       setNotice(null);
@@ -167,9 +218,9 @@ export function BrowserSearchDialog() {
           {bang ? `Search ${bang.label}` : "Search or enter a URL"}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          Enter opens a website or a {engine} search in a new workspace tab. Type an exclamation
-          mark for shortcuts, such as !files, !bookmarks or !yt, to search there instead. Escape
-          closes search.
+          Enter opens a website, a {engine} search, an answer from your agent or a place in Misty;
+          Command-Enter opens it beside this page. Type ! for shortcuts, such as !files, !tabs or
+          !yt, or @ and an agent's name to ask that agent. Escape closes.
         </DialogDescription>
         <form
           onSubmit={(event) => {

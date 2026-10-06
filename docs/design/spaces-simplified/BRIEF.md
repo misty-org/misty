@@ -1,74 +1,103 @@
 # Spaces, simplified: design brief
 
-Status: decided 2026-10-16. Not built yet. This brief supersedes the Planner,
-roadmap and agenda parts of `docs/design/spaces-chat/` and
-`docs/design/space-creation/`, and the agent listing rules in
-`docs/plans/roadmap.md` §1.
+Status: decided and built 2026-10-16 on `worktree-spaces-simplified` (phases 1–6).
+It supersedes the Planner, roadmap, agenda, template and permission parts of
+`docs/design/spaces-chat/` and `docs/design/space-creation/`, the Space rail
+brief, and the earlier version of this brief (Pages, Tasks).
 
 ## Why
 
-A Space is where people and agents make things together, and seeing them made
-is what sets Misty apart from a chat app. Every tool in a Space is either a
-place to ask or a thing that gets made. Anything else goes.
+A Space is an organized, shareable place where people and their agents make
+things together. It holds only true primitives, chat is the one way to talk to
+anyone, person or agent, and anyone in the Space can work with anyone else's
+agents. Misty is mostly a browser, so the tab strip is the only bar and ⌘T is
+the way in.
 
-## The Space after this change
+## What a Space holds
 
-Five tools in the Space rail, in this order:
+| Section | What it holds |
+| --- | --- |
+| **Chat** | Channels, threads and DMs, with people and agents |
+| **Notes** | Documents, written by people and agents |
+| **Drawings** | Canvases |
+| **Files** | Files and folders, shown as cards with live previews |
+| **Code** | Code projects linked to the Space, with their GitHub repo and changes |
 
-| Tool | What it holds | Who makes it |
-| --- | --- | --- |
-| **Chat** | The Space's conversation: people, agents and their replies | Everyone |
-| **Pages** | Notes and drawings in one list; each page is a doc or a canvas | People and agents |
-| **Tasks** | Today's tasks, board and list views, unchanged | People and agents |
-| **Code** | The Space's code projects and what agents changed in them | Agents, with people |
-| **Files** | Uploaded and generated files and images | People and agents |
+The sections sit in the Space page's own header, with ⌘1 to ⌘5. There is no
+Space rail or tool strip.
 
-## Decisions
+## Members and agents
 
-1. **Remove roadmaps.** Goals, milestones, the node canvas and node definitions
-   go, with their 19 routes, the `roadmap.*` agent tools and their tables
-   (about 7,100 lines). Existing roadmaps are dropped. They aren't exported.
-2. **Remove the agenda, Misty's own calendar.** Space calendar events, calendar
-   sources and the Google calendars linked into a Space go, with `event.*` and
-   about 3,000 lines. A person's calendar is the one they connect (Google,
-   Outlook) through integrations, so "my calendar" always means that one. Task
-   due dates stay.
-3. **Remove the Planner wrapper.** Tasks become their own tool. The board and
-   list views, filters, drawers and `task.*` agent tools stay as they are.
-4. **Pages replaces Journal.** One list of notes and drawings, newest first, each
-   marked "Doc" or "Canvas" by an icon and a word. Creating a page asks which
-   kind. Routes stay `/notes` and `/drawings` underneath.
-5. **Code is a new tool.** It lists the code projects linked to the Space. Each
-   row shows the project's name, its GitHub repository when published, and its
-   latest changes. Opening a project shows its changes by run, using Claude-style
-   diffs (`src/features/agents/components/changes/`), its snapshots and its
-   previews. Project files stay on the device that has the project, as today;
-   others in the Space see the project, its changes and its GitHub link.
-6. **Remove the Smart Library's background AI.** Face grouping (people),
-   auto-tags, captions and video and audio indexing stop and their code goes.
-   Uploads no longer run models. Files keep name and text search.
-7. **Remove Space templates.** Create a Space no longer offers a template grid;
-   a new Space starts with the five tools, empty.
-8. **Remove agent listings.** Agents are plain members of a Space. Any member
-   can @mention an agent in the Space; the request is billed to whoever asked,
-   as today. There is no accept policy (ask, auto or off) and no listing rows.
-   To stop an agent answering in a Space, remove it from the Space's members.
+- A Space has an **owner and members**. Only the owner invites, removes people
+  or deletes the Space. There are no roles and no per-member permissions.
+- **Agents are members under a person.** You bring your own agents into any
+  Space you're in (`space_agents`), and an agent can be in many Spaces. The
+  member list shows each person with their agents under them. When a person
+  leaves, their agents leave with them.
+- **Asking someone else's agent:** @mention it in a channel or thread. It sees
+  the Space and keeps its own memory, which others' asks can read but not
+  change. Its owner's connected apps, files outside the Space and private chats
+  stay off-limits. The run is billed to the person who asked and starts at once:
+  there is no accept policy and no approval step, only the usual pauses before
+  paying, deleting or other irreversible actions, which go to whoever asked.
+- Every person keeps a **personal Space**, which holds their agents' DMs.
 
-## What stays as it is
+## One chat system
 
-- Chat, members and invitations, and the personal Space.
-- Tasks, apart from losing the Planner wrapper.
-- Artifacts from agent work saving to the agent's Space (roadmap §1).
-- Encrypted sync, item read state and storage accounting.
+- Every conversation is a `space_conversations` row: a channel or a DM. Private
+  agent chats are DMs with that agent in your personal Space, with the same ids
+  they had before, so runs, attachments and summaries carry over.
+- The Agents page lists those DMs and opens them with the full composer.
+  Writing a plain message into an agent DM is refused; it goes through a run.
+- Agents talk to each other in the chat: an agent that @mentions another in its
+  reply starts that agent's run in the same thread, one hop deep.
 
-## Open questions
+## Files and Code
 
-- Should the Code tool show projects from every member, or only projects
-  someone explicitly linked to the Space?
-- Do removed tables get a migration that drops them, or a later cleanup once
-  production has no readers?
+- Files are files and folders only. Cards preview images, PDFs, Markdown, CSV
+  as a table, code with highlighting, and HTML in a sandboxed frame that can't
+  reach Misty. Agent outputs are ordinary files, credited to the agent and run
+  that made them.
+- Trash is an ordinary collection for every member: there is no Library lock.
+- Code lists `space_code_projects`: each row shows the project, its owner, its
+  GitHub repo and latest changes. Project files stay on the owner's device; the
+  others see the changes and the GitHub link. Coding is Pro and above.
+
+## Navigation
+
+- The tab strip is the only bar. The navigator rail, the Spaces and Agents
+  pills and the app launcher are gone, and nothing replaces them: Spaces,
+  Agents, Bookmarks and Settings are pages that open in tabs and can be pinned.
+- ⌘T opens a new tab whose page is the panel; ⌘L or a click on the address bar
+  opens the same panel over the current tab. The address bar is only a doorway:
+  all typing happens in the panel.
+- The panel guesses what the input is, with no model call: a URL opens, keywords
+  search the web, a request or question asks your agent (its DM opens), and a
+  name jumps to a place, Space section, agent, file, note or open tab. The guess
+  sits on top with the alternatives under it. ⌘⏎ opens beside, in a split.
+- Rows show only the target, never a verb; the icon says what Enter does.
+- Bangs: `!chat`, `!notes`, `!drawings`, `!files`, `!code`, `!spaces`,
+  `!agents`, `!bookmarks`, `!history`, `!tabs`, `!downloads`, `!settings`,
+  `!extensions` and `!ask`; `@agent` asks that agent. Web and custom bangs stay.
+- There is no ⌘K and no Global Misty overlay. Misty is one of your agents.
+
+## Removed, with their data
+
+Roadmaps, the agenda and Misty's own calendar, the Planner and tasks, Space
+templates, roles and permission overrides, agent listings and accept policies,
+and every Library extra: albums, people, stacks, groups, pins, imports, the
+Library lock, semantic search and all Smart Library background AI. Their tables
+are dropped by migration, with no export.
+
+## Still open
+
+- Projects are linked from the Code section's "Link a project" menu; the
+  composer's Project menu doesn't offer it yet.
+- Device-local pick history doesn't bias the panel's guess yet.
+- Agent work in channel replies shows the final answer, not the live work lines.
 
 ## Rules followed
 
 These come from AGENTS.md: monochrome only, with item-type tones on rows;
-checkmarks in menus; no loading text; failures inline in plain language.
+checkmarks in menus; no loading text; failures inline in plain language; agent
+conversations follow `docs/design/agent-chat/`.

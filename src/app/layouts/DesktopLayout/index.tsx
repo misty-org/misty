@@ -24,12 +24,7 @@ import { useDockingTransition } from "./useDockingTransition";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
-import {
-  AgentsMenuButton,
-  BrowserProfileButton,
-  StripDownloads,
-} from "./WorkspaceStripDock";
-import { SpacesMenuButton } from "@/features/spaces";
+import { BrowserProfileButton, StripDownloads } from "./WorkspaceStripDock";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { dockingMetrics } from "./dockingGeometry";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
@@ -59,16 +54,8 @@ export type {
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();
   const { user, refreshUser, transitioning } = useAuth();
-  const {
-    location,
-    navigate,
-    settingsLoad,
-    activePaneId,
-    activeWorkspacePaneId,
-    lastAppRoute,
-    lastNonSettingsRouteRef,
-    routeId,
-  } = useDesktopBootstrap({ getRouteId: props.getRouteId });
+  const { location, navigate, settingsLoad, lastAppRoute, lastNonSettingsRouteRef, routeId } =
+    useDesktopBootstrap({ getRouteId: props.getRouteId });
   const {
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
@@ -175,8 +162,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         onSettingsClick={openSettingsOverlay}
       />
     ) : null;
-  // The sidebar's bottom edge: downloads and sync together on the left, the app launcher on the
-  // right.
+  // The sidebar's bottom edge: downloads and sync together.
   const stripFootEnd = (
     <>
       <div className="flex items-center gap-0.5">
@@ -193,8 +179,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     </>
   );
   const browserChrome = {
-    spaces: <SpacesMenuButton labeled />,
-    agents: <AgentsMenuButton />,
     sync: (
       <BrowserSyncBadge
         key={user?.id}
@@ -315,9 +299,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             settingsOpen={settingsOpen}
             onCloseSettings={closeSettingsOverlay}
             userId={user?.id}
-            currentPath={`${location.pathname}${location.search}`}
-            activePaneId={activePaneId}
-            activeWorkspacePaneId={activeWorkspacePaneId}
           />
         ) : null}
       </main>

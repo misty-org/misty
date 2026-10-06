@@ -2,8 +2,8 @@ import { TooltipProvider } from "@/shared/ui";
 import { FileCode2, FolderOpen, MessagesSquare, Notebook, PenTool } from "lucide-react";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
-// A Space's primitives. Management controls live at the bottom of the Space rail.
-const sections = [
+// A Space's primitives, in ⌘1 to ⌘5 order. Management controls sit beside them.
+export const spaceSections = [
   { id: "social", label: "Chat", icon: MessagesSquare },
   { id: "notes", label: "Notes", icon: Notebook },
   { id: "drawings", label: "Drawings", icon: PenTool },
@@ -39,7 +39,7 @@ export function SpaceSectionNavigation({
         }
         aria-label="Space sections"
       >
-        {sections.map(({ id, label, icon: Icon }) => (
+        {spaceSections.map(({ id, label, icon: Icon }) => (
           <SpaceSidebarLink
             key={id}
             horizontal={horizontal}

@@ -5,18 +5,25 @@ import {
   focusModeCommands,
   tabFeatureCommands,
 } from "./browserFeatureCommands";
-import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("search.toggle", "New tab", {
     description:
-      "Open a new tab: search the web, open an address, or type ! to search your files, spaces and bookmarks.",
+      "Open a new tab: open an address, search the web, ask an agent or jump to any page. Type ! to search one place, or @ to pick an agent.",
     category: "Navigation",
-    aliases: ["new tab", "search", "url", "website", "google", "bangs", "shortcuts"],
+    aliases: [
+      "new tab",
+      "search",
+      "url",
+      "website",
+      "google",
+      "bangs",
+      "shortcuts",
+      "ask",
+      "agent",
+    ],
     mac: "Cmd+T",
-    macAlternate: "Cmd+K",
     windows: "Ctrl+T",
-    windowsAlternate: "Ctrl+K",
     allowInEditable: true,
     nativeMenu: true,
     allowShadowing: true,
@@ -38,16 +45,6 @@ const shellCommands: ShortcutCommandDefinition[] = [
     windows: "Ctrl+Shift+K",
     allowInEditable: true,
     nativeMenu: false,
-    allowShadowing: true,
-  }),
-  command("app.command_palette", "Open command palette", {
-    description: "Open Misty with command-only results.",
-    category: "Misty",
-    aliases: ["actions", "commands", "launcher"],
-    mac: "Cmd+Shift+P",
-    windows: "Ctrl+Shift+P",
-    allowInEditable: true,
-    nativeMenu: true,
     allowShadowing: true,
   }),
   command("app.open_settings", "Open settings", {
@@ -300,14 +297,28 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
 // Each tool keeps its Cmd/Ctrl+Shift number; 1 belonged to the retired Home page.
 const toolSlots = [
   ["journal", "Journal", 2],
-  ["planner", "Planner", 3],
   ["social", "Social", 4],
   ["library", "Library", 5],
   ["browser", "Browser", 6],
   ["code", "Code", 8],
 ] as const;
 
+/** A Space page's sections, on ⌘1 to ⌘5 while it is focused (tabs elsewhere). */
+const spaceSections = ["Chat", "Notes", "Drawings", "Files", "Code"] as const;
+
 const tabAndToolCommands = [
+  ...spaceSections.map((label, index) =>
+    command(`space.section_${index + 1}`, `Open ${label}`, {
+      description: `Open this Space's ${label}.`,
+      category: "Spaces",
+      scope: "tool:space",
+      aliases: ["space", "section", label.toLowerCase()],
+      mac: `Cmd+${index + 1}`,
+      windows: `Ctrl+${index + 1}`,
+      allowInEditable: true,
+      allowShadowing: true,
+    }),
+  ),
   ...Array.from({ length: 9 }, (_, index) =>
     command(
       `workspace.tab_${index + 1}`,
@@ -339,14 +350,6 @@ const tabAndToolCommands = [
 ];
 
 const toolCommands: ShortcutCommandDefinition[] = [
-  command("planner.create", "Create Planner item", {
-    description: "Create an item in the focused Planner view.",
-    category: "Planner",
-    scope: "tool:planner",
-    mac: "C",
-    windows: "C",
-  }),
-  ...roadmapShortcutCommands,
   command("library.copy", "Copy Library selection", {
     description: "Copy the selected Library content.",
     category: "Library",

@@ -25,7 +25,7 @@ export function AiSelectionMenu({
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       ) : (
         <MenuTrigger
-          label="Ask Misty"
+          label="Ask an agent"
           variant="secondary"
           icon={<MessageCircle className="size-3.5" />}
           className="h-7 text-xs"

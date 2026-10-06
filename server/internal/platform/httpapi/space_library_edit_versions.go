@@ -24,10 +24,6 @@ func (s *SpaceLibraryService) EditVersions() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
-		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
-			writeLibraryError(w, err)
-			return
-		}
 		switch r.Method {
 		case http.MethodGet:
 			versions, err := s.database.LibraryEditVersions(r.Context(), userID, spaceID, itemID)
@@ -67,10 +63,6 @@ func (s *SpaceLibraryService) SelectEditVersion() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
-		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
-			writeLibraryError(w, err)
-			return
-		}
 		var body struct {
 			ItemVersion int64  `json:"item_version"`
 			EditID      string `json:"edit_id"`
@@ -98,10 +90,6 @@ func (s *SpaceLibraryService) DeleteEditVersion() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
-		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
-			writeLibraryError(w, err)
-			return
-		}
 		if err := s.database.DeleteLibraryEditVersion(r.Context(), userID, spaceID, itemID, chi.URLParam(r, "editID")); err != nil {
 			writeLibraryError(w, err)
 			return

@@ -31,6 +31,8 @@ export interface OmniboxDeps {
     text: string,
     limit: number,
   ): { id: string; title: string; detail: string; route: string }[];
+  /** Misty's places: each Space and its sections, and the person's agents. */
+  places(): { id: string; title: string; detail: string; route: string }[];
   /** A web address on the clipboard, read locally; null when there is none. */
   clipboardUrl(): Promise<string | null>;
   /** Browser tabs in every window, from the synced workspace. */

@@ -6,67 +6,45 @@ import type {
 } from "@/api/spaces/dto/entities";
 import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 
-import { libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { SpaceRequest } from "./types";
 export function createSpaceLibraryEditsApi(spaceRequest: SpaceRequest) {
   return {
-    editVersions: (spaceId: string, itemId: string, reauthenticationToken = "") =>
+    editVersions: (spaceId: string, itemId: string) =>
       spaceRequest<{ versions: LibraryEditVersion[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions`,
-        { headers: libraryReauthenticationHeaders(reauthenticationToken) },
       ),
     createEditVersion: (
       spaceId: string,
       item: SpaceLibraryItem,
       definition: LibraryEditDefinition,
-      reauthenticationToken = "",
     ) =>
       spaceRequest<LibraryEditResult>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}/versions`,
         {
           method: "POST",
-          headers: libraryReauthenticationHeaders(reauthenticationToken),
           body: JSON.stringify({ item_version: item.version, edit_definition: definition }),
         },
       ),
-    renderEditVersion: (
-      spaceId: string,
-      itemId: string,
-      editId: string,
-      maximumOutputBytes = 0,
-      reauthenticationToken = "",
-    ) =>
+    renderEditVersion: (spaceId: string, itemId: string, editId: string, maximumOutputBytes = 0) =>
       spaceRequest<LibraryRenditionRequest>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}/render`,
         {
           method: "POST",
-          headers: libraryReauthenticationHeaders(reauthenticationToken),
           body: JSON.stringify({ maximum_output_bytes: maximumOutputBytes }),
         },
       ),
-    selectEditVersion: (
-      spaceId: string,
-      item: SpaceLibraryItem,
-      editId = "",
-      reauthenticationToken = "",
-    ) =>
+    selectEditVersion: (spaceId: string, item: SpaceLibraryItem, editId = "") =>
       spaceRequest<LibraryEditResult>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}/versions/current`,
         {
           method: "PUT",
-          headers: libraryReauthenticationHeaders(reauthenticationToken),
           body: JSON.stringify({ item_version: item.version, edit_id: editId }),
         },
       ),
-    deleteEditVersion: (
-      spaceId: string,
-      itemId: string,
-      editId: string,
-      reauthenticationToken = "",
-    ) =>
+    deleteEditVersion: (spaceId: string, itemId: string, editId: string) =>
       spaceRequest(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/versions/${encodeURIComponent(editId)}`,
-        { method: "DELETE", headers: libraryReauthenticationHeaders(reauthenticationToken) },
+        { method: "DELETE" },
       ),
   };
 }

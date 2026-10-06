@@ -6,6 +6,7 @@ import { historyProvider, sessionHistoryProvider } from "./history";
 import { mistyContentProvider } from "./mistyContent";
 import { mistyPagesProvider } from "./misty";
 import { openTabsProvider } from "./openTabs";
+import { placesProvider } from "./places";
 import { searchSuggestProvider } from "./searchSuggest";
 import { recentPagesProvider } from "./recentPages";
 import { typedProvider } from "./typed";
@@ -20,6 +21,7 @@ export function createOmniboxProviders(deps: OmniboxDeps): OmniboxProvider[] {
     bookmarksProvider(deps),
     openTabsProvider(deps),
     mistyPagesProvider(),
+    placesProvider(deps),
     mistyContentProvider(deps),
     historyProvider(deps),
     recentPagesProvider(deps),

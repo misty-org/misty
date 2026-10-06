@@ -15,7 +15,6 @@ import (
 const (
 	TestingLibraryUploadTokenHeader    = "X-Misty-Library-Upload-Token"
 	TestingLibrarySignedDownloadHeader = "X-Misty-Signed-Download"
-	libraryReauthenticationHeader      = "X-Misty-Library-Reauthentication"
 	libraryUploadLifetime              = 30 * time.Minute
 )
 

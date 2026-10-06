@@ -61,7 +61,7 @@ async function handleContextRequest(request: Omit<Request, "id">): Promise<unkno
       (Date.parse(artifact.expiresAt) <= Date.now() ||
         registration.adapter.canApply?.(artifact) === false)
     )
-      throw new Error("The source changed. Ask Misty to regenerate this proposal.");
+      throw new Error("The source changed. Ask your agent to regenerate this proposal.");
     if (
       artifact.target &&
       !registration.adapter

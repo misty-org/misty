@@ -23,8 +23,6 @@ const (
 	PermissionStorageViewOwn     = spaces.PermissionStorageViewOwn
 	PermissionStudioView         = spaces.PermissionStudioView
 	PermissionAskRun             = spaces.PermissionAskRun
-	PermissionTasksView          = spaces.PermissionTasksView
-	PermissionTasksManage        = spaces.PermissionTasksManage
 	PermissionIntegrationsManage = spaces.PermissionIntegrationsManage
 	PermissionSpaceInvite        = spaces.PermissionSpaceInvite
 	PermissionSpaceRename        = spaces.PermissionSpaceRename
@@ -62,13 +60,12 @@ func UploadPurposePermission(purpose string) (string, bool) {
 }
 
 var (
-	ErrLibraryNotFound         = errors.New("library resource not found")
-	ErrLibraryForbidden        = errors.New("library permission denied")
-	ErrLibraryInvalid          = errors.New("invalid library request")
-	ErrLibraryQuota            = errors.New("account cloud storage quota exceeded")
-	ErrLibraryConflict         = errors.New("library resource version conflict")
-	ErrLibraryReauthentication = errors.New("library reauthentication required")
-	ErrLibraryUploadMismatch   = errors.New("library upload does not match its reservation")
+	ErrLibraryNotFound       = errors.New("library resource not found")
+	ErrLibraryForbidden      = errors.New("library permission denied")
+	ErrLibraryInvalid        = errors.New("invalid library request")
+	ErrLibraryQuota          = errors.New("account cloud storage quota exceeded")
+	ErrLibraryConflict       = errors.New("library resource version conflict")
+	ErrLibraryUploadMismatch = errors.New("library upload does not match its reservation")
 )
 
 type SpaceStorageUsage struct {

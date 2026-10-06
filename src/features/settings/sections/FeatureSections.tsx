@@ -36,17 +36,6 @@ export function SpaceDefaultsSection() {
     </Section>
   );
 }
-export function SpaceAgendaSection() {
-  return (
-    <Section
-      title="Agenda defaults"
-      description="Existing choices in individual Spaces take precedence."
-    >
-      <PreferenceRow id="spaces.agenda.tasks" />
-      <PreferenceRow id="spaces.agenda.roadmap" />
-    </Section>
-  );
-}
 export function ManageSpacesSection(props: SettingsContentProps) {
   const spaces = useSpacesStore((s) => s.spaces);
   const navigate = useNavigate();

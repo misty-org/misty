@@ -300,11 +300,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <BrowserOmnibox
       focusRequest={addressFocusRequest}
       currentUrl={state.url}
-      historyEntries={history.entries}
-      tab={tab}
       onNavigate={navigateActiveTab}
       hostOnly={sidebar}
-      panel={sidebar}
       leading={sidebar ? undefined : siteInfo}
       trailing={sidebar ? sidebarTrailing : undefined}
     />

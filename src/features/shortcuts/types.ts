@@ -1,7 +1,6 @@
 export type ShortcutPlatform = "macos" | "windows" | "linux";
 
-export type ShortcutScope =
-  "global" | "workspace" | "tool:browser" | "tool:library" | "tool:planner" | "tool:roadmap";
+export type ShortcutScope = "global" | "workspace" | "tool:browser" | "tool:library" | "tool:space";
 
 export interface ShortcutBindingPair {
   primary: string | null;

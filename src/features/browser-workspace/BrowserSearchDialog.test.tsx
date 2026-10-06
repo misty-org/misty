@@ -4,6 +4,9 @@ import { MemoryRouter } from "react-router-dom";
 import { activeLayoutView, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { BrowserSearchDialog } from "./BrowserSearchDialog";
 import { useBrowserSearchStore } from "./search";
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile } from "@/shared/schemas";
 vi.mock("@/features/webviews/browserRuntime", () => ({
   onBrowserRuntimeClose: () => () => undefined,
   setBrowserWebviewsSuspended: vi.fn(),
@@ -73,7 +76,7 @@ describe("bangs", () => {
   it("reads a trailing shortcut on submit", async () => {
     const input = renderDialog();
     fireEvent.change(input, { target: { value: "misty !gh" } });
-    expect(screen.getByRole("option", { name: /Search GitHub/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /GitHub/ })).toBeTruthy();
     fireEvent.submit(input.closest("form")!);
     await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
     expect(openedUrl()).toBe("https://github.com/search?q=misty");
@@ -103,5 +106,51 @@ describe("bangs", () => {
     expect(
       parseBrowserViewState(activeLayoutView(useWorkspaceStore.getState().layout)!.state).url,
     ).toBe("misty://bookmarks");
+  });
+});
+
+describe("asking an agent", () => {
+  const agent = (id: string, name: string, system = false) =>
+    ({
+      id,
+      name,
+      role: "",
+      enabled: true,
+      system_managed: system,
+      avatar: {},
+    }) as unknown as AgentProfile;
+  beforeEach(() => {
+    usePersonalAgentsStore.setState({
+      agents: [agent("misty", "Misty", true), agent("res", "Researcher")],
+    });
+    useMistyStore.setState({ selectedAgentId: "" });
+  });
+
+  const optionNames = () => screen.getAllByRole("option").map((option) => option.textContent ?? "");
+
+  it("leads with asking your agent when the text is a request or question", () => {
+    fireEvent.change(renderDialog(), { target: { value: "summarize this page for me" } });
+    expect(optionNames()[0]).toContain("summarize this page for me");
+    expect(optionNames()[0]).toContain("Misty");
+  });
+
+  it("offers asking second when the text reads as a search", () => {
+    fireEvent.change(renderDialog(), { target: { value: "pizza brooklyn" } });
+    const names = optionNames();
+    expect(names[0]).not.toContain("Misty");
+    expect(names[1]).toContain("Misty");
+  });
+
+  it("does not offer asking for an address", () => {
+    fireEvent.change(renderDialog(), { target: { value: "github.com" } });
+    expect(optionNames().some((name) => name.includes("Misty"))).toBe(false);
+  });
+
+  it("picks the agent named after @", () => {
+    fireEvent.change(renderDialog(), { target: { value: "@res find the launch date" } });
+    const names = optionNames();
+    expect(names).toHaveLength(1);
+    expect(names[0]).toContain("find the launch date");
+    expect(names[0]).toContain("Researcher");
   });
 });

@@ -8,7 +8,7 @@ import {
   workspaceSurfaceFromRoute,
 } from "@/features/workspace";
 import { useSpacesStore } from "../store/useSpacesStore";
-import { SpaceWorkspaceRail } from "./SpaceWorkspaceRail";
+import { SpacePageHeader } from "./SpacePageHeader";
 import { WorkspaceViewRouteScope } from "@/features/workspace/WorkspaceViewRouteScope";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 
@@ -48,9 +48,12 @@ function open(path: string) {
 function Rail() {
   const route = useSpacePanelRoute();
   const location = useLocation();
+  const space = useSpacesStore((state) =>
+    state.spaces.find((item) => item.id === route.activeSpaceId),
+  );
   return (
     <>
-      <SpaceWorkspaceRail activeSpaceId={route.activeSpaceId} section={route.section} />
+      {space ? <SpacePageHeader space={space} section={route.section} /> : null}
       <output data-testid="settings-return">{location.state?.spaceSettingsReturnTo ?? ""}</output>
     </>
   );
@@ -117,7 +120,6 @@ it("follows the focused Space", () => {
   mount();
   act(() => open("/spaces/work/social"));
   expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "Recent items" })).toBeTruthy();
   const nav = screen.getByRole("navigation", { name: "Space sections" });
   expect(within(nav).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
 });

@@ -1,7 +1,6 @@
 import type { LibraryEditDefinition } from "./common";
-export type * from "./actionSuggestionTypes";
 export type * from "./agentArchitectureTypes";
-export type * from "./agentTaskTypes";
+export type * from "./memberTypes";
 export type * from "./conversationTypes";
 
 interface LibraryFile {

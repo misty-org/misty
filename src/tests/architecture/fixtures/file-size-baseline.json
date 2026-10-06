@@ -17,7 +17,6 @@
   "src/features/auth/AuthContext.test.tsx": 720,
   "src/features/auth/store/useAuthTokenStore.ts": 565,
   "src/features/browser-workspace/controller.test.ts": 672,
-  "src/features/global-search/GlobalMisty.tsx": 691,
   "src/features/global-search/globalMistyState.test.ts": 596,
   "src/features/misty/useMistyStore.ts": 754,
   "src/features/webviews/browserRuntime.ts": 785,

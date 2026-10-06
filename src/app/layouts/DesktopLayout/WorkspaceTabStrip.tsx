@@ -20,7 +20,6 @@ import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
-import { AgentsMenuButton } from "./WorkspaceStripDock";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
 import { dockingMetrics } from "./dockingGeometry";
 
@@ -37,8 +36,6 @@ export function WorkspaceTabStrip(
     account?: ReactNode;
     /** The sidebar's bottom-left: downloads. */
     footEnd?: ReactNode;
-    /** Horizontal tabs: Spaces, Agents and the profile, at the row's trailing end. */
-    cluster?: ReactNode;
   },
 ) {
   const position = props.position ?? "top";
@@ -122,15 +119,6 @@ export function WorkspaceTabStrip(
           <SidebarAddressFallback />
         </div>
       )}
-      {vertical && props.cluster ? (
-        <div
-          className="mb-1 flex min-w-0 flex-col items-start gap-1"
-          data-misty-window-drag-block="true"
-        >
-          {props.cluster}
-          <AgentsMenuButton />
-        </div>
-      ) : null}
       {vertical ? <FavoritesStrip vertical onOpen={props.onOpen} /> : null}
       <div
         {...reorder}
@@ -215,7 +203,6 @@ export function WorkspaceTabStrip(
                 <div ref={setNavSlot} className="flex items-center" />
                 <SidebarNavFallback />
               </div>
-
             </div>
             {cardBody}
             <SidebarNowPlaying />
@@ -226,15 +213,6 @@ export function WorkspaceTabStrip(
         ) : (
           cardBody
         )}
-        {!vertical && props.cluster ? (
-          <div
-            className="ml-2 flex shrink-0 items-center gap-1"
-            data-browser-toolbar
-            data-misty-window-drag-block="true"
-          >
-            {props.cluster}
-          </div>
-        ) : null}
         {vertical ? props.account : null}
         {hoverCards.card}
         {editingGroup && (

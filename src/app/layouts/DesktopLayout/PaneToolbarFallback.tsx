@@ -14,7 +14,6 @@ import { useHiddenToolbarButtons } from "@/features/settings/browserToolbarButto
 import { browserInternalUrl, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 
-const noHistory: string[] = [];
 const keepOverlay = async () => {};
 
 /**
@@ -43,10 +42,7 @@ export function PaneToolbarFallback({ tab }: { tab: WorkspaceView }) {
       }
       address={
         <BrowserOmnibox
-          focusRequest={0}
           currentUrl=""
-          historyEntries={noHistory}
-          tab={tab}
           onNavigate={(value) =>
             useWorkspaceStore.getState().openBrowserView({ url: normalizeBrowserAddress(value) })
           }

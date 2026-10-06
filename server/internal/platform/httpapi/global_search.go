@@ -109,8 +109,8 @@ func parseGlobalSearchLimit(value string) int {
 
 func parseGlobalSearchKinds(value string) map[string]bool {
 	allowed := map[string]bool{
-		"space": true, "task": true, "note": true, "message": true, "conversation": true,
-		"calendar": true, "roadmap": true, "drawing": true, "agent": true, "workflow": true,
+		"space": true, "note": true, "message": true, "conversation": true,
+		"drawing": true, "agent": true, "workflow": true,
 	}
 	result := map[string]bool{}
 	for _, part := range strings.Split(value, ",") {

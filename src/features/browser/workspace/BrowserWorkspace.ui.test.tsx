@@ -1,5 +1,5 @@
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
-import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -207,7 +207,7 @@ describe("BrowserWorkspace", () => {
     });
     expect(container.querySelector('[aria-label="Browser annotation canvas"]')).toBeNull();
   });
-  it("selects the complete address when the omnibox receives focus", async () => {
+  it("opens the search panel over the page when the address bar is focused", async () => {
     const tab = {
       ...browserTab,
       state: createBrowserViewState("https://example.com/path?q=misty"),
@@ -220,38 +220,11 @@ describe("BrowserWorkspace", () => {
       input?.focus();
       await settleBrowserOverlay();
     });
-    expect(input?.value).toBe("https://example.com/path?q=misty");
-    expect(input?.selectionStart).toBe(0);
-    expect(input?.selectionEnd).toBe(input?.value.length);
-  });
-  it("shows the current page on focus, then direct and web-search suggestions while typing", async () => {
-    const tab = {
-      ...browserTab,
-      state: createBrowserViewState("https://youtube.com/watch?v=misty"),
-    };
-    await act(async () => root.render(view(tab)));
-    const input = container.querySelector<HTMLInputElement>(
-      '[aria-label="Search or enter address"]',
-    );
-    await act(async () => {
-      input?.focus();
-      await settleBrowserOverlay();
-    });
-    const focusedOptions = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    // Before typing the list is recent pages and tabs; the current page is not repeated.
-    expect(focusedOptions.length).toBeGreaterThan(0);
-    expect(focusedOptions.some((option) => option.textContent?.includes("youtube.com"))).toBe(
-      false,
-    );
-    await act(async () => {
-      fireEvent.change(input!, { target: { value: "vimeo.com" } });
-      await settleBrowserOverlay();
-    });
-    const options = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(options.map((option) => option.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining("vimeo.com")]),
-    );
-    expect(options.some((option) => option.textContent?.includes("Search with"))).toBe(false);
+    const search = useBrowserSearchStore.getState();
+    expect(search.open).toBe(true);
+    // Anchored over the address bar, so the choice navigates this tab.
+    expect(search.anchor).not.toBeNull();
+    act(() => search.close());
   });
   it("opens a functional browser menu", async () => {
     await act(async () => root.render(view(browserTab)));
@@ -263,14 +236,7 @@ describe("BrowserWorkspace", () => {
     const menuItems = [
       ...document.body.querySelectorAll<HTMLElement>('[data-browser-menu] [role="menuitem"]'),
     ].map((item) => item.textContent?.trim() ?? "");
-    for (const label of [
-      "New tab",
-      "History",
-      "Downloads",
-      "Find…",
-      "More tools",
-      "Settings",
-    ]) {
+    for (const label of ["New tab", "History", "Downloads", "Find…", "More tools", "Settings"]) {
       expect(
         menuItems.some((item) => item.startsWith(label)),
         label,

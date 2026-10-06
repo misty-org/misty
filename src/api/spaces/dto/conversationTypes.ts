@@ -30,4 +30,4 @@ export interface SpaceConversation {
   created_at: string;
   updated_at: string;
 }
-import type { AgentAvatar } from "./agentTaskTypes";
+import type { AgentAvatar } from "./memberTypes";

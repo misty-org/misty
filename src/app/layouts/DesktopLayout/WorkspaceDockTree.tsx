@@ -457,11 +457,6 @@ function aiSurfaceForView(tab: WorkspaceView): AiSurfaceId {
   if (section === "social" || section === "chat") return "space.chat";
   if (section === "library") return "library";
   if (section === "activity") return "activity";
-  if (section === "planner") {
-    if (view === "agenda") return "planner.agenda";
-    if (view === "roadmaps" || view === "goals" || view === "milestones") return "planner.roadmap";
-    return "planner.tasks";
-  }
   return "settings";
 }
 
@@ -508,32 +503,6 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
       "chat.actions",
       "Find action items",
       "Identify action items and owners. Do not create tasks yet.",
-    ),
-  ],
-  "planner.tasks": [
-    action(
-      "planner.status",
-      "Summarize status",
-      "Summarize the visible plan's status, risks, and blockers.",
-    ),
-    action(
-      "planner.breakdown",
-      "Draft breakdown",
-      "Draft a practical task breakdown for the visible plan.",
-    ),
-  ],
-  "planner.agenda": [
-    action(
-      "agenda.plan",
-      "Plan my day",
-      "Propose a realistic plan for the visible agenda without scheduling anything.",
-    ),
-  ],
-  "planner.roadmap": [
-    action(
-      "roadmap.risks",
-      "Find risks",
-      "Assess dependencies, schedule risks, and likely bottlenecks in this roadmap.",
     ),
   ],
   browser: [

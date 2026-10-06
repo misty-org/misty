@@ -39,7 +39,7 @@ major model built in.
   Grok Bot (they have no APIs). A Grok Bot routine tool is parked.
 
 ## Work, in order
-1. Agents live in Spaces (built 2026-10-12, uncommitted; see "Built" in §1)
+1. Agents live in Spaces (built 2026-10-12; simplified 2026-10-16, see §1)
 2. Workflow parity: C1, C2, C8 (built 2026-10-12, uncommitted; see "Built" in §2)
 3. One extension system for Chrome and Firefox add-ons (built 2026-10-12 on macOS,
    uncommitted; see §3)
@@ -52,103 +52,50 @@ Done: unlimited sync (2026-10-11, uncommitted; see the end).
 
 ## 1. Agents live in Spaces
 Agents can now write code, create files and make images, and all of that needs
-a home. A Space is that home.
+a home. A Space is that home. Simplified 2026-10-16; the full model is in
+[docs/design/spaces-simplified/BRIEF.md](../design/spaces-simplified/BRIEF.md),
+which supersedes the first version of this section (one Space per agent, agent
+listings with ask/auto/off, the Agents page as a separate chat system).
 
 ### Model
-- **Every agent belongs to exactly one Space.** Several agents can share a
-  Space. An agent never needs more than one, because agents can talk to each
-  other.
-- **Everyone gets a personal Space,** named after them ("Matthew's Space"). Its
-  members start as the person and their agents. It's created at sign-up and by a
-  migration for existing accounts.
-- **New agents** pick a Space when they're created; the default is the personal
-  Space. Misty's built-in agent lives in the personal Space. An agent can be
-  moved to another Space later; its past artifacts stay where they were saved.
-- **Agents are members.** A Space's member list shows people and agents, and
-  says whose each agent is. People can invite others to their personal Space
-  like any Space.
-- **Artifacts save to the agent's Space automatically.** Files, images, code
-  outputs, documents and downloads from agent work become Space items. They
-  count against the agent owner's storage. This replaces today's local-only
-  tracking in `src/features/agents/taskArtifacts.ts`, which lives in
-  localStorage on one computer.
-- **Code projects stay local folders,** linked to the Space. The sandbox and git
-  work as today. The Space shows the project and keeps its outputs and
-  snapshots as artifacts.
+- **A Space holds five primitives:** Chat, Notes, Drawings, Files and Code.
+  Tasks, roadmaps, the agenda, the Planner, templates and the Library extras
+  are gone, with their tables.
+- **Owner and members.** Only the owner invites, removes people or deletes the
+  Space. No roles, no per-member permissions.
+- **Agents are members under a person** (`space_agents`). You bring your agents
+  into any Space you're in, and an agent can be in many. When you leave, your
+  agents leave too. Everyone keeps a personal Space, created at sign-up.
+- **Asking someone else's agent:** @mention it. The run starts at once, sees
+  only the Space, reads but never changes the agent's memory, and is billed to
+  whoever asked. No accept policy, no approvals; the usual pauses before paying
+  or deleting go to the asker.
+- **One chat system.** Agent chats are DMs in your personal Space
+  (`space_conversations`, same ids as before). Agents reply to each other in
+  threads, one hop deep.
+- **Artifacts are Files,** credited to the agent and run that made them, with
+  live previews. They count against the agent owner's storage.
+- **Code projects stay local folders,** linked to a Space
+  (`space_code_projects`); others see the changes and the GitHub link. Coding is
+  Pro and above.
 
-### Agents page vs Space
-- **Agents page:** your private one-to-one conversations with your agents. Work
-  happens here, and nobody else sees these chats.
-- **Space:** the shared place, with its members (people and agents), the
-  artifacts agents saved, notes and tasks, and the Space chat.
+### Navigation
+The tab strip is the only bar; the rail, pills and launcher are gone. ⌘T opens
+the panel in a new tab, ⌘L over the current one. It opens URLs, searches the
+web, asks an agent (`!ask`, `@agent`) and jumps to any place, with ⌘⏎ for a
+split. No ⌘K, no Global Misty.
 
-### Talking to other people's agents
-- In a Space chat, anyone can @mention any agent that's a member, including a
-  teammate's.
-- The request runs under the owner's rules, which reuse `space_agent_listings`
-  (accept policy ask / auto / off, max open requests). The agent only uses what's
-  in the Space unless its owner approves more.
-- The reply posts in the Space chat. Requests are billed to the person who asked,
-  as `agent_member_requests` already does.
-- People can't open or read another person's conversations with their agent, or
-  message it privately.
-- Agent-to-agent work continues for longer jobs (`agentCollaboration.ts`). Each
-  owner sees their own agent's side of the exchange in full.
-- A request from another agent is untrusted input: it can never make the
-  receiving agent reveal its owner's private apps, files or chats.
+### Built
+- 2026-10-12: the first version (personal Spaces, @mention requests billed to
+  the asker, agent artifacts with provenance, code snapshots).
+- 2026-10-16: the simplification, in six phases on `worktree-spaces-simplified`
+  (prune, agents as members, one chat system, previews and Code, navigation,
+  cleanup). Not pushed.
 
-### Data changes
-- Agents (`misty_ask_identities`) get a required `space_id` (backfilled to the
-  personal Space).
-- Space membership gets an agent member kind with an owner.
-- Agent artifacts become Space items with provenance (agent, conversation, run).
-- `space_agent_listings` defaults to "ask" for every agent member.
-
-### Verification
-- Migration test: every existing agent ends up in its owner's personal Space.
-- Visibility rules across two accounts: artifacts are visible, chats are not, and
-  there's no direct message to another person's agent.
-- @mention requests are billed to the requester and respect off/ask/auto.
-- An artifact saved on one computer shows up on another.
-
-### Built (2026-10-12, uncommitted)
-Migration `20271012020000_agents_in_spaces`, contract tests in
-`server/test/contract/postgres/agents_in_spaces_test.go`.
-- **Personal Space:** `misty_ensure_personal_space` creates "<First name>'s
-  Space" at sign-up (trigger on `users`) and for existing accounts. Accounts
-  that already had a default Space keep it under its name. Created Spaces are
-  never the default any more.
-- **One Space per agent:** `misty_ask_identities.space_id`, required for live
-  agents. A trigger defaults new agents to the personal Space and refuses a
-  Space the owner isn't in. Misty's built-in agent can't move.
-- **Membership is the listing:** each agent has exactly one
-  `space_agent_listings` row, in its Space, kept by a trigger. A move starts over
-  at "ask". "Off" replaces unpublishing. When the owner leaves a Space or it's
-  deleted, its agents go back to the owner's personal Space.
-- **@mentions:** a Space chat message that mentions an agent member starts a
-  member request (`requester_run_id` = `message:<id>`). It runs under the
-  owner's off/ask/auto rule. The owner's own mentions never wait. The reply,
-  "waiting for approval", "declined" and "not taking requests" all post under
-  the message as the agent. Mentions in a group chat need the owner in it.
-- **Billing changed:** all member requests, agent-to-agent included, now bill
-  the person who asked (`space_runs.billing_user_id`); before, the owner paid.
-- **Artifacts:** uploads can carry agent provenance (agent, conversation, run,
-  kind). The agent must live in the target Space, and finished items get a
-  `space_agent_artifacts` row. Downloads from agent work save automatically.
-  After a run changes a code project, a ZIP snapshot saves too. The snapshot
-  leaves out `.git`, package and build folders and `.env` files, and stops at
-  100 MB. Only the owner sees the conversation and run ids. The Space overview
-  credits these files to the agent ("Researcher, Bob's agent") and has a
-  "From agents" filter. localStorage tracking in `taskArtifacts.ts` is gone.
-- **UI:** a Space picker on agent setup and the editor. "Requests from the
-  Space" (ask/auto/off) replaces the old per-Space sharing. An Agents section
-  sits under Members. Agent members show in the chat's @ list.
-- **Also:** the rail's Team popover lists agent members under the people, and the
-  account export gives each agent its `space_id` and its membership there.
-- **Storage:** every agent artifact, agent chat message and agent-made note is
-  stored as the agent's owner, so it counts against the owner's plan (5 GB to
-  2 TB), even when another member asked for the work. Only the AI cost moves to
-  the asker.
+### Still open
+- Link a project to a Space from the composer's Project menu.
+- Bias the panel's best guess with device-local pick history.
+- Show an agent's live work lines in channel replies, not only its answer.
 
 ---
 

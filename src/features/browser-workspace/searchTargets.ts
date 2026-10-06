@@ -1,5 +1,9 @@
 import type { NavigateFunction } from "react-router-dom";
-import { useWorkspaceStore } from "@/features/workspace";
+import {
+  useWorkspaceStore,
+  workspaceSurfaceFromRoute,
+  type WorkspaceView,
+} from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { OmniboxMatch } from "@/features/browser/omnibox";
 import type { ScopedSearchResult } from "./scopedSearchSources";
@@ -8,6 +12,25 @@ import type { ScopedSearchResult } from "./scopedSearchSources";
 export function openInNewBrowserTab(url: string, navigate: NavigateFunction): void {
   const tab = useWorkspaceStore.getState().openBrowserView({ url });
   navigate(tab.route, { replace: true });
+}
+
+/** Opens a tab and docks it in a split beside the focused pane (⌘⏎). */
+function openBeside(open: () => WorkspaceView | null): void {
+  const store = useWorkspaceStore.getState();
+  const paneId = store.layout.focusedPaneId;
+  const view = open();
+  if (view) useWorkspaceStore.getState().splitPane(paneId, "right", view.id);
+}
+
+/** A web address or an app route, beside the focused pane. */
+export function openTargetBeside(target: { url: string } | { route: string }): void {
+  if ("url" in target) {
+    openBeside(() => useWorkspaceStore.getState().openBrowserView({ url: target.url }));
+    return;
+  }
+  const surface = workspaceSurfaceFromRoute(target.route);
+  if (surface)
+    openBeside(() => useWorkspaceStore.getState().openSurface({ ...surface, forceNew: true }));
 }
 
 /** Switches to an open tab in whichever window holds it. */

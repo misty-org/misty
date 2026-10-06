@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo } from "react";
 import {
   createOmniboxProviders,
+  inputIntent,
   liveOmniboxDeps,
   warmOmniboxCaches,
   searchSuggestProvider,
@@ -9,6 +10,9 @@ import {
   type OmniboxMatch,
 } from "@/features/browser/omnibox";
 import { activeBrowserTabContext } from "@/features/workspace/browserTabs";
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile } from "@/shared/schemas";
 import { allBangs } from "./bangs/catalog";
 import { bangDestination, matchingBangs, parseBang } from "./bangs/parse";
 import type { Bang, WebBang } from "./bangs/types";
@@ -57,12 +61,32 @@ function webSearchMatch(bang: WebBang, query: string): OmniboxMatch[] {
       id: `bang:${bang.trigger}:${query}`,
       kind: "search",
       title: query,
-      detail: `Search ${bang.label}`,
+      detail: bang.label,
       target: { type: "navigate", url },
       relevance: 0,
       allowedToBeDefault: true,
     },
   ];
+}
+
+const noAgents: AgentProfile[] = [];
+const ask = (agent: AgentProfile, prompt: string): SearchListItem => ({
+  type: "ask",
+  agent,
+  prompt,
+});
+
+/**
+ * The panel's rows for `@name`: the matching agents, or, once a message
+ * follows the name, that message to the first of them.
+ */
+function mentionItems(text: string, agents: AgentProfile[]): SearchListItem[] | null {
+  const at = /^@(\S*)(?:\s+([\s\S]*))?$/.exec(text);
+  if (!at) return null;
+  const name = at[1].toLowerCase();
+  const named = agents.filter((agent) => agent.name.toLowerCase().startsWith(name));
+  if (at[2] !== undefined && named[0]) return [ask(named[0], at[2].trim())];
+  return named.map((agent) => ask(agent, ""));
 }
 
 /**
@@ -95,6 +119,14 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
   );
   useEffect(() => (open ? warmOmniboxCaches() : undefined), [open]);
   const webSuggestions = useOmniboxAutocomplete(webInput, suggestProviders);
+  const agents = usePersonalAgentsStore((state) => (open ? state.agents : noAgents));
+  const selectedAgentId = useMistyStore((state) => state.selectedAgentId);
+  const enabledAgents = agents.filter((agent) => agent.enabled);
+  // The agent an ask goes to: the one last used, else Misty.
+  const defaultAgent =
+    enabledAgents.find((agent) => agent.id === selectedAgentId) ??
+    enabledAgents.find((agent) => agent.system_managed) ??
+    enabledAgents[0];
 
   let items: SearchListItem[];
   if (suggestions.length) items = suggestions.map((entry) => ({ type: "bang", bang: entry }));
@@ -108,7 +140,10 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
     items = webSuggestions.flatMap((match) =>
       webSearchMatch(bang, match.title).map((row) => ({ type: "match" as const, match: row })),
     );
+  else if (bang?.kind === "scope" && bang.scope === "ask")
+    items = defaultAgent ? [ask(defaultAgent, query.trim())] : [];
   else if (bang) items = scoped.results.map((result) => ({ type: "result", result }));
+  else if (plain !== null && text.startsWith("@")) items = mentionItems(text, enabledAgents) ?? [];
   else
     items = [
       ...matches.map((match) => ({ type: "match" as const, match })),
@@ -118,6 +153,15 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
         result,
       })),
     ];
+
+  // The best guess leads: a request or question asks the agent; otherwise asking
+  // waits right under the first row, as the alternative.
+  if (plain !== null && text && !text.startsWith("@") && defaultAgent) {
+    const intent = inputIntent(text);
+    if (intent === "ask") items = [ask(defaultAgent, text), ...items];
+    else if (intent === "search")
+      items = [...items.slice(0, 1), ask(defaultAgent, text), ...items.slice(1)];
+  }
 
   return {
     items,

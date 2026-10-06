@@ -426,7 +426,7 @@
   },
   {
     "id": "spaces.openingTool",
-    "label": "Opening tool",
+    "label": "Opens on",
     "page": "spaces-defaults",
     "section": "spaces",
     "key": "opening_tool",
@@ -434,29 +434,7 @@
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["chat", "journal", "planner", "library"]
-  },
-  {
-    "id": "spaces.agenda.tasks",
-    "label": "Show tasks",
-    "page": "spaces-agenda",
-    "section": "spaces",
-    "key": "agenda_tasks",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "spaces.agenda.roadmap",
-    "label": "Show roadmap",
-    "page": "spaces-agenda",
-    "section": "spaces",
-    "key": "agenda_roadmap",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
+    "enum": ["chat", "notes", "drawings", "library", "code"]
   },
   {
     "id": "files.startingFolder",
@@ -697,19 +675,6 @@
     "page": "appearance",
     "section": "collections",
     "key": "journal_tab_order",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "collections.tabs.planner",
-    "label": "Planner tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "planner_tab_order",
     "default": "[]",
     "owner": "account",
     "type": "string",

@@ -156,7 +156,7 @@ async function applyNoteArtifact(
   artifact: AiArtifact,
 ) {
   if (!canApplyNoteArtifact(editor, props, artifact)) {
-    throw new Error("The note selection changed. Ask Misty to regenerate this draft.");
+    throw new Error("The note selection changed. Ask your agent to regenerate this draft.");
   }
   const operations = artifact.operations as Record<string, unknown>;
   const replacement = operations.replacement;

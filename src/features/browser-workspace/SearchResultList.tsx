@@ -4,6 +4,7 @@ import {
   Bookmark,
   Bot,
   ChevronRight,
+  FileCode2,
   Download,
   File,
   Folder,
@@ -13,6 +14,7 @@ import {
   Library,
   MessageSquare,
   NotebookPen,
+  PenTool,
   Puzzle,
   RotateCcw,
   Search,
@@ -21,12 +23,16 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BrandIcon, brandIconAsset, cn } from "@/shared/ui";
+import { AgentAvatar } from "@/features/agents/AgentAvatar";
+import type { AgentProfile } from "@/shared/schemas";
 import mistyIcon from "@/assets/branding/misty-icon.png?inline";
 import { omniboxMatchIcon, type OmniboxMatch } from "@/features/browser/omnibox";
 import type { Bang, SearchScope } from "./bangs/types";
 import type { ScopedSearchKind, ScopedSearchResult } from "./scopedSearchSources";
 
 export type SearchListItem =
+  /** Sends the text to an agent: a new chat with it. */
+  | { type: "ask"; agent: AgentProfile; prompt: string }
   /** `query` carries text typed before a trailing `!name`. */
   | { type: "bang"; bang: Bang; query?: string }
   | { type: "match"; match: OmniboxMatch }
@@ -38,6 +44,8 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   space: LayoutGrid,
   "space-item": Library,
   note: NotebookPen,
+  drawing: PenTool,
+  code: FileCode2,
   message: MessageSquare,
   agent: Bot,
   conversation: History,
@@ -55,8 +63,11 @@ const scopeIcons: Record<Exclude<SearchScope, "default">, LucideIcon> = {
   files: Folder,
   spaces: LayoutGrid,
   notes: NotebookPen,
+  drawings: PenTool,
+  code: FileCode2,
   chat: MessageSquare,
   agents: Bot,
+  ask: Bot,
   bookmarks: Bookmark,
   history: History,
   tabs: AppWindow,
@@ -94,13 +105,13 @@ const groupLabels: Record<Bang["group"], string> = {
 
 function itemKey(item: SearchListItem): string {
   if (item.type === "bang") return `bang:${item.bang.trigger}`;
+  if (item.type === "ask") return `ask:${item.agent.id}`;
   return item.type === "match" ? item.match.id : item.result.id;
 }
 
 function formatDetail(item: SearchListItem): string {
-  if (item.type === "bang") {
-    return item.bang.kind === "scope" && !item.query ? item.bang.description : "";
-  }
+  if (item.type === "bang") return item.query ? item.bang.label : item.bang.description;
+  if (item.type === "ask") return item.agent.name;
   if (item.type === "result") {
     return item.result.subtitle;
   }
@@ -124,8 +135,17 @@ function formatDetail(item: SearchListItem): string {
 function ItemIcon({ item }: { item: SearchListItem }) {
   const [imgError, setImgError] = useState(false);
 
+  if (item.type === "ask")
+    return (
+      <span className="inline-flex size-4 shrink-0">
+        <AgentAvatar agent={item.agent} />
+      </span>
+    );
+
   if (item.type === "bang") {
     const { bang } = item;
+    // A shortcut on its own is shown as text, without an icon.
+    if (!item.query) return null;
     const Icon = bang.kind === "scope" ? scopeIcons[bang.scope] : Search;
     return (
       <div className="relative flex size-4 shrink-0 items-center justify-center">
@@ -209,16 +229,18 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   );
 }
 
+/** Rows name only the target: the address, the search, the agent's message or the place. */
 function Row(props: { item: SearchListItem }) {
   const { item } = props;
   const title =
     item.type === "bang"
-      ? item.query
-        ? `Search ${item.bang.label} for “${item.query}”`
-        : item.bang.label
-      : item.type === "match"
-        ? item.match.title
-        : item.result.title;
+      ? item.query || `!${item.bang.trigger}`
+      : item.type === "ask"
+        ? item.prompt || `Ask ${item.agent.name}`
+        : item.type === "match"
+          ? item.match.title
+          : item.result.title;
+  const bangOnly = item.type === "bang" && !item.query;
 
   const detail = formatDetail(item);
 
@@ -226,16 +248,15 @@ function Row(props: { item: SearchListItem }) {
     <>
       <ItemIcon item={item} />
       <div className="flex min-w-0 flex-1 items-center text-sm">
-        <span className="truncate font-normal text-zinc-100">{title}</span>
+        <span className={cn("truncate font-normal text-zinc-100", bangOnly && "font-mono")}>
+          {title}
+        </span>
         {detail && (
           <span className="ml-3 min-w-0 truncate text-xs font-normal text-zinc-500 sm:text-sm">
             {detail}
           </span>
         )}
       </div>
-      {item.type === "bang" && !item.query && (
-        <span className="shrink-0 text-xs text-zinc-500 sm:text-sm">!{item.bang.trigger}</span>
-      )}
     </>
   );
 }

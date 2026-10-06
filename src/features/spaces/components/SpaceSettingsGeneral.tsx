@@ -137,7 +137,8 @@ export function SpaceSettingsGeneral({
                 <div className="min-w-0 flex-1">
                   <p className="m-0 text-sm font-medium">Leave this Space</p>
                   <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
-                    You will immediately lose access to chat, Planner, and protected Library items.
+                    You lose access to its chat, notes, drawings, files and code at once, and your
+                    agents leave with you.
                   </p>
                 </div>
                 <Button

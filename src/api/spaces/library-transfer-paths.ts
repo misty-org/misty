@@ -1,7 +1,3 @@
-export function libraryReauthenticationHeaders(token: string): Record<string, string> {
-  return token ? { "X-Misty-Library-Reauthentication": token } : {};
-}
-
 export function libraryPreviewPath(
   spaceId: string,
   itemId: string,

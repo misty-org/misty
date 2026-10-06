@@ -134,32 +134,32 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                         <IconButton label="Open in Agents" onClick={openInAgents}>
                           <ArrowUpRight />
                         </IconButton>
-                        <IconButton label="Close Misty" onClick={close}>
+                        <IconButton label="Close agent panel" onClick={close}>
                           <X />
                         </IconButton>
                       </>
                     }
                   />
-                    <AgentWorkspaceConversation
-                      key={`${accountId}:${profile?.id}:${chatRevision}`}
-                      agent={profile}
-                      spaceId=""
-                      accountId={accountId}
-                      showControlBar
-                      emptyContent={
-                        profile ? (
-                          <div className="agent-studio-welcome">
-                            <h1>What can I do for you?</h1>
-                          </div>
-                        ) : undefined
-                      }
-                      initialDraft={
-                        !activeConversationId && draftSeed.agentId === profile?.id
-                          ? draftSeed.text
-                          : ""
-                      }
-                      onCreate={openInAgents}
-                    />
+                  <AgentWorkspaceConversation
+                    key={`${accountId}:${profile?.id}:${chatRevision}`}
+                    agent={profile}
+                    spaceId=""
+                    accountId={accountId}
+                    showControlBar
+                    emptyContent={
+                      profile ? (
+                        <div className="agent-studio-welcome">
+                          <h1>What can I do for you?</h1>
+                        </div>
+                      ) : undefined
+                    }
+                    initialDraft={
+                      !activeConversationId && draftSeed.agentId === profile?.id
+                        ? draftSeed.text
+                        : ""
+                    }
+                    onCreate={openInAgents}
+                  />
                 </div>
               </div>
             </div>

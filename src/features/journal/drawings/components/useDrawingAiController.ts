@@ -64,7 +64,9 @@ export function useDrawingAiController(
       apply: (patch) => {
         const resolved = resolvePatch(patch);
         if (!resolved)
-          throw new Error("The drawing selection changed. Ask Misty to regenerate this layout.");
+          throw new Error(
+            "The drawing selection changed. Ask your agent to regenerate this layout.",
+          );
         const next = resolved.elements.map((element) => {
           const update = resolved.updates.get(element.id);
           return update

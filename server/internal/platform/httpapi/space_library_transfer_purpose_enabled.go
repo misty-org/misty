@@ -118,8 +118,6 @@ func (s *SpaceLibraryService) ReadExplicitAgentAttachment(ctx context.Context, u
 	switch kind {
 	case "library_item":
 		download, err = s.database.ExplicitAgentLibraryItemDownload(ctx, userID, spaceID, resourceID)
-	case "task_attachment":
-		download, err = s.database.ExplicitAgentTaskAttachmentDownload(ctx, userID, spaceID, resourceID)
 	case "chat_attachment":
 		download, err = s.database.MessageAttachmentDownload(ctx, userID, spaceID, resourceID)
 	default:
@@ -210,18 +208,6 @@ func (s *SpaceLibraryService) Items() http.HandlerFunc {
 		spaceID := chi.URLParam(r, "spaceID")
 		if r.Method == http.MethodGet {
 			queryValues := r.URL.Query()
-			sensitiveScope := ""
-			if queryValues.Get("visibility") == "hidden" {
-				sensitiveScope = "hidden"
-			} else if queryValues.Get("collection") == "recently-deleted" {
-				sensitiveScope = "recently_deleted"
-			}
-			if sensitiveScope != "" {
-				if err := s.validateLibraryReauthentication(r, userID, spaceID, sensitiveScope); err != nil {
-					writeLibraryError(w, err)
-					return
-				}
-			}
 			limit, _ := strconv.Atoi(queryValues.Get("limit"))
 			if limit < 1 || limit > 200 {
 				limit = 100

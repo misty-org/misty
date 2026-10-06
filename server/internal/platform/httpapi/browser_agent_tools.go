@@ -13,16 +13,6 @@ import (
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
 )
 
-func (s *SpacesService) executeBrowserAgentTool(
-	ctx context.Context,
-	run *db.SpaceRun,
-	tool serveragent.ToolRequest,
-) (json.RawMessage, error) {
-	return s.executeBrowserAgentToolInvocation(ctx, agenttools.Invocation{
-		UserID: run.RequestingMemberID, SpaceID: run.SpaceID, AgentID: run.AgentID, RunID: run.ID,
-	}, tool)
-}
-
 func (s *SpacesService) executeBrowserAgentToolInvocation(
 	ctx context.Context,
 	invocation agenttools.Invocation,

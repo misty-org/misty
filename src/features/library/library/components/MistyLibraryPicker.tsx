@@ -318,7 +318,7 @@ function MistyLibraryPickerThumbnail({
     let current = true;
     let objectURL = "";
     void spacesApi
-      .libraryPreview(spaceId, item.id, "", item.version)
+      .libraryPreview(spaceId, item.id, item.version)
       .then((blob) => {
         if (!current) return;
         objectURL = URL.createObjectURL(blob);

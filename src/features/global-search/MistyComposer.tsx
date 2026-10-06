@@ -14,7 +14,6 @@ import {
 import { Camera, ImagePlus, Plus, Search, X } from "lucide-react";
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef, useState } from "react";
-import { SearchAskToggle } from "./GlobalMistySupport";
 import { validateMistyImage } from "./mistyImageValues";
 import type { GlobalAiMode, MistyImageAttachment } from "./types";
 
@@ -23,7 +22,6 @@ export function MistyComposer(props: {
   modelId?: string;
   onChange: (value: string) => void;
   mode: GlobalAiMode;
-  onModeChange?: (mode: GlobalAiMode) => void;
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   attachments: MistyImageAttachment[];
   maxAttachments: number;
@@ -81,9 +79,7 @@ export function MistyComposer(props: {
   );
   const showEstimate = props.mode !== "search" && !props.busy && !props.hideUsageEstimate;
   // An empty footer would still add its bottom padding under the input row.
-  const hasFooter = Boolean(
-    props.onModeChange || props.mode === "search" || props.modelControl || showEstimate,
-  );
+  const hasFooter = Boolean(props.mode === "search" || props.modelControl || showEstimate);
   const send = (
     <MessageComposerSend
       label={props.mode === "search" ? "Search" : "Send to Misty"}
@@ -148,9 +144,7 @@ export function MistyComposer(props: {
         "aria-label": props.mode === "search" ? "Search Misty" : "Message Misty",
         placeholder:
           props.placeholder ??
-          (props.mode === "search"
-            ? "Search files, notes, and connected apps…"
-            : "Ask Misty anything…"),
+          (props.mode === "search" ? "Search files, notes, and connected apps…" : "Ask anything…"),
       }}
       context={
         props.attachments.length ? (
@@ -257,9 +251,7 @@ export function MistyComposer(props: {
       footer={
         hasFooter && (
           <div className="flex min-w-0 flex-col gap-2">
-            {props.onModeChange ? (
-              <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
-            ) : props.mode === "search" ? (
+            {props.mode === "search" ? (
               <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
                 <Search className="size-3.5" />
                 Search

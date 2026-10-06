@@ -5,12 +5,11 @@ import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 export async function copyLibraryItemsToClipboard(
   spaceId: string,
   items: SpaceLibraryItem[],
-  reauthenticationToken = "",
 ): Promise<void> {
   if (items.length === 0) return;
   const files: Array<{ name: string; blob: Blob }> = [];
   for (const item of items) {
-    const blob = await spacesApi.libraryContent(spaceId, item.id, reauthenticationToken);
+    const blob = await spacesApi.libraryContent(spaceId, item.id);
     files.push({ name: clipboardFileName(item), blob });
   }
   await copyBlobFilesToClipboard(files);

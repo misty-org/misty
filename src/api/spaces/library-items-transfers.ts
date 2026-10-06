@@ -1,7 +1,7 @@
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 
 import type { LibraryTransfers } from "./library-items-core";
-import { libraryPreviewPath, libraryReauthenticationHeaders } from "./library-transfer-paths";
+import { libraryPreviewPath } from "./library-transfer-paths";
 import type { LibraryUploadOptions } from "./library-upload";
 
 export function createLibraryTransferApi(transfers: LibraryTransfers) {
@@ -33,34 +33,18 @@ export function createLibraryTransferApi(transfers: LibraryTransfers) {
       filename: string,
       options?: LibraryUploadOptions,
     ) => replaceLibraryItemContent(spaceId, item, blob, filename, options),
-    libraryContent: (spaceId: string, itemId: string, reauthenticationToken = "") =>
+    libraryContent: (spaceId: string, itemId: string) =>
       fetchProtectedBlob(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download`,
-        { headers: libraryReauthenticationHeaders(reauthenticationToken) },
       ),
-    libraryOriginalContent: (spaceId: string, itemId: string, reauthenticationToken = "") =>
+    libraryOriginalContent: (spaceId: string, itemId: string) =>
       fetchProtectedBlob(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/download?version=original`,
-        { headers: libraryReauthenticationHeaders(reauthenticationToken) },
       ),
-    libraryPreview: (
-      spaceId: string,
-      itemId: string,
-      reauthenticationToken = "",
-      cacheVersion?: string | number,
-    ) =>
-      fetchProtectedBlob(libraryPreviewPath(spaceId, itemId, false, cacheVersion), {
-        headers: libraryReauthenticationHeaders(reauthenticationToken),
-      }),
-    libraryOriginalPreview: (
-      spaceId: string,
-      itemId: string,
-      reauthenticationToken = "",
-      cacheVersion?: string | number,
-    ) =>
-      fetchProtectedBlob(libraryPreviewPath(spaceId, itemId, true, cacheVersion), {
-        headers: libraryReauthenticationHeaders(reauthenticationToken),
-      }),
+    libraryPreview: (spaceId: string, itemId: string, cacheVersion?: string | number) =>
+      fetchProtectedBlob(libraryPreviewPath(spaceId, itemId, false, cacheVersion)),
+    libraryOriginalPreview: (spaceId: string, itemId: string, cacheVersion?: string | number) =>
+      fetchProtectedBlob(libraryPreviewPath(spaceId, itemId, true, cacheVersion)),
     downloadAttachment: (spaceId: string, attachmentId: string, filename: string) =>
       downloadProtectedFile(
         `/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/download`,

@@ -96,7 +96,7 @@ describe("MistyPanel", () => {
     const chat = container.querySelector(".agents-chat");
     expect(chat).toBeTruthy();
 
-    expect(screen.getByRole("button", { name: /Close Misty/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Close agent panel/i })).toBeDefined();
     expect(screen.getByRole("button", { name: /Open in Agents/i })).toBeDefined();
     expect(screen.getByPlaceholderText(/Message Misty Assistant/i)).toBeDefined();
   });
@@ -130,7 +130,7 @@ describe("MistyPanel", () => {
       </MemoryRouter>,
     );
 
-    const closeBtn = screen.getByRole("button", { name: /Close Misty/i });
+    const closeBtn = screen.getByRole("button", { name: /Close agent panel/i });
     fireEvent.click(closeBtn);
     expect(useMistyPanelStore.getState().open).toBe(false);
   });

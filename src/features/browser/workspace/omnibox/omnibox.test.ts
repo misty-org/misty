@@ -17,6 +17,7 @@ function deps(overrides: Partial<OmniboxDeps> = {}): OmniboxDeps {
     recentVisits: async () => [],
     bookmarks: () => [],
     mistyContent: () => [],
+    places: () => [],
     clipboardUrl: async () => null,
     openTabs: () => [],
     ...overrides,
@@ -262,5 +263,39 @@ describe("Misty content and copied links", () => {
   it("ignores clipboard text that is not a web address", async () => {
     const matches = await suggest("", deps({ clipboardUrl: async () => "just some words" }));
     expect(matches.some((match) => match.title === "Link you copied")).toBe(false);
+  });
+});
+
+describe("places", () => {
+  const places = deps({
+    places: () => [
+      { id: "s1", title: "Launch team", detail: "Space", route: "/spaces/s1/chat" },
+      { id: "s1:notes", title: "Launch team · Notes", detail: "Space", route: "/spaces/s1/notes" },
+      { id: "agent:a1", title: "Researcher", detail: "Agent", route: "/agents?agent=a1" },
+    ],
+  });
+
+  it("jumps to a place typed in full, ahead of searching for it", async () => {
+    const [first] = await suggest("launch team", places);
+    expect(first.target).toEqual({ type: "open-in-app", url: "/spaces/s1/chat" });
+    expect(first.allowedToBeDefault).toBe(true);
+  });
+
+  it("lists sections and agents by a word of their name, below what was typed", async () => {
+    const matches = await suggest("notes", places);
+    const section = matches.find((match) => match.title === "Launch team · Notes");
+    expect(section?.allowedToBeDefault).toBe(false);
+    expect(matches[0].kind).toBe("search");
+    expect((await suggest("resea", places)).some((match) => match.title === "Researcher")).toBe(
+      true,
+    );
+  });
+
+  it("shows no places in private tabs", async () => {
+    expect(
+      (await suggest("launch team", places, { private: true })).some((match) =>
+        match.id.startsWith("place:"),
+      ),
+    ).toBe(false);
   });
 });

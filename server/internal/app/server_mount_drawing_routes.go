@@ -210,9 +210,7 @@ func TestingAllowedCORSOrigins() []string {
 //
 // A header missing here fails at the preflight with a 200 that carries no
 // Access-Control-Allow-Origin, which surfaces in the browser as an opaque
-// "load failed" rather than anything pointing at CORS. Omitting
-// X-Misty-Library-Reauthentication is exactly how Recently Deleted and Hidden
-// became unreachable: only those collections send it.
+// "load failed" rather than anything pointing at CORS.
 var allowedCORSRequestHeaders = []string{
 	"Accept",
 	"Authorization",
@@ -229,7 +227,6 @@ var allowedCORSRequestHeaders = []string{
 	"X-Misty-Device-Signature",
 	"X-Misty-Attachment-Upload-Token",
 	"X-Misty-Library-Upload-Token",
-	"X-Misty-Library-Reauthentication",
 }
 
 func productionEnvironment() bool {

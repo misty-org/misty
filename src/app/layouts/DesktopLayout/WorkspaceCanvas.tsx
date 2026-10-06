@@ -43,8 +43,6 @@ export function WorkspaceCanvas(props: {
   stripAccount?: ReactNode;
   /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
   browserChrome?: {
-    spaces: ReactNode;
-    agents: ReactNode;
     sync: ReactNode;
     profile: ReactNode;
     accountItems: ReactNode;
@@ -390,7 +388,6 @@ export function WorkspaceCanvas(props: {
                   onResizeSplit={updateSplitRatio}
                   account={props.stripAccount}
                   footEnd={props.stripFootEnd}
-                  cluster={props.browserChrome?.spaces}
                 />
               </SidebarDrawer>
             ) : (
@@ -421,14 +418,6 @@ export function WorkspaceCanvas(props: {
                 onResizeSplit={updateSplitRatio}
                 account={props.stripAccount}
                 footEnd={props.stripFootEnd}
-                cluster={
-                  props.browserChrome ? (
-<>
-                      {props.browserChrome.spaces}
-                      {props.browserChrome.agents}
-                    </>
-                  ) : undefined
-                }
               />
             ))}
           <WorkspaceTabPanels

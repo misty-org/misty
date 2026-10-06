@@ -191,7 +191,7 @@ export function SpaceSocial({
         const operations = messageDraft(artifact);
         if (!operations) {
           throw new Error(
-            "The conversation or composer changed. Ask Misty to regenerate this draft.",
+            "The conversation or composer changed. Ask your agent to regenerate this draft.",
           );
         }
         setDraftText(operations.text!.trim());

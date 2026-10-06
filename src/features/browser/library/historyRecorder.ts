@@ -28,19 +28,6 @@ function historyTarget(tabId: string): { profileId?: string } | null {
   if (state.agentOwned || state.private || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
-const typedNavigations = new Map<string, number>();
-
-/** Marks the tab's next visit as typed by the person, which ranks it higher in the address bar. */
-export function markBrowserNavigationTyped(tabId: string): void {
-  typedNavigations.set(tabId, Date.now());
-}
-
-/** Removes a page from the tab's profile history. Private and agent tabs have none. */
-export function forgetBrowserPage(tabId: string, url: string): Promise<void> {
-  const target = historyTarget(tabId);
-  return target ? browserLibrary.forgetPage({ ...target, url }) : Promise.resolve();
-}
-
 export function recordBrowserVisitTitle(tabId: string, url: string, title: string): void {
   if (!/^https?:\/\//i.test(url) || !title.trim()) return;
   const target = historyTarget(tabId);

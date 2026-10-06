@@ -40,10 +40,10 @@ export function useLibraryItemContent(options: {
     const request = itemIsImage
       ? editing
         ? spacesApi
-            .libraryOriginalPreview(spaceId, item.id, "", item.version)
+            .libraryOriginalPreview(spaceId, item.id, item.version)
             .catch(() => spacesApi.libraryOriginalContent(spaceId, item.id))
         : spacesApi
-            .libraryPreview(spaceId, item.id, "", item.version)
+            .libraryPreview(spaceId, item.id, item.version)
             .catch(() => spacesApi.libraryContent(spaceId, item.id))
       : editing
         ? spacesApi.libraryOriginalContent(spaceId, item.id)

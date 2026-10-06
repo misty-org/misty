@@ -35,12 +35,6 @@ func (s *SpaceLibraryService) DuplicateItems() http.HandlerFunc {
 			writeLibraryError(w, err)
 			return
 		}
-		for _, itemID := range body.ItemIDs {
-			if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
-				writeLibraryError(w, err)
-				return
-			}
-		}
 		// Each copy obtains account admission through the storage adapter.
 		duplicated := make([]db.SpaceLibraryItem, 0, len(items))
 		for _, source := range items {

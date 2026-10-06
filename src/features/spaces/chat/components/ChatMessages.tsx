@@ -1,6 +1,5 @@
 import type { FormEvent, RefObject, UIEventHandler } from "react";
 import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto/entities";
-import type { SpaceActionSuggestionBatch } from "@/api/spaces/dto/actionSuggestionTypes";
 
 export type SpaceChatStarter = "mention" | "files" | "library";
 
@@ -9,9 +8,6 @@ export interface SpaceChatMessagesProps {
   error: string;
   loading: boolean;
   messages: SpaceMessage[];
-  /** Agent turns still in flight; drives the typing indicator. */
-  actionSuggestions?: SpaceActionSuggestionBatch[];
-  onActionSuggestionsChanged?: () => void;
   currentUserId?: string;
   isOwner: boolean;
   canWrite: boolean;

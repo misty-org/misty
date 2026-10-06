@@ -22,8 +22,8 @@ vi.mock("./SpaceSectionView", () => ({
     <input aria-label={`${section} draft`} defaultValue="kept draft" />
   ),
 }));
-vi.mock("./components/SpaceWorkspaceRail", () => ({
-  SpaceWorkspaceRail: () => <aside aria-label="Space navigation" />,
+vi.mock("./components/SpacePageHeader", () => ({
+  SpacePageHeader: () => <header aria-label="Space navigation" />,
 }));
 vi.mock("./GlobalCreateSpaceDialog", () => ({ GlobalCreateSpaceDialog: () => null }));
 const tab = { id: "space-tab", route: "/spaces/project/social" } as WorkspaceView;
@@ -49,7 +49,7 @@ it("keeps the page available without a pull tab, overlay, or Escape-to-close beh
   expect((draft as HTMLInputElement).value).toBe("unfinished");
   expect(screen.getByRole("textbox", { name: "social draft" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Space navigation|Close Space sheet/ })).toBeNull();
-  expect(container.querySelector('aside[aria-label="Space navigation"]')).not.toBeNull();
+  expect(container.querySelector('header[aria-label="Space navigation"]')).not.toBeNull();
   expect(container.querySelector("[inert]")).toBeNull();
 });
 it("asks signed-out users to sign in", () => {

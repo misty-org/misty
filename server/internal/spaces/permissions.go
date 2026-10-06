@@ -18,8 +18,6 @@ const (
 	PermissionStudioView         = "studio.view"
 	PermissionStudioManage       = "studio.manage"
 	PermissionAskRun             = "ask.run"
-	PermissionTasksView          = "tasks.view"
-	PermissionTasksManage        = "tasks.manage"
 	PermissionIntegrationsManage = "integrations.manage"
 	PermissionSpaceInvite        = "space.invite"
 	PermissionSpaceRename        = "space.rename"

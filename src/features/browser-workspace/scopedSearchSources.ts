@@ -1,7 +1,6 @@
 import type { AgentProfile } from "@/shared/schemas";
 import { searchApi } from "@/api/search/api";
 import type { GlobalAiConversation } from "@/features/global-search/types";
-import { kuraDownloadUrl, kuraOpen } from "@/native/kura";
 
 export type ScopedSearchKind =
   | "file"
@@ -9,6 +8,8 @@ export type ScopedSearchKind =
   | "space"
   | "space-item"
   | "note"
+  | "drawing"
+  | "code"
   | "message"
   | "agent"
   | "conversation"
@@ -38,30 +39,6 @@ export interface ScopedSearchResult {
 }
 
 export const resultLimit = 12;
-
-/** Files live in Kura, a separate file manager; `!files` hands the search to it. */
-export function kuraSearchResult(query: string, installed: boolean): ScopedSearchResult {
-  if (!installed)
-    return {
-      id: "kura:install",
-      kind: "action",
-      title: "Search your files with Kura",
-      subtitle: "Kura isn't installed. Get Kura, the free file manager",
-      target: { kind: "url", url: kuraDownloadUrl },
-    };
-  return {
-    id: `kura:search:${query}`,
-    kind: "action",
-    title: `Search for “${query}” in Kura`,
-    subtitle: "Opens Kura, the file manager",
-    target: {
-      kind: "run",
-      run: () => {
-        void kuraOpen({ action: "search", query }).catch(() => undefined);
-      },
-    },
-  };
-}
 
 export async function searchSpaces(
   query: string,

@@ -137,10 +137,3 @@ func (s *SpacesService) startAgentReplyMentions(ctx context.Context, request *db
 		}
 	}
 }
-
-func firstName(name, fallback string) string {
-	if fields := strings.Fields(name); len(fields) > 0 {
-		return fields[0]
-	}
-	return fallback
-}

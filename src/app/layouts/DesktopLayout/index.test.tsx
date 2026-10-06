@@ -35,8 +35,6 @@ vi.mock("./GlobalNavigator", () => ({
 vi.mock("./AccountIsland", () => ({ AccountIsland: () => null }));
 vi.mock("./WorkspaceStripDock", () => ({
   BrowserProfileButton: () => null,
-  AppLauncherButton: () => null,
-  AgentsMenuButton: () => null,
   StripDownloads: () => null,
 }));
 vi.mock("./WorkspaceCanvas", () => ({
@@ -67,9 +65,6 @@ vi.mock("./useDesktopBootstrap", () => ({
       navigate: vi.fn(),
       app: null,
       settingsLoad: vi.fn(),
-      activePaneId: "",
-      activePanePath: "",
-      activeWorkspacePaneId: "",
       lastAppRoute: "/browser",
       lastNonSettingsRouteRef: { current: "/browser" },
       routeId: location.pathname.slice(1),

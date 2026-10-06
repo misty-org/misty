@@ -1,2 +1,2 @@
 export type WorkspaceToolId =
-  "journal" | "planner" | "social" | "library" | "browser" | "extensions" | "scheduled" | "agents";
+  "journal" | "social" | "library" | "browser" | "extensions" | "scheduled" | "agents";

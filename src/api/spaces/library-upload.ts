@@ -241,7 +241,7 @@ export function directTransferErrorMessage(direct: boolean, status: number): str
   return "The direct R2 upload failed.";
 }
 
-export { libraryReauthenticationHeaders, libraryPreviewPath } from "./library-transfer-paths";
+export { libraryPreviewPath } from "./library-transfer-paths";
 export async function downloadProtectedFile(
   path: string,
   filename: string,

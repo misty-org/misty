@@ -53,8 +53,7 @@ export function groupProgress(items: AiProgressItem[]): ProgressGroup[] {
     if (item.type === "note") {
       const text = companionReply(item.text).text;
       if (text) groups.push({ type: "note", key: `note:${index}`, text });
-    }
-    else if (last?.type === "tools") last.tools.push(item);
+    } else if (last?.type === "tools") last.tools.push(item);
     else groups.push({ type: "tools", key: `tools:${item.id || index}`, tools: [item] });
   });
   return groups;
@@ -159,13 +158,10 @@ const uiSubjects: Record<string, string> = {
   integration: "apps",
   folder: "shared folder",
   "space.member": "members",
-  event: "calendar",
   "browser.tab": "tabs",
   bookmark: "bookmarks",
   note: "notes",
-  task: "tasks",
   drawing: "drawings",
-  roadmap: "roadmaps",
   message: "messages",
   thread: "threads",
   space: "Spaces",

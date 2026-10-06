@@ -23,6 +23,10 @@ export const relevance = {
   contentTitlePrefix: 900,
   content: 620,
   copiedLink: 850,
+  /** A place typed in full outranks searching for it; a partial name ranks below. */
+  placeExact: 1400,
+  placePrefix: 1100,
+  placeWord: 880,
 } as const;
 
 export type MatchQuality = "address-prefix" | "title-word-prefix" | "substring" | "none";

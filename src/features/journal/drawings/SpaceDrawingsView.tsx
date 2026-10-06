@@ -350,7 +350,9 @@ function DrawingWorkspace(props: {
       applyArtifact: async (artifact) => {
         const patch = applicablePatch(artifact);
         if (!patch || !aiController)
-          throw new Error("The drawing selection changed. Ask Misty to regenerate this layout.");
+          throw new Error(
+            "The drawing selection changed. Ask your agent to regenerate this layout.",
+          );
         aiController.apply(patch);
       },
     };

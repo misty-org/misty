@@ -17,12 +17,10 @@ import { TEXT_PREVIEW_MAX_BYTES, textPreviewKind } from "./textPreviewKind";
 export function LibraryItemThumbnail({
   spaceId,
   item,
-  reauthenticationToken = "",
   api = spacesApi,
 }: {
   spaceId: string;
   item: SpaceLibraryItem;
-  reauthenticationToken?: string;
   api?: Pick<typeof spacesApi, "libraryPreview" | "libraryContent">;
 }) {
   const [preview, setPreview] = useState<{ url: string; kind: "image" | "pdf" } | null>(null);
@@ -37,10 +35,10 @@ export function LibraryItemThumbnail({
     (libraryItemThumbnailEligible(mimeType, item.file.original_filename) ||
       Number(item.file.intrinsic_metadata.width ?? 0) > 0);
   const loadText = useCallback(
-    () => api.libraryContent(spaceId, item.id, reauthenticationToken),
+    () => api.libraryContent(spaceId, item.id),
     // A new version of the file reloads its preview.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [api, spaceId, item.id, item.version, reauthenticationToken],
+    [api, spaceId, item.id, item.version],
   );
 
   useEffect(() => {
@@ -51,10 +49,10 @@ export function LibraryItemThumbnail({
     let current = true;
     let objectUrl = "";
     void api
-      .libraryPreview(spaceId, item.id, reauthenticationToken, item.version)
+      .libraryPreview(spaceId, item.id, item.version)
       .catch(() =>
         mimeType.startsWith("image/") || mimeType === "application/pdf"
-          ? api.libraryContent(spaceId, item.id, reauthenticationToken)
+          ? api.libraryContent(spaceId, item.id)
           : Promise.reject(new Error("The file reader could not load this item")),
       )
       .then((blob) => {
@@ -74,7 +72,7 @@ export function LibraryItemThumbnail({
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [api, item.id, item.version, mimeType, reauthenticationToken, spaceId, visual]);
+  }, [api, item.id, item.version, mimeType, spaceId, visual]);
 
   if (textKind)
     return <LibraryTextPreview kind={textKind} name={item.display_name} load={loadText} />;

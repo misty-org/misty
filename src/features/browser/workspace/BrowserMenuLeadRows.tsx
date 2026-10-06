@@ -30,7 +30,7 @@ export function BrowserMenuLeadRows(props: {
       />
       <MenuItem
         icon={<MistyPanelSprite size={16} />}
-        label={open ? "Close Misty" : "Ask Misty"}
+        label={open ? "Close agent panel" : "Ask an agent"}
         onSelect={() => useMistyPanelStore.getState().setOpen(!open, paneId ?? null)}
       />
       <ExtensionsMenuRows

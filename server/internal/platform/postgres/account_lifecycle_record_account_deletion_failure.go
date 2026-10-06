@@ -177,9 +177,6 @@ func (db *Database) CompleteAccountDeletion(
 		if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id=$1`, userID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM library_lock_credentials WHERE user_id=$1`, userID); err != nil {
-			return err
-		}
 		if err := purgeAccountAgentsTx(ctx, tx, userID); err != nil {
 			return err
 		}

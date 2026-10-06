@@ -54,9 +54,7 @@ func corsTestServer(t *testing.T) *Server {
 //
 // A missing entry fails in a uniquely unhelpful way: the preflight returns 200
 // with no Access-Control-Allow-Origin, so the browser reports an opaque "load
-// failed" that points at the origin rather than the header. Omitting
-// X-Misty-Library-Reauthentication made Recently Deleted and Hidden completely
-// unreachable, because only those collections send it.
+// failed" that points at the origin rather than the header.
 func TestPreflightAllowsEveryClientHeader(t *testing.T) {
 	server := corsTestServer(t)
 
@@ -73,7 +71,6 @@ func TestPreflightAllowsEveryClientHeader(t *testing.T) {
 		"X-Misty-Device-Signature",
 		"X-Misty-Attachment-Upload-Token",
 		"X-Misty-Library-Upload-Token",
-		"X-Misty-Library-Reauthentication",
 	}
 
 	for _, header := range clientHeaders {

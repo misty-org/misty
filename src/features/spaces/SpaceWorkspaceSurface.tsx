@@ -1,28 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import type { WorkspaceView } from "@/features/workspace/core";
-import { Menu } from "lucide-react";
 import { SpaceOverviewProvider } from "./useSpaceOverview";
-import {
-  Button,
-  IconButton,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
-  CollectionSkeleton,
-  SkeletonList,
-} from "@/shared/ui";
+import { Button, CollectionSkeleton, Skeleton } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
 import { preferredDefaultSpace } from "./defaultSpace";
 import { defaultSpaceRoute } from "./store/useSpacesTabsStore";
 import { useSpacesStore } from "./store/useSpacesStore";
 import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
-import { SpaceWorkspaceRail } from "./components/SpaceWorkspaceRail";
+import { SpacePageHeader } from "./components/SpacePageHeader";
 import { SpaceInvitationsNotice } from "./spacesShell/SpaceInvitationsNotice";
 /** Each Space pane owns its navigation and content. */
 export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
@@ -40,16 +29,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const respondInvite = useSpacesStore((state) => state.respondInvite);
   const space = spaces.find((item) => item.id === route.activeSpaceId);
   const fallback = preferredDefaultSpace(spaces);
-  const hostRef = useRef<HTMLElement>(null);
-  const [narrow, setNarrow] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => setNarrow(entries[0].contentRect.width < 760));
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [ready, space?.id, user?.id]);
   const [inviteError, setInviteError] = useState("");
   useEffect(() => {
     if (!route.activeSpaceId && ready && fallback) {
@@ -89,12 +68,12 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
     );
   if (!ready)
     return (
-      <div className="flex h-full min-h-0 overflow-hidden bg-charcoal-workspace">
-        {!narrow && (
-          <div className="h-full w-56 shrink-0 border-r border-charcoal-border bg-charcoal-sidebar p-3">
-            <SkeletonList label="Space navigation" rows={7} leading="icon" lines={1} />
-          </div>
-        )}
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-workspace">
+        <div className="flex h-11 shrink-0 items-center gap-3 border-b border-charcoal-border px-3">
+          <Skeleton className="size-6 rounded-md" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-6 w-72" />
+        </div>
         <div className="flex min-w-0 flex-1 flex-col p-6">
           <CollectionSkeleton label="Spaces" view="grid" />
         </div>
@@ -131,40 +110,12 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   return (
     <SpaceOverviewProvider accountId={user.id} space={space}>
       <section
-        ref={hostRef}
         className="relative flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace"
         data-space-workspace={route.activeSpaceId}
         aria-label={`${space?.name ?? "Space"} workspace`}
       >
-        {!narrow && (
-          <div className="h-full shrink-0">
-            <SpaceWorkspaceRail activeSpaceId={route.activeSpaceId} section={route.section} />
-          </div>
-        )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {narrow && (
-            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-charcoal-border px-2">
-              <Sheet open={navOpen} onOpenChange={setNavOpen}>
-                <SheetTrigger asChild>
-                  <IconButton label="Open Space navigation">
-                    <Menu />
-                  </IconButton>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[min(300px,90vw)] p-0 pt-10">
-                  <SheetTitle className="sr-only">Space navigation</SheetTitle>
-                  <SheetDescription className="sr-only">
-                    Browse this Space and your recent items.
-                  </SheetDescription>
-                  <SpaceWorkspaceRail
-                    activeSpaceId={space.id}
-                    section={route.section}
-                    onNavigated={() => setNavOpen(false)}
-                  />
-                </SheetContent>
-              </Sheet>
-              <span className="truncate text-sm">{space.name}</span>
-            </div>
-          )}
+          <SpacePageHeader space={space} section={route.section} />
           <div className="min-h-0 flex-1 overflow-hidden">
             <SpaceSectionView
               spaceId={route.activeSpaceId}

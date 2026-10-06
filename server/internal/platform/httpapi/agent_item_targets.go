@@ -64,7 +64,7 @@ func (s *SpacesService) renameToolRegistration() agenttools.Registration {
 	return agenttools.Registration{
 		Descriptor: agenttools.Descriptor{
 			Name: "item.rename", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
-			Description: "Rename a drawing or a thread. Threads also need their Space. Notes, tasks, roadmaps and albums rename through their own update tools.",
+			Description: "Rename a drawing or a thread. Threads also need their Space. Notes rename through their own update tool.",
 			InputSchema: agentToolSchema(map[string]any{
 				"kind":  map[string]any{"type": "string", "enum": []string{"drawing", "thread"}},
 				"id":    map[string]any{"type": "string", "minLength": 1, "maxLength": 200},

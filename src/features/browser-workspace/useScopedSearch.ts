@@ -5,9 +5,9 @@ import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useBrowserDownloadsStore } from "@/features/browser";
 import { useWorkspaceStore } from "@/features/workspace";
-import { kuraInstalled } from "@/native/kura";
 import type { SearchScope } from "./bangs/types";
-import { kuraSearchResult, searchAgents, type ScopedSearchResult } from "./scopedSearchSources";
+import { searchAgents, type ScopedSearchResult } from "./scopedSearchSources";
+import { searchSpaceCode, searchSpaceDrawings, searchSpaceFiles } from "./scopedSources/spaceItems";
 import {
   searchBookmarkLibrary,
   searchBrowserHistory,
@@ -31,10 +31,13 @@ type Source = (
 const debounceMs = 180;
 const none: never[] = [];
 
-/** Scopes that answer from one function. Files (handed to Kura) and agents have their own paths below. */
+/** Scopes that answer from one function. Agents have their own path below; Ask answers in the box. */
 const sources: Partial<Record<SearchScope, Source>> = {
   spaces: searchEverythingInSpaces,
   notes: searchSpaceNotes,
+  drawings: searchSpaceDrawings,
+  code: searchSpaceCode,
+  files: searchSpaceFiles,
   chat: searchSpaceChat,
   bookmarks: searchBookmarkLibrary,
   history: searchBrowserHistory,
@@ -44,12 +47,11 @@ const sources: Partial<Record<SearchScope, Source>> = {
   extensions: searchExtensions,
 };
 
-const spaceScopes = new Set<SearchScope>(["spaces", "notes", "chat"]);
+const spaceScopes = new Set<SearchScope>(["spaces", "notes", "drawings", "code", "files", "chat"]);
 
 /**
  * The default scope is answered by the address bar's providers, not here.
- * Files searches are handed to Kura, the separate file manager. Responses for
- * stale queries are dropped, and a
+ * Responses for stale queries are dropped, and a
  * refresh keeps the current rows until new ones arrive.
  */
 export function useScopedSearch(scope: SearchScope, query: string, open = true) {
@@ -116,30 +118,6 @@ export function useScopedSearch(scope: SearchScope, query: string, open = true) 
       window.clearTimeout(timer);
     };
   }, [open, scope, trimmed, spaces, downloads, bookmarks]);
-
-  useEffect(() => {
-    if (scope !== "files") return;
-    if (!trimmed) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    const timer = window.setTimeout(() => {
-      void kuraInstalled()
-        .catch(() => false)
-        .then((installed) => {
-          if (cancelled) return;
-          setResults([kuraSearchResult(trimmed, installed)]);
-          setLoading(false);
-        });
-    }, debounceMs);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [scope, trimmed]);
 
   return { results, loading };
 }

@@ -93,7 +93,7 @@ export function ViewIcon({
     : null;
   if (
     website &&
-    ["planner", "journal", "library"].includes(appId) &&
+    ["journal", "library"].includes(appId) &&
     Object.prototype.hasOwnProperty.call(websiteIntegrations, website)
   )
     return (
@@ -106,19 +106,9 @@ export function ViewIcon({
     tab &&
     (!website || website === "misty") &&
     section &&
-    [
-      "notes",
-      "drawings",
-      "tasks",
-      "agenda",
-      "roadmaps",
-      "explorer",
-      "recent",
-      "favorites",
-      "collections",
-      "albums",
-      "deleted",
-    ].includes(section)
+    ["notes", "drawings", "explorer", "recent", "favorites", "collections", "deleted"].includes(
+      section,
+    )
   )
     return (
       <span className="inline-flex shrink-0 [&_svg]:!size-4">

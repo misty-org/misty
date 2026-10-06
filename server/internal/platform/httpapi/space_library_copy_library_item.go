@@ -77,10 +77,6 @@ func (s *SpaceLibraryService) Item() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
-		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
-			writeLibraryError(w, err)
-			return
-		}
 		switch r.Method {
 		case http.MethodGet:
 			item, err := s.database.LibraryItem(r.Context(), userID, spaceID, itemID)
@@ -135,18 +131,6 @@ func (s *SpaceLibraryService) BulkItems() http.HandlerFunc {
 			return
 		}
 		spaceID := chi.URLParam(r, "spaceID")
-		for _, item := range body.Items {
-			if err := s.validateSensitiveLibraryItem(r, userID, spaceID, item.ID); err != nil {
-				writeLibraryError(w, err)
-				return
-			}
-		}
-		if body.Action == "restore" {
-			if err := s.validateLibraryReauthentication(r, userID, spaceID, "recently_deleted"); err != nil {
-				writeLibraryError(w, err)
-				return
-			}
-		}
 		operation := db.BulkLibraryItemOperation{Action: body.Action, Items: body.Items, AlbumID: body.AlbumID, Tags: body.Tags, LocationOverride: body.LocationOverride}
 		if body.DateOverride != "" {
 			parsed, err := time.Parse(time.RFC3339, body.DateOverride)
@@ -172,10 +156,6 @@ func (s *SpaceLibraryService) TrashItem() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
-		if err := s.validateSensitiveLibraryItem(r, userID, spaceID, itemID); err != nil {
-			writeLibraryError(w, err)
-			return
-		}
 		item, err := s.database.TrashLibraryItem(r.Context(), userID, spaceID, itemID)
 		if err != nil {
 			writeLibraryError(w, err)
@@ -192,10 +172,6 @@ func (s *SpaceLibraryService) RestoreItem() http.HandlerFunc {
 			return
 		}
 		spaceID, itemID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "itemID")
-		if err := s.validateLibraryReauthentication(r, userID, spaceID, "recently_deleted"); err != nil {
-			writeLibraryError(w, err)
-			return
-		}
 		item, err := s.database.RestoreLibraryItem(r.Context(), userID, spaceID, itemID)
 		if err != nil {
 			writeLibraryError(w, err)

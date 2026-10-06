@@ -31,7 +31,7 @@ type globalSpaceCall struct {
 
 func spaceDataTool(name string) bool {
 	switch strings.Split(name, ".")[0] {
-	case "context", "members", "messages", "library", "tasks", "calendar", "notes", "drawings", "roadmaps", "roadmap", "threads":
+	case "context", "members", "messages", "library", "notes", "drawings", "threads":
 		return true
 	}
 	return false

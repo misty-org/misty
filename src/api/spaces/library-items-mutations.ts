@@ -5,7 +5,6 @@ import type {
   SpaceLibraryItem,
 } from "@/api/spaces/dto/entities";
 
-import { libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { SpaceRequest } from "./types";
 
 export function createLibraryItemMutationApi(spaceRequest: SpaceRequest) {
@@ -15,13 +14,11 @@ export function createLibraryItemMutationApi(spaceRequest: SpaceRequest) {
       items: SpaceLibraryItem[],
       action: BulkLibraryItemAction,
       options: BulkLibraryItemOptions = {},
-      reauthenticationToken = "",
     ) =>
       spaceRequest<LibraryItemsResult>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/bulk`,
         {
           method: "POST",
-          headers: libraryReauthenticationHeaders(reauthenticationToken),
           body: JSON.stringify({
             action,
             album_id: options.albumId ?? "",
@@ -32,12 +29,11 @@ export function createLibraryItemMutationApi(spaceRequest: SpaceRequest) {
           }),
         },
       ),
-    duplicateLibraryItems: (spaceId: string, itemIds: string[], reauthenticationToken = "") =>
+    duplicateLibraryItems: (spaceId: string, itemIds: string[]) =>
       spaceRequest<LibraryItemsResult>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/duplicate`,
         {
           method: "POST",
-          headers: libraryReauthenticationHeaders(reauthenticationToken),
           body: JSON.stringify({ item_ids: itemIds }),
         },
       ),
@@ -47,13 +43,11 @@ export function createLibraryItemMutationApi(spaceRequest: SpaceRequest) {
       patch: Partial<
         Pick<SpaceLibraryItem, "display_name" | "caption" | "tags" | "favorite" | "hidden">
       >,
-      reauthenticationToken = "",
     ) =>
       spaceRequest<SpaceLibraryItem>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(item.id)}`,
         {
           method: "PATCH",
-          headers: libraryReauthenticationHeaders(reauthenticationToken),
           body: JSON.stringify({
             version: item.version,
             display_name: patch.display_name ?? item.display_name,
@@ -64,15 +58,15 @@ export function createLibraryItemMutationApi(spaceRequest: SpaceRequest) {
           }),
         },
       ),
-    trashLibraryItem: (spaceId: string, itemId: string, reauthenticationToken = "") =>
+    trashLibraryItem: (spaceId: string, itemId: string) =>
       spaceRequest<SpaceLibraryItem>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/trash`,
-        { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) },
+        { method: "POST" },
       ),
-    restoreLibraryItem: (spaceId: string, itemId: string, reauthenticationToken = "") =>
+    restoreLibraryItem: (spaceId: string, itemId: string) =>
       spaceRequest<SpaceLibraryItem>(
         `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/restore`,
-        { method: "POST", headers: libraryReauthenticationHeaders(reauthenticationToken) },
+        { method: "POST" },
       ),
     promoteAttachment: (spaceId: string, attachmentId: string) =>
       spaceRequest<SpaceLibraryItem>(
