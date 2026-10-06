@@ -1,3 +1,4 @@
+import type { CollaborationEvent } from "@/features/agents/agentCollaboration";
 import type { DisplayCapture } from "@/features/agents";
 import type { AppRequest } from "@/features/agents";
 
@@ -191,6 +192,8 @@ export interface AiInvocationRequest {
   skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
+  /** Pins a new conversation's Thinking model with its first message. */
+  modelOverride?: string;
   displayCaptures?: DisplayCapture[];
   agentId?: string;
   taskId?: string;
@@ -210,6 +213,8 @@ export interface AiInvocationRequest {
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   requestedArtifactKind?: AiArtifactKind;
   conversationId?: string;
+  /** Plan researches and proposes; Act does the work. Omitted uses the conversation's mode. */
+  collaborationMode?: "act" | "plan";
   idempotencyKey: string;
   timezone?: string;
 }
@@ -255,6 +260,7 @@ export type AiInvocationState =
   | "canceled";
 export type AiInvocationEvent =
   | { id: string; type: "user.steering"; text: string }
+  | ({ id: string } & CollaborationEvent)
   | {
       id: string;
       type: "steering.received" | "steering.closed";

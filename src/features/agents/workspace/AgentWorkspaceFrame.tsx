@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
-import { Activity, LayoutGrid, Maximize2, Plug, SquarePen, Workflow, X } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { Activity, LayoutGrid, Plug, SquarePen, Workflow } from "lucide-react";
+import type { MistyActivityEntry } from "@/features/misty/activity";
 import type { AgentProfile } from "@/shared/schemas";
-import { Button, IconButton } from "@/shared/ui";
-import { AgentRecentConversations } from "./AgentRecentConversations";
-import { AgentAvatar } from "../components/AgentAvatar";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
+import { Button } from "@/shared/ui";
+import { AgentRecentConversations, type RecentStatus } from "./AgentRecentConversations";
 import { AgentActivityPage } from "./AgentActivityPage";
 import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
@@ -17,41 +18,58 @@ export function AgentWorkspaceFrame({
   agent,
   page,
   conversations,
+  activity,
   conversationId,
   disabled,
-  floating,
   identity,
   children,
-  activitySection,
   onPageChange,
   onNewTask,
   onConversation,
   onUseTemplate,
   onStartWork,
-  onFloatingChange,
   onCompanion,
 }: {
   agent: AgentProfile;
   page: AgentWorkspacePage;
   conversations: RecentConversation[];
+  /** This agent's runs; Recents shows each conversation's latest one. */
+  activity: MistyActivityEntry[];
   conversationId: string;
   disabled: boolean;
-  floating: boolean;
   /** The agent switcher. It also holds New agent and this agent's settings. */
   identity: ReactNode;
   children: ReactNode;
-  activitySection?: "activity" | "scheduled";
   onPageChange(page: AgentWorkspacePage): void;
   onNewTask(): void;
   onConversation(id: string): void;
   onUseTemplate(prompt: string): void;
   onStartWork(action: () => void): void;
-  onFloatingChange(floating: boolean): void;
   onCompanion(): void;
 }) {
-  const recent = [...conversations]
+  const sorted = [...conversations]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 12);
+  // Rows only show ids and titles; a streaming answer rewrites its conversation on every
+  // token, so key the list on what the rows show to keep the memoized list still.
+  const recentKey = sorted.map((c) => `${c.id}\u0000${c.title ?? ""}`).join("\u0001");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- recentKey captures the shown fields
+  const recent = useMemo(() => sorted.map(({ id, title }) => ({ id, title })), [recentKey]);
+  // Latest top-level run per conversation, keyed on what the icons show so the memoized
+  // list stays still while a run streams.
+  const latestRuns = new Map<string, RecentStatus>();
+  for (const entry of activity) {
+    if (entry.parent_run_id || !entry.conversation_id) continue;
+    const known = latestRuns.get(entry.conversation_id);
+    if (!known || entry.updated_at > known.updatedAt)
+      latestRuns.set(entry.conversation_id, { state: entry.state, updatedAt: entry.updated_at });
+  }
+  const statusKey = [...latestRuns]
+    .map(([id, run]) => `${id}\u0000${run.state}\u0000${run.updatedAt}`)
+    .join("\u0001");
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- statusKey captures the shown fields
+  const statuses = useMemo(() => Object.fromEntries(latestRuns), [statusKey]);
+  const openConversation = useStableCallback(onConversation);
   return (
     <div className="agent-studio" data-page={page}>
       <aside className="agent-studio-sidebar" aria-label={`${agent.name} workspace`}>
@@ -93,45 +111,20 @@ export function AgentWorkspaceFrame({
         </nav>
         <AgentRecentConversations
           recent={recent}
+          statuses={statuses}
           activeId={page === "task" ? conversationId : undefined}
           disabled={disabled}
-          onConversation={onConversation}
+          onConversation={openConversation}
         />
       </aside>
       <div className="agent-studio-canvas">
         {/* Keep the live conversation mounted while browsing catalogs; its draft and voice state belong to it. */}
-        <div
-          className="agent-studio-task"
-          hidden={page !== "task" && !floating}
-          data-floating={floating}
-        >
-          {floating && (
-            <div className="agent-studio-floating-bar">
-              <AgentAvatar agent={agent} />
-              <strong>{agent.name}</strong>
-              <span />
-              <IconButton
-                label="Return to full conversation"
-                onClick={() => {
-                  onPageChange("task");
-                  onFloatingChange(false);
-                }}
-              >
-                <Maximize2 size={15} />
-              </IconButton>
-              <IconButton
-                label="Close floating conversation"
-                onClick={() => onFloatingChange(false)}
-              >
-                <X size={16} />
-              </IconButton>
-            </div>
-          )}
+        <div className="agent-studio-task" hidden={page !== "task"}>
           {children}
         </div>
         <div className="agent-studio-catalog-host" hidden={page === "task"}>
           {page === "activity" ? (
-            <AgentActivityPage initialSection={activitySection} />
+            <AgentActivityPage />
           ) : (
             <AgentWorkspaceCatalog
               agentId={agent.id}
@@ -145,16 +138,6 @@ export function AgentWorkspaceFrame({
             />
           )}
         </div>
-        {page === "task" && floating && (
-          <div className="agent-studio-floating-placeholder">
-            <AgentAvatar agent={agent} />
-            <h1>Your conversation is floating</h1>
-            <p>Browse activity, workflows and templates while keeping the conversation open.</p>
-            <Button variant="outline" onClick={() => onFloatingChange(false)}>
-              Return to conversation
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );

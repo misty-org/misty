@@ -6,6 +6,8 @@ export interface ConnectedApp {
   app: string;
   name: string;
   alias?: string;
+  /** Who the connection signed in as: an email address or username, when the app reveals it. */
+  account?: string;
   status: "active" | "pending" | "needs_attention";
   created_at: string;
 }

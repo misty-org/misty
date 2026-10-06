@@ -341,3 +341,8 @@ tunnel hostname alias, and PostgreSQL workflow consolidation remain intentional
 upgrade paths. Removing these just because their names are old could strand
 existing installs or databases. No old running product/service implementation is
 reactivated by the deprecated-name lists.
+
+Restored on 2026-10-05: `OPENAI_API_KEY`, optional. When set, the agent runtime
+calls OpenAI models (`openai/…`) directly with it, and the API uses it for
+OpenAI realtime voices; every other model still goes through the AI Gateway.
+Account-owned provider keys (bring your own key) were removed the same day.

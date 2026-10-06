@@ -26,24 +26,27 @@ Do not recreate a service with only a subset of those files loaded for Compose i
 
 ### AI models
 
-Instance AI (the agent worker, visual planner, routing, Library and companion
-voice) runs on the AI Gateway and draws on its balance. Set the key in the
-private `server/.env/dev/integrations/ai.env`:
+All AI (the agent worker, visual planner, routing, Library and companion
+voice) runs on Misty's own keys through the agent runtime's AI SDK. OpenAI
+models (`openai/…`) call OpenAI directly when `OPENAI_API_KEY` is set; every
+other model, and OpenAI models without that key, go through the AI Gateway and
+draw on its balance. Set the keys in the private
+`server/.env/dev/integrations/ai.env`:
 
 ```dotenv
 AI_GATEWAY_API_KEY=<your AI Gateway API key>
+# Optional: OpenAI models use this key instead of the Gateway.
+OPENAI_API_KEY=<your OpenAI API key>
 # Optional: pin the default agent model (any Gateway provider/model ID).
 MISTY_AGENT_MODEL=openai/gpt-6-luna
 ```
 
-Then run `misty server up` to rebuild and apply the configuration. There is no
-instance-wide direct provider key. Account users can bring their own OpenAI,
-Anthropic, Google, Gateway or OpenAI-compatible keys in Settings → Agents →
-Models and choose each task's model there, including Library metadata,
-embeddings, transcription and speech. Those keys are encrypted per account and
-never copied into runtime environment files. Agent calls never switch provider
-silently. Production uses the same settings in `server/.env/prod/`; changing
-development does not deploy production.
+Then run `misty server up` to rebuild and apply the configuration. Accounts
+cannot add their own keys. In Settings → Agents → Models they choose a model
+for each of four senses (Thinking, Seeing, Listening, Speaking) from the
+Gateway catalog, and the Agents composer can pin a different Thinking model to
+one conversation. Production uses the same settings in `server/.env/prod/`;
+changing development does not deploy production.
 
 ```sh
 misty env check dev

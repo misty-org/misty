@@ -357,11 +357,16 @@ function startGesture(
   return cancel;
 }
 
+/**
+ * Starts a drag from a pointerdown, or from a pointermove with the primary button held,
+ * so a control can first decide what a gesture is (a pull versus a reorder) and hand off.
+ */
 export function usePointerDrag(drag: ReorderDrag, onLift?: () => () => void) {
   const cancel = useRef<(() => void) | undefined>(undefined);
   useEffect(() => () => cancel.current?.(), []);
   return (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || !event.isPrimary) return;
+    const pressed = event.type === "pointerdown" ? event.button === 0 : (event.buttons & 1) === 1;
+    if (!pressed || !event.isPrimary) return;
     event.stopPropagation();
     cancel.current = startGesture(event, drag, onLift);
   };

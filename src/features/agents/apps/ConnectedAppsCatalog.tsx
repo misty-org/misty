@@ -1,17 +1,16 @@
-import { Check, CircleAlert, Plug, Plus, RefreshCw, Search } from "lucide-react";
+import { Check, Plus, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { BrandIcon, brandIconAsset, Button, IconButton, Input, SkeletonList } from "@/shared/ui";
+import { IconButton, Input, SkeletonList } from "@/shared/ui";
 import { appsApi, type CatalogApp, type ConnectedApp } from "./api";
+import { AppLogo, ConnectedAppGroup, groupApps } from "./ConnectedAppRows";
 
-/** Official brand artwork when the shared registry has it; a monochrome plug otherwise. */
-export function AppLogo({ app, size = 24 }: { app: string; size?: number }) {
-  return brandIconAsset(app) ? (
-    <BrandIcon brand={app} size={size} />
-  ) : (
-    <Plug size={Math.round(size * 0.75)} className="text-cream-muted" aria-hidden="true" />
-  );
+/** A sign-in open in the browser, and the accounts that app already had when it began. */
+interface SignIn {
+  app: string;
+  name: string;
+  known: string[];
 }
 
 /** Account-wide connected apps. Every agent can use them; nothing is set per agent. */
@@ -20,7 +19,8 @@ export function ConnectedAppsCatalog() {
   const [available, setAvailable] = useState(true);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CatalogApp[]>([]);
-  const [signingIn, setSigningIn] = useState("");
+  const [signingIn, setSigningIn] = useState<SignIn | null>(null);
+  const [catalogVersion, setCatalogVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -59,7 +59,36 @@ export function ConnectedAppsCatalog() {
       live = false;
       window.clearTimeout(timer);
     };
-  }, [query, available]);
+  }, [query, available, catalogVersion]);
+  // While a sign-in is open in the browser, check once each time Misty regains focus.
+  useEffect(() => {
+    if (!signingIn) return;
+    let stopped = false;
+    const check = () =>
+      void appsApi
+        .list()
+        .then((result) => {
+          if (stopped) return;
+          setAvailable(result.available);
+          setApps(result.apps);
+        })
+        .catch(() => undefined);
+    window.addEventListener("focus", check);
+    return () => {
+      stopped = true;
+      window.removeEventListener("focus", check);
+    };
+  }, [signingIn]);
+  useEffect(() => {
+    if (!signingIn) return;
+    const { app, known } = signingIn;
+    const done = apps?.some(
+      (item) => item.app === app && item.status === "active" && !known.includes(item.id),
+    );
+    if (!done) return;
+    setSigningIn(null);
+    setCatalogVersion((version) => version + 1);
+  }, [apps, signingIn]);
 
   async function act(operation: () => Promise<void>) {
     if (busy) return;
@@ -77,19 +106,23 @@ export function ConnectedAppsCatalog() {
     act(async () => {
       const { url } = await appsApi.connect(app.app);
       await openExternalLink(url);
-      setSigningIn(app.name);
+      const known = (apps ?? [])
+        .filter((item) => item.app === app.app && item.status === "active")
+        .map((item) => item.id);
+      setSigningIn({ app: app.app, name: app.name, known });
     });
-  const disconnect = (item: ConnectedApp) =>
+  const disconnect = (item: ConnectedApp, label: string) =>
     act(async () => {
       if (
         !(await confirmAction(
-          `Disconnect ${item.name}? Agents lose access right away.`,
+          `Disconnect ${label}? Agents lose access right away.`,
           "Disconnect app",
         ))
       )
         return;
       await appsApi.disconnect(item.id);
       await refresh();
+      setCatalogVersion((version) => version + 1);
     });
 
   return (
@@ -113,7 +146,7 @@ export function ConnectedAppsCatalog() {
         ) : null}
         {signingIn ? (
           <p role="status" className="agent-integrations-description">
-            Finish signing in to {signingIn} in your browser, then refresh.
+            Finish signing in to {signingIn.name} in your browser, then come back to Misty.
           </p>
         ) : null}
         {apps === null && !error ? (
@@ -125,39 +158,15 @@ export function ConnectedAppsCatalog() {
           />
         ) : apps?.length ? (
           <div className="agent-integrations-list">
-            {apps.map((item) => (
-              <div key={item.id} className="agent-integrations-row">
-                <AppLogo app={item.app} size={26} />
-                <div className="agent-integrations-row-text">
-                  <strong>{item.alias ? `${item.name} · ${item.alias}` : item.name}</strong>
-                  {item.status === "needs_attention" ? (
-                    <span className="agent-integrations-attention">
-                      <CircleAlert size={13} aria-hidden="true" />
-                      Needs attention
-                    </span>
-                  ) : (
-                    <span>{item.status === "pending" ? "Waiting for sign-in" : "Connected"}</span>
-                  )}
-                </div>
-                {item.status === "needs_attention" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => void connect(item)}
-                  >
-                    Reconnect
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => void disconnect(item)}
-                >
-                  Disconnect
-                </Button>
-              </div>
+            {groupApps(apps).map((group) => (
+              <ConnectedAppGroup
+                key={group.app}
+                group={group}
+                busy={busy}
+                onAdd={(next) => void connect(next)}
+                onReconnect={(item) => void connect(item)}
+                onDisconnect={(item, label) => void disconnect(item, label)}
+              />
             ))}
           </div>
         ) : apps ? (

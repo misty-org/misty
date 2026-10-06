@@ -54,6 +54,7 @@ type mistyConversation struct {
 	OriginHref    string                     `json:"originHref,omitempty"`
 	Privacy       string                     `json:"privacyBoundary,omitempty"`
 	ModelID       string                     `json:"modelId"`
+	ModelOverride string                     `json:"modelOverride,omitempty"`
 	Reasoning     string                     `json:"reasoningEffort,omitempty"`
 	CreatedAt     string                     `json:"createdAt"`
 	UpdatedAt     string                     `json:"updatedAt"`

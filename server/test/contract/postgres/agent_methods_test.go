@@ -58,21 +58,24 @@ func TestAgentMethodVersionsOwnershipAndSchedulePin(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	schedule, err := database.CreateScheduledTask(ctx, owner.ID, conversation, ScheduledTask{Title: first.Definition.Title, Prompt: definition.Instructions, Enabled: true, MethodVersionID: first.VersionID, MethodInputs: map[string]any{}, ScheduledTaskSchedule: ScheduledTaskSchedule{Cadence: "daily", LocalTime: "09:00", Weekday: 1, MonthDay: 1, Timezone: "UTC"}}, now)
-	if err != nil {
-		t.Fatal(err)
+	timing := ScheduleTiming{Timezone: "UTC", Rules: []ScheduleRule{{Frequency: "daily", Times: []string{"09:00"}}}}
+	schedule, err := database.SaveWorkflowSchedule(ctx, owner.ID, conversation, WorkflowSchedule{MethodID: first.ID, ScheduleTiming: timing, Inputs: map[string]any{}, Enabled: true}, now)
+	if err != nil || schedule.NextRunAt == nil {
+		t.Fatal("schedule not saved", err)
 	}
-	saved, err := database.ScheduledTaskByID(ctx, owner.ID, schedule.ID)
-	if err != nil || saved.MethodVersionID != first.VersionID {
-		t.Fatal("schedule lost version", err)
-	}
-	if _, err := database.ScheduledTaskByID(ctx, other.ID, schedule.ID); err == nil {
+	if _, err := database.WorkflowScheduleByMethod(ctx, other.ID, first.ID); err == nil {
 		t.Fatal("foreign schedule")
 	}
-	saved.Enabled = false
-	updated, err := database.UpdateScheduledTask(ctx, owner.ID, *saved, now)
-	if err != nil || updated.MethodVersionID != first.VersionID {
-		t.Fatal("edit changed pin", err)
+	if _, err := database.SaveWorkflowSchedule(ctx, other.ID, "", WorkflowSchedule{MethodID: first.ID, ScheduleTiming: timing, Enabled: true}, now); err == nil {
+		t.Fatal("scheduled a foreign workflow")
+	}
+	paused, err := database.SaveWorkflowSchedule(ctx, owner.ID, "", WorkflowSchedule{MethodID: first.ID, ScheduleTiming: timing, Enabled: false}, now)
+	if err != nil || paused.ID != schedule.ID || paused.NextRunAt != nil || paused.ConversationID != conversation {
+		t.Fatal("one schedule per workflow, paused without a next run", err)
+	}
+	listed, err := database.AgentMethods(ctx, owner.ID, agent.ID)
+	if err != nil || len(listed) != 1 || listed[0].Schedule == nil || listed[0].Schedule.ID != schedule.ID {
+		t.Fatal("workflow list lost its schedule", err)
 	}
 	second.Enabled = false
 	if _, err := database.SaveAgentMethod(ctx, owner.ID, second, second.Version); err != nil {

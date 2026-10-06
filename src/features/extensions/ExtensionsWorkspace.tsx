@@ -1,24 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Menu } from "lucide-react";
-import {
-  Button,
-  CollectionHeading,
-  CollectionPage,
-  CollectionSearch,
-  IconButton,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-  SheetTrigger,
-} from "@/shared/ui";
+import { ArrowLeft } from "lucide-react";
+import { Button, CollectionHeading, CollectionPage, CollectionSearch } from "@/shared/ui";
 import { resolveSetting, useSettingsProfiles } from "@/features/settings";
-import { defaultCategories, withCategoryIcons } from "./extensionCategories";
+import { defaultCategories } from "./extensionCategories";
 import { ExtensionDetail } from "./ExtensionDetail";
 import { InstallReviewDialog, UninstallDialog } from "./ExtensionDialogs";
 import { ExtensionsCollection } from "./ExtensionsCollection";
-import { ExtensionsRail } from "./ExtensionsRail";
 import { extensionsNative } from "./native";
 import {
   install,
@@ -44,7 +32,7 @@ export function ExtensionsWorkspace() {
     void extensionsNative
       .categories()
       .then((categories) => {
-        if (current) setCategories(withCategoryIcons(categories));
+        if (current) setCategories(categories);
       })
       .catch(() => {});
     return () => {
@@ -80,15 +68,6 @@ export function ExtensionsWorkspace() {
   const [review, setReview] = useState<ExtensionReview | null>(null);
   const [privateAccess, setPrivateAccess] = useState(true);
   const [removing, setRemoving] = useState<Installation | null>(null);
-  const [narrow, setNarrow] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
-  const host = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (!host.current || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([value]) => setNarrow(value.contentRect.width < 760));
-    observer.observe(host.current);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => {
     setPage(1);
   }, [query, sort, category]);
@@ -142,25 +121,12 @@ export function ExtensionsWorkspace() {
   }
   function go(route: string) {
     navigate(route);
-    setNavOpen(false);
   }
-  const rail = (
-    <ExtensionsRail
-      categories={categories}
-      category={category}
-      inInstalled={inInstalled}
-      detailId={detailId}
-      go={go}
-    />
-  );
   const selected = installed.find((i) => i.id === Number(detailId));
   const local = runtime.states.find((s) => s.id === selected?.id);
   const detail = entry ?? local?.review?.entry;
-  const title = detailId
-    ? (detail?.name ?? "Extension")
-    : inInstalled
-      ? "Installed"
-      : (categories.find((c) => c.id === category)?.name ?? "Discover");
+  // Discover, Installed and the categories are chips under the heading, not a sidebar.
+  const title = detailId ? (detail?.name ?? "Extension") : "Extensions";
   const items = inInstalled
     ? installed.filter(
         (i) =>
@@ -174,27 +140,8 @@ export function ExtensionsWorkspace() {
     : (catalog?.entries ?? []);
 
   return (
-    <section ref={host} className="flex h-full min-h-0 min-w-0 bg-charcoal-bg">
-      {!narrow && rail}
+    <section className="flex h-full min-h-0 min-w-0 bg-charcoal-bg">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {narrow && (
-          <div className="px-4 pt-3">
-            <Sheet open={navOpen} onOpenChange={setNavOpen}>
-              <SheetTrigger asChild>
-                <IconButton label="Extensions navigation">
-                  <Menu size={18} />
-                </IconButton>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-56 p-0">
-                <SheetTitle className="sr-only">Extensions navigation</SheetTitle>
-                <SheetDescription className="sr-only">
-                  Discover and manage browser extensions.
-                </SheetDescription>
-                {rail}
-              </SheetContent>
-            </Sheet>
-          </div>
-        )}
         <CollectionPage className="pt-5 pb-6">
           {detailId ? (
             <div className="flex items-center">
@@ -276,6 +223,8 @@ export function ExtensionsWorkspace() {
               sort={sort}
               query={query}
               items={items}
+              categories={categories}
+              category={category}
               installed={installed}
               states={runtime.states}
               catalog={catalog}

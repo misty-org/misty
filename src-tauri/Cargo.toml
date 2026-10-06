@@ -26,7 +26,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 aes-gcm = "0.10"
-axum = "0.8"
+# A small local HTTP server: routing, state/path extractors and raw responses.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 async-stream = "0.3"
 arboard = "3.6.1"
 base64 = "0.22"
@@ -34,7 +35,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 ciborium = "0.2"
 dirs = "6.0.0"
 hex = "0.4"
-jsonwebtoken = { version = "10.3", default-features = false, features = ["aws_lc_rs"] }
 misty-credential-store = { path = "vendor/misty-credential-store" }
 misty-browser-sync = { path = "crates/browser-sync" }
 misty-agent-files = { path = "crates/agent-files" }
@@ -44,7 +44,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 hkdf = "0.12"
-semver = "1"
+# Signs the local HS256 access token (hkdf already depends on it).
+hmac = "0.12"
 tempfile = "3"
 tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
 tauri-plugin-dialog = "2"
@@ -54,7 +55,7 @@ tauri-plugin-os = "2"
 tauri-plugin-notification = "2.3.3"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "cookies", "json", "multipart", "rustls-no-provider", "stream"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["cookies", "json", "rustls-no-provider", "stream"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
@@ -68,13 +69,14 @@ ed25519-dalek = "2"
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 futures-util = { version = "0.3", features = ["sink"] }
 mdns-sd = "0.13"
-zip = { version = "4.6.1", default-features = false, features = ["deflate"] }
+# Deflate through flate2's Rust backend only; zip's "deflate" also builds zopfli and zlib-rs.
+zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
 percent-encoding = "2"
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 cap-std = "4.0.3"
-portable-pty = "0.9"
 
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 cpal = "0.16"
@@ -109,8 +111,6 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
-# Use the JWT crypto backend's bundled assembly when NASM is unavailable.
-aws-lc-rs = { version = "1.18.1", features = ["prebuilt-nasm"] }
 webview2-com = "0.38.2"
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
@@ -118,11 +118,16 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphic
 [features]
 custom-protocol = ["tauri/custom-protocol"]
 
-# Keep local desktop builds useful for debugging without retaining Cargo's
-# largest symbol and incremental caches. Release builds are unaffected.
+# Local desktop builds: line-level debug info for Misty's own code, none for
+# dependencies (they rarely need stepping into and dominate link time), and
+# incremental builds so an edit recompiles only what changed. The incremental
+# cache costs disk space under target/; Release builds are unaffected.
 [profile.dev]
 debug = 1
-incremental = false
+incremental = true
+
+[profile.dev.package."*"]
+debug = false
 
 # Optimize the shipped host independently of its optional app packages.
 # Keep unwinding: document processing still uses catch_unwind for recovery.

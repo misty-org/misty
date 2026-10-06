@@ -107,21 +107,53 @@ export function ManageSpacesSection(props: SettingsContentProps) {
     </Section>
   );
 }
-export { ModelProvidersSection as ModelsSection } from "./ModelProvidersSection";
+export { ModelSensesSection as ModelsSection } from "./ModelSensesSection";
 
 export function AgentDefaultsSection() {
   const setActiveSection = useSettingsStore((state) => state.setActiveSection);
   return (
-    <Section
-      title="Models"
-      description="Choose provider connections, models and reasoning for new agent tasks in Models settings."
-    >
-      <Row label="Provider and model choices">
-        <Button variant="outline" onClick={() => setActiveSection("models")}>
-          Open Models
-        </Button>
-      </Row>
-    </Section>
+    <>
+      <Section
+        title="Models"
+        description="Choose which model thinks, sees, listens and speaks for new agent tasks in Models settings."
+      >
+        <Row label="Model choices">
+          <Button variant="outline" onClick={() => setActiveSection("models")}>
+            Open Models
+          </Button>
+        </Row>
+      </Section>
+      <Section
+        title="Conversations"
+        description={
+          "Plan first: agents research and propose a plan you approve before they change " +
+          "anything. Switch any conversation with the Plan chip or Shift+Tab."
+        }
+      >
+        <CollaborationModeRow />
+        <PreferenceRow id="agents.plan_deep_thinking" />
+      </Section>
+    </>
+  );
+}
+function CollaborationModeRow() {
+  const d = definitionById.get("agents.collaboration_mode")!;
+  const store = useSettingsStore();
+  const ready = useSettingsProfiles((s) => s.ready);
+  const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
+  const value = String(fromLegacy(d, section?.[d.key]) || "act");
+  return (
+    <Row label={d.label}>
+      <ChoiceControl
+        disabled={store.working || !ready}
+        value={value}
+        onValueChange={(next) => void store.updateSetting(d.section, d.key, next)}
+        options={[
+          { value: "act", label: "Act" },
+          { value: "plan", label: "Plan first" },
+        ]}
+      />
+    </Row>
   );
 }
 export function NativeAvailability({ feature }: { feature: string }) {

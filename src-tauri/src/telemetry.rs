@@ -85,7 +85,9 @@ pub fn initialize() {
     }
     let token = token.to_owned();
     let _ = std::thread::Builder::new().name("misty-error-reporter".into()).spawn(move || {
-        let Ok(client) = reqwest::blocking::Client::builder().timeout(Duration::from_secs(2)).build() else { return; };
+        // A one-thread runtime keeps this reporter off the app's async runtime.
+        let Ok(runtime) = tokio::runtime::Builder::new_current_thread().enable_all().build() else { return; };
+        let Ok(client) = reqwest::Client::builder().timeout(Duration::from_secs(2)).build() else { return; };
         // A random process identity cannot associate reports with an account.
         let distinct_id = uuid::Uuid::new_v4().to_string();
         // Errors are coalesced into one batch per window, and the same error
@@ -97,7 +99,7 @@ pub fn initialize() {
         let send = |events: &mut Vec<serde_json::Value>| {
             if events.is_empty() { return; }
             let payload = json!({ "api_key":token, "batch":std::mem::take(events) });
-            let _ = client.post(endpoint.clone()).json(&payload).send();
+            let _ = runtime.block_on(client.post(endpoint.clone()).json(&payload).send());
         };
         loop {
             let message = match window_started {

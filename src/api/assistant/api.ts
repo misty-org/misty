@@ -71,6 +71,12 @@ export const assistantApi = {
       `/misty/conversations/${encodeURIComponent(conversationId)}`,
       { method: "PATCH", body: JSON.stringify(settings) },
     ),
+  /** Pins a conversation's model; an empty model follows the account's Thinking choice. */
+  updateConversationModel: (conversationId: string, model: string) =>
+    apiRequest<{ id: string; model_override: string }>(
+      `/misty/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "PATCH", body: JSON.stringify({ model_id: model }) },
+    ),
   frontierModels: () => apiRequest<FrontierModelCatalog>("/ai/models"),
   complete: (prompt: string) =>
     apiRequest<{ text: string }>("/ai/complete", {

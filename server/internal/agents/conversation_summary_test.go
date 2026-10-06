@@ -32,7 +32,7 @@ func TestConversationNotesExtendThePreviousNotesOnMistysGateway(t *testing.T) {
 	}
 }
 
-func TestConversationNotesUseTheAccountsOwnConnection(t *testing.T) {
+func TestConversationNotesUseTheAccountsThinkingModel(t *testing.T) {
 	runtime := modelruntime.TestingNewFake(t, func(call modelruntime.TestingCall) (int, any) {
 		return http.StatusOK, map[string]any{"text": "Open items: none.", "usage": map[string]int{"inputTokens": 10}}
 	})
@@ -41,13 +41,13 @@ func TestConversationNotesUseTheAccountsOwnConnection(t *testing.T) {
 		if role != "agent" {
 			t.Fatalf("role = %s", role)
 		}
-		return &aimodels.Resolved{Provider: "anthropic", Model: "anthropic/claude-x", BaseURL: "https://api.anthropic.com/v1", APIKey: "account-key"}, nil
+		return &aimodels.Resolved{Model: "anthropic/claude-x"}, nil
 	})
 	if _, model, err := service.SummarizeConversation(t.Context(), "user", "", "User: hi\n"); err != nil || model != "anthropic/claude-x" {
 		t.Fatalf("model = %q %v", model, err)
 	}
 	route := runtime.Calls()[0].Body["route"].(map[string]any)
-	if route["provider"] != "anthropic" || route["apiKey"] != "account-key" {
+	if route["provider"] != "instance" || route["apiKey"] != nil {
 		t.Fatalf("route = %v", route)
 	}
 }

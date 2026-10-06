@@ -264,6 +264,8 @@ function toServerInvocation(input: AiInvocationRequest) {
     method_inputs: input.methodInputs,
     skill_version_ids: input.skillVersionIds,
     companion_model: input.companionModel,
+    model_override: input.modelOverride,
+    collaboration_mode: input.collaborationMode,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,
       name: c.name,

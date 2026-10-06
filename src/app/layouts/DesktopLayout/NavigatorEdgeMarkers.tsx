@@ -127,8 +127,14 @@ export function NavigatorEdgeMarkers({
     observeSizes();
     const events = ["pointerover", "pointerout", "focusin", "focusout"] as const;
     events.forEach((event) => nav.addEventListener(event, schedule));
+    // Only scrolls inside the navigator or around it move markers; content scrolling
+    // (chat transcripts, file lists) must not re-measure the rail every frame.
+    const scrolled = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Node && (nav.contains(target) || target.contains(nav))) schedule();
+    };
     window.addEventListener("resize", schedule);
-    window.addEventListener("scroll", schedule, true);
+    window.addEventListener("scroll", scrolled, true);
     window.addEventListener(appZoomChangedEvent, schedule);
     measure();
     return () => {
@@ -137,7 +143,7 @@ export function NavigatorEdgeMarkers({
       mutations.disconnect();
       events.forEach((event) => nav.removeEventListener(event, schedule));
       window.removeEventListener("resize", schedule);
-      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("scroll", scrolled, true);
       window.removeEventListener(appZoomChangedEvent, schedule);
     };
   }, [navigatorRef, vertical, position]);

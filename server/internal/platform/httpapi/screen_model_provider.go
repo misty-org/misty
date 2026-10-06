@@ -7,35 +7,32 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/kannachi323/misty/server/internal/aimodels"
 	"github.com/kannachi323/misty/server/internal/modelruntime"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// screenModelRoute is the run's vision route, which the account can point at
-// its own provider; billing meters screen calls against the same route.
+// screenModelRoute is the run's frozen vision route, which follows the
+// account's Seeing choice; billing meters screen calls against the same route.
 func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvocationRecord) (modelruntime.Route, string, error) {
 	route, err := s.database.AIModelRunRoute(ctx, record.UserID, record.ID, "vision")
 	if err != nil {
 		return modelruntime.Route{}, "", err
 	}
+	if !route.Enabled {
+		return modelruntime.Route{}, "", aimodels.ErrDisabled
+	}
 	model := route.Model
 	if model == "" {
 		model = aiInvocationMeteredModel(record)
 	}
-	account, err := s.resolveAIRoute(ctx, record.UserID, route)
-	if err != nil {
-		return modelruntime.Route{}, "", err
-	}
-	if account != nil {
-		model = account.Model
-	}
 	if model == "" {
 		return modelruntime.Route{}, "", errScreenModelUnconfigured
 	}
-	resolved := modelruntime.For(account)
-	if resolved.Provider == "openai" {
-		// Account OpenAI reasoning models spend output on reasoning first; keep
-		// it short like the server's own agent provider does.
+	resolved := modelruntime.Instance()
+	if aimodels.DirectOpenAI(model) {
+		// OpenAI reasoning models spend output on reasoning first; keep it short
+		// like the server's own agent provider does.
 		resolved.Reasoning = "low"
 	}
 	return resolved, model, nil

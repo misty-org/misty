@@ -258,6 +258,10 @@ func validateAIInvocationInput(body *aiInvocationInput) error {
 	if body.ThinkingMode != "" && body.ThinkingMode != "normal" && body.ThinkingMode != "deep" {
 		return errors.New("thinking mode must be normal or deep")
 	}
+	body.CollaborationMode = strings.TrimSpace(body.CollaborationMode)
+	if body.CollaborationMode != "" && body.CollaborationMode != "act" && body.CollaborationMode != "plan" {
+		return errors.New("collaboration mode must be act or plan")
+	}
 	if body.Timezone == "" {
 		body.Timezone = "UTC"
 	}

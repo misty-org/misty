@@ -230,7 +230,7 @@ export function PlannerCollection({ spaceId, canManage }: { spaceId: string; can
         actions={
           <>
             {section === "agenda" && (
-              <Button variant="outline" onClick={() => navigate(`${base}/agenda/month`)}>
+              <Button variant="outline" size="sm" onClick={() => navigate(`${base}/agenda/month`)}>
                 Calendar
               </Button>
             )}
