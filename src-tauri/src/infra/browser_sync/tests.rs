@@ -138,6 +138,7 @@ async fn local_profile_survives_failed_sync_verification_and_stopped_worker() {
         .activate_browser_profile(&root, &logical, binding.revision, &generation)
         .unwrap();
     let cached_workspace = Document::default().workspace_view().unwrap();
+    let admission_root = root.duplicate();
     let (worker, handle) = Worker::new(
         api.clone(),
         scope.clone(),
@@ -168,6 +169,7 @@ async fn local_profile_survives_failed_sync_verification_and_stopped_worker() {
         held: Default::default(),
         #[cfg(any(target_os = "macos", windows))]
         capture_view: None,
+        admission_root,
     };
     // A failed read-back must not revoke an activated local store. This is
     // the same journal failure that previously prevented native tab creation.
@@ -269,6 +271,7 @@ async fn account_replacement_waits_for_key_owner_and_releases_process_lock() {
         &initial.encode().unwrap(),
     )
     .unwrap();
+    let admission_root = root.duplicate();
     let (worker, handle) = Worker::new(
         api.clone(),
         scope.clone(),
@@ -300,6 +303,7 @@ async fn account_replacement_waits_for_key_owner_and_releases_process_lock() {
         held: Default::default(),
         #[cfg(any(target_os = "macos", windows))]
         capture_view: None,
+        admission_root,
     };
     *session().lock().await = Some(active);
     let epoch = BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire);

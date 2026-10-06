@@ -1,4 +1,5 @@
 import { readInvocationStream } from "./invocationStream";
+import { withDeviceRunGrants } from "./deviceRunGrants";
 import {
   apiRequest,
   apiRequestCredentials,
@@ -170,12 +171,14 @@ export const aiSurfaceApi = {
       method: "POST",
       body: JSON.stringify({ rating, reason, comment }),
     }),
-  createInvocation: (input: AiInvocationRequest) =>
-    apiRequest<AiInvocationCreated>("/ai/invocations", {
+  createInvocation: async (input: AiInvocationRequest) => {
+    const deviceContexts = await withDeviceRunGrants(input.deviceContexts, input.agentId);
+    return apiRequest<AiInvocationCreated>("/ai/invocations", {
       method: "POST",
       headers: { "Idempotency-Key": input.idempotencyKey },
-      body: JSON.stringify(toServerInvocation(input)),
-    }),
+      body: JSON.stringify(toServerInvocation({ ...input, deviceContexts })),
+    });
+  },
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
       method: "POST",
@@ -298,6 +301,7 @@ function toServerInvocation(input: AiInvocationRequest) {
       display_name: context.displayName,
       capabilities: context.capabilities,
       metadata: context.metadata,
+      run_grant: context.runGrant,
     })),
     thinking_mode: input.thinkingMode,
     model_id: input.modelId,

@@ -17,7 +17,7 @@ import {
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
-import { DeviceControls } from "./DeviceControls";
+import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
@@ -150,7 +150,7 @@ export function CompanionSection() {
   );
 }
 export function DevicesSection() {
-  return hasTauriInternals() ? <DeviceControls /> : <NativeAvailability feature="File sharing" />;
+  return hasTauriInternals() ? <DevicesSettings /> : <NativeAvailability feature="Devices" />;
 }
 export function AgentPermissionsSection() {
   return hasTauriInternals() ? (

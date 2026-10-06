@@ -91,6 +91,14 @@ func (db *Store) ControlBrowserSyncDevice(ctx context.Context, user string, c Sy
 	if err != nil {
 		return "", err
 	}
+	// A device has one name everywhere: renaming its sync workspace renames
+	// the device record that sync, agents and file sharing all show.
+	if c.DisplayName != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE trusted_devices SET name=$4,name_updated_at=clock_timestamp(),updated_at=clock_timestamp()
+			WHERE user_id=$1 AND vault_id=$2::text AND sync_device_id=$3::text AND admission_state<>'revoked'`, user, vault, c.DeviceID, *c.DisplayName); err != nil {
+			return "", err
+		}
+	}
 	// Publish with the commit: no periodic reconcile backs up a lost hint.
 	if err = notifySync(ctx, tx, user, vault, "browser-presence"); err != nil {
 		return "", err

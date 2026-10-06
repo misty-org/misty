@@ -76,7 +76,7 @@ export const settingsAreas: Record<
   spaces: { label: "Spaces", icon: Layers },
   agents: { label: "Agents", icon: Sparkles },
   sync: { label: "Sync", icon: RefreshCw, breakBefore: true },
-  devices: { label: "File sharing", icon: MonitorSmartphone },
+  devices: { label: "Devices", icon: MonitorSmartphone },
   privacy: { label: "Privacy", icon: Shield },
   about: { label: "About", icon: Info },
 };
@@ -157,7 +157,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("agents", "agents-permissions", "Permissions", AgentPermissionsSection, "resource"),
   page("agents", "agents-companion", "Companion", CompanionSection, "account"),
   page("sync", "sync", "Sync", BrowserSyncSettings),
-  page("devices", "devices", "File sharing", DevicesSection, "account"),
+  page("devices", "devices", "Devices", DevicesSection, "account"),
   page("privacy", "privacy", "Privacy", PrivacySection, "account"),
   page("about", "about", "Version", AboutSection, "account"),
   page("about", "updates", "Updates", UpdatesSection, "account", true),

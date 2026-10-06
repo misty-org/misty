@@ -54,12 +54,15 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  /** A browser tab, a folder shared with agents, or the Misty browser itself. */
-  kind: "browser_tab" | "local_folder" | "workspace";
+  /** A browser tab, a folder shared with agents, the Misty browser itself, or
+   * the device's inbox for files its other devices send it. */
+  kind: "browser_tab" | "local_folder" | "workspace" | "inbox";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];
   metadata?: Record<string, string | number | boolean>;
+  /** Signed by the device that asked; required by the server. */
+  runGrant?: { payload: string; signature: string };
 }
 export interface AiSelectionSnapshot {
   kind: "text" | "blocks" | "canvas" | "objects" | "rows";
