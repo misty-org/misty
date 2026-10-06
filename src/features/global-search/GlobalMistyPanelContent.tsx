@@ -1,5 +1,6 @@
 import { companionReply } from "@/features/agents";
 import {
+  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import { Link } from "react-router-dom";
 import { MistyAppRequestCard } from "@/features/misty/MistyAppRequestCard";
 import { ScreenRequestCard } from "@/features/misty/ScreenRequestCard";
@@ -85,7 +86,7 @@ export function ConversationView(props: { conversation?: GlobalAiConversation; w
               </div>
               {message.content ? (
                 <div className="misty-markdown-message">
-                  <ReactMarkdown>{companionReply(message.content).text}</ReactMarkdown>
+                  <MistyMarkdown>{companionReply(message.content).text}</MistyMarkdown>
                 </div>
               ) : (
                 <MistyActivityStatus activity={message.activity} compact />
@@ -111,13 +112,17 @@ export function ConversationView(props: { conversation?: GlobalAiConversation; w
               </summary>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {message.citations.map((citation) => (
-                  <Link
+                  <Button
                     key={citation.id}
-                    to={citation.href}
-                    className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.025] px-2.5 py-1 hover:text-cream"
+                    asChild
+                    variant="chip"
+                    size="chip"
+                    className="max-w-full font-normal"
                   >
-                    {citation.title}
-                  </Link>
+                    <Link to={citation.href}>
+                      <span className="truncate">{citation.title}</span>
+                    </Link>
+                  </Button>
                 ))}
               </div>
             </details>

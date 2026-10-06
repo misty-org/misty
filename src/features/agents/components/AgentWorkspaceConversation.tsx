@@ -7,12 +7,20 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, IconButton, Spinner } from "@/shared/ui";
-import { Mic, Square, X } from "lucide-react";
-import { useEffect, useRef, useImperativeHandle, type Ref, type ReactNode } from "react";
+import { Mic, Reply, Square, X } from "lucide-react";
+import { useEffect, useRef, useImperativeHandle, useState, type Ref, type ReactNode } from "react";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
+import { useShallow } from "zustand/react/shallow";
 import { useCompanionState } from "../companion/companionState";
 import { AgentConversationView } from "./AgentConversationView";
+import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
+import { ConversationModelPicker } from "../models/ConversationModelPicker";
+import { AgentModeToggle } from "../collaboration/AgentModeToggle";
+import { AgentPlanCard } from "../collaboration/AgentPlanCard";
+import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
+import { useCollaborationComposer } from "../collaboration/useCollaborationComposer";
 export type AgentVoiceControl = { toggle(): void };
 export function AgentWorkspaceConversation({
   agent,
@@ -43,7 +51,19 @@ export function AgentWorkspaceConversation({
   onDraftStateChange?: (status: { dirty: boolean; busy: boolean }) => void;
 }) {
   const spaceId = "";
-  const state = useMistyStore();
+  // Only what this view shows; a whole-store subscription re-rendered the transcript on
+  // every unrelated store write.
+  const state = useMistyStore(
+    useShallow((s) => ({
+      query: s.query,
+      conversations: s.conversations,
+      activeConversationId: s.activeConversationId,
+      working: s.working,
+      conversationsLoading: s.conversationsLoading,
+      error: s.error,
+      invocationId: s.invocationId,
+    })),
+  );
   const draft = state.query;
   const setDraft = (value: string | ((previous: string) => string)) => {
     const store = useMistyStore.getState();
@@ -53,6 +73,8 @@ export function AgentWorkspaceConversation({
     if (initialDraft && !useMistyStore.getState().query)
       useMistyStore.getState().setQuery(initialDraft);
   }, [initialDraft]);
+  /** The answer, or part of one, the next message responds to. */
+  const [reply, setReply] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scoped = state.conversations.filter(
@@ -94,7 +116,8 @@ export function AgentWorkspaceConversation({
       void store.loadConversations();
   }, [accountId]);
   useEffect(() => {
-    const view = scrollRef.current;
+    // On the Agents page the chat column scrolls, so follow that instead of the transcript.
+    const view = scrollRef.current?.closest<HTMLElement>("[data-scroll-root]") ?? scrollRef.current;
     if (
       conversation?.messages.length &&
       view &&
@@ -139,7 +162,28 @@ export function AgentWorkspaceConversation({
         busy: false,
       });
   }, [hasDraft, composingBusy, onDraftStateChange]);
-  const send = async (prompt = draft) => {
+  const collaboration = useCollaborationComposer({
+    accountId,
+    conversationId: conversation?.id,
+    working: state.working,
+    send: (prompt, id) => void send(prompt, "", id),
+    ensureConversation: async () => {
+      prepare();
+      return useMistyStore.getState().newConversation(spaceId);
+    },
+    clearDraft: () => setDraft(""),
+    reportError,
+  });
+  const { planning, questions, proposedPlan } = collaboration;
+  const send = async (typed = draft, quote = reply, targetConversationId?: string) => {
+    // /plan and /goal run as commands rather than messages.
+    if (!quote && !state.working && typed.trim().startsWith("/")) {
+      const rewritten = await collaboration.command(typed);
+      if (rewritten === undefined) return;
+      typed = rewritten;
+    }
+    const prompt = quote && typed.trim() ? replyPrompt(quote, typed) : typed;
+    const targetId = targetConversationId ?? conversation?.id ?? "";
     if (
       !agent?.enabled ||
       attachments.attachments.some((a) => a.state !== "ready") ||
@@ -162,7 +206,7 @@ export function AgentWorkspaceConversation({
         await submit({
           prompt,
           attachments: attachments.attachments,
-          conversationId: conversation?.id ?? "",
+          conversationId: targetId,
         });
       } else {
         await useMistyStore
@@ -173,7 +217,7 @@ export function AgentWorkspaceConversation({
             undefined,
             "workspace",
             [],
-            { conversationId: conversation?.id ?? "", context: [] },
+            { conversationId: targetId, context: [] },
             { executionMode: "user", interactionMode: companion.mode, model: companion.model },
           );
       }
@@ -183,9 +227,20 @@ export function AgentWorkspaceConversation({
     }
     if (!useMistyStore.getState().error) {
       setDraft("");
+      setReply("");
       attachments.consume();
     }
   };
+  // Stable, so the memoized transcript skips re-rendering while the person types.
+  const retryPrompt = useStableCallback((prompt: string) => void send(prompt, ""));
+  const editPrompt = useStableCallback((text: string) => {
+    setDraft(text);
+    textareaRef.current?.focus();
+  });
+  const replyTo = useStableCallback((quote: string) => {
+    setReply(quote);
+    textareaRef.current?.focus();
+  });
   return (
     <section
       className="agent-conversation"
@@ -194,11 +249,26 @@ export function AgentWorkspaceConversation({
     >
       <div className="agent-conversation-scroll" ref={scrollRef}>
         {conversation?.messages.length ? (
-          <AgentConversationView
-            conversation={conversation}
-            working={state.working}
-            onRetry={(prompt) => void send(prompt)}
-          />
+          <>
+            <AgentConversationView
+              conversation={conversation}
+              working={state.working}
+              onRetry={retryPrompt}
+              onEdit={editPrompt}
+              onReply={replyTo}
+            />
+            {proposedPlan && (
+              <div className="agent-plan-slot">
+                <AgentPlanCard
+                  plan={proposedPlan}
+                  history={collaboration.state?.planHistory}
+                  working={state.working}
+                  onRun={(prompt) => void send(prompt, "")}
+                  onKeepPlanning={() => textareaRef.current?.focus()}
+                />
+              </div>
+            )}
+          </>
         ) : emptyContent ? (
           emptyContent
         ) : !agent && !state.conversationsLoading ? (
@@ -214,7 +284,11 @@ export function AgentWorkspaceConversation({
           <div role="alert" className="agent-compose-error">
             <p>{state.error}</p>
             {state.working && state.invocationId && (
-              <Button variant="ghost" size="sm" onClick={() => void state.loadConversations(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void useMistyStore.getState().loadConversations(true)}
+              >
                 Reconnect to task
               </Button>
             )}
@@ -236,9 +310,32 @@ export function AgentWorkspaceConversation({
         ) : (
           <MistyFolderWork accountId={accountId} disabled={state.working} />
         )}
+        {questions && (
+          <AgentQuestionCard
+            questionSet={questions}
+            agentName={agent?.name || "Misty"}
+            onContinue={(prompt) => void send(prompt, "")}
+          />
+        )}
+        {reply && (
+          <div className="agent-reply-target">
+            <Reply size={14} aria-hidden="true" />
+            <p>
+              <span>Replying to {agent?.name || "Misty"}</span> {reply}
+            </p>
+            <IconButton size="xs" label="Cancel reply" onClick={() => setReply("")}>
+              <X />
+            </IconButton>
+          </div>
+        )}
         <MistyComposer
           hideUsageEstimate={showControlBar && Boolean(agent)}
           modelId={conversation?.modelId}
+          // One toolbar under the text: Attach and the mode on the left; the model,
+          // usage, voice and send on the right.
+          leadingControl={
+            <AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />
+          }
           layout="conversation"
           value={draft}
           onChange={setDraft}
@@ -251,16 +348,29 @@ export function AgentWorkspaceConversation({
           onSubmit={() => void send()}
           onError={reportError}
           onKeyDown={(e) => {
+            if (e.key === "Tab" && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+              // Shift+Tab switches between Plan and Act, as in other agent tools.
+              e.preventDefault();
+              collaboration.toggleMode();
+              return;
+            }
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               if (!attachments.attachments.some((a) => a.state !== "ready")) void send();
             }
           }}
-          placeholder={`Message ${agent?.name || "Misty"}…`}
+          placeholder={
+            planning ? `Plan with ${agent?.name || "Misty"}…` : `Message ${agent?.name || "Misty"}…`
+          }
           disabled={!agent?.enabled || !accountId}
           busy={state.working && !draft.trim()}
           voiceControl={
             <>
+              <ConversationModelPicker
+                conversation={conversation}
+                disabled={state.working}
+                onError={reportError}
+              />
               {showControlBar && agent && (
                 <AgentUsageControl
                   draft={draft}
@@ -305,7 +415,10 @@ export function AgentWorkspaceConversation({
             ) : undefined
           }
         />
-        {(state.working || voice.recording || voice.transcribing) && (
+        {/* The transcript shows its own working status once it has messages. */}
+        {((state.working && !conversation?.messages.length) ||
+          voice.recording ||
+          voice.transcribing) && (
           <p className="agent-compose-status" role="status">
             {voice.recording
               ? "Listening…"

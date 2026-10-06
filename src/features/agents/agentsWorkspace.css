@@ -106,9 +106,10 @@
   font-size: 12px;
   color: var(--color-cream-muted);
 }
+/* Same column and gutters as .agent-compose-area, so bubbles line up with the composer. */
 .agent-conversation .agent-transcript {
   max-width: 836px;
-  padding: 28px 32px;
+  padding: 28px 24px;
 }
 .agent-conversation .agent-transcript > div {
   display: flex;
@@ -118,27 +119,26 @@
 .agent-conversation .agent-transcript > div > * {
   margin-block: 0;
 }
-.agent-conversation .agent-transcript article {
+.agent-conversation .agent-message-assistant {
   gap: 10px;
   align-items: flex-start;
 }
-.agent-conversation .agent-transcript article > :first-child {
-  margin-top: 6px;
+/* The avatar's center meets the reply's first line (5px inset + 22.4px line). */
+.agent-conversation .agent-message-assistant > :first-child {
+  margin-top: 0;
   width: 32px;
   height: 32px;
   background: none;
   box-shadow: none;
 }
-.agent-conversation .agent-transcript article > :last-child {
-  flex: initial;
+.agent-conversation .agent-message-assistant > :last-child {
+  flex: 1;
   min-width: 0;
-  max-width: min(82%, 72ch);
   padding: 0;
 }
+/* Only the user's messages are bubbles; replies sit on the canvas as plain text. */
 .agent-conversation .misty-markdown-message {
-  padding: 10px 14px;
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
+  padding-top: 5px;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -148,12 +148,97 @@
 .agent-conversation .misty-markdown-message p:last-child {
   margin-bottom: 0;
 }
-.agent-conversation .agent-message-user > div {
+/* Status lines take the avatar's height to stay beside it. */
+.agent-message-status {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+.agent-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  color: var(--color-cream-muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.agent-message-assistant .agent-message-actions {
+  margin-top: 4px;
+}
+.agent-message-actions[data-align="end"] {
+  justify-content: flex-end;
+}
+.agent-message-actions:focus-within,
+:is(.agent-message-assistant, .agent-message-user):hover .agent-message-actions {
+  opacity: 1;
+}
+.agent-message-actions button {
+  color: var(--color-cream-muted);
+}
+.agent-message-actions button:is(:hover, [aria-pressed="true"]) {
+  color: var(--color-cream);
+}
+.agent-message-time {
+  padding-inline: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.agent-message-actions[data-align="end"] .agent-message-time {
+  order: -1;
+}
+@media (hover: none) {
+  .agent-message-actions {
+    opacity: 1;
+  }
+}
+/* A reply's quote inside the person's bubble, and the target above the composer. */
+.agent-message-quote {
+  display: -webkit-box;
+  margin: 0 0 8px;
+  padding-left: 10px;
+  overflow: hidden;
+  border-left: 2px solid var(--color-charcoal-border);
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.agent-reply-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-reply-target > svg {
+  flex-shrink: 0;
+}
+.agent-reply-target p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-reply-target p span {
+  color: var(--color-cream);
+}
+.agent-conversation .agent-message-user > div:not(.agent-message-actions) {
   max-width: min(82%, 72ch);
   padding: 10px 14px;
   border: 0;
   border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
+  /* One step above the card surface, which barely separates from the canvas. */
+  background: var(--color-charcoal-hover);
   box-shadow: none;
   font-size: 14px;
   line-height: 1.6;
@@ -471,54 +556,52 @@
   margin-top: 12px;
 }
 
-/* The conversation and its panel share the row under the header. */
+/*
+ * Only the chat column (header and conversation) scrolls; its scrollbar sits at the
+ * chat's right edge, so it never overlays or shifts the pull-tab panels, which stay on
+ * the window's wall at full height. The header sticks to the top of the chat column,
+ * the composer to the bottom, and the panels run beside them, level with the title.
+ */
 .agents-body {
+  --agents-canvas: var(--color-charcoal-workspace);
+  container: agents-body / size;
   display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-
-/*
- * The task panel sits under the header beside the conversation. The rail's width
- * opens and closes while its fixed-width card slides and fades, so the conversation
- * reflows smoothly instead of jumping.
- */
-.agent-overview-rail {
-  --agent-rail-width: 340px;
-  --agent-rail-motion: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  width: var(--agent-rail-width);
-  flex-shrink: 0;
-  min-height: 0;
   overflow: hidden;
-  transition:
-    width var(--agent-rail-motion),
-    visibility 0s;
 }
-.agent-overview-rail[data-open="false"] {
-  width: 0;
-  visibility: hidden;
-  transition:
-    width var(--agent-rail-motion),
-    visibility 0s 260ms;
-}
-.agent-overview-rail-content {
-  width: var(--agent-rail-width);
-  height: 100%;
+.agents-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 360px;
+  min-height: 0;
   overflow-y: auto;
-  padding: 0 16px 16px 0;
-  transition:
-    transform var(--agent-rail-motion),
-    opacity 200ms ease-out;
+  overscroll-behavior: contain;
 }
-.agent-overview-rail[data-open="false"] .agent-overview-rail-content {
-  transform: translateX(32px);
-  opacity: 0;
+/* Rows keep their content height so the column overflows and scrolls instead of squeezing. */
+.agents-chat > * {
+  flex-shrink: 0;
 }
-@media (prefers-reduced-motion: reduce) {
-  .agent-overview-rail,
-  .agent-overview-rail[data-open="false"],
-  .agent-overview-rail-content {
-    transition: none;
-  }
+/* The conversation fills a short column and grows past a long one. */
+.agents-chat > :is(.agent-conversation, .agent-new-chat) {
+  flex: 1 0 auto;
+  min-height: auto;
+}
+.agents-chat > .agent-conversation-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--agents-canvas);
+}
+.agents-body .agent-conversation-scroll {
+  flex: 1 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+.agents-body .agent-conversation:not([data-empty="true"]) .agent-compose-area {
+  position: sticky;
+  bottom: 0;
+  background: var(--agents-canvas);
 }

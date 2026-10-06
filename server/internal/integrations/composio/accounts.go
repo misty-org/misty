@@ -11,8 +11,8 @@ import (
 
 var accountPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,160}$`)
 
-// Account is a connected app account. Composio's `state` field, which holds
-// provider credentials, is never decoded.
+// Account is a connected app account. Only the provider's display name is
+// read from Composio's `state` field; the credentials beside it are never decoded.
 type Account struct {
 	ID        string `json:"id"`
 	UserID    string `json:"user_id"`
@@ -23,6 +23,11 @@ type Account struct {
 	Toolkit   struct {
 		Slug string `json:"slug"`
 	} `json:"toolkit"`
+	State struct {
+		Val struct {
+			DisplayName string `json:"displayName"`
+		} `json:"val"`
+	} `json:"state"`
 }
 
 func (a Account) Active() bool { return a.Status == "ACTIVE" && !a.Disabled }

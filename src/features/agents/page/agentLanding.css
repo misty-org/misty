@@ -1,30 +1,17 @@
-/* Under the empty composer: context chips, then two columns on the composer's edges. */
+/* Under the empty composer: the device picker's chips, then two columns on the composer's edges. */
 .agent-context-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
 }
+/* Shared chips; only the weight differs, so names stand out from their status. */
 .agent-context-chips > button {
-  height: 28px;
-  gap: 6px;
-  padding-inline: 10px;
-  border-radius: 999px;
-  color: var(--color-cream-muted);
-  font-size: 12.5px;
   font-weight: 400;
 }
 .agent-context-chips > button strong {
   color: var(--color-cream);
   font-weight: 500;
-}
-.agent-context-chips > .agent-context-chip-skeleton {
-  height: 28px;
-  border-radius: 999px;
-}
-.agent-context-chips > button.agent-context-chip-attention {
-  color: var(--color-cream-bright);
-  border-color: var(--color-charcoal-active);
 }
 .agent-landing {
   display: grid;

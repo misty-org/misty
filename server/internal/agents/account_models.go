@@ -37,25 +37,6 @@ func (a *SmartLibraryAnalyzer) embeddingRoute(ctx context.Context) (modelruntime
 	return modelruntime.Instance(), a.embeddingModel(), nil
 }
 
-// forRealtime points the realtime voice socket at the account's own
-// connection. Realtime voice is the one model connection Go still opens.
-func (a *SmartLibraryAnalyzer) forRealtime(ctx context.Context) (*SmartLibraryAnalyzer, *aimodels.Resolved, error) {
-	c, err := a.roleConfig(ctx, "realtime")
-	if err != nil || c == nil {
-		return a, nil, err
-	}
-	clone := *a
-	clone.APIKey, clone.BaseURL = c.APIKey, c.BaseURL
-	client, err := aimodels.HTTPClient(c.BaseURL)
-	if err != nil {
-		return nil, nil, err
-	}
-	if clone.Client == nil {
-		clone.Client = client
-	}
-	return &clone, c, nil
-}
-
 func (a *SmartLibraryAnalyzer) AccountEmbeddingModel(ctx context.Context) (string, error) {
 	c, err := a.roleConfig(ctx, "embedding")
 	if err != nil {
@@ -71,20 +52,25 @@ func accountCompletionProvider(models *modelruntime.Client, c *aimodels.Resolved
 	if !models.Enabled() {
 		return nil, modelruntime.ErrUnavailable
 	}
-	provider := c.Provider
-	if provider == "gateway" {
-		provider = ProviderVercelAI
-	}
-	return NewBudgetedProvider(NewRuntimeProvider(models, modelruntime.For(c), c.Model, provider, c.Reasoning), ProviderBudgetFromEnv()), nil
+	return NewBudgetedProvider(NewRuntimeProvider(models, modelruntime.For(c), c.Model, modelProviderName(c.Model), c.Reasoning), ProviderBudgetFromEnv()), nil
 }
 
+// modelProviderName labels who serves a model: OpenAI directly, or the Gateway.
+func modelProviderName(model string) string {
+	if aimodels.DirectOpenAI(model) {
+		return "openai"
+	}
+	return ProviderVercelAI
+}
+
+// ConfiguredRealtime applies the account's Speaking choice to the voice socket.
 func (a *SmartLibraryAnalyzer) ConfiguredRealtime(ctx context.Context, account string) (*SmartLibraryAnalyzer, bool, error) {
 	scoped := a.WithAIAccount(account)
-	configured, config, err := scoped.forRealtime(ctx)
+	config, err := scoped.roleConfig(ctx, "realtime")
 	if err != nil {
 		return nil, false, err
 	}
-	clone := *configured
+	clone := *scoped
 	clone.realtimeConfig = config
 	return &clone, config != nil, nil
 }

@@ -1,6 +1,6 @@
 // Package modelruntime is the Go API's only way to call AI models. The agent
-// runtime makes every call with the Vercel AI SDK; Go resolves which model and
-// connection a call uses, meters it, and sends it here signed with the shared
+// runtime makes every call with the Vercel AI SDK on Misty's own keys; Go
+// chooses the model, meters the call, and sends it here signed with the shared
 // runtime control secret. Go holds no model HTTP clients of its own.
 package modelruntime
 
@@ -65,8 +65,8 @@ func New(baseURL string, secret []byte, client *http.Client) *Client {
 		// Library batches with images and long audio can take a while.
 		client = &http.Client{Timeout: 3 * time.Minute}
 	}
-	// A call body can carry an account's provider key. A redirect would resend
-	// it to another address, so redirects are failures, never followed.
+	// A redirect would resend a signed call to another address, so redirects
+	// are failures, never followed.
 	noRedirects := *client
 	noRedirects.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return &Client{url: strings.TrimRight(baseURL, "/"), secret: secret, http: &noRedirects}
@@ -84,29 +84,24 @@ func Sign(secret []byte, method, path, timestamp string, body []byte) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// Route is the connection a call uses: Misty's own Gateway, or the account's
-// provider with its key. It carries a secret, so it is only ever sent to the
-// runtime over the signed channel.
+// Route is how a call runs. It is always Misty's own: the runtime sends OpenAI
+// models to OpenAI when the instance has a key, and everything else through
+// the AI Gateway. Only the reasoning an account chose travels with it.
 type Route struct {
 	Provider  string `json:"provider"`
-	Model     string `json:"model,omitempty"`
-	BaseURL   string `json:"baseURL,omitempty"`
-	APIKey    string `json:"apiKey,omitempty"`
 	Reasoning string `json:"reasoning,omitempty"`
 }
 
-// Instance routes through Misty's own AI Gateway account.
+// Instance runs on Misty's own keys with the model's default reasoning.
 func Instance() Route { return Route{Provider: "instance"} }
 
-// For returns the account's route, or Misty's Gateway when it has none.
+// For carries an account's chosen reasoning, if it has one.
 func For(resolved *aimodels.Resolved) Route {
 	if resolved == nil {
 		return Instance()
 	}
-	return Route{Provider: resolved.Provider, Model: resolved.Model, BaseURL: resolved.BaseURL, APIKey: resolved.APIKey, Reasoning: resolved.Reasoning}
+	return Route{Provider: "instance", Reasoning: resolved.Reasoning}
 }
-
-func (r Route) IsAccount() bool { return r.Provider != "" && r.Provider != "instance" }
 
 type Part struct {
 	Type      string `json:"type"`
@@ -137,7 +132,7 @@ type TextRequest struct {
 	System          string    `json:"system,omitempty"`
 	Messages        []Message `json:"messages"`
 	MaxOutputTokens int64     `json:"maxOutputTokens"`
-	// Reasoning applies to Misty's Gateway; an account route carries its own.
+	// Reasoning is the call's own; a route's reasoning, when set, wins.
 	Reasoning string  `json:"reasoning,omitempty"`
 	Schema    *Schema `json:"schema,omitempty"`
 }

@@ -27,6 +27,8 @@ vi.mock("./store/useAgentDeviceStore", () => ({
   signedAgentDeviceRequest: vi.fn(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+// The job's run grant is checked natively before it runs.
+vi.mock("@/native/devices", () => ({ devicesNative: { verifyJob: async () => {} } }));
 import { DesktopAgentJobWorker } from "./worker";
 let worker: DesktopAgentJobWorker | undefined;
 afterEach(() => {

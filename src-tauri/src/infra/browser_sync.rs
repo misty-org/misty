@@ -66,11 +66,57 @@ struct Session {
     held: super::browser_data_budget::Held,
     #[cfg(any(target_os = "macos", windows))]
     capture_view: Option<capture::CaptureView>,
+    /// While the vault is open this device can admit and remove devices
+    /// (docs/design/devices/BRIEF.md). Dropped, and zeroized, on lock.
+    admission_root: VaultRoot,
 }
 
 static SESSION: OnceLock<Mutex<Option<Session>>> = OnceLock::new();
 fn session() -> &'static Mutex<Option<Session>> {
     SESSION.get_or_init(|| Mutex::new(None))
+}
+
+/// The open vault's root, scope and this device's sync identity, for signing
+/// device grants and lists. None while the vault is locked.
+pub(crate) async fn device_admission_authority(
+    account: &str,
+) -> Option<(VaultRoot, VaultScope, String)> {
+    session()
+        .lock()
+        .await
+        .as_ref()
+        .filter(|s| s.scope.account_id == account)
+        .map(|s| {
+            (
+                s.admission_root.duplicate(),
+                s.scope.clone(),
+                s.device_id.clone(),
+            )
+        })
+}
+
+/// Opens the vault with a root sealed to this device by one already added
+/// (approval from another device). The root was checked against the vault's
+/// root public key before this is called.
+pub(crate) async fn open_with_transferred_root(
+    app: tauri::AppHandle,
+    api_base: String,
+    account_id: String,
+    root: VaultRoot,
+    remember: bool,
+) -> Result<SyncView, String> {
+    open_vault_with(
+        app,
+        api_base,
+        account_id,
+        None,
+        None,
+        Some(root),
+        remember,
+        false,
+        false,
+    )
+    .await
 }
 
 /// Native extension settings share the encrypted account transport, independent
@@ -771,6 +817,24 @@ async fn open_vault(
     create: bool,
     reenroll: bool,
 ) -> Result<SyncView, String> {
+    open_vault_with(
+        app, api_base, account_id, password, secret, None, remember, create, reenroll,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn open_vault_with(
+    app: tauri::AppHandle,
+    api_base: String,
+    account_id: String,
+    password: Option<Zeroizing<String>>,
+    secret: Option<Zeroizing<String>>,
+    provided_root: Option<VaultRoot>,
+    remember: bool,
+    create: bool,
+    reenroll: bool,
+) -> Result<SyncView, String> {
     // Re-enrolling registers a new device identity, so it must be authorized by
     // the vault password and sync secret, never by a remembered key alone.
     let reenroll = reenroll && !create;
@@ -785,6 +849,7 @@ async fn open_vault(
     if !create
         && password.is_none()
         && secret.is_none()
+        && provided_root.is_none()
         && current.as_ref().is_some_and(|active| {
             active.scope.deployment == api.deployment()
                 && active.scope.account_id == account_id
@@ -884,15 +949,23 @@ async fn open_vault(
                 },
             };
             let server = &vault.vault;
-            let root = match (password, secret) {
-                (Some(password), Some(secret)) => VaultRoot::unlock(
+            let root = match (password, secret, provided_root) {
+                (Some(password), Some(secret), None) => VaultRoot::unlock(
                     &native_scope,
                     &server.key_envelope,
                     &password,
                     &secret,
                     &server.root_public_key,
                 )?,
-                (None, None) => secure_store::recall(&native_scope, &server.root_public_key)?
+                // Sealed to this device by an approving one; it must match the
+                // vault the server names before anything is opened with it.
+                (None, None, Some(root)) => {
+                    if root.public_key()? != server.root_public_key {
+                        return Err(misty_browser_sync::Error::Identity);
+                    }
+                    root
+                }
+                (None, None, None) => secure_store::recall(&native_scope, &server.root_public_key)?
                     .ok_or(misty_browser_sync::Error::Unlock)?,
                 _ => return Err(misty_browser_sync::Error::Invalid),
             };
@@ -950,6 +1023,7 @@ async fn open_vault(
     cached_workspace.active_device = committed.active_device;
     cached_workspace.sequence = pending.committed_sequence;
     let device_id = store.grant().device_id.clone();
+    let admission_root = root.duplicate();
     let (worker, handle) = Worker::new(
         api.clone(),
         scope.clone(),
@@ -1040,6 +1114,7 @@ async fn open_vault(
         held: Default::default(),
         #[cfg(any(target_os = "macos", windows))]
         capture_view: None,
+        admission_root,
     });
     let _ = app.emit_to("main", "misty:browser-sync-changed", "");
     view(current.as_mut().expect("session was installed")).await

@@ -100,7 +100,7 @@ func TestAgentMethodHTTPManualAndScheduledExecution(t *testing.T) {
 	spaces := &SpacesService{database: database, aiInvocations: service.invocations}
 	router := chi.NewRouter()
 	router.Post("/methods/run", service.RunAgentMethod())
-	router.Post("/schedules", service.ScheduledTasks())
+	router.Put("/methods/{methodID}/schedule", service.WorkflowSchedule())
 	router.Post("/invocations/{invocationID}/cancel", service.CancelInvocation())
 	router.Get("/conversations", service.MistyConversations())
 	signer, err := security.SessionSignerFromEnv()
@@ -313,43 +313,66 @@ func TestAgentMethodHTTPManualAndScheduledExecution(t *testing.T) {
 	if _, err = database.SaveAgentMethod(ctx, other.ID, db.AgentMethod{AgentID: agent.ID, Kind: "template", Enabled: true, Definition: definition, SourceInvocationID: admitted.ID}, 0); err == nil {
 		t.Fatal("foreign source accepted")
 	}
-	scheduleBody := map[string]any{"method_version_id": originalVersion, "method_inputs": map[string]any{"topic": "Ocean currents"}, "agent_id": agent.ID, "title": "Daily brief", "prompt": "Forged schedule instructions", "cadence": "daily", "local_time": "09:00", "weekday": 1, "month_day": 1, "timezone": "UTC"}
-	w = invoke("/schedules", owner.ID, scheduleBody)
-	if w.Code != 201 {
+	// A schedule runs the workflow's latest version, never a forged prompt.
+	scheduleBody := map[string]any{"inputs": map[string]any{"topic": "Ocean currents"}, "prompt": "Forged schedule instructions", "timezone": "UTC", "rules": []any{map[string]any{"frequency": "daily", "times": []string{"09:00"}}}}
+	raw, _ := json.Marshal(scheduleBody)
+	put := httptest.NewRequest(http.MethodPut, "/methods/"+method.ID+"/schedule", bytes.NewReader(raw))
+	put.AddCookie(&http.Cookie{Name: TestingSessionCookieName, Value: token(owner.ID)})
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, put)
+	if w.Code != http.StatusOK {
 		t.Fatalf("schedule creation %d %s", w.Code, w.Body)
 	}
 	var created struct {
-		Task db.ScheduledTask `json:"task"`
+		Schedule db.WorkflowSchedule `json:"schedule"`
 	}
-	if json.Unmarshal(w.Body.Bytes(), &created) != nil || created.Task.MethodVersionID != originalVersion {
-		t.Fatal("schedule pin missing")
+	if json.Unmarshal(w.Body.Bytes(), &created) != nil || created.Schedule.MethodID != method.ID {
+		t.Fatal("schedule not attached to its workflow")
 	}
 	now := time.Now().UTC()
-	if err = database.RunScheduledTaskNow(ctx, owner.ID, created.Task.ID, now); err != nil {
+	if err = database.TestingWithRLSContext(ctx, db.TestingServiceRLSSettings(), func(tx *sql.Tx) error {
+		_, e := tx.ExecContext(ctx, `UPDATE workflow_schedules SET next_run_at=$2 WHERE id=$1`, created.Schedule.ID, now)
+		return e
+	}); err != nil {
 		t.Fatal(err)
 	}
-	n, err := service.ProcessDueScheduledTasks(ctx, now.Add(time.Second), 10)
+	n, err := service.ProcessDueWorkflowSchedules(ctx, now.Add(time.Second), 10)
 	if err != nil || n != 1 {
 		t.Fatal("scheduled admission", n, err)
 	}
-	running, err := database.ScheduledTaskByID(ctx, owner.ID, created.Task.ID)
+	running, err := database.WorkflowScheduleByMethod(ctx, owner.ID, method.ID)
 	if err != nil || running.LastInvocationID == "" || running.State != "running" {
 		t.Fatal("schedule not bound", err)
 	}
-	assertPin(running.LastInvocationID)
-	if err = service.startScheduledTaskRun(ctx, *running, now.Add(time.Second)); err != nil {
+	latest, err := database.AgentMethodByID(ctx, owner.ID, method.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduledRecord, err := database.AIInvocationByID(ctx, owner.ID, running.LastInvocationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var scheduled aiInvocationInput
+	if json.Unmarshal(scheduledRecord.RequestPayload, &scheduled) != nil || scheduled.MethodVersionID != latest.VersionID || !strings.Contains(scheduled.Prompt, "Changed instructions") || strings.Contains(scheduled.Prompt, "Forged") || scheduled.MethodInputs["topic"] != "Ocean currents" {
+		t.Fatal("scheduled run did not use the latest version and saved inputs", string(scheduledRecord.RequestPayload))
+	}
+	if err = service.startWorkflowScheduleRun(ctx, *running, now.Add(time.Second)); err != nil {
 		t.Fatal("occurrence retry", err)
 	}
-	repeated, err := database.ScheduledTaskByID(ctx, owner.ID, running.ID)
+	repeated, err := database.WorkflowScheduleByMethod(ctx, owner.ID, method.ID)
 	if err != nil || repeated.LastInvocationID != running.LastInvocationID || starts.Load() != 2 {
 		t.Fatal("same occurrence dispatched twice", starts.Load(), err)
 	}
-	finish(running.LastInvocationID)
-	record := assertPin(running.LastInvocationID)
-	if err = spaces.completeScheduledTaskInvocation(ctx, record, nil); err != nil {
+	if _, e := service.invocations.restoreDurable(ctx, *scheduledRecord); e != nil {
+		t.Fatal(e)
+	}
+	if e := spaces.finishAIInvocationRuntimeAnswer(owner.ID, scheduledRecord.ID, scheduled, "Ocean currents distribute heat around the planet.", nil, scheduled.Prompt); e != nil {
+		t.Fatal(e)
+	}
+	if err = spaces.completeWorkflowScheduleInvocation(ctx, scheduledRecord, nil); err != nil {
 		t.Fatal(err)
 	}
-	settled, err := database.ScheduledTaskByID(ctx, owner.ID, running.ID)
+	settled, err := database.WorkflowScheduleByMethod(ctx, owner.ID, method.ID)
 	if err != nil || settled.State != "idle" || settled.RunCount != 1 || settled.LastError != "" || settled.NextRunAt == nil || !settled.NextRunAt.After(now) {
 		t.Fatal("schedule did not settle", settled, err)
 	}

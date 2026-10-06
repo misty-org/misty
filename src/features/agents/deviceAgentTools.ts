@@ -6,6 +6,7 @@ import {
   useWorkspaceStore,
 } from "@/features/workspace";
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
+import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
@@ -18,6 +19,7 @@ import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 export const deviceAgentOperations = new Set([
   "files.list",
   "files.read",
+  "files.send",
   "tabs.list",
   "tabs.open",
   "bookmarks.list",
@@ -58,6 +60,14 @@ export async function runDeviceAgentOperation(
 ): Promise<Record<string, unknown>> {
   const input = record(job.input);
   switch (job.operation) {
+    case "files.send": {
+      const target = scopedPath(job);
+      if (!target.relativePath) throw new Error("invalid_device_scope");
+      // The file goes directly to the other device over the LAN; only this
+      // receipt returns to the server.
+      const receipt = await devicesNative.sendFile(job.scopeId, job.input, job.config);
+      return { ...receipt };
+    }
     case "files.list":
       return invoke<Record<string, unknown>>("agents_list_scoped_files", {
         request: scopedPath(job),

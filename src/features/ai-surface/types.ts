@@ -1,3 +1,4 @@
+import type { CollaborationEvent } from "@/features/agents/agentCollaboration";
 import type { DisplayCapture } from "@/features/agents";
 import type { AppRequest } from "@/features/agents";
 
@@ -54,12 +55,15 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  /** A browser tab, a folder shared with agents, or the Misty browser itself. */
-  kind: "browser_tab" | "local_folder" | "workspace";
+  /** A browser tab, a folder shared with agents, the Misty browser itself, or
+   * the device's inbox for files its other devices send it. */
+  kind: "browser_tab" | "local_folder" | "workspace" | "inbox";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];
   metadata?: Record<string, string | number | boolean>;
+  /** Signed by the device that asked; required by the server. */
+  runGrant?: { payload: string; signature: string };
 }
 export interface AiSelectionSnapshot {
   kind: "text" | "blocks" | "canvas" | "objects" | "rows";
@@ -188,6 +192,8 @@ export interface AiInvocationRequest {
   skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
+  /** Pins a new conversation's Thinking model with its first message. */
+  modelOverride?: string;
   displayCaptures?: DisplayCapture[];
   agentId?: string;
   taskId?: string;
@@ -207,6 +213,8 @@ export interface AiInvocationRequest {
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   requestedArtifactKind?: AiArtifactKind;
   conversationId?: string;
+  /** Plan researches and proposes; Act does the work. Omitted uses the conversation's mode. */
+  collaborationMode?: "act" | "plan";
   idempotencyKey: string;
   timezone?: string;
 }
@@ -252,6 +260,7 @@ export type AiInvocationState =
   | "canceled";
 export type AiInvocationEvent =
   | { id: string; type: "user.steering"; text: string }
+  | ({ id: string } & CollaborationEvent)
   | {
       id: string;
       type: "steering.received" | "steering.closed";

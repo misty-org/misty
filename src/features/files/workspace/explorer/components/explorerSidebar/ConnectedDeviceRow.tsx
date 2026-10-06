@@ -1,9 +1,12 @@
-import { connectedDevicesPrepareClipboardFiles, connectedDevicesRoots } from "../../../native";
+import {
+  connectedDevicesPrepareClipboardFiles,
+  connectedDevicesRoots,
+  connectedDevicesSnapshot,
+} from "../../../native";
 import { reportSystemError } from "@/features/activity";
 import {
-  deviceLink,
-  peerIsOnline,
-  type ServerConnectedPeer,
+  deviceStatusLabel,
+  type DevicePeer,
   type useConnectedDevices,
 } from "@/features/connected-devices";
 import {
@@ -14,38 +17,35 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@/shared/ui";
-import {
-  ClipboardCopy,
-  ClipboardPaste,
-  Info,
-  Link2,
-  Link2Off,
-  Lock,
-  LockOpen,
-  MonitorSmartphone,
-  Pencil,
-  Unlink,
-} from "lucide-react";
+import { ClipboardPaste, Info, Link2, MonitorSmartphone, Pencil } from "lucide-react";
 import { useState } from "react";
 import { sidebarStyles } from "@/features/file-ui";
 
 type Controller = ReturnType<typeof useConnectedDevices>;
 
+const connectWaitMs = 15_000;
+
+/** Waits for a direct LAN connection after a connect request. */
+async function waitForConnection(deviceId: string): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < connectWaitMs) {
+    const snapshot = await connectedDevicesSnapshot().catch(() => null);
+    if (snapshot?.peers.some((peer) => peer.deviceId === deviceId)) return true;
+    await new Promise((resolve) => window.setTimeout(resolve, 400));
+  }
+  return false;
+}
+
 export function ConnectedDeviceRow(props: {
-  peer: ServerConnectedPeer;
+  peer: DevicePeer;
   controller: Controller;
   activePath: string;
   onNavigate: (path: string) => void;
 }) {
   const { peer, controller } = props;
   const [busy, setBusy] = useState(false);
-  const link = deviceLink(peer, controller.snapshot);
-  const connected = link.state === "connected";
-  // A pair that never connected, or whose session ended, needs Misty's server
-  // once, so the other device must be online for it.
-  const needsConnect = link.state === "new" || link.state === "ended";
-  const canOpen = connected || (needsConnect && peerIsOnline(peer) && Boolean(peer.addressing));
-  const selected = props.activePath.startsWith(`misty://device/${peer.deviceId}/`);
+  const canOpen = peer.online && peer.policy?.files !== "off";
+  const selected = props.activePath.startsWith(`misty://device/${peer.id}/`);
 
   const run = async (title: string, action: () => Promise<unknown>) => {
     setBusy(true);
@@ -65,12 +65,23 @@ export function ConnectedDeviceRow(props: {
 
   const open = () =>
     run(`Couldn't open ${peer.name}`, async () => {
-      if (!connected) await controller.connectPeer(peer);
-      const roots = await connectedDevicesRoots(peer.deviceId);
+      if (!peer.connected) {
+        await controller.connect(peer.id);
+        if (!(await waitForConnection(peer.id)))
+          throw new Error(`${peer.name} isn't reachable on this network.`);
+      }
+      const roots = await connectedDevicesRoots(peer.id);
       // The system disk first; volumes follow it.
       const root = roots.find((item) => item.kind === "system") ?? roots[0];
-      if (root) props.onNavigate(`misty://device/${peer.deviceId}/${root.id}`);
+      if (root) props.onNavigate(`misty://device/${peer.id}/${root.id}`);
     });
+
+  const access =
+    peer.policy?.files === "edit"
+      ? "Can edit"
+      : peer.policy?.files === "off"
+        ? "Not shared"
+        : "View";
 
   return (
     <ContextMenu>
@@ -92,59 +103,30 @@ export function ConnectedDeviceRow(props: {
             </span>
             <span className={sidebarStyles.deviceCopy}>
               <strong className={sidebarStyles.deviceName}>{peer.name}</strong>
-              <small className={sidebarStyles.deviceMeta}>{linkLabel(link.state, peer)}</small>
+              <small className={sidebarStyles.deviceMeta}>
+                {deviceStatusLabel(peer.status)}
+                {peer.online ? ` · ${access}` : ""}
+              </small>
             </span>
           </Button>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        {connected || link.state === "reconnecting" ? (
-          <ContextMenuAction
-            icon={<Link2Off size={15} />}
-            label="Disconnect"
-            onSelect={() =>
-              void run(`Couldn't disconnect ${peer.name}`, () => controller.endSession(peer))
-            }
-          />
-        ) : (
-          <ContextMenuAction
-            icon={<Link2 size={15} />}
-            label="Connect"
-            disabled={!canOpen}
-            onSelect={() =>
-              void run(`Couldn't connect ${peer.name}`, () => controller.connectPeer(peer))
-            }
-          />
-        )}
         <ContextMenuAction
-          icon={peer.filesAcceptWrites ? <Lock size={15} /> : <LockOpen size={15} />}
-          label={
-            peer.filesAcceptWrites
-              ? "Stop changes from this device"
-              : "Allow changes from this device"
-          }
+          icon={<Link2 size={15} />}
+          label="Connect"
+          disabled={!peer.online || peer.connected}
           onSelect={() =>
-            void run("Couldn't update file access", () =>
-              controller.setFileWrites(peer, !peer.filesAcceptWrites),
-            )
-          }
-        />
-        <ContextMenuAction
-          icon={<ClipboardCopy size={15} />}
-          label={peer.clipboardCanSend ? "Stop sharing clipboard" : "Share clipboard"}
-          onSelect={() =>
-            void run("Couldn't update clipboard sharing", () =>
-              controller.setClipboardConsent(peer, !peer.clipboardCanSend),
-            )
+            void run(`Couldn't connect ${peer.name}`, () => controller.connect(peer.id))
           }
         />
         <ContextMenuAction
           icon={<ClipboardPaste size={15} />}
           label="Prepare copied files for other apps"
-          disabled={!peer.clipboardCanSend || !connected}
+          disabled={!peer.policy?.clipboard || !peer.connected}
           onSelect={() =>
             void run("Couldn't prepare the copied files", () =>
-              connectedDevicesPrepareClipboardFiles(peer.deviceId),
+              connectedDevicesPrepareClipboardFiles(peer.id),
             )
           }
         />
@@ -153,30 +135,16 @@ export function ConnectedDeviceRow(props: {
           label="Rename"
           onSelect={() => {
             const name = window.prompt("Device name", peer.name);
-            if (name)
-              void run("Couldn't rename the device", () => controller.renamePeer(peer, name));
+            if (name?.trim())
+              void run("Couldn't rename the device", () => controller.rename(peer.id, name.trim()));
           }}
         />
         <ContextMenuAction
           icon={<Info size={15} />}
           label="Copy diagnostics ID"
-          onSelect={() => void navigator.clipboard.writeText(peer.p2pEndpointId)}
-        />
-        <ContextMenuAction
-          icon={<Unlink size={15} />}
-          label="Unpair"
-          destructive
-          onSelect={() => void run(`Couldn't unpair ${peer.name}`, () => controller.unpair(peer))}
+          onSelect={() => void navigator.clipboard.writeText(peer.p2pEndpointId ?? peer.id)}
         />
       </ContextMenuContent>
     </ContextMenu>
   );
-}
-
-function linkLabel(state: ReturnType<typeof deviceLink>["state"], peer: ServerConnectedPeer) {
-  const access = peer.filesCanWrite ? "Can edit" : "Read-only";
-  if (state === "connected") return `Connected · ${access}`;
-  if (state === "reconnecting") return "Reconnecting";
-  if (state === "ended") return peerIsOnline(peer) ? "Session ended · Connect" : "Session ended";
-  return peerIsOnline(peer) ? "Connecting" : "Offline";
 }

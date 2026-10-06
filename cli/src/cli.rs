@@ -200,7 +200,8 @@ struct Server {
 
 #[derive(Debug, Subcommand)]
 enum ServerCommand {
-    /// Start containers, wait for readiness, and return with a status summary.
+    /// Start every local service (billing first, migrated and rebuilt, then the
+    /// server's containers), wait for readiness, and return with a status summary.
     Up {
         #[arg(long)]
         detach: bool,
@@ -218,7 +219,9 @@ enum ServerCommand {
     /// Deploy the development collaboration Worker explicitly.
     Deploy,
     Url,
+    /// Stop every local service, billing included.
     Down {
+        /// Also delete the server's data volumes. Billing's database is never deleted here.
         #[arg(long)]
         volumes: bool,
     },

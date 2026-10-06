@@ -13,4 +13,11 @@ func (s *Server) mountMCPRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.Post(prefix+"/me/app-requests/{requestID}", spaces.AppRequestControl())
 	s.Router.Post(prefix+"/me/app-requests/{requestID}/link", spaces.AppRequestLink())
 	s.Router.Post(prefix+"/me/screen-model/{jobID}", spaces.ScreenModel())
+	// Collaboration: Plan/Act mode, agent questions, plans and goals.
+	s.Router.Get(prefix+"/me/conversations/{conversationID}/collaboration", spaces.ConversationCollaboration())
+	s.Router.Put(prefix+"/me/conversations/{conversationID}/mode", spaces.ConversationModeControl())
+	s.Router.Post(prefix+"/me/conversations/{conversationID}/goal", spaces.ConversationGoal())
+	s.Router.Post(prefix+"/me/agent-questions/{questionID}/answer", spaces.AnswerAgentQuestions())
+	s.Router.Post(prefix+"/me/agent-plans/{planID}/{action}", spaces.AgentPlanControl())
+	s.Router.Patch(prefix+"/me/agent-goals/{goalID}", spaces.AgentGoalControl())
 }

@@ -96,7 +96,7 @@ function validEvent(value: unknown): value is AccountEvent {
       "jobs",
       "agents",
       "interventions",
-      "scheduled-tasks",
+      "workflows",
       "usage",
       "library-renditions",
       "device-pairing",

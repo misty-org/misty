@@ -3,10 +3,14 @@ export * from "./flags";
 export type { GlobalSpaceLibraryHit } from "./model/interfaces/personal";
 export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgentsStore";
 export {
+  deviceAccount,
+  ensureDeviceStarted,
   ensureServerAgentDevice,
   noteServerAgentDeviceSeen,
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
+export { useAgentDeviceTargets } from "./store/useAgentDeviceTargets";
+export type { RemoteAgentDevice } from "./deviceGrants";
 export * from "./store/useAiServerStore";
 
 export { companionReply } from "./companion/companionReply";
@@ -22,3 +26,8 @@ export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversat
 
 export type { AppRequest } from "./apps/api";
 export { AppRequestCard } from "./apps/AppRequestCard";
+
+export { ModelPicker } from "./models/ModelPicker";
+export { describeNextRun } from "./workflows/scheduleSummary";
+export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
+export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";

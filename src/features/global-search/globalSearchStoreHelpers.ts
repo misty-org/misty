@@ -1,3 +1,8 @@
+import {
+  useCollaborationStore,
+  collaborationEventTypes,
+  type CollaborationEvent,
+} from "@/features/agents/agentCollaboration";
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId } from "./globalMistyActions";
 import type { GlobalSearchState } from "./globalSearchState";
@@ -125,6 +130,10 @@ export function applyGlobalInvocationEvent(
   }
   if (event.type === "app.request") {
     patchConversationMessage(set, get, conversationId, messageId, { appRequest: event.appRequest });
+    return;
+  }
+  if (collaborationEventTypes.has(event.type)) {
+    useCollaborationStore.getState().applyEvent(conversationId, event as CollaborationEvent);
     return;
   }
   if (event.type === "screen.request") {

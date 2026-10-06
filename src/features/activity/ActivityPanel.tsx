@@ -2,7 +2,7 @@ import { ActivityPanelToolbar } from "./ActivityPanelToolbar";
 import { ActivityPanelFooter } from "./ActivityPanelFooter";
 import { defaultActivityView, selectActivityView } from "./activityView";
 import { useActivityStore } from "./useActivityStore";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { cn, Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
@@ -11,13 +11,16 @@ import { AgentMemberRequests } from "@/features/agent-member-requests/AgentMembe
 import { ActivityFeed } from "./ActivityFeed";
 import { closeActivityPanel, openActivityPanel, useActivityPanel } from "./activityPanelState";
 
+const noItems: ReturnType<typeof useActivityStore.getState>["allItems"] = [];
+
 export function ActivityPanel() {
   const { user } = useAuth();
   const account = useRef(user?.id);
   const panel = useActivityPanel();
   const [view, setView] = useState(defaultActivityView);
-  const items = useActivityStore((state) => state.allItems);
-  const results = selectActivityView(items, view);
+  // The panel stays mounted while closed; only follow activity while it is open.
+  const items = useActivityStore((state) => (panel.open ? state.allItems : noItems));
+  const results = useMemo(() => selectActivityView(items, view), [items, view]);
   useEffect(() => {
     if (!panel.open) setView(defaultActivityView);
   }, [panel.open]);

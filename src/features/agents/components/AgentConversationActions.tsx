@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MoreHorizontal, PanelTop, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { globalMistyError } from "@/features/global-search/globalMistyActions";
 import {
@@ -19,7 +19,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   Input,
@@ -30,13 +29,10 @@ export function AgentConversationActions({
   conversation,
   disabled,
   onOpen,
-  onFloat,
 }: {
   conversation: { id: string; title?: string };
   disabled?: boolean;
   onOpen?(): void;
-  /** The open conversation can float over the workspace, even while it works. */
-  onFloat?(): void;
 }) {
   const [params, setParams] = useSearchParams();
   const [action, setAction] = useState<"rename" | "delete">();
@@ -86,11 +82,7 @@ export function AgentConversationActions({
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <IconButton
-            ref={trigger}
-            disabled={(disabled && !onFloat) || busy}
-            label={`More actions for ${name}`}
-          >
+          <IconButton ref={trigger} disabled={disabled || busy} label={`More actions for ${name}`}>
             <MoreHorizontal />
           </IconButton>
         </DropdownMenuTrigger>
@@ -101,14 +93,6 @@ export function AgentConversationActions({
           }}
         >
           {onOpen && <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>}
-          {onFloat && (
-            <>
-              <DropdownMenuItem onSelect={onFloat}>
-                <PanelTop /> Float conversation
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
           <DropdownMenuItem
             disabled={disabled}
             onSelect={() => {

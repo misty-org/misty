@@ -191,8 +191,7 @@ Each phase leaves the product working.
   dependency and the pinned SDK execution path were removed once no run could
   grant native input directly.
 - Screen calls use the run's frozen *vision* route, which defaults to the run's
-  model. When the account points that route at its own provider connection,
-  calls go there with the account's key; billing meters the same route.
+  model and follows the account's Seeing choice; billing meters the same route.
 - Midscene's Node-only helpers get browser stubs in the desktop build
   (`src/shared/platform/nodeShims`); reports and caches are not written.
 - Scope at first: Misty's own windows. Other Mac apps came next (below).
@@ -240,9 +239,8 @@ were dropped by `20271004070000_retire_legacy_features.sql`.
   messaging, provider-shared resources and the provider OAuth shell. Apps go
   through Composio; Google, Microsoft and Dropbox account connections remain
   for calendars and files.
-- Direct instance model providers (`OPENAI_API_KEY`,
-  `MISTY_AGENT_MODEL_PROVIDER`). Instance AI bills the AI Gateway; accounts
-  can still bring their own keys in Settings.
+- Direct instance model providers (`MISTY_AGENT_MODEL_PROVIDER` and friends).
+  `OPENAI_API_KEY` returned on October 5 for OpenAI models only (below).
 - The single-turn voice relay and the WebRTC voice transport. Voice is always a
   realtime conversation over the gateway WebSocket.
 
@@ -448,3 +446,40 @@ The first live run on October 4, 2026 found and fixed:
   failed. It now hands off like a screen request: the run ends with the card,
   and the conversation continues once the app is connected or the action is
   approved.
+
+### Misty's own keys; senses instead of tasks (October 5, 2026)
+
+- Account provider keys (bring your own key) are gone, with their encrypted
+  connections table. Every model runs on Misty's own keys through the agent
+  runtime's AI SDK.
+- OpenAI models (`openai/…`) call OpenAI directly when the instance sets
+  `OPENAI_API_KEY`; every other model, and OpenAI models without it, go through
+  the AI Gateway. Go applies the same rule for billing labels and OpenAI
+  realtime voices (`aimodels.DirectOpenAI`).
+- Settings → Agents → Models offers four senses instead of twelve tasks:
+  Thinking (agent), Seeing (vision and Library), Listening (transcription) and
+  Speaking (realtime voice). Each picks a Gateway model of the fitting type, or
+  Misty's default. Routing, fallbacks, embeddings and speech output keep the
+  instance defaults.
+- The Agents composer can pin a Thinking model to one conversation
+  (`misty_ask_conversations.model_override`). It beats the account's Thinking
+  choice, is frozen into each run like every route, and falls back with a
+  notice if the Gateway retires it.
+
+### Schedules belong to workflows (October 5, 2026)
+
+- `scheduled_tasks` became `workflow_schedules`: one per workflow (`method_id`,
+  unique), runs posted into the schedule's own conversation, leases and
+  lifecycle hints unchanged. Plain-prompt scheduled tasks were deleted.
+- Timing is a list of rules in one timezone plus skipped dates
+  (`ScheduleTiming` in `workflow_schedule_timing.go`): once on dates, every N
+  hours within a window, every N days/weeks/months/years, weekdays, days of the
+  month (clamped, -1 for last), nth weekdays and months. The next run is the
+  earliest moment any rule produces.
+- Every scheduled run renders the workflow's latest version with the
+  schedule's saved inputs; a turned-off workflow keeps its schedule but never
+  runs.
+- API: `PUT/DELETE /ai/agent-methods/{id}/schedule`, `GET /ai/workflow-schedules`
+  for cross-agent overviews; methods lists carry each workflow's schedule.
+  Agent tools `workflows.schedule` and `workflows.unschedule` replaced
+  `schedules.*`. Account event topic `workflows` replaced `scheduled-tasks`.

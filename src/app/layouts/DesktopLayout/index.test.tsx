@@ -128,7 +128,9 @@ vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({
 }));
 vi.mock("@/features/files/workspace/explorer", () => ({ MediaSearchViewer: () => null }));
 vi.mock("@/features/activity", () => ({ ActivityBridge: () => null }));
-vi.mock("@/features/scheduled", () => ({ ScheduledTasksBridge: () => null }));
+vi.mock("@/features/agents/workflows/WorkflowSchedulesBridge", () => ({
+  WorkflowSchedulesBridge: () => null,
+}));
 vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
 
 import { SavedAccountSessionUnavailableError } from "@/features/auth/sessionErrors";

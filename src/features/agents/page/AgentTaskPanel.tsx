@@ -1,48 +1,62 @@
-import { Check, CircleAlert } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronDown, CircleAlert } from "lucide-react";
 import type { GlobalAiConversation } from "@/features/global-search/types";
-import { SkeletonList } from "@/shared/ui";
+import type { MistyActivityEntry } from "@/features/misty/activity";
+import { Button, SkeletonList } from "@/shared/ui";
+import { AgentCollaborationSections } from "../collaboration/AgentCollaborationSections";
 import { toolSteps } from "../components/ToolActivity";
-import { activityStateLabels, formatActivityTime, useAgentActivity } from "./useAgentActivity";
+import { activityStateIcon, activityStateLabels, formatActivityTime } from "./useAgentActivity";
 import "./agentTaskPanel.css";
 
+/** The open conversation's top-level runs, newest first. */
+export const conversationRuns = (entries: MistyActivityEntry[], conversationId?: string) =>
+  entries
+    .filter((entry) => entry.conversation_id === conversationId && !entry.parent_run_id)
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+
+const stateLabel = (state: string) => activityStateLabels[state] ?? state.replace(/_/g, " ");
+
 /**
- * The floating panel beside a conversation. It describes this task only; what the
- * agent can reach in general lives on Integrations.
+ * The Task section of Details. It describes this conversation's task only: the latest
+ * run's status and steps, work it handed to other agents, and earlier runs (retries,
+ * follow-ups) folded underneath. What every agent can reach lives on Integrations.
  */
 export function AgentTaskPanel({
-  accountId,
-  agentId,
+  activity,
   conversation,
   working,
   deviceName,
 }: {
-  accountId: string;
-  agentId: string;
+  activity: { entries: MistyActivityEntry[]; loading: boolean };
   conversation?: GlobalAiConversation;
   working: boolean;
   deviceName?: string;
 }) {
-  const activity = useAgentActivity(accountId, agentId);
+  const [showEarlier, setShowEarlier] = useState(false);
   if (!conversation)
     return (
       <div className="agent-task-panel">
+        <AgentCollaborationSections />
         <p className="agent-task-panel-note">Details appear here once a task starts.</p>
       </div>
     );
-  const runs = activity.entries
-    .filter((entry) => entry.conversation_id === conversation.id && !entry.parent_run_id)
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  const latest = runs[0];
-  const status = working
-    ? "Working"
-    : latest
-      ? (activityStateLabels[latest.state] ?? latest.state.replace(/_/g, " "))
-      : "Ready";
+  const runs = conversationRuns(activity.entries, conversation.id);
+  const [latest, ...earlier] = runs;
+  const status = working ? "Working" : latest ? stateLabel(latest.state) : "Ready";
   const steps = latest ? toolSteps(latest.events).slice(-8) : [];
+  // Work the latest run handed to other agents, as they report it.
+  const handedOff = latest
+    ? activity.entries.filter(
+        (entry) =>
+          entry.parent_run_id &&
+          (entry.parent_run_id === latest.id || entry.parent_run_id === latest.run_id),
+      )
+    : [];
   return (
-    <div className="agent-task-panel" aria-label="This task">
+    <div className="agent-task-panel">
+      <AgentCollaborationSections conversationId={conversation.id} />
       <section>
-        <h3>This task</h3>
+        <h3>Details</h3>
         <dl>
           <dt>Status</dt>
           <dd role="status">{status}</dd>
@@ -83,12 +97,49 @@ export function AgentTaskPanel({
           <p className="agent-task-panel-note">No tool steps yet.</p>
         )}
       </section>
-      {runs.length > 1 && (
+      {handedOff.length > 0 && (
         <section>
-          <h3>Runs</h3>
-          <p className="agent-task-panel-note">
-            {runs.length} runs in this conversation. Activity has the full history.
-          </p>
+          <h3>Handed off</h3>
+          <ul>
+            {handedOff.map((run) => {
+              const Icon = activityStateIcon(run.state);
+              return (
+                <li key={run.id} title={run.result || run.title}>
+                  <Icon size={14} aria-hidden="true" />
+                  <span>{run.title || "Agent task"}</span>
+                  <small>{stateLabel(run.state)}</small>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {earlier.length > 0 && (
+        <section>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="agent-task-panel-toggle"
+            aria-expanded={showEarlier}
+            onClick={() => setShowEarlier((open) => !open)}
+          >
+            {earlier.length} earlier run{earlier.length === 1 ? "" : "s"}
+            <ChevronDown size={12} aria-hidden="true" />
+          </Button>
+          {showEarlier && (
+            <ul>
+              {earlier.map((run) => {
+                const Icon = activityStateIcon(run.state);
+                return (
+                  <li key={run.id}>
+                    <Icon size={14} aria-hidden="true" />
+                    <span>{stateLabel(run.state)}</span>
+                    <small>{formatActivityTime(run.updated_at)}</small>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       )}
     </div>

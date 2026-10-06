@@ -82,8 +82,8 @@ export function SpaceRecentNavigation({
       {recent.length > 5 && (
         <Button
           variant="ghost"
-          size="sm"
-          className="mt-1 w-full justify-start"
+          size="xs"
+          className="mt-1 ml-1 font-normal text-cream-muted"
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "Show less" : "Show more"}
