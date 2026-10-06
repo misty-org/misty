@@ -105,6 +105,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     ? context.system
     : [context.system, "", executionInstructions, taskCompletionInstructions].join("\n");
   let modelTurn = 0;
+  // The agent swallows errors thrown from its step hooks, so a failed settlement
+  // checkpoint is held here and rethrown once the call returns.
+  let hookFailure: unknown;
   const agent = new WorkflowAgent({
     id: "misty-space-task-agent",
     model: new InstanceModel(context.model_id, identity),
@@ -119,22 +122,21 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     maxOutputTokens: 2_200,
     reasoning: context.reasoning_effort === "max" ? undefined : context.reasoning_effort || undefined,
     telemetry: { isEnabled: true, recordInputs: false, recordOutputs: false, functionId: "misty.space-task-agent" },
-    experimental_onStepStart: async ({ stepNumber, messages }) => {
+    experimental_onStepStart: async ({ stepNumber }) => {
       if (stepNumber !== 0) throw new FatalError("unexpected_model_step: the pinned adapter exceeded one model call");
-      await execution.checkpoint({
-        node_id: `model:${modelTurn + 1}`, state: "running", phase: "thinking", progress: Math.min(85, 10 + modelTurn * 6),
-        // Native serialized payload size only. Billing estimates tokens/rates.
-        output: { input_bytes: new TextEncoder().encode(JSON.stringify({ system: instructions, messages, tools: explaining ? [] : catalog.tools })).byteLength },
-      });
     },
     onStepEnd: async ({ finishReason, usage, text }) => {
-      await execution.checkpoint({
-        node_id: `model:${modelTurn + 1}`, state: "completed", phase: "working", progress: Math.min(90, 15 + modelTurn * 6),
-        // The control plane projects this model-owned text into the public SSE
-        // stream for interactive invocations. Tool-only steps normally have no
-        // text, while the final step supplies Markdown as it becomes durable.
-        output: { finish_reason: finishReason, usage, text_delta: text },
-      });
+      try {
+        await execution.checkpoint({
+          node_id: `model:${modelTurn + 1}`, state: "completed", phase: "working", progress: Math.min(90, 15 + modelTurn * 6),
+          // The control plane projects this model-owned text into the public SSE
+          // stream for interactive invocations. Tool-only steps normally have no
+          // text, while the final step supplies Markdown as it becomes durable.
+          output: { finish_reason: finishReason, usage, text_delta: text },
+        });
+      } catch (error) {
+        hookFailure ??= error;
+      }
     },
     onToolExecutionStart: monitor.onStart,
     onToolExecutionEnd: monitor.onEnd,
@@ -196,7 +198,16 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       await manageContext();
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);
+      // Admission (billing's hold for this turn) happens before the model call and
+      // outside the agent's hooks, so a refusal stops the call instead of being
+      // swallowed while the model runs unmetered.
+      await execution.checkpoint({
+        node_id: `model:${modelTurn + 1}`, state: "running", phase: "thinking", progress: Math.min(85, 10 + modelTurn * 6),
+        // Native serialized payload size only. Billing estimates tokens/rates.
+        output: { input_bytes: new TextEncoder().encode(JSON.stringify({ system: instructions, messages, tools: explaining ? [] : catalog.tools })).byteLength },
+      });
       const current = await agent.stream({ messages, ...shared, timeout: modelTimeout(budget, Date.now(), legacyDeadline) });
+      if (hookFailure) throw hookFailure;
       lastInputTokens = current.steps.at(-1)?.usage?.inputTokens ?? 0;
       result = { ...current, steps: [...(result?.steps ?? []), ...current.steps], totalUsage: accumulateModelUsage(result?.totalUsage, current.totalUsage) };
       // WorkflowAgent returns the complete model transcript, including tool
@@ -228,6 +239,11 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   if (order.stoppedReason) return await finish(stopped());
   if (unfinished) return await finish({ status: "incomplete", text: unfinished.message, error_code: unfinished.code, error_message: unfinished.message });
   const text = finalText(result.steps);
+  // A run that took no actions and answered in text (a greeting, or a question
+  // answered directly) is a reply, with nothing to confirm. Any run that acted
+  // must still confirm its outcome with misty_finish_task.
+  const acted = result.steps.some((step) => step.content.some((part) => part.type.startsWith("tool-")));
+  if (!explaining && !taskReport && !acted && text) return await finish({ status: "success", text });
   if (!explaining) {
     const outcome = taskCompletionOutcome(taskReport);
     return await finish({ ...outcome, text: taskReport ? taskCompletionText(taskReport) : text || outcome.error_message! });
