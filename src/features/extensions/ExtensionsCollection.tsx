@@ -1,4 +1,4 @@
-import { Button, CollectionItems, CollectionViewToggle } from "@/shared/ui";
+import { Button, CollectionItems, CollectionViewToggle, Separator } from "@/shared/ui";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
 import { AccountCollectionFilters } from "@/features/settings/AccountCollectionFilters";
@@ -77,6 +77,7 @@ export function ExtensionsCollection(props: {
           />
         }
       />
+      <Separator />
       {inInstalled ? (
         <ExtensionsChipRow
           label="Installed extensions"
