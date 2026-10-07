@@ -1,4 +1,4 @@
-import type { WorkspaceToolId } from "./useRecentToolsStore";
+import type { WorkspaceToolId } from "./workspaceTools";
 
 export const NAVIGATOR_APP_IDS = [
   "social",

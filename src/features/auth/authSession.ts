@@ -5,7 +5,7 @@ import { useAppRouteMemoryStore } from "@/features/app-shell";
 import type { CurrentLicense } from "@/features/native-session";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState } from "@/features/spaces";
-import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
+import { resetWorkspaceAccountState } from "@/features/workspace";
 import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./store/accountEvents";
@@ -25,7 +25,6 @@ export function resetAccountScopedState(previousAccountId?: string): void {
   resetConnectionsAccountState();
   resetWorkspaceAccountState();
   useAppRouteMemoryStore.getState().resetAppRoute();
-  useRecentToolsStore.getState().resetRecentTools();
   resetAiSurfaceAccountState(previousAccountId);
   notifyAccountScopeReset();
 }

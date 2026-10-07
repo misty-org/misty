@@ -10,16 +10,16 @@ import { normalizeWorkspaceLayout } from "./windows";
 const store = () => useWorkspaceStore.getState();
 const go = (route: string) => store().openDestination(workspaceSurfaceFromRoute(route)!);
 beforeEach(() => {
-  configureWorkspaceDefaultView(0);
+  configureWorkspaceDefaultView(3);
   store().reset();
 });
-afterEach(() => configureWorkspaceDefaultView(0));
+afterEach(() => configureWorkspaceDefaultView(1));
 
 it("returns to the most recently used browser without losing either URL or runtime identity", () => {
   const one = store().openBrowserView({ url: "https://one.example" });
   const two = store().openBrowserView({ url: "https://two.example" });
   store().focusView(one.id);
-  go("/home");
+  go("/agents");
   const resumed = go("/browser");
   expect(resumed).toMatchObject({
     id: one.id,
@@ -37,7 +37,7 @@ it("returns to the most recently used browser without losing either URL or runti
 it("reuses Files at its last route without mixing navbar selection into Back/Forward", () => {
   const files = go("/files");
   store().updateViewRoute(files.id, "/files?path=Projects");
-  go("/home");
+  go("/agents");
   expect(store().navigatePane(-1)).toBeNull();
   expect(go("/files")).toMatchObject({ id: files.id, route: "/files?path=Projects" });
   expect(store().navigatePane(-1)?.route).toBe("/files");
@@ -95,7 +95,7 @@ it("starts configured fresh tabs and stops replacing them after interaction", ()
   const fresh = store().newTab();
   expect(fresh).toMatchObject({ surfaceId: "files", placeholder: true });
   store().commitPlaceholder(fresh.id);
-  go("/home");
+  go("/agents");
   expect(allLayoutViews(store().layout).find((view) => view.id === fresh.id)).toMatchObject({
     placeholder: false,
   });
@@ -109,7 +109,7 @@ it("preserves established and fresh tabs across persistence", () => {
   useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
   expect(activeLayoutView(store().layout)).toMatchObject({
     id: fresh.id,
-    surfaceId: "home",
+    surfaceId: "agents",
     placeholder: true,
   });
   expect(allLayoutViews(store().layout).find((view) => view.id === files.id)?.placeholder).not.toBe(

@@ -24,7 +24,7 @@ function legacyTab(overrides: LegacyViewOverrides = {}): WorkspaceView {
 }
 
 describe("browser workspace migration", () => {
-  it.each(["space", "code", "terminal", "marketplace"] as const)(
+  it.each(["home", "space", "code", "terminal", "marketplace"] as const)(
     "replaces retired %s views without changing tab identity",
     (surfaceId) => {
       const tab = legacyTab({ surfaceId, state: { savedDocument: "recovery-data" } });
@@ -129,11 +129,6 @@ it("preserves restored Space tabs during persistence migration", () => {
   expect(migrateRetiredWorkspaceView(tab)).toEqual(tab);
 });
 
-it("preserves Home as a supported workspace surface", () => {
-  const home = legacyTab();
-  expect(migrateRetiredWorkspaceView(home)).toEqual(home);
-});
-
 it.each([
   "/extensions",
   "/extensions?category=privacy-security",
@@ -184,7 +179,10 @@ it("migrates a saved Scheduled tab into Agents without losing its selected task"
 
 it("restores saved views that lost their route instead of failing the whole workspace", () => {
   const home = legacyTab({ route: undefined as unknown as string });
-  expect(migrateRetiredWorkspaceView(home)).toMatchObject({ surfaceId: "home", route: "/home" });
+  expect(migrateRetiredWorkspaceView(home)).toMatchObject({
+    surfaceId: "browser",
+    route: "/browser",
+  });
   const files = legacyTab({
     surfaceId: "files",
     groupKey: "tool:files",

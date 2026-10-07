@@ -54,7 +54,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     useWorkspaceStore.getState().reset();
   });
   afterEach(() => {
-    configureWorkspaceDefaultView(0);
+    configureWorkspaceDefaultView(1);
     cleanup();
     if (originalAnimate) HTMLElement.prototype.animate = originalAnimate;
     else delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
@@ -88,14 +88,14 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
 
   it.each(["close", "select"])("does not add shell history when tabs %s", (action) => {
     const store = useWorkspaceStore.getState();
-    store.addSurface(workspaceSurfaceFromRoute("/home")!);
+    store.addSurface(workspaceSurfaceFromRoute("/agents")!);
     const ui = render(
-      <MemoryRouter initialEntries={["/before", "/home"]} initialIndex={1}>
+      <MemoryRouter initialEntries={["/before", "/agents"]} initialIndex={1}>
         <WorkspaceCanvas />
         <LocationProbe />
       </MemoryRouter>,
     );
-    if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Home" }));
+    if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Agents" }));
     else fireEvent.click(ui.getByRole("tab", { name: "New Tab" }));
     expect(ui.getByTestId("location").textContent).toBe("/browser");
     fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));

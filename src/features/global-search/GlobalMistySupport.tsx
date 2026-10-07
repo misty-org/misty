@@ -351,7 +351,6 @@ export function contextForCurrentView(
 }
 
 function routeTitle(path: string) {
-  if (path.startsWith("/home")) return "Home";
   if (path.startsWith("/files")) return "Files";
   if (path.startsWith("/agents")) return "Agents";
   if (path.startsWith("/discover") || path.startsWith("/store") || path.startsWith("/marketplace"))
