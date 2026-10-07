@@ -299,15 +299,15 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
 ];
 
+// Each tool keeps its Cmd/Ctrl+Shift number; 1 belonged to the retired Home page.
 const toolSlots = [
-  ["home", "Home"],
-  ["journal", "Journal"],
-  ["planner", "Planner"],
-  ["social", "Social"],
-  ["library", "Library"],
-  ["browser", "Browser"],
-  ["files", "Files"],
-  ["code", "Code"],
+  ["journal", "Journal", 2],
+  ["planner", "Planner", 3],
+  ["social", "Social", 4],
+  ["library", "Library", 5],
+  ["browser", "Browser", 6],
+  ["files", "Files", 7],
+  ["code", "Code", 8],
 ] as const;
 
 const tabAndToolCommands = [
@@ -328,14 +328,14 @@ const tabAndToolCommands = [
       },
     ),
   ),
-  ...toolSlots.map(([id, label], index) =>
+  ...toolSlots.map(([id, label, slot]) =>
     command(`tool.${id}`, `Open or focus ${label}`, {
       description: `Focus the last ${label} tab or open one in the focused pane.`,
       category: "Jump to tool",
       scope: "workspace",
       aliases: ["jump", "switch tool", label.toLowerCase()],
-      mac: `Cmd+Shift+${index + 1}`,
-      windows: `Ctrl+Shift+${index + 1}`,
+      mac: `Cmd+Shift+${slot}`,
+      windows: `Ctrl+Shift+${slot}`,
       allowInEditable: true,
     }),
   ),

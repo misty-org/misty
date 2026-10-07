@@ -35,11 +35,6 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       scopeKey: "global",
     };
   }
-  if (path === "/home")
-    return {
-      ...request("home", "tool:home", "Home", "/home", "home", "single"),
-      scopeKey: "global",
-    };
   if (path === "/spaces" || path.startsWith("/spaces/")) {
     const parts = path.split("/").filter(Boolean);
     let spaceId = "";

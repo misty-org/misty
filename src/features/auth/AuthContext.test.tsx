@@ -146,7 +146,7 @@ vi.mock("@/features/app-shell", () => {
     useAppRouteMemoryStore: Object.assign(vi.fn(), {
       getState: () => ({
         resetAppRoute: vi.fn(),
-        lastAppRoute: "/home",
+        lastAppRoute: "/browser",
       }),
     }),
   };

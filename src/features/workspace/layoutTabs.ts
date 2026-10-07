@@ -104,11 +104,7 @@ export function migrateTabs(layout: WorkspaceLayout): WorkspaceLayout {
 
 export function paneViewLabel(view: WorkspaceView | null | undefined): string {
   if (!view || view.placeholder) return "New Tab";
-  return (
-    view.title?.trim() ||
-    workspaceSurfaceFromRoute(view.route)?.title ||
-    (view.surfaceId === "home" ? "Home" : "New Tab")
-  );
+  return view.title?.trim() || workspaceSurfaceFromRoute(view.route)?.title || "New Tab";
 }
 export function tabLabel(tab: WorkspaceTab): string {
   const view = activeLayoutView(tab);

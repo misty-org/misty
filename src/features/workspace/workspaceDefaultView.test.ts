@@ -1,5 +1,11 @@
 import { afterEach, expect, it } from "vitest";
-import { configureWorkspaceDefaultView, createDefaultWorkspaceView } from "./workspaceDefaultView";
+import {
+  configureWorkspaceDefaultView,
+  createDefaultWorkspaceView,
+  workspaceDefaultViewOption,
+  workspaceDefaultViewOptions,
+  workspaceDefaultViewStoredIndex,
+} from "./workspaceDefaultView";
 afterEach(() => configureWorkspaceDefaultView(1));
 it("starts in Browser before a preference is configured", () => {
   expect(createDefaultWorkspaceView("global")).toMatchObject({
@@ -9,7 +15,7 @@ it("starts in Browser before a preference is configured", () => {
   });
 });
 it.each([
-  [0, "home"],
+  [0, "browser"],
   [1, "browser"],
   [2, "files"],
   [3, "agents"],
@@ -24,6 +30,12 @@ it("falls back to Browser for invalid preferences and allocates independent iden
   expect(first.surfaceId).toBe("browser");
   expect(first.id).not.toBe(second.id);
   expect(first.instanceKey).not.toBe(second.instanceKey);
+});
+
+it("maps stored indexes to the options shown in Settings", () => {
+  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(3)]).toBe("Agents");
+  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(0)]).toBe("Browser");
+  expect(workspaceDefaultViewStoredIndex(workspaceDefaultViewOptions.indexOf("Files"))).toBe(2);
 });
 
 it("round-trips the configurable starting page through portable settings", async () => {

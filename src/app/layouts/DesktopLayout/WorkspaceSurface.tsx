@@ -2,7 +2,6 @@ import { ExtensionsWorkspace } from "@/features/extensions/ExtensionsWorkspace";
 import { SpaceWorkspaceSurface } from "@/features/spaces/SpaceWorkspaceSurface";
 import { FilesPage } from "@/features/files/workspace";
 import { BrowserWorkspace } from "@/features/browser/workspace";
-import { HomePage } from "@/features/home";
 import { AgentsPage } from "@/features/agents";
 import {
   WorkspaceViewRouteScope,
@@ -22,9 +21,7 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceView; a
         onClickCapture={() => useWorkspaceStore.getState().commitPlaceholder(current.id)}
       >
         <WorkspaceViewRouteScope tab={current}>
-          {current.surfaceId === "home" ? (
-            <HomePage />
-          ) : current.surfaceId === "extensions" ? (
+          {current.surfaceId === "extensions" ? (
             <ExtensionsWorkspace />
           ) : current.surfaceId === "space" ? (
             <SpaceWorkspaceSurface tab={current} />

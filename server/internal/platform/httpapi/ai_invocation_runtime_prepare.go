@@ -108,7 +108,7 @@ func (s *SpacesService) aiInvocationContext(ctx context.Context, record *db.AIIn
 			return resolved, nil
 		}
 	}
-	if body.AgentID != "" || (body.SurfaceID != "home" && body.SurfaceID != "activity" && body.SurfaceID != "global") || !shouldRetrieveAccountContext(body.Prompt) {
+	if body.AgentID != "" || (body.SurfaceID != "activity" && body.SurfaceID != "global") || !shouldRetrieveAccountContext(body.Prompt) {
 		return resolved, nil
 	}
 	embedding, _ := s.globalSearchQueryEmbedding(ctx, record.UserID, body.Prompt)

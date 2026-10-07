@@ -10,7 +10,7 @@ import {
   TooltipHint,
 } from "@/shared/ui";
 import { Puzzle, Search } from "lucide-react";
-const { browser: BrowserIcon, agents: AgentIcon, home: HomeIcon } = appIcons;
+const { browser: BrowserIcon, agents: AgentIcon } = appIcons;
 import { Link, useNavigate } from "react-router-dom";
 import { navigatorFocusRingClass } from "./styles";
 
@@ -72,11 +72,6 @@ export function NavigatorExtensionsLink(props: { active: boolean }) {
       icon={Puzzle}
     />
   );
-}
-
-/** Home opens or selects its workspace tab. */
-export function NavigatorHomeLink(props: { active: boolean }) {
-  return <NavigatorPrimaryLink path="/home" active={props.active} label="Home" icon={HomeIcon} />;
 }
 
 export function NavigatorHeaderSearchButton(props?: { className?: string }) {

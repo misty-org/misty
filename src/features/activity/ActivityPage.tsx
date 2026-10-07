@@ -8,7 +8,7 @@ export function ActivityPage() {
   const navigate = useNavigate();
   useEffect(() => {
     openActivityPanel(`/activity${search}`);
-    navigate("/home", { replace: true });
+    navigate("/browser", { replace: true });
   }, [navigate, search]);
   return null;
 }
