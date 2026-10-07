@@ -129,7 +129,10 @@ function ExtensionControls({
           checked={selected.privateAccess}
           disabled={busy || local?.review?.privateAllowed === false}
           onChange={(value) =>
-            void work(() => updateInstallation(selected.id, { privateAccess: value }))
+            void work(async () => {
+              if (value) await extensionsNative.approve(selected.guid, [], [], true);
+              await updateInstallation(selected.id, { privateAccess: value });
+            })
           }
         />
       </DesktopSettingsRow>

@@ -16,6 +16,9 @@ const context = readFileSync(
 const script = rust
   .match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
   // Native background reporting is exercised separately in browser-background.test.ts.
+  // macOS rendering: host messages use the captured native channel.
+  .replace("__MISTY_NATIVE_HOST_PLACEHOLDER__", "true")
+  .replace("__MISTY_POINTER_NAVIGATION_PLACEHOLDER__", "")
   .replace("__MISTY_BACKGROUND_PLACEHOLDER__", "")
   .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", context)
   .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", "() => null")

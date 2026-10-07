@@ -1,5 +1,3 @@
-import { useAiSurfaceStore } from "@/features/ai-surface";
-import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
 import {
   browserViewUrl,
   recordBrowserVisitTitle,
@@ -16,7 +14,6 @@ import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
   browserTabShowsInternalPage,
-  captureNativeBrowserRegion,
   parkAllBrowserWebviews,
   reconcileBrowserOverlayState,
   requestBrowserWebviewLayoutByRuntimeId,
@@ -99,16 +96,6 @@ interface BrowserDownloadEvent {
   state: "requested" | "finished" | "failed";
   success: boolean;
   error?: string;
-}
-interface BrowserCompanionEvent {
-  id: string;
-  kind: "submit" | "action" | "capture";
-  prompt: string;
-  actionId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
@@ -365,66 +352,6 @@ export function BrowserRuntimeBridge() {
                   error instanceof Error ? error.message : "Misty could not open this context.",
                 );
           });
-      }),
-      listen<BrowserCompanionEvent>("misty://browser-companion", ({ payload }) => {
-        if (disposed) return;
-        const tabId = browserTabIdForRuntime(payload.id);
-        if (!tabId) return;
-        const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-          (candidate) => candidate.activeViewId === tabId,
-        );
-        if (!pane) return;
-        const ai = useAiSurfaceStore.getState();
-        const registration = Object.values(ai.registrations).find(
-          (candidate) => candidate.paneId === pane.id,
-        );
-        if (!registration) return;
-        if (payload.kind === "submit") {
-          ai.setPrompt(registration.accountId, pane.id, payload.prompt);
-          void ai.submit(registration.accountId, pane.id, registration.adapter);
-          return;
-        }
-        if (payload.kind === "action") {
-          const action = registration.adapter
-            .getSuggestedActions?.()
-            .find((candidate) => candidate.id === payload.actionId);
-          if (action) void ai.submit(registration.accountId, pane.id, registration.adapter, action);
-          return;
-        }
-        if (
-          payload.width < 8 ||
-          payload.height < 8 ||
-          ![payload.x, payload.y, payload.width, payload.height].every(Number.isFinite)
-        ) {
-          return;
-        }
-        void captureNativeBrowserRegion(payload.id, payload)
-          .then(({ dataUrl, width, height }) =>
-            captureAttachmentFromDataUrl(dataUrl, width, height),
-          )
-          .then(async (capture) => {
-            const { openMisty } = await import("@/features/misty/handoff");
-            const { mistyContextRef } = await import("@/features/misty/context");
-            await openMisty({
-              accountId: registration.accountId,
-              paneId: pane.id,
-              surfaceId: registration.adapter.surfaceId,
-              context: registration.adapter.getContext().map(mistyContextRef),
-              capture,
-            });
-          })
-          .catch((error: unknown) =>
-            useBrowserRuntimeStore
-              .getState()
-              .setError(
-                tabId,
-                error instanceof Error
-                  ? error.message
-                  : typeof error === "string"
-                    ? error
-                    : "Misty could not capture that region.",
-              ),
-          );
       }),
       listen<string>("misty://open-web-url", ({ payload }) => {
         if (disposed || !/^https?:\/\//i.test(payload)) return;

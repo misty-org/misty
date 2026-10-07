@@ -1,3 +1,4 @@
+import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
@@ -63,6 +64,11 @@ export function routeForMistyDeepLink(
   if (!first || ignoredMistyHosts.has(first)) return null;
   if (first === "open") {
     return normalizeDeepLinkRoute(rest, url.search, isRouteAllowed);
+  }
+  if (first === "auth" && rest[0] === "google" && rest[1] === "complete") {
+    // The browser finishing Google sign-in hands over its one-time code.
+    deliverGoogleSignInCode(url.searchParams.get("code") ?? "");
+    return null;
   }
   if (first === "auth") {
     return resolveAuthRoute(

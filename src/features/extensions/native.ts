@@ -46,8 +46,11 @@ export const extensionsNative = {
     invoke<CatalogPage>("extensions_search", { query, category, page, sort }),
   detail: (id: number) => invoke<CatalogEntry>("extensions_detail", { id }),
   prepare: (id: number) => invoke<ExtensionReview>("extensions_prepare", { id }),
-  commit: (token: string, generation: string | null = null) =>
-    invoke<ExtensionReview>("extensions_commit", { token, generation }),
+  commit: (token: string, generation: string | null = null, privateAccess = false) =>
+    invoke<ExtensionReview>("extensions_commit", { token, generation, privateAccess }),
+  /** Records access granted on this device; synced settings alone cannot widen it. */
+  approve: (guid: string, permissions: string[], hosts: string[], privateAccess: boolean) =>
+    invoke<void>("extensions_approve", { guid, permissions, hosts, privateAccess }),
   reconcile: (account: string, installations: Installation[], agentAccess: boolean) =>
     invoke<InstalledState[]>("extensions_reconcile", { account, installations, agentAccess }),
   actions: (tabId: string) =>

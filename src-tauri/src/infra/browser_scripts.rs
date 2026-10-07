@@ -6,6 +6,36 @@ use url::Url;
 pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 (() => {
   const shortcutToken = __MISTY_SHORTCUT_TOKEN_PLACEHOLDER__;
+  // Page scripts share this JavaScript world and run after this one. They can
+  // replace globals, prototype methods (postMessage, URLSearchParams) and
+  // Object.prototype.toJSON, so nothing that carries the token may reach them.
+  // Capture what the messages need now and build them by concatenation.
+  const nativeHost = __MISTY_NATIVE_HOST_PLACEHOLDER__;
+  const encode = encodeURIComponent;
+  const stringify = JSON.stringify;
+  const bindChannel = () => {
+    const channel = window.webkit?.messageHandlers?.mistyFocus;
+    return channel && typeof channel.postMessage === 'function' ? channel.postMessage.bind(channel) : null;
+  };
+  let postToHost = nativeHost ? bindChannel() : null;
+  const sendToHost = (message) => {
+    // The handler is normally installed before the first document starts.
+    postToHost = postToHost || bindChannel();
+    if (!postToHost) return false;
+    postToHost(message);
+    return true;
+  };
+  const finite = (value) => (typeof value === 'number' && value === value && value !== Infinity && value !== -Infinity ? value : 0);
+  // macOS posts host navigations through the captured channel: a page can
+  // observe its own navigations, but not a bound native function call.
+  const sendHostNavigation = (url) => {
+    if (nativeHost) sendToHost('{"navigate":"' + url + '"}');
+    else window.location.href = url;
+  };
+  const sendFocus = () => {
+    if (nativeHost) sendToHost(shortcutToken);
+    else window.location.href = 'misty-focus:event?token=' + encode(shortcutToken);
+  };
   __MISTY_CONTEXT_MENU_PLACEHOLDER__
   __MISTY_BACKGROUND_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
@@ -64,12 +94,12 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     ));
     const allowInEditable = window.__MISTY_APP_SHORTCUTS__.get(shortcut);
     if (allowInEditable === undefined || (editable && !allowInEditable)) return;
-    const params = new URLSearchParams({
-      key: event.key, code: event.code, alt: String(event.altKey),
-      ctrl: String(event.ctrlKey), meta: String(event.metaKey), shift: String(event.shiftKey),
-      repeat: String(event.repeat), token: shortcutToken, editable: String(editable)
-    });
-    window.location.href = `misty-shortcut:event?${params}`;
+    const flag = (value) => (value === true ? 'true' : 'false');
+    const params = 'key=' + encode(event.key) + '&code=' + encode(event.code) +
+      '&alt=' + flag(event.altKey) + '&ctrl=' + flag(event.ctrlKey) + '&meta=' + flag(event.metaKey) +
+      '&shift=' + flag(event.shiftKey) + '&repeat=' + flag(event.repeat) +
+      '&token=' + encode(shortcutToken) + '&editable=' + flag(editable);
+    sendHostNavigation('misty-shortcut:event?' + params);
     event.preventDefault();
     event.stopImmediatePropagation();
   }, true);
@@ -79,11 +109,16 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   // active workspace pane before shell shortcuts are evaluated.
   document.addEventListener('pointerdown', (event) => {
     if (!event.isTrusted) return;
-    window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);
+    sendFocus();
   }, true);
 
   const sendPointer = (pointer) => {
-    window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));
+    if (!nativeHost) {
+      __MISTY_POINTER_NAVIGATION_PLACEHOLDER__
+      return;
+    }
+    sendToHost('{"token":"' + shortcutToken + '","pointer":{"x":' + finite(pointer.x) + ',"y":' + finite(pointer.y) +
+      ',"inside":' + (pointer.inside === true ? 'true' : 'false') + '}}');
   };
   const reportPointer = (event) => {
     if (!pointerTrackingEnabled || !event?.isTrusted) return;
@@ -160,19 +195,15 @@ pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
 pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
     BROWSER_VIEWPORT_SCRIPT
         .replace(
-            "window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));",
-            if cfg!(target_os = "macos") {
-                "window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));"
-            } else {
-                "window.location.href = pointer.inside ? `misty-pointer:move?x=${pointer.x}&y=${pointer.y}` : 'misty-pointer:leave';"
-            },
+            "__MISTY_NATIVE_HOST_PLACEHOLDER__",
+            if cfg!(target_os = "macos") { "true" } else { "false" },
         )
         .replace(
-            "window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);",
+            "__MISTY_POINTER_NAVIGATION_PLACEHOLDER__",
             if cfg!(target_os = "macos") {
-                "window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);"
+                ""
             } else {
-                "window.location.href = `misty-focus:event?${new URLSearchParams({ token: shortcutToken })}`;"
+                "window.location.href = pointer.inside ? 'misty-pointer:move?x=' + finite(pointer.x) + '&y=' + finite(pointer.y) : 'misty-pointer:leave';"
             },
         )
         .replace("__MISTY_BACKGROUND_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_background.js") } else { "" })
@@ -332,8 +363,7 @@ mod tests {
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("mistyFocus?.postMessage(shortcutToken)"));
-        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-focus:event"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("if (nativeHost) sendToHost(shortcutToken)"));
     }
 
     #[test]
@@ -366,6 +396,7 @@ mod tests {
         assert!(!script.contains("__MISTY_POINTER_TRACKING_PLACEHOLDER__"));
         assert!(!script.contains("__MISTY_COMPANION_TOKEN_PLACEHOLDER__"));
         assert!(!script.contains("window.__MISTY_SHORTCUT_TOKEN"));
+        assert!(!script.contains("__MISTY_NATIVE_HOST_PLACEHOLDER__"));
         assert!(BROWSER_COMPANION_SCRIPT.contains("window.__MISTY_SET_COMPANION__"));
     }
 

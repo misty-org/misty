@@ -159,12 +159,47 @@ pub(super) async fn commit(app: &tauri::AppHandle, token: &str) -> Result<packag
     Ok(review)
 }
 
+/// Records access the person granted on this device outside an install: an
+/// extension's permission request, or allowing it in private tabs.
+#[tauri::command]
+pub async fn extensions_approve(
+    caller: tauri::Webview,
+    app: tauri::AppHandle,
+    guid: String,
+    permissions: Vec<String>,
+    hosts: Vec<String>,
+    private_access: bool,
+) -> Result<(), ExtensionFailure> {
+    let result: Result<_, String> = async {
+        native::trusted(&caller)?;
+        if guid.is_empty()
+            || guid.len() > 256
+            || permissions.len() > 256
+            || hosts.len() > 2048
+            || permissions
+                .iter()
+                .chain(&hosts)
+                .any(|value| value.len() > 8192 || value.contains('\0'))
+        {
+            return Err("Invalid extension approval.".into());
+        }
+        let account = service().lock().await.account.clone();
+        if account.is_empty() {
+            return Err("Sign in to manage extensions.".into());
+        }
+        approvals::record(&app, &account, &guid, &permissions, &hosts, private_access)
+    }
+    .await;
+    result.map_err(ExtensionFailure::from)
+}
+
 #[tauri::command]
 pub async fn extensions_commit(
     caller: tauri::Webview,
     app: tauri::AppHandle,
     token: String,
     generation: Option<String>,
+    private_access: Option<bool>,
 ) -> Result<package::Review, ExtensionFailure> {
     let result: Result<_, String> = async {
         native::trusted(&caller)?;
@@ -176,6 +211,16 @@ pub async fn extensions_commit(
             return Err("Invalid installation generation.".into());
         }
         let review = commit(&app, &token).await?;
+        // The person reviewed this package here; record what they approved.
+        let account = service().lock().await.account.clone();
+        approvals::record(
+            &app,
+            &account,
+            &review.entry.guid,
+            &review.permissions,
+            &review.hosts,
+            review.private_allowed && private_access.unwrap_or(false),
+        )?;
         if let Some(generation) = generation {
             let state = service().lock().await;
             if !state

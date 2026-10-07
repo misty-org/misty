@@ -19,9 +19,9 @@ if (window === window.top) {
     }
     const channels = context.getImageData(0, 0, 1, 1).data;
     const background = '#' + Array.from(channels.slice(0, 3), v => v.toString(16).padStart(2, '0')).join('');
-    const channel = window.webkit?.messageHandlers?.mistyFocus;
-    if (background === lastBackground || !channel) return;
-    channel.postMessage(JSON.stringify({ token: shortcutToken, background }));
+    if (background === lastBackground) return;
+    // Built by concatenation: a page-defined toJSON must never see the token.
+    if (!sendToHost('{"token":"' + shortcutToken + '","background":"' + background + '"}')) return;
     lastBackground = background;
   };
   const scheduleBackground = () => {

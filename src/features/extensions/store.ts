@@ -131,7 +131,11 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
   const account = useExtensionsStore.getState().account;
   const existing = installations().find((item) => item.id === review.entry.id && item.installed);
   const generation = existing?.generation ?? crypto.randomUUID();
-  await extensionsNative.commit(review.token, existing ? null : generation);
+  await extensionsNative.commit(
+    review.token,
+    existing ? null : generation,
+    review.privateAllowed && privateAccess,
+  );
   if (account !== useExtensionsStore.getState().account)
     throw new Error("The account changed during installation.");
   await changeControls(async () => {

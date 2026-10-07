@@ -267,13 +267,6 @@ export function browserRuntimeIdForScope(scopeId: string): string | null {
   return null;
 }
 
-export function captureNativeBrowserRegion(
-  id: string,
-  region: { x: number; y: number; width: number; height: number },
-): Promise<{ dataUrl: string; width: number; height: number }> {
-  return invoke("browser_webview_capture_region", { request: { id, ...region } });
-}
-
 /** Capture an already-rendered page. Background reads never bring it to the front. */
 export async function captureBrowserPagePreview(
   tab: WorkspaceView,

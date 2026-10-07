@@ -702,9 +702,11 @@ fn open_url_in_system_browser(url: &str) -> io::Result<()> {
         Ok(())
     }
 
+    // ShellExecute, not `cmd /C start`: URLs contain & that cmd would run.
     #[cfg(target_os = "windows")]
     {
-        Command::new("cmd").args(["/C", "start", "", url]).spawn()?;
+        tauri_plugin_opener::open_url(url, None::<&str>)
+            .map_err(|err| io::Error::other(err.to_string()))?;
         return Ok(());
     }
 
