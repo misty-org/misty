@@ -162,6 +162,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build());
 
     let builder = builder
+        // Keeps privileged windows on the bundled app; see navigation_guard.rs.
+        .plugin(platform::navigation_guard::init())
+        // Replaces Tauri's asset handler so website views cannot read local files.
+        .register_asynchronous_uri_scheme_protocol("asset", |context, request, responder| {
+            platform::asset_protocol::handle(context, request, responder)
+        })
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
@@ -290,6 +296,7 @@ pub fn run() {
                     crate::infra::extensions::extensions_detail,
                     crate::infra::extensions::install::extensions_prepare,
                     crate::infra::extensions::install::extensions_commit,
+                    crate::infra::extensions::install::extensions_approve,
                     crate::infra::extensions::runtime::extensions_reconcile,
                     crate::infra::extensions::runtime::extensions_action,
                     crate::infra::extensions::runtime::extensions_respond,

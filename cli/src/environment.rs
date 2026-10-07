@@ -99,6 +99,8 @@ const FILES: &[FileSpec] = &[
             "MISTY_R2_ALLOWED_ORIGINS",
             "MISTY_BACKUP_BUCKET",
             "MISTY_BACKUP_AGE_RECIPIENT",
+            "MISTY_BACKUP_R2_ACCESS_KEY",
+            "MISTY_BACKUP_R2_SECRET_KEY",
         ],
     },
     FileSpec {

@@ -1,10 +1,11 @@
 import "katex/dist/katex.min.css";
 import "./mistyMarkdown.css";
-import { IconButton } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 import {
   Check,
   CircleAlert,
   Copy,
+  Image as ImageIcon,
   Info,
   Lightbulb,
   MessageSquareWarning,
@@ -95,8 +96,41 @@ const components: Components = {
     );
   },
   img: ({ src, alt }) =>
-    typeof src === "string" && src ? <img src={src} alt={alt ?? ""} loading="lazy" /> : null,
+    typeof src === "string" && src ? <ReplyImage src={src} alt={alt ?? ""} /> : null,
 };
+
+/**
+ * Replies can repeat text from web pages and files, so a prompt-injected reply
+ * could name an image URL that carries private conversation text to another
+ * server the moment it renders. Remote images load only when the person asks.
+ */
+function ReplyImage({ src, alt }: { src: string; alt: string }) {
+  const [shown, setShown] = useState(false);
+  const host = remoteImageHost(src);
+  if (!host || shown) return <img src={src} alt={alt} loading="lazy" />;
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="misty-markdown-remote-image"
+      onClick={() => setShown(true)}
+    >
+      <ImageIcon aria-hidden="true" />
+      <span>{alt ? `Show image "${alt}" from ${host}` : `Show image from ${host}`}</span>
+    </Button>
+  );
+}
+
+function remoteImageHost(src: string): string | null {
+  try {
+    const url = new URL(src, window.location.href);
+    if (url.origin === window.location.origin) return null;
+    return url.host || url.protocol;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Markdown for Misty's replies: GitHub-flavored Markdown (tables, task lists,

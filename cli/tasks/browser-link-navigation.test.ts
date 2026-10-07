@@ -42,25 +42,36 @@ test('explicit new-tab gestures still work', () => {
   }
 });
 
+// The script as macOS renders it: host messages use the captured native channel.
+function rendered(tracking) {
+  return source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
+    .replace('__MISTY_NATIVE_HOST_PLACEHOLDER__', 'true')
+    .replace('__MISTY_POINTER_NAVIGATION_PLACEHOLDER__', '')
+    .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
+    .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
+    .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
+    .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', String(tracking));
+}
+
 test('pointer focus reports over native messaging without navigating the page', () => {
-  const start = source.indexOf("  document.addEventListener('pointerdown'");
-  const end = source.indexOf('\n\n  const reportPointer', start);
-  let pointer;
+  const listeners = {};
   const messages = [];
-  const window = { webkit: { messageHandlers: { mistyFocus: { postMessage: token => messages.push(token) } } } };
+  const window = {
+    webkit: { messageHandlers: { mistyFocus: { postMessage: token => messages.push(token) } } },
+    addEventListener() {},
+  };
   Object.defineProperty(window, 'location', { get() { throw new Error('Focus must not touch page navigation'); } });
-  runInNewContext(source.slice(start, end), { shortcutToken: 'test-token', window, document: { addEventListener: (_, fn) => { pointer = fn; } } });
-  pointer({ isTrusted: true });
-  pointer({ isTrusted: false });
+  runInNewContext(rendered(false), {
+    window, Map, URL,
+    document: { addEventListener: (type, fn) => { listeners[type] = fn; } },
+  });
+  listeners.pointerdown({ isTrusted: true });
+  listeners.pointerdown({ isTrusted: false });
   assert.deepEqual(messages, ['test-token']);
 });
 
 test('companion pointer tracking reports over native messaging without interrupting navigation', () => {
-  const script = source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
-    .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
-    .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
-    .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
-    .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', 'true');
+  const script = rendered(true);
   const listeners = {};
   const frames = [];
   const messages = [];
