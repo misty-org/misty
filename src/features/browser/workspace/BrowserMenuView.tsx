@@ -11,9 +11,6 @@ import {
 import { ShortcutText } from "@/features/shortcuts";
 import {
   AppWindow,
-  Bookmark,
-  BookmarkCheck,
-  BookmarkPlus,
   CircleHelp,
   Code2,
   Copy,
@@ -21,7 +18,6 @@ import {
   Eraser,
   ExternalLink,
   FileDown,
-  Library,
   MoreVertical,
   Plus,
   Printer,
@@ -128,24 +124,6 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="browser.downloads"
               onSelect={() => commands.openPage("downloads")}
             />
-            <MenuSubmenu icon={<Bookmark />} label="Bookmarks" width="lg">
-              <Item
-                icon={<BookmarkPlus />}
-                label="Bookmark this page"
-                shortcut="browser.bookmark"
-                onSelect={commands.bookmark}
-              />
-              <Item
-                icon={<BookmarkCheck />}
-                label="Bookmark all tabs"
-                onSelect={commands.bookmarkAllViews}
-              />
-              <Item
-                icon={<Library />}
-                label="Bookmark manager"
-                onSelect={() => commands.openPage("bookmarks")}
-              />
-            </MenuSubmenu>
             <DropdownMenuSeparator />
           </>
         ) : null}

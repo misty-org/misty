@@ -2,7 +2,7 @@ import { Button, cn, IconButton, SuggestionItem } from "@/shared/ui";
 import { AppWindow, FileText, Globe2, History, Search, Settings2, Star, X } from "lucide-react";
 import type { OmniboxMatch } from "./types";
 
-function rowIcon(match: OmniboxMatch) {
+export function omniboxMatchIcon(match: OmniboxMatch) {
   if (match.kind === "search" || match.kind === "suggestion") return Search;
   if (match.kind === "tab") return AppWindow;
   if (match.kind === "action") return Settings2;
@@ -21,7 +21,7 @@ export function OmniboxRow(props: {
   onRemove?: () => void;
 }) {
   const { match } = props;
-  const Icon = rowIcon(match);
+  const Icon = omniboxMatchIcon(match);
   const detail = match.kind === "tab" ? `Switch to tab · ${match.detail}` : match.detail;
   return (
     <SuggestionItem

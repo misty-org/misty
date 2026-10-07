@@ -285,6 +285,20 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "browser.customBangs",
+    "label": "Search shortcuts",
+    "keywords": ["bangs", "shortcuts", "search", "custom"],
+    "page": "browser",
+    "section": "general",
+    "key": "browser_custom_bangs_json",
+    "default": "[]",
+    "owner": "account",
+    "type": "string",
+    "format": "json",
+    "maxLength": 16384,
+    "platforms": ["desktop"]
+  },
+  {
     "id": "browser.homepage",
     "label": "Homepage",
     "page": "browser",

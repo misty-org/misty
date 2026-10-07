@@ -243,7 +243,6 @@ describe("BrowserWorkspace", () => {
       "New tab",
       "History",
       "Downloads",
-      "Bookmarks",
       "Find…",
       "Print…",
       "More tools",
@@ -257,6 +256,8 @@ describe("BrowserWorkspace", () => {
       ).toBe(true);
     }
     expect(menuItems.some((item) => item.startsWith("Reload"))).toBe(false);
+    // Bookmarks live in search (!bookmarks); the star and Cmd+D still save a page.
+    expect(menuItems.some((item) => item.startsWith("Bookmarks"))).toBe(false);
   });
   it("waits for native sibling order before mounting browser popups", async () => {
     (

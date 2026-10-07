@@ -24,6 +24,7 @@ import {
   useBookmarkLibrary,
   type Bookmark,
 } from "@/features/bookmarks/library";
+import { bookmarkLocation, searchBookmarks } from "@/features/bookmarks/search";
 import { InternalPageEmpty, InternalPageFrame } from "./InternalPageFrame";
 import { BookmarkFolderRow, BookmarkLinkRow } from "./BookmarkRows";
 import type { BrowserInternalPageProps } from "./types";
@@ -39,17 +40,10 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
   const current = tree.folder(folderId) ? folderId : otherBookmarksId;
   const path = tree.path(current);
   const root = path[0]?.id ?? otherBookmarksId;
-  const needle = text.trim().toLocaleLowerCase();
+  const needle = text.trim();
   const children = tree.children(current);
   const links = children.filter((node) => node.kind === "bookmark");
-  const matches = needle
-    ? tree.bookmarks.filter((b) => `${b.title} ${b.url}`.toLocaleLowerCase().includes(needle))
-    : [];
-  const location = (b: Bookmark) =>
-    tree
-      .path(b.folderId)
-      .map((folder) => folder.name)
-      .join(" / ");
+  const matches = searchBookmarks(tree, text);
   const roots = bookmarkRoots.filter(
     (r) => r.id !== mobileBookmarksId || tree.children(r.id).length || root === r.id,
   );
@@ -172,7 +166,7 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
                 key={b.id}
                 {...props}
                 bookmark={b}
-                location={location(b)}
+                location={bookmarkLocation(tree, b)}
                 onEdit={() => setEditing(b)}
               />
             ))}
