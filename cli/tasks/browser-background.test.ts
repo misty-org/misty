@@ -17,7 +17,7 @@ test("native background reporting coalesces changes and sends only changed color
     getImageData: () => ({ data: new Uint8ClampedArray(pixels) }),
   };
   const window: Record<string, unknown> = {
-    webkit: { messageHandlers: { mistyFocus: { postMessage: (value: string) => reports.push(value) } } },
+    webkit: { messageHandlers: { kiriHost: { postMessage: (value: string) => reports.push(value) } } },
   };
   window.top = window;
   runInNewContext(script, {

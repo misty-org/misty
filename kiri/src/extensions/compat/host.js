@@ -3,7 +3,8 @@
 // the extension's background and pages to Misty, and Misty's events back.
 "use strict";
 const channel = new BroadcastChannel("misty-compat");
-const native = window.webkit.messageHandlers.mistyExtensionCompat;
+// Kiri's extension transport (kiri/src/extensions/bridge.rs).
+const native = window.webkit.messageHandlers.kiriExtension;
 
 const voices = () =>
   speechSynthesis.getVoices().map((voice) => ({

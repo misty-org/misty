@@ -904,6 +904,10 @@ impl InnerWebView {
           args.TryGetWebMessageAsString(&mut js)?;
           take_pwstr(js)
         };
+        // Kiri's host channel shares this event; its messages are not IPC.
+        if js.starts_with("\u{1}kiri-host\u{1}") {
+          return Ok(());
+        }
 
         #[cfg(feature = "tracing")]
         let _span = tracing::info_span!(parent: None, "wry::ipc::handle").entered();

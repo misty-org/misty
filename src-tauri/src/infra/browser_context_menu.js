@@ -6,7 +6,7 @@ document.addEventListener('contextmenu', event => {
   const target = event.target instanceof Element ? event.target : event.target?.parentElement;
   if (!target) return;
   const editable = target.closest('input,textarea,[contenteditable="true"],[role="textbox"]');
-  // Fields keep WebKit's own menu so AutoFill, passwords, and spelling suggestions still work.
+  // Fields keep the engine's own menu so AutoFill, passwords, and spelling suggestions still work.
   if (editable) return;
   event.preventDefault();
   event.stopImmediatePropagation();

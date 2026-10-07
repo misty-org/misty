@@ -6,6 +6,7 @@
 // over a same-origin BroadcastChannel; the page reaches Misty through a
 // reply-capable script message handler. Requests are checked against the
 // permissions the account granted before Misty reads or changes anything.
+#import "MistyExtensions.h"
 #import "MistyExtensionsInternal.h"
 #import <objc/message.h>
 #import <NaturalLanguage/NaturalLanguage.h>
@@ -53,17 +54,9 @@ static BOOL RecordMatches(WKWebsiteDataRecord *record, NSArray *hosts) {
     return NO;
 }
 
-API_AVAILABLE(macos(15.4))
-@interface MistyExtensionCompatHandler : NSObject <WKScriptMessageHandlerWithReply>
-@property (weak) MistyExtensionHost *host;
-@end
-
-@implementation MistyExtensionCompatHandler
-- (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message replyHandler:(void (^)(id, NSString *))reply {
-    MistyExtensionHost *host = self.host;
-    if (host) [host compatMessage:message reply:reply]; else reply(nil, @"The extension host stopped.");
-}
-@end
+/// Kiri's extension transport installer (kiri/src/extensions/bridge.rs).
+static MistyCompatChannelInstaller installCompatChannel;
+void misty_extensions_set_compat_channel(MistyCompatChannelInstaller install) { installCompatChannel = install; }
 
 @implementation MistyExtensionHost (Compat)
 - (NSURL *)compatPage:(WKWebExtensionContext *)context {
@@ -73,11 +66,11 @@ API_AVAILABLE(macos(15.4))
     [self stopCompat:identifier];
     WKWebViewConfiguration *config = context.webViewConfiguration;
     if (!config) return;
-    // Like the sync bridge, the host gets its own handler namespace.
+    // Like the sync bridge, the host gets its own handler namespace. Kiri owns
+    // the transport; its requests return through misty_extensions_compat_message.
     config.userContentController = [WKUserContentController new];
-    MistyExtensionCompatHandler *handler = [MistyExtensionCompatHandler new];
-    handler.host = self;
-    [config.userContentController addScriptMessageHandlerWithReply:handler contentWorld:WKContentWorld.pageWorld name:@"mistyExtensionCompat"];
+    if (!installCompatChannel) return;
+    installCompatChannel((__bridge void *)config.userContentController);
     WKWebView *view = [[WKWebView alloc] initWithFrame:NSMakeRect(0, 0, 1, 1) configuration:config];
     view.navigationDelegate = self;
     self.compatViews[identifier] = view;

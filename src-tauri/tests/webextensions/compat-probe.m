@@ -5,6 +5,7 @@
 #import "../../native/macos/MistyExtensions.h"
 #import <AppKit/AppKit.h>
 #import <WebKit/WebKit.h>
+#import "compat-channel.h"
 
 static NSString *account, *origin, *pageURL;
 static NSWindow *window;
@@ -146,6 +147,7 @@ int main(int argc, const char *argv[]) {
         window = [[NSWindow alloc] initWithContentRect:NSMakeRect(80, 80, 500, 400) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
         [window makeKeyAndOrderFront:nil];
         misty_extensions_set_events(events);
+        misty_extensions_set_compat_channel(installCompatChannel);
         NSArray *permissions = @[@"storage", @"webRequest", @"webRequestBlocking", @"declarativeNetRequest", @"history", @"idle", @"notifications", @"browsingData", @"tabs"];
         request(@{@"operation":@"configure", @"controllerId":NSUUID.UUID.UUIDString}, ^(NSDictionary *result) {
             request(@{@"operation":@"load", @"id":@"1", @"guid":@"compat-fixture@misty.test", @"origin":origin, @"runtimePath":root, @"privateAccess":@NO, @"permissions":permissions, @"hosts":@[@"http://127.0.0.1/*"]}, ^(NSDictionary *loaded) {

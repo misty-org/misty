@@ -156,6 +156,10 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_drag::init());
 
+    // Web APIs that website tabs reach natively; see kiri/README.md.
+    #[cfg(desktop)]
+    let builder = builder.plugin(infra::browser_kiri::plugin());
+
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_process::init())
@@ -178,6 +182,16 @@ pub fn run() {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
+            // Debug-only end-to-end check of Kiri; see browser_kiri_probe.rs.
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            if std::env::var_os("MISTY_KIRI_PROBE").is_some() {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let passed = infra::browser::kiri_probe::run(handle.clone()).await;
+                    println!("KIRI PROBE DONE: {}", if passed { "all passed" } else { "failures" });
+                    handle.exit(if passed { 0 } else { 1 });
+                });
+            }
             #[cfg(all(desktop, debug_assertions))]
             if let Ok(profile) =
                 std::env::var("MISTY_DESKTOP_PROFILE").or_else(|_| std::env::var("MISTY_PROFILE"))
@@ -459,7 +473,7 @@ pub fn run() {
                     #[cfg(desktop)]
                     infra::browser::browser_agent_set_locked,
                     infra::agent_workspace::agent_browser_session_id,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(desktop)]
                     crate::infra::browser::browser_context_menu_select,
                     #[cfg(desktop)]
                     browser_shortcuts_update,
@@ -482,13 +496,13 @@ pub fn run() {
                     browser_webview_forward,
                     #[cfg(desktop)]
                     browser_webview_reload,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(desktop)]
                     infra::browser_site_permissions::browser_site_info,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(desktop)]
                     infra::browser_site_permissions::browser_site_permissions_set,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(desktop)]
                     infra::browser_site_permissions::browser_site_permissions_list,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(desktop)]
                     infra::browser_site_permissions::browser_site_permissions_reset,
                     browser_webview_set_zoom,
                     #[cfg(desktop)]

@@ -13,12 +13,13 @@ const context = readFileSync(
   new URL("../../src-tauri/src/infra/browser_context_menu.js", import.meta.url),
   "utf8",
 );
+// Kiri's host channel sender as WebKit renders it (kiri/src/channel/macos.rs).
+const sender = readFileSync(new URL("../../kiri/src/channel/macos.rs", import.meta.url), "utf8")
+  .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
 const script = rust
   .match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
   // Native background reporting is exercised separately in browser-background.test.ts.
-  // macOS rendering: host messages use the captured native channel.
-  .replace("__MISTY_NATIVE_HOST_PLACEHOLDER__", "true")
-  .replace("__MISTY_POINTER_NAVIGATION_PLACEHOLDER__", "")
+  .replace("__KIRI_HOST_SENDER_PLACEHOLDER__", sender)
   .replace("__MISTY_BACKGROUND_PLACEHOLDER__", "")
   .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", context)
   .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", "() => null")

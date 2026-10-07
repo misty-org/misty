@@ -23,9 +23,9 @@ mod native_input;
 #[path = "browser_task_files.rs"]
 mod task_files;
 
-#[cfg(target_os = "macos")]
-#[path = "browser_focus.rs"]
-mod focus_messages;
+#[path = "browser_host_messages.rs"]
+mod host_messages;
+pub(super) use host_messages::init as init_host_messages;
 
 #[cfg(target_os = "macos")]
 #[path = "browser_attachment_download_macos.rs"]
@@ -45,9 +45,12 @@ pub(crate) mod popup_probe;
 #[path = "browser_render_probe.rs"]
 pub(crate) mod render_probe;
 
-#[cfg(target_os = "macos")]
 #[path = "browser_context_menu.rs"]
 mod context_menu;
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+#[path = "browser_kiri_probe.rs"]
+pub(crate) mod kiri_probe;
 
 #[path = "browser_page_tools.rs"]
 mod page_tools;
@@ -57,7 +60,6 @@ pub use page_tools::{
     browser_webview_stop,
 };
 
-#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn browser_context_menu_select(
     app: AppHandle,
@@ -78,10 +80,9 @@ use super::browser_macos::{
     unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
-    browser_pointer_navigation, browser_scrollbar_script, browser_status_script,
+    browser_scrollbar_script, browser_status_script,
     browser_status_update_script, browser_viewport_script, emit_browser_pointer,
     set_status_bubble_enabled, BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
-    BROWSER_MEDIA_SCRIPT,
 };
 use super::browser_shortcuts::{
     apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
@@ -121,9 +122,22 @@ pub(super) fn browser_owner_label(app: &AppHandle, id: &str) -> String {
         .unwrap_or_else(|| "main".into())
 }
 
+/// Where a tab's site permissions live: its profile's store, or the private
+/// session's. Private tabs share one throwaway session.
+pub(super) fn session_permission_scope(app: &AppHandle, id: &str) -> Option<kiri::engine::StoreScope> {
+    let state = app.try_state::<BrowserSessionState>()?;
+    let sessions = state.sessions.lock().ok()?;
+    let session = sessions.get(id)?;
+    if session.private || browser_requires_ephemeral_store() {
+        return Some(kiri::engine::StoreScope::Temporary(0));
+    }
+    super::browser_site_permissions::profile_key(session.profile_id.as_deref())
+        .ok()
+        .map(kiri::engine::StoreScope::Persistent)
+}
+
 #[derive(Default)]
 pub struct BrowserSessionState {
-    #[cfg(target_os = "macos")]
     context_menu: Mutex<HashMap<String, context_menu::PendingMenu>>,
     pending_popups: Mutex<HashSet<String>>,
     sessions: Mutex<HashMap<String, BrowserSession>>,
@@ -930,8 +944,6 @@ pub async fn browser_webview_create(
     let popup_id = request.id.clone();
     let download_app = app.clone();
     let download_id = request.id.clone();
-    let navigation_app = app.clone();
-    let navigation_id = request.id.clone();
     let replacing_extension_view=super::extensions::pending_navigation(&request.id).await;
     let restoring_tab_session = profile_lease.tab_session.is_some() || replacing_extension_view;
     let preview_only = request.preview_only;
@@ -983,41 +995,15 @@ pub async fn browser_webview_create(
             &shortcut_token,
             renderer(caller.window().label()).tracking,
         ))
-        .initialization_script(browser_status_script())
-        .initialization_script(BROWSER_MEDIA_SCRIPT)
+        .initialization_script(browser_status_script(&shortcut_token))
+        .initialization_script(kiri::page_script())
         .on_navigation(move |url| {
             if restoring_tab_session && url.as_str() == "about:blank" { return true; }
-            #[cfg(target_os = "macos")]
-            if context_menu::forward(&navigation_app, &navigation_id, url) { return false; }
-            if url.scheme() == "misty-media" {
-                let audible = url.query_pairs().any(|(key, value)| key == "audible" && value == "1");
-                let _ = navigation_app.emit_to(
-                    browser_owner_label(&navigation_app, &navigation_id),
-                    "misty://browser-media",
-                    json!({ "id": navigation_id, "audible": audible }),
-                );
-                false
-            } else if url.scheme() == "misty-status" {
-                let _ = navigation_app.emit_to(
-                    browser_owner_label(&navigation_app, &navigation_id),
-                    "misty://browser-stopped",
-                    BrowserFocusEvent { id: navigation_id.clone() },
-                );
-                false
-            } else if let Some(pointer) = browser_pointer_navigation(url) {
-                emit_browser_pointer(&navigation_app, &navigation_id, pointer);
-                false
-            } else if forward_focus_navigation(&navigation_app, &navigation_id, url) {
-                false
-            } else if forward_companion_navigation(&navigation_app, &navigation_id, url) {
-                false
-            } else if forward_navigation(&navigation_app, &navigation_id, url) {
-                false
-            } else {
-                // This callback includes frames, redirects and POST submissions.
-                // Never turn these requests into URL-only Browser handoffs.
-                external_url(url.as_str()).is_ok()
-            }
+            // Misty's page scripts report over Kiri's host channel, never by
+            // navigating, so every non-web scheme is refused here. This
+            // callback includes frames, redirects and POST submissions.
+            // Never turn these requests into URL-only Browser handoffs.
+            external_url(url.as_str()).is_ok()
         })
         .on_new_window(move |url, features| {
             if preview_only { return NewWindowResponse::Deny; }
@@ -1058,7 +1044,7 @@ pub async fn browser_webview_create(
                     let _ = apply_shortcuts(&webview, &state);
                 }
                 #[cfg(target_os = "macos")]
-                focus_messages::forget_page_background(&page_id);
+                host_messages::forget_page_background(&page_id);
             }
             let phase = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "started",
@@ -1100,8 +1086,7 @@ pub async fn browser_webview_create(
         .add_child(builder, position, size)
         .map_err(|error| error.to_string())?;
     if !preview_only { super::extensions::native::register(&webview, &request.id, request.private, &request.url); }
-    #[cfg(target_os = "macos")]
-    focus_messages::install(&app, &webview, &request.id)?;
+    host_messages::install(&webview)?;
     #[cfg(target_os = "macos")]
     attachment_download::install(&webview)?;
     #[cfg(any(target_os = "macos", windows))]
@@ -1128,36 +1113,6 @@ pub async fn browser_webview_create(
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     present_macos_webview(&webview)
-}
-
-fn forward_focus_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
-    if url.scheme() != "misty-focus" {
-        return false;
-    }
-    let token = url
-        .query_pairs()
-        .find_map(|(key, value)| (key == "token").then(|| value.into_owned()))
-        .unwrap_or_default();
-    let trusted = app
-        .try_state::<BrowserSessionState>()
-        .map(|state| shortcut_token_matches(&state, id, &token))
-        .unwrap_or(false);
-    if trusted {
-        let _ = app.emit_to(
-            browser_owner_label(app, id),
-            "misty://browser-focus",
-            BrowserFocusEvent { id: id.to_owned() },
-        );
-    }
-    true
-}
-
-/// Pages used to reach the in-page companion through this scheme. The token
-/// that authenticated it is readable by a hostile page (it shares the page's
-/// JavaScript world), so a forged URL could submit agent prompts. The scheme
-/// is swallowed and nothing is forwarded.
-fn forward_companion_navigation(_app: &AppHandle, _id: &str, url: &Url) -> bool {
-    url.scheme() == "misty-companion"
 }
 
 fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {
@@ -1729,7 +1684,7 @@ pub fn browser_webview_reconcile(
     present_macos_webview(&webview)?;
     // A reloaded shell forgot the page's color; the page will not resend it.
     #[cfg(target_os = "macos")]
-    focus_messages::replay_page_background(&app, &request.id);
+    host_messages::replay_page_background(&app, &request.id);
     Ok(true)
 }
 
@@ -2136,8 +2091,7 @@ pub fn browser_webview_close(
     }
     #[cfg(target_os = "macos")]
     popups::forget_close_handler(&request.id);
-    #[cfg(target_os = "macos")]
-    focus_messages::forget(&request.id);
+    host_messages::forget(&request.id);
     if let Ok(mut pending) = state.pending_popups.lock() {
         pending.remove(&request.id);
     }
@@ -2150,8 +2104,9 @@ pub fn browser_webview_close(
     if private_session_ended {
         let _ = app.run_on_main_thread(wry::reset_private_data_store);
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = private_session_ended;
+    if private_session_ended {
+        super::browser_site_permissions::forget_private_session();
+    }
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
