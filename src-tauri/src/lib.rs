@@ -103,6 +103,12 @@ use infra::browser_history::{
     browser_history_record, browser_history_set_title, browser_history_suggest,
 };
 #[cfg(desktop)]
+use infra::browser_import::{
+    browser_import_bookmarks, browser_import_bookmarks_file, browser_import_discover,
+    browser_import_history, browser_import_preview, browser_import_save_bookmarks,
+    browser_import_settings, browser_import_signins,
+};
+#[cfg(desktop)]
 use infra::browser_library::{
     browser_download_cancel, browser_download_open, browser_download_reveal,
     browser_downloads_list, browser_downloads_progress, browser_downloads_remove,
@@ -518,6 +524,22 @@ pub fn run() {
                     browser_history_suggest,
                     #[cfg(desktop)]
                     browser_history_forget,
+                    #[cfg(desktop)]
+                    browser_import_discover,
+                    #[cfg(desktop)]
+                    browser_import_bookmarks,
+                    #[cfg(desktop)]
+                    browser_import_bookmarks_file,
+                    #[cfg(desktop)]
+                    browser_import_save_bookmarks,
+                    #[cfg(desktop)]
+                    browser_import_preview,
+                    #[cfg(desktop)]
+                    browser_import_history,
+                    #[cfg(desktop)]
+                    browser_import_settings,
+                    #[cfg(desktop)]
+                    browser_import_signins,
                     browser_search_suggest,
                     #[cfg(desktop)]
                     browser_download_cancel,

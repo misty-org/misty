@@ -440,6 +440,46 @@ pub async fn browser_site_permissions_reset(
     .await
 }
 
+/// Camera and microphone decisions imported from another browser, for one
+/// Misty browser profile. Only sites still set to Ask change, so a choice
+/// already made in Misty always wins. Returns how many decisions were added.
+pub(crate) fn import_decisions(
+    profile: Option<&str>,
+    decisions: &[(String, &str, bool)],
+) -> Result<usize, String> {
+    let identifier = super::browser_profile::data_store_identifier(profile)?;
+    // The store is keyed like WebKit's `UUIDString`.
+    let key = uuid::Uuid::from_bytes(identifier)
+        .hyphenated()
+        .to_string()
+        .to_uppercase();
+    let mut store = read_store();
+    let sites = store.entry(key).or_default();
+    let mut added = 0;
+    for (origin, kind, allow) in decisions {
+        let Ok(origin) = canonical_origin(origin) else {
+            continue;
+        };
+        let entry = sites.entry(origin).or_default();
+        let slot = if *kind == "camera" {
+            &mut entry.camera
+        } else {
+            &mut entry.microphone
+        };
+        if *slot == Decision::Ask {
+            *slot = if *allow {
+                Decision::Allow
+            } else {
+                Decision::Block
+            };
+            added += 1;
+        }
+    }
+    sites.retain(|_, permissions| *permissions != Permissions::default());
+    write_store(&store)?;
+    Ok(added)
+}
+
 #[path = "browser_site_permissions_store.rs"]
 mod store;
 use store::{read_store, sites_for_scope, update_scope, write_store};

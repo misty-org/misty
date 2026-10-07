@@ -8,6 +8,10 @@ export interface FolderFields {
   icon: string;
   order: number;
   hidden: boolean;
+  /** Absent for the roots and for folders directly in Other bookmarks. */
+  parent_id?: string;
+  /** First added, in ms since the epoch (kept from imports). */
+  added_at?: number;
 }
 export interface BookmarkFields {
   folder_id: string;
@@ -15,6 +19,8 @@ export interface BookmarkFields {
   url: string;
   order: number;
   pinned: boolean;
+  /** First added, in ms since the epoch (kept from imports). */
+  added_at?: number;
 }
 export interface WindowFields {
   title: string;

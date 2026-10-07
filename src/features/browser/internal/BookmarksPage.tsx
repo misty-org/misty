@@ -1,231 +1,226 @@
-import { MoreHorizontal, Plus } from "lucide-react";
+import { ArrowDownUp, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { BrowserImportDialog, exportBookmarks } from "@/features/browser-import";
 import {
-  Button,
   CollectionFilters,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
-  Field,
-  Input,
-  ListRow,
-  ListRowButton,
   MenuItem,
   MenuTrigger,
+  Pressable,
 } from "@/shared/ui";
 import { useState } from "react";
 import { BookmarkEditor } from "@/features/bookmarks/BookmarkEditor";
 import {
-  createBookmarkFolder,
-  removeBookmark,
+  BookmarkFolderDialog,
+  type BookmarkFolderDraft,
+} from "@/features/bookmarks/BookmarkFolderDialog";
+import {
+  bookmarkRoots,
+  isBookmarkRoot,
+  mobileBookmarksId,
+  otherBookmarksId,
   removeBookmarkFolder,
-  renameBookmarkFolder,
-  unfiledFolderId,
   useBookmarkLibrary,
-  type Bookmark as BookmarkItem,
+  type Bookmark,
 } from "@/features/bookmarks/library";
-import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
+import { InternalPageEmpty, InternalPageFrame } from "./InternalPageFrame";
+import { BookmarkFolderRow, BookmarkLinkRow } from "./BookmarkRows";
 import type { BrowserInternalPageProps } from "./types";
 
 export function BookmarksPage(props: BrowserInternalPageProps) {
-  const { folders, bookmarks } = useBookmarkLibrary();
+  const tree = useBookmarkLibrary();
   const [text, setText] = useState("");
-  const [folderId, setFolderId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<BookmarkItem | "new" | null>(null);
-  const [folderDraft, setFolderDraft] = useState<{ id?: string; name: string } | null>(null);
-  const [error, setError] = useState("");
-  const folderLabel = (folder?: (typeof folders)[number]) =>
-    folder?.name === "Bookmarks"
-      ? folder.id === unfiledFolderId
-        ? "Unfiled"
-        : "Bookmarks folder"
-      : (folder?.name ?? "Recovered bookmarks");
-  const selected = folders.find((f) => f.id === folderId);
+  const [folderId, setFolderId] = useState<string>(otherBookmarksId);
+  const [editing, setEditing] = useState<Bookmark | "new" | null>(null);
+  const [folderDraft, setFolderDraft] = useState<BookmarkFolderDraft | null>(null);
+  const [importing, setImporting] = useState(false);
+  // A folder removed elsewhere falls back to Other bookmarks.
+  const current = tree.folder(folderId) ? folderId : otherBookmarksId;
+  const path = tree.path(current);
+  const root = path[0]?.id ?? otherBookmarksId;
   const needle = text.trim().toLocaleLowerCase();
-  const matches = bookmarks.filter(
-    (b) =>
-      (!selected || b.folderId === selected.id) &&
-      (!needle || `${b.title} ${b.url}`.toLocaleLowerCase().includes(needle)),
+  const children = tree.children(current);
+  const links = children.filter((node) => node.kind === "bookmark");
+  const matches = needle
+    ? tree.bookmarks.filter((b) => `${b.title} ${b.url}`.toLocaleLowerCase().includes(needle))
+    : [];
+  const location = (b: Bookmark) =>
+    tree
+      .path(b.folderId)
+      .map((folder) => folder.name)
+      .join(" / ");
+  const roots = bookmarkRoots.filter(
+    (r) => r.id !== mobileBookmarksId || tree.children(r.id).length || root === r.id,
   );
   return (
     <InternalPageFrame
       title="Bookmarks"
       search={{ value: text, placeholder: "Search bookmarks", onChange: setText }}
       actions={
-        <DropdownMenu modal={false}>
-          <MenuTrigger
-            label="Add"
-            variant="primary"
-            className="h-9 px-4"
-            icon={<Plus size={16} />}
-          />
-          <DropdownMenuContent align="end">
-            <MenuItem label="Add bookmark" onSelect={() => setEditing("new")} />
-            <MenuItem
-              label="New folder"
-              onSelect={() => {
-                setError("");
-                setFolderDraft({ name: "" });
-              }}
+        <>
+          <DropdownMenu modal={false}>
+            <MenuTrigger
+              iconOnly
+              label="Import and export bookmarks"
+              icon={<ArrowDownUp size={16} />}
             />
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <DropdownMenuContent align="end">
+              <MenuItem label="Import from another browser" onSelect={() => setImporting(true)} />
+              <MenuItem
+                label="Export bookmarks"
+                onSelect={() => void exportBookmarks().catch(() => undefined)}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu modal={false}>
+            <MenuTrigger
+              label="Add"
+              variant="primary"
+              className="h-9 px-4"
+              icon={<Plus size={16} />}
+            />
+            <DropdownMenuContent align="end">
+              <MenuItem label="Add bookmark" onSelect={() => setEditing("new")} />
+              <MenuItem
+                label="New folder"
+                onSelect={() => setFolderDraft({ mode: "new", parentId: current })}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
       }
       toolbar={
         <CollectionFilters
-          options={[
-            { value: "all", label: "All" },
-            ...folders.map((folder) => ({ value: folder.id, label: folderLabel(folder) })),
-          ]}
-          value={selected?.id ?? "all"}
-          onChange={(value) => setFolderId(value === "all" ? null : value)}
+          options={roots.map((r) => ({ value: r.id, label: r.label }))}
+          value={root}
+          onChange={setFolderId}
           actions={
-            selected ? (
-              <DropdownMenu modal={false}>
-                <MenuTrigger
-                  iconOnly
-                  label={`Manage folder ${folderLabel(selected)}`}
-                  icon={<MoreHorizontal size={16} />}
+            <DropdownMenu modal={false}>
+              <MenuTrigger
+                iconOnly
+                label={`Manage folder ${path[path.length - 1]?.name ?? ""}`}
+                icon={<MoreHorizontal size={16} />}
+              />
+              <DropdownMenuContent align="end">
+                <MenuItem
+                  label="Open all in new tabs"
+                  disabled={!links.length}
+                  onSelect={() => links.forEach((b) => props.openInNewView(b.url))}
                 />
-                <DropdownMenuContent align="end">
-                  <MenuItem
-                    label="Open all in new tabs"
-                    disabled={!matches.length}
-                    onSelect={() => matches.forEach((b) => props.openInNewView(b.url))}
-                  />
-                  <MenuItem
-                    label="Rename folder"
-                    onSelect={() => {
-                      setError("");
-                      setFolderDraft({ id: selected.id, name: selected.name });
-                    }}
-                  />
-                  <DropdownMenuSeparator />
-                  <MenuItem
-                    label="Remove folder, keep bookmarks"
-                    disabled={selected.id === unfiledFolderId}
-                    onSelect={() => {
-                      removeBookmarkFolder(selected.id);
-                      setFolderId(null);
-                    }}
-                  />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : undefined
+                {!isBookmarkRoot(current) && (
+                  <>
+                    <MenuItem
+                      label="Rename folder"
+                      onSelect={() =>
+                        setFolderDraft({
+                          mode: "rename",
+                          id: current,
+                          name: tree.folder(current)!.name,
+                        })
+                      }
+                    />
+                    <DropdownMenuSeparator />
+                    <MenuItem
+                      label="Remove folder, keep contents"
+                      onSelect={() => {
+                        setFolderId(tree.folder(current)?.parentId ?? otherBookmarksId);
+                        removeBookmarkFolder(current);
+                      }}
+                    />
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           }
         />
       }
     >
-      {matches.length ? (
-        <ul className="grid">
-          {matches.map((b) => (
-            <ListRow key={b.id}>
-              <SiteIcon url={b.url} />
-              <ListRowButton
-                title={b.url}
-                onClick={(event) =>
-                  event.metaKey || event.ctrlKey
-                    ? props.openInNewView(b.url)
-                    : props.navigate(b.url)
-                }
+      {!needle && path.length > 1 && (
+        <nav
+          aria-label="Folder path"
+          className="flex min-w-0 flex-wrap items-center gap-1 px-2 pb-2"
+        >
+          {path.map((folder, index) =>
+            index === path.length - 1 ? (
+              <span
+                key={folder.id}
+                aria-current="page"
+                className="truncate text-sm text-cream-bright"
               >
-                <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-1.5">
-                  <span className="max-w-full truncate text-sm text-cream-bright">{b.title}</span>
-                  <span className="max-w-full truncate text-xs text-cream-muted">{b.url}</span>
-                </span>
-                {!selected && (
-                  <span className="max-w-32 truncate text-xs text-cream-muted">
-                    {folderLabel(folders.find((f) => f.id === b.folderId))}
-                  </span>
-                )}
-              </ListRowButton>
-              <DropdownMenu modal={false}>
-                <MenuTrigger
-                  iconOnly
-                  label={`Manage bookmark ${b.title}`}
-                  icon={<MoreHorizontal size={16} />}
-                />
-                <DropdownMenuContent align="end">
-                  <MenuItem label="Open in new tab" onSelect={() => props.openInNewView(b.url)} />
-                  <MenuItem label="Edit bookmark" onSelect={() => setEditing(b)} />
-                  <DropdownMenuSeparator />
-                  <MenuItem label="Remove bookmark" onSelect={() => removeBookmark(b.id)} />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </ListRow>
-          ))}
+                {folder.name}
+              </span>
+            ) : (
+              <span key={folder.id} className="flex min-w-0 items-center gap-1">
+                <Pressable
+                  className="truncate rounded-sm text-sm text-cream-muted hover:text-cream-bright"
+                  onClick={() => setFolderId(folder.id)}
+                >
+                  {folder.name}
+                </Pressable>
+                <ChevronRight size={14} className="shrink-0 text-cream-muted" aria-hidden />
+              </span>
+            ),
+          )}
+        </nav>
+      )}
+      {needle ? (
+        matches.length ? (
+          <ul className="grid">
+            {matches.map((b) => (
+              <BookmarkLinkRow
+                key={b.id}
+                {...props}
+                bookmark={b}
+                location={location(b)}
+                onEdit={() => setEditing(b)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <InternalPageEmpty title="No matching bookmarks" detail="Try another name or address." />
+        )
+      ) : children.length ? (
+        <ul className="grid">
+          {children.map((node) =>
+            node.kind === "folder" ? (
+              <BookmarkFolderRow
+                key={node.id}
+                folder={node}
+                count={tree.children(node.id).length}
+                onOpen={() => setFolderId(node.id)}
+                onRename={() => setFolderDraft({ mode: "rename", id: node.id, name: node.name })}
+                onMove={() =>
+                  setFolderDraft({ mode: "move", id: node.id, parentId: node.parentId ?? current })
+                }
+                onRemove={() => removeBookmarkFolder(node.id)}
+              />
+            ) : (
+              <BookmarkLinkRow
+                key={node.id}
+                {...props}
+                bookmark={node}
+                onEdit={() => setEditing(node)}
+              />
+            ),
+          )}
         </ul>
       ) : (
         <InternalPageEmpty
-          title={
-            needle
-              ? "No matching bookmarks"
-              : selected
-                ? "No bookmarks in this folder"
-                : "No bookmarks yet"
-          }
-          detail={
-            needle
-              ? "Try another name or address."
-              : "Save a page with the star in the address bar, or add a bookmark here."
-          }
+          title={path.length > 1 ? "No bookmarks in this folder" : "No bookmarks yet"}
+          detail="Save a page with the star in the address bar, or add a bookmark here."
         />
       )}
       {editing && (
         <BookmarkEditor
           bookmark={editing === "new" ? undefined : editing}
-          folderId={selected?.id}
+          folderId={current}
           onClose={() => setEditing(null)}
         />
       )}
+      {importing && <BrowserImportDialog onClose={() => setImporting(false)} />}
       {folderDraft && (
-        <Dialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setFolderDraft(null);
-          }}
-        >
-          <DialogContent className="sm:max-w-sm">
-            <DialogTitle>{folderDraft.id ? "Rename folder" : "New folder"}</DialogTitle>
-            <form
-              className="grid gap-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                try {
-                  if (folderDraft.id) renameBookmarkFolder(folderDraft.id, folderDraft.name);
-                  else setFolderId(createBookmarkFolder(folderDraft.name));
-                  setFolderDraft(null);
-                } catch (failure) {
-                  setError(failure instanceof Error ? failure.message : String(failure));
-                }
-              }}
-            >
-              <Field label="Folder name">
-                <Input
-                  autoFocus
-                  required
-                  maxLength={160}
-                  value={folderDraft.name}
-                  onChange={(e) => setFolderDraft({ ...folderDraft, name: e.target.value })}
-                />
-              </Field>
-              {error && (
-                <p role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-              <DialogFooter>
-                <Button variant="ghost" type="button" onClick={() => setFolderDraft(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Save</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <BookmarkFolderDialog draft={folderDraft} onClose={() => setFolderDraft(null)} />
       )}
     </InternalPageFrame>
   );

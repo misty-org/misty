@@ -13,6 +13,10 @@ cd "$root"
 # checkout root, git finds the same repository without them.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 hooks="$root/.githooks"
+# misty-billing sits beside the main checkout. A linked worktree lives inside it
+# (.claude/worktrees/...), so find the main checkout through the shared git dir.
+main_root=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+export MISTY_BILLING_REPO="${MISTY_BILLING_REPO:-$(dirname "$main_root")/misty-billing}"
 
 frontend() {
   npm run typecheck
@@ -22,7 +26,7 @@ frontend() {
 }
 tasks() { npm run test:tasks; }
 billing() {
-  local billing_root="${MISTY_BILLING_REPO:-$(dirname "$root")/misty-billing}"
+  local billing_root="$MISTY_BILLING_REPO"
   [ -f "$billing_root/.githooks/checks.sh" ] || { echo "Billing checkout missing: $billing_root" >&2; return 1; }
   (cd "$billing_root" && MISTY_SERVER_REPO="$root" bash .githooks/checks.sh go)
 }

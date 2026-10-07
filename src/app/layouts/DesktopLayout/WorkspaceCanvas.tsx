@@ -1,3 +1,4 @@
+import { BookmarksBar } from "@/features/bookmarks/BookmarksBar";
 import { routes } from "@/features/app-shell";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { openMisty } from "@/features/misty/handoff";
@@ -454,43 +455,46 @@ export function WorkspaceCanvas(props: {
           onResizeSplit={updateSplitRatio}
         />
       )}
-      {layoutTabs(layout).map((tab) => {
-        const active = tab.id === layout.activeTabId;
-        return (
-          <div
-            key={tab.id}
-            className={active ? "min-h-0 min-w-0 flex-1 overflow-hidden" : "hidden"}
-            role="tabpanel"
-            aria-label={tabLabel(tab)}
-            aria-hidden={!active}
-            inert={!active}
-          >
-            <WorkspaceDockTree
-              node={tab.root}
-              workspaceActive={active}
-              focusedPaneId={tab.focusedPaneId}
-              lastUsedViewByGroup={lastUsedTabByGroup}
-              onOpen={openTab}
-              onClose={closeWorkspaceTab}
-              onMoveView={moveTab}
-              onDockView={dockTab}
-              onSplitPane={splitWorkspacePane}
-              onClosePane={(paneId) => {
-                closePane(paneId);
-                navigateToActiveLayoutTab();
-              }}
-              windows={virtualWindows}
-              activeWindowId={activeVirtualWindowId}
-              canReopenWindow={canReopenVirtualWindow}
-              onSelectWindow={selectVirtualWindow}
-              onCreateWindow={createWorkspaceVirtualWindow}
-              onCloseWindow={closeWorkspaceVirtualWindow}
-              onReopenWindow={reopenWorkspaceVirtualWindow}
-              onResizeSplit={updateSplitRatio}
-            />
-          </div>
-        );
-      })}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {!standaloneAgents && <BookmarksBar />}
+        {layoutTabs(layout).map((tab) => {
+          const active = tab.id === layout.activeTabId;
+          return (
+            <div
+              key={tab.id}
+              className={active ? "min-h-0 min-w-0 flex-1 overflow-hidden" : "hidden"}
+              role="tabpanel"
+              aria-label={tabLabel(tab)}
+              aria-hidden={!active}
+              inert={!active}
+            >
+              <WorkspaceDockTree
+                node={tab.root}
+                workspaceActive={active}
+                focusedPaneId={tab.focusedPaneId}
+                lastUsedViewByGroup={lastUsedTabByGroup}
+                onOpen={openTab}
+                onClose={closeWorkspaceTab}
+                onMoveView={moveTab}
+                onDockView={dockTab}
+                onSplitPane={splitWorkspacePane}
+                onClosePane={(paneId) => {
+                  closePane(paneId);
+                  navigateToActiveLayoutTab();
+                }}
+                windows={virtualWindows}
+                activeWindowId={activeVirtualWindowId}
+                canReopenWindow={canReopenVirtualWindow}
+                onSelectWindow={selectVirtualWindow}
+                onCreateWindow={createWorkspaceVirtualWindow}
+                onCloseWindow={closeWorkspaceVirtualWindow}
+                onReopenWindow={reopenWorkspaceVirtualWindow}
+                onResizeSplit={updateSplitRatio}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
