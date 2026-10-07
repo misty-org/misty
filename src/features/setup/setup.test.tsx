@@ -37,27 +37,37 @@ vi.mock("@/features/browser-import", () => ({
 
 beforeEach(() => {
   localStorage.clear();
-  useSetupStore.setState({ isOpen: false, step: "theme", completedAccounts: {} });
+  useSetupStore.setState({ isOpen: false, step: "spaces", completedAccounts: {} });
   mocks.native = false;
   vi.clearAllMocks();
 });
 afterEach(cleanup);
 
-it("applies a theme and a layout as they are chosen, then finishes", () => {
+it("introduces Spaces, asks for a layout with no default, then a theme, and finishes", () => {
   render(<FirstRunSetup />);
   act(() => useSetupStore.getState().startSetup());
-  expect(screen.getByText("Choose a theme")).toBeTruthy();
-  expect(screen.getByRole("radio", { name: /Dark/ }).getAttribute("aria-checked")).toBe("true");
-  fireEvent.click(screen.getByRole("radio", { name: /Light/ }));
-  expect(mocks.updateSetting).toHaveBeenCalledWith("appearance", "theme_mode", "light");
-
+  expect(screen.getByText("Meet Spaces")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
   expect(screen.getByText("Choose a layout")).toBeTruthy();
+  expect(screen.getByRole("radio", { name: /Horizontal tabs/ }).getAttribute("aria-checked")).toBe(
+    "false",
+  );
+  expect(screen.getByRole("radio", { name: /Vertical tabs/ }).getAttribute("aria-checked")).toBe(
+    "false",
+  );
+  expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  );
   fireEvent.click(screen.getByRole("radio", { name: /Vertical tabs/ }));
   expect(mocks.setLayout).toHaveBeenCalledWith({ navigation: "right", tabs: "left" });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
+  expect(screen.getByText("Choose a theme")).toBeTruthy();
+  fireEvent.click(screen.getByRole("radio", { name: /Light/ }));
+  expect(mocks.updateSetting).toHaveBeenCalledWith("appearance", "theme_mode", "light");
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
-  expect(screen.queryByText("Choose a layout")).toBeNull();
+  expect(screen.queryByText("Choose a theme")).toBeNull();
   expect(isSetupCompletedForAccount(useSetupStore.getState(), "account-1")).toBe(true);
   expect(isSetupCompletedForAccount(useSetupStore.getState(), "account-2")).toBe(false);
 });
@@ -66,6 +76,8 @@ it("ends with importing from another browser in the desktop app", () => {
   mocks.native = true;
   render(<FirstRunSetup />);
   act(() => useSetupStore.getState().startSetup());
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  fireEvent.click(screen.getByRole("radio", { name: /Horizontal tabs/ }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByText("Import from your browser")).toBeTruthy();

@@ -37,8 +37,8 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     allowShadowing: true,
   }),
-  command("misty.contextual_companion", "Toggle Misty panel", {
-    description: "Open or close the Misty panel beside the workspace.",
+  command("misty.contextual_companion", "Toggle chat panel", {
+    description: "Open or close the chat panel beside the page.",
     category: "Misty",
     aliases: ["assistant", "ask misty"],
     mac: "Cmd+Shift+K",

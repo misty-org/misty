@@ -82,7 +82,7 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
       </Section>
-      <Section title="Misty panel">
+      <Section title="Chat panel">
         <PanelSideRow />
       </Section>
     </>

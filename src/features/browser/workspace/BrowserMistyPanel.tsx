@@ -15,12 +15,12 @@ export function useBrowserMistyPanel(tabId: string) {
   return { paneId, here: open, open };
 }
 
-/** The toolbar's Misty button: opens the panel, or closes it. */
+/** The toolbar's Chat button: opens the chat panel, or closes it. */
 export function BrowserMistyButton({ tabId }: { tabId: string }) {
   const { paneId, open } = useBrowserMistyPanel(tabId);
   return (
     <IconButton
-      label="Misty"
+      label={open ? "Close chat" : "Chat"}
       tooltip={false}
       aria-pressed={open}
       onClick={() => useMistyPanelStore.getState().setOpen(!open, paneId ?? null)}

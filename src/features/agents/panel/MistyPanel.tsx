@@ -18,9 +18,8 @@ import { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./mistyPanelStore";
 export type MistyPanelSide = "left" | "right";
 
 /**
- * The Agents conversation beside the workspace, so Misty is one keystroke away from any
- * tool. It is the Agents page's own title bar, conversation and landing in one column;
- * anything beyond that (Activity, Templates, agent settings) opens the Agents page.
+ * The chat panel beside the workspace, so an agent (and, once chats live in Spaces, a
+ * friend) is one keystroke away from any page. Expanding it opens the full chat page.
  */
 export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const settingsAgent = useSettingsStore((s) => s.settings?.document.agent) as
@@ -88,7 +87,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
       // The dock sets the width; it stays fixed while the dock slides, so the panel
       // slides in from the edge instead of squeezing.
       style={{ width: `var(--misty-panel-width, ${MISTY_PANEL_WIDTH}px)` }}
-      aria-label="Misty"
+      aria-label="Chat"
       data-misty-panel={side}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -131,10 +130,10 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                     }
                     actions={
                       <>
-                        <IconButton label="Open in Agents" onClick={openInAgents}>
+                        <IconButton label="Open full chat" onClick={openInAgents}>
                           <ArrowUpRight />
                         </IconButton>
-                        <IconButton label="Close agent panel" onClick={close}>
+                        <IconButton label="Close chat" onClick={close}>
                           <X />
                         </IconButton>
                       </>

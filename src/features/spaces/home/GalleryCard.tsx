@@ -1,4 +1,11 @@
-import { Code2, FileText, Image as ImageIcon, NotebookText, PenLine } from "lucide-react";
+import {
+  Code2,
+  FileText,
+  Image as ImageIcon,
+  MessagesSquare,
+  NotebookText,
+  PenLine,
+} from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { LibraryItemThumbnail } from "@/features/library";
 import { cn, itemToneClass, itemTones, Pressable, type ItemTone } from "@/shared/ui";
@@ -6,6 +13,7 @@ import { editedLabel, type GalleryItem, type GalleryKind } from "./galleryItems"
 
 type KindIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 const kindIcon: Record<GalleryKind, { Icon: KindIcon; tone: ItemTone; label: string }> = {
+  chat: { Icon: MessagesSquare, tone: itemTones.chat, label: "Chat" },
   note: { Icon: NotebookText, tone: itemTones.note, label: "Note" },
   drawing: { Icon: PenLine, tone: itemTones.drawing, label: "Drawing" },
   image: { Icon: ImageIcon, tone: itemTones.image, label: "Image" },
@@ -28,6 +36,14 @@ function Preview({ item, spaceId }: { item: GalleryItem; spaceId: string }): Rea
         <p className="m-0 line-clamp-4 text-xs leading-relaxed text-cream-muted">
           {item.excerpt || "Empty note"}
         </p>
+      </div>
+    );
+  if (item.kind === "chat")
+    return (
+      <div className="flex h-full flex-col justify-end gap-1.5 p-3">
+        <span className="w-fit max-w-full truncate rounded-lg bg-charcoal-card px-2.5 py-1.5 text-xs text-cream-muted">
+          {item.people?.length ? `With ${item.people.join(", ")}` : "Just you so far"}
+        </span>
       </div>
     );
   if (item.kind === "code")

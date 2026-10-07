@@ -1,11 +1,13 @@
 import type { SpaceDrawing } from "@/api/drawings/types";
 import type { ServerSpaceNote } from "@/api/notes/api";
 import type { SpaceCodeProject } from "@/api/spaces/code-projects";
+import type { SpaceConversation } from "@/api/spaces/dto/conversationTypes";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { libraryItemMIME } from "@/features/library";
+import { conversationPath } from "../chat/chatRoute";
 
 /** One thing made in a Space, as the Space home shows it. */
-export type GalleryKind = "note" | "drawing" | "image" | "file" | "code";
+export type GalleryKind = "chat" | "note" | "drawing" | "image" | "file" | "code";
 
 export interface GalleryItem {
   /** Unique across kinds, for React keys. */
@@ -20,15 +22,22 @@ export interface GalleryItem {
   excerpt?: string;
   libraryItem?: SpaceLibraryItem;
   repo?: string;
+  /** Who a chat is with. */
+  people?: string[];
 }
 
-export type GalleryFilter = "all" | "notes" | "drawings" | "images" | "files" | "code";
+export type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
 export type GalleryMadeBy = "anyone" | "me" | "others";
 export type GallerySort = "edited" | "name";
 
-/** The Space home's tabs, in order; ⌘1 to ⌘6 follow it. */
-export const galleryFilters: ReadonlyArray<{ id: GalleryFilter; label: string; kind?: GalleryKind }> = [
+/** The Space home's tabs, in order. */
+export const galleryFilters: ReadonlyArray<{
+  id: GalleryFilter;
+  label: string;
+  kind?: GalleryKind;
+}> = [
   { id: "all", label: "All" },
+  { id: "chats", label: "Chats", kind: "chat" },
   { id: "notes", label: "Notes", kind: "note" },
   { id: "drawings", label: "Drawings", kind: "drawing" },
   { id: "images", label: "Images", kind: "image" },
@@ -41,6 +50,46 @@ export function isGalleryFilter(value: string | null): value is GalleryFilter {
 }
 
 const base = (spaceId: string) => `/spaces/${encodeURIComponent(spaceId)}`;
+
+/** A chat with people or an agent; it is one more thing in the Space, like a note. */
+export function chatItem(
+  spaceId: string,
+  conversation: SpaceConversation,
+  me: string,
+): GalleryItem {
+  const people = conversation.participants
+    .filter((person) => person.agent_id || person.user_id !== me)
+    .map((person) => person.name)
+    .filter(Boolean);
+  return {
+    key: `chat:${conversation.id}`,
+    kind: "chat",
+    title: conversation.title.trim() || people.join(", ") || "Untitled chat",
+    updatedAt: conversation.updated_at || conversation.created_at,
+    creatorId: conversation.created_by_user_id,
+    href: conversationPath(spaceId, conversation),
+    people,
+  };
+}
+
+/** A chat with one of your agents. Until agent chats move into Spaces, they show in your own Space. */
+export function agentChatItem(
+  conversation: { id: string; title?: string; agentId?: string; updatedAt: string },
+  agent: { id: string; name: string } | undefined,
+  me: string,
+): GalleryItem {
+  const params = new URLSearchParams({ conversation: conversation.id });
+  if (agent) params.set("agent", agent.id);
+  return {
+    key: `agent-chat:${conversation.id}`,
+    kind: "chat",
+    title: conversation.title?.trim() || "Untitled chat",
+    updatedAt: conversation.updatedAt,
+    creatorId: me,
+    href: `/agents?${params}`,
+    people: agent ? [agent.name] : [],
+  };
+}
 
 export function noteItem(spaceId: string, note: ServerSpaceNote): GalleryItem {
   const text = (note.plain_text ?? note.markdown ?? "").replace(/\s+/g, " ").trim();
@@ -99,7 +148,13 @@ export function codeItem(spaceId: string, project: SpaceCodeProject): GalleryIte
 /** What the current tab, maker and sort leave, newest first unless sorted by name. */
 export function visibleGallery(
   items: GalleryItem[],
-  options: { filter: GalleryFilter; madeBy: GalleryMadeBy; sort: GallerySort; me: string; query: string },
+  options: {
+    filter: GalleryFilter;
+    madeBy: GalleryMadeBy;
+    sort: GallerySort;
+    me: string;
+    query: string;
+  },
 ): GalleryItem[] {
   const kind = galleryFilters.find((filter) => filter.id === options.filter)?.kind;
   const query = options.query.trim().toLowerCase();
@@ -107,8 +162,12 @@ export function visibleGallery(
     (item) =>
       (!kind || item.kind === kind) &&
       (options.madeBy === "anyone" ||
-        (options.madeBy === "me" ? item.creatorId === options.me : item.creatorId !== options.me)) &&
-      (!query || item.title.toLowerCase().includes(query) || item.excerpt?.toLowerCase().includes(query)),
+        (options.madeBy === "me"
+          ? item.creatorId === options.me
+          : item.creatorId !== options.me)) &&
+      (!query ||
+        item.title.toLowerCase().includes(query) ||
+        item.excerpt?.toLowerCase().includes(query)),
   );
   return kept.sort((a, b) =>
     options.sort === "name"

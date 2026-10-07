@@ -19,8 +19,9 @@ import {
   Pressable,
 } from "@/shared/ui";
 import { Check } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { LayoutPreview, ThemePreview } from "./SetupPreviews";
+import { SpacesStep } from "./SpacesStep";
 import { useSetupStore, type SetupStep } from "./useSetupStore";
 
 const themeChoices: Array<{ value: AppThemeMode; label: string }> = [
@@ -43,6 +44,10 @@ const layoutChoices: Array<{ label: string; detail: string; layout: DockingLayou
 ];
 
 const stepCopy: Record<SetupStep, { title: string; description: string }> = {
+  spaces: {
+    title: "Meet Spaces",
+    description: "A Space is a profile for one part of your life, like work, school or family.",
+  },
   theme: {
     title: "Choose a theme",
     description: "System follows your computer's light or dark appearance.",
@@ -50,7 +55,7 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
   layout: {
     title: "Choose a layout",
     description:
-      "Pick how tabs are laid out. Navigation always sits on the opposite side. It applies to this window as you choose.",
+      "Pick where tabs sit in every Space's window. Navigation sits on the opposite side, and you can switch later in Settings.",
   },
   import: {
     title: "Import from your browser",
@@ -71,8 +76,10 @@ export function FirstRunSetup() {
   const visible = isOpen && !transitioning && Boolean(user?.id);
   // Importing reads other browsers on this computer, so it needs the native app.
   const steps: SetupStep[] = hasTauriInternals()
-    ? ["theme", "layout", "import"]
-    : ["theme", "layout"];
+    ? ["spaces", "layout", "theme", "import"]
+    : ["spaces", "layout", "theme"];
+  // There is no default layout: the person picks one before going on.
+  const [layoutChosen, setLayoutChosen] = useState(false);
   const index = Math.max(0, steps.indexOf(step));
   const finish = () => finishSetup(user?.id);
   const next = () => (index < steps.length - 1 ? setStep(steps[index + 1]) : finish());
@@ -98,8 +105,11 @@ export function FirstRunSetup() {
           {copy.description}
         </DialogDescription>
         <div className="mt-6">
+          {steps[index] === "spaces" ? <SpacesStep /> : null}
           {steps[index] === "theme" ? <ThemeStep /> : null}
-          {steps[index] === "layout" ? <LayoutStep /> : null}
+          {steps[index] === "layout" ? (
+            <LayoutStep chosen={layoutChosen} onChoose={() => setLayoutChosen(true)} />
+          ) : null}
           {steps[index] === "import" ? (
             <BrowserImportFlow onClose={finish} closeLabel="Skip" />
           ) : null}
@@ -115,7 +125,15 @@ export function FirstRunSetup() {
                   Back
                 </Button>
               ) : null}
-              <Button onClick={next}>{index === steps.length - 1 ? "Done" : "Continue"}</Button>
+              <Button
+                onClick={next}
+                disabled={steps[index] === "layout" && !layoutChosen}
+                title={
+                  steps[index] === "layout" && !layoutChosen ? "Choose a layout first" : undefined
+                }
+              >
+                {index === steps.length - 1 ? "Done" : "Continue"}
+              </Button>
             </div>
           </div>
         ) : null}
@@ -146,7 +164,7 @@ function ThemeStep() {
   );
 }
 
-function LayoutStep() {
+function LayoutStep({ chosen, onChoose }: { chosen: boolean; onChoose(): void }) {
   const current = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
   return (
@@ -157,9 +175,14 @@ function LayoutStep() {
           label={choice.label}
           detail={choice.detail}
           selected={
-            current.navigation === choice.layout.navigation && current.tabs === choice.layout.tabs
+            chosen &&
+            current.navigation === choice.layout.navigation &&
+            current.tabs === choice.layout.tabs
           }
-          onSelect={() => setLayout(choice.layout)}
+          onSelect={() => {
+            setLayout(choice.layout);
+            onChoose();
+          }}
         >
           <LayoutPreview layout={choice.layout} />
         </Choice>

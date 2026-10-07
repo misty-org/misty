@@ -122,7 +122,7 @@ describe("SupportRecoverySection", () => {
 
     expect(closeSettingsListener).toHaveBeenCalledOnce();
     expect(useSetupStore.getState().isOpen).toBe(true);
-    expect(useSetupStore.getState().step).toBe("theme");
+    expect(useSetupStore.getState().step).toBe("spaces");
     window.removeEventListener("misty:close-settings", closeSettingsListener);
   });
 });

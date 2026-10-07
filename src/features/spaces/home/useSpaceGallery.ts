@@ -4,6 +4,7 @@ import { notesApi } from "@/api/notes/api";
 import { spacesApi } from "@/api/spaces/api";
 import { codeProjectsApi } from "@/api/spaces/code-projects";
 import {
+  chatItem,
   codeItem,
   drawingItem,
   libraryGalleryItem,
@@ -23,8 +24,8 @@ export interface SpaceGallery {
   reload: () => void;
 }
 
-/** Everything made in a Space: notes, drawings, files and images, and code projects. */
-export function useSpaceGallery(spaceId: string): SpaceGallery {
+/** Everything made in a Space: chats, notes, drawings, files and images, and code projects. */
+export function useSpaceGallery(spaceId: string, me: string): SpaceGallery {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState<string[]>([]);
@@ -39,12 +40,17 @@ export function useSpaceGallery(spaceId: string): SpaceGallery {
     }
     const controller = new AbortController();
     void Promise.allSettled([
+      spacesApi
+        .conversations(spaceId)
+        .then((r) => r.conversations.map((conversation) => chatItem(spaceId, conversation, me))),
       notesApi.list(spaceId).then((r) => r.notes.map((note) => noteItem(spaceId, note))),
-      drawingsApi.list(spaceId).then((r) =>
-        r.drawings
-          .filter((drawing) => drawing.lifecycle_state === "active")
-          .map((drawing) => drawingItem(spaceId, drawing)),
-      ),
+      drawingsApi
+        .list(spaceId)
+        .then((r) =>
+          r.drawings
+            .filter((drawing) => drawing.lifecycle_state === "active")
+            .map((drawing) => drawingItem(spaceId, drawing)),
+        ),
       spacesApi
         .libraryItems(spaceId, { limit: FILE_LIMIT, sort: "recently-added", direction: "desc" })
         .then((r) => r.items.map((item) => libraryGalleryItem(spaceId, item))),
@@ -53,9 +59,11 @@ export function useSpaceGallery(spaceId: string): SpaceGallery {
         .then((r) => r.projects.map((project) => codeItem(spaceId, project))),
     ]).then((results) => {
       if (!live) return;
-      const names = ["notes", "drawings", "files", "code projects"];
+      const names = ["chats", "notes", "drawings", "files", "code projects"];
       setItems(results.flatMap((result) => (result.status === "fulfilled" ? result.value : [])));
-      setFailed(results.flatMap((result, index) => (result.status === "rejected" ? [names[index]] : [])));
+      setFailed(
+        results.flatMap((result, index) => (result.status === "rejected" ? [names[index]] : [])),
+      );
       setLoading(false);
       loadedFor.current = spaceId;
     });
@@ -63,7 +71,7 @@ export function useSpaceGallery(spaceId: string): SpaceGallery {
       live = false;
       controller.abort();
     };
-  }, [spaceId, version]);
+  }, [spaceId, me, version]);
 
   const reload = useCallback(() => setVersion((value) => value + 1), []);
   return { items, loading, failed, reload };

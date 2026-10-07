@@ -1,20 +1,22 @@
-import { Code2, NotebookText, PenLine, Upload } from "lucide-react";
+import { Code2, MessagesSquare, NotebookText, PenLine, Upload } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { drawingsApi } from "@/api/drawings/api";
 import { notesApi } from "@/api/notes/api";
 import { useCodingIncluded } from "@/features/agents";
 import { cn, itemToneClass, itemTones, Pressable, type ItemTone } from "@/shared/ui";
+import { spaceChatPath } from "../chat/chatRoute";
 import { preloadSpaceSection } from "../SpaceSectionView";
 
 type Tile = {
-  id: "note" | "drawing" | "upload" | "code";
+  id: "chat" | "note" | "drawing" | "upload" | "code";
   label: string;
   Icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   tone: ItemTone;
 };
 
 const tiles: Tile[] = [
+  { id: "chat", label: "Chat", Icon: MessagesSquare, tone: itemTones.chat },
   { id: "note", label: "Note", Icon: NotebookText, tone: itemTones.note },
   { id: "drawing", label: "Drawing", Icon: PenLine, tone: itemTones.drawing },
   { id: "upload", label: "Upload", Icon: Upload, tone: itemTones.sheet },
@@ -26,7 +28,13 @@ const tiles: Tile[] = [
  * their kind's tone, the one place outside an icon glyph where a tone shows
  * (AGENTS.md, Space home exception).
  */
-export function MakeSomethingNew({ spaceId, onCreated }: { spaceId: string; onCreated: () => void }) {
+export function MakeSomethingNew({
+  spaceId,
+  onCreated,
+}: {
+  spaceId: string;
+  onCreated: () => void;
+}) {
   const navigate = useNavigate();
   const coding = useCodingIncluded();
   const [busy, setBusy] = useState("");
@@ -47,6 +55,9 @@ export function MakeSomethingNew({ spaceId, onCreated }: { spaceId: string; onCr
         const drawing = await drawingsApi.create(spaceId, "Untitled drawing");
         onCreated();
         navigate(`${base}/drawings/${encodeURIComponent(drawing.id)}`);
+      } else if (tile.id === "chat") {
+        await preloadSpaceSection("social");
+        navigate(spaceChatPath(spaceId));
       } else {
         const section = tile.id === "upload" ? "library" : "code";
         await preloadSpaceSection(section);
@@ -91,7 +102,11 @@ export function MakeSomethingNew({ spaceId, onCreated }: { spaceId: string; onCr
           </Pressable>
         ))}
       </div>
-      {error && <p role="alert" className="m-0 mt-2 text-sm text-cream">{error}</p>}
+      {error && (
+        <p role="alert" className="m-0 mt-2 text-sm text-cream">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

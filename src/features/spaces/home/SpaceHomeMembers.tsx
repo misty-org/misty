@@ -5,7 +5,12 @@ import { SpaceMembersPopover } from "../members";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 const initials = (name: string) =>
-  name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "?";
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "?";
 
 /** Who's in the Space, as a few faces and a count; it opens the member list. */
 export function SpaceHomeMembers({ space }: { space: Space }) {
