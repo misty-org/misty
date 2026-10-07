@@ -189,7 +189,7 @@ export function BrowserOmniboxView(props: {
         autoComplete="off"
         spellCheck={false}
         variant="toolbar"
-        className="text-center focus:text-left"
+        className="text-left"
       />
       {focused && overlay.open && matches.length ? (
         <SuggestionList
@@ -220,11 +220,7 @@ function displayBrowserAddress(value: string): string {
   return value === blankBrowserUrl ? "" : value;
 }
 
+/** The full address at rest, protocol included, so where a page lives is never hidden. */
 function toolbarAddress(value: string): string {
-  if (value === blankBrowserUrl) return "Search or enter URL";
-  try {
-    return new URL(value).hostname.replace(/^www\./, "") || value;
-  } catch {
-    return value;
-  }
+  return value === blankBrowserUrl ? "Search or enter URL" : value;
 }
