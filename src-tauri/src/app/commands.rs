@@ -1673,20 +1673,26 @@ fn open_path_default(file_path: &str) -> ApiResult<()> {
         return Err(ApiError::Message("File path is required.".to_owned()));
     }
 
-    #[cfg(target_os = "macos")]
-    let spawn_result = Command::new("open").arg(file_path).spawn();
-
+    // ShellExecute opens the file itself. `cmd /C start` would parse the path
+    // as a command line, and file names may contain & | ^ that cmd runs.
     #[cfg(target_os = "windows")]
-    let spawn_result = Command::new("cmd")
-        .args(["/C", "start", "", file_path])
-        .spawn();
+    {
+        return tauri_plugin_opener::open_path(file_path, None::<&str>)
+            .map_err(|err| ApiError::Message(format!("Failed to open file: {err}")));
+    }
 
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let spawn_result = Command::new("xdg-open").arg(file_path).spawn();
+    #[cfg(not(target_os = "windows"))]
+    {
+        #[cfg(target_os = "macos")]
+        let spawn_result = Command::new("open").arg(file_path).spawn();
 
-    spawn_result
-        .map(|_| ())
-        .map_err(|err| ApiError::Message(format!("Failed to open file: {err}")))
+        #[cfg(all(unix, not(target_os = "macos")))]
+        let spawn_result = Command::new("xdg-open").arg(file_path).spawn();
+
+        spawn_result
+            .map(|_| ())
+            .map_err(|err| ApiError::Message(format!("Failed to open file: {err}")))
+    }
 }
 
 fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
@@ -1719,18 +1725,27 @@ fn open_terminal_default(path: &str, preferred: &str) -> ApiResult<()> {
 
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
         let executable = match preferred {
             "Warp" => "warp",
             "Ghostty" => "ghostty",
             "Alacritty" => "alacritty",
             _ => "wt",
         };
-        match Command::new(executable).arg("-d").arg(trimmed).spawn() {
+        // The folder is the working directory, never an argument: Windows
+        // Terminal splits its arguments at `;`, and cmd runs & | ^ as commands.
+        match Command::new(executable)
+            .args(["-d", "."])
+            .current_dir(folder)
+            .spawn()
+        {
             Ok(_) => return Ok(()),
             Err(wt_err) => {
                 return Command::new("cmd")
-                    .args(["/C", "start", "", "cmd", "/K", "cd", "/d"])
-                    .arg(trimmed)
+                    .arg("/K")
+                    .current_dir(folder)
+                    .creation_flags(CREATE_NEW_CONSOLE)
                     .spawn()
                     .map(|_| ())
                     .map_err(|cmd_err| {

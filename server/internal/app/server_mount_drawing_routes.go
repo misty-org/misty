@@ -215,9 +215,12 @@ func TestingAllowedCORSOrigins() []string {
 		"tauri://localhost",
 		"http://tauri.localhost",
 		"https://tauri.localhost",
-		"http://localhost:5173",
-		"http://127.0.0.1:5173",
 		"https://apps.mistysys.com",
+	}
+	// Local development servers are credentialed origins only outside
+	// production; anything on the user's machine could otherwise serve them.
+	if !productionEnvironment() {
+		origins = append(origins, "http://localhost:5173", "http://127.0.0.1:5173")
 	}
 	for _, origin := range strings.Split(envconfig.Getenv("MISTY_ALLOWED_ORIGINS"), ",") {
 		origin = strings.TrimSpace(origin)
@@ -254,11 +257,18 @@ var allowedCORSRequestHeaders = []string{
 	"X-Misty-Library-Reauthentication",
 }
 
+func productionEnvironment() bool {
+	return strings.EqualFold(strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT")), "production")
+}
+
 func TestingIsAllowedCORSOrigin(origin string) bool {
 	for _, allowed := range TestingAllowedCORSOrigins() {
 		if strings.EqualFold(origin, allowed) {
 			return true
 		}
+	}
+	if productionEnvironment() {
+		return false
 	}
 	parsed, err := url.Parse(origin)
 	if err != nil || parsed.Scheme != "http" || !TestingIsLocalhostHostname(parsed.Hostname()) || parsed.Path != "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {

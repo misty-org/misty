@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+mod approvals;
 mod catalog;
 mod compat;
 pub(crate) mod install;

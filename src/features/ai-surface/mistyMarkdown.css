@@ -57,6 +57,11 @@
     height: auto;
     border-radius: var(--radius-md);
   }
+  & .misty-markdown-remote-image {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   & sup {
     line-height: 0;
   }
