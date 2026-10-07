@@ -16,6 +16,7 @@ import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { dockLeaves } from "./dockTree";
 import type { WorkspaceView } from "./model";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
 
 interface WorkspaceViewRouteHistory {
   entries: string[];
@@ -84,7 +85,13 @@ function recordWorkspaceViewRoute(tabId: string, route: string, replace: boolean
  * focused tab mirrors its route to the desktop address bar.
  */
 export function WorkspaceViewRouteScope(props: { tab: WorkspaceView; children: ReactNode }) {
-  const outerNavigate = useNavigate();
+  // React Router replaces `navigate` on every app route change. Read it
+  // through a stable callback so this tab's navigator, and every link and
+  // navigate hook in the tab, stays the same while other tabs navigate.
+  const navigateOuter = useNavigate();
+  const outerNavigate = useStableCallback((to: To, options?: NavigateOptions) =>
+    navigateOuter(to, options),
+  );
   const route = props.tab.route || "/";
   const [routeState, setRouteState] = useState<{
     tabId: string;

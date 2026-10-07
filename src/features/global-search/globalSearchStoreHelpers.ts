@@ -69,6 +69,55 @@ export function patchConversationMessage(
   }));
 }
 
+/**
+ * Streamed text waiting to be applied, per message. Each token used to copy the
+ * conversation list, re-rendering everything that shows it once per token;
+ * text now lands at most once per frame.
+ */
+interface PendingText {
+  set: GlobalSearchSet;
+  get: GlobalSearchGet;
+  conversationId: string;
+  messageId: string;
+  text: string;
+}
+const pendingText = new Map<string, PendingText>();
+let scheduledFlush: (() => void) | null = null;
+
+function scheduleFlush() {
+  if (scheduledFlush) return;
+  if (typeof requestAnimationFrame === "function") {
+    const frame = requestAnimationFrame(() => flushStreamedText());
+    scheduledFlush = () => cancelAnimationFrame(frame);
+  } else {
+    const timer = setTimeout(() => flushStreamedText(), 16);
+    scheduledFlush = () => clearTimeout(timer);
+  }
+}
+
+/** Applies buffered streamed text now. Every other event calls this first, so
+ * nothing that follows a delta can apply before the text it follows. */
+export function flushStreamedText() {
+  scheduledFlush?.();
+  scheduledFlush = null;
+  const entries = [...pendingText.values()];
+  pendingText.clear();
+  for (const { set, get, conversationId, messageId, text } of entries) {
+    const message = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((candidate) => candidate.id === messageId);
+    // A message that finished, failed or was canceled keeps its state.
+    const settled =
+      message?.state === "completed" ||
+      message?.state === "failed" ||
+      message?.state === "canceled";
+    patchConversationMessage(set, get, conversationId, messageId, {
+      content: `${message?.content ?? ""}${text}`,
+      ...(settled ? {} : { state: "streaming" as const, activity: undefined }),
+    });
+  }
+}
+
 export function applyGlobalInvocationEvent(
   set: GlobalSearchSet,
   get: GlobalSearchGet,
@@ -76,6 +125,15 @@ export function applyGlobalInvocationEvent(
   messageId: string,
   event: AiInvocationEvent,
 ) {
+  if (event.type === "response.delta") {
+    const key = `${conversationId}\u0000${messageId}`;
+    const pending = pendingText.get(key);
+    if (pending) pending.text += event.delta;
+    else pendingText.set(key, { set, get, conversationId, messageId, text: event.delta });
+    scheduleFlush();
+    return;
+  }
+  flushStreamedText();
   if (event.type === "user.steering") {
     const invocationId = get().invocationId;
     const id = `${invocationId}-steering-${event.id}`;
@@ -107,17 +165,6 @@ export function applyGlobalInvocationEvent(
         `${get().invocationId}-steering-${message.sequence}`,
         { activity: "Received by the agent" },
       );
-    return;
-  }
-  if (event.type === "response.delta") {
-    const current = get()
-      .conversations.find((conversation) => conversation.id === conversationId)
-      ?.messages.find((message) => message.id === messageId);
-    patchConversationMessage(set, get, conversationId, messageId, {
-      content: `${current?.content ?? ""}${event.delta}`,
-      state: "streaming",
-      activity: undefined,
-    });
     return;
   }
   if (event.type === "assistant.message") {
