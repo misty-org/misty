@@ -277,14 +277,14 @@ export function spacesTabsSessionKey(accountId: string, spaceId: string): string
 export function defaultSpaceRoute(spaceId: string): string {
   const preferences = useSettingsStore.getState().settings?.document.spaces as
     Record<string, unknown> | undefined;
-  const tool = String(preferences?.opening_tool ?? "chat");
-  // Older choices (Journal, Planner) open on Notes and Chat.
+  const tool = String(preferences?.opening_tool ?? "home");
+  // Older choices (Journal, Planner) open on Notes and the Space home.
   const route =
     tool === "journal"
       ? "notes"
-      : ["chat", "notes", "drawings", "library", "code"].includes(tool)
+      : ["home", "chat", "notes", "drawings", "library", "code"].includes(tool)
         ? tool
-        : "chat";
+        : "home";
   return `/spaces/${encodeURIComponent(spaceId)}/${route}`;
 }
 
@@ -298,12 +298,11 @@ function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
     const pathParts = parsed.pathname.split("/");
     if (spaceId && pathParts[2] && decodeURIComponent(pathParts[2]) !== spaceId) return fallback;
     if (pathParts[1] === "spaces" && pathParts[2] && !pathParts[3]) {
-      pathParts[3] = "chat";
+      pathParts[3] = "home";
     }
-    if (pathParts[1] === "spaces" && pathParts[3] === "home") pathParts[3] = "chat";
-    // Tasks and the Planner are gone; their saved tabs open the Space's chat.
+    // Tasks and the Planner are gone; their saved tabs open the Space home.
     if (pathParts[1] === "spaces" && (pathParts[3] === "tasks" || pathParts[3] === "planner"))
-      pathParts.splice(3, pathParts.length - 3, "chat");
+      pathParts.splice(3, pathParts.length - 3, "home");
     return `${pathParts.join("/")}${parsed.search}${parsed.hash}`;
   } catch {
     return fallback;

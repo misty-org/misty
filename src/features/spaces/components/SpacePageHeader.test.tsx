@@ -91,49 +91,36 @@ afterEach(() => {
   useWorkspaceStore.getState().reset();
 });
 
-it("opens a section in the owning Space tab after loading it", async () => {
+it("leads back to the Space home in the owning tab after loading it", async () => {
   const before = activeLayoutView(useWorkspaceStore.getState().layout)?.id;
   mount();
-  const nav = screen.getByRole("navigation", { name: "Space sections" });
-  expect(
-    within(nav)
-      .getAllByRole("link")
-      .map((link) => link.textContent),
-  ).toEqual(["Chat", "Notes", "Drawings", "Files", "Code"]);
-  expect(within(nav).getByRole("link", { name: "Notes" }).getAttribute("aria-current")).toBe(
-    "page",
-  );
-  fireEvent.click(within(nav).getByRole("link", { name: "Files" }));
+  expect(screen.queryByRole("navigation", { name: "Space sections" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Back to Family home" }));
   await waitFor(() =>
-    expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe(
-      "/spaces/family/library",
-    ),
+    expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/spaces/family/home"),
   );
-  expect(preload).toHaveBeenCalledWith("library");
+  expect(preload).toHaveBeenCalledWith("home");
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.id).toBe(before);
 });
 
 it("follows the focused Space", () => {
-  useSpacesStore.setState({
-    spaces: [space("family", "Family"), { ...space("work", "Work") }],
-  });
   mount();
   act(() => open("/spaces/work/social"));
-  expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy();
-  const nav = screen.getByRole("navigation", { name: "Space sections" });
-  expect(within(nav).getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("button", { name: "Back to Work home" })).toBeTruthy();
+});
+
+it("shows nothing on the home, which has its own header", () => {
+  open("/spaces/family/home");
+  mount();
+  expect(screen.queryByRole("banner")).toBeNull();
+  expect(screen.queryByRole("button", { name: /Back to/ })).toBeNull();
 });
 
 it("names the Space without a switcher and exposes management directly", async () => {
   mount();
-  expect(screen.getByRole("heading", { name: "Family" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Switch Space/ })).toBeNull();
   const management = screen.getByRole("navigation", { name: "Space management" });
   expect(within(management).getByRole("button", { name: "Members" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Family options" })).toBeNull();
-  expect(
-    management.closest("header")?.contains(screen.getByRole("heading", { name: "Family" })),
-  ).toBe(true);
   // Usage is the account's, in the profile menu, not the Space's.
   expect(within(management).queryByRole("button", { name: "Usage" })).toBeNull();
   fireEvent.click(within(management).getByRole("button", { name: "Members" }));
@@ -141,14 +128,12 @@ it("names the Space without a switcher and exposes management directly", async (
   expect(useSpacesStore.getState().loadMembers).toHaveBeenCalledWith("family");
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  act(() => open("/spaces/work/social"));
-  await waitFor(() => expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy());
 });
 
 it("keeps the current page on load failure and ignores loads after the pane route changes", async () => {
   mount();
   preload.mockRejectedValueOnce(new Error("offline"));
-  fireEvent.click(screen.getByRole("link", { name: "Files" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back to Family home" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/spaces/family/notes");
   let finish!: () => void;
@@ -158,16 +143,8 @@ it("keeps the current page on load failure and ignores loads after the pane rout
         finish = resolve;
       }),
   );
-  fireEvent.click(screen.getByRole("link", { name: "Files" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back to Family home" }));
   act(() => open("/agents"));
   await act(async () => finish());
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/agents");
-});
-
-it("keeps Files selected for Trash without duplicating Trash in the rail", () => {
-  open("/spaces/family/library?collection=deleted");
-  mount();
-  expect(screen.queryByRole("link", { name: "Trash" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "New item" })).toBeNull();
-  expect(screen.getByRole("link", { name: "Files" }).getAttribute("aria-current")).toBe("page");
 });

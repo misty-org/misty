@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 
 const validSections = new Set([
+  "home",
   "social",
   "chat",
   "notes",
@@ -32,7 +33,7 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const location = useLocation();
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const routeParts = location.pathname.split("/").filter(Boolean);
-  const defaultSection = "social";
+  const defaultSection = "home";
   const requestedSection = routeParts[2] ?? defaultSection;
   const routeSection = requestedSection === "files" ? "library" : requestedSection;
   const requestedSettingsSection =

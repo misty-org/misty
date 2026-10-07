@@ -44,11 +44,14 @@ vi.mock("./chat/SpaceChatEntry", async () => {
   };
 });
 vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
+vi.mock("./home/SpaceHome", () => ({
+  SpaceHome: ({ space }: { space: { id: string } }) => <div>Home in {space.id}</div>,
+}));
 afterEach(() => {
   cleanup();
 });
 it.each([
-  ["home", "Chat"],
+  ["home", "Home"],
   ["notes", "Notes"],
   ["drawings", "Drawings"],
   ["library", "Library"],

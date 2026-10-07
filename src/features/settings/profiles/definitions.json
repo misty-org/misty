@@ -430,11 +430,11 @@
     "page": "spaces-defaults",
     "section": "spaces",
     "key": "opening_tool",
-    "default": "chat",
+    "default": "home",
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["chat", "notes", "drawings", "library", "code"]
+    "enum": ["home", "chat", "notes", "drawings", "library", "code"]
   },
   {
     "id": "files.startingFolder",

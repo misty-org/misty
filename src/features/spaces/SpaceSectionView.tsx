@@ -31,9 +31,21 @@ async function loadChat() {
 }
 const Chat = lazy(loadChat);
 const Code = lazy(() => import("./code/SpaceCode").then((m) => ({ default: m.SpaceCode })));
+async function loadHome() {
+  // File previews on the home page use the Library's runtime.
+  const { initializeHostLibraryRuntime } =
+    await import("@/features/library/library/hostLibraryRuntime");
+  initializeHostLibraryRuntime();
+  const { SpaceHome } = await import("./home/SpaceHome");
+  return { default: SpaceHome };
+}
+const Home = lazy(loadHome);
 
 export async function preloadSpaceSection(section: string) {
   switch (section) {
+    case "home":
+      await loadHome();
+      break;
     case "social":
     case "chat":
       await loadChat();
@@ -69,7 +81,7 @@ export function SpaceSectionView(props: {
   workspaceTabId?: string;
 }) {
   const { spaceId, studioKind = "" } = props;
-  const section = props.section === "home" ? "social" : props.section;
+  const section = props.section || "home";
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -138,7 +150,9 @@ export function SpaceSectionView(props: {
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
-        {section === "settings" ? (
+        {section === "home" ? (
+          <Home space={space} />
+        ) : section === "settings" ? (
           <SpaceSettings
             key={`settings:${spaceId}:${studioKind}`}
             spaceId={spaceId}

@@ -303,8 +303,8 @@ const toolSlots = [
   ["code", "Code", 8],
 ] as const;
 
-/** A Space page's sections, on ⌘1 to ⌘5 while it is focused (tabs elsewhere). */
-const spaceSections = ["Chat", "Notes", "Drawings", "Files", "Code"] as const;
+/** The Space home's tabs, on ⌘1 to ⌘5 while a Space is focused (browser tabs elsewhere). */
+const spaceSections = ["Home", "Notes", "Drawings", "Files", "Code"] as const;
 
 const tabAndToolCommands = [
   ...spaceSections.map((label, index) =>

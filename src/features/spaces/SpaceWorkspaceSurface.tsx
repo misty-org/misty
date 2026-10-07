@@ -38,8 +38,8 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   useEffect(() => {
     if (!route.activeSpaceId) return;
     const base = `/spaces/${encodeURIComponent(route.activeSpaceId)}`;
-    if (location.pathname === base || location.pathname === `${base}/home`) {
-      navigate(`${base}/chat${location.search}${location.hash}`, { replace: true });
+    if (location.pathname === base) {
+      navigate(`${base}/home${location.search}${location.hash}`, { replace: true });
     }
   }, [location.hash, location.pathname, location.search, navigate, route.activeSpaceId]);
   useEffect(() => {

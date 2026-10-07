@@ -1,6 +1,6 @@
 # Spaces as profiles: design brief
 
-Status: proposed 2026-10-16, decisions below agreed in conversation; not built. It builds
+Status: decided 2026-10-16; not built. One spike remains before the build plan. It builds
 on [Spaces, simplified](../spaces-simplified/BRIEF.md), which is built and in `main`, and
 changes its agent model.
 
@@ -26,16 +26,19 @@ profile is also the boundary for AI.
   takes over the window's chosen color (`windowColors.ts`) and its AGENTS.md color
   exception.
 
-### What the sync tree doesn't hold yet
+### Joining the sync tree
 
-| Not in the tree | Today |
-| --- | --- |
-| Installed extensions and whether each is on | On the device; only their synced settings travel |
-| Downloads list | On the device |
-| Per-site permissions (camera, notifications, pop-ups) | On the device |
-| Autofill addresses and cards | Not stored |
-| Custom search engines and bangs | On the device |
-| App settings | On the device by AGENTS.md rule; stays that way |
+These join the sync tree as Space-wide collections (decided 2026-10-16):
+
+- **Extensions:** which are installed in the Space and whether each is on, alongside the
+  synced settings that already travel.
+- **Site permissions:** camera, microphone, notifications and pop-up choices per site.
+- **Search engines and bangs,** custom ones included.
+- **Downloads list:** the record of past downloads; the files stay on the device that
+  downloaded them.
+
+App settings stay on the device, by the AGENTS.md rule. Autofill for addresses and cards
+isn't stored anywhere yet; when it's built, it belongs in the sync tree next to passwords.
 
 ## Private and public
 
@@ -45,8 +48,10 @@ No roles and no permission settings. Everything in a Space is private or public,
 **Private (each person's own):**
 - the sync tree (their tabs, windows, sign-ins, history, bookmarks, passwords)
 - the memory tree (below)
-- the integrations tree: the apps they connected in this Space, so work Gmail and
-  personal Gmail can live in different Spaces
+- the integrations tree: a person connects each account once, and each Space lists which
+  of their accounts it uses (work Gmail in Work, personal Gmail in Personal). The tree
+  shows at a glance which integration is used where. Composio still holds the tokens, so
+  the server keeps this per-Space, owner-only list
 - their private chats, including DMs with their agents
 
 **Public (everyone in the Space):** the gallery (notes, drawings, images, files, code),
@@ -85,20 +90,20 @@ like the rest of the sync tree. The server never reads it.
 
 ## Plans
 
-The number of Spaces depends on the plan: a few on Basic and unlimited on Pro and above,
-which fits the free plan funded by paying users (`docs/plans/pricing-v2.md`).
+Basic gets two Spaces: the personal Space and one more. Pro and above get unlimited
+Spaces. This fits the free plan funded by paying users (`docs/plans/pricing-v2.md`).
+
+## Getting started
+
+There is nothing to migrate: Misty has no users yet. Virtual windows are removed outright,
+and today's local data becomes the personal Space. Onboarding teaches what a Space is and
+how it works: a profile per part of your life, each with its own memory and agents, and how
+much more the browser does because of it.
 
 ## Still open
 
-- How many Spaces Basic gets (two is the working assumption).
-- Whether the parts missing from the sync tree (extensions, downloads, site permissions,
-  autofill, bangs) join it or stay on the device.
-- Where the integrations tree lives: connected accounts are held by Composio, so it can
-  only be a per-Space, owner-only list kept by the server.
 - Separate web data per Space: WebKit keeps sign-ins apart with a data store per
-  identifier (macOS 14 and later), which needs a spike first.
-- Moving existing data: today's vault becomes the personal Space; virtual windows become
-  Spaces only if the person chooses; server memory moves into the personal Space's vault.
+  identifier (macOS 14 and later), which needs a spike before the build plan.
 
 ## Rules followed
 

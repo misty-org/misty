@@ -1,17 +1,21 @@
+import { ChevronLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Space } from "@/api/spaces/dto/entities";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import { preloadSpaceSection } from "../SpaceSectionView";
+import { Button } from "@/shared/ui";
 import { SpaceAvatar } from "./SpaceAvatar";
 import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
-import { SpaceSectionNavigation, spaceSections } from "./SpaceSectionNavigation";
+
+/** ⌘1 to ⌘5 open these Space home tabs. */
+const shortcutFilters = ["", "notes", "drawings", "files", "code"] as const;
 
 /**
- * The top of every Space page: its name, its sections (Chat, Notes, Drawings,
- * Files, Code, also on ⌘1 to ⌘5) and its management actions. There is no
- * Space rail; the tab strip is the only bar.
+ * The bar above a Space's item pages (a note, a drawing, a file, a project, the
+ * chat): the Space's name, which leads back to its home, and its members. The
+ * home has its own header, so there this renders nothing but the shortcuts.
  */
 export function SpacePageHeader({ space, section }: { space: Space; section: string }) {
   const location = useLocation();
@@ -39,38 +43,40 @@ export function SpacePageHeader({ space, section }: { space: Space; section: str
     }
   }
 
+  const home = `/spaces/${encodeURIComponent(space.id)}/home`;
   const focused = useWorkspaceViewFocused();
-  const sectionPath = (index: number) =>
-    `/spaces/${encodeURIComponent(space.id)}/${spaceSections[index].id}`;
-  useShortcutHandler("space.section_1", () => void openPage(sectionPath(0)), focused);
-  useShortcutHandler("space.section_2", () => void openPage(sectionPath(1)), focused);
-  useShortcutHandler("space.section_3", () => void openPage(sectionPath(2)), focused);
-  useShortcutHandler("space.section_4", () => void openPage(sectionPath(3)), focused);
-  useShortcutHandler("space.section_5", () => void openPage(sectionPath(4)), focused);
+  const homeTab = (index: number) =>
+    shortcutFilters[index] ? `${home}?filter=${shortcutFilters[index]}` : home;
+  useShortcutHandler("space.section_1", () => void openPage(homeTab(0)), focused);
+  useShortcutHandler("space.section_2", () => void openPage(homeTab(1)), focused);
+  useShortcutHandler("space.section_3", () => void openPage(homeTab(2)), focused);
+  useShortcutHandler("space.section_4", () => void openPage(homeTab(3)), focused);
+  useShortcutHandler("space.section_5", () => void openPage(homeTab(4)), focused);
 
+  if (section === "home") return null;
   return (
     <header
-      className="flex h-11 shrink-0 items-center gap-3 border-b border-charcoal-border px-3"
+      className="flex h-11 shrink-0 items-center gap-2 border-b border-charcoal-border px-3"
       aria-label={`${space.name} navigation`}
     >
-      <div className="flex min-w-0 shrink items-center gap-2">
-        <SpaceAvatar space={space} className="size-6" />
-        <h1 className="m-0 truncate text-sm font-semibold">{space.name || "Space"}</h1>
-      </div>
-      <div className="min-w-0 flex-1 overflow-x-auto">
-        <SpaceSectionNavigation
-          spaceId={space.id}
-          section={["chat", "social"].includes(section) ? "social" : section}
-          horizontal
-          onNavigate={(path) => void openPage(path)}
-        />
-      </div>
-      <SpaceManagementNavigation key={space.id} space={space} />
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => void openPage(home)}
+        className="min-w-0 gap-2 px-1.5 text-cream-muted"
+        aria-label={`Back to ${space.name || "Space"} home`}
+      >
+        <ChevronLeft aria-hidden className="size-4 shrink-0" />
+        <SpaceAvatar space={space} className="size-5" />
+        <span className="truncate text-sm text-cream-bright">{space.name || "Space"}</span>
+      </Button>
+      <span className="flex-1" />
       {error ? (
         <p role="alert" className="m-0 shrink-0 text-xs text-cream-muted">
           {error}
         </p>
       ) : null}
+      <SpaceManagementNavigation key={space.id} space={space} />
     </header>
   );
 }
