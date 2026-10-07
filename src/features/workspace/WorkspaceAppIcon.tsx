@@ -1,5 +1,5 @@
 import { appIcon, appIconStrokeWidth, cn } from "@/shared/ui";
-import type { WorkspaceToolId } from "./useRecentToolsStore";
+import type { WorkspaceToolId } from "./workspaceTools";
 
 type WorkspaceAppIconSize = "picker" | "nav" | "marketplace" | "tree";
 

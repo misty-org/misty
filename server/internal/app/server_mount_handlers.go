@@ -144,8 +144,6 @@ func (s *Server) MountHandlers() error {
 		s.Router.Get(prefix+"/me/agent-interventions", s.Spaces.AIUserInterventionControl())
 		s.Router.Post(prefix+"/me/agent-interventions/{waitID}", s.Spaces.AIUserInterventionControl())
 
-		s.Router.Get(prefix+"/me/home", api.HomeDashboard(s.Database))
-		s.Router.Post(prefix+"/me/home/apps", api.RecordHomeAppActivity(s.Database))
 		s.Router.Put(prefix+"/me/telemetry", api.UpdateTelemetryPreferences(s.Database))
 		s.Router.Post(prefix+"/billing/checkout-session", api.CreateCheckoutSession(s.Database))
 		s.Router.Post(prefix+"/billing/portal-session", api.CreatePortalSession(s.Database))

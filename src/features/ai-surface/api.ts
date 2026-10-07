@@ -83,7 +83,7 @@ export interface AiSavedAction {
 }
 
 export interface AiRecapRecord {
-  surface_id: "global" | "home" | "activity";
+  surface_id: "global" | "activity";
   enabled: boolean;
   cadence: "daily" | "weekly";
   local_time: string;

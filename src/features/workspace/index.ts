@@ -15,7 +15,7 @@ export {
 } from "./useMultiPanelStore";
 export type { MultiPanelStoreHook } from "./useMultiPanelStore";
 export * from "./useNavigatorAppsStore";
-export * from "./useRecentToolsStore";
+export * from "./workspaceTools";
 export { useWindowDockingLayout } from "./useWindowDockingLayout";
 export * from "./useWorkspaceStore";
 export * from "./useWorkspaceViewTitle";

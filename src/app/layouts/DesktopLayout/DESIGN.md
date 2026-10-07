@@ -122,7 +122,7 @@ Custom titlebar and tab-strip icons share a 16px baseline, including tab icons. 
 
 Shared translucent interaction fills use `control-hover` (10% theme text) and `control-active` (16% theme text), increasing visibility while following both dark and light palettes. Buttons, icon buttons, menu triggers, navigation actions, toggles, segmented controls, and list rows use these shared fills where they previously used a faint text wash. Strong selected surfaces continue to use the existing active theme token.
 
-Home is a normal, reusable workspace tab at `/home`: it appears in the tab strip, supports selection and closing, and survives workspace migration. Scheduled lives within Agents; legacy schedule links and saved tabs migrate to that section.
+The Home page was removed on 2026-10-07. Saved, recovered and synced Home tabs open as new browser tabs, and `/home` links open Browser. Scheduled lives within Agents; legacy schedule links and saved tabs migrate to that section.
 
 The synthetic source-component preview in `.impeccable/review/topbar/` historically covered compact and labeled navigation, Home in the tab strip, the unclipped group submenu, group-editor focus handoff, and the virtual-window menu at 860px. Focused tests passed, including Home reuse/closing, compact-mode persistence, shell layout preservation, and portaled group creation. Typechecking remains blocked by two unrelated Settings errors. The detector reported only retained 10px count text and a pre-existing 10px radius; no new visual exceptions were introduced.
 
@@ -132,7 +132,7 @@ Navigation visibility correction: `NavigatorRail.tsx` owns edge hover, keyboard 
 
 ## Destination navigation and history
 
-Home, Browser, Files, Agents (including Scheduled), and each Space reuse their most recently used established view in the current virtual window. Selection restores the exact route and state, including a view inside a split arrangement. A missing destination opens a new window tab. Navigation never replaces an occupied pane or adds cross-destination Back entries. Private browser views are excluded from ordinary Browser destination reuse.
+Browser, Files, Agents (including Scheduled), and each Space reuse their most recently used established view in the current virtual window. Selection restores the exact route and state, including a view inside a split arrangement. A missing destination opens a new window tab. Navigation never replaces an occupied pane or adds cross-destination Back entries. Private browser views are excluded from ordinary Browser destination reuse.
 
 An unused New Tab or new split pane accepts the next destination, even if another instance already exists. Its starting page defaults to Browser and is configurable under Settings → General → New tabs and splits (Home, Browser, Files, Agents). Interacting with its content or navigating commits that view. Settings, Search, Activity, and Sync remain utility overlays.
 
@@ -140,7 +140,7 @@ Back/Forward stays within the view's own content history. Restoring legacy cross
 
 Files and Spaces both use the shared NavigationTray and NavigationTrayItem components for identical tile padding, rounding, hover and selected highlights. Files contains Explorer and Transfers destinations. Selecting a destination resumes its most recent matching tab; an explicit blank tab or split hosts a new instance. The collapsed Files control carries the active edge marker, which moves to the selected child while expanded. Both trays follow all four dock positions and reduced-motion preferences.
 
-Home, Browser, Agents, Files, Extensions, and Spaces can be reordered by dragging their main icon. Files and Spaces move with their expanded contents. The shared pointer-reorder interaction supplies the neutral insertion marker, drag preview, edge scrolling, Escape cancellation, and click suppression. Alt+Shift+Up/Down moves a focused destination in side rails; top/bottom rails use Left/Right. Child destinations and fixed header/footer utilities do not participate. Order is an account setting (`collections.tabs.navigator`), using the existing settings outbox and server schema. New destinations append to a saved order; unavailable destinations do not render. No separate local ordering preference is introduced.
+Browser, Agents, Files, Extensions, and Spaces can be reordered by dragging their main icon. Files and Spaces move with their expanded contents. The shared pointer-reorder interaction supplies the neutral insertion marker, drag preview, edge scrolling, Escape cancellation, and click suppression. Alt+Shift+Up/Down moves a focused destination in side rails; top/bottom rails use Left/Right. Child destinations and fixed header/footer utilities do not participate. Order is an account setting (`collections.tabs.navigator`), using the existing settings outbox and server schema. New destinations append to a saved order; unavailable destinations do not render. No separate local ordering preference is introduced.
 
 ## Connected tabs and reorder motion — October 3
 

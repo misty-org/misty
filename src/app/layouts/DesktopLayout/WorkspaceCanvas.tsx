@@ -12,8 +12,6 @@ import {
   maxWorkspacePanels,
   paneBoundsFromDocument,
   paneIdInDirection,
-  toolIdFromView,
-  useRecentToolsStore,
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/workspace";
@@ -145,9 +143,6 @@ export function WorkspaceCanvas(props: {
   const openTab = useCallback(
     (tab: WorkspaceView) => {
       focusTab(tab.id);
-      if (!tab.placeholder) {
-        useRecentToolsStore.getState().recordToolUsage(toolIdFromView(tab));
-      }
       if (`${location.pathname}${location.search}` !== tab.route)
         navigate(tab.route, { replace: true });
     },

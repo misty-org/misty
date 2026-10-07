@@ -9,7 +9,6 @@ import {
 } from "./model";
 /** Saved views synced from records without a route; restore them at their tool's root. */
 const missingRouteFallback: Partial<Record<string, string>> = {
-  home: "/home",
   space: "/spaces",
   files: "/files",
   agents: "/agents",
@@ -83,7 +82,6 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
       route: `/agents?${params}`,
     };
   }
-  if (tab.surfaceId === "home" && tab.route === "/home") return tab;
   if (tab.surfaceId === "extensions" && /^\/extensions(?:\/|$)/.test(route.pathname)) return tab;
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
   const retiredTransfers =

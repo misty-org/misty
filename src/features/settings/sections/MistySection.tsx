@@ -30,8 +30,8 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
   const [preferences, setPreferences] = useState<Record<string, AiSurfacePreferenceRecord>>({});
   const [recaps, setRecaps] = useState<Record<string, AiRecapRecord>>({});
   const [memories, setMemories] = useState<AiMemoryRecord[]>([]);
-  const [recapSurface, setRecapSurface] = useState<AiRecapRecord["surface_id"]>("home");
-  const [recapDraft, setRecapDraft] = useState<AiRecapRecord>(() => defaultRecap("home"));
+  const [recapSurface, setRecapSurface] = useState<AiRecapRecord["surface_id"]>("activity");
+  const [recapDraft, setRecapDraft] = useState<AiRecapRecord>(() => defaultRecap("activity"));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [provider, setProvider] = useState<{ configured: boolean; model_name: string } | null>(
@@ -69,7 +69,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           if (!active) return;
           const values = Object.fromEntries(result.recaps.map((item) => [item.surface_id, item]));
           setRecaps(values);
-          setRecapDraft(values.home ?? defaultRecap("home"));
+          setRecapDraft(values.activity ?? defaultRecap("activity"));
         })
         .catch(() => undefined);
     }

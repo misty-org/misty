@@ -7,12 +7,7 @@ import {
   useBrowserMediaStore,
 } from "@/features/browser/library";
 import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
-import {
-  dockLeaves,
-  useRecentToolsStore,
-  useWorkspaceStore,
-  type WorkspaceDockNode,
-} from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore, type WorkspaceDockNode } from "@/features/workspace";
 import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
@@ -442,8 +437,6 @@ export function BrowserRuntimeBridge() {
         if (disposed) return;
         const tab = openBrowserPopup(payload);
         if (!tab) return;
-        if (tab.groupKey === "app:browser")
-          useRecentToolsStore.getState().recordToolUsage("browser");
         navigate(tab.route);
       }),
       listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {

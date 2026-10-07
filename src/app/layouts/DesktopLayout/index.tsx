@@ -256,7 +256,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   );
 
   useEffect(() => {
-    const tools = ["home", "browser", "files", "agents"];
+    const tools = ["browser", "files", "agents"];
     const unregister = tools.map((tool) =>
       registerShortcutHandler(`tool.${tool}`, () => focusTool(tool)),
     );

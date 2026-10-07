@@ -33,7 +33,7 @@
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["home", "browser", "files", "agents"],
+    "enum": ["browser", "files", "agents"],
     "legacyValues": ["home", "browser", "files", "agents"]
   },
   {

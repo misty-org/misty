@@ -1,5 +1,6 @@
 import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
 import {
+  browserViewTitle,
   createBrowserViewState,
   type WorkspaceDockNode,
   type WorkspaceTab,
@@ -36,12 +37,27 @@ const surfaceRoutes = {
   files: "/files",
   agents: "/agents",
   space: "/spaces",
-  home: "/home",
   extensions: "/extensions",
 } as const;
 /** A synced view as the pane content the workspace UI renders. */
 function viewAsWorkspaceView(record: SharedRecord<"view">): WorkspaceView {
   const fields = record.fields;
+  if (fields.surface === "home") {
+    // Older clients still sync the retired Home page; it opens as a new tab.
+    const state = createBrowserViewState();
+    return {
+      id: record.id,
+      instanceKey: record.id,
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title: browserViewTitle(state.url),
+      route: "/browser",
+      sidebarVisible: false,
+      state,
+      createdAt: 0,
+      lastFocusedAt: 0,
+    };
+  }
   const toolRoute =
     fields.surface === "browser"
       ? "/browser"
