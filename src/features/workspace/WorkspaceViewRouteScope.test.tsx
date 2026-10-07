@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, memo } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -165,5 +165,34 @@ describe("WorkspaceTabRouteScope", () => {
     });
     expect(container.querySelector('[data-focus="first"]')?.textContent).toBe("true");
     expect(container.querySelector('[data-focus="second"]')?.textContent).toBe("false");
+  });
+  it("keeps a tab's links and navigators still while only the app route changes", async () => {
+    const tab = dockTreeViews(useWorkspaceStore.getState().layout.root)[0];
+    let renders = 0;
+    let goOuter: (to: string) => void = () => undefined;
+    const NavigatingChild = memo(function NavigatingChild() {
+      useNavigate();
+      renders += 1;
+      return null;
+    });
+    function OuterDriver() {
+      const navigate = useNavigate();
+      goOuter = (to) => void navigate(to);
+      return null;
+    }
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/home"]}>
+          <OuterDriver />
+          <WorkspaceViewRouteScope tab={tab}>
+            <NavigatingChild />
+          </WorkspaceViewRouteScope>
+        </MemoryRouter>,
+      );
+    });
+    renders = 0;
+    await act(async () => goOuter("/files"));
+    await act(async () => goOuter("/agents"));
+    expect(renders).toBe(0);
   });
 });
