@@ -24,6 +24,8 @@ document.addEventListener('contextmenu', event => {
     content, selection: Boolean(selection), editable: Boolean(editable),
     link: link ? safeURL(link.href) : '', image: image ? safeURL(image.currentSrc || image.src) : '',
   };
-  const params = new URLSearchParams({ token: shortcutToken, payload: JSON.stringify(payload) });
-  window.location.href = `misty-context-menu:open?${params}`;
+  // The page's own data may pass through its hooks; the token never does.
+  const json = stringify(payload);
+  if (typeof json !== 'string') return;
+  sendHostNavigation('misty-context-menu:open?token=' + encode(shortcutToken) + '&payload=' + encode(json));
 }, true);

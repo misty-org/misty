@@ -24,13 +24,15 @@ export const accountApi = {
       { reauthenticate },
       signal,
     ),
-  completeGoogle: (flowToken: string, signal?: AbortSignal) =>
-    requestJson<LoginResponse | { status: "pending" } | { reauthentication_token: string }>(
+  completeGoogle: (flowToken: string, signal?: AbortSignal, completionCode?: string) =>
+    requestJson<
+      LoginResponse | { status: "pending" | "confirm" } | { reauthentication_token: string }
+    >(
       "POST",
       "/auth/google/complete",
-      {
-        flow_token: flowToken,
-      },
+      completionCode
+        ? { flow_token: flowToken, completion_code: completionCode }
+        : { flow_token: flowToken },
       signal,
     ),
   signIn: (email: string, password: string) =>

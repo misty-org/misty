@@ -40,6 +40,24 @@ fn pointer_message(raw: &str) -> Option<PointerMessage> {
     }
     Some(message)
 }
+/// A host navigation (shortcut or context menu) posted instead of loaded, so
+/// the page cannot observe the URL that carries the token. The forwarders it
+/// is handed to check that token exactly as they do for a navigation.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NavigateMessage {
+    navigate: String,
+}
+
+fn navigate_message(raw: &str) -> Option<Url> {
+    if raw.len() > 400_000 {
+        return None;
+    }
+    let message: NavigateMessage = serde_json::from_str(raw).ok()?;
+    let url = Url::parse(&message.navigate).ok()?;
+    matches!(url.scheme(), "misty-shortcut" | "misty-context-menu").then_some(url)
+}
+
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BackgroundMessage {
@@ -135,6 +153,14 @@ extern "C" fn receive(this: &Object, _: Sel, _: *mut Object, message: *mut Objec
         let Ok(token) = std::ffi::CStr::from_ptr(raw).to_str() else {
             return;
         };
+        if let Some(url) = navigate_message(token) {
+            let frame: *mut Object = msg_send![message, frameInfo];
+            let main_frame: BOOL = msg_send![frame, isMainFrame];
+            if main_frame == YES && !super::forward_navigation(&app, &id, &url) {
+                super::context_menu::forward(&app, &id, &url);
+            }
+            return;
+        }
         if let Some(background) = background_message(token) {
             let frame: *mut Object = msg_send![message, frameInfo];
             let main_frame: BOOL = msg_send![frame, isMainFrame];
@@ -206,6 +232,20 @@ mod tests {
             r##"{"token":"test","background":"#202124","extra":true}"##,
         ] {
             assert!(background_message(raw).is_none(), "{raw}");
+        }
+    }
+
+    #[test]
+    fn native_navigate_messages_carry_only_host_navigations() {
+        assert!(navigate_message(r#"{"navigate":"misty-shortcut:event?key=w&token=t"}"#).is_some());
+        assert!(navigate_message(r#"{"navigate":"misty-context-menu:open?token=t&payload=%7B%7D"}"#).is_some());
+        for raw in [
+            r#"{"navigate":"misty-companion:submit?token=t&prompt=hi"}"#,
+            r#"{"navigate":"https://example.com/"}"#,
+            r#"{"navigate":"misty-shortcut:event","token":"t"}"#,
+            r#"{"navigate":7}"#,
+        ] {
+            assert!(navigate_message(raw).is_none(), "{raw}");
         }
     }
 

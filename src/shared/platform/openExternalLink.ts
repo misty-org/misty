@@ -60,7 +60,12 @@ export function installExternalLinkRouting(root: Document = document): () => voi
       return;
     }
     const rawHref = anchor.getAttribute("href")?.trim() ?? "";
-    if (!/^(?:https?:|mailto:|\/\/)/i.test(rawHref)) return;
+    if (!/^(?:https?:|mailto:|\/\/)/i.test(rawHref)) {
+      // The shell never navigates away from its own pages: asset:, file:,
+      // data: and other schemes would replace the app (see navigation_guard.rs).
+      if (!isShellUrl(anchor.href)) event.preventDefault();
+      return;
+    }
     event.preventDefault();
     void openExternalLink(anchor.href);
   };
@@ -70,6 +75,13 @@ export function installExternalLinkRouting(root: Document = document): () => voi
     root.removeEventListener("click", handleClick);
     root.removeEventListener("auxclick", handleClick);
   };
+}
+function isShellUrl(href: string): boolean {
+  try {
+    return new URL(href, window.location.href).origin === window.location.origin;
+  } catch {
+    return false;
+  }
 }
 function isWebUrl(url: string): boolean {
   return url.startsWith("https://") || url.startsWith("http://");
