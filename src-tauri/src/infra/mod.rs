@@ -15,6 +15,8 @@ pub mod browser_import;
 #[cfg(desktop)]
 pub mod browser_library;
 #[cfg(desktop)]
+pub(crate) mod browser_kiri;
+#[cfg(desktop)]
 pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
@@ -150,7 +152,7 @@ pub(crate) mod browser_website_storage;
 #[cfg(desktop)]
 pub mod cursor_companion;
 
-#[cfg(target_os = "macos")]
+#[cfg(desktop)]
 pub mod browser_site_permissions;
 
 pub mod settings_profile_store;

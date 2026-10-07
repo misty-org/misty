@@ -479,6 +479,13 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 @end
 
 void misty_extensions_set_events(MistyExtensionEvent callback) { emitEvent = callback; }
+void misty_extensions_compat_message(void *message, void *reply) {
+    void (^answer)(id, NSString *) = (__bridge void (^)(id, NSString *))reply;
+    if (@available(macOS 15.4, *)) {
+        if (host) { [host compatMessage:(__bridge WKScriptMessage *)message reply:answer]; return; }
+    }
+    answer(nil, @"The extension host stopped.");
+}
 void misty_extensions_request(const char *json, MistyExtensionReply callback, void *pointer) {
     NSData *data = [[NSString stringWithUTF8String:json] dataUsingEncoding:NSUTF8StringEncoding];
     dispatch_async(dispatch_get_main_queue(), ^{

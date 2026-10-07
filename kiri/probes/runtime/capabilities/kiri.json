@@ -1,0 +1,6 @@
+{
+  "identifier": "kiri-pages",
+  "webviews": ["probe-*"],
+  "remote": { "urls": ["https://*:*", "http://*:*"] },
+  "permissions": ["kiri:default"]
+}

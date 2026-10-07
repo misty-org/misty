@@ -11,6 +11,7 @@
 #import <AppKit/AppKit.h>
 #import <WebKit/WebKit.h>
 #import <UserNotifications/UserNotifications.h>
+#import "compat-channel.h"
 
 static NSString *account, *origin;
 static NSWindow *window;
@@ -107,6 +108,7 @@ int main(int argc, const char *argv[]) {
         if (![NSBundle.mainBundle.bundlePath hasSuffix:@".app"]) { fprintf(stderr, "Run this probe from its app bundle.\n"); return 2; }
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        misty_extensions_set_compat_channel(installCompatChannel);
         account = [@"notifications-" stringByAppendingString:NSUUID.UUID.UUIDString];
         origin = NSUUID.UUID.UUIDString.lowercaseString;
         NSString *root = [NSString stringWithUTF8String:argv[1]];

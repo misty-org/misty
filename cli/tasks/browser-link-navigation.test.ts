@@ -42,11 +42,14 @@ test('explicit new-tab gestures still work', () => {
   }
 });
 
-// The script as macOS renders it: host messages use the captured native channel.
+// Kiri's host channel sender as WebKit renders it (kiri/src/channel/macos.rs).
+const sender = readFileSync(new URL('../../kiri/src/channel/macos.rs', import.meta.url), 'utf8')
+  .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
+
+// The script as WebKit renders it: host messages use Kiri's captured native channel.
 function rendered(tracking) {
   return source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
-    .replace('__MISTY_NATIVE_HOST_PLACEHOLDER__', 'true')
-    .replace('__MISTY_POINTER_NAVIGATION_PLACEHOLDER__', '')
+    .replace('__KIRI_HOST_SENDER_PLACEHOLDER__', sender)
     .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
     .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
     .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
@@ -57,7 +60,7 @@ test('pointer focus reports over native messaging without navigating the page', 
   const listeners = {};
   const messages = [];
   const window = {
-    webkit: { messageHandlers: { mistyFocus: { postMessage: token => messages.push(token) } } },
+    webkit: { messageHandlers: { kiriHost: { postMessage: token => messages.push(token) } } },
     addEventListener() {},
   };
   Object.defineProperty(window, 'location', { get() { throw new Error('Focus must not touch page navigation'); } });
@@ -77,7 +80,7 @@ test('companion pointer tracking reports over native messaging without interrupt
   const messages = [];
   const window = {
     innerWidth: 800, innerHeight: 600,
-    webkit: { messageHandlers: { mistyFocus: { postMessage: body => messages.push(JSON.parse(body)) } } },
+    webkit: { messageHandlers: { kiriHost: { postMessage: body => messages.push(JSON.parse(body)) } } },
     addEventListener: (type, fn) => { listeners[type] = fn; },
   };
   Object.defineProperty(window, 'location', { get() { throw new Error('Pointer tracking must not navigate'); } });

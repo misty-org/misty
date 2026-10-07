@@ -30,7 +30,7 @@ uses checkmarks; extension artwork keeps its official colors. All preferences us
 the server-backed account settings system.
 
 The runtime is the system `WKWebExtension`. Misty adds a compatibility layer
-(`src-tauri/src/infra/extensions/compat/`) for Firefox APIs WebKit lacks. Its
+(`kiri/src/extensions/compat/`, part of Kiri) for Firefox APIs WebKit lacks. Its
 scripts load before an extension's own and define only missing APIs. Calls that
 need Misty's data go through a hidden host page per extension. The native host
 checks the account's granted permission, and `compat/` in this folder answers

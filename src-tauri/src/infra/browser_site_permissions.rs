@@ -1,33 +1,11 @@
-//! Native website permissions. Decisions are local to this app and data-store profile.
-#![allow(unexpected_cfgs)]
-use objc::{msg_send, sel, sel_impl};
-use objc2_foundation::{NSProcessInfo, NSString};
-use objc2_web_kit::{WKMediaCaptureState, WKSecurityOrigin, WKWebView};
+//! Website camera and microphone permissions. Choices are local to this app and
+//! browser profile. Kiri applies them in every engine; this module stores them
+//! and serves Misty's site settings.
+use kiri::engine::{self, MediaRequest, StoreScope};
+use kiri::permissions::{canonical_origin, media_verdict, Verdict};
+pub use kiri::permissions::{Decision, MediaPermissions as Permissions};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Webview};
-
-const DELEGATE_CLASS: &str = "MistySitePermissionDelegate";
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum PermissionScope {
-    Persistent(String),
-    Temporary(usize),
-}
-
-#[derive(Clone, Copy, Default, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Decision {
-    #[default]
-    Ask,
-    Allow,
-    Block,
-}
-
-#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Permissions {
-    pub camera: Decision,
-    pub microphone: Decision,
-}
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,155 +25,53 @@ pub struct SiteInfo {
     profile: Option<String>,
     permissions: Permissions,
     #[serde(skip)]
-    scope: PermissionScope,
+    scope: StoreScope,
 }
 
-unsafe fn scope(view: &WKWebView) -> PermissionScope {
-    profile(view)
-        .map(PermissionScope::Persistent)
-        .unwrap_or_else(|| {
-            PermissionScope::Temporary(
-                &*view.configuration().websiteDataStore() as *const _ as usize
-            )
-        })
+/// Answers Kiri's engine hooks from the stored choices.
+struct Policy {
+    app: AppHandle,
 }
 
-fn canonical_origin(value: &str) -> Result<String, String> {
-    let url = url::Url::parse(value).map_err(|_| "Invalid website address.")?;
-    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err("Site permissions are available for HTTP and HTTPS websites.".into());
-    }
-    Ok(url.origin().ascii_serialization())
-}
-
-unsafe fn profile(view: &WKWebView) -> Option<String> {
-    let store = view.configuration().websiteDataStore();
-    // The identifier selector was added in macOS 14. Ephemeral stores never persist choices.
-    if !store.isPersistent()
-        || NSProcessInfo::processInfo()
-            .operatingSystemVersion()
-            .majorVersion
-            < 14
-    {
-        return None;
-    }
-    store.identifier().map(|id| id.UUIDString().to_string())
-}
-
-unsafe fn current_origin(view: &WKWebView) -> Result<String, String> {
-    canonical_origin(
-        &view
-            .URL()
-            .ok_or("The page has no website address.")?
-            .absoluteString()
-            .ok_or("The page has no website address.")?
-            .to_string(),
-    )
-}
-
-fn decision(permissions: &Permissions, capture_type: usize, same_origin: bool) -> usize {
-    // WKPermissionDecision: Prompt=0, Grant=1, Deny=2. Unknown resource types fail closed.
-    let requested = match capture_type {
-        0 => vec![permissions.camera],
-        1 => vec![permissions.microphone],
-        2 => vec![permissions.camera, permissions.microphone],
-        _ => return 2,
-    };
-    if requested.contains(&Decision::Block) {
-        2
-    } else if same_origin && requested.iter().all(|value| *value == Decision::Allow) {
-        1
-    } else {
-        0
-    }
-}
-
-fn effective_permissions(top: &Permissions, requester: &Permissions) -> Permissions {
-    Permissions {
-        camera: if top.camera == Decision::Block {
-            Decision::Block
-        } else {
-            requester.camera
-        },
-        microphone: if top.microphone == Decision::Block {
-            Decision::Block
-        } else {
-            requester.microphone
-        },
-    }
-}
-
-extern "C" fn media_permission(
-    _delegate: &objc::runtime::Object,
-    _selector: objc::runtime::Sel,
-    webview: *mut objc::runtime::Object,
-    origin: *mut objc::runtime::Object,
-    _frame: *mut objc::runtime::Object,
-    capture_type: usize,
-    handler: *mut objc::runtime::Object,
-) {
-    unsafe {
-        let view = &*webview.cast::<WKWebView>();
-        let requester = &*origin.cast::<WKSecurityOrigin>();
-        let host = requester.host().to_string();
-        let host = if host.contains(':') && !host.starts_with('[') {
-            format!("[{host}]")
-        } else {
-            host
+impl engine::MediaPolicy for Policy {
+    fn media_verdict(&self, request: &MediaRequest) -> Verdict {
+        let Some(scope) = request
+            .store
+            .clone()
+            .or_else(|| session_scope(&self.app, &request.webview))
+        else {
+            return Verdict::Deny;
         };
-        let port = requester.port();
-        let suffix = if port > 0 {
-            format!(":{port}")
-        } else {
-            String::new()
-        };
-        let requester = canonical_origin(&format!("{}://{host}{suffix}", requester.protocol()));
-        let top = current_origin(view);
-        let sites = sites_for_scope(&scope(view));
-        let top_permissions = top
-            .as_ref()
-            .ok()
-            .and_then(|origin| sites.get(origin))
-            .cloned()
-            .unwrap_or_default();
-        let requesting_permissions = requester
-            .as_ref()
-            .ok()
-            .and_then(|origin| sites.get(origin))
-            .cloned()
-            .unwrap_or_default();
-        let permissions = effective_permissions(&top_permissions, &requesting_permissions);
-        // A top-level allowance never silently grants capture to an embedded third party.
-        let same_origin =
-            matches!((&top, &requester), (Ok(top), Ok(requester)) if top == requester);
-        let result = if top.is_err() || requester.is_err() {
-            2
-        } else {
-            decision(&permissions, capture_type, same_origin)
-        };
-        (&*handler.cast::<block2::Block<dyn Fn(usize)>>()).call((result,));
+        // Engines raise these on the main thread, where the store is read.
+        let sites = unsafe { sites_for_scope(&scope) };
+        media_verdict(
+            request.top_origin.as_deref(),
+            request.requester_origin.as_deref(),
+            request.kind,
+            |origin| sites.get(origin).cloned().unwrap_or_default(),
+        )
     }
+}
+
+pub(crate) fn init(app: &AppHandle) {
+    engine::set_media_policy(Policy { app: app.clone() });
 }
 
 pub(super) fn install(webview: &Webview) -> Result<(), String> {
-    webview.with_webview(|native| unsafe {
-        let view = native.inner() as *mut objc::runtime::Object;
-        let delegate: *mut objc::runtime::Object = msg_send![view, UIDelegate];
-        if delegate.is_null() || (*delegate).class().name() == DELEGATE_CLASS { return; }
-        let subclass = objc::runtime::Class::get(DELEGATE_CLASS).unwrap_or_else(|| {
-            let mut declaration = objc::declare::ClassDecl::new(DELEGATE_CLASS, (*delegate).class())
-                .expect("unique site permission delegate class");
-            declaration.add_method(sel!(webView:requestMediaCapturePermissionForOrigin:initiatedByFrame:type:decisionHandler:),
-                media_permission as extern "C" fn(&objc::runtime::Object, objc::runtime::Sel,
-                    *mut objc::runtime::Object, *mut objc::runtime::Object, *mut objc::runtime::Object, usize, *mut objc::runtime::Object));
-            declaration.register()
-        });
-        extern "C" { fn object_setClass(object: *mut objc::runtime::Object, class: *const objc::runtime::Class) -> *const objc::runtime::Class; }
-        // Same-size subclass preserves Wry's upload and popup delegate behavior.
-        object_setClass(delegate, subclass);
-        let _: () = msg_send![view, setUIDelegate: std::ptr::null_mut::<objc::runtime::Object>()];
-        let _: () = msg_send![view, setUIDelegate: delegate];
-    }).map_err(|error| error.to_string())
+    engine::install_media_permissions(webview)
+}
+
+/// The store a tab's choices live in, from the profile Misty opened it with.
+/// WebKit reports its own store instead (see `PageFacts::store`).
+fn session_scope(app: &AppHandle, label: &str) -> Option<StoreScope> {
+    super::browser::session_permission_scope(app, label.strip_prefix("misty-browser-")?)
+}
+
+/// The last private tab closed: its choices go with it. WebKit's private
+/// store carries them itself, so this applies to the other engines.
+pub(super) fn forget_private_session() {
+    #[cfg(not(target_os = "macos"))]
+    store::forget_temporary();
 }
 
 fn require_host(caller: &Webview) -> Result<(), String> {
@@ -217,54 +93,64 @@ fn target(app: &AppHandle, id: &str) -> Result<Webview, String> {
         .ok_or("This browser tab has closed.".into())
 }
 
+/// Runs a store operation on the tab's UI thread while the tab is alive, so a
+/// private store it refers to cannot be released underneath it.
+async fn with_tab<T: Send + 'static>(
+    view: &Webview,
+    operation: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    view.with_webview(move |_| {
+        let _ = send.send(operation());
+    })
+    .map_err(|error| error.to_string())?;
+    receive
+        .await
+        .map_err(|_| "The browser closed while reading site settings.".to_owned())
+}
+
 async fn inspect(
+    app: &AppHandle,
     view: Webview,
     expected_origin: Option<String>,
     update: Option<Permissions>,
 ) -> Result<SiteInfo, String> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    view.with_webview(move |native| unsafe {
-        let result = (|| {
-            let view: &WKWebView = &*native.inner().cast();
-            let origin = current_origin(view)?;
-            if expected_origin
-                .as_ref()
-                .is_some_and(|expected| expected != &origin)
-            {
-                return Err("The page changed. Reopen site settings and try again.".into());
+    let facts = engine::page_facts(&view).await?;
+    let origin = canonical_origin(&facts.url)?;
+    if expected_origin
+        .as_ref()
+        .is_some_and(|expected| expected != &origin)
+    {
+        return Err("The page changed. Reopen site settings and try again.".into());
+    }
+    let scope = facts
+        .store
+        .clone()
+        .or_else(|| session_scope(app, view.label()))
+        .ok_or("This browser tab has closed.")?;
+    let sites = {
+        let (scope, origin) = (scope.clone(), origin.clone());
+        with_tab(&view, move || unsafe {
+            match update {
+                Some(update) => update_scope(&scope, &origin, update),
+                None => Ok(sites_for_scope(&scope)),
             }
-            let profile = profile(view);
-            let scope = scope(view);
-            let sites = match update {
-                Some(update) => update_scope(&scope, &origin, update)?,
-                None => sites_for_scope(&scope),
-            };
-            let permissions = sites.get(&origin).cloned().unwrap_or_default();
-            Ok(SiteInfo {
-                url: view
-                    .URL()
-                    .unwrap()
-                    .absoluteString()
-                    .ok_or("The page has no website address.")?
-                    .to_string(),
-                origin,
-                secure: view.hasOnlySecureContent()
-                    && view
-                        .URL()
-                        .unwrap()
-                        .scheme()
-                        .is_some_and(|s| s.to_string() == "https"),
-                persistent: profile.is_some(),
-                profile,
-                permissions,
-                scope,
-            })
-        })();
-        let _ = tx.send(result);
+        })
+        .await??
+    };
+    let profile = match &scope {
+        StoreScope::Persistent(profile) => Some(profile.clone()),
+        StoreScope::Temporary(_) => None,
+    };
+    Ok(SiteInfo {
+        url: facts.url,
+        permissions: sites.get(&origin).cloned().unwrap_or_default(),
+        origin,
+        secure: facts.secure,
+        persistent: profile.is_some(),
+        profile,
+        scope,
     })
-    .map_err(|error| error.to_string())?;
-    rx.await
-        .map_err(|_| "The browser closed while reading site settings.".to_owned())?
 }
 
 #[tauri::command]
@@ -274,64 +160,33 @@ pub async fn browser_site_info(
     id: String,
 ) -> Result<SiteInfo, String> {
     require_host(&caller)?;
-    inspect(target(&app, &id)?, None, None).await
+    inspect(&app, target(&app, &id)?, None, None).await
 }
 
-// Stop capture in every browser view. This includes third-party frames and other tabs
-// whose current top-level URL does not reveal the origin of an active media stream.
+// Stop capture in every browser view on the store. This includes third-party frames and
+// other tabs whose current top-level URL does not reveal the origin of an active stream.
 async fn stop_capture(
     app: &AppHandle,
-    affected_scope: &PermissionScope,
+    affected_scope: &StoreScope,
     camera: bool,
     microphone: bool,
 ) -> Result<(), String> {
-    let mut receivers = Vec::new();
     for (label, webview) in app.webviews() {
         if !label.starts_with("misty-browser-") {
             continue;
         }
-        for is_camera in [true, false] {
-            if (is_camera && !camera) || (!is_camera && !microphone) {
-                continue;
-            }
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let affected_scope = affected_scope.clone();
-            webview
-                .with_webview(move |native| unsafe {
-                    let view: &WKWebView = &*native.inner().cast();
-                    if scope(view) != affected_scope {
-                        let _ = tx.send(());
-                        return;
-                    }
-                    let tx = std::cell::RefCell::new(Some(tx));
-                    let done = block2::RcBlock::new(move || {
-                        if let Some(tx) = tx.borrow_mut().take() {
-                            let _ = tx.send(());
-                        }
-                    });
-                    if is_camera {
-                        view.setCameraCaptureState_completionHandler(
-                            WKMediaCaptureState::None,
-                            Some(&done),
-                        );
-                    } else {
-                        view.setMicrophoneCaptureState_completionHandler(
-                            WKMediaCaptureState::None,
-                            Some(&done),
-                        );
-                    }
-                })
-                .map_err(|error| error.to_string())?;
-            receivers.push(rx);
+        // WebKit compares its own store; other engines rely on Misty's profiles.
+        if !cfg!(target_os = "macos") && session_scope(app, &label).as_ref() != Some(affected_scope)
+        {
+            continue;
         }
-    }
-    for rx in receivers {
-        tokio::time::timeout(std::time::Duration::from_secs(5), rx)
+        engine::stop_capture(&webview, Some(affected_scope), camera, microphone)
             .await
-            .map_err(|_| {
-                "Permission saved, but stopping capture timed out. Close affected tabs.".to_owned()
-            })?
-            .map_err(|_| "The tab closed while stopping capture.".to_owned())?;
+            .map_err(|error| {
+                let mut letters = error.chars();
+                let first = letters.next().map(|c| c.to_lowercase().to_string()).unwrap_or_default();
+                format!("Permission saved, but {first}{}", letters.as_str())
+            })?;
     }
     Ok(())
 }
@@ -345,8 +200,9 @@ pub async fn browser_site_permissions_set(
     permissions: Permissions,
 ) -> Result<SiteInfo, String> {
     require_host(&caller)?;
-    let before = inspect(target(&app, &id)?, Some(canonical_origin(&origin)?), None).await?;
+    let before = inspect(&app, target(&app, &id)?, Some(canonical_origin(&origin)?), None).await?;
     let info = inspect(
+        &app,
         target(&app, &id)?,
         Some(canonical_origin(&origin)?),
         Some(permissions.clone()),
@@ -363,24 +219,15 @@ pub async fn browser_site_permissions_set(
     Ok(info)
 }
 
-async fn active_profiles(app: &AppHandle) -> Result<std::collections::HashSet<String>, String> {
-    let mut profiles = std::collections::HashSet::new();
-    for (label, webview) in app.webviews() {
-        if !label.starts_with("misty-browser-") {
-            continue;
-        }
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        webview
-            .with_webview(move |native| unsafe {
-                let view: &WKWebView = &*native.inner().cast();
-                let _ = tx.send(profile(view));
-            })
-            .map_err(|error| error.to_string())?;
-        if let Some(profile) = rx.await.map_err(|_| "Browser profile closed.")? {
-            profiles.insert(profile);
-        }
-    }
-    Ok(profiles)
+/// Profiles with an open tab. Dormant profiles of another signed-in account stay hidden.
+fn active_profiles(app: &AppHandle) -> std::collections::HashSet<String> {
+    app.webviews()
+        .into_keys()
+        .filter_map(|label| match session_scope(app, &label)? {
+            StoreScope::Persistent(profile) => Some(profile),
+            StoreScope::Temporary(_) => None,
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -389,8 +236,7 @@ pub async fn browser_site_permissions_list(
     app: AppHandle,
 ) -> Result<Vec<SavedPermission>, String> {
     require_host(&caller)?;
-    // Do not expose origins belonging to a different signed-in account's dormant profiles.
-    let active = active_profiles(&app).await?;
+    let active = active_profiles(&app);
     Ok(read_store()
         .into_iter()
         .filter(|(profile, _)| active.contains(profile))
@@ -415,10 +261,10 @@ pub async fn browser_site_permissions_reset(
 ) -> Result<(), String> {
     require_host(&caller)?;
     let origin = canonical_origin(&origin)?;
-    if !active_profiles(&app).await?.contains(&profile) {
+    if !active_profiles(&app).contains(&profile) {
         return Err("Open a tab in this browser profile before resetting its permissions.".into());
     }
-    // Serialize all NSUserDefaults read/modify/write operations on the main thread.
+    // Serialize all store read/modify/write operations on the main thread.
     let (tx, rx) = tokio::sync::oneshot::channel();
     let affected_profile = profile.clone();
     app.run_on_main_thread(move || {
@@ -431,13 +277,16 @@ pub async fn browser_site_permissions_reset(
     .map_err(|error| error.to_string())?;
     rx.await
         .map_err(|_| "Could not reset website permissions.".to_owned())??;
-    stop_capture(
-        &app,
-        &PermissionScope::Persistent(affected_profile),
-        true,
-        true,
-    )
-    .await
+    stop_capture(&app, &StoreScope::Persistent(affected_profile), true, true).await
+}
+
+/// The store key for a Misty browser profile, as WebKit's `UUIDString` writes it.
+pub(super) fn profile_key(profile: Option<&str>) -> Result<String, String> {
+    let identifier = super::browser_profile::data_store_identifier(profile)?;
+    Ok(uuid::Uuid::from_bytes(identifier)
+        .hyphenated()
+        .to_string()
+        .to_uppercase())
 }
 
 /// Camera and microphone decisions imported from another browser, for one
@@ -447,12 +296,7 @@ pub(crate) fn import_decisions(
     profile: Option<&str>,
     decisions: &[(String, &str, bool)],
 ) -> Result<usize, String> {
-    let identifier = super::browser_profile::data_store_identifier(profile)?;
-    // The store is keyed like WebKit's `UUIDString`.
-    let key = uuid::Uuid::from_bytes(identifier)
-        .hyphenated()
-        .to_string()
-        .to_uppercase();
+    let key = profile_key(profile)?;
     let mut store = read_store();
     let sites = store.entry(key).or_default();
     let mut added = 0;
@@ -480,9 +324,17 @@ pub(crate) fn import_decisions(
     Ok(added)
 }
 
+#[cfg(target_os = "macos")]
 #[path = "browser_site_permissions_store.rs"]
 mod store;
+#[cfg(not(target_os = "macos"))]
+#[path = "browser_site_permissions_store_file.rs"]
+mod store;
 use store::{read_store, sites_for_scope, update_scope, write_store};
+// The Windows and Linux store, compiled and tested on macOS too.
+#[cfg(all(test, target_os = "macos"))]
+#[path = "browser_site_permissions_store_file.rs"]
+mod file_store;
 
 #[cfg(test)]
 #[path = "browser_site_permissions_tests.rs"]
