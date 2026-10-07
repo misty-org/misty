@@ -80,36 +80,22 @@ describe("navigation reordering", () => {
     const before = workspace().layout;
     fireEvent.keyDown(files, { key: "ArrowUp", altKey: true, shiftKey: true });
     await waitFor(() =>
-      expect(destinationOrder()).toEqual([
-        "home",
-        "browser",
-        "files",
-        "agents",
-        "extensions",
-        "spaces",
-      ]),
+      expect(destinationOrder()).toEqual(["browser", "files", "agents", "extensions", "spaces"]),
     );
     expect(saveOrder).toHaveBeenCalledWith(
       "collections.tabs.navigator",
-      '["home","browser","files","agents","extensions","spaces"]',
+      '["browser","files","agents","extensions","spaces"]',
     );
     expect(document.activeElement).toBe(files);
     expect(files.getAttribute("aria-expanded")).toBe("true");
     expect(workspace().layout).toBe(before);
     ui.unmount();
     renderNavigator();
-    expect(destinationOrder()[2]).toBe("files");
+    expect(destinationOrder()[1]).toBe("files");
     act(() =>
       useSettingsProfiles.setState({ accountId: "account-2", state: initialProfileState({}) }),
     );
-    expect(destinationOrder()).toEqual([
-      "home",
-      "browser",
-      "agents",
-      "files",
-      "extensions",
-      "spaces",
-    ]);
+    expect(destinationOrder()).toEqual(["browser", "agents", "files", "extensions", "spaces"]);
   });
 
   it.each(["left", "right", "top", "bottom"] as const)(
@@ -125,16 +111,16 @@ describe("navigation reordering", () => {
         return new DOMRect(vertical ? 0 : index * 40, vertical ? index * 40 : 0, 40, 40);
       });
       renderNavigator(position);
-      const home = screen.getByRole("link", { name: "Home" });
+      const browser = screen.getByRole("link", { name: "Browser" });
       const before = workspace().layout;
-      pointer(home, "pointerdown", 10, 10);
+      pointer(browser, "pointerdown", 10, 10);
       pointer(window, "pointermove", vertical ? 10 : 110, vertical ? 110 : 10);
       expect(saveOrder).not.toHaveBeenCalled();
       expect(document.querySelector(".pointer-reorder-indicator")).toBeTruthy();
       pointer(window, "pointerup", vertical ? 10 : 110, vertical ? 110 : 10);
-      fireEvent.click(home, { detail: 1 });
+      fireEvent.click(browser, { detail: 1 });
       await waitFor(() =>
-        expect(destinationOrder().slice(0, 3)).toEqual(["browser", "agents", "home"]),
+        expect(destinationOrder().slice(0, 3)).toEqual(["agents", "files", "browser"]),
       );
       expect(workspace().layout).toBe(before);
       expect(document.querySelector(".pointer-reorder-shield")).toBeNull();
@@ -160,7 +146,7 @@ describe("navigation reordering", () => {
   it("reports save failures and preserves the saved order", async () => {
     useSettingsProfiles.setState({ edit: vi.fn().mockRejectedValue(new Error("Unavailable")) });
     renderNavigator();
-    fireEvent.keyDown(screen.getByRole("link", { name: "Browser" }), {
+    fireEvent.keyDown(screen.getByRole("link", { name: "Agents" }), {
       key: "ArrowUp",
       altKey: true,
       shiftKey: true,
@@ -168,13 +154,13 @@ describe("navigation reordering", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "Navigation order couldn’t be saved",
     );
-    expect(destinationOrder()[0]).toBe("home");
+    expect(destinationOrder()[0]).toBe("browser");
   });
 
   it("does not reorder until account settings are ready", () => {
     useSettingsProfiles.setState({ ready: false });
     renderNavigator();
-    fireEvent.keyDown(screen.getByRole("link", { name: "Browser" }), {
+    fireEvent.keyDown(screen.getByRole("link", { name: "Agents" }), {
       key: "ArrowUp",
       altKey: true,
       shiftKey: true,
@@ -189,7 +175,7 @@ describe("browser workspace navigator", () => {
     saveBookmark({ title: "Example", url: "example.com", folderId: folder });
     renderNavigator();
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["Home", "Browser", "Agents", "Explorer", "Transfers"])
+    for (const name of ["Browser", "Agents", "Explorer", "Transfers"])
       expect(within(nav).getByRole("link", { name })).toBeTruthy();
     expect(within(nav).getByRole("button", { name: "Spaces" })).toBeTruthy();
     expect(within(nav).queryByRole("heading", { name: "Groups" })).toBeNull();
@@ -197,15 +183,14 @@ describe("browser workspace navigator", () => {
     expect(within(nav).queryByText("Reading")).toBeNull();
     expect(workspace().bookmarks).toHaveLength(1);
     const pages = within(nav).getAllByRole("link");
-    expect(pages.slice(0, 5).map((page) => page.getAttribute("aria-label"))).toEqual([
-      "Home",
+    expect(pages.slice(0, 4).map((page) => page.getAttribute("aria-label"))).toEqual([
       "Browser",
       "Agents",
       "Explorer",
       "Transfers",
     ]);
     expect(pages[0].closest(".misty-navigator-items")).toBeTruthy();
-    for (const name of ["Home", "Browser", "Agents", "Explorer", "Transfers"])
+    for (const name of ["Browser", "Agents", "Explorer", "Transfers"])
       expect(
         within(nav).getByRole("link", { name }).hasAttribute("data-navigation-destination"),
       ).toBe(true);

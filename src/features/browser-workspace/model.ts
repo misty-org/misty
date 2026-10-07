@@ -40,6 +40,7 @@ export interface TabFields {
   tree: SplitTree;
 }
 export interface ViewFields {
+  /** "home" is the retired Home page, still sent by older clients. */
   surface: "browser" | "files" | "agents" | "space" | "home" | "extensions";
   title: string;
   placement: {

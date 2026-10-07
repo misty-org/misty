@@ -8,7 +8,6 @@ const identityState = {
 };
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
-  home: descriptor("home", "singleton", "suspend", 360, 240),
   extensions: descriptor("extensions", "singleton", "suspend", 360, 240),
   space: descriptor("space", "per-space", "suspend", 360, 240),
   browser: {

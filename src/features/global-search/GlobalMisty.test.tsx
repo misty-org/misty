@@ -92,10 +92,10 @@ describe("GlobalMisty", () => {
     const contentVisibilityChanged = vi.fn();
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/home"]}>
+        <MemoryRouter initialEntries={["/browser"]}>
           <GlobalMisty
             accountId="account-1"
-            currentPath="/home"
+            currentPath="/browser"
             activePaneId=""
             activePanePath=""
             onContentVisibilityChange={contentVisibilityChanged}
@@ -147,11 +147,11 @@ describe("GlobalMisty", () => {
   it("keeps Ask history scrollable while a follow-up is composed", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/home"]}>
+        <MemoryRouter initialEntries={["/browser"]}>
           <GlobalMisty
             controller="misty"
             accountId="account-1"
-            currentPath="/home"
+            currentPath="/browser"
             activePaneId=""
             activePanePath=""
           />
@@ -306,7 +306,7 @@ describe("GlobalMisty", () => {
         <MemoryRouter>
           <GlobalMisty
             accountId="account-1"
-            currentPath="/home"
+            currentPath="/browser"
             activePaneId=""
             activePanePath=""
           />
@@ -335,7 +335,7 @@ describe("GlobalMisty", () => {
         <MemoryRouter>
           <GlobalMisty
             accountId="account-1"
-            currentPath="/home"
+            currentPath="/browser"
             activePaneId=""
             activePanePath=""
           />

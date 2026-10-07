@@ -8,7 +8,7 @@ export * from "./navigatorApps";
 export * from "./paneNavigation";
 export * from "./routeSurface";
 export * from "./useNavigatorAppsStore";
-export * from "./useRecentToolsStore";
+export * from "./workspaceTools";
 export * from "./useWorkspaceStore";
 export * from "./useWorkspaceViewTitle";
 export * from "./WorkspaceAppIcon";

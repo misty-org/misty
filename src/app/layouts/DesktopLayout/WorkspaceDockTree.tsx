@@ -41,7 +41,6 @@ import {
 } from "@/features/ai-surface/AiPaneHost";
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
-  home: "Home",
   extensions: "Extensions",
   space: "Space",
   browser: "Browser",

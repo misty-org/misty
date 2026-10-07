@@ -1,1 +1,1 @@
-export type AppTab = "home" | "browser" | "files" | "spaces" | "agents" | "providers" | "settings";
+export type AppTab = "browser" | "files" | "spaces" | "agents" | "providers" | "settings";

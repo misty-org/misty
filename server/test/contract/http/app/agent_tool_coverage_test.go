@@ -44,7 +44,6 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^POST /a2a/agents/\{agentID\}/token$`, why: "agent credentials are minted by the person's signed-in app"},
 	{pattern: `^POST /a2a/`, tool: "agents.request"},
 	{pattern: `^\S+ /space-invitations/`, why: "accepting an invitation is the invitee's choice"},
-	{pattern: `^\S+ /me/home/apps$`, why: "personal home layout"},
 	{pattern: `^POST /ai/(smart-library|media-search)/search$`, tool: "library.search"},
 	{pattern: `^POST /search/global/visual$`, tool: "search.all"},
 	{pattern: `^\S+ /ai/(smart-library|media-search)/`, why: "device indexing pipelines run by the desktop app"},

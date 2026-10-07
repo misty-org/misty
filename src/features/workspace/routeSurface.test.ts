@@ -59,14 +59,8 @@ it("restores Space tools as split-capable surfaces in the current global workspa
   expect(workspaceSurfaceFromRoute("/spaces")).toMatchObject({ surfaceId: "space" });
 });
 
-it("opens Home as a reusable workspace tab", () => {
-  expect(workspaceSurfaceFromRoute("/home")).toMatchObject({
-    surfaceId: "home",
-    groupKey: "tool:home",
-    title: "Home",
-    route: "/home",
-    instancePolicy: "single",
-  });
+it("does not open the retired Home page as a tab", () => {
+  expect(workspaceSurfaceFromRoute("/home")).toBeNull();
 });
 
 it("opens schedule links inside Agents and preserves the task", () => {
