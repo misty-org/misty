@@ -1,0 +1,391 @@
+/*
+ * Questions, plans, goals and the Plan switch. Monochrome: selection shows as a
+ * checkmark and a neutral fill, status as an icon with words, risk as an icon
+ * with words. Nothing here is tinted.
+ */
+
+/* Question card above the composer. */
+.agent-question-card,
+.agent-question-strip {
+  margin-bottom: 8px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.agent-question-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 12px 10px;
+}
+.agent-question-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+.agent-question-strip > span {
+  flex: 1;
+  min-width: 0;
+}
+.agent-question-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-question-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 9999px;
+  color: var(--color-cream);
+  font-size: 12px;
+}
+.agent-question-count {
+  flex: 1;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-question-text {
+  margin: 0;
+  color: var(--color-cream-bright);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.agent-question-options {
+  display: grid;
+  gap: 4px;
+}
+.agent-question-option {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-cream);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+.agent-question-option:hover {
+  background: var(--color-charcoal-hover);
+}
+.agent-question-option:focus-visible {
+  outline: none;
+  border-color: var(--color-charcoal-active);
+}
+.agent-question-option[aria-checked="true"] {
+  border-color: var(--color-charcoal-active);
+  background: var(--color-charcoal-active);
+  color: var(--color-cream-bright);
+}
+.agent-question-key {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 4px;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.agent-question-label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.agent-question-label small {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.agent-question-check {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  opacity: 0;
+}
+.agent-question-option[aria-checked="true"] .agent-question-check {
+  opacity: 1;
+}
+.agent-question-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.agent-question-hint {
+  flex: 1;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-question-error {
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 12px;
+}
+
+/* Plan card in the transcript, and the editor that replaces it. */
+.agent-plan-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.agent-plan-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-plan-card-head small {
+  margin-left: auto;
+}
+.agent-plan-card h3 {
+  margin: 0;
+  color: var(--color-cream-bright);
+  font-size: 15px;
+  font-weight: 600;
+}
+.agent-plan-summary {
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-plan-steps,
+.agent-plan-edit-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan-steps > li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13px;
+}
+.agent-plan-step-number {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--color-charcoal-active);
+  color: var(--color-cream);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.agent-plan-step-body p,
+.agent-plan-step-body summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  color: var(--color-cream);
+  line-height: 20px;
+}
+.agent-plan-step-body summary {
+  cursor: pointer;
+}
+.agent-plan-step-detail {
+  margin-top: 6px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+.agent-plan-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+}
+.agent-plan-list h4 {
+  margin: 0 0 4px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.agent-plan-list ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--color-cream);
+  font-size: 13px;
+  list-style: disc;
+}
+.agent-plan-list li[data-proven] {
+  list-style: none;
+  margin-left: -16px;
+}
+.agent-plan-list li small {
+  display: block;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.agent-plan-dismiss {
+  margin-left: auto;
+}
+.agent-plan-edit-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 140px 24px;
+  align-items: start;
+  gap: 6px;
+}
+.agent-plan-edit-fields {
+  display: grid;
+  gap: 4px;
+}
+
+/* Task drawer sections. */
+.agent-goal-section,
+.agent-plan-checklist {
+  display: grid;
+  gap: 8px;
+}
+.agent-goal-objective,
+.agent-plan-checklist-title {
+  margin: 0;
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-goal-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 13px;
+}
+.agent-goal-status small {
+  margin-left: auto;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-goal-budget {
+  display: grid;
+  gap: 4px;
+}
+.agent-goal-budget small,
+.agent-goal-report {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.agent-plan-checklist ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan-checklist li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13px;
+}
+.agent-plan-checklist li p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+}
+.agent-plan-checklist li small {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-plan-checklist li[data-status="done"] p > span:first-child,
+.agent-plan-checklist li[data-status="skipped"] p > span:first-child {
+  color: var(--color-cream-muted);
+}
+.agent-plan-check {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  color: var(--color-cream-muted);
+}
+.agent-plan-checklist li[data-status="done"] .agent-plan-check {
+  color: var(--color-cream-bright);
+}
+
+/* Answers given inside a run, under that run's answer. */
+.agent-answered-questions p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-answered-label {
+  color: var(--color-cream);
+}
+.agent-answered-item + .agent-answered-item::before {
+  content: "· ";
+}
+
+/* Turns Misty started toward a goal read as a quiet label, not a bubble. */
+.agent-goal-continuation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+
+/* The proposed plan sits at the end of the transcript, on its column and gutters. */
+.agent-plan-slot {
+  max-width: 836px;
+  margin: 0 auto;
+  padding: 0 24px 20px;
+}
+
+/* Earlier versions of a plan, folded under it. */
+.agent-plan-history summary {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.agent-plan-history ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.agent-plan-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--color-cream);
+}
+.agent-plan-history li small {
+  color: var(--color-cream-muted);
+}

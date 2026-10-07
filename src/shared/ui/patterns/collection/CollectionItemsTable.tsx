@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { cn } from "../../utils";
 import { CollectionItemSurface } from "./CollectionCards";
 import {
+  collectionIconTone,
   collectionUtilityReveal,
   type CollectionColumn,
   type CollectionItem,
@@ -14,8 +15,10 @@ export type CollectionSort = { key: string; descending: boolean };
 const rowClass = cn(
   "group/collection-item [&>td]:px-4 [&>td]:py-2.5 cursor-pointer border-0 transition-none",
   "[&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg",
-  "hover:[&>td]:bg-control-hover focus-within:[&>td]:bg-control-hover",
-  "data-[state=open]:[&>td]:bg-control-hover has-[[data-state=open]]:[&>td]:bg-control-hover",
+  "[--collection-row-highlight:transparent]",
+  "hover:[--collection-row-highlight:var(--color-control-hover)] focus-within:[--collection-row-highlight:var(--color-control-hover)]",
+  "data-[state=open]:[--collection-row-highlight:var(--color-control-hover)] has-[[data-state=open]]:[--collection-row-highlight:var(--color-control-hover)]",
+  "[&>td]:bg-[image:linear-gradient(var(--collection-row-highlight),var(--collection-row-highlight))]",
 );
 
 function SortHeader({
@@ -38,7 +41,7 @@ function SortHeader({
         variant="ghost"
         size="none"
         justify="start"
-        className="group/sort min-h-8 w-full gap-1.5 rounded-sm px-2 py-1 text-inherit font-medium"
+        className="group/sort min-h-8 w-full gap-1.5 rounded-sm px-2 py-1 text-[13px] text-inherit font-medium"
         onClick={() =>
           onSort(selected && sort.descending ? null : { key: column.key, descending: selected })
         }
@@ -62,6 +65,7 @@ export function CollectionItemsTable({
   columns,
   metadataColumns,
   hasActions,
+  stickyActions = false,
   sort,
   onSort,
 }: {
@@ -71,6 +75,7 @@ export function CollectionItemsTable({
   /** Visible columns after the name column. */
   metadataColumns: CollectionColumn[];
   hasActions: boolean;
+  stickyActions?: boolean;
   sort: CollectionSort | null;
   onSort: (sort: CollectionSort | null) => void;
 }) {
@@ -83,8 +88,13 @@ export function CollectionItemsTable({
               <SortHeader key={column.key} column={column} sort={sort} onSort={onSort} />
             ))}
             {hasActions && (
-              <TableHead className="w-12">
-                <span className="sr-only">Actions</span>
+              <TableHead
+                className={cn(
+                  "w-12",
+                  stickyActions && "sticky right-0 z-10 bg-charcoal-workspace text-right",
+                )}
+              >
+                <span className={stickyActions ? "px-2" : "sr-only"}>Actions</span>
               </TableHead>
             )}
           </TableRow>
@@ -118,7 +128,10 @@ export function CollectionItemsTable({
                     <span
                       className={cn(
                         "grid size-8 shrink-0 place-items-center rounded-lg border",
-                        "border-charcoal-border text-cream-muted",
+                        "border-charcoal-border",
+                        collectionIconTone(item),
+                        "group-hover/collection-item:border-cream-muted group-focus-within/collection-item:border-cream-muted",
+                        "group-data-[state=open]/collection-item:border-cream-muted group-has-[[data-state=open]]/collection-item:border-cream-muted",
                       )}
                     >
                       {item.icon}
@@ -130,17 +143,25 @@ export function CollectionItemsTable({
                   </Button>
                 </TableCell>
                 {metadataColumns.map((column) => (
-                  <TableCell key={column.key} className="text-cream-muted whitespace-nowrap">
+                  <TableCell
+                    key={column.key}
+                    className="text-[13px] text-cream-muted whitespace-nowrap"
+                  >
                     {column.render(item)}
                   </TableCell>
                 ))}
                 {hasActions && (
                   <TableCell
-                    className="w-12 whitespace-nowrap text-right [&_button:focus-visible]:ring-inset"
+                    className={cn(
+                      "w-12 whitespace-nowrap text-right [&_button:focus-visible]:ring-inset",
+                      stickyActions && "sticky right-0 z-10 bg-charcoal-workspace",
+                    )}
                     data-collection-actions
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div className={cn("flex justify-end", collectionUtilityReveal)}>
+                    <div
+                      className={cn("flex justify-end", !stickyActions && collectionUtilityReveal)}
+                    >
                       {item.actions}
                     </div>
                   </TableCell>

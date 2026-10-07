@@ -1,5 +1,3 @@
-#[cfg(desktop)]
-pub mod agent_device_identity;
 pub mod agent_workspace;
 pub mod agents;
 #[cfg(target_os = "macos")]
@@ -13,6 +11,8 @@ pub mod browser_agent_control;
 #[cfg(desktop)]
 pub mod browser_history;
 #[cfg(desktop)]
+pub mod browser_import;
+#[cfg(desktop)]
 pub mod browser_library;
 #[cfg(desktop)]
 pub(crate) mod browser_macos;
@@ -21,6 +21,7 @@ mod browser_pointer_guard_macos;
 #[cfg(desktop)]
 mod browser_scripts;
 pub mod browser_search_suggest;
+pub mod extensions;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
 mod browser_theme;
@@ -30,6 +31,28 @@ pub mod commands;
 pub mod connected_devices;
 pub mod credential_store;
 pub mod credentials;
+#[cfg(desktop)]
+pub mod device_admission;
+#[cfg(desktop)]
+pub mod device_approval;
+#[cfg(desktop)]
+pub mod device_approval_approver;
+#[cfg(desktop)]
+pub mod device_channel;
+#[cfg(desktop)]
+pub mod device_discovery;
+#[cfg(desktop)]
+pub mod device_http;
+#[cfg(desktop)]
+pub mod device_identity;
+#[cfg(desktop)]
+pub mod device_records;
+#[cfg(all(test, desktop))]
+mod device_records_fixture;
+#[cfg(all(test, desktop))]
+mod device_server_e2e_tests;
+#[cfg(desktop)]
+pub mod device_trust;
 pub mod devices;
 pub mod directory_size;
 mod directory_size_local;
@@ -49,6 +72,8 @@ pub mod operation_queue;
 pub mod paths;
 #[cfg(desktop)]
 pub mod peer_files;
+#[cfg(desktop)]
+pub mod peer_writes;
 #[cfg(desktop)]
 pub mod peer_identity;
 #[cfg(desktop)]
@@ -129,3 +154,6 @@ pub mod cursor_companion;
 pub mod browser_site_permissions;
 
 pub mod settings_profile_store;
+
+#[cfg(unix)]
+pub mod agent_files;

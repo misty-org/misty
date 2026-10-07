@@ -89,6 +89,13 @@ impl MistyRuntime {
         #[cfg(desktop)]
         let media_search = MediaSearchService::new(environment.clone());
         let operation_queue = OperationQueueService::new(explorer.clone(), transfers.clone());
+        #[cfg(desktop)]
+        let operation_queue = {
+            // Paired devices apply incoming changes with the same local file
+            // operations, and the queue reaches theirs through Connected Devices.
+            connected_devices.set_local_explorer(explorer.clone());
+            operation_queue.with_connected_devices(connected_devices.clone())
+        };
         let power_pack = PowerPackService::new(
             environment.clone(),
             explorer.clone(),

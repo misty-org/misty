@@ -62,6 +62,39 @@ describe("useFilesDockWorkspace", () => {
     expect(renderCount).toBe(1);
   });
 
+  it("keeps Transfers route and title in sync and leaves it when opening a folder", async () => {
+    const navigate = vi.fn() as unknown as NavigateFunction;
+    function Harness({ path }: { path: string }) {
+      useFilesDockWorkspace({
+        workspaceId: filesTab.id,
+        activePaneId: "explorer-pane",
+        activePath: path,
+        initialized: true,
+        embedded: true,
+        homePath: "/Users/misty",
+        multiPanelStore,
+        navigate,
+      });
+      return null;
+    }
+    await act(async () => root.render(<Harness path="misty-transfers://history" />));
+    const view = () => {
+      const node = useWorkspaceStore.getState().layout.root;
+      return node.type === "leaf" ? node.views[0] : null;
+    };
+    expect(view()).toMatchObject({
+      title: "Transfers",
+      route: "/files?view=transfers",
+      state: { path: "misty-transfers://history" },
+    });
+    await act(async () => root.render(<Harness path="/Users/misty/Documents" />));
+    expect(view()).toMatchObject({
+      title: "Documents",
+      route: "/files",
+      state: { path: "/Users/misty/Documents" },
+    });
+  });
+
   it("synchronizes the active path back to the workspace tab state when user navigates", async () => {
     const navigate = vi.fn() as unknown as NavigateFunction;
 

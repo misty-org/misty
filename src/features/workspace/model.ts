@@ -14,7 +14,8 @@ export {
   normalizeBrowserHomeUrl,
 } from "./browserHome";
 
-export type WorkspaceSurfaceId = "home" | "space" | "browser" | "files" | "agents" | "scheduled";
+export type WorkspaceSurfaceId =
+  "home" | "space" | "browser" | "files" | "agents" | "scheduled" | "extensions";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 export type WorkspaceInstancePolicy = "multiple" | "single";

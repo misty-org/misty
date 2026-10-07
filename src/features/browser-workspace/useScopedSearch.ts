@@ -19,15 +19,24 @@ import {
 export type { ScopedSearchResult } from "./scopedSearchSources";
 
 const debounceMs = 180;
+const noSpaces: ReturnType<typeof useSpacesStore.getState>["spaces"] = [];
+const noAgents: ReturnType<typeof usePersonalAgentsStore.getState>["agents"] = [];
+const noConversations: ReturnType<typeof useMistyStore.getState>["conversations"] = [];
 
 /** Browser scope never searches while typing. Files show name matches first,
  * then fold in content matches once the slower semantic search settles.
  * Responses for stale queries are dropped. */
-export function useScopedSearch(scope: SearchScope, query: string) {
+export function useScopedSearch(scope: SearchScope, query: string, open = true) {
   const { user } = useAuth();
-  const spaces = useSpacesStore((state) => state.spaces);
-  const agents = usePersonalAgentsStore((state) => state.agents);
-  const conversations = useMistyStore((state) => state.conversations);
+  // The dialog stays mounted while closed. Subscribe only to the open scope's sources, so a
+  // streaming answer (which rewrites conversations per token) does not re-render it.
+  const spaces = useSpacesStore((state) => (open && scope === "spaces" ? state.spaces : noSpaces));
+  const agents = usePersonalAgentsStore((state) =>
+    open && scope === "agents" ? state.agents : noAgents,
+  );
+  const conversations = useMistyStore((state) =>
+    open && scope === "agents" ? state.conversations : noConversations,
+  );
   const [results, setResults] = useState<ScopedSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const trimmed = query.trim();

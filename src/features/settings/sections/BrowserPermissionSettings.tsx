@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DesktopSettingsSection } from "../components/DesktopSettingsUI";
-import { Button } from "@/shared/ui";
+import { Button, SkeletonList } from "@/shared/ui";
 import {
   permissionLabels,
   supportsSitePermissions,
@@ -56,9 +56,14 @@ export function BrowserPermissionSettings() {
       }
     >
       {loading ? (
-        <p role="status" className="p-4 text-sm text-cream-muted">
-          Loading website permissions…
-        </p>
+        <SkeletonList
+          label="Website permissions"
+          rows={3}
+          leading="none"
+          trailing
+          className="gap-0 divide-y divide-charcoal-border"
+          rowClassName="px-5 py-3"
+        />
       ) : !error && entries.length === 0 ? (
         <p className="p-4 text-sm text-cream-muted">
           No saved choices for open browser profiles. Websites use the default Ask setting.

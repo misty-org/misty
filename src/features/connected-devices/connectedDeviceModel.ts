@@ -1,53 +1,91 @@
-import { ManagedAiRequestError } from "@/features/agents";
+import { ManagedAiRequestError } from "@/features/agents/devices";
+import type { ChannelSnapshot, DevicePolicy } from "@/native/devices";
 
-export interface ServerConnectedPeer {
-  pairId: string;
-  deviceId: string;
+/** One of the account's devices, as the server lists it. Addresses are never
+ * listed; presence comes from the device channel (docs/design/devices/BRIEF.md). */
+export interface AccountDevice {
+  id: string;
   name: string;
   platform: string;
-  p2pEndpointId: string;
-  protocolVersions: string[];
-  addressing: unknown;
-  protocolVersion?: string;
-  connectionHint: "unknown" | "direct" | "relay";
-  lastHeartbeatAt?: string | null;
-  clipboardCanSend: boolean;
-  clipboardCanReceive: boolean;
+  publicKey: string;
+  p2pEndpointId?: string;
+  admissionState: "pending" | "admitted" | "revoked" | "legacy";
+  osVersion: string;
+  appVersion: string;
+  approvedByDeviceId?: string;
+  admittedAt?: string;
+  lastSeenAt: string;
+  createdAt: string;
+  policy?: Omit<DevicePolicy, "version"> & { version: number; updatedAt: string };
 }
 
-export interface PairingSession {
-  id: string;
-  creatorDeviceId: string;
-  requesterDeviceId?: string;
-  state: "pending" | "redeemed" | "confirmed" | "expired" | "locked";
-  expiresAt: string;
-  creatorName: string;
-  requesterName?: string;
+export type DeviceStatus = "self" | "same-network" | "other-network" | "offline" | "unreachable";
+
+export interface DevicePeer extends AccountDevice {
+  isSelf: boolean;
+  online: boolean;
+  connected: boolean;
+  status: DeviceStatus;
 }
 
-export interface PairingView {
-  session: PairingSession;
-  manualCode?: string;
-  deepLink?: string;
-  fingerprint?: string;
+export function deviceStatusLabel(status: DeviceStatus): string {
+  switch (status) {
+    case "self":
+      return "This device";
+    case "same-network":
+      return "Same network";
+    case "other-network":
+      return "Other network";
+    case "unreachable":
+      return "Can't reach";
+    default:
+      return "Offline";
+  }
+}
+
+/** The account's added devices with what this device knows of each now. */
+export function devicePeers(
+  devices: AccountDevice[],
+  selfId: string | null,
+  channel: ChannelSnapshot | null,
+  connected: string[],
+  unreachable: ReadonlySet<string>,
+): DevicePeer[] {
+  return devices
+    .filter((device) => device.admissionState === "admitted" || device.id === selfId)
+    .map((device) => {
+      const isSelf = device.id === selfId;
+      const presence = channel?.peers.find((peer) => peer.deviceId === device.id);
+      const online = isSelf || Boolean(presence?.online);
+      const isConnected = connected.includes(device.id);
+      const sameNetwork =
+        Boolean(presence) &&
+        ((Boolean(channel?.networkKey) && presence?.networkKey === channel?.networkKey) ||
+          (Boolean(channel?.overlay) && Boolean(presence?.overlay)));
+      const status: DeviceStatus = isSelf
+        ? "self"
+        : !online
+          ? "offline"
+          : isConnected || sameNetwork
+            ? "same-network"
+            : unreachable.has(device.id)
+              ? "unreachable"
+              : "other-network";
+      return { ...device, isSelf, online, connected: isConnected, status };
+    })
+    .sort((a, b) => Number(b.isSelf) - Number(a.isSelf) || a.name.localeCompare(b.name));
 }
 
 export function connectedDevicesErrorMessage(cause: unknown): string {
   if (cause instanceof ManagedAiRequestError) {
-    if (cause.status === 404) return "Connected Devices isn’t enabled on this Misty server.";
-    if (cause.status === 503) return "Connected Devices is temporarily unavailable.";
+    if (cause.status === 503) return "Your devices are temporarily unavailable.";
     // Cloudflare edge failures (e.g. 1033: tunnel offline) arrive as a bare
     // "error code: NNNN" body. That means the server is unreachable, not broken.
     if (cause.status === 530 || /^error code: \d+$/i.test(cause.message.trim())) {
       return "Can’t reach the Misty server right now. Misty will keep retrying.";
     }
   }
-  return cause instanceof Error ? cause.message : "Connected Devices is unavailable.";
-}
-
-export function peerIsOnline(peer: ServerConnectedPeer): boolean {
-  const heartbeat = peer.lastHeartbeatAt ? Date.parse(peer.lastHeartbeatAt) : 0;
-  return heartbeat > Date.now() - 90_000;
+  return cause instanceof Error ? cause.message : String(cause || "Your devices are unavailable.");
 }
 
 export function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unknown" {
@@ -56,20 +94,4 @@ export function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unkn
   if (value.includes("win")) return "windows";
   if (value.includes("linux")) return "linux";
   return "unknown";
-}
-
-export function parsePairingInput(input: string): {
-  sessionId?: string;
-  secret?: string;
-  code?: string;
-} {
-  const value = input.trim();
-  if (value.startsWith("misty://")) {
-    const url = new URL(value);
-    return {
-      sessionId: url.searchParams.get("session") || undefined,
-      secret: url.searchParams.get("secret") || undefined,
-    };
-  }
-  return { code: value.toUpperCase().replace(/[^A-Z2-7]/g, "") };
 }

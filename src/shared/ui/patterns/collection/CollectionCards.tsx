@@ -3,7 +3,11 @@ import { Button } from "../../controls/Button";
 import { Card } from "../../display/Card";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "../../overlays/ContextMenu";
 import { cn } from "../../utils";
-import { collectionUtilityReveal, type CollectionItem } from "./collectionItemTypes";
+import {
+  collectionIconTone,
+  collectionUtilityReveal,
+  type CollectionItem,
+} from "./collectionItemTypes";
 
 export function CollectionGrid({ children }: { children: ReactNode }) {
   return (
@@ -90,52 +94,105 @@ export function CollectionItemsGrid({
   items,
   hasCreators,
   creatorLabel,
+  layout = "preview",
 }: {
   items: CollectionItem[];
   hasCreators: boolean;
   creatorLabel: string;
+  layout?: "preview" | "compact";
 }) {
   return (
     <CollectionGrid>
       {items.map((item) => (
         <CollectionItemSurface key={item.id} item={item}>
-          <Card className="group/collection-item relative gap-0 p-0">
-            <Button
-              variant="ghost"
-              size="none"
-              aria-label={item.title}
-              className="h-64 w-full flex-col items-stretch gap-0 whitespace-normal p-4 text-left font-normal"
-              onClick={item.onOpen}
-            >
-              <span className={cn("flex h-8 min-w-0 items-center gap-2", item.actions && "pr-8")}>
-                <CollectionCardTitle title={item.title} />
-                {item.marker}
-              </span>
-              <span
-                aria-hidden="true"
+          {layout === "compact" ? (
+            <Card className="group/collection-item min-w-0 gap-0 p-0 hover:bg-charcoal-hover focus-within:bg-charcoal-hover">
+              <Button
+                variant="ghost"
+                size="none"
+                aria-label={item.title}
                 className={cn(
-                  "grid min-h-0 flex-1 place-items-center overflow-hidden rounded-lg text-cream-muted",
-                  "[&>img]:size-full [&>img]:object-cover [&_svg]:!size-10",
+                  "w-full flex-1 flex-col items-stretch justify-start gap-0 whitespace-normal",
+                  "rounded-none p-4 pb-0 text-left font-normal hover:bg-transparent",
+                  "focus-visible:ring-inset",
                 )}
+                onClick={item.onOpen}
               >
-                {item.preview ?? item.icon}
-              </span>
-              <CollectionCardMetadata
-                category={item.category}
-                updated={item.updated}
-                creator={hasCreators ? item.creator || "Unknown" : undefined}
-                creatorDescription={item.creatorDescription}
-                creatorLabel={creatorLabel}
-              />
-            </Button>
-            {item.actions && (
-              <div
-                className={cn("absolute right-3 top-4 flex items-center", collectionUtilityReveal)}
+                <span className="flex min-h-10 min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "grid size-8 shrink-0 place-items-center [&_img]:size-8 [&_img]:object-contain [&_svg]:!size-6",
+                      collectionIconTone(item),
+                    )}
+                  >
+                    {item.icon}
+                  </span>
+                  <span
+                    className="line-clamp-2 min-w-0 flex-1 break-words text-sm font-medium text-cream"
+                    title={item.title}
+                  >
+                    {item.title}
+                  </span>
+                  {item.marker}
+                </span>
+                <CollectionCardMetadata
+                  category={item.category}
+                  updated={item.updated}
+                  creator={hasCreators ? item.creator || "Unknown" : undefined}
+                  creatorDescription={item.creatorDescription}
+                  creatorLabel={creatorLabel}
+                />
+              </Button>
+              {item.actions && (
+                <div className="flex justify-end px-4 pt-3 pb-4">{item.actions}</div>
+              )}
+            </Card>
+          ) : (
+            <Card className="group/collection-item relative gap-0 p-0">
+              <Button
+                variant="ghost"
+                size="none"
+                aria-label={item.title}
+                className="h-64 w-full flex-col items-stretch gap-0 whitespace-normal p-4 text-left font-normal"
+                onClick={item.onOpen}
               >
-                {item.actions}
-              </div>
-            )}
-          </Card>
+                <span className={cn("flex h-8 min-w-0 items-center gap-2", item.actions && "pr-8")}>
+                  <CollectionCardTitle title={item.title} />
+                  {item.marker}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "grid min-h-0 flex-1 place-items-center overflow-hidden rounded-lg",
+                    collectionIconTone(item),
+                    item.preview
+                      ? "[&>img]:size-full [&>img]:object-cover"
+                      : "[&_img]:size-10 [&_img]:object-contain [&_svg]:!size-10",
+                  )}
+                >
+                  {item.preview ?? item.icon}
+                </span>
+                <CollectionCardMetadata
+                  category={item.category}
+                  updated={item.updated}
+                  creator={hasCreators ? item.creator || "Unknown" : undefined}
+                  creatorDescription={item.creatorDescription}
+                  creatorLabel={creatorLabel}
+                />
+              </Button>
+              {item.actions && (
+                <div
+                  className={cn(
+                    "absolute right-3 top-4 flex items-center",
+                    collectionUtilityReveal,
+                  )}
+                >
+                  {item.actions}
+                </div>
+              )}
+            </Card>
+          )}
         </CollectionItemSurface>
       ))}
     </CollectionGrid>

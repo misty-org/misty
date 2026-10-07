@@ -27,10 +27,16 @@ use crate::domain::{
 };
 use crate::error::{ApiError, ApiResult};
 use crate::infra::power_pack::{archive_create_blocking, ArchiveCreateRequest};
+#[cfg(desktop)]
+use crate::infra::{connected_devices::ConnectedDevicesService, peer_files::PeerVirtualPath};
 use crate::infra::{
     explorer::ExplorerService,
     transfers::{TransferQueuePatch, TransferService},
 };
+
+#[cfg(desktop)]
+#[path = "operation_queue_peer.rs"]
+mod peer;
 
 #[derive(Clone)]
 pub struct OperationQueueService {
@@ -42,6 +48,9 @@ pub struct OperationQueueService {
     pause_requests: Arc<Mutex<HashSet<u64>>>,
     redo_stack: Arc<Mutex<Vec<FileTransferRecord>>>,
     pumping: Arc<AtomicBool>,
+    /// Paired devices, for items whose path is on a connected device.
+    #[cfg(desktop)]
+    peers: Option<ConnectedDevicesService>,
 }
 
 #[derive(Clone)]
@@ -71,7 +80,24 @@ impl OperationQueueService {
             pause_requests: Arc::new(Mutex::new(HashSet::new())),
             redo_stack: Arc::new(Mutex::new(Vec::new())),
             pumping: Arc::new(AtomicBool::new(false)),
+            #[cfg(desktop)]
+            peers: None,
         }
+    }
+
+    #[cfg(desktop)]
+    pub fn with_connected_devices(mut self, peers: ConnectedDevicesService) -> Self {
+        self.peers = Some(peers);
+        self
+    }
+
+    /// Like `ExplorerService::item_is_directory`, for local and connected-device paths.
+    async fn is_directory_at(&self, path: &str) -> ApiResult<Option<bool>> {
+        #[cfg(desktop)]
+        if PeerVirtualPath::is_peer_path(path) {
+            return self.peer_is_directory(path).await;
+        }
+        self.explorer.item_is_directory(path).await
     }
 
     pub async fn enqueue_paste_items(
@@ -100,17 +126,8 @@ impl OperationQueueService {
                 .as_deref()
                 .filter(|_| request.sources.len() == 1)
                 .map(str::to_string)
-                .unwrap_or_else(|| {
-                    Path::new(&source.path)
-                        .file_name()
-                        .and_then(|value| value.to_str())
-                        .unwrap_or(&source.path)
-                        .to_string()
-                });
-            let target_path = Path::new(&request.destination_directory)
-                .join(&file_name)
-                .to_string_lossy()
-                .to_string();
+                .unwrap_or_else(|| leaf_name(&source.path).unwrap_or_else(|| source.path.clone()));
+            let target_path = child_path(&request.destination_directory, &file_name);
             let source_endpoint = self.endpoint_for_path(source.path.clone());
             let target_endpoint = self.endpoint_for_path(target_path);
             let operation_kind =
@@ -148,10 +165,7 @@ impl OperationQueueService {
         &self,
         request: CreateItemRequest,
     ) -> ApiResult<OperationQueueSnapshot> {
-        let target_path = Path::new(&request.directory)
-            .join(&request.name)
-            .to_string_lossy()
-            .to_string();
+        let target_path = child_path(&request.directory, &request.name);
         let item_label = match request.kind {
             CreateItemKind::File => "file",
             CreateItemKind::Folder => "folder",
@@ -183,12 +197,7 @@ impl OperationQueueService {
         &self,
         request: RenameItemRequest,
     ) -> ApiResult<OperationQueueSnapshot> {
-        let target_path = Path::new(&request.path)
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .join(&request.new_name)
-            .to_string_lossy()
-            .to_string();
+        let target_path = child_path(&parent_path(&request.path), &request.new_name);
         self.enqueue_operations(
             "Rename item",
             false,
@@ -216,12 +225,7 @@ impl OperationQueueService {
         let mut descriptors = Vec::with_capacity(request.items.len());
         let mut payloads = Vec::with_capacity(request.items.len());
         for item in request.items {
-            let target_path = Path::new(&item.path)
-                .parent()
-                .unwrap_or_else(|| Path::new(""))
-                .join(&item.new_name)
-                .to_string_lossy()
-                .to_string();
+            let target_path = child_path(&parent_path(&item.path), &item.new_name);
             descriptors.push(OperationDescriptor {
                 kind: OperationKind::Rename,
                 source: self.endpoint_for_path(item.path.clone()),
@@ -261,11 +265,7 @@ impl OperationQueueService {
                 .await?;
                 continue;
             }
-            let name = Path::new(&path)
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or(&path)
-                .to_string();
+            let name = leaf_name(&path).unwrap_or_else(|| path.clone());
             descriptors.push(OperationDescriptor {
                 kind: OperationKind::Delete,
                 source: self.endpoint_for_path(path.clone()),
@@ -300,6 +300,11 @@ impl OperationQueueService {
     }
 
     async fn should_fan_out_delete_path(&self, path: &str) -> ApiResult<bool> {
+        // A connected device removes a whole tree in one request.
+        #[cfg(desktop)]
+        if PeerVirtualPath::is_peer_path(path) {
+            return Ok(false);
+        }
         Ok(self.explorer.item_is_directory(path).await? == Some(true))
     }
 
@@ -372,11 +377,7 @@ impl OperationQueueService {
         root_transfer_id: u64,
         tree_depth: u32,
     ) -> OperationDescriptor {
-        let name = Path::new(path)
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or(path)
-            .to_string();
+        let name = leaf_name(path).unwrap_or_else(|| path.to_string());
         OperationDescriptor {
             parent_transfer_id,
             root_transfer_id,
@@ -838,8 +839,7 @@ impl OperationQueueService {
         }
         let original_name = file_name_for_path(&row.local_source_path)?;
         let source_is_directory = self
-            .explorer
-            .item_is_directory(&row.local_dest_path)
+            .is_directory_at(&row.local_dest_path)
             .await?
             .unwrap_or(false);
         self.enqueue_rename_item_inner(RenameItemRequest {
@@ -866,14 +866,9 @@ impl OperationQueueService {
             ));
         }
         let original_name = file_name_for_path(&row.local_source_path)?;
-        let original_parent = Path::new(&row.local_source_path)
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .to_string_lossy()
-            .to_string();
+        let original_parent = parent_path(&row.local_source_path);
         let is_directory = self
-            .explorer
-            .item_is_directory(&row.local_dest_path)
+            .is_directory_at(&row.local_dest_path)
             .await?
             .unwrap_or(false);
         self.enqueue_paste_items_inner(PasteItemsRequest {
@@ -943,11 +938,7 @@ impl OperationQueueService {
         };
         let (destination_directory, target_name) = if !row.local_dest_path.is_empty() {
             (
-                Path::new(&row.local_dest_path)
-                    .parent()
-                    .unwrap_or_else(|| Path::new(""))
-                    .to_string_lossy()
-                    .to_string(),
+                parent_path(&row.local_dest_path),
                 file_name_for_path(&row.local_dest_path)?,
             )
         } else {
@@ -955,11 +946,7 @@ impl OperationQueueService {
                 "Transfer retry is missing destination metadata.".to_string(),
             ));
         };
-        let is_directory = self
-            .explorer
-            .item_is_directory(&source_path)
-            .await?
-            .unwrap_or(false);
+        let is_directory = self.is_directory_at(&source_path).await?.unwrap_or(false);
         self.enqueue_paste_items_inner(PasteItemsRequest {
             sources: vec![PasteItem {
                 path: source_path,
@@ -985,11 +972,7 @@ impl OperationQueueService {
                 "Create retry is missing destination metadata.".to_string(),
             ));
         };
-        let directory = Path::new(&target_path)
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .to_string_lossy()
-            .to_string();
+        let directory = parent_path(&target_path);
         self.enqueue_create_item(CreateItemRequest {
             directory,
             name: file_name_for_path(&target_path)?,
@@ -1017,11 +1000,7 @@ impl OperationQueueService {
                 file_name_for_path(&row.local_dest_path)?,
             )
         };
-        let source_is_directory = self
-            .explorer
-            .item_is_directory(&source_path)
-            .await?
-            .unwrap_or(false);
+        let source_is_directory = self.is_directory_at(&source_path).await?.unwrap_or(false);
         self.enqueue_rename_item_inner(RenameItemRequest {
             path: source_path,
             new_name: target_name,
@@ -1065,8 +1044,7 @@ impl OperationQueueService {
         }
         let redone_name = file_name_for_path(&row.local_dest_path)?;
         let source_is_directory = self
-            .explorer
-            .item_is_directory(&row.local_source_path)
+            .is_directory_at(&row.local_source_path)
             .await?
             .unwrap_or(false);
         self.enqueue_rename_item_inner(RenameItemRequest {
@@ -1093,14 +1071,9 @@ impl OperationQueueService {
             ));
         }
         let redone_name = file_name_for_path(&row.local_dest_path)?;
-        let redone_parent = Path::new(&row.local_dest_path)
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .to_string_lossy()
-            .to_string();
+        let redone_parent = parent_path(&row.local_dest_path);
         let is_directory = self
-            .explorer
-            .item_is_directory(&row.local_source_path)
+            .is_directory_at(&row.local_source_path)
             .await?
             .unwrap_or(false);
         self.enqueue_paste_items_inner(PasteItemsRequest {
@@ -1297,6 +1270,13 @@ impl OperationQueueService {
         ensure_not_canceled(&cancellation)?;
         if operation.transfer_id > 0 {
             let _ = self.transfers.mark_started(operation.transfer_id).await;
+        }
+        #[cfg(desktop)]
+        if let Some(outcome) = self
+            .execute_peer(&operation, &payload, cancellation.clone())
+            .await?
+        {
+            return Ok(outcome);
         }
         match payload {
             QueuedExplorerOperation::Create(request) => {
@@ -1504,12 +1484,7 @@ impl OperationQueueService {
     ) -> ApiResult<Option<ExecutionOutcome>> {
         ensure_not_canceled(&cancellation)?;
         let destination_path = destination.to_string_lossy().to_string();
-        if self
-            .explorer
-            .item_is_directory(&destination_path)
-            .await?
-            .is_none()
-        {
+        if self.is_directory_at(&destination_path).await?.is_none() {
             return Ok(None);
         }
 
@@ -1548,8 +1523,7 @@ impl OperationQueueService {
     ) -> ApiResult<PathBuf> {
         ensure_not_canceled_if(cancellation)?;
         if self
-            .explorer
-            .item_is_directory(&path.to_string_lossy())
+            .is_directory_at(&path.to_string_lossy())
             .await?
             .is_none()
         {
@@ -1837,11 +1811,49 @@ fn operation_action_label(kind: OperationKind) -> &'static str {
 }
 
 fn file_name_for_path(path: &str) -> ApiResult<String> {
+    leaf_name(path)
+        .ok_or_else(|| ApiError::Message(format!("Could not determine file name for {path}.")))
+}
+
+// Connected-device paths percent-encode each name and always use "/", so they
+// are split and joined through `PeerVirtualPath` rather than `Path`.
+
+fn leaf_name(path: &str) -> Option<String> {
+    #[cfg(desktop)]
+    if PeerVirtualPath::is_peer_path(path) {
+        return PeerVirtualPath::parse(path).ok()?.name();
+    }
     Path::new(path)
         .file_name()
         .and_then(|value| value.to_str())
         .map(str::to_string)
-        .ok_or_else(|| ApiError::Message(format!("Could not determine file name for {path}.")))
+}
+
+fn child_path(directory: &str, name: &str) -> String {
+    #[cfg(desktop)]
+    if PeerVirtualPath::is_peer_path(directory) {
+        if let Ok(child) = PeerVirtualPath::parse(directory).and_then(|parent| parent.child(name)) {
+            return child;
+        }
+    }
+    Path::new(directory)
+        .join(name)
+        .to_string_lossy()
+        .to_string()
+}
+
+fn parent_path(path: &str) -> String {
+    #[cfg(desktop)]
+    if PeerVirtualPath::is_peer_path(path) {
+        if let Ok(Some(parent)) = PeerVirtualPath::parse(path).and_then(|item| item.parent()) {
+            return parent;
+        }
+    }
+    Path::new(path)
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_string_lossy()
+        .to_string()
 }
 
 fn remote_parent_for_path(path: &str) -> ApiResult<String> {

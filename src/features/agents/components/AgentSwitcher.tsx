@@ -1,5 +1,5 @@
 import { useState, type Ref } from "react";
-import { Check, LayoutGrid, MessageSquare, Plus } from "lucide-react";
+import { Check, MessageSquare, Plus, SlidersHorizontal } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
@@ -24,9 +24,10 @@ export function AgentSwitcher({
   disabled,
   restoreTriggerFocus,
   triggerRef,
+  className = "agent-heading-identity",
   onSelect,
   onCreate,
-  onBrowse,
+  onSettings,
 }: {
   agents: AgentProfile[];
   conversations: GlobalAiConversation[];
@@ -35,9 +36,11 @@ export function AgentSwitcher({
   disabled: boolean;
   restoreTriggerFocus: boolean;
   triggerRef?: Ref<HTMLButtonElement>;
+  className?: string;
   onSelect(agentId: string, startNew?: boolean, conversationId?: string): void;
   onCreate(): void;
-  onBrowse(): void;
+  /** Opens the selected agent's settings. */
+  onSettings(): void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -64,7 +67,7 @@ export function AgentSwitcher({
       <MenuTrigger
         ref={triggerRef}
         kind="popover"
-        className="agent-heading-identity"
+        className={className}
         label={`Switch agent: ${selectedAgent?.name || "Agents"}`}
         value={selectedAgent?.name || "Agents"}
         icon={<AgentAvatar agent={selectedAgent} />}
@@ -111,41 +114,48 @@ export function AgentSwitcher({
                 </CommandItem>
               ))}
             </CommandGroup>
-            <CommandGroup heading={query.trim() ? "Conversations" : "Recent conversations"}>
-              {(query.trim() ? chats : chats.slice(0, 8)).map(({ chat, agent }) => (
-                <CommandItem
-                  key={chat.id}
-                  value={`conversation:${chat.id}`}
-                  keywords={[chat.title || "Untitled conversation", agent.name]}
-                  disabled={disabled}
-                  onSelect={() =>
-                    choose(() => {
-                      if (chat.id !== conversationId || agent.id !== selectedAgent?.id)
-                        onSelect(agent.id, false, chat.id);
-                    })
-                  }
-                >
-                  <MessageSquare />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{chat.title || "Untitled conversation"}</span>
-                    <span className="block truncate text-xs text-cream-muted">{agent.name}</span>
-                  </span>
-                  {chat.id === conversationId && agent.id === selectedAgent?.id && (
-                    <Check aria-label="Current conversation" />
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {/* Conversations join the list only while searching; the sidebar lists recents. */}
+            {query.trim() && (
+              <CommandGroup heading="Conversations">
+                {chats.map(({ chat, agent }) => (
+                  <CommandItem
+                    key={chat.id}
+                    value={`conversation:${chat.id}`}
+                    keywords={[chat.title || "Untitled conversation", agent.name]}
+                    disabled={disabled}
+                    onSelect={() =>
+                      choose(() => {
+                        if (chat.id !== conversationId || agent.id !== selectedAgent?.id)
+                          onSelect(agent.id, false, chat.id);
+                      })
+                    }
+                  >
+                    <MessageSquare />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">
+                        {chat.title || "Untitled conversation"}
+                      </span>
+                      <span className="block truncate text-xs text-cream-muted">{agent.name}</span>
+                    </span>
+                    {chat.id === conversationId && agent.id === selectedAgent?.id && (
+                      <Check aria-label="Current conversation" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
             <CommandSeparator />
             <CommandGroup>
               <CommandItem disabled={disabled} onSelect={() => choose(onCreate)}>
                 <Plus />
                 New agent
               </CommandItem>
-              <CommandItem disabled={disabled} onSelect={() => choose(onBrowse)}>
-                <LayoutGrid />
-                Browse all agents
-              </CommandItem>
+              {selectedAgent && (
+                <CommandItem disabled={disabled} onSelect={() => choose(onSettings)}>
+                  <SlidersHorizontal />
+                  {selectedAgent.name} settings
+                </CommandItem>
+              )}
             </CommandGroup>
           </CommandList>
         </Command>

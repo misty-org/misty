@@ -1,4 +1,3 @@
-export { ConnectedDevicePairingDialog } from "./connected-devices/ConnectedDevicePairingDialog";
 export { default as FilesPage } from "./explorer";
 export type * from "./explorer/model/stores/media/interfaces/useSmartLibraryServerStore";
 export {

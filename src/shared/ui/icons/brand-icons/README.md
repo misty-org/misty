@@ -1,6 +1,6 @@
 # Integration brand artwork
 
-`../brandIcons.ts` is the single asset registry for app packages and the host. `../BrandIcon.tsx` renders these SVG files with their original fills and gradients. X uses the same SVG as a silhouette painted black or white according to its surrounding color scheme. ProviderBrandIcon, WebsiteBrandIcon, navigation, workspace tabs, Discover, storage connections, automation integrations, and model pickers reuse it.
+`../brandIcons.ts` is the single asset registry for app packages and the host. `../BrandIcon.tsx` renders these SVG files with their original fills and gradients. Single-color marks such as X, Linear, GitHub and Composio render as silhouettes painted black or white according to their surrounding color scheme; an `<img>` would follow the OS appearance instead of the app surface. ProviderBrandIcon, WebsiteBrandIcon, navigation, workspace tabs, Discover, storage connections, automation integrations, and model pickers reuse it.
 
 Assets are bundled locally with `?inline`, so downloaded app packages and offline views need no third-party logo requests. These are vector paths, not PNG files inside SVG wrappers. `sources.json` records each asset source and any adaptation. Google and Microsoft product artwork comes from their product asset CDNs; remaining artwork comes from the listed brand SVG collections. Trademarks remain the property of their respective owners.
 

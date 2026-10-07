@@ -9,7 +9,11 @@ export const MistyBrowserUrlSchema = z
     if (value === "about:blank") return true;
     try {
       const url = new URL(value);
-      return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password;
+      return (
+        ["https:", "http:", "webkit-extension:"].includes(url.protocol) &&
+        !url.username &&
+        !url.password
+      );
     } catch {
       return false;
     }

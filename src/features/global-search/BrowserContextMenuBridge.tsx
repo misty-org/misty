@@ -15,6 +15,7 @@ import {
   Image,
   Link,
   MessageCircle,
+  Puzzle,
   QrCode,
   RotateCw,
   Scissors,
@@ -61,6 +62,7 @@ const entries = {
   "copy-page-link": { label: "Copy Page Link", icon: Link },
   "qr-code": { label: "QR Code for Page…", icon: QrCode },
   annotate: { label: "Annotate Page", icon: Highlighter },
+  extensions: { label: "Extensions", icon: Puzzle },
   inspect: { label: "Inspect Page", icon: Code },
 };
 const suspensionReason = "browser-context-menu";

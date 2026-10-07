@@ -1,38 +1,90 @@
 import type { ComponentProps, Ref } from "react";
-import { ArrowLeft, PanelRight, Plus, X } from "lucide-react";
-import { IconButton, Input } from "@/shared/ui";
+import { PanelRight, Plus, X } from "lucide-react";
+import { Button, IconButton, Input, Spinner } from "@/shared/ui";
+import { AgentConversationActions } from "../components/AgentConversationActions";
 import { AgentSwitcher } from "../components/AgentSwitcher";
 
 type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
 
-/** The conversation title bar: back, the agent switcher, and the panel controls. */
+/** The Details panel's controls in the title bar. */
+export type AgentDetailsToggle = {
+  open: boolean;
+  working: boolean;
+  onToggle(): void;
+  /** Opens Details on the Task section. */
+  onTask(): void;
+};
+
+/**
+ * The conversation title bar. Inside the agent workspace the sidebar owns identity and
+ * New task, so the bar carries the conversation's title, a quiet Working status while a
+ * task runs, and the Details toggle; rename and delete live on its Recents row. Outside
+ * it (loading, or picking a recipient) the bar keeps the switcher and the conversation's
+ * actions.
+ */
 export function AgentConversationHeading({
+  workspace = false,
   newChat,
+  conversation,
   recipientSearch,
   recipientInputRef,
   switcher,
   disabled,
-  panelDisabled,
-  panelVisible,
-  onBack,
   onRecipientSearch,
   onCloseNewChat,
   onNewChat,
-  onTogglePanel,
+  details,
 }: {
+  workspace?: boolean;
   newChat: boolean;
+  conversation?: { id: string; title?: string };
   recipientSearch: string;
   recipientInputRef: Ref<HTMLInputElement>;
   switcher: SwitcherProps;
   disabled: boolean;
-  panelDisabled: boolean;
-  panelVisible: boolean;
-  onBack(): void;
   onRecipientSearch(value: string): void;
   onCloseNewChat(): void;
   onNewChat(): void;
-  onTogglePanel(): void;
+  details?: AgentDetailsToggle;
 }) {
+  if (workspace && !newChat)
+    return (
+      <header
+        className="agent-conversation-heading"
+        data-workspace
+        data-window-toolbar
+        data-tauri-drag-region
+        data-misty-window-titlebar-region="true"
+      >
+        <h1 className="agent-heading-title" title={conversation?.title}>
+          {conversation ? conversation.title || "Untitled conversation" : ""}
+        </h1>
+        {details && (
+          <div className="agent-heading-details">
+            {details.working && (
+              <Button
+                variant="chip"
+                size="chip"
+                className="font-normal"
+                title="Show task details"
+                onClick={details.onTask}
+              >
+                <Spinner size="sm" label={false} />
+                Working
+              </Button>
+            )}
+            <IconButton
+              data-agent-details-toggle
+              label={details.open ? "Hide details" : "Show details"}
+              aria-pressed={details.open}
+              onClick={details.onToggle}
+            >
+              <PanelRight size={16} />
+            </IconButton>
+          </div>
+        )}
+      </header>
+    );
   return (
     <header
       className="agent-conversation-heading"
@@ -40,11 +92,6 @@ export function AgentConversationHeading({
       data-tauri-drag-region
       data-misty-window-titlebar-region="true"
     >
-      <div className="agent-heading-start">
-        <IconButton label="Back to agents" onClick={onBack}>
-          <ArrowLeft size={16} />
-        </IconButton>
-      </div>
       {newChat ? (
         <>
           <label className="agent-recipient-input">
@@ -67,6 +114,9 @@ export function AgentConversationHeading({
         <>
           <AgentSwitcher {...switcher} />
           <div className="agent-heading-end">
+            {conversation && (
+              <AgentConversationActions conversation={conversation} disabled={disabled} />
+            )}
             <IconButton
               label="New chat"
               data-agent-navigation-control
@@ -74,15 +124,6 @@ export function AgentConversationHeading({
               onClick={onNewChat}
             >
               <Plus />
-            </IconButton>
-            <IconButton
-              label="Show agent panel"
-              disabled={panelDisabled}
-              data-agent-navigation-control
-              aria-pressed={panelVisible}
-              onClick={onTogglePanel}
-            >
-              <PanelRight size={16} />
             </IconButton>
           </div>
         </>

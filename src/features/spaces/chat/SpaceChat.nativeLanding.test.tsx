@@ -82,21 +82,13 @@ it("shows existing Everyone messages when opening Misty without a conversation s
     useSpacesStore: spaces,
     useAuth: () => ({ user: { id: "viewer" } }),
     useNativeSessionStore: create(() => ({ status: null })),
-    useConnectionsStore: create(() => ({
-      connections: [],
-      loading: false,
-      setAccount: noop,
-      load: noop,
-      beginAuthorization: noop,
-      clearError: noop,
-    })),
     useAiSurfaceAdapter: noop,
     useWorkspaceViewTitle: noop,
     useSpaceChatDraft,
   } as unknown as SocialRuntime);
   const ui = render(
     <MemoryRouter initialEntries={["/apps/social?provider=misty"]}>
-      <SpaceSocial spaceId="space-a" spaceName="Our Space" provider="misty" />
+      <SpaceSocial spaceId="space-a" spaceName="Our Space" />
     </MemoryRouter>,
   );
   expect(ui.getByRole("heading", { name: "Everyone" })).toBeTruthy();
@@ -107,7 +99,7 @@ it("shows existing Everyone messages when opening Misty without a conversation s
   expect(ui.getByRole("alertdialog")).toBeTruthy();
   ui.rerender(
     <MemoryRouter initialEntries={["/apps/social?provider=misty"]}>
-      <SpaceSocial spaceId="space-b" spaceName="Other Space" provider="misty" />
+      <SpaceSocial spaceId="space-b" spaceName="Other Space" />
     </MemoryRouter>,
   );
   expect(ui.queryByRole("alertdialog")).toBeNull();

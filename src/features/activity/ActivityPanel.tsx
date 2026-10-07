@@ -2,22 +2,25 @@ import { ActivityPanelToolbar } from "./ActivityPanelToolbar";
 import { ActivityPanelFooter } from "./ActivityPanelFooter";
 import { defaultActivityView, selectActivityView } from "./activityView";
 import { useActivityStore } from "./useActivityStore";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { cn, Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
-import { CapabilityApprovalDetail } from "@/features/capability-approvals/CapabilityApprovals";
 import { AgentInterventions } from "@/features/agent-interventions/AgentInterventions";
+import { AgentMemberRequests } from "@/features/agent-member-requests/AgentMemberRequests";
 import { ActivityFeed } from "./ActivityFeed";
 import { closeActivityPanel, openActivityPanel, useActivityPanel } from "./activityPanelState";
+
+const noItems: ReturnType<typeof useActivityStore.getState>["allItems"] = [];
 
 export function ActivityPanel() {
   const { user } = useAuth();
   const account = useRef(user?.id);
   const panel = useActivityPanel();
   const [view, setView] = useState(defaultActivityView);
-  const items = useActivityStore((state) => state.allItems);
-  const results = selectActivityView(items, view);
+  // The panel stays mounted while closed; only follow activity while it is open.
+  const items = useActivityStore((state) => (panel.open ? state.allItems : noItems));
+  const results = useMemo(() => selectActivityView(items, view), [items, view]);
   useEffect(() => {
     if (!panel.open) setView(defaultActivityView);
   }, [panel.open]);
@@ -58,10 +61,10 @@ export function ActivityPanel() {
             Activity
           </DialogTitle>
         </header>
-        {!panel.approvalId && !panel.interventionId && (
+        {!panel.interventionId && !panel.agentRequestId && (
           <ActivityPanelToolbar view={view} counts={results.counts} onChange={setView} />
         )}
-        {panel.approvalId || panel.interventionId ? (
+        {panel.interventionId || panel.agentRequestId ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
             <Button
               variant="ghost"
@@ -71,19 +74,19 @@ export function ActivityPanel() {
             >
               Back to Activity
             </Button>
-            {user?.id && panel.approvalId ? (
-              <CapabilityApprovalDetail
-                key={`${user.id}:${panel.approvalId}`}
-                id={panel.approvalId}
-                onClose={() => openActivityPanel()}
-              />
-            ) : null}
             {user?.id && panel.interventionId ? (
               <AgentInterventions
                 key={`${user.id}:${panel.interventionId}`}
                 accountId={user.id}
                 selectedId={panel.interventionId}
                 onCount={() => undefined}
+              />
+            ) : null}
+            {user?.id && panel.agentRequestId ? (
+              <AgentMemberRequests
+                key={`${user.id}:${panel.agentRequestId}`}
+                accountId={user.id}
+                selectedId={panel.agentRequestId}
               />
             ) : null}
           </div>

@@ -142,6 +142,16 @@ export function BrowserSection(
             />
           </SettingsRow>
           <SettingsRow
+            label="Show bookmarks bar"
+            description="Keep the Bookmarks bar folder under the tab strip."
+          >
+            <SwitchControl
+              checked={booleanSetting(props.document, "general", "browser_bookmarks_bar", true)}
+              disabled={props.working}
+              onChange={(value) => props.onSettingChange("general", "browser_bookmarks_bar", value)}
+            />
+          </SettingsRow>
+          <SettingsRow
             label="Link and loading status"
             description="Show where a link goes, and when a page is loading, in the corner of the page."
           >

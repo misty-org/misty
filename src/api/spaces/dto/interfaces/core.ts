@@ -1,5 +1,3 @@
-import type { WorkflowVersion } from "./agentArchitectureTypes";
-
 import type { MessageSpan, SpaceRole, SpaceTaskPriority, SpaceTaskStatus } from "../types/types";
 import type { SpaceTaskSourceRef } from "./agentTaskTypes";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
@@ -38,7 +36,7 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-export type SpaceIntegrationProvider = "github";
+export type SpaceIntegrationProvider = "google";
 
 export interface SpaceTemplateSeedSummary {
   task_count: number;
@@ -197,11 +195,6 @@ export interface SpaceMessage {
     author_avatar_url?: string;
     [key: string]: unknown;
   };
-  social_provider?: "misty" | "instagram" | "discord" | "messenger" | "x";
-  social_external_id?: string;
-  social_direction?: "inbound" | "outbound";
-  social_delivery_state?:
-    "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "cancelled";
   created_at: string;
 }
 export interface SpaceMessageReaction {
@@ -233,31 +226,6 @@ export interface SpaceEvent {
   entity_id?: string;
   payload: Record<string, unknown>;
   created_at: string;
-}
-
-export interface SpaceStudioResource {
-  id: string;
-  space_id: string;
-  creator_user_id: string;
-  kind: "agent" | "workflow";
-  name: string;
-  description?: string;
-  icon?: string;
-  model_mode?: "automatic" | "pinned";
-  model_id?: string;
-  instructions?: string;
-  definition?: Record<string, unknown>;
-  enabled: boolean;
-  status?: "available" | "disabled" | string;
-  runtime_kind?: "cloud" | "device" | string;
-  version: number;
-  schedules_enabled: boolean;
-  stable_identifier?: string;
-  active_workflow_version_id?: string;
-  active_workflow?: WorkflowVersion;
-  access_policy?: { mode: "space" | "selected"; allowedUserIds: string[] };
-  created_at: string;
-  updated_at: string;
 }
 
 export interface SpacesSnapshot {

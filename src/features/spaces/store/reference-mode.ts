@@ -45,7 +45,6 @@ export async function referenceSpaceSnapshotState(
     membersBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},
-    workflowsBySpace: {},
     snapshotReady: false,
     referenceOnly: true,
     lastSyncedAt: null,

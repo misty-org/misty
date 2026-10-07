@@ -6,7 +6,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{SecondsFormat, Utc};
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use hmac::{Hmac, Mac};
 use rand::{rngs::OsRng, RngCore};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -409,6 +409,16 @@ fn license_allows_local_use(license: &CurrentLicense) -> bool {
         && license.allows_use
 }
 
+/// A standard HS256 JWT: base64url(header).base64url(claims).base64url(HMAC-SHA256).
+fn sign_hs256(claims: &impl Serialize, secret: &[u8]) -> Result<String, String> {
+    let encode = |bytes: &[u8]| general_purpose::URL_SAFE_NO_PAD.encode(bytes);
+    let payload = serde_json::to_vec(claims).map_err(|error| error.to_string())?;
+    let signing_input = format!("{}.{}", encode(br#"{"typ":"JWT","alg":"HS256"}"#), encode(&payload));
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(secret).map_err(|error| error.to_string())?;
+    mac.update(signing_input.as_bytes());
+    Ok(format!("{signing_input}.{}", encode(&mac.finalize().into_bytes())))
+}
+
 fn issue_local_access_token(conn: &Connection, user: &CurrentUser) -> Result<(), String> {
     let secret = read_or_create_jwt_secret()?;
     let issued_at = Utc::now();
@@ -421,12 +431,8 @@ fn issue_local_access_token(conn: &Connection, user: &CurrentUser) -> Result<(),
         iat: issued_at.timestamp(),
         exp: expires_at.timestamp(),
     };
-    let token = encode(
-        &Header::new(Algorithm::HS256),
-        &claims,
-        &EncodingKey::from_secret(&secret),
-    )
-    .map_err(|error| format!("Could not sign local Misty access token: {error}"))?;
+    let token = sign_hs256(&claims, &secret)
+        .map_err(|error| format!("Could not sign local Misty access token: {error}"))?;
 
     conn.execute(
         "UPDATE access_tokens SET revoked = 1 WHERE user_id = ?1 AND revoked = 0",

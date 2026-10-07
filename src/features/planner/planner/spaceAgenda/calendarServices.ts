@@ -4,7 +4,6 @@ import type { connectionsApi } from "@/api/connections/api";
 export type PlannerCalendarServices = Pick<
   typeof spacesApi,
   | "agenda"
-  | "calendarEvents"
   | "createCalendarEvent"
   | "updateCalendarEvent"
   | "deleteCalendarEvent"

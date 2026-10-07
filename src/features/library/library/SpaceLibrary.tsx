@@ -121,20 +121,25 @@ export function SpaceLibrary({
     >
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
         <CollectionPage>
-          <LibraryEntryHeader />
-          <SpaceLibraryInlineStatus />
-          <div className="min-h-0">
-            <DateGroupIndex />
-            {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
-            <AlbumsIndex />
-            <ImportHistoryIndex />
-            <SharedReferencesIndex />
-            <DuplicatesIndex />
+          {data.collection === "smart" ? (
             <SmartLibrarySection />
-            <LibraryCollectionHeader />
-            <MemoryControls />
-            <LibraryItemsRegion />
-          </div>
+          ) : (
+            <>
+              <LibraryEntryHeader />
+              <SpaceLibraryInlineStatus />
+              <div className="min-h-0">
+                <DateGroupIndex />
+                {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
+                <AlbumsIndex />
+                <ImportHistoryIndex />
+                <SharedReferencesIndex />
+                <DuplicatesIndex />
+                <LibraryCollectionHeader />
+                <MemoryControls />
+                <LibraryItemsRegion />
+              </div>
+            </>
+          )}
           <SpaceLibraryOverlays />
         </CollectionPage>
       </LibraryCanEditContext.Provider>

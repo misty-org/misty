@@ -1,5 +1,4 @@
 export type {
-  ContextMenuBranchItem,
   ContextMenuEntry,
   ContextMenuLeafItem,
 } from "../model/types/workspace/ExplorerContextMenu";

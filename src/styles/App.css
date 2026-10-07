@@ -86,7 +86,7 @@
    horizontal inset, so fills line up down the whole rail. */
 .misty-global-navigator :is(.misty-navigator-row-target, .misty-navigator-icon-target),
 .misty-global-navigator [data-tree-row-surface],
-.misty-space-rail-control {
+:is(.misty-space-rail-control, .misty-navigator-tray-item) {
   border-radius: 8px;
 }
 
@@ -94,17 +94,23 @@
   padding-inline: 10px;
 }
 
-/* Hover is paint-only: no fades and no promoted icon layers. Fading a fill
-   under a composited glyph makes WebKit re-rasterize it every frame, which
-   reads as the icon wiggling. */
+/* Navigation highlights respond immediately to hover and focus. */
 .misty-global-navigator :is(a, button, [data-tree-row-surface]),
-.misty-space-rail-control {
+:is(.misty-space-rail-control, .misty-navigator-tray-item) {
   transition: none !important;
 }
 
-.misty-global-navigator :is(svg, img, [data-app-icon]) {
-  transform: none;
-  backface-visibility: visible;
+/* Keep UI glyphs on a stable compositing layer in WebKit. At fractional page
+   zoom, repainting a shared layer for an unrelated hover or popup can snap SVG
+   strokes differently even though their layout rectangles have not moved.
+   Use the individual translate property so chevron rotations and loading
+   animations can continue to own transform. Do not promote drawings/charts. */
+@supports (-webkit-backdrop-filter: blur(0)) {
+  svg.lucide,
+  [data-app-icon] {
+    translate: 0 0 0;
+    backface-visibility: hidden;
+  }
 }
 
 /* Row icon slots match the glyph exactly so every row icon, the Misty logo
@@ -122,13 +128,14 @@
   height: var(--misty-navigation-identity-size, 28px) !important;
 }
 
-.misty-space-rail-control {
+:is(.misty-space-rail-control, .misty-navigator-tray-item) {
   width: 32px !important;
   height: 32px !important;
   min-width: 32px;
 }
 
-.misty-global-navigator :is(.misty-navigator-icon-target, .misty-space-rail-control) {
+.misty-global-navigator
+  :is(.misty-navigator-icon-target, :is(.misty-space-rail-control, .misty-navigator-tray-item)) {
   width: var(--misty-navigation-tile-size) !important;
   height: var(--misty-navigation-tile-size) !important;
   min-width: var(--misty-navigation-tile-size);
@@ -154,7 +161,7 @@
   color: var(--misty-theme-text-bright);
 }
 
-.misty-space-rail-control:is(
+:is(.misty-space-rail-control, .misty-navigator-tray-item):is(
   :hover,
   :focus-visible,
   [aria-current="page"],

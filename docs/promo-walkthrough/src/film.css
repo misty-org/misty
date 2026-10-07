@@ -1,0 +1,19 @@
+/* Frames are captured instantly after each commit, so nothing may animate on
+   its own clock. Motion comes only from the film timeline. */
+.film-frame *,
+.film-frame *::before,
+.film-frame *::after {
+  transition: none !important;
+  animation: none !important;
+  caret-color: transparent;
+}
+
+html,
+body {
+  background: #050505;
+}
+
+.film-frame {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

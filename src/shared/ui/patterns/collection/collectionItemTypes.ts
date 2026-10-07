@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
+import { itemToneClass, type ItemTone } from "../../icons/itemTones";
 
 export type CollectionItem = {
   id: string;
   title: string;
   icon: ReactNode;
+  /** Glyph color for the item type; omit for artwork that brings its own colors. */
+  tone?: ItemTone;
   preview?: ReactNode;
   category: string;
   updated: string;
@@ -17,6 +20,11 @@ export type CollectionItem = {
   marker?: ReactNode;
   contextMenu?: ReactNode;
 };
+
+/** The icon slot's glyph color: the item's tone, or the muted default. */
+export function collectionIconTone(item: Pick<CollectionItem, "tone">) {
+  return item.tone ? itemToneClass(item.tone) : "text-cream-muted";
+}
 
 /** Reveals row and card utilities on hover, focus, or while one of their menus is open. */
 export const collectionUtilityReveal = [

@@ -31,14 +31,6 @@ export function readExpandedGoals(storage: PlannerPreferenceStorage, key: string
   }
 }
 
-export function readBoolean(storage: PlannerPreferenceStorage, key: string) {
-  try {
-    return JSON.parse(storage.getItem(key) ?? "false") === true;
-  } catch {
-    return false;
-  }
-}
-
 export function milestoneAt(
   milestones: SpaceRoadmapMilestone[],
   position: { x: number; y: number },

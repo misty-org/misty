@@ -132,12 +132,6 @@ export function shortDue(value: string) {
   return new Date(value).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-export function memberName(members: SpaceMember[], id?: string) {
-  return id
-    ? (members.find((member) => member.user_id === id)?.name ?? "Former member")
-    : "Unassigned";
-}
-
 export function toLocalInput(value: string) {
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);

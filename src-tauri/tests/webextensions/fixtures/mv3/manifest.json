@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Misty native extension fixture",
+  "version": "1.0.0",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "native-fixture@misty.test"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Misty fixture"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ]
+}

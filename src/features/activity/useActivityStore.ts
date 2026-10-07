@@ -1,5 +1,5 @@
-import { useCapabilityApprovals } from "@/features/capability-approvals/store";
 import { useAgentInterventions } from "@/features/agent-interventions/store";
+import { useAgentMemberRequests } from "@/features/agent-member-requests/store";
 import { readDeploymentScope } from "@/api/deployment/api";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -39,7 +39,7 @@ interface ActivityStore extends ActivityData {
   ): void;
   resolveSourceRequest(accountId: string, source: Source, sourceId: string): void;
   load(): Promise<void>;
-  /** Re-reads the named sources, or both when none are named. */
+  /** Re-reads the named sources, or all when none are named. */
   refresh(only?: ActivityRefreshSource[]): Promise<void>;
   ingestLocal(input: LocalActivityInput): string | null;
   markRead(id: string): void;
@@ -55,7 +55,7 @@ interface ActivityStore extends ActivityData {
   clearError(): void;
 }
 
-export type ActivityRefreshSource = "approvals" | "interventions";
+export type ActivityRefreshSource = "interventions" | "agent_requests";
 
 export const useActivityStore = create<ActivityStore>()(
   persist(
@@ -89,11 +89,13 @@ export const useActivityStore = create<ActivityStore>()(
         set({ loading: true, offline: false, error: null });
         try {
           const accountId = get().accountId;
-          const sources = [useCapabilityApprovals, useAgentInterventions];
+          const named = [
+            ["interventions", useAgentInterventions],
+            ["agent_requests", useAgentMemberRequests],
+          ] as const;
+          const sources = named.map(([, source]) => source);
           const selected = only
-            ? sources.filter((_, index) =>
-                only.includes(index === 0 ? "approvals" : "interventions"),
-              )
+            ? named.filter(([name]) => only.includes(name)).map(([, source]) => source)
             : sources;
           await Promise.all(
             selected.map((source) => {

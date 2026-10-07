@@ -82,7 +82,7 @@ Library, Chat, Planner, and Agents share a quiet desktop collection grammar: cho
 
 Source authority is `src/shared/ui/patterns/CollectionWorkspace.tsx`, shared `Button` and `NavIsland`, `src/styles/styles.css`, and the feature entry components `LibraryEntryHeader`, `SpaceLibraryItems`, `SpaceChatEntry`, `PlannerCollection`, and `AgentCollection`. The latest shared controls and metadata treatments take precedence over historical screenshots. Approved direction is recorded in [PRODUCT.md](../../../.impeccable/review/journal-entry-implementation/PRODUCT.md).
 
-Current captures in `.impeccable/review/journal-entry-implementation/` render actual production components with deterministic fixture data at desktop width, not a live backend. The implementation pass reports 96 focused tests across 13 suites, desktop build, typecheck, and scoped lint passing. Historical mobile mockups are superseded; no mobile shell behavior or viewport verification is claimed.
+Current captures in `.impeccable/review/journal-entry-implementation/` render actual production components with deterministic fixture data at desktop width, not a live backend. The implementation pass reports 96 focused tests across 13 suites, desktop build, typecheck, and scoped lint passing.
 
 **Key Characteristics:**
 
@@ -116,7 +116,7 @@ Inherit the application font. The compact hierarchy uses the heading role for pa
 
 List tables keep their metadata columns and permit horizontal overflow. Shared grids use auto-filled columns with a minimum width of 180px and 12px gaps. Shared collection cards are 256px tall; Library retains its media-oriented thumbnail composition and scale control.
 
-**The Desktop Shell Rule.** Space navigation remains present; Agents opens a collection before its conversation; Scheduled retains its task roster and optional inspector. These shells do not switch to mobile Sheets or hide columns at breakpoints. Explicit creation, settings, and connection dialogs retain their existing purpose.
+**The Desktop Shell Rule.** Space navigation remains present; Agents opens a collection before its conversation; Scheduled retains its task roster and optional inspector. These shells preserve their navigation and columns at every window width. Explicit creation, settings, and connection dialogs retain their existing purpose.
 
 ## Elevation & Depth
 
@@ -145,7 +145,7 @@ Text buttons retain the control radius; search and text navigation islands retai
 - Do reuse the latest shared collection, button, and navigation components.
 - Do preserve keyboard focus, permissions, account boundaries, draft guards, and retry behavior.
 - Do retain creator metadata, semantic file icons, and hover/focus menu access.
-- Do keep desktop navigation and metadata visible without mobile shell switching.
+- Do keep desktop navigation and metadata visible at every window width.
 
 ### Don't:
 

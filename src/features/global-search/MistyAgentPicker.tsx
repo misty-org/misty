@@ -7,9 +7,14 @@ import {
   selectedPersonalAgent,
 } from "@/features/agents/personalAgentsStore";
 import { finishLocalExecution, useLocalExecution } from "@/features/agents/localExecution";
-import { betaExecutionMode } from "@/features/agents/betaModes";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, MenuTrigger } from "@/shared/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  MenuTrigger,
+  SkeletonList,
+} from "@/shared/ui";
 
 export function MistyAgentPicker({ accountId }: { accountId: string }) {
   const agents = usePersonalAgentsStore((state) => state.agents);
@@ -43,7 +48,6 @@ export function MistyAgentPicker({ accountId }: { accountId: string }) {
       useMistyStore.setState({
         selectedAgentId: id,
         activeConversationId: "",
-        executionMode: betaExecutionMode("user"),
         context: [],
         handoff: undefined,
         browserRequest: undefined,
@@ -82,9 +86,7 @@ export function MistyAgentPicker({ accountId }: { accountId: string }) {
             </DropdownMenuItem>
           ))}
         {loading && !agents.length && (
-          <p role="status" className="px-2 py-1.5 text-xs text-cream-muted">
-            Loading agents…
-          </p>
+          <SkeletonList label="Agents" rows={3} leading="avatar" lines={1} rowClassName="px-2" />
         )}
         {error && (
           <p role="alert" className="px-2 py-1.5 text-xs text-cream-muted">

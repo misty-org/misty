@@ -1,9 +1,9 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
-import { Avatar, AvatarFallback, AvatarImage, Badge, BrandIcon, Button } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Badge, Button } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
-import { Fragment, type FormEvent } from "react";
+import { Fragment, memo, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
@@ -12,8 +12,6 @@ import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { initials, isAgentAuthoredMessage } from "./messageHelpers";
-import { InstagramBrandIcon } from "../../social/InstagramBrandIcon";
-import { MessengerBrandIcon, XBrandIcon } from "../../social/SocialProviderBrandIcons";
 
 export interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -31,7 +29,57 @@ export interface ChatMessageRowProps {
  * Consecutive messages from the same sender render `compact`, dropping the
  * avatar and header for a timestamp that only appears on hover.
  */
-export function ChatMessageRow({
+/** The list fields a row renders; anything else on the list props never reaches a row. */
+const rowFields = [
+  "canAddToLibrary",
+  "canCopyLibrary",
+  "canWrite",
+  "currentUserId",
+  "isOwner",
+  "libraryItems",
+  "nodes",
+  "spaceId",
+  "onRetry",
+  "onEditingText",
+  "onCancelEditing",
+  "onSaveEdited",
+  "onReply",
+  "onToggleReaction",
+  "onBeginEditing",
+  "onDelete",
+  "onOpenNode",
+  "onError",
+  "onLibraryItem",
+  "onReload",
+] as const satisfies readonly (keyof SpaceChatMessagesProps)[];
+
+/**
+ * Memoized so typing in the composer does not re-render the whole history. The edit draft
+ * only matters to the row being edited.
+ */
+export const ChatMessageRow = memo(ChatMessageRowView, (previous, next) => {
+  if (
+    previous.message !== next.message ||
+    previous.compact !== next.compact ||
+    previous.dateLabel !== next.dateLabel ||
+    previous.avatarUrl !== next.avatarUrl ||
+    previous.repliedToMessage !== next.repliedToMessage ||
+    previous.repliedToAvatarUrl !== next.repliedToAvatarUrl ||
+    rowFields.some((field) => previous.props[field] !== next.props[field])
+  )
+    return false;
+  const id = next.message.id;
+  const wasEditing = previous.props.editingMessageId === id;
+  const editing = next.props.editingMessageId === id;
+  return (
+    wasEditing === editing &&
+    (!editing ||
+      (previous.props.editingText === next.props.editingText &&
+        previous.props.editSaving === next.props.editSaving))
+  );
+});
+
+function ChatMessageRowView({
   message,
   compact,
   dateLabel,
@@ -48,8 +96,8 @@ export function ChatMessageRow({
       {dateLabel ? <ChatDateDivider label={dateLabel} /> : null}
       <article
         className={[
-          "group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
-          "transition-colors duration-150 hover:bg-charcoal-card focus-within:bg-charcoal-card focus-visible:outline-none",
+          "group/chat-message relative -mx-3 grid min-h-10 grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
+          "hover:bg-charcoal-card focus-within:bg-charcoal-card focus-visible:outline-none",
           // `first:` covers the message that opens a thread with no date
           // divider above it, whose top margin would double the scroller's.
           compact ? "" : "mt-4 first:mt-0",
@@ -72,7 +120,12 @@ export function ChatMessageRow({
 
         <div className={`col-start-1 flex justify-end ${rowClass}`}>
           {compact ? (
-            <time className="pt-1 text-[10px] tabular-nums text-cream-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+            <time
+              className={
+                "pt-1 text-[10px] tabular-nums text-cream-muted opacity-0 " +
+                "group-hover/chat-message:opacity-100 group-focus-within/chat-message:opacity-100"
+              }
+            >
               {formatChatMessageTime(message.created_at)}
             </time>
           ) : (
@@ -173,26 +226,6 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
           <Bot />
           Agent
-        </Badge>
-      ) : null}
-      {message.social_provider === "instagram" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <InstagramBrandIcon size={12} />
-          Instagram
-        </Badge>
-      ) : message.social_provider === "discord" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <BrandIcon brand="discord" size={12} />
-          Discord
-        </Badge>
-      ) : message.social_provider === "messenger" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <MessengerBrandIcon size={12} />
-          Messenger
-        </Badge>
-      ) : message.social_provider === "x" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <XBrandIcon size={12} />X
         </Badge>
       ) : null}
       <time className="text-[11px] tabular-nums text-cream-muted">

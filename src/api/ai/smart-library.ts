@@ -28,8 +28,6 @@ export const smartLibraryApi = {
   planReindex: <T>(body: unknown) => post<T>(`${basePath}/reindex`, body),
   completeReindex: <T>(jobId: string, assets: unknown[]) =>
     post<T>(`${basePath}/reindex/${encodeURIComponent(jobId)}/complete`, { assets }),
-  searchFolder: <T>(folderId: string, query: string, limit: number) =>
-    post<T>(`${folderPath(folderId)}/search`, { query, limit }),
   removeFolder: (folderId: string) =>
     managedAiRequest(`${folderPath(folderId)}`, { method: "DELETE" }),
 };

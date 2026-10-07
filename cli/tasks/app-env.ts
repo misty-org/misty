@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 
-// One file for every app target. Shell/CI values take precedence.
+// One file for desktop renderer configuration. Shell/CI values take precedence.
 export function loadAppEnv(root, environment = process.env) {
   const path = resolve(root, ".env");
   return { ...(existsSync(path) ? parseEnv(readFileSync(path, "utf8")) : {}), ...environment };

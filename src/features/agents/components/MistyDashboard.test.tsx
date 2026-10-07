@@ -6,7 +6,6 @@ const fixture = vi.hoisted(() => ({
   cancelInvocation: vi.fn(async () => {}),
   cancelRun: vi.fn(async () => {}),
   run: vi.fn(),
-  decideApproval: vi.fn(async () => {}),
 }));
 vi.mock("../AgentsRuntime", () => ({
   runtimeAiApi: {
@@ -16,7 +15,6 @@ vi.mock("../AgentsRuntime", () => ({
   runtimeAgentsApi: {
     cancelRun: fixture.cancelRun,
     run: fixture.run,
-    decideApproval: fixture.decideApproval,
   },
   useAgentsAuth: () => ({ user: { id: fixture.user } }),
 }));
@@ -98,7 +96,7 @@ it("discards a previous account's pending activity response", async () => {
       },
     ],
   });
-  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Agent activity" })).toBeNull());
   expect(screen.queryByText("Other account secret")).toBeNull();
 });
 it("opens task details without any conversation navigation", async () => {
@@ -134,7 +132,7 @@ it("shows a recoverable error when activity cannot be loaded", async () => {
     expect.stringContaining("Could not load activity"),
   );
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Agent activity" })).toBeNull());
   expect(screen.queryByText("No activity yet.")).toBeNull();
 });
 
@@ -152,36 +150,8 @@ it("loads personal activity without a Space", async () => {
   fixture.activity.mockResolvedValue({ entries: [] });
   render(<MistyDashboard />);
   await waitFor(() => expect(fixture.activity).toHaveBeenCalledWith("", undefined));
-  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Agent activity" })).toBeNull());
   expect(screen.queryByText("No activity yet.")).toBeNull();
-});
-
-it("keeps approvals attached to their task run", async () => {
-  fixture.activity.mockResolvedValue({
-    entries: [
-      {
-        id: "run-entry",
-        run_id: "approval-run",
-        kind: "run",
-        title: "Rename files",
-        state: "awaiting_approval",
-        events: [],
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  });
-  fixture.run.mockResolvedValue({
-    instruction: "Rename screenshots",
-    result: {},
-    approvals: [{ id: "approval-1", state: "pending", summary: "Rename 6 files?" }],
-    summary: { run_id: "approval-run" },
-  });
-  render(<MistyDashboard />);
-  fireEvent.click(await screen.findByRole("button", { name: /Rename files/ }));
-  fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
-  await waitFor(() =>
-    expect(fixture.decideApproval).toHaveBeenCalledWith("approval-run", "approval-1", "approve"),
-  );
 });
 
 it.each([
@@ -211,7 +181,7 @@ it.each([
 it("renders the empty activity collection without an extra information block", async () => {
   fixture.activity.mockResolvedValue({ entries: [] });
   render(<MistyDashboard collection={{ query: "", view: "list" }} />);
-  await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Agent activity" })).toBeNull());
   expect(screen.queryByText("No activity yet.")).toBeNull();
   expect(screen.getAllByRole("row")).toHaveLength(1);
 });

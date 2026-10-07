@@ -1,14 +1,13 @@
-import { useCompanionState, requestsScreenContext } from "@/features/agents/companion";
-import { isAgentModeActive } from "./searchAvailability";
 import {
-  MistyApprovalReview,
-  MistyOverlayControls,
-  usePendingMistyApproval,
-} from "./MistyOverlayControls";
+  AgentQuestionCard,
+  pendingQuestionSet,
+  useConversationCollaboration,
+} from "@/features/agents/agentCollaboration";
+import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
+import { MistyOverlayControls } from "./MistyOverlayControls";
 import { routeLocalFollowup, useLocalExecution } from "@/features/agents/localExecution";
 import { readOptionalSurfaceContext } from "./optionalSurfaceContext";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { installMistyContextBridge } from "@/features/misty/contextBridge";
 import { MistyContextBar } from "@/features/misty/MistyContextBar";
 import { thinkingEffort } from "@/features/agents/thinkingMode";
 import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
@@ -17,7 +16,7 @@ import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { invokeShortcutCommand } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
-import { cn, ScrollArea, ViewportLayer } from "@/shared/ui";
+import { Button, cn, ScrollArea, ViewportLayer } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -36,6 +35,7 @@ import type { UnifiedMistyCandidate } from "./types";
 import { buildUnifiedMistyCandidates } from "./unifiedMistyCandidates";
 import { useGlobalMistyAttachments } from "./useGlobalMistyAttachments";
 import { useGlobalMistyResults } from "./useGlobalMistyResults";
+import { useGlobalMistyHost } from "./useGlobalMistyHost";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
 
 const MistyRegionCapture = lazy(() =>
@@ -79,7 +79,6 @@ export function GlobalMistySurface(props: {
     onVoiceActivityChange,
   } = props;
   const execution = useLocalExecution((s) => s.execution);
-  const pendingApproval = usePendingMistyApproval();
   const docked = props.controller === "misty";
   // Finished executions retain browser context for follow-ups, not an overlay lease.
   const taskSurface =
@@ -125,9 +124,6 @@ export function GlobalMistySurface(props: {
     visualSearch,
     submitAnswer,
     submitAgentTask,
-    rejectAction,
-    cancelAgentTask,
-    approveAgentTask,
   } = useController(
     useShallow((state) => ({
       panel: state.panel,
@@ -162,9 +158,6 @@ export function GlobalMistySurface(props: {
       visualSearch: state.visualSearch,
       submitAnswer: state.submitAnswer,
       submitAgentTask: state.submitAgentTask,
-      rejectAction: state.rejectAction,
-      cancelAgentTask: state.cancelAgentTask,
-      approveAgentTask: state.approveAgentTask,
     })),
   );
   const aiPaneId = props.activeWorkspacePaneId ?? props.activePaneId;
@@ -199,6 +192,7 @@ export function GlobalMistySurface(props: {
   );
   const activeMode = mode === "search" ? "search" : "ask";
   const attachmentState = useGlobalMistyAttachments({
+    sharedAccountId: docked ? props.accountId : undefined,
     mode,
     activeConversationId,
     newConversation,
@@ -221,11 +215,18 @@ export function GlobalMistySurface(props: {
     candidates.findIndex((candidate) => candidate.id === selectedCandidateId),
   );
   const conversation = conversations.find((item) => item.id === activeConversationId);
-  const open = panel !== "closed" || taskSurface || (docked && !!pendingApproval);
+  // Questions an agent asked in this conversation wait above the composer here too.
+  const collaboration = useConversationCollaboration(
+    props.accountId,
+    activeConversationId || undefined,
+  );
+  const pendingQuestions = pendingQuestionSet(collaboration.state);
+  const open = panel !== "closed" || taskSurface;
   const conversationActive = panel === "answer" || panel === "agent";
   const contentVisible = hasQuery || conversationActive;
   const wasOpenRef = useRef(false);
   const voice = useAiVoiceRecorder({
+    contextKey: `${props.accountId}:${activeConversationId}`,
     onTranscript: (transcript) => {
       const current = useController.getState().query.trim();
       useController.getState().setQuery(`${current}${current ? " " : ""}${transcript}`);
@@ -309,16 +310,17 @@ export function GlobalMistySurface(props: {
     if (open) onContentVisibilityChange?.(contentVisible);
   }, [contentVisible, onContentVisibilityChange, open]);
   const sendAnswer = async (prompt: string) => {
-    if (
-      !allowCapture &&
-      requestsScreenContext(prompt) &&
-      !registeredAiSelection &&
-      !attachments.length &&
-      !useCompanionState.getState().submit
-    ) {
-      setVoiceError(
-        "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there, or attach an image.",
-      );
+    if (docked && useMistyStore.getState().working && useMistyStore.getState().invocationId) {
+      if (attachments.length) {
+        setVoiceError("Keep attachments for the next task; follow-ups can contain text only.");
+        return;
+      }
+      try {
+        await useMistyStore.getState().steerResponse?.(prompt);
+        setFollowupNotice("Queued for the next safe boundary.");
+      } catch (error) {
+        setVoiceError(error instanceof Error ? error.message : String(error));
+      }
       return;
     }
     if (taskSurface) {
@@ -343,23 +345,8 @@ export function GlobalMistySurface(props: {
       }
       return;
     }
-    const companionSubmit = useCompanionState.getState().submit;
-    if (companionSubmit && !registeredAiSelection && requestsScreenContext(prompt)) {
-      // Like Clicky's panel dismissal, expose the referenced workspace before capture.
-      useController.getState().closePanel();
-      try {
-        await companionSubmit({
-          prompt,
-          attachments: attachmentState.attachments,
-          conversationId: useController.getState().activeConversationId,
-        });
-      } catch (error) {
-        setVoiceError(error instanceof Error ? error.message : String(error));
-        useController.getState().openPanel();
-      }
-    } else {
-      await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
-    }
+    // The task looks at the screen itself (screen_look) when the request needs it.
+    await submitAnswer(prompt, attachmentState.attachments, registeredAiSelection ?? undefined);
     if (!useController.getState().query) attachmentState.consume();
   };
   const activateCandidate = (candidate?: UnifiedMistyCandidate) => {
@@ -413,6 +400,15 @@ export function GlobalMistySurface(props: {
 
   const composer = (
     <>
+      {pendingQuestions && mode !== "search" && (
+        <div className="px-3 pt-2">
+          <AgentQuestionCard
+            questionSet={pendingQuestions}
+            agentName="Misty"
+            onContinue={(prompt) => void submitAnswer(prompt, [], undefined)}
+          />
+        </div>
+      )}
       <GlobalMistyComposerBar
         headerControls={
           docked ? (
@@ -423,8 +419,8 @@ export function GlobalMistySurface(props: {
                 loading={conversationsLoading}
                 onSelect={selectConversation}
                 onNew={() => void newConversation()}
-                onDelete={(id) => void deleteConversation(id)}
-                onRename={(id, title) => void renameConversation(id, title)}
+                onDelete={(id) => void deleteConversation(id).catch(() => {})}
+                onRename={(id, title) => void renameConversation(id, title).catch(() => {})}
               />
             </>
           ) : undefined
@@ -449,7 +445,7 @@ export function GlobalMistySurface(props: {
         }}
         onKeyDown={onInputKeyDown}
         onCapture={allowCapture ? () => setCapturingRegion(true) : undefined}
-        busy={taskSurface ? routingFollowup : searching || working}
+        busy={taskSurface ? routingFollowup : searching || (working && !query.trim())}
         working={working}
         conversation={conversation}
         activeConversationId={activeConversationId}
@@ -475,6 +471,11 @@ export function GlobalMistySurface(props: {
           )
         }
       />
+      {docked && (
+        <div className="px-4 pb-2">
+          <MistyFolderWork accountId={props.accountId} disabled={working} />
+        </div>
+      )}
     </>
   );
 
@@ -491,6 +492,11 @@ export function GlobalMistySurface(props: {
           className="pointer-events-none absolute inset-1 rounded-2xl border border-white/20 bg-black/10"
           data-misty-capture-frame
         />
+      )}
+      {docked && error && working && (
+        <Button variant="ghost" size="sm" onClick={() => void loadConversations(true)}>
+          Reconnect to task
+        </Button>
       )}
       {error || voiceError ? (
         <SystemErrorActivity
@@ -527,9 +533,8 @@ export function GlobalMistySurface(props: {
                   data-misty-top-controls
                 >
                   {composer}
-                  <MistyApprovalReview />
                   <MistyContextBar />
-                  {followupNotice && (
+                  {followupNotice && working && (
                     <p role="status" className="px-4 pb-2 text-sm text-cream-muted">
                       {followupNotice}
                     </p>
@@ -571,14 +576,7 @@ export function GlobalMistySurface(props: {
                         className={docked ? "h-[min(320px,calc(100dvh-340px))]" : "h-full"}
                         data-misty-conversation-scroll
                       >
-                        <ConversationView
-                          conversation={conversation}
-                          approvalControlsInFooter={docked}
-                          working={working}
-                          onConfirm={(id) => void approveAgentTask(id)}
-                          onReject={rejectAction}
-                          onCancel={(id) => void cancelAgentTask(id)}
-                        />
+                        <ConversationView conversation={conversation} working={working} />
                       </ScrollArea>
                     </div>
                     {!docked && composer}
@@ -641,38 +639,7 @@ export function GlobalMistySurface(props: {
 }
 
 export function GlobalMisty(props: Parameters<typeof GlobalMistySurface>[0]) {
-  useEffect(() => {
-    const enforceAgentMode = () => {
-      if (isAgentModeActive() && useGlobalSearchStore.getState().panel !== "closed")
-        useGlobalSearchStore.getState().closePanel();
-    };
-    enforceAgentMode();
-    const removeMisty = useMistyStore.subscribe(enforceAgentMode);
-    const removeExecution = useLocalExecution.subscribe(enforceAgentMode);
-    return () => {
-      removeMisty();
-      removeExecution();
-    };
-  }, []);
-  const [bridgeError, setBridgeError] = useState("");
-  useEffect(() => {
-    if (props.controller === "misty") return;
-    let disposed = false;
-    let cleanup: (() => void) | undefined;
-    void installMistyContextBridge()
-      .then((remove) => {
-        if (disposed) remove();
-        else cleanup = remove;
-      })
-      .catch((error) => {
-        if (!disposed)
-          setBridgeError(error instanceof Error ? error.message : "Misty context could not start.");
-      });
-    return () => {
-      disposed = true;
-      cleanup?.();
-    };
-  }, [props.controller]);
+  const bridgeError = useGlobalMistyHost(props.controller);
   return (
     <>
       {bridgeError && (

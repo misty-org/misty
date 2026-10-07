@@ -58,11 +58,11 @@ it("asks signed-out users to sign in", () => {
   expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
   expect(screen.queryByRole("textbox")).toBeNull();
 });
-it("shows loading and lets users retry a failed snapshot", () => {
+it("shows the load failure and lets users retry a failed snapshot", () => {
   state.snapshotReady = false;
   state.error = "Offline";
   mount();
-  expect(screen.getByRole("status").textContent).toContain("Spaces could not be loaded");
+  expect(screen.getByRole("alert").textContent).toContain("Spaces could not be loaded");
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(state.load).toHaveBeenCalledWith({ force: true });
 });

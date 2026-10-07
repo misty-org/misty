@@ -80,7 +80,7 @@ describe("legacy workspace scope restoration", () => {
       route: "/agents",
     });
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((t) => t.surfaceId)).toEqual([
-      "home",
+      "browser",
       "agents",
     ]);
 
@@ -97,7 +97,7 @@ describe("legacy workspace scope restoration", () => {
     // 3. Switch back to Space A
     useWorkspaceStore.getState().setScope("space:space-a");
     const tabsInA = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["home", "agents"]);
+    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["browser", "agents"]);
     expect(tabsInA.find((tab) => tab.surfaceId === "agents")?.id).toBe(agentsTab.id);
   });
 });

@@ -83,6 +83,7 @@ export function resolveDirectAddress(value: string): string | null {
   const internal = browserInternalPage(trimmed);
   if (internal) return browserInternalUrl(internal);
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^webkit-extension:\/\/[0-9a-f-]{36}(?:\/|$)/i.test(trimmed)) return trimmed;
   if (trimmed.includes(" ")) return null;
 
   const match = trimmed.match(/^([^/?#]+)(.*)$/);

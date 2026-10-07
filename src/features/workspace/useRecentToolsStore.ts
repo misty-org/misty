@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { homeApi } from "@/api/home/api";
+import { Puzzle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { appIcon, appIcons } from "@/shared/ui";
 import type { WorkspaceSurfaceId, WorkspaceView } from "./model";
@@ -13,6 +14,7 @@ export type WorkspaceToolId =
   | "social"
   | "library"
   | "browser"
+  | "extensions"
   | "files"
   | "scheduled"
   | "agents";
@@ -36,10 +38,12 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
     icon: appIcon("library", "space")!,
   },
   browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
+  extensions: { id: "extensions", label: "Extensions", surfaceId: "extensions", icon: Puzzle },
   files: { id: "files", label: "Files", surfaceId: "files", icon: appIcons.files },
+  // The retired Scheduled tool opens Workflows; its id is a stored name.
   scheduled: {
     id: "scheduled",
-    label: "Scheduled",
+    label: "Workflows",
     surfaceId: "scheduled",
     icon: appIcons.scheduled,
   },

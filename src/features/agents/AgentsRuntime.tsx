@@ -3,7 +3,6 @@ import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { agentsApi } from "@/api/agents/api";
 import type { assistantApi } from "@/api/assistant/api";
 import type { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
-import type { mcpConnectionsApi } from "./mcp/api";
 import type { useAuth, useAccountAvatarUrl } from "@/features/auth";
 import type { useWorkspaceStore } from "@/features/workspace";
 import type { SystemErrorActivity } from "@/features/activity";
@@ -22,7 +21,6 @@ export interface AgentsRuntime {
   agentsApi: typeof agentsApi;
   assistantApi: typeof assistantApi;
   aiSurfaceApi: typeof aiSurfaceApi;
-  mcpConnectionsApi: typeof mcpConnectionsApi;
   subscribeToAiInvocation: typeof subscribeToAiInvocation;
   useAuth: typeof useAuth;
   useAccountAvatarUrl: typeof useAccountAvatarUrl;
@@ -69,7 +67,6 @@ function service<K extends keyof AgentsRuntime>(name: K): AgentsRuntime[K] {
 export const runtimeAgentsApi = service("agentsApi"),
   runtimeAssistantApi = service("assistantApi"),
   runtimeAiApi = service("aiSurfaceApi"),
-  runtimeMcpApi = service("mcpConnectionsApi"),
   subscribeAgentsInvocation = service("subscribeToAiInvocation"),
   useAgentsAuth = service("useAuth"),
   useAgentsAvatar = service("useAccountAvatarUrl"),

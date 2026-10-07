@@ -14,16 +14,13 @@ import { createSpaceConversationsApi } from "@/api/spaces/conversations";
 import type {
   CreateSpaceRequest,
   CreateSpaceResult,
-  ProviderAuthorizationStart,
   ProviderConnectionAvailability,
   Space,
   SpaceIntegration,
   SpaceInvitationPreview,
   SpaceNode,
-  SpaceRun,
   SpaceSetup,
   SpacesSnapshot,
-  SpaceStudioResource,
   SpaceTemplate,
 } from "@/api/spaces/dto/interfaces/types";
 import { createSpaceMembersApi } from "@/api/spaces/members";
@@ -109,11 +106,11 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     personal_storage_limit_reached:
       "Your personal storage is full. Free some of your contributions or upgrade your plan. Existing files remain available.",
     space_storage_limit_reached:
-      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
     personal_ai_limit_reached:
-      "Your personal weekly hosted AI allowance is used. Wait for it to reset or upgrade your plan.",
+      "Your account’s weekly AI allowance is used. Wait for it to reset or upgrade your plan.",
     space_ai_limit_reached:
-      "This Space’s weekly hosted AI allowance is used. Its owner must upgrade their plan, or wait for the allowance to reset.",
+      "Your account’s weekly AI allowance is used. Wait for it to reset or upgrade your plan.",
   };
   if (reason && quotaMessages[reason]) return quotaMessages[reason];
   const messages: Record<string, string> = {
@@ -127,13 +124,13 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     default_space_protected:
       "Your default Space can’t be deleted or transferred. It keeps your account usable.",
     owner_storage_quota_exceeded:
-      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
     space_storage_quota_exceeded:
-      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
     storage_limit_reached:
-      "Storage is full. Free capacity or review your personal and Space limits before trying again.",
+      "Your account’s cloud storage is full. Free some storage or review your account usage.",
     hosted_ai_limit_reached:
-      "Weekly hosted AI is unavailable. Review your personal and Space allowances before trying again.",
+      "AI usage is unavailable. Review your account allowance and command budget before trying again.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
@@ -143,34 +140,9 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     library_reauthentication_required: "Unlock this protected Library collection again.",
     offline_reference_only: "Spaces are unavailable while Misty reconnects.",
-    integration_required:
-      "Connect the workflow’s required provider in this Space before running it.",
     agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
-    provider_exchange_failed: "The provider could not complete sign-in. Try connecting again.",
-    provider_token_missing:
-      "The provider completed sign-in without returning an access token. Try connecting again.",
-    github_app_not_configured: "GitHub is not configured on this Misty server.",
-    github_repository_permission_denied:
-      "The GitHub App does not have permission to read that repository.",
-    github_write_permission_denied: "The GitHub App does not have permission to make that change.",
-    github_mutation_confirmation_required: "Confirm this GitHub change before continuing.",
-    github_handoff_expired: "That one-time GitHub authorization expired. Try the action again.",
-    github_api_error: "GitHub could not complete that request. Try again in a moment.",
-    figma_api_error: "Figma could not complete that request. Try again in a moment.",
-    figma_rate_limited: "Figma is receiving too many requests. Wait a moment, then try again.",
-    figma_response_too_large:
-      "That Figma file is too large to read safely. Link a smaller file or project source.",
-    figma_comment_confirmation_required: "Review and confirm this Figma comment before posting.",
-    figma_idempotency_key_required: "Review this Figma comment again before posting.",
-    figma_comment_already_claimed:
-      "That Figma comment was already submitted. Refresh the file context before trying again.",
-    figma_discovery_unavailable:
-      "Project browsing is unavailable for this Figma app. Paste a direct file link instead.",
-    figma_webhook_setup_failed:
-      "Figma live sync could not be started. Check the connected user’s Can edit access.",
-    figma_sync_failed: "Figma context could not be refreshed. Try syncing again.",
     reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
@@ -199,11 +171,6 @@ export const spacesApi = {
   create: createSpaceRequest,
   setup: (spaceId: string) =>
     spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`),
-  updateSetup: (spaceId: string, provider: string, status: string) =>
-    spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`, {
-      method: "PATCH",
-      body: JSON.stringify({ provider, status }),
-    }),
   invitationPreview: (token: string) =>
     spaceRequest<SpaceInvitationPreview>(`/space-invitations/${encodeURIComponent(token)}`),
   redeemInvitation: (token: string) =>
@@ -230,11 +197,6 @@ export const spacesApi = {
       integrations: SpaceIntegration[];
       providers?: ProviderConnectionAvailability[];
     }>(`/spaces/${encodeURIComponent(spaceId)}/integrations`),
-  beginProviderConnection: (spaceId: string, provider: string, returnTo: string) =>
-    spaceRequest<ProviderAuthorizationStart>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(provider)}/authorize`,
-      { method: "POST", body: JSON.stringify({ return_to: returnTo }) },
-    ),
   bindAccountConnection: (
     spaceId: string,
     provider: string,
@@ -248,42 +210,12 @@ export const spacesApi = {
         body: JSON.stringify({ connection_id: connectionId, capability }),
       },
     ),
-  deleteProviderIntegration: (integrationId: string) =>
-    spaceRequest<void>(`/integrations/${encodeURIComponent(integrationId)}`, {
-      method: "DELETE",
-    }),
   nodes: (spaceId: string) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
     spaceRequest<{ ticket: string; url: string; expires_in: number }>(
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
       { method: "POST", body: JSON.stringify({ disposition }) },
-    ),
-  studio: (spaceId: string, kind: "workflows") =>
-    spaceRequest<{ resources: SpaceStudioResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`,
-    ),
-  saveStudio: (spaceId: string, kind: "workflows", item: Partial<SpaceStudioResource>) =>
-    spaceRequest<SpaceStudioResource>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`, {
-      method: "POST",
-      body: JSON.stringify(item),
-    }),
-  deleteStudio: (spaceId: string, kind: "workflows", id: string) =>
-    spaceRequest(
-      `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
-    ),
-  runStudio: (spaceId: string, kind: "workflows", id: string, prompt = "", capabilityId = "") =>
-    spaceRequest<SpaceRun>(
-      `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}/runs`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          prompt,
-          capability_id: capabilityId || undefined,
-          input: { prompt },
-        }),
-      },
     ),
   realtimeTicket: (after: number) =>
     spaceRequest<{ ticket: string; expires_in: number }>("/realtime/tickets", {

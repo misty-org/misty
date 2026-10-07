@@ -32,7 +32,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import {
@@ -43,6 +43,9 @@ import {
   paneViewLabel,
 } from "@/features/workspace/layoutTabs";
 import { canFitDockSplit, dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { ConnectedTabShape } from "./ConnectedTabShape";
+import { useTabPresenceMotion } from "./useTabPresenceMotion";
+import { usePaneBounds, useTabStripFade } from "./useTabStripGeometry";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 import { minimumForWorkspaceViews } from "./WorkspaceDockTree";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
@@ -76,43 +79,12 @@ export function WorkspaceTabStrip(
   }, [layout.activeTabId, allTabs, groups]);
   const ref = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
-  const [bounds, setBounds] = useState({ width: 0, height: 0 });
-  useLayoutEffect(() => {
-    const list = tabListRef.current;
-    if (!list || vertical) return;
-    const updateFade = () => {
-      list.style.setProperty("--tab-fade-start", list.scrollLeft > 1 ? "16px" : "0px");
-      list.style.setProperty(
-        "--tab-fade-end",
-        list.scrollWidth - list.clientWidth - list.scrollLeft > 1 ? "16px" : "0px",
-      );
-    };
-    updateFade();
-    const observer = new ResizeObserver(updateFade);
-    observer.observe(list);
-    Array.from(list.children).forEach((child) => observer.observe(child));
-    list.addEventListener("scroll", updateFade, { passive: true });
-    return () => {
-      observer.disconnect();
-      list.removeEventListener("scroll", updateFade);
-    };
-  }, [vertical, tabs.length]);
+  useTabPresenceMotion(tabListRef, !vertical);
+  useTabStripFade(tabListRef, !vertical, tabs.length);
   const pane =
     dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
     dockLeaves(layout.root)[0];
-  useEffect(() => {
-    const paneSelector = typeof CSS !== "undefined" && CSS?.escape ? CSS.escape(pane.id) : pane.id;
-    const element = document.querySelector<HTMLElement>(`[data-workspace-pane="${paneSelector}"]`);
-    if (!element) return;
-    const update = () => {
-      const rect = element.getBoundingClientRect();
-      setBounds({ width: rect.width, height: rect.height });
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    update();
-    return () => observer.disconnect();
-  }, [pane.id, layout.root]);
+  const bounds = usePaneBounds(pane.id, layout.root);
   const ClosePaneIcon = {
     up: PanelTopClose,
     down: PanelBottomClose,
@@ -134,11 +106,18 @@ export function WorkspaceTabStrip(
     });
   const reorder = usePointerReorder({
     scope: "workspace-layout-tabs",
+    animate: true,
     axis: vertical ? "y" : "x",
     getDrag: (id) => {
       if (id.startsWith("group-header:")) {
         const group = groups.find((g) => `group-header:${g.id}` === id);
-        return group ? { id, label: groupName(group) } : null;
+        return group
+          ? {
+              id,
+              label: groupName(group),
+              ids: [id, ...tabs.filter((tab) => tab.tabGroupId === group.id).map((tab) => tab.id)],
+            }
+          : null;
       }
       const tab = allTabs.find((tab) => tab.id === id);
       return tab ? { id, label: tabLabel(tab) } : null;
@@ -175,7 +154,13 @@ export function WorkspaceTabStrip(
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeTabId, position]);
   const newTabButton = (
-    <IconButton size="xs" tooltip={false} label="New tab" onClick={props.onNewTab}>
+    <IconButton
+      className="misty-workspace-new-tab"
+      size="xs"
+      tooltip={false}
+      label="New tab"
+      onClick={props.onNewTab}
+    >
       <Plus className="size-3.5" />
     </IconButton>
   );
@@ -208,7 +193,9 @@ export function WorkspaceTabStrip(
           vertical
             ? undefined
             : {
-                paddingLeft: props.titlebarInsets?.left ?? 8,
+                // The first shoulder starts in the strip's inset, next to the traffic
+                // lights, but never closer to the edge than a rounded pane corner.
+                paddingLeft: `max(12px, ${props.titlebarInsets?.left ?? 8}px - var(--tab-shoulder))`,
                 paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
               }
         }
@@ -272,6 +259,7 @@ export function WorkspaceTabStrip(
                     <div
                       style={group ? groupStyle(group) : undefined}
                       data-group-active={group ? active : undefined}
+                      data-active={active}
                       data-reorder-item={tab.id}
                       data-reorder-preview="true"
                       data-misty-window-drag-block="true"
@@ -285,6 +273,7 @@ export function WorkspaceTabStrip(
                           : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
                       )}
                     >
+                      {!vertical && <ConnectedTabShape />}
                       <Pressable
                         role="tab"
                         aria-selected={active}
@@ -403,7 +392,7 @@ export function WorkspaceTabStrip(
                           tooltip={false}
                           label={`Close tab ${label}`}
                           title={`Close tab ${label}`}
-                          className="mr-0.5"
+                          className="misty-workspace-tab-close mr-0.5"
                           onClick={() => props.onCloseLayoutTab(tab.id)}
                         >
                           <X className="size-3.5" size={14} />

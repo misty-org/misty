@@ -1,7 +1,6 @@
 import { explorerGenerateImageThumbnail } from "../../../native";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { createGridThumbnailQueue } from "./createGridThumbnailQueue";
-export { gridThumbnailSupported } from "@/features/file-ui";
 const queue = createGridThumbnailQueue(async (entry, maxDimension) => {
   const payload = await explorerGenerateImageThumbnail(entry.path, maxDimension, {
     modifiedMs: entry.modifiedMs,

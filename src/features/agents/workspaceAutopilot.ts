@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-export { visibleAutopilotAvailable, betaExecutionMode } from "./betaModes";
+export { visibleAutopilotAvailable } from "./betaModes";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { currentWindows } from "@/features/workspace/windows";
 import { layoutTabs } from "@/features/workspace/layoutTabs";

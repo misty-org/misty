@@ -68,7 +68,9 @@ it("attaches the originating browser view without a Space, app installation, or 
     deviceId: "device",
     metadata: { window_label: "main" },
   });
-  expect(request.deviceContexts[0].capabilities).toContain("browser.interact");
+  // Pages are acted on through browser.act; the low-level input tools are retired.
+  expect(request.deviceContexts[0].capabilities).toContain("browser.act");
+  expect(request.deviceContexts[0].capabilities).not.toContain("browser.interact");
   expect(fixture.state.submitAnswer).not.toHaveBeenCalled();
 });
 it("does not infer authority from selected instructions or retired Space metadata", async () => {

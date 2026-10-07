@@ -32,6 +32,10 @@ pub enum Kind {
     /// One device's browsing history for one hour, or one part of it
     /// (`history` collection).
     HistoryBatch,
+    /// A single extension storage.sync key in a private encrypted collection.
+    ExtensionSyncKey,
+    /// Durable account removal; old offline writes cannot restore this generation.
+    ExtensionRemoval,
 }
 
 impl Kind {
@@ -49,6 +53,8 @@ impl Kind {
             Self::TabGroup => "tab_group",
             Self::SavedTabGroup => "saved_tab_group",
             Self::HistoryBatch => "history_batch",
+            Self::ExtensionSyncKey => "extension_sync_key",
+            Self::ExtensionRemoval => "extension_removal",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -98,6 +104,14 @@ pub struct Folder {
     pub icon: String,
     pub order: f64,
     pub hidden: bool,
+    /// The folder this one sits in. Absent for the roots and for folders
+    /// directly in Other bookmarks, so records without nesting keep the shape
+    /// older versions accept (see `NESTED_BOOKMARK_FIELDS`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// When the folder was first added, in ms since the epoch (kept from imports).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added_at: Option<i64>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -109,6 +123,23 @@ pub struct Bookmark {
     pub url: String,
     pub order: f64,
     pub pinned: bool,
+    /// When the bookmark was first added, in ms since the epoch (kept from imports).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added_at: Option<i64>,
+}
+
+/// Bookmark tree fields. Versions before nested folders reject records that
+/// carry them, so they are only written once every device understands them
+/// (control version 2); until then sync drops them and folders stay flat.
+pub const NESTED_BOOKMARK_FIELDS: [&str; 2] = ["parent_id", "added_at"];
+/// Folders nest at most this deep below a root.
+pub const MAX_FOLDER_DEPTH: usize = 64;
+
+fn added_at(value: Option<i64>) -> Result<()> {
+    if value.is_some_and(|at| !(0..=10_000_000_000_000).contains(&at)) {
+        return Err(Error::Invalid);
+    }
+    Ok(())
 }
 
 /// Tab group colors, as named by the renderer.
@@ -246,6 +277,7 @@ pub enum Surface {
     Files,
     Agents,
     Space,
+    Extensions,
 }
 
 /// Moving a view is one field: concurrent moves cannot combine a tab from
@@ -315,6 +347,10 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             text(&v.label, 160, false)?;
             group_icon(&v.icon)?;
             order(v.order)?;
+            if v.parent_id.as_deref().is_some_and(|id| !valid_id(id)) {
+                return Err(Error::Invalid);
+            }
+            added_at(v.added_at)?;
         }
         Kind::Bookmark => {
             let v: Bookmark = serde_json::from_value(value)?;
@@ -324,6 +360,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             text(&v.title, 512, false)?;
             web_url(&v.url)?;
             order(v.order)?;
+            added_at(v.added_at)?;
         }
         Kind::Window => {
             let v: Window = serde_json::from_value(value)?;
@@ -361,6 +398,24 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             }
             order(v.order)?;
         }
+        Kind::ExtensionRemoval => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Removed { extension:String, generation:String }
+            let v:Removed=serde_json::from_value(value)?;
+            if v.extension.is_empty() || v.extension.len()>256 || uuid::Uuid::parse_str(&v.generation).is_err() { return Err(Error::Invalid); }
+        }
+        Kind::ExtensionSyncKey => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct ExtensionValue { extension: String, generation: String, key: String, change: Value }
+            let v: ExtensionValue = serde_json::from_value(value)?;
+            if v.extension.is_empty() || v.extension.len() > 256 || !valid_id(&v.generation)
+                || v.key.len() > 8192 || serde_json::to_vec(&v.change)?.len() + v.key.len() > 8192
+                || !v.change.as_object().is_some_and(|change|change.len()==1 && (change.get("deleted")==Some(&Value::Bool(true)) || change.contains_key("value"))) {
+                return Err(Error::Invalid);
+            }
+        }
         Kind::HistoryBatch => {
             let v: HistoryBatch = serde_json::from_value(value)?;
             if !valid_id(&v.origin) || v.hour < 0 || v.part > 64 || v.visits.len() > 2000 {
@@ -388,13 +443,14 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                 Surface::Browser => {
                     let url = v.url.as_deref().ok_or(Error::Invalid)?;
                     if url != "about:blank" {
-                        web_url(url)?;
+                        let extension=url::Url::parse(url).is_ok_and(|u|u.scheme()=="webkit-extension" && u.username().is_empty() && u.password().is_none() && u.port().is_none() && u.host_str().is_some_and(|host|uuid::Uuid::parse_str(host).is_ok()));
+                        if !extension { web_url(url)?; }
                     }
                     if !v.profile_id.as_deref().is_some_and(profile_id) || v.tool_route.is_some() {
                         return Err(Error::Invalid);
                     }
                 }
-                Surface::Home | Surface::Files | Surface::Agents | Surface::Space => {
+                Surface::Home | Surface::Files | Surface::Agents | Surface::Space | Surface::Extensions => {
                     if v.url.is_some() || v.profile_id.is_some() || v.bookmark_id.is_some() {
                         return Err(Error::Invalid);
                     }
@@ -405,6 +461,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                         Surface::Home => "/home",
                         Surface::Files => "/files",
                         Surface::Space => "/spaces",
+                        Surface::Extensions => "/extensions",
                         _ => "/agents",
                     };
                     if path != prefix && !path.starts_with(&format!("{prefix}/")) {
@@ -415,4 +472,43 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod bookmark_tree_tests {
+    use super::*;
+
+    fn fields(value: Value) -> Fields {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn folders_without_a_parent_keep_the_shape_older_versions_accept() {
+        let flat = fields(serde_json::json!({
+            "label": "Work", "icon": "folder", "order": 1.0, "hidden": false
+        }));
+        validate(Kind::Folder, &flat).unwrap();
+        let folder: Folder = serde_json::from_value(serde_json::to_value(&flat).unwrap()).unwrap();
+        let written = serde_json::to_value(folder).unwrap();
+        assert!(written.get("parent_id").is_none() && written.get("added_at").is_none());
+    }
+
+    #[test]
+    fn nested_folders_and_dates_validate() {
+        let nested = fields(serde_json::json!({
+            "label": "Clients", "icon": "folder", "order": 0.0, "hidden": false,
+            "parent_id": "folder:work", "added_at": 1_700_000_000_000_i64
+        }));
+        validate(Kind::Folder, &nested).unwrap();
+        let bad_parent = fields(serde_json::json!({
+            "label": "Clients", "icon": "folder", "order": 0.0, "hidden": false,
+            "parent_id": "folder/../x"
+        }));
+        assert!(validate(Kind::Folder, &bad_parent).is_err());
+        let bad_date = fields(serde_json::json!({
+            "group_id": "group:bookmarks", "title": "A", "url": "https://a.example/",
+            "order": 0.0, "pinned": true, "added_at": -5
+        }));
+        assert!(validate(Kind::Bookmark, &bad_date).is_err());
+    }
 }

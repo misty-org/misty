@@ -210,8 +210,13 @@ export function BrowserRuntimeBridge() {
         const host = document.querySelector<HTMLElement>(
           `[data-browser-workspace-tab="${CSS.escape(tabId)}"] [data-browser-page-host]`,
         );
-        if (host && host.dataset.mistyBrowserBackground !== color) {
+        if (!host) continue;
+        if (host.dataset.mistyBrowserBackground !== color) {
           host.dataset.mistyBrowserBackground = color;
+        }
+        // Paint the host like the page so a live resize never shows a gap.
+        if (host.style.getPropertyValue("--browser-page-background") !== color) {
+          host.style.setProperty("--browser-page-background", color);
         }
       }
     };
@@ -245,7 +250,10 @@ export function BrowserRuntimeBridge() {
           const host = document.querySelector<HTMLElement>(
             `[data-browser-workspace-tab="${CSS.escape(tabId)}"] [data-browser-page-host]`,
           );
-          if (host) delete host.dataset.mistyBrowserBackground;
+          if (host) {
+            delete host.dataset.mistyBrowserBackground;
+            host.style.removeProperty("--browser-page-background");
+          }
           useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
           useBrowserRuntimeStore.getState().setLoading(tabId, true);
         }

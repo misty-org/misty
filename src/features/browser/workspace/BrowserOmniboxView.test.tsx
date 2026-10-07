@@ -36,6 +36,13 @@ function baseProps(overrides: Partial<Parameters<typeof BrowserOmniboxView>[0]> 
   };
 }
 
+it("shows the full address with its protocol while the address bar is at rest", () => {
+  const props = baseProps({ currentUrl: "http://localhost:5173/settings?tab=general" });
+  render(<BrowserOmniboxView {...props} />);
+  const input = screen.getByLabelText("Search or enter address") as HTMLInputElement;
+  expect(input.value).toBe("http://localhost:5173/settings?tab=general");
+});
+
 it("keeps typed text local until the address is submitted", async () => {
   const props = baseProps();
   render(<BrowserOmniboxView {...props} />);

@@ -3,7 +3,8 @@ import { CollectionFilters } from "@/shared/ui";
 import { useSettingsProfiles } from "./profiles/store";
 import { resolveSetting } from "./profiles/model";
 
-export type CollectionTabs = "space" | "chat" | "journal" | "planner" | "library" | "agents";
+export type CollectionTabs =
+  "space" | "chat" | "journal" | "planner" | "library" | "agents" | "extensions";
 
 /** Append new tabs, ignore unavailable ones, and never duplicate a saved tab. */
 export function orderedTabs<T extends { value: string }>(options: T[], raw: string): T[] {

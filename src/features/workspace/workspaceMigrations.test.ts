@@ -134,6 +134,38 @@ it("preserves Home as a supported workspace surface", () => {
   expect(migrateRetiredWorkspaceView(home)).toEqual(home);
 });
 
+it.each([
+  "/extensions",
+  "/extensions?category=privacy-security",
+  "/extensions?category=tabs#results",
+  "/extensions#results",
+  "/extensions/installed",
+  "/extensions/addon/607454",
+])("preserves the Extensions workspace at %s instead of opening Google", (route) => {
+  const tab = legacyTab({
+    surfaceId: "extensions",
+    groupKey: "tool:extensions",
+    title: "Extensions",
+    route,
+  });
+  expect(migrateRetiredWorkspaceView(tab)).toEqual(tab);
+  const pane = createDockLeaf([tab]);
+  const migrated = migrateRetiredWorkspaceViews({ root: pane, focusedPaneId: pane.id });
+  expect(dockTreeViews(migrated.root)).toEqual([tab]);
+});
+
+it("restores Extensions views that lost their route", () => {
+  expect(
+    migrateRetiredWorkspaceView(
+      legacyTab({
+        surfaceId: "extensions",
+        groupKey: "tool:extensions",
+        route: undefined as unknown as string,
+      }),
+    ),
+  ).toMatchObject({ surfaceId: "extensions", route: "/extensions" });
+});
+
 it("migrates a saved Scheduled tab into Agents without losing its selected task", () => {
   const migrated = migrateRetiredWorkspaceView(
     legacyTab({
@@ -176,4 +208,22 @@ it("restores a route-less Scheduled view into the current Agents collection", ()
     groupKey: "tool:agents",
     route: "/agents?view=scheduled",
   });
+});
+
+it("restores retired Transfers views inside Files without losing their identity", () => {
+  const tab = legacyTab({
+    surfaceId: "transfers",
+    groupKey: "tool:transfers" as WorkspaceView["groupKey"],
+    route: "/transfers",
+    title: "Transfers",
+  });
+  const restored = migrateRetiredWorkspaceView(tab);
+  expect(restored).toMatchObject({
+    id: tab.id,
+    surfaceId: "files",
+    title: "Transfers",
+    route: "/files?view=transfers",
+    state: { path: "misty-transfers://history" },
+  });
+  expect(migrateRetiredWorkspaceView(restored)).toEqual(restored);
 });

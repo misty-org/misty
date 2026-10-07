@@ -11,9 +11,11 @@
 
 <h1 align="center">Misty</h1>
 
-Misty is a browser workspace for organizing your tabs, continuing across computers, and working alongside agents in your browsing context. Keep websites in groups, work in split panes, and bring your workspace with you through encrypted sync.
+Misty is a desktop browser workspace for organizing your tabs, continuing across computers, and working alongside agents in your browsing context. Keep websites in groups, work in split panes, and bring your workspace with you through encrypted sync.
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/misty-org/misty)
 Misty is in development. Everyday browser features and cross-device sync are actively being built and verified. See the [wiki](https://github.com/misty-org/misty/wiki/Features) for current capabilities and limits.
+
+Misty runs in the native Tauri desktop app. This repository does not ship a hosted app or handheld app target. The public/account website and backend services are separate products.
 
 ## Requirements
 

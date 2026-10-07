@@ -186,17 +186,17 @@ describe("window → tabs → panes", () => {
   });
 });
 
-it("opens replaceable Home in new tabs and splits and navigates inside the selected split", () => {
+it("opens replaceable Browser in new tabs and splits and navigates inside the selected split", () => {
   expect(state().newTab()).toMatchObject({
-    title: "Home",
-    surfaceId: "home",
+    route: "/browser",
+    surfaceId: "browser",
     placeholder: true,
   });
   const tabId = state().layout.activeTabId;
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   expect(activeLayoutView(state().layout)).toMatchObject({
-    title: "Home",
-    surfaceId: "home",
+    route: "/browser",
+    surfaceId: "browser",
     placeholder: true,
   });
   const view = state().openBrowserView({ url: "https://example.com", paneId });

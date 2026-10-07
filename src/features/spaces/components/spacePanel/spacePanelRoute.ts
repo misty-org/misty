@@ -1,7 +1,5 @@
-import type { SocialProviderId } from "@/api/social";
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { socialProviderFromRoute } from "../../social/socialRoute";
 
 const validSections = new Set([
   "home",
@@ -25,7 +23,6 @@ export interface SpacePanelRoute {
   roadmapId: string;
   settingsSection: string;
   libraryCollection: string;
-  socialProvider: SocialProviderId;
   conversationId: string | null;
   drawingId: string;
 }
@@ -81,7 +78,6 @@ export function useSpacePanelRoute(): SpacePanelRoute {
       ? requestedSettingsSection
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
-    socialProvider: socialProviderFromRoute(`${location.pathname}${location.search}`),
     conversationId: search.get("conversation"),
     drawingId: routeSection === "drawings" ? decodeRouteSegment(routeParts[3] ?? "") : "",
   };

@@ -8,6 +8,12 @@
    so the Themes extension can preview and persist one coherent app palette. */
 :root {
   --misty-theme-workspace: #0f0f0f;
+  /* Active tab and browser toolbar. Darker than the Polar reference so the
+     chrome sits closer to the black tab strip. */
+  --workspace-tab-surface-top: #222222;
+  --workspace-tab-surface: #1c1c1c;
+  --workspace-tab-text: #c5c5c5;
+  --workspace-tab-muted: #ababab;
   --misty-theme-bg: #131313;
   --misty-theme-sidebar: #161616;
   --misty-theme-card: #191919;
@@ -84,6 +90,18 @@
   --color-sage-fg: var(--misty-theme-sage);
   --color-sage-bg: var(--misty-theme-sage-bg);
   --color-status-green: var(--misty-theme-sage);
+
+  /* Item-type glyph tones (see src/shared/ui/icons/itemTones.ts). Mixed toward
+     the theme text so they soften on dark themes and deepen on light ones. */
+  --color-tone-blue: color-mix(in srgb, #4f86e8 72%, var(--misty-theme-text));
+  --color-tone-red: color-mix(in srgb, #e5533d 72%, var(--misty-theme-text));
+  --color-tone-green: color-mix(in srgb, #3fa463 72%, var(--misty-theme-text));
+  --color-tone-orange: color-mix(in srgb, #e8833a 72%, var(--misty-theme-text));
+  --color-tone-violet: color-mix(in srgb, #8b5cf6 72%, var(--misty-theme-text));
+  --color-tone-pink: color-mix(in srgb, #e0559b 72%, var(--misty-theme-text));
+  --color-tone-amber: color-mix(in srgb, #d9a21b 72%, var(--misty-theme-text));
+  --color-tone-teal: color-mix(in srgb, #14a39a 72%, var(--misty-theme-text));
+  --color-tone-sand: color-mix(in srgb, #a88a5a 72%, var(--misty-theme-text));
 
   /* Gruvbox-inspired pastels, deterministically assigned per person so the
      app doesn't read as entirely monochrome. Kept soft (no neon) — these are
@@ -185,7 +203,8 @@
      mounted Browser surface. Toggling these full-window ancestors for every
      popup forced WebKit to clear and repaint its backing store, which appeared
      as a dark flash. Opaque tool surfaces and Browser chrome still paint their
-     own backgrounds normally. */
+     own backgrounds normally. Once a page reports its color, its host paints
+     it, so a live resize exposes the page color instead of the window's. */
   html:has([data-browser-page-host]),
   html:has([data-browser-page-host]) body,
   html:has([data-browser-page-host]) #root,
@@ -199,7 +218,7 @@
   html:has([data-browser-page-host]) [data-browser-page-container]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-browser-workspace-tab],
   html:has([data-browser-page-host]) [data-browser-page-stage],
-  html:has([data-browser-page-host]) [data-browser-page-host] {
+  html:has([data-browser-page-host]) [data-browser-page-host]:not([data-misty-browser-background]) {
     background-color: transparent !important;
   }
 
@@ -327,6 +346,40 @@
     to {
       height: 0;
       opacity: 0;
+    }
+  }
+
+  /* Monochrome loading placeholder: a soft highlight sweeps across the block. */
+  .misty-skeleton {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .misty-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--color-cream) 7%, transparent) 50%,
+      transparent 100%
+    );
+    animation: misty-skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  @keyframes misty-skeleton-sweep {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .misty-skeleton::after {
+      animation: none;
+      display: none;
     }
   }
 

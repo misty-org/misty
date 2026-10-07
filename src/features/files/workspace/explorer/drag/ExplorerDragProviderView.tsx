@@ -23,6 +23,8 @@ import {
   selectDropCandidate,
 } from "@/features/file-ui";
 import { dragAnnouncement, ExplorerDragPreview, setWebviewDragActive } from "./ExplorerDragPreview";
+import { liftFilePreview } from "./liftedFilePreview";
+import "./explorerDrag.css";
 import {
   autoScrollAt,
   dragPreviewDataUrl,
@@ -34,6 +36,7 @@ import type { explorerPrepareDragItems } from "../../native";
 
 const DRAG_THRESHOLD = 6;
 const SPRING_LOAD_MS = 700;
+const SPRING_FLASH_MS = 260;
 const initialState: ExplorerDragViewState = {
   phase: "idle",
   payload: null,
@@ -72,6 +75,7 @@ export function ExplorerDragProviderView(props: {
   const stateRef = useRef(state);
   const armedRef = useRef<ArmedDrag | null>(null);
   const pointerHeldRef = useRef(false);
+  const liftedRef = useRef<ReturnType<typeof liftFilePreview> | null>(null);
   const zonesRef = useRef(new Map<string, RegisteredZone>());
   const modifiersRef = useRef<ExplorerDragModifiers>({
     copyRequested: false,
@@ -94,6 +98,8 @@ export function ExplorerDragProviderView(props: {
       preparedRef.current = null;
       armedRef.current = null;
       pointerHeldRef.current = false;
+      liftedRef.current?.remove();
+      liftedRef.current = null;
       if (springTimerRef.current !== null) window.clearTimeout(springTimerRef.current);
       springTimerRef.current = null;
       if (hitFrameRef.current !== null) window.cancelAnimationFrame(hitFrameRef.current);
@@ -130,7 +136,10 @@ export function ExplorerDragProviderView(props: {
       )?.zone ?? null;
     const acceptance = selected?.spec.accepts(payload, modifiersRef.current) ?? null;
     zonesRef.current.forEach(({ element }) => delete element.dataset.explorerDropActive);
-    if (selected) selected.element.dataset.explorerDropActive = "true";
+    // Only highlight items (folders, sidebar rows, path segments) that will
+    // actually take the drop; panes and sections accept drops without lighting up.
+    if (selected?.spec.springLoad && acceptance?.valid)
+      selected.element.dataset.explorerDropActive = "true";
     const next = {
       ...stateRef.current,
       pointer: { x, y },
@@ -227,6 +236,13 @@ export function ExplorerDragProviderView(props: {
       };
       stateRef.current = { ...initialState, phase: "internal", payload, pointer: point };
       setState(stateRef.current);
+      liftedRef.current = liftFilePreview(
+        armed.source,
+        armed.start,
+        armed.items[0]?.name ?? "",
+        armed.items.length,
+      );
+      liftedRef.current.move(point);
       setWebviewDragActive(true);
       beginPreparation(payload);
       scheduleHitTest(point.x, point.y);
@@ -270,6 +286,7 @@ export function ExplorerDragProviderView(props: {
         (item) => !item.location || item.location.kind === "local",
       );
       const mode = modifiersRef.current.moveRequested && allLocal ? "move" : "copy";
+      liftedRef.current?.hide();
       stateRef.current = { ...stateRef.current, phase: "native-egress", preparing: false };
       setState(stateRef.current);
       nativeEgressRef.current = true;
@@ -322,7 +339,10 @@ export function ExplorerDragProviderView(props: {
       ) {
         beginInternal(armed, point);
       }
-      if (stateRef.current.phase === "internal") scheduleHitTest(point.x, point.y);
+      if (stateRef.current.phase === "internal") {
+        liftedRef.current?.move(point);
+        scheduleHitTest(point.x, point.y);
+      }
     };
     const onPointerUp = () => {
       pointerHeldRef.current = false;
@@ -385,14 +405,20 @@ export function ExplorerDragProviderView(props: {
     springTimerRef.current = null;
     if (!zone?.spec.springLoad || !zone.spec.onSpringLoad) return;
     springTimerRef.current = window.setTimeout(() => {
-      springTimerRef.current = null;
-      zone.spec.onSpringLoad?.();
-      const pointer = stateRef.current.pointer;
-      if (pointer) window.requestAnimationFrame(() => resolveTargetAt(pointer.x, pointer.y));
+      // Blink the folder, like Finder, before opening it.
+      zone.element.dataset.explorerSpringFlash = "true";
+      springTimerRef.current = window.setTimeout(() => {
+        springTimerRef.current = null;
+        delete zone.element.dataset.explorerSpringFlash;
+        zone.spec.onSpringLoad?.();
+        const pointer = stateRef.current.pointer;
+        if (pointer) window.requestAnimationFrame(() => resolveTargetAt(pointer.x, pointer.y));
+      }, SPRING_FLASH_MS);
     }, SPRING_LOAD_MS);
     return () => {
       if (springTimerRef.current !== null) window.clearTimeout(springTimerRef.current);
       springTimerRef.current = null;
+      if (zone) delete zone.element.dataset.explorerSpringFlash;
     };
   }, [resolveTargetAt, state.activeZoneId]);
 

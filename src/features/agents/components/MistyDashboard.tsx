@@ -1,6 +1,6 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { activityParent, type MistyActivityEntry } from "@/features/misty/activity";
-import { Button, CollectionItems } from "@/shared/ui";
+import { Button, CollectionItems, CollectionSkeleton, SkeletonList } from "@/shared/ui";
 import {
   CalendarClock,
   Check,
@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { runtimeAiApi as ai, runtimeAgentsApi as agents, useAgentsAuth } from "../AgentsRuntime";
 import type { PersonalAgentRunDetail } from "../model/interfaces/personal";
+import { ToolActivity } from "./ToolActivity";
 
 const finishedStates = new Set(["completed", "failed", "canceled", "completed_with_errors"]);
 const stateLabels: Record<string, string> = {
@@ -107,11 +108,13 @@ export function MistyDashboard({
         </div>
       )}
       {loading ? (
-        <p className="agents-list-note" role="status">
-          Loading activity…
-        </p>
+        collection ? (
+          <CollectionSkeleton label="Agent activity" view={collection.view} />
+        ) : (
+          <SkeletonList label="Agent activity" rows={4} leading="icon" />
+        )
       ) : null}
-      {collection && (
+      {collection && !loading && (
         <CollectionItems
           columnSetId="agent-activity"
           fields={["Type", "Events", "Delegation"]}
@@ -317,7 +320,7 @@ function ActivityDetails({
   return (
     <>
       {parentTitle && <p className="text-cream-muted">Delegated by {parentTitle}</p>}
-      {loading && <p role="status">Loading task details…</p>}
+      {loading && <SkeletonList label="Task details" rows={3} leading="none" />}
       {error && (
         <div role="alert">
           <p>{error}</p>
@@ -329,46 +332,8 @@ function ActivityDetails({
         </div>
       )}
       {detail?.instruction && <p>{detail.instruction}</p>}
-      {detail?.approvals
-        .filter((approval) => approval.state === "pending")
-        .map((approval) => (
-          <div key={approval.id} className="agent-activity-approval">
-            <p>{approval.summary}</p>
-            <div>
-              {(["approve", "deny"] as const).map((decision) => (
-                <Button
-                  key={decision}
-                  variant={decision === "approve" ? "secondary" : "ghost"}
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void action(() => agents.decideApproval(entry.run_id, approval.id, decision))
-                  }
-                >
-                  {decision === "approve" ? "Approve" : "Deny"}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ))}
       {result && <p className="agent-activity-result">{result}</p>}
-      {entry.events.length > 0 && (
-        <details className="agent-activity-events">
-          <summary>Tool activity</summary>
-          <ul>
-            {entry.events.map((event, index) => (
-              <li key={index}>
-                {event.text ||
-                  event.error ||
-                  event.toolName ||
-                  event.tool_name ||
-                  event.phase ||
-                  event.type}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <ToolActivity events={entry.events} />
       {!loading && !error && !detail?.instruction && !result && !entry.events.length && (
         <p className="text-cream-muted">No details available.</p>
       )}

@@ -31,4 +31,10 @@ impl From<serde_json::Error> for ApiError {
     }
 }
 
+impl From<std::io::Error> for ApiError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Message(value.to_string())
+    }
+}
+
 pub type ApiResult<T> = Result<T, ApiError>;

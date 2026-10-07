@@ -46,7 +46,7 @@ export function CollectionColumnChooser() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton label="Choose columns" shape="round">
+        <IconButton label="Choose columns">
           <TableProperties />
         </IconButton>
       </DropdownMenuTrigger>

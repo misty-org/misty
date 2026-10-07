@@ -6,6 +6,7 @@ vi.mock("@/api/agents/native", () => ({ personalAgentsApi: { save } }));
 import { AgentSetup } from "./AgentSetup";
 const access = {
   accountId: "owner",
+  agentId: "",
   connections: [],
   loading: false,
   connectionsError: false,
@@ -19,7 +20,6 @@ const start = (onSaved = vi.fn(async () => {})) => {
     <AgentSetup
       access={access}
       onConnections={vi.fn()}
-      onCompanion={vi.fn()}
       onStatusChange={vi.fn()}
       onSaved={onSaved}
     />,
@@ -32,7 +32,9 @@ const start = (onSaved = vi.fn(async () => {})) => {
 it("preserves identity across steps and saves an account-wide profile without invented permissions", async () => {
   save.mockResolvedValue({ id: "created" });
   const done = start();
-  expect(screen.getByText("Connections are shared across your agents.")).toBeTruthy();
+  expect(
+    screen.getByText("Connected apps belong to your account. Every agent can use them."),
+  ).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Computer" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Research partner");

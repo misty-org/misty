@@ -18,13 +18,13 @@ char *misty_autopilot_focus_reason(void) {
 - (NSView *)hitTest:(NSPoint)point { return nil; }
 - (BOOL)isFlipped { return YES; }
 - (void)drawRect:(NSRect)rect {
+  // The same arrow as the in-page and desktop agent cursors.
   NSBezierPath *path = [NSBezierPath bezierPath];
-  [path moveToPoint:NSMakePoint(2,2)]; [path lineToPoint:NSMakePoint(2,24)];
-  [path lineToPoint:NSMakePoint(8,18)]; [path lineToPoint:NSMakePoint(13,28)];
-  [path lineToPoint:NSMakePoint(18,25)]; [path lineToPoint:NSMakePoint(13,16)];
-  [path lineToPoint:NSMakePoint(23,16)]; [path closePath];
-  [[NSColor colorWithRed:0.35 green:0.65 blue:1 alpha:1] setFill]; [path fill];
-  [NSColor.blackColor setStroke]; path.lineWidth=1.5; [path stroke];
+  [path moveToPoint:NSMakePoint(2,2)]; [path lineToPoint:NSMakePoint(22,17)];
+  [path lineToPoint:NSMakePoint(13,18)]; [path lineToPoint:NSMakePoint(9,26)]; [path closePath];
+  path.lineJoinStyle=NSLineJoinStyleRound; path.lineWidth=2;
+  [[NSColor colorWithSRGBRed:0xa0/255.0 green:0xc4/255.0 blue:0xd4/255.0 alpha:1] setFill]; [path fill];
+  [[NSColor colorWithSRGBRed:0x13/255.0 green:0x13/255.0 blue:0x13/255.0 alpha:1] setStroke]; [path stroke];
 }
 @end
 static MistyAutopilotCursor *cursor;
@@ -50,10 +50,10 @@ char *misty_autopilot_action(const char *json) {
       NSPoint point=NSMakePoint(x*window.frame.size.width,(1-y)*window.frame.size.height);
       NSRect content=[window.contentView convertRect:window.contentView.bounds toView:nil];
       if (!NSPointInRect(point,content)) return AutopilotJSON(@{@"error":@"Only the Misty workspace can be controlled"});
-      if (!cursor) { cursor=[[MistyAutopilotCursor alloc] initWithFrame:NSMakeRect(0,0,30,32)]; cursor.wantsLayer=YES; }
+      if (!cursor) { cursor=[[MistyAutopilotCursor alloc] initWithFrame:NSMakeRect(0,0,26,30)]; cursor.wantsLayer=YES; }
       [window.contentView addSubview:cursor positioned:NSWindowAbove relativeTo:nil];
       NSPoint local=[window.contentView convertPoint:point fromView:nil];
-      cursor.frame=NSMakeRect(local.x,local.y-30,30,32);
+      cursor.frame=NSMakeRect(local.x-2,local.y-28,26,30); // tip (2,2) of the flipped view on the target
       if ([kind isEqual:@"point"]) {
         for (NSNumber *type in @[@(NSEventTypeLeftMouseDown),@(NSEventTypeLeftMouseUp)]) {
           NSEvent *event=[NSEvent mouseEventWithType:type.unsignedIntegerValue location:point modifierFlags:0 timestamp:time windowNumber:window.windowNumber context:nil eventNumber:0 clickCount:1 pressure:1];
