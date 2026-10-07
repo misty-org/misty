@@ -26,8 +26,8 @@ use crate::error::{ApiError, ApiResult};
 use crate::infra::agents::PrepareScopedAgentDocumentRequest;
 use crate::infra::autostart::LaunchOnLoginSnapshot;
 use crate::infra::connected_devices::{
-    ConnectPeerRequest, ConnectedDevicesService, ConnectedDevicesSnapshot,
-    InitializeConnectedDevicesRequest, PeerPathRequest, PeerReadRequest,
+    ConnectedDevicesService, ConnectedDevicesSnapshot, InitializeConnectedDevicesRequest,
+    PeerPathRequest, PeerReadRequest,
 };
 use crate::infra::devices::{DeviceSnapshot, DeviceUnmountRequest};
 use crate::infra::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
@@ -134,6 +134,53 @@ pub async fn agents_revoke_folder_scope(
     state.agents.revoke_folder_scope(scope_id).await
 }
 
+/// Shows the native folder picker and grants the chosen folder to agents on
+/// this device. A page can never name a path itself.
+#[tauri::command]
+pub async fn agents_choose_folder_scope(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Option<serde_json::Value>> {
+    use tauri_plugin_dialog::DialogExt;
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Open the main Misty window to share a folder with agents.".into(),
+        ));
+    }
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Choose a folder Misty agents can read")
+        .pick_folder(move |folder| {
+            let _ = send.send(folder);
+        });
+    let Some(folder) = receive
+        .await
+        .map_err(|_| crate::error::ApiError::Message("Folder selection was canceled.".into()))?
+    else {
+        return Ok(None);
+    };
+    let path = folder
+        .into_path()
+        .map_err(|_| crate::error::ApiError::Message("Choose a local folder.".into()))?;
+    state.agents.register_folder_scope(path).await.map(Some)
+}
+
+#[tauri::command]
+pub async fn agents_list_scoped_files(
+    webview: tauri::Webview,
+    request: crate::infra::agents::ListScopedFilesRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<serde_json::Value> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can process approved device scopes.".into(),
+        ));
+    }
+    state.agents.list_scoped_files(request).await
+}
+
 #[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn agents_prepare_document(
@@ -190,21 +237,6 @@ pub async fn agents_prepare_scoped_document(
         path: target.to_string_lossy().into_owned(),
     })
     .await
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn agents_device_identity_load(local_device_id: String) -> ApiResult<Option<String>> {
-    crate::infra::agent_device_identity::load(&local_device_id)
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn agents_device_identity_store(
-    local_device_id: String,
-    encoded_identity: String,
-) -> ApiResult<()> {
-    crate::infra::agent_device_identity::store(&local_device_id, &encoded_identity)
 }
 
 #[tauri::command]
@@ -417,6 +449,7 @@ pub async fn explorer_list_directory(
         let PeerResponse::Directory {
             entries,
             snapshot: _,
+            writable,
             ..
         } = response
         else {
@@ -428,6 +461,7 @@ pub async fn explorer_list_directory(
             parsed.device_id.clone(),
             parsed.root_id.clone(),
             parsed.relative_path.to_string_lossy().into_owned(),
+            writable,
         );
         let total_count = entries.len();
         let hidden_count = entries.iter().filter(|entry| entry.hidden).count();
@@ -456,7 +490,7 @@ pub async fn explorer_list_directory(
                     size_bytes: entry.size_bytes,
                     modified_ms: entry.modified_ms,
                     created_ms: None,
-                    readonly: true,
+                    readonly: entry.readonly,
                     hidden: entry.hidden,
                     is_deleted: false,
                     location: location.clone(),
@@ -693,7 +727,7 @@ async fn materialize_peer_paste_sources(
 ) -> ApiResult<()> {
     if request.destination_directory.starts_with("misty://device/") {
         return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
+            "Copy to a connected device through the transfer queue.".to_owned(),
         ));
     }
     let has_peer_source = request
@@ -1267,11 +1301,11 @@ pub async fn settings_remove_open_with_association(
 
 #[tauri::command]
 pub async fn explorer_queue_paste_items(
-    mut request: PasteItemsRequest,
+    request: PasteItemsRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    #[cfg(desktop)]
-    materialize_peer_paste_sources(&mut request, &state.connected_devices).await?;
+    // Connected-device sources and destinations are resolved per item when the
+    // queue runs, so remote moves and uploads keep their progress and conflicts.
     state.operation_queue.enqueue_paste_items(request).await
 }
 
@@ -1304,11 +1338,6 @@ pub async fn explorer_queue_create_item(
     request: CreateItemRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request.directory.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_create_item(request).await
 }
 
@@ -1317,11 +1346,6 @@ pub async fn explorer_queue_rename_item(
     request: RenameItemRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request.path.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_rename_item(request).await
 }
 
@@ -1330,15 +1354,6 @@ pub async fn explorer_queue_rename_items(
     request: RenameItemsRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request
-        .items
-        .iter()
-        .any(|item| item.path.starts_with("misty://device/"))
-    {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_rename_items(request).await
 }
 
@@ -1347,15 +1362,6 @@ pub async fn explorer_queue_delete_items(
     request: DeleteItemsRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<OperationQueueSnapshot> {
-    if request
-        .paths
-        .iter()
-        .any(|path| path.starts_with("misty://device/"))
-    {
-        return Err(ApiError::Message(
-            "Connected devices are read-only.".to_owned(),
-        ));
-    }
     state.operation_queue.enqueue_delete_items(request).await
 }
 
@@ -1527,15 +1533,6 @@ pub async fn connected_devices_subscribe_directory(
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn connected_devices_connect(
-    request: ConnectPeerRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    state.connected_devices.connect(request).await
-}
-
-#[cfg(desktop)]
-#[tauri::command]
 pub async fn connected_devices_open_workspace_route(
     device_id: String,
     request: crate::domain::connected_devices::OpenWorkspaceRouteRequest,
@@ -1545,6 +1542,16 @@ pub async fn connected_devices_open_workspace_route(
         .connected_devices
         .open_workspace_route(&device_id, request)
         .await
+}
+
+/// This device's id on Misty's server, which paired devices know it by.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn connected_devices_set_identity(
+    device_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    state.connected_devices.set_network_identity(device_id)
 }
 
 #[cfg(desktop)]

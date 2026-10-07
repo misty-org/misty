@@ -426,9 +426,6 @@ nav {
   padding: 32px;
   color: var(--misty-theme-text-muted);
 }
-.mobile-heading {
-  display: none;
-}
 @media (min-width: 1600px) {
   .sidebar {
     width: 16.5vw;
@@ -465,117 +462,5 @@ nav {
   .item-button {
     font-size: 12px;
     gap: 7px;
-  }
-}
-@media (max-width: 700px) {
-  .sidebar {
-    display: none;
-  }
-  .sidebar.mobile-open {
-    display: flex;
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 3;
-    width: 244px;
-    box-shadow: 12px 0 40px #0008;
-  }
-  .main {
-    padding: 16px 20px;
-    min-height: 100vh;
-  }
-  .mobile-heading {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--misty-theme-text-muted);
-    margin-bottom: 24px;
-  }
-  .content-heading {
-    align-items: flex-start;
-    gap: 14px;
-    flex-direction: column;
-  }
-  .header-actions {
-    width: 100%;
-  }
-  .content-search {
-    flex: 1;
-  }
-  .filter-bar {
-    margin-top: 20px;
-  }
-  .filter-button {
-    padding: 0 12px;
-  }
-  .toolbar-divider {
-    margin: 0 2px;
-  }
-  .areas {
-    margin-top: 26px;
-  }
-  .area-card-link {
-    padding: 16px;
-    min-height: 124px;
-  }
-  .items-section th:nth-child(2),
-  .items-section td:nth-child(2) {
-    display: none;
-  }
-  .items-section th:first-child {
-    width: 63%;
-  }
-  .items-section th:nth-child(3) {
-    width: 37%;
-  }
-  .items-section th:last-child,
-  .items-section td:last-child {
-    display: none;
-  }
-  .items-section td {
-    font-size: 11px;
-  }
-  .item-button {
-    white-space: normal;
-    text-align: left;
-    font-size: 12px;
-  }
-  .file-icon {
-    width: 28px;
-    height: 30px;
-    flex-shrink: 0;
-  }
-  .favorite-star {
-    display: none;
-  }
-  .starter-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    margin-top: 28px;
-  }
-  .scheduled-main {
-    justify-content: flex-start;
-  }
-  .scheduled-start {
-    padding: 20px 0;
-  }
-  .scheduled-start h2 {
-    font-size: 20px;
-  }
-  .starter {
-    min-height: 105px;
-  }
-  .filter-bar {
-    gap: 4px;
-  }
-  .filters {
-    gap: 0;
-  }
-  .preview-notice {
-    position: fixed;
-    max-width: 90vw;
-  }
-  .journal-description {
-    line-height: 1.6;
   }
 }

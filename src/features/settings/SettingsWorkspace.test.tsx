@@ -113,6 +113,23 @@ vi.mock("@/api/assistant/api", () => ({
     }),
   },
 }));
+vi.mock("@/api/assistant/senses", () => ({
+  sensesApi: {
+    list: async () => ({
+      senses: [
+        {
+          id: "thinking",
+          name: "Thinking",
+          description: "Conversations, planning and using tools.",
+          model: "",
+          default_model: "openai/default",
+          options: [{ id: "openai/default", name: "Default model", provider: "OpenAI" }],
+        },
+      ],
+    }),
+    set: async () => {},
+  },
+}));
 initializeHostAgentsRuntime();
 describe("SettingsWorkspace", () => {
   let container: HTMLDivElement;
@@ -172,9 +189,10 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
     expect(container.querySelector("[aria-expanded]")).toBeNull();
   });
-  it("shows actual available models", async () => {
+  it("shows a model choice per sense", async () => {
     await render("models");
-    expect(container.querySelector("main")?.textContent).toContain("Available model");
+    expect(container.querySelector("main")?.textContent).toContain("Thinking");
+    expect(container.querySelector("main")?.textContent).toContain("Misty default");
   });
   it("keeps system pages individually addressable", () => {
     for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])

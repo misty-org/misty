@@ -10,7 +10,7 @@ export const fileBrowserStyles = {
     "grid grid-cols-[minmax(240px,1fr)_220px_128px_128px] items-center gap-4 px-3.5",
   tableSkeletonHeader: "h-10 bg-charcoal-card",
   tableSkeletonRow: "h-12 [[data-compact-mode=true]_&]:h-10",
-  skeletonCell: "relative animate-pulse overflow-hidden rounded-md bg-charcoal-card",
+  skeletonCell: "misty-skeleton rounded-md bg-charcoal-card",
   tableSkeletonHeaderCell: "h-[13px]",
   tableSkeletonCell: "h-3 first:h-4",
   gridSkeleton: cn(
@@ -79,8 +79,10 @@ export const fileBrowserStyles = {
   tableNameText:
     "min-w-0 cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap",
   tableIconSlot: "grid size-5 flex-none place-items-center",
-  entryIcon:
-    "block shrink-0 text-cream-muted group-data-[state=selected]/file-row:text-cream group-aria-pressed/file-row:text-cream group-hover/file-row:text-cream",
+  entryIcon: "block shrink-0",
+  // Untoned icons brighten with their row; toned icons keep their color.
+  entryIconMuted:
+    "text-cream-muted group-data-[state=selected]/file-row:text-cream group-aria-pressed/file-row:text-cream group-hover/file-row:text-cream",
   gridScroll:
     "misty-transient-scrollbar misty-file-browser-scrollbar min-h-0 min-w-0 overflow-auto [contain:layout_paint] [overscroll-behavior:contain]",
   gridSizer: "relative min-w-0",

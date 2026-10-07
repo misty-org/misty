@@ -16,14 +16,14 @@ mod telemetry;
 
 #[cfg(desktop)]
 use app::commands::{
-    agents_device_identity_load, agents_device_identity_store,
     media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
     media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
     media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
     media_search_set_asset_state, media_search_snapshot,
 };
 use app::commands::{
-    agents_device_snapshot, agents_prepare_scoped_document, agents_revoke_folder_scope,
+    agents_choose_folder_scope, agents_device_snapshot, agents_list_scoped_files,
+    agents_prepare_scoped_document, agents_revoke_folder_scope,
     app_snapshot, archive_create, archive_extract, archive_list, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
@@ -40,11 +40,12 @@ use app::commands::{
     explorer_save_preview_item, file_metadata_snapshot, file_sync_apply, file_sync_compare,
     file_sync_pair_remove, file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum,
     file_tools_create_symlink, file_tools_read_symlink, navigation_names_snapshot,
-    navigation_names_update, open_terminal_at_path, operation_queue_redo,
-    operation_queue_resolve_conflict, operation_queue_snapshot, operation_queue_undo,
-    saved_searches_delete, saved_searches_save, saved_searches_snapshot, search_cancel_scan,
-    search_get_status, search_init, search_query, search_start_scan,
-    settings_apply_launch_on_login, settings_launch_on_login_snapshot,
+    navigation_names_update, open_terminal_at_path, operation_queue_cancel, operation_queue_pause,
+    operation_queue_pause_all, operation_queue_redo, operation_queue_resolve_conflict,
+    operation_queue_resume, operation_queue_resume_all, operation_queue_retry_transfer,
+    operation_queue_snapshot, operation_queue_undo, saved_searches_delete, saved_searches_save,
+    saved_searches_snapshot, search_cancel_scan, search_get_status, search_init, search_query,
+    search_start_scan, settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_profile_commit, settings_profile_state,
     settings_save, settings_snapshot, smart_library_apply_results, smart_library_assets_page,
     smart_library_delete, smart_library_import_files, smart_library_preflight_import,
@@ -54,9 +55,23 @@ use app::commands::{
 
 #[cfg(desktop)]
 use app::commands::{
-    connected_devices_connect, connected_devices_initialize, connected_devices_media_url,
-    connected_devices_prepare_clipboard_files, connected_devices_roots, connected_devices_snapshot,
+    connected_devices_initialize, connected_devices_media_url,
+    connected_devices_prepare_clipboard_files, connected_devices_roots,
+    connected_devices_set_identity, connected_devices_snapshot,
     connected_devices_subscribe_directory,
+};
+#[cfg(desktop)]
+use app::device_admission_commands::{
+    devices_admit_self, devices_approval_status, devices_approve_confirm, devices_approve_start,
+    devices_approve_status, devices_connect, devices_deny, devices_pending_requests,
+    devices_publish_folders, devices_remove, devices_rename, devices_request_approval,
+    devices_set_policy,
+};
+#[cfg(desktop)]
+use app::device_commands::{devices_refresh, devices_start, devices_stop, devices_view};
+#[cfg(desktop)]
+use app::device_job_commands::{
+    device_send_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
@@ -86,6 +101,12 @@ use infra::browser_agent_control::{
 use infra::browser_history::{
     browser_history_clear, browser_history_delete, browser_history_forget, browser_history_query,
     browser_history_record, browser_history_set_title, browser_history_suggest,
+};
+#[cfg(desktop)]
+use infra::browser_import::{
+    browser_import_bookmarks, browser_import_bookmarks_file, browser_import_discover,
+    browser_import_history, browser_import_preview, browser_import_save_bookmarks,
+    browser_import_settings, browser_import_signins,
 };
 #[cfg(desktop)]
 use infra::browser_library::{
@@ -174,6 +195,10 @@ pub fn run() {
                     .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
             }
             let runtime = MistyRuntime::new();
+            // What this device trusts (vault root pin, device list, its own
+            // policy) lives beside its other app data.
+            #[cfg(desktop)]
+            infra::device_trust::set_storage_root(runtime.environment.config_dir());
             #[cfg(desktop)]
             {
                 let route_app = app.handle().clone();
@@ -185,6 +210,8 @@ pub fn run() {
                             .is_ok()
                     }));
             }
+            #[cfg(unix)]
+            app.manage(infra::agent_files::AgentFilesState::default());
             app.manage(runtime);
             #[cfg(desktop)]
             app.manage(BrowserSessionState::default());
@@ -258,6 +285,18 @@ pub fn run() {
         .invoke_handler({
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
+                    crate::infra::extensions::extensions_search,
+                    crate::infra::extensions::extensions_categories,
+                    crate::infra::extensions::extensions_detail,
+                    crate::infra::extensions::install::extensions_prepare,
+                    crate::infra::extensions::install::extensions_commit,
+                    crate::infra::extensions::runtime::extensions_reconcile,
+                    crate::infra::extensions::runtime::extensions_action,
+                    crate::infra::extensions::runtime::extensions_respond,
+                    crate::infra::extensions::runtime::extensions_tab_created,
+                    crate::infra::extensions::extensions_layout,
+                    crate::infra::extensions::extensions_compat,
+                    crate::infra::extensions::runtime::extensions_check_updates,
                     crate::infra::browser_sync::browser_sync_availability,
                     crate::infra::workspace_recovery::browser_recovery_open,
                     crate::infra::workspace_recovery::browser_recovery_read,
@@ -302,12 +341,27 @@ pub fn run() {
                     mac_rounded_corners::set_native_wallpaper_video,
                     app_snapshot,
                     agents_device_snapshot,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_choose,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_prepare,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_apply,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_cancel,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_manifest,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_history,
+                    infra::agent_files::agent_files_snapshot,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_undo,
+                    #[cfg(unix)]
+                    infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
+                    agents_choose_folder_scope,
+                    agents_list_scoped_files,
                     agents_prepare_scoped_document,
-                    #[cfg(desktop)]
-                    agents_device_identity_load,
-                    #[cfg(desktop)]
-                    agents_device_identity_store,
                     #[cfg(desktop)]
                     connected_devices_initialize,
                     #[cfg(desktop)]
@@ -315,9 +369,51 @@ pub fn run() {
                     #[cfg(desktop)]
                     connected_devices_subscribe_directory,
                     #[cfg(desktop)]
-                    connected_devices_connect,
-                    #[cfg(desktop)]
                     connected_devices_roots,
+                    #[cfg(desktop)]
+                    connected_devices_set_identity,
+                    #[cfg(desktop)]
+                    devices_start,
+                    #[cfg(desktop)]
+                    devices_stop,
+                    #[cfg(desktop)]
+                    devices_view,
+                    #[cfg(desktop)]
+                    devices_refresh,
+                    #[cfg(desktop)]
+                    devices_admit_self,
+                    #[cfg(desktop)]
+                    devices_request_approval,
+                    #[cfg(desktop)]
+                    devices_approval_status,
+                    #[cfg(desktop)]
+                    devices_pending_requests,
+                    #[cfg(desktop)]
+                    devices_approve_start,
+                    #[cfg(desktop)]
+                    devices_approve_status,
+                    #[cfg(desktop)]
+                    devices_approve_confirm,
+                    #[cfg(desktop)]
+                    devices_deny,
+                    #[cfg(desktop)]
+                    devices_remove,
+                    #[cfg(desktop)]
+                    devices_rename,
+                    #[cfg(desktop)]
+                    devices_set_policy,
+                    #[cfg(desktop)]
+                    devices_publish_folders,
+                    #[cfg(desktop)]
+                    devices_connect,
+                    #[cfg(desktop)]
+                    device_sign_request,
+                    #[cfg(desktop)]
+                    device_sign_run_grants,
+                    #[cfg(desktop)]
+                    device_verify_job,
+                    #[cfg(desktop)]
+                    device_send_file,
                     #[cfg(desktop)]
                     connected_devices_media_url,
                     #[cfg(desktop)]
@@ -330,6 +426,7 @@ pub fn run() {
                     #[cfg(desktop)]
                     browser_webview_create,
                     infra::agent_workspace::agent_window_open,
+                    infra::agent_workspace::agent_window_show,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_configure,
                     #[cfg(any(target_os = "macos", windows))]
@@ -345,6 +442,7 @@ pub fn run() {
                     #[cfg(any(target_os = "macos", windows))]
                     infra::agent_workspace::agent_window_take_task,
                     infra::agent_workspace::agent_window_ack_task,
+                    infra::agent_workspace::agent_window_task_receipt,
                     infra::agent_workspace::agent_foreground_queue,
                     infra::agent_workspace::agent_workspace_acquire,
                     infra::agent_workspace::agent_workspace_release,
@@ -426,6 +524,22 @@ pub fn run() {
                     browser_history_suggest,
                     #[cfg(desktop)]
                     browser_history_forget,
+                    #[cfg(desktop)]
+                    browser_import_discover,
+                    #[cfg(desktop)]
+                    browser_import_bookmarks,
+                    #[cfg(desktop)]
+                    browser_import_bookmarks_file,
+                    #[cfg(desktop)]
+                    browser_import_save_bookmarks,
+                    #[cfg(desktop)]
+                    browser_import_preview,
+                    #[cfg(desktop)]
+                    browser_import_history,
+                    #[cfg(desktop)]
+                    browser_import_settings,
+                    #[cfg(desktop)]
+                    browser_import_signins,
                     browser_search_suggest,
                     #[cfg(desktop)]
                     browser_download_cancel,
@@ -551,6 +665,12 @@ pub fn run() {
                     transfers_snapshot,
                     open_terminal_at_path,
                     operation_queue_snapshot,
+                    operation_queue_cancel,
+                    operation_queue_retry_transfer,
+                    operation_queue_pause,
+                    operation_queue_resume,
+                    operation_queue_pause_all,
+                    operation_queue_resume_all,
                     operation_queue_undo,
                     operation_queue_redo,
                     operation_queue_resolve_conflict,

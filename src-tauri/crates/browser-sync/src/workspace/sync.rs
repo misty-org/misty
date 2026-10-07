@@ -81,6 +81,9 @@ pub struct SyncState {
     /// Every active device understands tab groups and collections.
     /// Set by the worker; tab groups sync only then.
     pub all_upgraded: bool,
+    /// Every active device understands nested bookmark folders. Set by the
+    /// worker; bookmark tree fields sync only then.
+    pub nested_bookmarks: bool,
     /// Records with changes the server has not confirmed yet (queued or in
     /// flight), one entry per record, so the renderer can name them per tab.
     pub unsynced: Vec<UnsyncedRecord>,
@@ -1116,6 +1119,7 @@ impl WorkspaceSync {
             on_workspace: self.on_workspace().map(str::to_owned),
             collections: BTreeMap::new(),
             all_upgraded: false,
+            nested_bookmarks: false,
             unsynced: unsynced.into_values().collect(),
             retired_edits: store.retired_workspace_count()?,
         })

@@ -10,13 +10,29 @@ export interface BrandIconProps {
   "aria-hidden"?: boolean;
 }
 
+/** Single-color marks painted black or white to match the surrounding surface. */
+const adaptiveMarks = new Set([
+  "anthropic",
+  "composio",
+  "filen",
+  "files-com",
+  "github",
+  "internet-archive",
+  "linear",
+  "ollama",
+  "openai",
+  "typeform",
+  "vercel",
+  "x",
+]);
+
 /** Shared original SVG artwork; never inherit an inactive row's foreground color. */
 export function BrandIcon({ brand, size = 24, className, style, title, ...aria }: BrandIconProps) {
   const asset = brandIconAsset(brand);
   if (!asset) return null;
   // Embedded SVG media queries can follow the OS rather than the surrounding
-  // WebView surface. Paint X's original silhouette using the local color scheme.
-  if (asset.id === "x") {
+  // WebView surface. Paint monochrome silhouettes using the local color scheme.
+  if (adaptiveMarks.has(asset.id)) {
     const mask = `url("${asset.src}") center / contain no-repeat`;
     return (
       <span
@@ -26,8 +42,8 @@ export function BrandIcon({ brand, size = 24, className, style, title, ...aria }
         aria-hidden={aria["aria-hidden"] ?? !title}
         title={title}
         className={className}
-        data-brand-icon="x"
-        data-social-provider-icon="x"
+        data-brand-icon={asset.id}
+        data-social-provider-icon={asset.id === "x" ? "x" : undefined}
         style={{
           display: "inline-block",
           flexShrink: 0,

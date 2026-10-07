@@ -1,4 +1,21 @@
+import type { CollaborationEvent } from "@/features/agents/agentCollaboration";
 import type { DisplayCapture } from "@/features/agents";
+import type { AppRequest } from "@/features/agents";
+
+/**
+ * A run that needs a screen asks for one and ends its response. The desktop
+ * opens it where the account setting says, then continues the conversation.
+ */
+export interface ScreenRequest {
+  /** A browser screen, a look at the user's screen, or the user's desktop apps. */
+  kind: "open" | "look" | "desktop";
+  url?: string;
+  reason: string;
+  location: "separate" | "window" | "ask";
+  /** Client progress: waiting for a choice, opening, or done. */
+  state?: "pending" | "opening" | "opened" | "declined" | "failed";
+  error?: string;
+}
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
@@ -12,6 +29,7 @@ export type AiSurfaceId =
   | "drawings"
   | "library"
   | "browser"
+  | "extensions"
   | "files"
   | "photo-editor"
   | "scheduled"
@@ -37,11 +55,15 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  kind: "browser_tab";
+  /** A browser tab, a folder shared with agents, the Misty browser itself, or
+   * the device's inbox for files its other devices send it. */
+  kind: "browser_tab" | "local_folder" | "workspace" | "inbox";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];
   metadata?: Record<string, string | number | boolean>;
+  /** Signed by the device that asked; required by the server. */
+  runGrant?: { payload: string; signature: string };
 }
 export interface AiSelectionSnapshot {
   kind: "text" | "blocks" | "canvas" | "objects" | "rows";
@@ -165,8 +187,13 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
+  methodVersionId?: string;
+  methodInputs?: Record<string, string | number | boolean>;
+  skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
+  /** Pins a new conversation's Thinking model with its first message. */
+  modelOverride?: string;
   displayCaptures?: DisplayCapture[];
   agentId?: string;
   taskId?: string;
@@ -186,6 +213,8 @@ export interface AiInvocationRequest {
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   requestedArtifactKind?: AiArtifactKind;
   conversationId?: string;
+  /** Plan researches and proposes; Act does the work. Omitted uses the conversation's mode. */
+  collaborationMode?: "act" | "plan";
   idempotencyKey: string;
   timezone?: string;
 }
@@ -230,6 +259,14 @@ export type AiInvocationState =
   | "failed"
   | "canceled";
 export type AiInvocationEvent =
+  | { id: string; type: "user.steering"; text: string }
+  | ({ id: string } & CollaborationEvent)
+  | {
+      id: string;
+      type: "steering.received" | "steering.closed";
+      messages: Array<{ sequence: number; text: string }>;
+      closed: boolean;
+    }
   | {
       id: string;
       type: "invocation.started";
@@ -259,6 +296,16 @@ export type AiInvocationEvent =
       id: string;
       type: "citation";
       citation: AiCitation;
+    }
+  | {
+      id: string;
+      type: "app.request";
+      appRequest: AppRequest;
+    }
+  | {
+      id: string;
+      type: "screen.request";
+      screenRequest: ScreenRequest;
     }
   | {
       id: string;

@@ -17,7 +17,8 @@ import {
   MenuItem,
   ContextMenuAction,
   IconButton,
-  Spinner,
+  CollectionSkeleton,
+  itemTones,
 } from "@/shared/ui";
 import type { UnifiedNote } from "../model/types/types";
 import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
@@ -117,7 +118,7 @@ export function JournalCollection(props: {
         </div>
       )}
       {props.loading ? (
-        <Spinner label="Loading notes" />
+        <CollectionSkeleton label="Loading notes" view={view} />
       ) : (
         <CollectionItems
           columnSetId="notes"
@@ -129,6 +130,7 @@ export function JournalCollection(props: {
             id: note.id,
             title: note.title || "Untitled note",
             icon: <FileText size={18} />,
+            tone: itemTones.note,
             category: "Note",
             creator: creatorName(note.creatorUserId),
             metadata: {

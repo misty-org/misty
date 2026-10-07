@@ -22,7 +22,6 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 export function AgentSetup(props: {
   access: AgentAccessState;
   onConnections(): void;
-  onCompanion(): void;
   onStatusChange(status: { dirty: boolean; busy: boolean }): void;
   onSaved(id: string, companion?: boolean): Promise<void>;
 }) {
@@ -176,14 +175,7 @@ export function AgentSetup(props: {
             </details>
           </>
         )}
-        {step === 1 && (
-          <AgentAccess
-            access={props.access}
-            showComputer={false}
-            onConnections={props.onConnections}
-            onCompanion={props.onCompanion}
-          />
-        )}
+        {step === 1 && <AgentAccess access={props.access} onConnections={props.onConnections} />}
         {step === 2 && (
           <>
             <div role="group" aria-label="Start with">

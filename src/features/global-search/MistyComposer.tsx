@@ -1,3 +1,4 @@
+import { CommandUsageEstimate } from "./CommandUsageEstimate";
 import {
   cn,
   DropdownMenu,
@@ -19,6 +20,7 @@ import type { GlobalAiMode, MistyImageAttachment } from "./types";
 
 export function MistyComposer(props: {
   value: string;
+  modelId?: string;
   onChange: (value: string) => void;
   mode: GlobalAiMode;
   onModeChange?: (mode: GlobalAiMode) => void;
@@ -31,6 +33,8 @@ export function MistyComposer(props: {
   onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onCapture?: () => void;
   voiceControl?: ReactNode;
+  /** Controls after Attach in the leading group, such as a conversation's mode. */
+  leadingControl?: ReactNode;
   modelControl?: ReactNode;
   trailingControl?: ReactNode;
   disabled?: boolean;
@@ -38,6 +42,8 @@ export function MistyComposer(props: {
   placeholder?: string;
   compact?: boolean;
   layout?: "default" | "conversation";
+  /** The surface shows usage itself (the Agents control bar), so the footer omits it. */
+  hideUsageEstimate?: boolean;
   className?: string;
   onError?: (message: string) => void;
 }) {
@@ -71,6 +77,11 @@ export function MistyComposer(props: {
   };
   const canSend = Boolean(
     props.value.trim() || props.attachments.some((item) => item.state === "ready"),
+  );
+  const showEstimate = props.mode !== "search" && !props.busy && !props.hideUsageEstimate;
+  // An empty footer would still add its bottom padding under the input row.
+  const hasFooter = Boolean(
+    props.onModeChange || props.mode === "search" || props.modelControl || showEstimate,
   );
   return (
     <MessageComposer
@@ -218,18 +229,24 @@ export function MistyComposer(props: {
               <Plus className="size-4" />
             </IconButton>
           )}
+          {props.leadingControl}
         </>
       }
       footer={
-        props.onModeChange ? (
-          <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
-        ) : props.mode === "search" ? (
-          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
-            <Search className="size-3.5" />
-            Search
-          </span>
-        ) : (
-          props.modelControl
+        hasFooter && (
+          <div className="flex min-w-0 flex-col gap-2">
+            {props.onModeChange ? (
+              <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
+            ) : props.mode === "search" ? (
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
+                <Search className="size-3.5" />
+                Search
+              </span>
+            ) : (
+              props.modelControl
+            )}
+            {showEstimate && <CommandUsageEstimate text={props.value} model={props.modelId} />}
+          </div>
         )
       }
       actions={

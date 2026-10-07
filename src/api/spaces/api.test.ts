@@ -61,19 +61,19 @@ describe("spaceErrorMessage", () => {
         "owner_storage_quota_exceeded",
         JSON.stringify({ reason: "space_storage_limit_reached" }),
       ),
-    ).toContain("Space’s storage is full");
+    ).toContain("account’s cloud storage is full");
     expect(
       spaceErrorMessage(
         "hosted_ai_limit_reached",
         JSON.stringify({ reason: "personal_ai_limit_reached" }),
       ),
-    ).toContain("Your personal weekly hosted AI allowance");
+    ).toContain("Your account’s weekly AI allowance");
     expect(
       spaceErrorMessage(
         "hosted_ai_limit_reached",
         JSON.stringify({ reason: "space_ai_limit_reached" }),
       ),
-    ).toContain("Its owner must upgrade");
+    ).toContain("Your account’s weekly AI allowance");
   });
 
   it("keeps the owned-Space limit message plan-neutral", () => {
@@ -168,9 +168,9 @@ describe("spaceRequest account isolation", () => {
         updated_at: "2026-07-26T00:00:00Z",
       },
       setup: {
-        selected_providers: ["google", "notion"],
+        selected_providers: ["google"],
         completed_providers: [],
-        pending_providers: ["google", "notion"],
+        pending_providers: ["google"],
       },
     };
     const fetchMock = vi
@@ -196,7 +196,7 @@ describe("spaceRequest account isolation", () => {
     const request: Parameters<typeof spacesApi.create>[0] = {
       name: "Research group",
       template_id: "research",
-      integration_providers: ["github"],
+      integration_providers: ["google"],
     };
 
     await expect(spacesApi.create(request)).rejects.toMatchObject({ status: 503 });

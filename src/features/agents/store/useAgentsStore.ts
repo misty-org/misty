@@ -8,6 +8,22 @@ export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
 
 export async function agentsRevokeFolderScope(scopeId: string): Promise<void> {
   await invoke("agents_revoke_folder_scope", { scopeId });
+  await republishDeviceFolders();
+}
+
+/** Shares a folder with agents on this device, chosen in the system picker. */
+export async function agentsChooseFolderScope(): Promise<unknown> {
+  const result = await invoke("agents_choose_folder_scope");
+  await republishDeviceFolders();
+  return result;
+}
+
+/** This device's signed policy lists its shared folders (names only, never
+ * paths) so the person's other devices can offer them to agents. */
+async function republishDeviceFolders(): Promise<void> {
+  const { deviceAccount } = await import("./useAgentDeviceStore");
+  const { devicesNative } = await import("@/native/devices");
+  await devicesNative.publishFolders(await deviceAccount()).catch(() => {});
 }
 
 export async function agentsPrepareScopedDocument(

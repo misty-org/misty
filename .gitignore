@@ -72,6 +72,7 @@ artifacts/
 *.svg
 !src/assets/icons/*.svg
 !src/shared/assets/mail-providers/*.svg
+!src/shared/ui/icons/brand-icons/*.svg
 *.psd
 *.ai
 *.xcf
@@ -172,6 +173,9 @@ node_modules/@misty/desktop
 !src/shared/assets/agents/*.webp
 !src/shared/assets/agents/*.png
 !src/shared/assets/agents/*.svg
+
+# Live acceptance evidence (npm run acceptance)
+/.misty/acceptance/
 
 # Server CLI local diagnostic output
 /server/.misty/

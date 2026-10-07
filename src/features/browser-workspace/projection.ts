@@ -37,6 +37,7 @@ const surfaceRoutes = {
   agents: "/agents",
   space: "/spaces",
   home: "/home",
+  extensions: "/extensions",
 } as const;
 /** A synced view as the pane content the workspace UI renders. */
 function viewAsWorkspaceView(record: SharedRecord<"view">): WorkspaceView {

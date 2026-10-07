@@ -49,7 +49,6 @@ vi.mock("@/features/workspace/dockTree", () => ({
   ],
 }));
 import {
-  betaExecutionMode,
   startWorkspaceAutopilot,
   watchWorkspaceAutopilot,
   workspaceAutopilotContext,
@@ -83,12 +82,6 @@ it("binds explicit control to a task and stops on an account change", async () =
   expect(stop).toHaveBeenCalledOnce();
   dispose();
 });
-it("closes the other beta modes without changing non-native behavior", () => {
-  expect(betaExecutionMode("team")).toBe("agent");
-  Object.defineProperty(navigator, "platform", { configurable: true, value: "Linux" });
-  expect(betaExecutionMode("user")).toBe("user");
-});
-
 it("preserves desktop ownership and Ask across live context updates", async () => {
   useCompanionState.setState({ presentation: { ...initialCompanionPresentation, ask: true } });
   await startWorkspaceAutopilot("desktop", "account", "", true);

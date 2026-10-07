@@ -1,6 +1,6 @@
 import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
-import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
+import { spaceChatPath, useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
@@ -33,12 +33,8 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
         kind: "message",
         title: message.sender_name || "Message",
         body,
-        keywords: [space.name, "social", "message", "instagram", "discord", "messenger", "x"],
-        href: socialProviderPath(
-          spaceId,
-          socialProvider(message.social_provider) ?? "misty",
-          new URLSearchParams({ message: message.id }),
-        ),
+        keywords: [space.name, "chat", "message"],
+        href: spaceChatPath(spaceId, new URLSearchParams({ message: message.id })),
         spaceId,
         spaceName: space.name,
         updatedAt: message.created_at,
@@ -93,12 +89,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
     });
   }
 
-  for (const [spaceId, resources] of Object.entries(state.workflowsBySpace)) {
-    const space = spacesById.get(spaceId);
-    if (!space) continue;
-    for (const resource of resources)
-      documents.push(resourceDocument(accountId, spaceId, space.name, resource, "workflow"));
-  }
   for (const space of state.spaces) {
     if (space.permissions?.["tasks.create"] !== true) continue;
     documents.push({
@@ -115,28 +105,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
     });
   }
   return documents;
-}
-
-function resourceDocument(
-  accountId: string,
-  spaceId: string,
-  spaceName: string,
-  resource: { id: string; name: string; description?: string; updated_at: string },
-  kind: "agent" | "workflow",
-): GlobalSearchDocument {
-  return {
-    id: `${kind}:${resource.id}`,
-    accountId,
-    kind,
-    title: resource.name,
-    body: resource.description ?? "",
-    keywords: [spaceName, kind],
-    href: `/spaces/${encodeURIComponent(spaceId)}/assistant/studio/${kind === "agent" ? "agents" : "workflows"}`,
-    spaceId,
-    spaceName,
-    updatedAt: resource.updated_at,
-    source: "local",
-  };
 }
 
 export async function searchServerTasks(

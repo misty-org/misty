@@ -29,7 +29,7 @@ describe("app zoom", () => {
     setAppZoom(0.8);
 
     expect(getAppliedAppZoom()).toBe(0.8);
-    expect(document.body.style.zoom).toBe("0.88");
+    expect(document.body.style.zoom).toBe("0.8");
     expect(document.documentElement.dataset.appZoom).toBe("80");
   });
 
@@ -39,21 +39,21 @@ describe("app zoom", () => {
 
     act(() => result.current.zoomOut());
     expect(result.current.zoom).toBe(0.9);
-    expect(document.body.style.zoom).toBe("0.99");
+    expect(document.body.style.zoom).toBe("0.9");
 
     act(() => result.current.resetZoom());
     expect(result.current.zoom).toBe(1);
-    expect(document.body.style.zoom).toBe("1.1");
+    expect(document.body.style.zoom).toBe("1");
   });
 
-  it("restores physical scale while displaying the relative percentage", () => {
-    window.localStorage.setItem("misty.app.zoom", "1.21");
+  it("restores a stored physical scale", () => {
+    window.localStorage.setItem("misty.app.zoom", "1.2");
     const { result } = renderHook(() => useAppZoom());
-    expect(result.current.zoomPercent).toBe(110);
-    expect(document.body.style.zoom).toBe("1.21");
+    expect(result.current.zoomPercent).toBe(120);
+    expect(document.body.style.zoom).toBe("1.2");
     act(() => result.current.resetZoom());
     expect(result.current.zoomPercent).toBe(100);
-    expect(document.body.style.zoom).toBe("1.1");
+    expect(document.body.style.zoom).toBe("1");
     expect(window.localStorage.getItem("misty.app.zoom")).toBeNull();
   });
 
@@ -69,7 +69,7 @@ describe("app zoom", () => {
 
     expect(getAppliedAppZoom()).toBe(0.9);
     expect(document.body.style.zoom).toBe("");
-    await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(0.99));
+    await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(0.9));
   });
   it("reconciles child geometry after native zoom resolves", async () => {
     (window as typeof window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
@@ -87,7 +87,7 @@ describe("app zoom", () => {
     try {
       setAppZoom(1.2);
       expect(onZoom).toHaveBeenCalledTimes(1);
-      await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(1.32));
+      await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(1.2));
       expect(onZoom).toHaveBeenCalledTimes(1);
       await act(async () => {
         finishZoom();

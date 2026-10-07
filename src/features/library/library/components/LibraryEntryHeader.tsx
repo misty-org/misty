@@ -1,4 +1,5 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
+import type { ReactNode } from "react";
 import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
 import { mediaTypeOptions, sortOptions } from "./SpaceLibraryChrome";
 import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
@@ -37,11 +38,20 @@ const more: { value: LibraryCollectionKind; label: string }[] = [
   { value: "years", label: "Years" },
 ];
 
-export function LibraryEntryHeader() {
+export function LibraryEntryHeader({
+  smartControls,
+}: {
+  smartControls?: {
+    search: ReactNode;
+    actions: ReactNode;
+    filterControl: ReactNode;
+    viewToggle: ReactNode;
+  };
+} = {}) {
   const { data, collectionActions } = useSpaceLibraryContext();
   const upload = useLibraryUploadState();
   const extra = more.find((x) => x.value === data.collection);
-  // Smart Library browses on-device files with its own search and actions.
+  // Smart Library supplies local-catalog actions in the same shared toolbar slots.
   const onDevice = data.collection === "smart";
   return (
     <>
@@ -49,7 +59,9 @@ export function LibraryEntryHeader() {
         title="Library"
         actions={
           <>
-            {onDevice ? null : (
+            {onDevice ? (
+              smartControls?.search
+            ) : (
               <CollectionSearch
                 aria-label="Search library"
                 placeholder={data.collection === "deleted" ? "Search trash" : "Search library"}
@@ -59,6 +71,7 @@ export function LibraryEntryHeader() {
                 onBlur={() => window.setTimeout(() => data.setSearchFocused(false), 120)}
               />
             )}
+            {onDevice && smartControls?.actions}
             {data.collection === "albums" && !data.selectedCollectionId
               ? data.canEditLibrary && (
                   <Button
@@ -92,7 +105,9 @@ export function LibraryEntryHeader() {
         value={data.collection}
         onChange={(value) => collectionActions.selectCollection(value as LibraryCollectionKind)}
         filterControl={
-          onDevice ? undefined : (
+          onDevice ? (
+            smartControls?.filterControl
+          ) : (
             <CollectionFilterMenu
               label="Filter and sort Library"
               active={
@@ -138,7 +153,6 @@ export function LibraryEntryHeader() {
               <NavIsland aria-label="Item scale">
                 <IconButton
                   label="Zoom out"
-                  shape="round"
                   disabled={data.libraryItemScale <= 0}
                   onClick={() => data.setLibraryItemScale(data.libraryItemScale - 1)}
                 >
@@ -146,7 +160,6 @@ export function LibraryEntryHeader() {
                 </IconButton>
                 <IconButton
                   label="Zoom in"
-                  shape="round"
                   disabled={data.libraryItemScale >= 2}
                   onClick={() => data.setLibraryItemScale(data.libraryItemScale + 1)}
                 >
@@ -156,7 +169,7 @@ export function LibraryEntryHeader() {
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <IconButton label="More Library sections" shape="round">
+                <IconButton label="More Library sections">
                   <MoreHorizontal />
                 </IconButton>
               </DropdownMenuTrigger>
@@ -175,7 +188,9 @@ export function LibraryEntryHeader() {
           </>
         }
         actions={
-          onDevice ? undefined : (
+          onDevice ? (
+            smartControls?.viewToggle
+          ) : (
             <CollectionViewToggle value={data.libraryViewMode} onChange={data.setLibraryViewMode} />
           )
         }

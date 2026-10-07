@@ -67,6 +67,18 @@ export async function pasteSystemClipboardTextIntoPane(
     return true;
   }
 
+  const sharedDeviceItems = await H.sharedDevicePasteItems();
+  if (sharedDeviceItems.length > 0) {
+    await explorerQueuePasteItems({
+      sources: sharedDeviceItems,
+      destinationDirectory: directory,
+      operation: "copy",
+    });
+    H.refreshFileOperationState();
+    H.queuePaneRefresh(paneId, directory);
+    return true;
+  }
+
   const uriListItems = await H.readClipboardUriListPasteItems();
   if (uriListItems.length > 0) {
     await explorerQueuePasteItems({

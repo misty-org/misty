@@ -9,7 +9,7 @@ export function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {
     <section
       className={`${fileBrowserStyles.browser} ${fileBrowserStyles.browserLoading}`}
       aria-busy="true"
-      aria-label="Loading directory"
+      aria-label="Directory"
     >
       {props.viewMode === "grid" ? (
         <div className={fileBrowserStyles.gridSkeleton} aria-hidden="true">
@@ -59,7 +59,9 @@ export function FileBrowserSkeleton(props: { viewMode: ExplorerViewMode }) {
           ))}
         </div>
       )}
-      <footer className={fileBrowserStyles.footer}>Loading directory...</footer>
+      <footer className={fileBrowserStyles.footer} aria-hidden="true">
+        <span className={`${fileBrowserStyles.skeletonCell} h-3 w-24`} />
+      </footer>
     </section>
   );
 }

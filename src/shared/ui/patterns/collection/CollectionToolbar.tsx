@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Columns3, LayoutGrid, List, Search } from "lucide-react";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
+import { Button } from "../../controls/Button";
 import { InputGroup } from "../../controls/InputGroup";
 import { Input } from "../../controls/Input";
 import { NavIsland, NavIslandItem } from "../../navigation/NavIsland";
@@ -80,25 +81,30 @@ export function CollectionFilters({
   const hasUtilities = Boolean(filterControl || utilities || columnContext?.schema);
   return (
     <Toolbar variant="bare" wrap label="Collection controls" className="justify-between gap-3">
-      <NavIsland asChild aria-label="Filter items" className="inline-flex">
-        <div {...reorder} role="navigation">
-          {options.map((option) => (
-            <NavIslandItem
-              key={option.value}
-              className="h-7 px-3 text-[13px] font-normal"
-              data-reorder-item={option.value}
-              data-reorder-handle={onReorder ? "" : undefined}
-              title={onReorder ? "Drag to reorder · Alt+Shift+Left/Right" : undefined}
-              aria-keyshortcuts={onReorder ? "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight" : undefined}
-              active={value === option.value}
-              aria-pressed={value === option.value}
-              onClick={() => onChange(option.value)}
-            >
-              {option.label}
-            </NavIslandItem>
-          ))}
-        </div>
-      </NavIsland>
+      {/* Section tabs are shared chips: outlined until pressed, then filled. */}
+      <div
+        {...reorder}
+        role="navigation"
+        aria-label="Filter items"
+        className="flex min-w-0 flex-wrap items-center gap-1.5"
+      >
+        {options.map((option) => (
+          <Button
+            key={option.value}
+            variant="chip"
+            size="sm"
+            className="font-normal"
+            data-reorder-item={option.value}
+            data-reorder-handle={onReorder ? "" : undefined}
+            title={onReorder ? "Drag to reorder · Alt+Shift+Left/Right" : undefined}
+            aria-keyshortcuts={onReorder ? "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight" : undefined}
+            aria-pressed={value === option.value}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
       <span className="sr-only" role="status">
         {announcement}
       </span>
@@ -143,7 +149,7 @@ export function CollectionViewToggle({
           active={value === option}
           aria-pressed={value === option}
           disabled={disabled}
-          className="size-8 rounded-full p-0"
+          className="size-8 p-0"
           onClick={() => onChange(option)}
         >
           <Icon className="size-4" />
@@ -154,7 +160,7 @@ export function CollectionViewToggle({
           aria-label="Board view"
           title="Board view"
           disabled={disabled}
-          className="size-8 rounded-full p-0"
+          className="size-8 p-0"
           onClick={onBoardView}
         >
           <Columns3 className="size-4" />

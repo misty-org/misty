@@ -13,15 +13,16 @@ import {
 } from "@/shared/ui";
 import { ExternalLink, Folder, PinOff, Plus, RefreshCcw, X } from "lucide-react";
 import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
-import { pinnedPathLabel, SidebarSectionHeader, sidebarStyles } from "@/features/file-ui";
+import { SidebarSectionHeader, sidebarStyles } from "@/features/file-ui";
+import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import type { ExplorerSidebarRuntime } from "./ExplorerSidebarRuntime";
 import type { useSidebarQuickAccess } from "./useSidebarQuickAccess";
 
 /**
  * The Quick access section: platform folders, then the user's pinned paths.
  *
- * Both lists are drop targets and share one context menu, which is why they
- * live in a single section rather than two.
+ * Both kinds are drop targets, share one context menu and reorder together by
+ * dragging, which is why they live in a single list rather than two.
  */
 export function SidebarQuickAccessSectionView({
   DropTarget,
@@ -36,6 +37,21 @@ export function SidebarQuickAccessSectionView({
   onToggle: () => void;
   quick: ReturnType<typeof useSidebarQuickAccess>;
 }) {
+  const reorder = usePointerReorder({
+    scope: "explorer-quick-access",
+    axis: "y",
+    animate: true,
+    getDrag: (id) => {
+      const row = quick.rows.find((candidate) => candidate.path === id);
+      return row ? { id, label: row.label } : null;
+    },
+    onDrop: (drag, target, after) => quick.moveQuickAccessRow(drag.id, target, after),
+    onKeyboardMove: (id, direction) => {
+      const index = quick.rows.findIndex((row) => row.path === id);
+      const target = quick.rows[index + direction];
+      if (target) quick.moveQuickAccessRow(id, target.path, direction === 1);
+    },
+  });
   return (
     <Collapsible className={sidebarStyles.section} open={!collapsed}>
       <ContextMenu>
@@ -84,121 +100,60 @@ export function SidebarQuickAccessSectionView({
         </ContextMenuContent>
       </ContextMenu>
       <CollapsibleContent>
-        <div className={sidebarStyles.list}>
-          {quick.visibleQuickAccess.map((item) => {
-            const Icon = item.icon;
-
-            const selected = sidebar.activePath === item.path;
+        <div {...reorder} className={sidebarStyles.list}>
+          {quick.rows.map((row) => {
+            const Icon = row.kind === "builtIn" ? row.icon : Folder;
             return (
-              <ContextMenu key={`quick:${item.path}`}>
+              <ContextMenu key={`${row.kind}:${row.path}`}>
                 <ContextMenuTrigger asChild>
-                  <div className={sidebarStyles.treeRow}>
+                  <div
+                    className={sidebarStyles.treeRow}
+                    data-reorder-item={row.path}
+                    data-reorder-preview="true"
+                  >
+                    {/* The drag captures the pointer on this row, so clicks land here,
+                        not on the button; the button's own click bubbles up too. */}
                     <div
+                      data-reorder-handle="true"
+                      onClick={(event) => {
+                        if (!(event.target as Element).closest("[data-reorder-ignore]"))
+                          sidebar.onNavigate(row.path);
+                      }}
                       className={cn(
                         sidebarStyles.treeSurface,
                         sidebarStyles.quickAccessSurface,
                         sidebarStyles.pinnedRow,
-                        selected && sidebarStyles.itemSelected,
+                        sidebar.activePath === row.path && sidebarStyles.itemSelected,
                       )}
                     >
                       <DropTarget
-                        id={`sidebar:quick:${item.path}`}
-                        path={item.path}
+                        id={`sidebar:${row.kind === "builtIn" ? "quick" : "pinned"}:${row.path}`}
+                        path={row.path}
                         springLoad
-                        onSpringLoad={() => sidebar.onNavigate(item.path)}
+                        onSpringLoad={() => sidebar.onNavigate(row.path)}
                       >
                         <Button
                           type="button"
                           variant="ghost"
                           className={sidebarStyles.pinnedButton}
-                          onClick={() => {
-                            sidebar.onNavigate(item.path);
-                          }}
                         >
                           <span className={sidebarStyles.itemIcon} aria-hidden="true">
                             <Icon size={24} strokeWidth={1.9} />
                           </span>
                           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {item.label}
-                          </span>
-                        </Button>
-                      </DropTarget>
-                      {
-                        <IconButton
-                          label={`Unpin ${item.label} from Quick access`}
-                          className={sidebarStyles.pinnedUnpinButton}
-                          onClick={() => quick.hideQuickAccessPath(item.path)}
-                        >
-                          <PinOff size={15} />
-                        </IconButton>
-                      }
-                    </div>
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent className="w-56">
-                  <ContextMenuAction
-                    icon={<ExternalLink size={15} />}
-                    label="Open in New Tab"
-                    onSelect={() => sidebar.onOpenInNewTab(item.path, item.label)}
-                  />
-                  <ContextMenuAction
-                    icon={<X size={15} />}
-                    label="Remove from Sidebar"
-                    onSelect={() =>
-                      quick.removeQuickAccessItem({
-                        kind: "builtIn",
-                        label: item.label,
-                        path: item.path,
-                      })
-                    }
-                  />
-                  <ContextMenuSeparator />
-                  <ContextMenuAction
-                    icon={<RefreshCcw size={15} />}
-                    label="Reset Defaults"
-                    onSelect={quick.resetQuickAccessDefaults}
-                  />
-                </ContextMenuContent>
-              </ContextMenu>
-            );
-          })}
-          {quick.visiblePinnedPaths.map((path) => {
-            return (
-              <ContextMenu key={`pin:${path}`}>
-                <ContextMenuTrigger asChild>
-                  <div className={sidebarStyles.treeRow}>
-                    <div
-                      className={cn(
-                        sidebarStyles.treeSurface,
-                        sidebarStyles.quickAccessSurface,
-                        sidebarStyles.pinnedRow,
-                        sidebar.activePath === path && sidebarStyles.itemSelected,
-                      )}
-                    >
-                      <DropTarget
-                        id={`sidebar:pinned:${path}`}
-                        path={path}
-                        springLoad
-                        onSpringLoad={() => sidebar.onNavigate(path)}
-                      >
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className={sidebarStyles.pinnedButton}
-                          onClick={() => sidebar.onNavigate(path)}
-                        >
-                          <span className={sidebarStyles.itemIcon} aria-hidden="true">
-                            <Folder size={24} strokeWidth={1.9} />
-                          </span>
-                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {pinnedPathLabel(path)}
+                            {row.label}
                           </span>
                         </Button>
                       </DropTarget>
                       <IconButton
-                        label={`Unpin ${path} from Quick access`}
+                        data-reorder-ignore="true"
+                        label={`Unpin ${row.kind === "builtIn" ? row.label : row.path} from Quick access`}
                         className={sidebarStyles.pinnedUnpinButton}
-                        onClick={() => sidebar.onUnpinPinnedPath(path)}
+                        onClick={() =>
+                          row.kind === "builtIn"
+                            ? quick.hideQuickAccessPath(row.path)
+                            : sidebar.onUnpinPinnedPath(row.path)
+                        }
                       >
                         <PinOff size={15} />
                       </IconButton>
@@ -209,16 +164,16 @@ export function SidebarQuickAccessSectionView({
                   <ContextMenuAction
                     icon={<ExternalLink size={15} />}
                     label="Open in New Tab"
-                    onSelect={() => sidebar.onOpenInNewTab(path, pinnedPathLabel(path))}
+                    onSelect={() => sidebar.onOpenInNewTab(row.path, row.label)}
                   />
                   <ContextMenuAction
                     icon={<X size={15} />}
                     label="Remove from Sidebar"
                     onSelect={() =>
                       quick.removeQuickAccessItem({
-                        kind: "pinned",
-                        label: pinnedPathLabel(path),
-                        path,
+                        kind: row.kind,
+                        label: row.label,
+                        path: row.path,
                       })
                     }
                   />

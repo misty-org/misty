@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   MenuItem,
-  Spinner,
+  Skeleton,
 } from "@/shared/ui";
 import type { ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
@@ -224,10 +224,14 @@ export function DrawingPreviewView(props: {
     content = <PreviewMessage>This canvas is empty</PreviewMessage>;
   } else if (!previewUrl) {
     content = (
-      <PreviewMessage>
-        <Spinner className="size-4" />
-        Preparing preview…
-      </PreviewMessage>
+      <div className="h-full min-h-0 p-4">
+        <Skeleton
+          role="status"
+          aria-label="Drawing preview"
+          aria-hidden={false}
+          className="h-full w-full rounded-lg"
+        />
+      </div>
     );
   } else {
     content = (

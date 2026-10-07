@@ -110,12 +110,18 @@ export function AgentExecutionSurface() {
         </Button>
         {execution.state === "running" ? (
           <Button variant="outline" size="sm" onClick={() => action(pauseLocalExecution)}>
-            Pause
+            Take over
           </Button>
         ) : (
           <Button
             variant="outline"
             size="sm"
+            disabled={Boolean(execution.method)}
+            title={
+              execution.method
+                ? "Review this workflow’s results and explicitly start a new run. Automatic resume is unavailable."
+                : undefined
+            }
             onClick={() =>
               action(() =>
                 steerLocalExecution(
@@ -145,19 +151,28 @@ export function AgentExecutionSurface() {
           </Button>
         )}
       </header>
+      {execution.method && execution.state !== "running" && (
+        <p
+          role="status"
+          className="border-b border-charcoal-border px-4 py-3 text-sm text-cream-muted"
+        >
+          Workflow stopped. Review completed and uncertain results before explicitly starting a new
+          run. Automatic resume is unavailable.
+        </p>
+      )}
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           <div ref={viewport} className="min-h-0 flex-1">
             <p className="p-5 text-sm text-cream-muted">
               {execution.views.length
-                ? "Integration workspace"
+                ? "Browser workspace"
                 : "Working with native apps. Progress and results appear in chat."}
             </p>
           </div>
           <TaskArtifacts agentId={execution.agentId} spaceId={execution.spaceId} />
           <nav
             className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-3"
-            aria-label="Task integrations"
+            aria-label="Task browser tabs"
           >
             {execution.context.map((view, index) => (
               <Button
@@ -172,10 +187,6 @@ export function AgentExecutionSurface() {
             ))}
           </nav>
         </div>
-        <aside
-          className="w-[440px] shrink-0 border-l border-charcoal-border"
-          aria-label="Agent conversation"
-        />
       </div>
       <form
         className="flex shrink-0 gap-2 border-t border-charcoal-border p-3"
@@ -219,7 +230,7 @@ export function AgentExecutionSurface() {
         />
       </form>
       {error && (
-        <p role="alert" className="px-4 pb-3 text-sm text-red-300">
+        <p role="alert" className="px-4 pb-3 text-sm text-cream-muted">
           {error}
         </p>
       )}

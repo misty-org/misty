@@ -126,6 +126,7 @@ pub(crate) async fn serve_received(
                         path,
                         entries,
                         snapshot,
+                        writable: false,
                     })
                 }
                 PeerRequest::ReadLink {

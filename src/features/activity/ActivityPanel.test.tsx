@@ -50,13 +50,7 @@ it("opens above the current workspace and closes without changing its route", as
 });
 
 it("keeps request destinations inside the panel", () => {
-  openActivityPanel("/activity?approval=approval-1");
-  expect(useActivityPanel.getState()).toMatchObject({ open: true, approvalId: "approval-1" });
   openActivityPanel("/activity?intervention=wait-1");
-  expect(useActivityPanel.getState()).toMatchObject({
-    open: true,
-    approvalId: undefined,
-    interventionId: "wait-1",
-  });
+  expect(useActivityPanel.getState()).toMatchObject({ open: true, interventionId: "wait-1" });
   closeActivityPanel();
 });

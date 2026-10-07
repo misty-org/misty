@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Button, cn, ListRow, ListRowButton } from "@/shared/ui";
+import { Button, cn, ListRow, ListRowButton, CollectionSkeleton } from "@/shared/ui";
 import {
   downloadProgressFraction,
   formatBytes,
@@ -70,12 +70,10 @@ export function DownloadsPage(props: BrowserInternalPageProps) {
   return (
     <InternalPageFrame
       title="Downloads"
-      icon={Download}
       search={{ value: text, placeholder: "Search downloads", onChange: setText }}
       actions={
         <Button
-          variant="toolbar"
-          size="xs"
+          variant="outline"
           disabled={!entries.some((entry) => entry.state !== "in_progress")}
           onClick={() => run(() => browserLibrary.removeDownloads({}))}
         >
@@ -84,9 +82,12 @@ export function DownloadsPage(props: BrowserInternalPageProps) {
       }
     >
       {error || actionError ? (
-        <p className="mb-3 text-xs text-red-300">{actionError ?? error}</p>
+        <p role="alert" className="mb-3 text-sm text-cream-muted">
+          {actionError ?? error}
+        </p>
       ) : null}
-      {loaded && !visible.length ? (
+      {!loaded && !error ? <CollectionSkeleton label="Loading downloads" view="rows" /> : null}
+      {loaded && !error && !visible.length ? (
         <InternalPageEmpty
           title={text ? "No matching downloads" : "No downloads yet"}
           detail={
@@ -120,8 +121,9 @@ function DownloadRow(props: {
   const active = entry.state === "in_progress";
   const openable = entry.state === "finished" && entry.exists;
   return (
-    <ListRow className="items-start py-2.5">
-      <div className="min-w-0 flex-1">
+    <ListRow className="flex-wrap items-start py-2.5">
+      <Download className="mt-1 size-5 shrink-0 text-cream-muted" aria-hidden="true" />
+      <div className="min-w-0 flex-1 basis-40">
         <ListRowButton
           className={cn(
             "block max-w-full truncate text-sm",
@@ -139,6 +141,7 @@ function DownloadRow(props: {
           <div
             className="mt-2 h-1 overflow-hidden rounded-full bg-charcoal-card"
             role="progressbar"
+            aria-label={`Downloading ${entry.fileName || "file"}`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={fraction === null ? undefined : Math.round(fraction * 100)}
@@ -153,7 +156,7 @@ function DownloadRow(props: {
           </div>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="ml-auto flex max-w-full flex-wrap items-center gap-1">
         {active ? (
           <Button
             variant="toolbar"

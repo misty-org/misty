@@ -24,7 +24,7 @@ import {
   type WorkspaceWindow,
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { memo, useEffect, useRef, useState, type DragEvent } from "react";
 import {
   Panel,
   PanelGroup,
@@ -42,6 +42,7 @@ import {
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
+  extensions: "Extensions",
   space: "Space",
   browser: "Browser",
   files: "Files",
@@ -184,6 +185,29 @@ function DockSplitView(
     </PanelGroup>
   );
 }
+
+/**
+ * One open tab's page. Every open tab stays mounted, so this is the render
+ * boundary: store updates keep an untouched tab's object identical, and a
+ * change to another tab, the layout or the app route leaves this page alone.
+ */
+const MountedWorkspaceView = memo(function MountedWorkspaceView(props: {
+  paneId: string;
+  tab: WorkspaceView;
+  active: boolean;
+}) {
+  return (
+    <AiPaneHost
+      paneId={props.paneId}
+      defaultAdapter={workspaceAiAdapter(props.tab)}
+      active={props.active}
+    >
+      <WorkspaceViewTitleProvider tabId={props.tab.id}>
+        <WorkspaceSurface tab={props.tab} active={props.active} />
+      </WorkspaceViewTitleProvider>
+    </AiPaneHost>
+  );
+});
 
 function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const { pane } = props;
@@ -366,15 +390,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
                 className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
                 aria-hidden={!isActive}
               >
-                <AiPaneHost
-                  paneId={pane.id}
-                  defaultAdapter={workspaceAiAdapter(mountedTab)}
-                  active={isActive}
-                >
-                  <WorkspaceViewTitleProvider tabId={mountedTab.id}>
-                    <WorkspaceSurface tab={mountedTab} active={isActive} />
-                  </WorkspaceViewTitleProvider>
-                </AiPaneHost>
+                <MountedWorkspaceView paneId={pane.id} tab={mountedTab} active={isActive} />
               </div>
             );
           })

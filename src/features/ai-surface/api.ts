@@ -1,4 +1,5 @@
 import { readInvocationStream } from "./invocationStream";
+import { withDeviceRunGrants } from "./deviceRunGrants";
 import {
   apiRequest,
   apiRequestCredentials,
@@ -12,15 +13,19 @@ import type {
   AiInvocationCreated,
   AiInvocationEvent,
   AiInvocationRequest,
-  AiRunCreated,
   AiCitation,
   AiContextReference,
 } from "./types";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 
+export type ScreenLocation = "separate" | "window" | "ask";
 export interface AiUserSettings {
   enabled: boolean;
   memory_enabled: boolean;
+  /** Sends, shares, deletes and payments in connected apps wait for approval. */
+  app_actions_ask: boolean;
+  /** Where agents open a screen when a task needs one. */
+  screen_location?: ScreenLocation;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
@@ -121,6 +126,16 @@ export const aiSurfaceApi = {
         ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
       }),
     }),
+  updateScreenLocation: (location: ScreenLocation) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/screen-location", {
+      method: "PUT",
+      body: JSON.stringify({ location }),
+    }),
+  updateAppActionsAsk: (ask: boolean) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
+      method: "PUT",
+      body: JSON.stringify({ ask }),
+    }),
   memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
   forgetMemory: (memoryId: string) =>
     apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
@@ -139,21 +154,6 @@ export const aiSurfaceApi = {
       `/ai/preferences/${encodeURIComponent(surfaceId)}`,
       { method: "PUT", body: JSON.stringify(input) },
     ),
-  recordProactiveEvent: (
-    surfaceId: string,
-    event: "shown" | "snoozed" | "dismissed",
-    snoozeMinutes?: number,
-  ) =>
-    apiRequest<{ preference: AiSurfacePreferenceRecord }>(
-      `/ai/preferences/${encodeURIComponent(surfaceId)}/proactive-events`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          event,
-          ...(snoozeMinutes === undefined ? {} : { snooze_minutes: snoozeMinutes }),
-        }),
-      },
-    ),
   recaps: () => apiRequest<{ recaps: AiRecapRecord[] }>("/ai/recaps"),
   updateRecap: (
     surfaceId: AiRecapRecord["surface_id"],
@@ -166,50 +166,19 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
-  markRecapSeen: (surfaceId: AiRecapRecord["surface_id"]) =>
-    apiRequest<void>(`/ai/recaps/${encodeURIComponent(surfaceId)}/seen`, { method: "POST" }),
   feedback: (invocationId: string, rating: -1 | 1, reason = "", comment = "") =>
     apiRequest<void>(`/ai/invocations/${encodeURIComponent(invocationId)}/feedback`, {
       method: "POST",
       body: JSON.stringify({ rating, reason, comment }),
     }),
-  createInvocation: (input: AiInvocationRequest) =>
-    apiRequest<AiInvocationCreated>("/ai/invocations", {
+  createInvocation: async (input: AiInvocationRequest) => {
+    const deviceContexts = await withDeviceRunGrants(input.deviceContexts, input.agentId);
+    return apiRequest<AiInvocationCreated>("/ai/invocations", {
       method: "POST",
       headers: { "Idempotency-Key": input.idempotencyKey },
-      body: JSON.stringify(toServerInvocation(input)),
-    }),
-  createRun: (input: {
-    prompt: string;
-    surfaceId: string;
-    paneId: string;
-    invocationId?: string;
-    conversationId?: string;
-    spaceId?: string;
-    href?: string;
-    title?: string;
-    context: AiContextReference[];
-    idempotencyKey: string;
-  }) =>
-    apiRequest<AiRunCreated>("/ai/runs", {
-      method: "POST",
-      headers: { "Idempotency-Key": input.idempotencyKey },
-      body: JSON.stringify({
-        prompt: input.prompt,
-        space_id: input.spaceId,
-        invocation_id: input.invocationId,
-        conversation_id: input.conversationId,
-        idempotency_key: input.idempotencyKey,
-        origin: {
-          surface_id: input.surfaceId,
-          pane_id: input.paneId,
-          invocation_id: input.invocationId,
-          href: input.href,
-          title: input.title,
-        },
-        context: input.context.map(toServerContextReference),
-      }),
-    }),
+      body: JSON.stringify(toServerInvocation({ ...input, deviceContexts })),
+    });
+  },
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
       method: "POST",
@@ -291,7 +260,12 @@ function toServerInvocation(input: AiInvocationRequest) {
     context: input.context.map(toServerContextReference),
     selection: input.selection,
     companion_mode: input.companionMode,
+    method_version_id: input.methodVersionId,
+    method_inputs: input.methodInputs,
+    skill_version_ids: input.skillVersionIds,
     companion_model: input.companionModel,
+    model_override: input.modelOverride,
+    collaboration_mode: input.collaborationMode,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,
       name: c.name,
@@ -329,6 +303,7 @@ function toServerInvocation(input: AiInvocationRequest) {
       display_name: context.displayName,
       capabilities: context.capabilities,
       metadata: context.metadata,
+      run_grant: context.runGrant,
     })),
     thinking_mode: input.thinkingMode,
     model_id: input.modelId,

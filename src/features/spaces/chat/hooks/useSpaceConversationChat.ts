@@ -22,7 +22,6 @@ export function useSpaceConversationChat(
   spaceId: string,
   conversationId: string,
   canRead: boolean,
-  loadConversationsWithoutSelection = false,
 ) {
   const [conversations, setConversations] = useState<SpaceConversation[]>([]);
   const session = readApiSessionGeneration();
@@ -61,7 +60,7 @@ export function useSpaceConversationChat(
   const activeConversationIdRef = useRef("");
   const reloadMessages = useCallback(() => setReloadRevision((current) => current + 1), []);
   useEffect(() => {
-    if (!canRead || (!conversationId && !loadConversationsWithoutSelection)) {
+    if (!canRead || !conversationId) {
       setConversations([]);
       setMessages(pendingByConversation.get(key) ?? []);
       setLoadedConversationId("");
@@ -143,15 +142,7 @@ export function useSpaceConversationChat(
       active = false;
       socialEvents.removeEventListener("misty:space-message-event", reload);
     };
-  }, [
-    canRead,
-    conversationId,
-    loadConversationsWithoutSelection,
-    reloadRevision,
-    spaceId,
-    key,
-    setMessages,
-  ]);
+  }, [canRead, conversationId, reloadRevision, spaceId, key, setMessages]);
   return {
     conversations,
     messages,

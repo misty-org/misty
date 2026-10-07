@@ -11,11 +11,11 @@ description: A compact, input-first overlay within the established Misty workspa
 
 This guide covers the docked desktop Misty overlay, including its upper composer and detached bottom controls. Inherit tokens, shared primitives, and product constraints from the root [DESIGN.md](../../../DESIGN.md) and [PRODUCT.md](../../../PRODUCT.md). This is a scoped refinement of that system; the separate search launcher and Agents workspace keep their own composition.
 
-The overlay is an Operate surface. A person starts with the message field, switches the active agent from its name, and reveals thinking choices only when needed. The confirmed direction preserves the incumbent dark desktop identity and reduces setup around the input. It does not establish a replacement product identity or a native mobile layout.
+The overlay is an Operate surface. A person starts with the message field, switches the active agent from its name, and reveals thinking choices only when needed. The confirmed direction preserves the incumbent dark desktop identity and reduces setup around the input. It does not establish a replacement product identity.
 
 **Key Characteristics:**
 
-- One upper shell for the composer, optional thinking row, approvals, and conversation.
+- One upper shell for the composer, optional thinking row and conversation.
 - An input-led hierarchy with quiet icon controls and a compact agent identity.
 - Automatic current-view context and a detached bar containing only execution controls.
 
@@ -45,7 +45,7 @@ The bottom bar is centered (16px) above the viewport edge, fits its controls, an
 
 ## Elevation & Depth
 
-Both surfaces float above the workspace and use the existing restrained shadow treatment. The upper shell owns its depth; the embedded composer removes its own border and shadow. Separate thinking options, approvals, and conversation with hairlines rather than nested cards. Menus use the shared floating-menu treatment. Preserve reduced-motion support for the overlay's opacity transition.
+Both surfaces float above the workspace and use the existing restrained shadow treatment. The upper shell owns its depth; the embedded composer removes its own border and shadow. Separate thinking options and conversation with hairlines rather than nested cards. Menus use the shared floating-menu treatment. Preserve reduced-motion support for the overlay's opacity transition.
 
 ## Shapes
 
@@ -58,7 +58,7 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 - **Thinking options:** Reuse shared buttons for only Normal and Deep thinking, with the selected choice exposed through `aria-pressed`. The compatibility component `MistyModelPicker` now presents thinking presets, not model or provider selection. Model choice remains server-managed; the presets map to high and xhigh effort. Keep those implementation labels out of the visible control. Disable changes while saving or working and show save failures beside the choices.
 - **Voice:** The microphone icon starts recording and changes to a stop control during recording. Its adjacent chevron opens the input-device menu; opening that menu must not start recording. Preserve recording, permission-request, and transcription restrictions, plus accessible names on both controls.
 - **Context and apps:** The overlay uses the current view automatically; users express another destination in the prompt. Do not add manual Space, screen, or workspace-context selectors. Installed and connected apps follow the automatic availability path, subject to existing capabilities and permissions; the overlay has no per-agent assignment setup. `MistyContextBar` is reserved for artifact review, undo, handoff notices, and errors, not context configuration.
-- **Approval review:** Show the proposed action, summary, and Approve/Deny actions in the upper surface. A pending approval keeps that surface available even when the conversation is closed. Approval errors stay beside the decision.
+- **Connected-app confirmations:** When _Ask before acting for you_ is on, connect and confirm cards appear in the conversation. They are not a separate approval surface.
 - **Bottom controls:** Idle controls expose disabled resume/pause plus close. Active execution exposes show chat, resume, pause, and stop/done, with availability reflecting execution state. Preserve accessible names and the screen-reader status; do not add visible explanatory text.
 - **Failures:** Execution failures propagate through Misty's existing error/activity path. They do not grow a second message panel inside the bottom bar.
 
@@ -67,7 +67,7 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 ### Do:
 
 - **Do** reuse the established theme and shared primitives before introducing custom controls or values.
-- **Do** retain accessible action names, pressed/expanded states, working-state restrictions, and explicit approval decisions.
+- **Do** retain accessible action names, pressed/expanded states, working-state restrictions, and explicit artifact decisions.
 - **Do** keep agent switching in the header, thinking choices beneath their disclosure, and input-device selection beside the recording control.
 - **Do** keep the bottom bar at its content width with one background.
 
@@ -78,6 +78,12 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 - **Don't** add visible Attach or Options text beside their compact icon triggers.
 - **Don't** apply this overlay composition as a new product-wide visual identity.
 
-The finish review used actual isolated component fixtures captured in `.impeccable/review/desktop.png`, `thinking.png`, `agents.png`, `microphone.png`, and `mobile.png`; disposition was ship, with no material fixes. The file named `mobile.png` is a (375px) narrow desktop-browser viewport, not native mobile or touch evidence. The authority was the precise refinement brief and incumbent design, with no approved comp. These captures do not verify the live full application, backend execution, native desktop capture, or native mobile behavior.
+The authority was the precise refinement brief and incumbent design, with no approved comp.
 
 Shared attachment drag/upload colors and recording/error colors are preserved local states, not new palette guidance. This scoped refresh inherits the root token frontmatter and sidecar; it does not regenerate either root artifact.
+
+## Shared lifecycle and bounded folder work
+
+The phase 1–2 extension preserves the input-first floating layout while sharing draft attachments, conversation and invocation identity with Agents and Talk to Companion. Typed follow-ups during a run queue into that invocation; queued feedback is shown only while work is active. Opening the popup never starts a new run or microphone session. Stop audio is independent of Stop task.
+
+Place the compact Organize folder control and receipt below the composer, after identity and input. Use the shared monochrome controls and neutral user message bubbles. File proposals show readable planned paths or access-recovery copy, never JSON. Receipts persist on the authorized device and explicitly distinguish verified effects, partial work and undo. Detailed functional limits and live versus automated evidence are in `docs/design/agent-workflows/IMPLEMENTATION.md`.

@@ -1,10 +1,5 @@
 export type {
   AlbumDialogModel,
-  LibraryAlbumDialogMode,
-  LibraryMetadataDialogAction,
-  LibraryPersonDialogMode,
-  LibraryTextDialogState,
-  LibraryUnlockScope,
   MetadataDialogModel,
   PersonDialogModel,
   TextDialogModel,

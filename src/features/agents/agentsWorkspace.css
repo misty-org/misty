@@ -12,83 +12,9 @@
   font-size: 14px;
   line-height: 1.5;
 }
-.agents-roster {
-  display: flex;
-  flex-direction: column;
-  width: 244px;
-  flex-shrink: 0;
-  min-height: 0;
-  padding: 0 8px;
-  background: var(--color-charcoal-sidebar);
-  border-right: 1px solid var(--color-charcoal-border);
-}
-.agents-roster-heading {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  height: 54px;
-  padding-inline: 4px;
-}
-.agents-roster-search {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.agents-roster-search > svg {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  margin-block: auto;
-  left: 10px;
-  color: var(--color-cream-muted);
-  pointer-events: none;
-}
-.agents-roster-search input {
-  padding-left: 34px;
-  font-size: 14px;
-}
-.agents-roster-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.agents-workspace .agent-roster-row {
-  width: 100%;
-  height: 64px;
-  gap: 12px;
-  padding: 8px 10px;
-  margin-bottom: 2px;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 400;
-}
-.agent-roster-row .agent-avatar {
-  width: 40px;
-  height: 40px;
-  font-size: 18px;
-}
-.agent-roster-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.agent-roster-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-cream-muted);
-  font-size: 12px;
-}
 .agents-list-note {
   padding: 12px 8px;
   color: var(--color-cream-muted);
-  font-size: 12px;
-}
-.agent-search-result {
-  width: 100%;
-  gap: 8px;
   font-size: 12px;
 }
 .agents-main {
@@ -107,7 +33,6 @@
   padding: 0 12px;
   flex-shrink: 0;
 }
-.agent-heading-start,
 .agent-heading-end {
   display: flex;
   flex: 1;
@@ -126,18 +51,6 @@
   width: 32px;
   height: 32px;
   font-size: 14px;
-}
-.agent-heading-chevron {
-  opacity: 0;
-}
-.agent-heading-identity:is(:hover, :focus-visible, [aria-expanded="true"]) .agent-heading-chevron {
-  opacity: 1;
-}
-.agent-heading-identity[aria-expanded="true"] .agent-heading-chevron {
-  transform: rotate(180deg);
-}
-.agents-roster-back {
-  display: none;
 }
 .agent-conversation,
 .agent-new-chat {
@@ -193,9 +106,10 @@
   font-size: 12px;
   color: var(--color-cream-muted);
 }
+/* Same column and gutters as .agent-compose-area, so bubbles line up with the composer. */
 .agent-conversation .agent-transcript {
   max-width: 836px;
-  padding: 28px 32px;
+  padding: 28px 24px;
 }
 .agent-conversation .agent-transcript > div {
   display: flex;
@@ -205,27 +119,26 @@
 .agent-conversation .agent-transcript > div > * {
   margin-block: 0;
 }
-.agent-conversation .agent-transcript article {
+.agent-conversation .agent-message-assistant {
   gap: 10px;
   align-items: flex-start;
 }
-.agent-conversation .agent-transcript article > :first-child {
-  margin-top: 6px;
+/* The avatar's center meets the reply's first line (5px inset + 22.4px line). */
+.agent-conversation .agent-message-assistant > :first-child {
+  margin-top: 0;
   width: 32px;
   height: 32px;
   background: none;
   box-shadow: none;
 }
-.agent-conversation .agent-transcript article > :last-child {
-  flex: initial;
+.agent-conversation .agent-message-assistant > :last-child {
+  flex: 1;
   min-width: 0;
-  max-width: min(82%, 72ch);
   padding: 0;
 }
+/* Only the user's messages are bubbles; replies sit on the canvas as plain text. */
 .agent-conversation .misty-markdown-message {
-  padding: 10px 14px;
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
+  padding-top: 5px;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -235,15 +148,154 @@
 .agent-conversation .misty-markdown-message p:last-child {
   margin-bottom: 0;
 }
-.agent-conversation .agent-message-user > div {
+/* Status lines take the avatar's height to stay beside it. */
+.agent-message-status {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+.agent-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  color: var(--color-cream-muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.agent-message-assistant .agent-message-actions {
+  margin-top: 4px;
+}
+.agent-message-actions[data-align="end"] {
+  justify-content: flex-end;
+}
+.agent-message-actions:focus-within,
+:is(.agent-message-assistant, .agent-message-user):hover .agent-message-actions {
+  opacity: 1;
+}
+.agent-message-actions button {
+  color: var(--color-cream-muted);
+}
+.agent-message-actions button:is(:hover, [aria-pressed="true"]) {
+  color: var(--color-cream);
+}
+.agent-message-time {
+  padding-inline: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.agent-message-actions[data-align="end"] .agent-message-time {
+  order: -1;
+}
+@media (hover: none) {
+  .agent-message-actions {
+    opacity: 1;
+  }
+}
+/* A reply's quote inside the person's bubble, and the target above the composer. */
+.agent-message-quote {
+  display: -webkit-box;
+  margin: 0 0 8px;
+  padding-left: 10px;
+  overflow: hidden;
+  border-left: 2px solid var(--color-charcoal-border);
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.agent-reply-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-reply-target > svg {
+  flex-shrink: 0;
+}
+.agent-reply-target p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-reply-target p span {
+  color: var(--color-cream);
+}
+.agent-conversation .agent-message-user > div:not(.agent-message-actions) {
   max-width: min(82%, 72ch);
   padding: 10px 14px;
   border: 0;
   border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
+  /* One step above the card surface, which barely separates from the canvas. */
+  background: var(--color-charcoal-hover);
   box-shadow: none;
   font-size: 14px;
   line-height: 1.6;
+}
+/* Interim replies fold into one quiet disclosure above the turn's answer. */
+.agent-steps {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.agent-steps-toggle {
+  margin-left: -6px;
+  gap: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-steps-toggle:hover,
+.agent-steps-toggle[aria-expanded="true"] {
+  color: var(--color-cream);
+}
+.agent-steps-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+.agent-steps-chevron {
+  transition: transform 150ms ease-out;
+}
+.agent-steps-toggle[aria-expanded="true"] .agent-steps-chevron {
+  transform: rotate(180deg);
+}
+.agent-steps-list {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 4px 0;
+  padding: 2px 0 2px 12px;
+  border-left: 1px solid var(--color-charcoal-border);
+  list-style: none;
+}
+.agent-steps-list > li > :first-child {
+  margin-top: 0;
+}
+.agent-step-text {
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.agent-step-text p {
+  margin: 0 0 6px;
+}
+.agent-step-text p:last-child {
+  margin-bottom: 0;
+}
+.agent-steps > :not(button, ol) {
+  width: 100%;
+  margin-top: 0;
 }
 .agent-conversation .agent-transcript :is(p, li, a, pre) {
   overflow-wrap: anywhere;
@@ -261,10 +313,6 @@
 }
 .agent-recipient-input input {
   font-size: 14px;
-}
-.agent-conversation-heading:has(.agent-recipient-input) .agent-heading-start {
-  flex: 0;
-  min-width: 0;
 }
 .agent-recipient-results {
   position: absolute;
@@ -338,75 +386,6 @@
   display: grid;
   gap: 16px;
   padding-top: 16px;
-}
-/* Navigation stays in the chat; shared popovers render above it without resizing the pane. */
-.agent-navigation-island {
-  display: flex;
-  flex-shrink: 0;
-  align-self: center;
-  gap: 2px;
-  padding: 3px;
-  margin-bottom: 4px;
-  max-width: calc(100% - 24px);
-}
-.agent-navigation-dropdown {
-  width: 432px;
-  max-width: min(calc(100vw - 24px), var(--radix-popover-content-available-width));
-  max-height: min(580px, var(--radix-popover-content-available-height));
-  padding: 12px;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.agent-history-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.agent-history-tools input {
-  flex: 1;
-  min-width: 0;
-}
-.agent-history-row {
-  width: 100%;
-  height: auto;
-  min-height: 64px;
-  padding: 12px;
-  margin-bottom: 4px;
-  white-space: normal;
-  text-align: left;
-}
-.agent-history-copy {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  gap: 6px;
-}
-.agent-history-copy > span {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-.agent-history-copy strong {
-  font-size: 14px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-.agent-history-copy time {
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--color-cream-muted);
-}
-.agent-history-copy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--color-cream-muted);
 }
 .agent-profile-form {
   display: grid;
@@ -490,16 +469,81 @@
 .agent-activity-result {
   white-space: pre-wrap;
 }
-.agent-activity-events summary {
-  cursor: pointer;
+/* Tool steps: a quiet count that discloses a compact, bounded timeline. */
+.agent-tool-activity {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
 }
-.agent-activity-events ul {
-  padding-left: 16px;
+.agent-tool-activity-toggle {
+  margin-left: -6px;
+  gap: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
 }
-.agent-activity-approval > div {
+.agent-tool-activity-toggle:hover,
+.agent-tool-activity-toggle[aria-expanded="true"] {
+  color: var(--color-cream);
+}
+.agent-tool-activity-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+.agent-tool-activity-chevron {
+  transition: transform 150ms ease-out;
+}
+.agent-tool-activity-toggle[aria-expanded="true"] .agent-tool-activity-chevron {
+  transform: rotate(180deg);
+}
+.agent-tool-activity-steps {
+  width: 100%;
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.agent-tool-activity-steps li {
+  position: relative;
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  padding: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+/* A hairline joins each step's icon to the next. */
+.agent-tool-activity-steps li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 2px;
+  left: 6px;
+  width: 1px;
+  background: var(--color-charcoal-border);
+}
+.agent-tool-activity-steps li > svg {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  color: var(--color-cream-muted);
+}
+.agent-tool-activity-steps li > div {
+  min-width: 0;
+}
+.agent-tool-activity-steps strong {
+  display: block;
+  font-weight: 500;
+  color: var(--color-cream);
+}
+.agent-tool-activity-steps p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-cream-muted);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 .agent-activity-details > button {
   justify-self: start;
@@ -512,62 +556,52 @@
   margin-top: 12px;
 }
 
-/* Dot-inspired context stays beside the conversation; controls inherit shared geometry. */
-.agent-overview-rail {
-  width: 340px;
-  flex-shrink: 0;
+/*
+ * Only the chat column (header and conversation) scrolls; its scrollbar sits at the
+ * chat's right edge, so it never overlays or shifts the pull-tab panels, which stay on
+ * the window's wall at full height. The header sticks to the top of the chat column,
+ * the composer to the bottom, and the panels run beside them, level with the title.
+ */
+.agents-body {
+  --agents-canvas: var(--color-charcoal-workspace);
+  container: agents-body / size;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.agents-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 360px;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 16px 16px 0;
+  overscroll-behavior: contain;
 }
-.agent-overview-rail .agent-navigation-island,
-[data-slot="sheet-content"] .agent-navigation-island {
-  margin: 0;
-  max-width: 100%;
-  align-self: stretch;
-  justify-content: space-between;
+/* Rows keep their content height so the column overflows and scrolls instead of squeezing. */
+.agents-chat > * {
+  flex-shrink: 0;
 }
-.agent-overview-rail .agent-activity-row {
-  min-height: 52px;
-  padding: 8px 0;
-  gap: 8px;
+/* The conversation fills a short column and grows past a long one. */
+.agents-chat > :is(.agent-conversation, .agent-new-chat) {
+  flex: 1 0 auto;
+  min-height: auto;
 }
-.agent-overview-rail .agent-activity-row strong {
-  font-size: 13px;
+.agents-chat > .agent-conversation-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--agents-canvas);
 }
-.agent-overview-rail .agent-activity-row small {
-  font-size: 12px;
+.agents-body .agent-conversation-scroll {
+  flex: 1 0 auto;
+  min-height: auto;
+  overflow: visible;
 }
-.agent-overview-rail .agent-activity-details {
-  padding: 0 0 12px;
-}
-.agent-overview-rail .agents-list-note {
-  padding: 4px 0;
-}
-.agent-overview-rail .agent-avatar--large {
-  width: 64px;
-  height: 64px;
-}
-.agent-welcome {
-  display: flex;
-  min-height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 40px 24px;
-  text-align: center;
-}
-.agent-welcome .agent-avatar {
-  width: 80px;
-  height: 80px;
-}
-.agent-welcome h1 {
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-.agent-welcome p {
-  max-width: 36ch;
-  color: var(--color-cream-muted);
+.agents-body .agent-conversation:not([data-empty="true"]) .agent-compose-area {
+  position: sticky;
+  bottom: 0;
+  background: var(--agents-canvas);
 }

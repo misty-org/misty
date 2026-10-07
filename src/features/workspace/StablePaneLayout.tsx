@@ -10,7 +10,18 @@ export function StablePaneLayout({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
-  useEffect(() => () => resizeCleanupRef.current?.(), []);
+  const observed = useRef<{ elements: Element[]; observer: ResizeObserver } | null>(null);
+  useEffect(
+    () => () => {
+      resizeCleanupRef.current?.();
+      observed.current?.observer.disconnect();
+      observed.current = null;
+    },
+    [],
+  );
+  // Runs after every commit because layout slots may be rebuilt by any render.
+  // Finding them is cheap; measuring is not, so geometry is read only when the
+  // mounted slots or contents change. The observer covers every resize after that.
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -60,11 +71,22 @@ export function StablePaneLayout({
       // Notify after all pane writes, including position-only moves/reparenting.
       if (changed) window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
     };
+    // Reuse the observer while the same slots and contents are mounted; rebuilding it on
+    // every render forced a fresh layout pass per observed element.
+    const elements = [...slots, ...contents.values()];
+    const previous = observed.current;
+    if (
+      previous &&
+      previous.elements.length === elements.length &&
+      previous.elements.every((element, index) => element === elements[index])
+    )
+      return;
     position();
+    previous?.observer.disconnect();
     const observer = new ResizeObserver(position);
     observer.observe(root);
     slots.forEach((slot) => observer.observe(slot));
-    return () => observer.disconnect();
+    observed.current = { elements, observer };
   });
   return (
     <div

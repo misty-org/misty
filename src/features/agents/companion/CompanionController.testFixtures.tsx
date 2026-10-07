@@ -4,24 +4,35 @@ import { useSettingsProfiles } from "@/features/settings/profiles/store";
 import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { CursorCompanionController } from "./CursorCompanionController";
+import type { CompanionConversation } from "./companionConversation";
 const mocks = vi.hoisted(() => ({
   listeners: new Map<string, (e: { payload: unknown }) => void>(),
   invoke: vi.fn(),
   transcribe: vi.fn(),
   speech: vi.fn(),
-  voiceClose: vi.fn(),
   voiceAppend: vi.fn(),
-  voiceError: undefined as undefined | ((error: Error) => void),
+  conversationOpen: vi.fn(),
+  conversationBegin: vi.fn(),
+  conversationCommit: vi.fn(),
+  conversationInterrupt: vi.fn(),
+  conversationClose: vi.fn(),
+  conversationOptions: undefined as
+    undefined | ConstructorParameters<typeof CompanionConversation>[0],
   cancel: vi.fn(),
   pause: vi.fn(),
   taskId: "desktop-task",
   submit: vi.fn(),
+  steer: vi.fn(),
+  loadConversations: vi.fn(async () => {}),
   state: {
     accountId: "account",
     activeConversationId: "conversation",
+    selectedAgentId: undefined as string | undefined,
+    executionMode: "user" as "user" | "agent" | "team",
     working: false,
     error: null as string | null,
     invocationId: undefined as string | undefined,
+    invocationConversationId: undefined as string | undefined,
     conversations: [] as unknown[],
   },
   subscribers: new Set<() => void>(),
@@ -46,35 +57,23 @@ vi.mock("@tauri-apps/api/window", () => ({
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
 }));
-vi.mock("./companionVoice", () => ({
-  CompanionVoice: class {
-    private finish?: () => void;
-    constructor(
-      private options: {
-        signal: AbortSignal;
-        onPlaying: () => void;
-        onError: (error: Error) => void;
-      },
-    ) {
-      mocks.voiceError = options.onError;
+vi.mock("./companionConversation", () => ({
+  CompanionConversation: class {
+    constructor(private options: ConstructorParameters<typeof CompanionConversation>[0]) {
+      mocks.conversationOpen();
+      mocks.conversationOptions = options;
     }
+    begin = mocks.conversationBegin;
     append = mocks.voiceAppend;
-    async commit() {
-      const value = await mocks.transcribe(undefined, undefined, this.options.signal);
-      return value.transcript;
-    }
-    async speak(id: string) {
-      await mocks.speech(id, this.options.signal);
-      if (this.options.signal.aborted) return;
+    commit = mocks.conversationCommit;
+    submitText = mocks.conversationCommit;
+    async readResult(id: string) {
+      await mocks.speech(id);
       this.options.onPlaying();
-      await new Promise<void>((resolve) => {
-        this.finish = resolve;
-      });
+      await new Promise<void>(() => {});
     }
-    close() {
-      mocks.voiceClose();
-      this.finish?.();
-    }
+    interrupt = mocks.conversationInterrupt;
+    close = mocks.conversationClose;
   },
 }));
 vi.mock("@/api/assistant/api", () => ({
@@ -86,6 +85,8 @@ vi.mock("@/api/assistant/api", () => ({
 }));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: {
+    setState: (update: (state: typeof mocks.state) => Partial<typeof mocks.state>) =>
+      Object.assign(mocks.state, update(mocks.state)),
     getState: () => ({
       ...mocks.state,
       setAccount: (accountId: string) => {
@@ -93,6 +94,8 @@ vi.mock("@/features/misty/useMistyStore", () => ({
       },
       cancelResponse: mocks.cancel,
       submitAnswer: mocks.submit,
+      steerResponse: mocks.steer,
+      loadConversations: mocks.loadConversations,
     }),
     subscribe: (cb: () => void) => {
       mocks.subscribers.add(cb);
@@ -138,10 +141,18 @@ beforeEach(() => {
   mocks.taskId = "desktop-task";
   mocks.pause.mockResolvedValue(undefined);
   mocks.state.accountId = "account";
+  mocks.state.activeConversationId = "conversation";
+  mocks.state.selectedAgentId = undefined;
+  mocks.steer.mockResolvedValue(undefined);
+  mocks.state.executionMode = "user";
   mocks.state.working = false;
   mocks.state.error = null;
   mocks.state.invocationId = undefined;
-  mocks.state.conversations = [];
+  mocks.state.conversations = [{ id: "conversation", messages: [] }];
+  mocks.state.invocationConversationId = undefined;
+  mocks.conversationCommit.mockReset().mockResolvedValue(undefined);
+  mocks.conversationInterrupt.mockResolvedValue(undefined);
+  mocks.conversationOptions = undefined;
   Object.defineProperty(navigator, "platform", {
     configurable: true,
     value: "MacIntel",

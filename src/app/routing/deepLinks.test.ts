@@ -23,4 +23,14 @@ describe("Misty deep links", () => {
       ),
     ).toBe("/invite/token-123");
   });
+
+  it("does not route retired device pairing links", () => {
+    expect(
+      routeForMistyDeepLink(
+        "misty://devices/pair?session=pairing_abc&secret=SECRET",
+        isDeepLinkRouteAllowed,
+        resolveAuthDeepLinkRoute,
+      ),
+    ).toBeNull();
+  });
 });

@@ -1,0 +1,14 @@
+{
+  "name": "misty-feature-promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.mjs",
+    "build": "vite build --config vite.config.mjs",
+    "storyboard": "node scripts/render.mjs storyboard",
+    "rough": "node scripts/render.mjs rough",
+    "render": "node scripts/render.mjs final",
+    "audio": "python3 scripts/audio.py",
+    "check": "node scripts/verify.mjs"
+  }
+}

@@ -1,0 +1,398 @@
+/* Agents opens straight into this shell for the selected agent; there is no collection. */
+.agent-studio {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  container: agent-studio / inline-size;
+}
+.agent-studio-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-right: 1px solid var(--color-charcoal-border);
+  background: var(--color-charcoal-sidebar);
+}
+.agent-studio-sidebar > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-bottom: 4px;
+}
+/* Spacing follows the Spaces sidebar: 32px rows 4px apart, 13px labels, compact section labels. */
+/* The switcher hugs its name instead of spanning the sidebar. */
+.agent-studio-identity {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: 36px;
+  justify-content: flex-start;
+  padding: 4px 8px 4px 4px;
+  font-weight: 600;
+}
+.agent-studio-sidebar .agent-avatar {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.agent-studio-sidebar nav {
+  display: grid;
+  gap: 4px;
+}
+.agent-studio-sidebar nav > button,
+.agent-studio-recent-row > button:first-child {
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  gap: 8px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.agent-studio-sidebar button[aria-current="page"] {
+  background: var(--color-charcoal-active);
+  color: var(--color-cream-bright);
+}
+.agent-studio-sidebar button > svg {
+  flex-shrink: 0;
+}
+.agent-studio-sidebar button > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-studio-recents {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* Rows end clear of the overlay scrollbar instead of running under it. */
+  padding-right: 10px;
+  margin-right: -2px;
+}
+.agent-studio-recents h2 {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin: 0;
+  padding-inline: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-cream);
+}
+.agent-studio-recent-row > button:first-child {
+  color: var(--color-cream-muted);
+}
+/* The title takes the row's width so a status icon sits at its end. */
+.agent-studio-recent-row > button:first-child > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+/* Status is an icon with a text label (tooltip and screen readers), never a color. */
+.agent-studio-recent-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+}
+.agent-studio-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-charcoal-bg);
+}
+.agent-studio-task {
+  height: 100%;
+  min-width: 0;
+  display: flex;
+}
+.agent-studio-task[hidden],
+.agent-studio-catalog-host[hidden] {
+  display: none;
+}
+.agent-studio-catalog-host {
+  height: 100%;
+}
+.agent-studio .agent-conversation-heading {
+  flex-shrink: 0;
+}
+.agent-studio .agent-conversation[data-empty="true"] {
+  justify-content: flex-start;
+  padding-top: clamp(40px, 18vh, 210px);
+}
+.agent-studio .agents-body {
+  --agents-canvas: var(--color-charcoal-bg);
+}
+.agent-studio .agent-conversation[data-empty="true"] .agent-conversation-scroll {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.agent-studio-welcome {
+  text-align: center;
+  margin: 0 auto 32px;
+  padding-inline: 20px;
+}
+.agent-studio-welcome h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  margin: 0;
+}
+.agent-studio .agent-conversation[data-empty="true"] .agent-compose-area {
+  width: 672px;
+  max-width: calc(100% - 48px);
+  margin: 0 auto;
+  padding: 0;
+  flex-shrink: 0;
+}
+@container agent-studio (max-width:1100px) {
+  .agent-studio-sidebar {
+    width: 190px;
+  }
+  .agent-studio-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container agent-studio (max-width:760px) {
+  .agent-studio-sidebar {
+    width: 58px;
+    padding: 6px;
+  }
+  .agent-studio-sidebar > header {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .agent-studio-identity > :not(.agent-avatar),
+  .agent-studio-sidebar button > span,
+  .agent-studio-recents h2 {
+    display: none;
+  }
+  .agent-studio-sidebar nav > button,
+  .agent-studio-recent-row > button:first-child {
+    justify-content: center;
+    padding: 8px;
+  }
+  .agent-studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .agent-studio-catalog,
+  .agent-studio-workflows {
+    max-width: calc(100% - 32px);
+    margin-top: 24px;
+  }
+  .agent-studio-welcome h1 {
+    font-size: 26px;
+  }
+}
+/*
+ * Every Agents composer has two rows: the text on top, and one toolbar under it with
+ * Attach and the mode on the left, the model, usage, voice and send on the right.
+ */
+.agent-studio .agent-conversation [data-slot="message-composer"] > div:has(textarea) {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  row-gap: 6px;
+  padding: 10px;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:has(> textarea) {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+/* Text starts where the + glyph starts: 10px card padding + 8px inset inside the 32px button. */
+.agent-studio .agent-conversation [data-slot="message-composer"] textarea {
+  padding-inline: 8px;
+}
+/* A new task's composer is roomier: a taller field in larger type. */
+.agent-studio .agent-conversation[data-empty="true"] [data-slot="message-composer"] textarea {
+  min-height: 64px;
+  padding: 8px;
+  font-size: 16px;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:first-child {
+  grid-row: 2;
+  /* The shared lift centers the buttons on a one-line input; here they have their own row. */
+  margin-bottom: 0;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:last-child {
+  grid-column: 3;
+  grid-row: 2;
+  margin-bottom: 0;
+}
+/*
+ * Control bar: a tab tucked behind the composer's top edge for active folder work and
+ * the agent window. Usage lives in the composer as a ring. Receipts and notices span below.
+ */
+.agent-control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  margin-inline: 14px;
+  padding: 3px 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: color-mix(in srgb, var(--color-charcoal-card) 55%, transparent);
+}
+/* Folder work and the agent window appear only while active; an idle bar takes no space. */
+.agent-control-bar:empty {
+  display: none;
+}
+.agent-control-bar button {
+  height: 28px;
+  gap: 6px;
+  padding-inline: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.agent-control-bar button:is(:hover, [data-state="open"]) {
+  color: var(--color-cream);
+}
+.agent-control-bar > p {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  padding: 2px 8px 6px;
+}
+/* The usage ring sits beside the mic; exact numbers live in the popover. */
+.agent-usage-ring circle:first-child {
+  stroke: color-mix(in srgb, var(--color-cream) 18%, transparent);
+}
+.agent-usage-ring circle:last-child {
+  stroke: var(--color-cream);
+}
+
+.agent-studio-recent-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--radius-md);
+}
+.agent-studio-recent-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+/* One surface per row: the title and its overflow menu highlight together. */
+.agent-studio-recent-row:hover,
+.agent-studio-recent-row:has(> [data-state="open"]) {
+  background: var(--color-charcoal-hover);
+}
+.agent-studio-recent-row:has(> button[aria-current="page"]) {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-recent-row > button,
+.agent-studio-recent-row > button:hover,
+.agent-studio-recent-row > button[aria-current="page"],
+.agent-studio-recent-row > button[data-state="open"] {
+  background: transparent;
+}
+.agent-studio-recent-row:has(> button[aria-current="page"]) > button:first-child {
+  color: var(--color-cream-bright);
+}
+.agent-studio-recent-row > :not(:first-child) {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  margin-right: 4px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-recent-row > button:not(:first-child):is(:hover, [data-state="open"]) {
+  color: var(--color-cream-bright);
+}
+
+/* The row's own overflow menu appears with intent, not on every recent. */
+.agent-studio-recent-row > :not(:first-child) {
+  opacity: 0;
+}
+.agent-studio-recent-row:is(:hover, :focus-within) > :not(:first-child),
+.agent-studio-recent-row:has(> button[aria-current="page"]) > :not(:first-child),
+.agent-studio-recent-row > [aria-expanded="true"],
+.agent-studio-recent-row > [data-state="open"] {
+  opacity: 1;
+}
+
+/* The workspace header names only the open conversation; the sidebar owns identity. */
+.agent-conversation-heading[data-workspace] {
+  padding: 0 16px 0 24px;
+}
+.agent-heading-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* The Working status and the Details toggle end the bar. */
+.agent-heading-details {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+.agent-heading-details > button:last-child {
+  color: var(--color-cream-muted);
+}
+.agent-heading-details > button:last-child[aria-pressed="true"] {
+  color: var(--color-cream-bright);
+}
+
+/* Folder work joins the bar's controls; its receipt and errors span the row below. */
+.agent-control-bar .misty-folder-work {
+  display: contents;
+}
+.agent-control-bar .misty-folder-work__controls {
+  gap: 2px;
+}
+.agent-control-bar .misty-folder-work__controls > span {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
+}
+.agent-control-bar .misty-folder-work__receipt,
+.agent-control-bar .misty-folder-work > p {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  padding: 2px 8px 6px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+
+/* Multi-selected recents share the open conversation's monochrome surface. */
+.agent-studio-recent-row[data-selected] {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-recent-row[data-selected] > button:first-child {
+  color: var(--color-cream-bright);
+}
+.agent-studio-recents-selection {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+  padding-left: 8px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-recents-selection > span {
+  flex: 1;
+}

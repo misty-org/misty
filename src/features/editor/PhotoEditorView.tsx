@@ -1,7 +1,7 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
 import type { PreviewErrorComponent } from "@/features/file-ui";
-import { IconButton, Spinner, ViewportLayer } from "@/shared/ui";
+import { IconButton, Skeleton, ViewportLayer } from "@/shared/ui";
 import { Copy, X } from "lucide-react";
 import {
   lazy,
@@ -163,10 +163,12 @@ function EditorStatus(props: {
               target={{ kind: "workspace-tool", tool: "files" }}
             />
           ) : (
-            <>
-              <Spinner size="lg" label={false} className="size-7" />
-              Preparing image…
-            </>
+            <Skeleton
+              role="status"
+              aria-label="Image"
+              aria-hidden={false}
+              className="aspect-[4/3] w-[min(70vw,720px)] rounded-lg"
+            />
           )}
           <IconButton
             size="lg"
@@ -221,8 +223,13 @@ export function PhotoEditorView(props: PhotoEditorProps & { Error: PreviewErrorC
     <EditorShell name={props.name}>
       <Suspense
         fallback={
-          <div className="grid h-full place-items-center text-cream-bright/60">
-            <Spinner size="lg" label={false} className="size-7" />
+          <div className="grid h-full place-items-center">
+            <Skeleton
+              role="status"
+              aria-label="Image"
+              aria-hidden={false}
+              className="aspect-[4/3] w-[min(70vw,720px)] rounded-lg"
+            />
           </div>
         }
       >

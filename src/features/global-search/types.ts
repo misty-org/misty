@@ -1,6 +1,8 @@
+import type { AppRequest } from "@/features/agents";
+import type { AiArtifact, ScreenRequest } from "@/features/ai-surface/types";
 import type { SearchResult } from "@/native/ipc";
 
-export type GlobalAiMode = "search" | "ask" | "action";
+export type GlobalAiMode = "search" | "ask";
 
 export type GlobalSearchKind =
   | "space"
@@ -16,7 +18,6 @@ export type GlobalSearchKind =
   | "folder"
   | "file"
   | "agent"
-  | "workflow"
   | "action";
 
 export interface GlobalSearchDocument {
@@ -100,24 +101,9 @@ export interface GlobalAiCitation {
   kind: GlobalSearchKind;
 }
 
-export interface GlobalAiActionProposal {
-  id: string;
-  title: string;
-  summary: string;
-  prompt: string;
-  risk: "read" | "write" | "dangerous";
-  state: "proposed" | "running" | "awaiting_approval" | "completed" | "failed" | "rejected";
-  requiresConfirmation: boolean;
-  agentName?: string;
-  spaceId?: string;
-  spaceName?: string;
-  runId?: string;
-  approvalId?: string;
-  resultHref?: string;
-  error?: string;
-}
-
 export interface GlobalAiMessage {
+  artifact?: AiArtifact;
+  invocationId?: string;
   id: string;
   role: "user" | "assistant";
   mode: Exclude<GlobalAiMode, "search">;
@@ -128,9 +114,14 @@ export interface GlobalAiMessage {
   activity?: string;
   attachments?: MistyImageAttachment[];
   citations?: GlobalAiCitation[];
-  action?: GlobalAiActionProposal;
+  /** Something the agent needs from the user: connect an app or approve an action. */
+  appRequest?: AppRequest;
+  /** A screen the agent asked for; Misty continues once it opens. */
+  screenRequest?: ScreenRequest;
   /** Set on turns Misty started itself rather than the person typing them. */
-  source?: "scheduled_task";
+  source?: "scheduled_task" | "goal_continuation";
+  /** Misty sees this message and everything before it only as summarized notes. */
+  compactedAfter?: boolean;
 }
 
 export interface MistyImageAttachment {
@@ -163,6 +154,8 @@ export interface GlobalAiConversation {
   createdAt: string;
   updatedAt: string;
   modelId?: string;
+  /** The model picked for this conversation; empty follows the account's Thinking choice. */
+  modelOverride?: string;
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   messages: GlobalAiMessage[];
   remote: boolean;

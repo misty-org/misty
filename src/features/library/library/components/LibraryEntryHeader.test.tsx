@@ -78,3 +78,24 @@ it("respects upload permissions and exposes album creation separately", () => {
   fireEvent.click(screen.getByRole("button", { name: "New album" }));
   expect(fixture.album).toHaveBeenCalled();
 });
+
+it("places Smart Library controls in the shared header without a cloud upload action", () => {
+  fixture.data.collection = "smart";
+  render(
+    <LibraryEntryHeader
+      smartControls={{
+        search: <input aria-label="Search Smart Library" />,
+        actions: <button>Add files</button>,
+        filterControl: <button>Filter Smart Library</button>,
+        viewToggle: <button>Smart list view</button>,
+      }}
+    />,
+  );
+  expect(screen.getByRole("textbox", { name: "Search Smart Library" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Add files" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Filter Smart Library" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Smart list view" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Upload files" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "All" }));
+  expect(fixture.select).toHaveBeenCalledWith("recent");
+});

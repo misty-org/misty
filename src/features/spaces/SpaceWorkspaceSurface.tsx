@@ -13,6 +13,8 @@ import {
   SheetDescription,
   SheetTitle,
   SheetTrigger,
+  CollectionSkeleton,
+  SkeletonList,
 } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
@@ -69,14 +71,24 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       </div>
     );
 
+  if (!ready && error)
+    return (
+      <div className="grid h-full place-content-center gap-3 text-center text-sm text-cream-muted">
+        <p role="alert">Spaces could not be loaded.</p>
+        <Button onClick={() => void load({ force: true })}>Retry</Button>
+      </div>
+    );
   if (!ready)
     return (
-      <div
-        className="grid h-full place-content-center gap-3 text-center text-sm text-cream-muted"
-        role="status"
-      >
-        <p>{error ? "Spaces could not be loaded." : "Loading Spaces…"}</p>
-        {error && <Button onClick={() => void load({ force: true })}>Retry</Button>}
+      <div className="flex h-full min-h-0 overflow-hidden bg-charcoal-workspace">
+        {!narrow && (
+          <div className="h-full w-56 shrink-0 border-r border-charcoal-border bg-charcoal-sidebar p-3">
+            <SkeletonList label="Space navigation" rows={7} leading="icon" lines={1} />
+          </div>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col p-6">
+          <CollectionSkeleton label="Spaces" view="grid" />
+        </div>
       </div>
     );
 

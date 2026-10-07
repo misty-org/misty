@@ -9,6 +9,8 @@ interface BrowserMediaStore {
   muted: Record<string, boolean>;
   setAudible: (tabId: string, audible: boolean) => void;
   toggleMuted: (tabId: string) => Promise<void>;
+  /** Records a mute that was already applied to the page, such as by an extension. */
+  setMutedState: (tabId: string, muted: boolean) => void;
   removeView: (tabId: string) => void;
 }
 
@@ -28,6 +30,10 @@ export const useBrowserMediaStore = create<BrowserMediaStore>((set, get) => ({
     await invoke<void>("browser_webview_set_muted", { request: { id: runtimeId, muted } });
     set((state) => ({ muted: { ...state.muted, [tabId]: muted } }));
   },
+  setMutedState: (tabId, muted) =>
+    set((state) =>
+      Boolean(state.muted[tabId]) === muted ? state : { muted: { ...state.muted, [tabId]: muted } },
+    ),
   removeView: (tabId) =>
     set((state) => {
       const audible = { ...state.audible };

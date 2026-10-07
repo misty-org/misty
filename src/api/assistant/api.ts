@@ -15,13 +15,6 @@ export interface FrontierModelCatalog {
   models: FrontierModel[];
 }
 
-export interface AssistantTurnInput<TContext extends object = Record<string, unknown>> {
-  mode: string;
-  prompt: string;
-  context: TContext[];
-  timezone?: string;
-}
-
 export const assistantApi = {
   search: <T>(query: string, limit = 40, filters?: { kinds?: string[]; spaceId?: string }) => {
     const params = new URLSearchParams({ q: query, limit: String(limit) });
@@ -78,12 +71,13 @@ export const assistantApi = {
       `/misty/conversations/${encodeURIComponent(conversationId)}`,
       { method: "PATCH", body: JSON.stringify(settings) },
     ),
+  /** Pins a conversation's model; an empty model follows the account's Thinking choice. */
+  updateConversationModel: (conversationId: string, model: string) =>
+    apiRequest<{ id: string; model_override: string }>(
+      `/misty/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "PATCH", body: JSON.stringify({ model_id: model }) },
+    ),
   frontierModels: () => apiRequest<FrontierModelCatalog>("/ai/models"),
-  turn: <T, TContext extends object>(conversationId: string, input: AssistantTurnInput<TContext>) =>
-    apiRequest<T>(`/misty/conversations/${encodeURIComponent(conversationId)}/turns`, {
-      method: "POST",
-      body: JSON.stringify(safeAssistantTurnInput(input)),
-    }),
   complete: (prompt: string) =>
     apiRequest<{ text: string }>("/ai/complete", {
       method: "POST",
@@ -92,23 +86,4 @@ export const assistantApi = {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
       }),
     }),
-  decideProposal: <T>(proposalId: string, approved: boolean) =>
-    apiRequest<T>(`/misty/action-proposals/${encodeURIComponent(proposalId)}/decision`, {
-      method: "POST",
-      body: JSON.stringify({ approved }),
-    }),
 };
-
-export function safeAssistantTurnInput<TContext extends object>(
-  input: AssistantTurnInput<TContext>,
-) {
-  return {
-    mode: input.mode,
-    prompt: input.prompt,
-    context: input.context.map((context) => {
-      const { localPath: _localPath, ...reference } = context as TContext & { localPath?: string };
-      return reference;
-    }),
-    timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-  };
-}

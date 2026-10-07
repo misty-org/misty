@@ -19,6 +19,7 @@ import {
   Input,
   Separator,
   WorkspaceOverlay,
+  SkeletonList,
 } from "@/shared/ui";
 import { Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
@@ -141,8 +142,19 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   };
   if (!space)
     return (
-      <div className="grid h-full place-items-center text-sm text-cream-muted">
-        Loading Space settings…
+      <div className="flex h-full min-h-0 overflow-hidden">
+        <div className="h-full w-56 shrink-0 border-r border-charcoal-border p-3">
+          <SkeletonList label="Settings sections" rows={6} leading="icon" lines={1} />
+        </div>
+        <div className="min-w-0 flex-1 p-8">
+          <SkeletonList
+            label="Space settings"
+            rows={5}
+            leading="none"
+            trailing
+            className="max-w-3xl"
+          />
+        </div>
       </div>
     );
   return (

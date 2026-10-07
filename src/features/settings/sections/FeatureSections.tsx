@@ -1,17 +1,13 @@
-import { assistantApi, type FrontierModel } from "@/api/assistant/api";
 import type { AgentScope } from "@/features/agents";
 import {
   agentsDeviceSnapshot,
   agentsRevokeFolderScope,
   CompanionAppearanceSettings,
-  McpConnectionsView,
 } from "@/features/agents";
-import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
-import { ConnectedDevicePairingDialog } from "@/features/files/workspace";
 import { useSpacesStore } from "@/features/spaces";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,8 +17,11 @@ import {
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
+import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
+import { AppActionsSection } from "./AppActionsSection";
+import { ScreenLocationSection } from "./ScreenLocationSection";
 export function PreferenceRow({ id }: { id: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
@@ -108,135 +107,53 @@ export function ManageSpacesSection(props: SettingsContentProps) {
     </Section>
   );
 }
-function useModels() {
-  const [models, setModels] = useState<FrontierModel[]>([]),
-    [error, setError] = useState(""),
-    [loading, setLoading] = useState(true),
-    [attempt, retry] = useState(0),
-    [defaultModel, setDefaultModel] = useState("");
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError("");
-    void assistantApi
-      .frontierModels()
-      .then((r) => {
-        if (active) {
-          setModels(r.models);
-          setDefaultModel(r.default_model_id);
-        }
-      })
-      .catch((e) => {
-        if (active) setError(String(e));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [attempt]);
-  return {
-    models,
-    defaultModel,
-    error,
-    loading,
-    retry: () => retry((n) => n + 1),
-  };
-}
-export function ModelsSection() {
-  const { models, error, loading, retry } = useModels();
-  const [query, setQuery] = useState("");
+export { ModelSensesSection as ModelsSection } from "./ModelSensesSection";
+
+export function AgentDefaultsSection() {
+  const setActiveSection = useSettingsStore((state) => state.setActiveSection);
   return (
-    <Section title="Available models">
-      <Input
-        aria-label="Filter models"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Filter models"
-      />
-      {loading && (
-        <p role="status" className="p-5 text-sm text-cream-muted">
-          Loading available models…
-        </p>
-      )}
-      {models
-        .filter((m) => `${m.name} ${m.provider_name}`.toLowerCase().includes(query.toLowerCase()))
-        .map((m) => (
-          <Row key={m.id} label={m.name} description={m.provider_name}>
-            <span className="text-xs text-cream-muted">{m.capabilities.join(", ") || "Chat"}</span>
-          </Row>
-        ))}
-      {!loading && !models.length && !error && (
-        <p className="p-5 text-sm text-cream-muted">No models are available from this server.</p>
-      )}
-      {error && (
-        <div className="p-5">
-          <p role="alert">{error}</p>
-          <Button onClick={retry} variant="outline">
-            Retry
+    <>
+      <Section
+        title="Models"
+        description="Choose which model thinks, sees, listens and speaks for new agent tasks in Models settings."
+      >
+        <Row label="Model choices">
+          <Button variant="outline" onClick={() => setActiveSection("models")}>
+            Open Models
           </Button>
-        </div>
-      )}
-    </Section>
+        </Row>
+      </Section>
+      <Section
+        title="Conversations"
+        description={
+          "Plan first: agents research and propose a plan you approve before they change " +
+          "anything. Switch any conversation with the Plan chip or Shift+Tab."
+        }
+      >
+        <CollaborationModeRow />
+        <PreferenceRow id="agents.plan_deep_thinking" />
+      </Section>
+    </>
   );
 }
-export function AgentDefaultsSection(props: SettingsContentProps) {
-  const { models, defaultModel, error, loading, retry } = useModels();
-  const agent = (props.document.agent ?? {}) as Record<string, unknown>;
-  const model = String(agent.default_model_id ?? definitionById.get("agents.model")!.default);
-  const chosen = models.find((m) => m.id === (model || defaultModel));
-  const reasoning = String(agent.default_reasoning_effort ?? "");
-  const levels = chosen?.reasoning_levels.filter((l) => l !== "default") ?? [];
+function CollaborationModeRow() {
+  const d = definitionById.get("agents.collaboration_mode")!;
+  const store = useSettingsStore();
+  const ready = useSettingsProfiles((s) => s.ready);
+  const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
+  const value = String(fromLegacy(d, section?.[d.key]) || "act");
   return (
-    <Section
-      title="New conversations"
-      description="Individual agent and conversation choices take precedence. Existing conversations stay unchanged."
-    >
-      <Row label="Default model">
-        <ChoiceControl
-          value={model}
-          disabled={loading || !!error || props.working}
-          onValueChange={(value) => {
-            const next = models.find((m) => m.id === (value || defaultModel));
-            props.onSettingChange("agent", "default_model_id", value);
-            if (reasoning && !next?.reasoning_levels.some((level) => level === reasoning))
-              props.onSettingChange("agent", "default_reasoning_effort", "");
-          }}
-          options={[
-            { value: "", label: "Server default" },
-            ...(model && !chosen
-              ? [{ value: model, label: loading ? "Loading…" : `${model} (unavailable)` }]
-              : []),
-            ...models.map((m) => ({ value: m.id, label: m.name })),
-          ]}
-        />
-      </Row>
-      <Row
-        label="Default reasoning"
-        description={!levels.length ? "This model uses its own reasoning defaults." : undefined}
-      >
-        <ChoiceControl
-          value={levels.some((level) => level === reasoning) ? reasoning : ""}
-          disabled={!levels.length || props.working}
-          onValueChange={(value) =>
-            props.onSettingChange("agent", "default_reasoning_effort", value)
-          }
-          options={[
-            { value: "", label: "Model default" },
-            ...levels.map((l) => ({ value: l, label: l })),
-          ]}
-        />
-      </Row>
-      {error && (
-        <div className="p-5">
-          <p role="alert">{error}</p>
-          <Button variant="outline" onClick={retry}>
-            Retry
-          </Button>
-        </div>
-      )}
-    </Section>
+    <Row label={d.label}>
+      <ChoiceControl
+        disabled={store.working || !ready}
+        value={value}
+        onValueChange={(next) => void store.updateSetting(d.section, d.key, next)}
+        options={[
+          { value: "act", label: "Act" },
+          { value: "plan", label: "Plan first" },
+        ]}
+      />
+    </Row>
   );
 }
 export function NativeAvailability({ feature }: { feature: string }) {
@@ -250,7 +167,12 @@ export function NativeAvailability({ feature }: { feature: string }) {
   );
 }
 export function AgentConnectionsSection() {
-  return <McpConnectionsView />;
+  return (
+    <>
+      <AppActionsSection />
+      <ScreenLocationSection />
+    </>
+  );
 }
 export function CompanionSection() {
   return hasTauriInternals() ? (
@@ -260,50 +182,7 @@ export function CompanionSection() {
   );
 }
 export function DevicesSection() {
-  return hasTauriInternals() ? <DeviceControls /> : <NativeAvailability feature="File sharing" />;
-}
-function DeviceControls() {
-  const devices = useConnectedDevices();
-  const [pairing, setPairing] = useState(false);
-  const [error, setError] = useState("");
-  return (
-    <Section title="Paired devices" description="Pair devices to send files between them.">
-      <div className="flex gap-2 p-4">
-        <Button variant="outline" onClick={() => setPairing(true)}>
-          Pair device
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => void devices.refresh().catch((e) => setError(String(e)))}
-        >
-          Refresh
-        </Button>
-      </div>
-      {devices.peers.map((peer) => (
-        <Row
-          key={peer.pairId}
-          label={peer.name}
-          description={peerIsOnline(peer) ? "Online" : "Offline"}
-        >
-          <Button
-            variant="outline"
-            onClick={() => void devices.unpair(peer).catch((e) => setError(String(e)))}
-          >
-            Disconnect
-          </Button>
-        </Row>
-      ))}
-      {!devices.peers.length && (
-        <p className="p-5 text-sm text-cream-muted">No devices paired for file sharing.</p>
-      )}
-      {(error || devices.error) && (
-        <p role="alert" className="p-5">
-          {error || devices.error}
-        </p>
-      )}
-      <ConnectedDevicePairingDialog controller={devices} open={pairing} onOpenChange={setPairing} />
-    </Section>
-  );
+  return hasTauriInternals() ? <DevicesSettings /> : <NativeAvailability feature="Devices" />;
 }
 export function AgentPermissionsSection() {
   return hasTauriInternals() ? (

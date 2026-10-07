@@ -1,4 +1,4 @@
-const shimmer = "relative animate-pulse overflow-hidden rounded-md bg-charcoal-hover";
+const shimmer = "misty-skeleton rounded-md bg-charcoal-hover";
 
 const rows = Array.from({ length: 10 }, (_, index) => index);
 const sidebarRows = Array.from({ length: 7 }, (_, index) => index);

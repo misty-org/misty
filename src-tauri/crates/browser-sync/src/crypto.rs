@@ -134,6 +134,51 @@ impl VaultRoot {
         Self(Zeroizing::new(random()))
     }
 
+    /// Signs a device admission record: a device grant or the account's device
+    /// list (docs/design/devices/BRIEF.md). Only payloads in those two domains
+    /// are signed here, so this path never signs sync protocol bytes.
+    pub fn sign_device_record(&self, payload: &[u8]) -> Result<String> {
+        const DOMAINS: [&[u8]; 2] = [
+            b"[\"misty.device.grant.v2\",",
+            b"[\"misty.device.list.v1\",",
+        ];
+        if payload.len() > 65536 || !DOMAINS.iter().any(|domain| payload.starts_with(domain)) {
+            return Err(Error::Invalid);
+        }
+        Ok(STANDARD.encode(self.signing_key()?.sign(payload).to_bytes()))
+    }
+
+    /// Verifies a device admission record against this vault's root key.
+    pub fn verify_device_record(public_key: &str, payload: &[u8], signature: &str) -> Result<()> {
+        let key = VerifyingKey::from_bytes(&decode_fixed::<32>(public_key)?)
+            .map_err(|_| Error::Identity)?;
+        let signature = Signature::from_bytes(&decode_fixed::<64>(signature)?);
+        key.verify_strict(payload, &signature)
+            .map_err(|_| Error::Identity)
+    }
+
+    /// A second handle to the same root, kept only while the vault is open so
+    /// this device can admit or remove devices.
+    pub fn duplicate(&self) -> Self {
+        Self(Zeroizing::new(*self.0))
+    }
+
+    /// The root's bytes, sealed by the caller to a newly approved device whose
+    /// key the person confirmed with a matching code.
+    pub fn transfer_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(*self.0)
+    }
+
+    /// Accepts a root received from an approving device, only if it matches the
+    /// vault's root public key.
+    pub fn from_transfer(bytes: &[u8], expected_public_key: &str) -> Result<Self> {
+        let root = Self::from_protected(bytes)?;
+        if root.public_key()? != expected_public_key {
+            return Err(Error::Identity);
+        }
+        Ok(root)
+    }
+
     pub(crate) fn protected_bytes(&self) -> &[u8; 32] {
         &self.0
     }

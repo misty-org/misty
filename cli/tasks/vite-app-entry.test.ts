@@ -6,6 +6,16 @@ import { join } from "node:path";
 import { optimizeDeps, resolveConfig } from "vite";
 import { execFileSync } from "node:child_process";
 
+test("retired application targets are rejected by Vite", async () => {
+  const configFile = join(import.meta.dirname, "../../.config/vite.config.ts");
+  for (const mode of ["web", "mobile", "ios", "android"]) {
+    await assert.rejects(
+      resolveConfig({ configFile, mode, logLevel: "silent" }, "build"),
+      /Misty only supports the desktop app target/,
+    );
+  }
+});
+
 test("simultaneous desktop profiles do not rewrite each other's dependency cache", () => {
   const configFile = join(import.meta.dirname, "../../.config/vite.config.ts");
   const script = `

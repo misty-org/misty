@@ -18,9 +18,6 @@ export function createSpaceContentActions(
   | "toggleMessageReaction"
   | "markRead"
   | "openNode"
-  | "saveStudio"
-  | "deleteStudio"
-  | "runStudio"
 > {
   return {
     sendMessage: async (
@@ -169,45 +166,6 @@ export function createSpaceContentActions(
         resolveSpacesApiBase(),
       ]);
       await openExternalLink(`${base}${ticket.url}`);
-    },
-    saveStudio: async (spaceId, kind, item) => {
-      set({
-        error: null,
-      });
-      try {
-        const saved = await spacesApi.saveStudio(spaceId, kind, item);
-        await get().loadStudio(spaceId, kind);
-        return saved;
-      } catch (error) {
-        set({
-          error: errorText(error),
-        });
-        throw error;
-      }
-    },
-    deleteStudio: async (spaceId, kind, id) => {
-      set({
-        error: null,
-      });
-      try {
-        await spacesApi.deleteStudio(spaceId, kind, id);
-        await get().loadStudio(spaceId, kind);
-      } catch (error) {
-        set({
-          error: errorText(error),
-        });
-        throw error;
-      }
-    },
-    runStudio: async (spaceId, kind, id, prompt = "", capabilityId = "") => {
-      try {
-        return await spacesApi.runStudio(spaceId, kind, id, prompt, capabilityId);
-      } catch (error) {
-        set({
-          error: errorText(error),
-        });
-        throw error;
-      }
     },
   };
 }

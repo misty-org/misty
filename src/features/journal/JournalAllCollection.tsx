@@ -14,8 +14,9 @@ import {
   CollectionSearch,
   CollectionItems,
   CollectionViewToggle,
-  Spinner,
+  CollectionSkeleton,
   useCollectionRefinement,
+  itemTones,
 } from "@/shared/ui";
 
 export const journalSections = [
@@ -113,7 +114,7 @@ export function JournalAllCollection(props: {
       )}
       {actions.dialog}
       {data.loading ? (
-        <Spinner label="Loading journal" />
+        <CollectionSkeleton label="Loading journal" view={view} />
       ) : (
         <CollectionItems
           columnSetId="journal-all"
@@ -125,6 +126,7 @@ export function JournalAllCollection(props: {
             ...item,
             ...actions.forItem(item),
             icon: item.kind === "note" ? <FileText /> : <PencilRuler />,
+            tone: item.kind === "note" ? itemTones.note : itemTones.drawing,
             category: item.kind === "note" ? "Note" : "Drawing",
             creator: creator(item.creatorUserId),
             metadata: {

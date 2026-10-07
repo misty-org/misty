@@ -56,6 +56,7 @@ export function GlobalMistyComposerBar(props: {
         </header>
       )}
       <MistyComposer
+        modelId={props.conversation?.modelId}
         value={props.query}
         onChange={props.onQuery}
         mode={props.mode}

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ArrowDownUp, Search, SlidersHorizontal, X } from "lucide-react";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -12,8 +13,6 @@ import {
   IconButton,
   Input,
   MenuItem,
-  NavIsland,
-  NavIslandItem,
 } from "@/shared/ui";
 import {
   activitySections,
@@ -43,20 +42,27 @@ export function ActivityPanelToolbar({
   return (
     <div className="shrink-0">
       <div className="flex shrink-0 items-center justify-between gap-3 px-3 py-1.5">
-        <NavIsland aria-label="Activity sections" className="misty-transient-scrollbar">
+        <div
+          role="group"
+          aria-label="Activity sections"
+          className="flex min-w-0 gap-1.5 overflow-x-auto [scrollbar-width:none]"
+        >
           {Object.entries(activitySections).map(([key, label]) => (
-            <NavIslandItem
+            <Button
               key={key}
-              active={view.section === key}
+              variant="chip"
+              size="sm"
+              className="shrink-0 font-normal"
+              aria-pressed={view.section === key}
               onClick={() => onChange({ ...view, section: key as ActivitySection })}
             >
               <span>{label}</span>
               <span className="text-[10px] tabular-nums text-cream-muted">
                 {counts[key as ActivitySection]}
               </span>
-            </NavIslandItem>
+            </Button>
           ))}
-        </NavIsland>
+        </div>
         <div className="ml-auto flex shrink-0 items-center gap-1 min-w-0">
           <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>
             <DropdownMenuTrigger asChild>

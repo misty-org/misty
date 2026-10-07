@@ -1,1 +1,1 @@
-export { AgentAvatar, AgentCloudImage } from "./components/AgentAvatar";
+export { AgentAvatar } from "./components/AgentAvatar";

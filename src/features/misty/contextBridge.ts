@@ -49,7 +49,11 @@ async function handleContextRequest(request: Omit<Request, "id">): Promise<unkno
   if (request.decision) {
     const { assertMistyAvailable } = await import("./availability");
     await assertMistyAvailable(request.accountId, request.spaceId);
-    const artifact = store.getState().companion.approval?.artifact;
+    const { useMistyStore } = await import("./useMistyStore");
+    const artifact = [
+      store.getState().companion.approval?.artifact,
+      useMistyStore.getState().pendingArtifact,
+    ].find((item) => item?.id === request.artifactId);
     if (!artifact || artifact.id !== request.artifactId)
       throw new Error("This proposal is no longer available. Open its conversation again.");
     if (

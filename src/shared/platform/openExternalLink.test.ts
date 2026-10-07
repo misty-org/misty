@@ -15,6 +15,7 @@ import {
 } from "@/shared/platform/openExternalLink";
 
 afterEach(() => {
+  configureMistyBrowserLinkOpener(null);
   mocks.openUrl.mockClear();
   document.body.replaceChildren();
 });
@@ -40,6 +41,14 @@ describe("normalizeExternalUrl", () => {
 });
 
 describe("openExternalLink", () => {
+  it("never falls back to a hosted browser tab when the desktop browser is unavailable", async () => {
+    configureMistyBrowserLinkOpener(null);
+    const open = vi.spyOn(window, "open");
+    await expect(openExternalLink("https://example.com")).rejects.toThrow(
+      "Misty Browser is not ready",
+    );
+    expect(open).not.toHaveBeenCalled();
+  });
   it("opens web destinations in Misty Browser by default", async () => {
     const openInMisty = vi.fn();
     configureMistyBrowserLinkOpener(openInMisty);

@@ -13,7 +13,7 @@ import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRe
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
 import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   assertAccountIdentity,
@@ -472,22 +472,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await removeAccountWorkspace(accountId);
     setAccounts(listSavedAccountSessions());
   }, []);
-  return (
-    <AuthContext.Provider
-      value={{
-        user: activeUser,
-        setUser,
-        accounts,
-        transitioning,
-        refreshUser,
-        authenticateAccount,
-        switchAccount,
-        resumeAccount,
-        removeAccount,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const fields = {
+    user: activeUser,
+    setUser,
+    accounts,
+    transitioning,
+    refreshUser,
+    authenticateAccount,
+    switchAccount,
+    resumeAccount,
+    removeAccount,
+    logout,
+  };
+  // A fresh value object would re-render every useAuth consumer whenever the provider
+  // renders, so it changes only when one of its fields does.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const value = useMemo(() => fields, Object.values(fields));
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

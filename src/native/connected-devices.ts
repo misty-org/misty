@@ -6,7 +6,6 @@ export function connectedDevicesInitialize(request: {
   accountId: string;
   deviceId: string;
   deviceName?: string;
-  developmentTicketKeys?: Record<string, string>;
 }): Promise<ConnectedDevicesSnapshot> {
   return invoke("connected_devices_initialize", { request });
 }
@@ -19,13 +18,9 @@ export function connectedDevicesSubscribeDirectory(path: string): Promise<void> 
   return invoke("connected_devices_subscribe_directory", { path });
 }
 
-export function connectedDevicesConnect(request: {
-  instance?: string;
-  deviceId: string;
-  address: unknown;
-  ticket: string;
-}): Promise<ConnectedDevicesSnapshot> {
-  return invoke("connected_devices_connect", { request });
+/** This device's server id, which its other devices know it by. */
+export function connectedDevicesSetIdentity(deviceId: string): Promise<void> {
+  return invoke("connected_devices_set_identity", { deviceId });
 }
 
 export function connectedDevicesRoots(deviceId: string): Promise<PeerRoot[]> {

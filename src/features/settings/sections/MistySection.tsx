@@ -199,7 +199,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           </SettingsRow>
           <SettingsRow
             label="Hosted provider"
-            description="Embedded and shared Misty features use the administrator-configured hosted provider. Code BYOK stays isolated."
+            description="Embedded and shared Misty features run on Misty's own model keys."
           >
             <span className="text-sm text-cream-muted">
               {provider === null

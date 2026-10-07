@@ -1,3 +1,5 @@
+import { TransfersPage } from "../../../transfers/TransfersPage";
+import { transfersPath } from "../../../transfers/transferModel";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { routes, useAppStore } from "@/features/app-shell";
 import {
@@ -155,14 +157,16 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     storageHomePath,
     settingsMountPath || app?.environment.mountPath || ".misty/mnt",
   );
-  const activePath = useExplorerStore(
-    (state) => state.panes[activePaneId]?.listing?.path ?? homePath,
+  const activePath = useExplorerStore((state) =>
+    activeTabPath === transfersPath
+      ? transfersPath
+      : (state.panes[activePaneId]?.listing?.path ?? homePath),
   );
   const aiAdapter = useMemo(
     () =>
       createFilesAiAdapter({
         viewId: `${props.workspaceId ?? "files"}:${activePaneId}`,
-        canMutate: true,
+        canMutate: activePath !== transfersPath,
         selected: () => {
           const pane = useExplorerStore.getState().panes[activePaneId];
           const ids = new Set(pane?.selectedIds ?? []);
@@ -171,7 +175,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         rename: (_entry, name) => useExplorerStore.getState().renameSelected(activePaneId, name),
         trash: () => useExplorerStore.getState().deleteSelected(activePaneId, "trash"),
       }),
-    [activePaneId, props.workspaceId],
+    [activePaneId, activePath, props.workspaceId],
   );
   useAiSurfaceAdapter(aiAdapter);
   const explorerInitialized = useExplorerStore((state) => state.initialized);
@@ -217,8 +221,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     () => buildExplorerLocationResults(homePath, mountRoot, pinnedPaths, library, workspacePaths),
     [homePath, library, mountRoot, pinnedPaths, workspacePaths],
   );
-  const sidebarVisible = activeTabSidebarVisible;
-  const previewVisible = activeTabPreviewVisible;
+  const sidebarVisible = activeTabSidebarVisible && activePath !== transfersPath;
+  const previewVisible = activeTabPreviewVisible && activePath !== transfersPath;
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
     activePathRef.current = activePath;
@@ -241,7 +245,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
-      if (path === libraryWorkspacePath) return null;
+      if (path === libraryWorkspacePath || path === transfersPath) return null;
       return (
         <ConnectedExplorerToolbar
           paneId={paneId}
@@ -255,6 +259,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
+      if (path === transfersPath) return <TransfersPage />;
       if (path === libraryWorkspacePath) {
         return <ComingSoonSurface feature="Smart Library" />;
       }
@@ -337,7 +342,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             onNavigationAsideResizeStart={startSidebarResize}
             onNavigationAsideResizeBy={resizeSidebarBy}
             navigationAsideResizing={resizeTarget === "sidebar"}
-            renderAside={inspector}
+            renderAside={activePath === transfersPath ? undefined : inspector}
             asideWidth={previewWidth}
             onAsideResizeStart={startPreviewResize}
             onAsideResizeBy={resizePreviewBy}

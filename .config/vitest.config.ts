@@ -15,6 +15,10 @@ export default defineConfig({
     // Each UI worker loads the application graph and a full DOM. Bound contention
     // so real interaction tests retain their normal timeouts in the full suite.
     maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)),
+    // The heaviest UI tests take about 2s alone. Hooks run on a shared machine
+    // where other apps and sessions compete for the CPU, and Vitest's 5s default
+    // failed a different one of them on most busy runs.
+    testTimeout: 15_000,
     include: ["src/**/*.test.{ts,tsx}"],
     restoreMocks: true,
     setupFiles: ["./src/tests/setup.ts"],

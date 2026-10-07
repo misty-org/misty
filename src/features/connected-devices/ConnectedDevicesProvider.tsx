@@ -15,6 +15,7 @@ import { useConnectedDevices as useConnectedDevicesController } from "./useConne
 import { cn } from "@/shared/ui";
 type ConnectedDevicesController = ReturnType<typeof useConnectedDevicesController>;
 const ConnectedDevicesContext = createContext<ConnectedDevicesController | null>(null);
+/** The account's devices, for every surface that shows or uses them. */
 export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
   const controller = useConnectedDevicesController();
   const navigate = useNavigate();
@@ -57,6 +58,10 @@ export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
       ) : null}
     </ConnectedDevicesContext.Provider>
   );
+}
+/** The devices controller, or null outside the provider (tests, web). */
+export function useOptionalConnectedDevices(): ConnectedDevicesController | null {
+  return useContext(ConnectedDevicesContext);
 }
 export function useConnectedDevices(): ConnectedDevicesController {
   const value = useContext(ConnectedDevicesContext);

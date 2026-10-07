@@ -51,10 +51,12 @@ export function WorkspacePaneControls({
     if (!paneElement) return;
     const update = () => {
       const rect = paneElement.getBoundingClientRect();
-      setBounds({
-        top: Math.max(4, rect.top - 14),
-        right: Math.max(4, window.innerWidth - rect.right + 4),
-      });
+      const top = Math.max(4, rect.top - 14);
+      const right = Math.max(4, window.innerWidth - rect.right + 4);
+      // Runs for every scroll anywhere in the window; skip the render when nothing moved.
+      setBounds((previous) =>
+        previous.top === top && previous.right === right ? previous : { top, right },
+      );
     };
     const move = (event: PointerEvent) => {
       const rect = paneElement.getBoundingClientRect();
@@ -75,13 +77,17 @@ export function WorkspacePaneControls({
     window.addEventListener("pointermove", move);
     window.addEventListener("blur", leave);
     window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    // Scrolling inside the pane cannot move it; only an enclosing scroller can.
+    const scrolled = (event: Event) => {
+      if (event.target instanceof Node && event.target.contains(paneElement)) update();
+    };
+    window.addEventListener("scroll", scrolled, true);
     return () => {
       observer.disconnect();
       window.removeEventListener("pointermove", move);
       window.removeEventListener("blur", leave);
       window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("scroll", scrolled, true);
     };
   }, [root]);
   if (panes.length < 2) return null;
