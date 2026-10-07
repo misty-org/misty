@@ -10,6 +10,10 @@ import (
 	"unicode/utf8"
 )
 
+// maxSyncControlVersion is the newest device capability level: 1 accepts
+// device controls, 2 also understands nested bookmark folders.
+const maxSyncControlVersion = 2
+
 type SyncDeviceControl struct {
 	DeviceID       string  `json:"device_id"`
 	DisplayName    *string `json:"display_name,omitempty"`
@@ -26,7 +30,7 @@ type SyncDeviceControl struct {
 // Device controls are account-owned. Activation is a short-lived request to
 // the target; only its signed native mutation can actually take over.
 func (db *Store) ControlBrowserSyncDevice(ctx context.Context, user string, c SyncDeviceControl) (string, error) {
-	if !validSyncID(c.DeviceID) || (c.DisplayName != nil && (!utf8.ValidString(*c.DisplayName) || len(*c.DisplayName) > 160 || strings.TrimSpace(*c.DisplayName) == "")) || (c.Platform != nil && len(*c.Platform) > 32) || (c.ControlVersion != nil && *c.ControlVersion != 1) || (c.OSVersion != nil && (!utf8.ValidString(*c.OSVersion) || len(*c.OSVersion) > 64)) || (c.WorkspaceID != nil && (!validSyncID(*c.WorkspaceID) || !c.Activate)) {
+	if !validSyncID(c.DeviceID) || (c.DisplayName != nil && (!utf8.ValidString(*c.DisplayName) || len(*c.DisplayName) > 160 || strings.TrimSpace(*c.DisplayName) == "")) || (c.Platform != nil && len(*c.Platform) > 32) || (c.ControlVersion != nil && (*c.ControlVersion < 1 || *c.ControlVersion > maxSyncControlVersion)) || (c.OSVersion != nil && (!utf8.ValidString(*c.OSVersion) || len(*c.OSVersion) > 64)) || (c.WorkspaceID != nil && (!validSyncID(*c.WorkspaceID) || !c.Activate)) {
 		return "", ErrSyncInvalid
 	}
 	tx, err := db.Conn.BeginTx(ctx, nil)

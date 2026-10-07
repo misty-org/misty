@@ -11,6 +11,8 @@ pub mod browser_agent_control;
 #[cfg(desktop)]
 pub mod browser_history;
 #[cfg(desktop)]
+pub mod browser_import;
+#[cfg(desktop)]
 pub mod browser_library;
 #[cfg(desktop)]
 pub(crate) mod browser_macos;
