@@ -3,6 +3,8 @@
 # as production runs it (same pinned image); the dev database is untouched.
 # Arguments replace the default ./... package list, e.g.
 #   .githooks/server-tests.sh ./test/contract/postgres -run NativeNote
+# With no arguments the suite runs in parallel: every job gets its own copy of
+# the migrated database, and the slowest package's tests are split across jobs.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)/server"
 image=pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
@@ -41,12 +43,61 @@ PATH="$bin:$PATH" ./scripts/goose.sh up >/dev/null
 PGHOST=127.0.0.1 PGPORT=$port PGUSER=misty PGPASSWORD=$password PGDATABASE=misty_test \
   MISTY_APP_DB_USER=misty_app MISTY_APP_DB_PASSWORD=misty-app-test-password \
   ./scripts/docker/postgres-grant-app-role.sh >/dev/null
-log=$(mktemp)
-set +e
-if [ $# -eq 0 ]; then set -- ./...; fi
-go test -p 1 -timeout 30m -count=1 "$@" >"$log" 2>&1
-status=$?
-set -e
-grep -v -e '^ok ' -e 'no test files' "$log" || true
-rm -f "$log"
+quiet() { grep -v -e '^ok ' -e 'no test files' "$1" || true; }
+
+if [ $# -gt 0 ]; then
+  log=$(mktemp)
+  set +e
+  go test -p 1 -timeout 30m -count=1 "$@" >"$log" 2>&1
+  status=$?
+  set -e
+  quiet "$log"
+  rm -f "$log"
+  exit "$status"
+fi
+
+# One package holds most of the database tests (about a minute alone); its
+# tests are dealt round-robin across shards. The other packages share the rest.
+heavy=./test/contract/postgres
+heavy_shards=${MISTY_GO_HEAVY_SHARDS:-4}
+other_jobs=${MISTY_GO_OTHER_JOBS:-2}
+heavy_tests=$(go test -list '^Test' "$heavy" | grep '^Test')
+others=$(go list ./... | grep -v -x "$(go list "$heavy")")
+
+# Tests reset their database between cases, so jobs never share one. A clone of
+# the migrated database is a file copy: nothing is connected to the template.
+jobs=$((heavy_shards + other_jobs))
+for i in $(seq 1 "$jobs"); do
+  docker exec "$container" psql -q -U misty -d postgres -v ON_ERROR_STOP=1 \
+    -c "CREATE DATABASE misty_test_$i TEMPLATE misty_test" >/dev/null
+done
+
+logs=$(mktemp -d)
+pids=()
+job() { # number, then go test arguments
+  local number=$1
+  shift
+  DB_NAME=misty_test_$number TEST_DB_NAME=misty_test_$number \
+    go test -p 1 -timeout 30m -count=1 "$@" >"$logs/$number.log" 2>&1
+}
+for shard in $(seq 1 "$heavy_shards"); do
+  names=$(echo "$heavy_tests" | awk -v n="$heavy_shards" -v s="$shard" '(NR - 1) % n == s - 1' | paste -sd '|' -)
+  [ -n "$names" ] || continue
+  job "$shard" "$heavy" -run "^($names)\$" &
+  pids+=($!)
+done
+for slot in $(seq 1 "$other_jobs"); do
+  packages=$(echo "$others" | awk -v n="$other_jobs" -v s="$slot" '(NR - 1) % n == s - 1')
+  [ -n "$packages" ] || continue
+  # shellcheck disable=SC2086 # one package per word
+  job "$((heavy_shards + slot))" $packages &
+  pids+=($!)
+done
+
+status=0
+for pid in "${pids[@]}"; do
+  wait "$pid" || status=1
+done
+for log in "$logs"/*.log; do quiet "$log"; done
+rm -rf "$logs"
 exit "$status"

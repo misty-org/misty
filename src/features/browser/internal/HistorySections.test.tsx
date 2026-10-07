@@ -77,7 +77,8 @@ it("paginates within a section and queries older sections beyond the first recen
   expect(query).toHaveBeenLastCalledWith(
     expect.objectContaining({ before: yesterday, text: "missing" }),
   );
-});
+  // Renders 150+ rows twice; the hooks share the CPU with the other suites.
+}, 30_000);
 
 it("ignores an earlier section response after switching sections", async () => {
   let finishOldRequest!: (visits: BrowserHistoryVisit[]) => void;

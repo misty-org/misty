@@ -41,3 +41,11 @@ tempfile = "3"
 [profile.dev]
 debug = 1
 incremental = false
+
+# This profile applies only to this crate's own tests (the desktop app builds
+# it with src-tauri's profile). Its tests push vault keys through Argon2 at the
+# production cost and megabyte shards through zstd, AES-GCM and serde, which
+# unoptimized took most of the suite's time. Dependencies are optimized; this
+# crate's own code still builds for debugging.
+[profile.dev.package."*"]
+opt-level = 2

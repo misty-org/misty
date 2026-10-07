@@ -13,11 +13,11 @@ function plan(paths: string[]) {
 
 test("change selection covers configuration, helper crates, and release tooling", () => {
   assert.deepEqual(plan(["README.md"]), []);
-  assert.deepEqual(plan(["src/features/example.ts"]), ["frontend", "tasks"]);
+  assert.deepEqual(plan(["src/features/example.ts"]), ["frontend", "scripts"]);
   assert.deepEqual(plan(["src-tauri/services/peer-transport/Cargo.toml"]), ["rust-desktop"]);
-  assert.deepEqual(plan(["cli/tasks/release/setup-keys.ts"]), ["tasks"]);
+  assert.deepEqual(plan(["cli/tasks/release/setup-keys.ts"]), ["scripts"]);
   assert.deepEqual(plan(["server/internal/billingadapter/http.go"]), ["server"]);
-  assert.deepEqual(plan([".githooks/checks.sh"]), ["frontend", "server", "rust-cli", "rust-desktop", "tasks", "billing"]);
+  assert.deepEqual(plan([".githooks/checks.sh"]), ["frontend", "server", "rust-cli", "rust-desktop", "scripts", "billing"]);
 });
 
 test("pre-commit refuses to validate unstaged code instead of the staged snapshot", () => {
@@ -43,7 +43,7 @@ test("pre-commit refuses to validate unstaged code instead of the staged snapsho
   }
 });
 
-test("a failed first check aborts the suite instead of being masked by a later success", () => {
+test("a failed check fails its suite even when the checks beside it pass", () => {
   const directory = mkdtempSync(resolve(tmpdir(), "misty-hook-failure-"));
   try {
     const npm = resolve(directory, "npm");
@@ -51,8 +51,11 @@ test("a failed first check aborts the suite instead of being masked by a later s
     const result = spawnSync("bash", [hook, "frontend"], {
       cwd: root, encoding: "utf8", env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
     });
+    // Steps run in parallel, so lint still runs; the suite must fail anyway,
+    // with the failing step's own exit code and output.
     assert.equal(result.status, 37);
-    assert.match(result.stdout, /run typecheck/);
-    assert.doesNotMatch(result.stdout, /run lint|✓ frontend/);
+    assert.match(result.stdout, /✗ frontend-typecheck\n {2}run typecheck/);
+    assert.match(result.stdout, /✓ frontend-lint/);
+    assert.doesNotMatch(result.stdout, /✓ frontend \(/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
