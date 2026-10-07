@@ -5,9 +5,10 @@ import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("search.toggle", "Search", {
-    description: "Search Google or open a web address in your workspace.",
+    description:
+      "Search the web, open an address, or type ! to search your files, spaces and bookmarks.",
     category: "Navigation",
-    aliases: ["search", "url", "website", "google"],
+    aliases: ["search", "url", "website", "google", "bangs", "shortcuts"],
     mac: "Cmd+K",
     windows: "Ctrl+K",
     allowInEditable: true,

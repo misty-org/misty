@@ -8,15 +8,40 @@ import {
 } from "@/features/files/workspace";
 import type { SearchResult } from "@/native/ipc";
 
+export type ScopedSearchKind =
+  | "file"
+  | "folder"
+  | "space"
+  | "space-item"
+  | "note"
+  | "task"
+  | "message"
+  | "agent"
+  | "conversation"
+  | "bookmark"
+  | "history"
+  | "closed-tab"
+  | "tab"
+  | "download"
+  | "setting"
+  | "extension"
+  | "action";
+
 export interface ScopedSearchResult {
   id: string;
-  kind: "file" | "folder" | "space" | "space-item" | "agent" | "conversation";
+  kind: ScopedSearchKind;
   title: string;
   subtitle: string;
   target:
     | { kind: "files"; result: SearchResult }
     | { kind: "route"; route: string }
-    | { kind: "agent"; agentId: string; conversationId: string };
+    | { kind: "agent"; agentId: string; conversationId: string }
+    /** A web page or Misty browser page, opened in a new browser tab. */
+    | { kind: "url"; url: string }
+    /** An open workspace tab to switch to. */
+    | { kind: "tab"; tabId: string }
+    /** Runs in place; a returned message stays in the box instead of closing it. */
+    | { kind: "run"; run: () => string | void };
 }
 
 export const resultLimit = 12;
@@ -30,7 +55,7 @@ export async function searchIndexedFiles(query: string): Promise<SearchResult[]>
 }
 
 /** Semantic hits cover file contents, captions and media transcripts. Space
- * library hits are left to `/spaces` so the two scopes don't overlap. */
+ * library hits are left to `!spaces` so the two scopes don't overlap. */
 export async function searchFileContents(
   query: string,
   indexed: SearchResult[],

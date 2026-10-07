@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { browserSearchUrl } from "@/features/workspace/browserSearchEngine";
 import { resolveDirectAddress } from "./address";
 
 export const useBrowserSearchStore = create<{
@@ -13,8 +14,8 @@ export const useBrowserSearchStore = create<{
   toggle: () => set((state) => ({ open: !state.open })),
 }));
 
-/** No requests are made while typing. Enter alone submits the chosen URL or
- * search phrase to Google. The launcher never evaluates a typed script URL. */
+/** Enter submits the typed URL, or the phrase to the person's search engine.
+ * The launcher never evaluates a typed script URL. */
 export function browserSearchDestination(input: string): string | null {
   const value = input.trim();
   if (!value) return null;
@@ -24,5 +25,5 @@ export function browserSearchDestination(input: string): string | null {
     if (url.protocol === "http:" || url.protocol === "https:" || url.href === "about:blank")
       return url.href;
   }
-  return `https://www.google.com/search?q=${encodeURIComponent(value)}`;
+  return browserSearchUrl(value);
 }
