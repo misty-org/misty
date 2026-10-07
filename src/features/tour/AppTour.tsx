@@ -16,7 +16,7 @@ const steps: TourStepConfig[] = [
     targetSelector: TOUR_TARGET_SELECTORS.navigation,
     title: "Your browser workspace",
     description:
-      "Open Home to browse, Search to enter a URL or search Google, and Agents to work with AI.",
+      "Open Browser to browse, Search to enter a URL or search Google, and Agents to work with AI.",
     actionHint: "Use ⌘K on Mac or Ctrl+K on Windows to open Search from anywhere.",
   },
   {
