@@ -3,9 +3,6 @@ use super::*;
 /// The SDK host derives this identity from the caller; package code cannot select a store.
 pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), String> {
     let identifier = browser_profile_identifier(Some(&profile_id))?;
-    if browser_requires_ephemeral_store() {
-        return Err("Website accounts require macOS 14 or later.".into());
-    }
     let ids = {
         let state = app.state::<BrowserSessionState>();
         let sessions = state

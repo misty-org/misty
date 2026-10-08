@@ -1,6 +1,7 @@
 # Spaces as profiles: design brief
 
-Status: decided 2026-10-16; not built. One spike remains before the build plan. It builds
+Status: decided 2026-10-16; not built. The build plan is
+[docs/plans/spaces-as-profiles.md](../../plans/spaces-as-profiles.md). It builds
 on [Spaces, simplified](../spaces-simplified/BRIEF.md), which is built and in `main`, and
 changes its agent model.
 
@@ -42,24 +43,40 @@ isn't stored anywhere yet; when it's built, it belongs in the sync tree next to 
 
 ## Private and public
 
-No roles and no permission settings. Everything in a Space is private or public, like
-`private` and `public` in a class.
+No roles and no permission settings. Public and private layers are the only permission
+system, like `private` and `public` in a class, and every agent is built on that split.
 
-**Private (each person's own):**
-- the sync tree (their tabs, windows, sign-ins, history, bookmarks, passwords)
+**A toggle on every Space item.** Notes, drawings, images, files, code projects and agents
+each have a private/public toggle. A private item stays in the Space but only its owner
+sees it, and only the owner's agents on runs the owner asked for can read it. A private
+agent is invisible to the rest of the Space and can't be @mentioned there. New items
+start public in a shared Space and private in a Space only you belong to.
+
+**Always private, no toggle:**
+- the sync tree: tabs, windows, sign-ins, history, bookmarks, passwords, extensions, site
+  permissions, search engines and bangs, downloads
 - the memory tree (below)
 - the integrations tree: a person connects each account once, and each Space lists which
-  of their accounts it uses (work Gmail in Work, personal Gmail in Personal). The tree
-  shows at a glance which integration is used where. Composio still holds the tokens, so
-  the server keeps this per-Space, owner-only list
-- their private chats, including DMs with their agents
+  of their accounts it uses (work Gmail in Work, personal Gmail in Personal). Composio
+  holds the tokens, so the server keeps this owner-only list
+- private chats, including DMs with their agents, and the runs inside them
+- what lives only on their devices: shared folders, code project files, open tabs
+- an agent's instructions and settings
 
-**Public (everyone in the Space):** the gallery (notes, drawings, images, files, code),
-chat channels and threads, and the Space's agents, which members can @mention.
+**Always public, no toggle:** the Space's name, color and members; chat channels and
+threads, with the agent replies and runs asked in them. A conversation only you can see is
+a DM.
 
-**The one rule:** an agent can read a private layer only when it belongs to that layer's
-owner. Anyone else's agent sees the public layer and nothing else. In a Space only you
-belong to, everything is private.
+**The one rule:** a private layer or item opens only for its owner, and for the owner's own
+agents on runs the owner asked for. When a teammate @mentions your agent, the run is theirs
+and sees public items and nothing else; so does anyone else's agent.
+
+## Incognito windows
+
+Incognito is a window, as in Chrome, not a tab. Each Space can open incognito windows; they
+share one temporary session for that Space, which is erased when its last incognito
+window closes. Incognito is entirely local: nothing in it syncs, reaches the server, enters
+memory or is seen by agents, and Misty does nothing with it.
 
 ## Agents
 
@@ -69,29 +86,43 @@ page groups agents by Space.
 
 ## The memory tree
 
-Each person has one memory tree per Space, inside that Space's vault, encrypted end to end
-like the rest of the sync tree. The server never reads it.
+Each person has one memory tree per Space, kept on the server and always private: only its
+owner, and the owner's agents on runs the owner asked for, can read it. It is not in the
+vault and not end-to-end encrypted (decided 2026-10-17); the server keeps the text and the
+search vectors, as it keeps memory today.
 
-| Branch | What it holds | Replaces |
+| Branch | What it holds | Today's tables |
 | --- | --- | --- |
 | Moments | Pages read, voice and dictation, recordings, captures, in hourly batches like history | `memory_events` |
-| Summaries | Day recaps built from moments | `ai_recaps` results |
+| Summaries | Day recaps built from moments | `ai_recaps` |
 | Facts | Things to remember (`memory.pref`) | `misty_memories` |
 | Workflows | Saved requests and their learned steps (`memory.workflow`) | `agent_methods`, `agent_method_versions`, `agent_method_lessons` |
 
-- **Search runs on the device,** with full-text search and on-device embeddings, so the
-  server no longer pays to embed memory.
-- **Agents read and write memory through the device,** as `web.fetch` runs there today.
-  When no device of the owner is online, the request waits as a queued device job for up
-  to one day; past that, the run says it couldn't reach memory and finishes without it.
-- **Learning happens on the device.** The device sees a run's steps as they stream, so it
-  writes the learned steps into the vault itself; the server can't.
-- The server's memory tables move into the vaults and are then dropped.
+- **Search is by meaning,** with embeddings made and kept on the server. There is no
+  full-text search. Every device and every agent searches the same index.
+- **Agents read and write memory on the server,** in the run's Space, with no device
+  online.
+- **Learning happens on the server,** which sees a run's steps as it runs them.
+- Today's memory tables stay and gain a Space: each row belongs to one person in one Space.
 
 ## Plans
 
-Basic gets two Spaces: the personal Space and one more. Pro and above get unlimited
-Spaces. This fits the free plan funded by paying users (`docs/plans/pricing-v2.md`).
+Every plan gets as many Spaces as it wants. Plans limit cloud storage and AI usage, not
+Spaces: ten small Spaces cost less than five gigabytes of files. A Space's vault, gallery
+and chat count toward its owner's storage like everything else
+(`docs/plans/pricing-v2.md`).
+
+## Smaller decisions
+
+Settled 2026-10-17:
+
+- **Clipboard:** one shared clipboard per account, kept in the personal Space's vault and used
+  by every Space's windows, like the system clipboard.
+- **Leaving a Space,** or its owner deleting it, deletes everything of yours in it: your vault,
+  your memory tree and your private items, after a confirm that names what goes.
+- **Memory moments** are kept until you delete them, and count toward your storage.
+- **Links from other apps** open in the Space that claims the site; otherwise in the Space you
+  used last, as Chrome does.
 
 ## Getting started
 
@@ -102,8 +133,17 @@ much more the browser does because of it.
 
 ## Still open
 
-- Separate web data per Space: WebKit keeps sign-ins apart with a data store per
-  identifier (macOS 14 and later), which needs a spike before the build plan.
+Nothing blocks the build. Answered since the brief was written:
+
+- **Separate web data per Space: answered.** Each Space gets its own named
+  `WKWebsiteDataStore` through Tauri's `data_store_identifier`, with no wry or Tauri
+  fork. Cookies, sign-ins, localStorage, IndexedDB and Cache Storage stay apart and
+  survive a restart, and two extension controllers run side by side, one per Space
+  ([spike findings](../../plans/spikes/space-web-data.md)). The work left is Misty's own:
+  sync per vault, one extension host per Space and window labels per Space.
+- **Minimum macOS: 14.0, raised with the Spaces build.** Named stores need macOS 14; on
+  12 and 13 every Space would forget its sign-ins at quit. Extensions still need macOS
+  15.4, as today.
 
 ## Rules followed
 

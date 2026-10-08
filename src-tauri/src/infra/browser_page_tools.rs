@@ -357,10 +357,6 @@ async fn clear_webkit_website_data(
             "WKWebsiteDataTypeFetchCache",
         ]);
     }
-    // Older macOS tabs use temporary stores that are discarded anyway.
-    if browser_requires_ephemeral_store() {
-        return Ok(());
-    }
     super::super::browser_macos::clear_browser_website_data(app, identifier, data_types, since)
         .await
 }

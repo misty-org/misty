@@ -157,16 +157,14 @@ pub async fn browser_webview_create(
     let builder = if request.private {
         builder.incognito(true)
     } else {
-        builder
-            .data_store_identifier(profile_identifier)
-            .incognito(browser_requires_ephemeral_store())
+        builder.data_store_identifier(profile_identifier)
     };
     #[cfg(target_os = "macos")]
     let builder = {
         let pointer = super::super::extensions::native::configuration(
             &app,
             profile_identifier,
-            request.private || browser_requires_ephemeral_store(),
+            request.private,
             request.url.clone(),
             !request.private && profile_lease.logical_profile_id.is_some(),
         )

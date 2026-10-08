@@ -166,10 +166,9 @@ pub fn browser_webview_context_menu_at(
 use std::sync::atomic::{AtomicIsize, AtomicU32};
 
 use super::browser_macos::{
-    browser_requires_ephemeral_store, configure_browser_frame_rate, configure_browser_webview,
-    configure_main_webview_pointer_guard, evaluate_browser_async_javascript,
-    native_macos_safari_user_agent, refresh_browser_cursor_ownership, reload_browser_webview,
-    unregister_browser_cursor_ownership,
+    configure_browser_frame_rate, configure_browser_webview, configure_main_webview_pointer_guard,
+    evaluate_browser_async_javascript, native_macos_safari_user_agent,
+    refresh_browser_cursor_ownership, reload_browser_webview, unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
     browser_scrollbar_script, browser_status_script, browser_status_update_script,
@@ -243,7 +242,7 @@ pub(super) fn session_permission_scope(
     let state = app.try_state::<BrowserSessionState>()?;
     let sessions = state.sessions.lock().ok()?;
     let session = sessions.get(id)?;
-    if session.private || browser_requires_ephemeral_store() {
+    if session.private {
         return Some(kiri::engine::StoreScope::Temporary(0));
     }
     super::browser_site_permissions::profile_key(session.profile_id.as_deref())
@@ -766,11 +765,6 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 #[cfg(test)]
 #[path = "browser_tests.rs"]
 mod tests;
-
-#[tauri::command]
-pub fn browser_profile_persistence() -> bool {
-    !browser_requires_ephemeral_store()
-}
 
 #[path = "browser_profile_cleanup.rs"]
 pub(crate) mod profile_cleanup;
