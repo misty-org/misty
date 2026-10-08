@@ -46,7 +46,7 @@ fn build_menu<R: Runtime, M: Manager<R>>(
                 snapshot,
                 "search.toggle",
                 "Search or Enter URL",
-                "Cmd+K",
+                "Cmd+T",
             )?,
             &command_item(
                 manager,
@@ -97,6 +97,13 @@ fn build_menu<R: Runtime, M: Manager<R>>(
                 "app.toggle_navigator",
                 "Toggle Navigator",
                 "Cmd+Shift+B",
+            )?,
+            &command_item(
+                manager,
+                snapshot,
+                "app.toggle_focus_mode",
+                "Toggle Focus Mode",
+                "Cmd+Shift+S",
             )?,
             &command_item(
                 manager,
@@ -152,7 +159,7 @@ fn build_menu<R: Runtime, M: Manager<R>>(
                 "Cmd+Option+Shift+W",
             )?,
             &PredefinedMenuItem::separator(manager)?,
-            &command_item(manager, snapshot, "workspace.new_tab", "New Tab", "Cmd+T")?,
+            &command_item(manager, snapshot, "workspace.new_tab", "New Tab", "")?,
             &command_item(
                 manager,
                 snapshot,

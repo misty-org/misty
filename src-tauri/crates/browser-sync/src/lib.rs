@@ -1,5 +1,6 @@
 //! Native-only browser synchronization. Secret types deliberately cannot be
 //! serialized or formatted; the web renderer only receives projected UI state.
+pub mod batch;
 pub mod collections;
 pub mod crypto;
 pub mod document;

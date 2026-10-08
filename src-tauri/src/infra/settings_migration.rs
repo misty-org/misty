@@ -4,62 +4,24 @@
 //! opposite directions: that file describes the settings that exist, this one
 //! describes the ones that used to.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 5;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 7;
 
-/// Makes Misty's Browser the default destination for web links introduced by
-/// schema 5. Users can still opt back into the system browser afterward.
-pub(super) fn migrate_external_link_default(
-    root: &mut Map<String, Value>,
-    stored_version: i64,
-) -> bool {
-    if stored_version >= 5 {
-        return false;
-    }
-    let Some(value) = root
-        .get_mut("general")
-        .and_then(Value::as_object_mut)
-        .and_then(|general| general.get_mut("open_links_externally"))
-    else {
-        return false;
-    };
-    if value.as_bool() != Some(true) {
-        return false;
-    }
-    *value = json!(false);
-    true
-}
-
-/// Upgrades values whose old defaults would otherwise make the redesigned
-/// Code workspace look unchanged after installing the new interface.
-pub(super) fn migrate_code_workspace_settings(
-    root: &mut Map<String, Value>,
-    stored_version: i64,
-) -> bool {
-    if stored_version >= 4 {
-        return false;
-    }
-    let Some(font_size) = root
-        .get_mut("editor")
-        .and_then(Value::as_object_mut)
-        .and_then(|editor| editor.get_mut("font_size"))
-    else {
-        return false;
-    };
-    if font_size.as_f64() != Some(12.5) {
-        return false;
-    }
-    *font_size = json!(14);
-    true
-}
-
-/// Whole sections that no longer exist. `account` and `ai` were never read;
-/// `transfer_profiles` keeps its presets but no longer stores a user-edited
-/// profile list.
-const RETIRED_SECTIONS: &[&str] = &["account", "ai"];
+/// Whole sections that no longer exist. `account` and `ai` were never read.
+/// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
+/// (`files`, `transfer_profiles`) and file indexing (`search`) left Misty.
+const RETIRED_SECTIONS: &[&str] = &[
+    "account",
+    "ai",
+    "editor",
+    "terminal",
+    "files",
+    "search",
+    "transfer_profiles",
+];
 
 /// Individual keys retired from sections that still exist.
 const RETIRED_KEYS: &[(&str, &str)] = &[
@@ -69,7 +31,6 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     ("general", "last_update_check_label"),
     ("appearance", "custom_fonts"),
     ("privacy", "data_stays_local"),
-    ("search", "automatic_image_discovery_enabled"),
     // Schema 3. Each of these persisted happily and was read by nothing:
     // `ui_scale_index`/`font_size_index`/`reduced_motion_enabled` reached the
     // DOM as data attributes with no CSS or JS consumer, `theme_index` was
@@ -81,6 +42,19 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     ("appearance", "reduced_motion_enabled"),
     ("shortcuts", "keymap_index"),
     ("advanced", "server_address"),
+    // Schema 6: settings with no reader, or for surfaces that left Misty.
+    ("general", "confirm_destructive_actions"),
+    ("general", "default_file_action_index"),
+    ("general", "open_links_externally"),
+    ("general", "preferred_terminal_app"),
+    ("general", "default_transfer_behavior_index"),
+    ("general", "browser_bookmarks_bar"),
+    ("appearance", "thumbnail_previews_enabled"),
+    ("agent", "default_model_id"),
+    ("agent", "default_reasoning_effort"),
+    // Schema 7: the video wallpaper and its panel opacity were removed.
+    ("appearance", "wallpaper_path"),
+    ("appearance", "panel_opacity"),
 ];
 
 /// Removes retired keys from an existing settings file.
@@ -205,20 +179,5 @@ mod tests {
         let mut root = object(json!({ "general": { "launch_on_login": true } }));
 
         assert!(!prune_retired_settings(&mut root));
-    }
-
-    #[test]
-    fn makes_in_app_links_the_schema_five_default_once() {
-        let mut root = object(json!({ "general": { "open_links_externally": true } }));
-
-        assert!(migrate_external_link_default(&mut root, 4));
-        assert_eq!(
-            root.get("general")
-                .and_then(Value::as_object)
-                .and_then(|general| general.get("open_links_externally"))
-                .and_then(Value::as_bool),
-            Some(false)
-        );
-        assert!(!migrate_external_link_default(&mut root, 5));
     }
 }

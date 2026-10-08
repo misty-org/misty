@@ -16,14 +16,19 @@ const adaptiveMarks = new Set([
   "composio",
   "filen",
   "files-com",
+  "fish-audio",
   "github",
+  "inception",
   "internet-archive",
   "linear",
+  "moonshot",
   "ollama",
   "openai",
   "typeform",
   "vercel",
   "x",
+  "xai",
+  "zai",
 ]);
 
 /** Shared original SVG artwork; never inherit an inactive row's foreground color. */

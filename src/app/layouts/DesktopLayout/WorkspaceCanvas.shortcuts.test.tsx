@@ -1,4 +1,4 @@
-import { ShortcutRuntime } from "@/features/shortcuts";
+import { invokeShortcutCommand, ShortcutRuntime } from "@/features/shortcuts";
 import {
   allLayoutViews,
   configureWorkspaceDefaultView,
@@ -54,7 +54,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     useWorkspaceStore.getState().reset();
   });
   afterEach(() => {
-    configureWorkspaceDefaultView(0);
+    configureWorkspaceDefaultView(1);
     cleanup();
     if (originalAnimate) HTMLElement.prototype.animate = originalAnimate;
     else delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
@@ -88,21 +88,21 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
 
   it.each(["close", "select"])("does not add shell history when tabs %s", (action) => {
     const store = useWorkspaceStore.getState();
-    store.addSurface(workspaceSurfaceFromRoute("/home")!);
+    store.addSurface(workspaceSurfaceFromRoute("/agents")!);
     const ui = render(
-      <MemoryRouter initialEntries={["/before", "/home"]} initialIndex={1}>
+      <MemoryRouter initialEntries={["/before", "/agents"]} initialIndex={1}>
         <WorkspaceCanvas />
         <LocationProbe />
       </MemoryRouter>,
     );
-    if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Home" }));
+    if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Agents" }));
     else fireEvent.click(ui.getByRole("tab", { name: "New Tab" }));
     expect(ui.getByTestId("location").textContent).toBe("/browser");
     fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));
     expect(ui.getByTestId("location").textContent).toBe("/before");
   });
 
-  it("leaves the final tab closed until the new-tab shortcut is used", async () => {
+  it("leaves the final tab closed until the new-tab command runs", async () => {
     render(
       <MemoryRouter initialEntries={["/browser"]}>
         <ShortcutRuntime />
@@ -114,7 +114,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
       expect(useWorkspaceStore.getState().closeView(initial.id)).toBe(true);
     });
     await waitFor(() => expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual([]));
-    fireEvent.keyDown(window, { key: "t", code: "KeyT", metaKey: true });
+    act(() => void invokeShortcutCommand("workspace.new_tab"));
     const reopened = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(reopened).toMatchObject([{ surfaceId: "browser", route: "/browser" }]);
     expect(reopened[0].id).not.toBe(initial.id);
@@ -128,7 +128,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
       </MemoryRouter>,
     );
     const initial = allLayoutViews(useWorkspaceStore.getState().layout)[0];
-    fireEvent.keyDown(window, { key: "t", code: "KeyT", metaKey: true });
+    act(() => void invokeShortcutCommand("workspace.new_tab"));
     const views = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(views).toHaveLength(2);
     expect(new Set(views.map((tab) => tab.instanceKey)).size).toBe(2);

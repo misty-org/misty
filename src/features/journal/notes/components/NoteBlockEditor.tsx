@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { MistyFilePicker, readFileFromPath } from "@/features/picker";
 import {
   useAiSurfaceActions,
@@ -46,11 +46,10 @@ export const hostNoteEditorRuntime: NoteEditorRuntime = {
     <NoteAiSelectionMenu adapter={adapter} selection={selection} />
   ),
   renderError: (error, spaceId, noteId) => (
-    <SystemErrorActivity
+    <SystemErrorNotice
       error={error}
       scope={`notes:collaboration:${noteId}`}
       title="Note collaboration is unavailable"
-      target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}/notes` }}
     />
   ),
   reportError: () => undefined,

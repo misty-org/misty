@@ -41,6 +41,17 @@ made is never recreated by it, and a move into a parent deleted that way is
 dropped. A structurally rejected op drops only its oldest edit. Focus
 (active tab, pane, window) is local and never synced.
 
+Edits are published in batches (`batch`): each workspace and collection
+queue waits for a quiet period, a maximum wait or a count of edits before its
+op goes out, and drops to near-live timing while another machine edits the
+same workspace. The server sends the timings (`batch_policy`, scaled by the
+account's sync frequency) to clients that connect with `batching=1`; the
+client clamps them. Queued batches made against the same version fold
+(`workspace::fold`), and the op is still the diff against the server's state,
+so edits that cancel out are never sent. `WorkerHandle::flush` sends
+everything now (lock, quit, switching workspaces, Sync now). A
+`sync_rate_limited` reply keeps the queue and waits as long as it asks.
+
 Only website sign-ins keep a single writer: the device's sign-in lease (the
 roster's driver). The device's own machine holds it when online; otherwise a
 machine on the workspace claims it when unheld or held by an offline machine.

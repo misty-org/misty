@@ -1,0 +1,128 @@
+[
+  {
+    "trigger": "yt",
+    "aliases": ["youtube"],
+    "name": "YouTube",
+    "search": "https://www.youtube.com/results?search_query=%s",
+    "home": "https://www.youtube.com/"
+  },
+  {
+    "trigger": "img",
+    "aliases": ["images"],
+    "name": "Google Images",
+    "search": "https://www.google.com/search?tbm=isch&q=%s",
+    "home": "https://images.google.com/"
+  },
+  {
+    "trigger": "maps",
+    "aliases": ["m"],
+    "name": "Google Maps",
+    "search": "https://www.google.com/maps/search/%s",
+    "home": "https://www.google.com/maps"
+  },
+  {
+    "trigger": "tr",
+    "aliases": ["translate"],
+    "name": "Google Translate",
+    "search": "https://translate.google.com/?sl=auto&tl=en&text=%s",
+    "home": "https://translate.google.com/"
+  },
+  {
+    "trigger": "w",
+    "aliases": ["wiki", "wikipedia"],
+    "name": "Wikipedia",
+    "search": "https://en.wikipedia.org/wiki/Special:Search?search=%s",
+    "home": "https://en.wikipedia.org/"
+  },
+  {
+    "trigger": "gh",
+    "aliases": ["github"],
+    "name": "GitHub",
+    "search": "https://github.com/search?q=%s",
+    "home": "https://github.com/"
+  },
+  {
+    "trigger": "so",
+    "aliases": ["stackoverflow"],
+    "name": "Stack Overflow",
+    "search": "https://stackoverflow.com/search?q=%s",
+    "home": "https://stackoverflow.com/"
+  },
+  {
+    "trigger": "mdn",
+    "aliases": [],
+    "name": "MDN Web Docs",
+    "search": "https://developer.mozilla.org/en-US/search?q=%s",
+    "home": "https://developer.mozilla.org/"
+  },
+  {
+    "trigger": "npm",
+    "aliases": [],
+    "name": "npm",
+    "search": "https://www.npmjs.com/search?q=%s",
+    "home": "https://www.npmjs.com/"
+  },
+  {
+    "trigger": "crates",
+    "aliases": ["crate"],
+    "name": "crates.io",
+    "search": "https://crates.io/search?q=%s",
+    "home": "https://crates.io/"
+  },
+  {
+    "trigger": "rs",
+    "aliases": ["docsrs"],
+    "name": "docs.rs",
+    "search": "https://docs.rs/releases/search?query=%s",
+    "home": "https://docs.rs/"
+  },
+  {
+    "trigger": "pypi",
+    "aliases": [],
+    "name": "PyPI",
+    "search": "https://pypi.org/search/?q=%s",
+    "home": "https://pypi.org/"
+  },
+  {
+    "trigger": "r",
+    "aliases": ["reddit"],
+    "name": "Reddit",
+    "search": "https://www.reddit.com/search/?q=%s",
+    "home": "https://www.reddit.com/"
+  },
+  {
+    "trigger": "hn",
+    "aliases": ["hackernews"],
+    "name": "Hacker News",
+    "search": "https://hn.algolia.com/?q=%s",
+    "home": "https://news.ycombinator.com/"
+  },
+  {
+    "trigger": "amz",
+    "aliases": ["amazon"],
+    "name": "Amazon",
+    "search": "https://www.amazon.com/s?k=%s",
+    "home": "https://www.amazon.com/"
+  },
+  {
+    "trigger": "wa",
+    "aliases": ["wolfram"],
+    "name": "Wolfram|Alpha",
+    "search": "https://www.wolframalpha.com/input?i=%s",
+    "home": "https://www.wolframalpha.com/"
+  },
+  {
+    "trigger": "x",
+    "aliases": ["twitter"],
+    "name": "X",
+    "search": "https://x.com/search?q=%s",
+    "home": "https://x.com/"
+  },
+  {
+    "trigger": "imdb",
+    "aliases": [],
+    "name": "IMDb",
+    "search": "https://www.imdb.com/find/?q=%s",
+    "home": "https://www.imdb.com/"
+  }
+]

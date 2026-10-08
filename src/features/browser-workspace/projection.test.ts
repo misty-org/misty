@@ -184,7 +184,7 @@ it("restores Space routes from another device without changing their pane", () =
   });
 });
 
-it("gives a synced tool view without a route its tool's root route", () => {
+it("opens a synced Files view from an older client as a new browser tab", () => {
   const record = tabRecord("tab:files", "layout:a", "pane:a");
   const { tool_route: _omitted, ...fields } = {
     ...record.fields,
@@ -198,9 +198,10 @@ it("gives a synced tool view without a route its tool's root route", () => {
     view([windowRecord("window:a"), layoutRecord("layout:a", "window:a", "pane:a"), record]),
     local(),
   );
+  // Files moved to Kura, a separate app.
   expect(dockLeaves(result.windows[0].layout.root)[0].views[0]).toMatchObject({
-    surfaceId: "files",
-    route: "/files",
+    surfaceId: "browser",
+    route: "/browser",
   });
 });
 

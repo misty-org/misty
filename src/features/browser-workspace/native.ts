@@ -52,6 +52,8 @@ export interface SyncState {
   all_upgraded?: boolean;
   /** Every device understands nested bookmark folders; until then folders stay flat. */
   nested_bookmarks?: boolean;
+  /** Every device understands pinned tabs; until then pins can't be kept through sync. */
+  pinned_tabs?: boolean;
   /** Records with changes the server has not confirmed yet, one per record. */
   unsynced?: UnsyncedRecord[];
   /** Edits an older version set aside unsent: kept on this device, never synced. */
@@ -95,6 +97,10 @@ export interface NativeSyncView {
     workspace_records_written?: number;
     workspace_ops_suppressed?: number;
     workspace_ops_built?: number;
+    /** Ticks that held a queue back until its batch was due. */
+    workspace_ops_deferred?: number;
+    /** Queued edits that never reached the server (folded or cancelled out). */
+    workspace_edits_coalesced?: number;
   };
   presence: { device_id: string; online: boolean; ready: boolean; applied_sequence: number }[];
   workspace: WorkspaceRecords;
@@ -125,6 +131,9 @@ export const renameNativeDevice = (sessionId: string, deviceId: string, name: st
 /** Open `workspaceId` on this machine. Other machines keep editing it too. */
 export const claimNativeWorkspace = (sessionId: string, workspaceId: string) =>
   invoke<void>("browser_sync_claim", { sessionId, workspaceId });
+/** Sync now: send batched changes without waiting for their batch. */
+export const flushNativeSync = (sessionId: string) =>
+  invoke<void>("browser_sync_flush", { sessionId });
 export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
   session.full_sync !== false && session.workspace.active_device?.device_id === session.device_id
     ? session.workspace.active_device.epoch

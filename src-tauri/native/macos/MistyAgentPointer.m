@@ -3,6 +3,7 @@
 #import <Carbon/Carbon.h>
 #import <QuartzCore/QuartzCore.h>
 #import "MistyAgentPointer.h"
+#import "MistyAgentRing.h"
 
 // Misty's own pointer for desktop tasks. It is a drawing above every app that
 // never takes input; actions reach apps through Accessibility and app-targeted
@@ -214,9 +215,14 @@ static NSDictionary *scrollAt(CGPoint point, int deltaX, int deltaY) {
 // `point` is in global display coordinates.
 NSDictionary *MistyAgentDesktopAction(NSDictionary *action, CGPoint point) {
   NSString *kind = action[@"kind"];
-  if ([kind isEqual:@"point"]) { misty_agent_pointer_move(point.x, point.y); return pointAt(point); }
+  if ([kind isEqual:@"point"]) {
+    misty_agent_pointer_move(point.x, point.y);
+    misty_agent_ring_pulse(point);
+    return pointAt(point);
+  }
   if ([kind isEqual:@"scroll"]) {
     misty_agent_pointer_move(point.x, point.y);
+    misty_agent_ring_pulse(point);
     return scrollAt(point, [action[@"deltaX"] intValue], [action[@"deltaY"] intValue]);
   }
   if ([kind isEqual:@"type"]) {

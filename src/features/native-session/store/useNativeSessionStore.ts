@@ -32,6 +32,7 @@ function licenseFromMe(me: AccountMeResponse): CurrentLicense {
     allows_use: me.allows_use,
     expires_at: me.expires_at,
     trial_started_at: me.trial_started_at,
+    email_verified: me.email_verified,
     license_device: me.license_device || null,
   };
 }

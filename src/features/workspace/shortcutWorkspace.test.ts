@@ -12,10 +12,10 @@ describe("workspace shortcut actions", () => {
     const store = useWorkspaceStore.getState();
     const defaultTab = findDockLeaf(store.layout.root, store.layout.focusedPaneId)?.views[0];
     const first = store.addSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       instancePolicy: "single",
     });
     store.addSurface({
@@ -34,10 +34,10 @@ describe("workspace shortcut actions", () => {
   it("selects the last tab for slot nine", () => {
     const store = useWorkspaceStore.getState();
     store.addSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       instancePolicy: "single",
     });
     const last = store.addSurface({
@@ -77,10 +77,10 @@ describe("workspace shortcut actions", () => {
   it("recreates a collapsed panel when reopening its last tab", () => {
     const store = useWorkspaceStore.getState();
     store.addSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       instancePolicy: "single",
     });
     const sourcePaneId = useWorkspaceStore.getState().layout.focusedPaneId;
@@ -113,10 +113,10 @@ describe("workspace shortcut actions", () => {
   it("returns a tab to its existing source panel instead of the focused panel", () => {
     const store = useWorkspaceStore.getState();
     const files = store.addSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       instancePolicy: "single",
     });
     const sourcePaneId = useWorkspaceStore.getState().layout.focusedPaneId;

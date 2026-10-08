@@ -219,8 +219,10 @@ async fn main() {
     );
     let root_b = VaultRoot::unlock(&scope, &wrapper, password, &secret, &public).unwrap();
     let (ha, _ta) = peer(&path_a, api.clone(), scope.clone(), root);
+    // Edits are accepted once A's copy of its workspace has arrived, which
+    // can be after the roster names it the driver.
     wait_workspaces("A connects", &ha, |v| {
-        v.driving_workspace.as_deref() == Some(id_a.as_str())
+        v.driving_workspace.as_deref() == Some(id_a.as_str()) && v.writable
     })
     .await;
 
@@ -237,9 +239,10 @@ async fn main() {
             && v.contents
                 .get(&id_a)
                 .is_some_and(|w| w.version >= 1 && w.records.iter().any(|r| r.id == "t1"))
-            && v.contents
-                .get(&scope.vault_id)
-                .is_some_and(|w| w.records.iter().any(|r| r.id == "g1"))
+            // Folders and bookmarks live in the bookmarks collection.
+            && v.collections
+                .get("bookmarks")
+                .is_some_and(|records| records.iter().any(|r| r.id == "g1"))
     })
     .await;
 
@@ -283,10 +286,14 @@ async fn main() {
     })
     .await;
 
-    // B continues on A's workspace: it gets A's tabs, and A loses its seat.
+    // B continues on A's workspace: it opens it, takes the sign-in lease, and
+    // gets A's tabs. A loses only the lease.
     hb.claim_workspace(id_a.clone())
         .await
         .expect("B claims A's tree");
+    hb.open_workspace(id_a.clone())
+        .await
+        .expect("B opens A's tree");
     wait_workspaces("B drives A", &hb, |v| {
         v.driving_workspace.as_deref() == Some(id_a.as_str())
             && v.contents
@@ -295,14 +302,12 @@ async fn main() {
     })
     .await;
     wait_workspaces("A displaced", &ha, |v| v.driving_workspace.is_none()).await;
-    assert!(
-        ha.workspace_changes(changes(
-            json!([{"action":"patch","kind":"window","id":"w1","fields":{"title":"x"}}])
-        ))
-        .await
-        .is_err(),
-        "a displaced device cannot edit"
-    );
+    // Workspaces have many writers: A still edits the workspace it is on.
+    ha.workspace_changes(changes(
+        json!([{"action":"patch","kind":"tab","id":"t1","fields":{"title":"Edited on A"}}]),
+    ))
+    .await
+    .expect("a machine without the lease still edits");
 
     // B receives exactly A's sign-ins; displaced A can no longer write them.
     let b_view = settled_signins("B sees A's sign-ins", &hb, &id_a).await;
@@ -363,12 +368,17 @@ async fn main() {
         .await
         .expect("A takes its tree back");
     wait_workspaces("A drives again", &ha, |v| {
-        v.driving_workspace.as_deref() == Some(id_a.as_str())
-            && v.contents.get(&id_a).is_some_and(|w| {
+        let title = |t: &str| {
+            v.contents.get(&id_a).is_some_and(|w| {
                 w.records
                     .iter()
-                    .any(|r| r.fields.get("title") == Some(&json!("Edited on B")))
+                    .any(|r| r.fields.get("title") == Some(&json!(t)))
             })
+        };
+        // Both machines' edits survive, each batched and rebased.
+        v.driving_workspace.as_deref() == Some(id_a.as_str())
+            && title("Edited on B")
+            && title("Edited on A")
     })
     .await;
     wait_workspaces("B displaced", &hb, |v| v.driving_workspace.is_none()).await;
@@ -385,5 +395,5 @@ async fn main() {
         loaded[0].payload.to_string().contains("token-from-b")
             && loaded[1].payload["k"] == "local-from-b"
     );
-    println!("native_tree_fixture_ok");
+    println!("native_workspace_fixture_ok");
 }

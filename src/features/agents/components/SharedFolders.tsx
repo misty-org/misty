@@ -44,8 +44,7 @@ export function useSharedFolders() {
     folders,
     busy,
     error,
-    share: () =>
-      void run(() => agentsChooseFolderScope(), "That folder couldn’t be shared."),
+    share: () => void run(() => agentsChooseFolderScope(), "That folder couldn’t be shared."),
     revoke: (folder: AgentScope) =>
       void run(() => agentsRevokeFolderScope(folder.id), "That folder couldn’t be removed."),
   };

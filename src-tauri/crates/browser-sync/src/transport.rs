@@ -50,6 +50,8 @@ pub struct TrafficSnapshot {
     pub workspace_records_written: u64,
     pub workspace_ops_suppressed: u64,
     pub workspace_ops_built: u64,
+    pub workspace_ops_deferred: u64,
+    pub workspace_edits_coalesced: u64,
 }
 impl TrafficCounters {
     pub fn snapshot(&self) -> TrafficSnapshot {
@@ -62,6 +64,8 @@ impl TrafficCounters {
             workspace_records_written: stats::read(&stats::RECORDS_WRITTEN),
             workspace_ops_suppressed: stats::read(&stats::OPS_SUPPRESSED),
             workspace_ops_built: stats::read(&stats::OPS_BUILT),
+            workspace_ops_deferred: stats::read(&stats::OPS_DEFERRED),
+            workspace_edits_coalesced: stats::read(&stats::EDITS_COALESCED),
         }
     }
 }
@@ -315,7 +319,7 @@ impl SyncApi {
                 reqwest::Method::POST,
                 "control",
                 Some(&serde_json::json!({
-                    "device_id": device_id, "control_version": 2,
+                    "device_id": device_id, "control_version": 3,
                     "platform": std::env::consts::OS,
                     "os_version": os_version.chars().take(64).collect::<String>(),
                 })),
@@ -425,7 +429,8 @@ impl SyncSocket {
         endpoint
             .query_pairs_mut()
             .append_pair("ticket", &ticket)
-            .append_pair("protocol", &PROTOCOL_VERSION.to_string());
+            .append_pair("protocol", &PROTOCOL_VERSION.to_string())
+            .append_pair("batching", BATCHING);
         let connector = if scheme == "wss" {
             Some(tls_connector()?)
         } else {

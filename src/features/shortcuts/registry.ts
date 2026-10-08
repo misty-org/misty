@@ -1,15 +1,22 @@
 import type { ShortcutBindingPair, ShortcutCommandDefinition, ShortcutPlatform } from "./types";
 import { command } from "./factory";
-import { filesShortcutCommands } from "./filesCommands";
+import {
+  browserFeatureCommands,
+  focusModeCommands,
+  tabFeatureCommands,
+} from "./browserFeatureCommands";
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("search.toggle", "Search", {
-    description: "Search Google or open a web address in your workspace.",
+    description:
+      "Search the web, open an address, or type ! to search your files, spaces and bookmarks.",
     category: "Navigation",
-    aliases: ["search", "url", "website", "google"],
-    mac: "Cmd+K",
-    windows: "Ctrl+K",
+    aliases: ["search", "url", "website", "google", "bangs", "shortcuts"],
+    mac: "Cmd+T",
+    macAlternate: "Cmd+K",
+    windows: "Ctrl+T",
+    windowsAlternate: "Ctrl+K",
     allowInEditable: true,
     nativeMenu: true,
     allowShadowing: true,
@@ -23,8 +30,8 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     allowShadowing: true,
   }),
-  command("misty.contextual_companion", "Open Misty", {
-    description: "Open Misty in the current window.",
+  command("misty.contextual_companion", "Toggle Misty panel", {
+    description: "Open or close the Misty panel beside the workspace.",
     category: "Misty",
     aliases: ["assistant", "ask misty"],
     mac: "Cmd+Shift+K",
@@ -61,6 +68,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
+  ...focusModeCommands,
   command("app.zoom_in", "Zoom in", {
     description: "Increase the app interface scale.",
     category: "View",
@@ -93,6 +101,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
 ];
 
 const workspaceCommands: ShortcutCommandDefinition[] = [
+  ...tabFeatureCommands,
   command("workspace.new_virtual_window", "New virtual window", {
     description: "Create a full workspace window inside the active Space.",
     category: "Virtual windows",
@@ -166,8 +175,6 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
     category: "Tabs and panes",
     scope: "workspace",
     aliases: ["add tab", "tool picker"],
-    mac: "Cmd+T",
-    windows: "Ctrl+T",
     allowInEditable: true,
     nativeMenu: true,
   }),
@@ -299,15 +306,14 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
 ];
 
+// Each tool keeps its Cmd/Ctrl+Shift number; 1 belonged to the retired Home page.
 const toolSlots = [
-  ["home", "Home"],
-  ["journal", "Journal"],
-  ["planner", "Planner"],
-  ["social", "Social"],
-  ["library", "Library"],
-  ["browser", "Browser"],
-  ["files", "Files"],
-  ["code", "Code"],
+  ["journal", "Journal", 2],
+  ["planner", "Planner", 3],
+  ["social", "Social", 4],
+  ["library", "Library", 5],
+  ["browser", "Browser", 6],
+  ["code", "Code", 8],
 ] as const;
 
 const tabAndToolCommands = [
@@ -328,21 +334,20 @@ const tabAndToolCommands = [
       },
     ),
   ),
-  ...toolSlots.map(([id, label], index) =>
+  ...toolSlots.map(([id, label, slot]) =>
     command(`tool.${id}`, `Open or focus ${label}`, {
       description: `Focus the last ${label} tab or open one in the focused pane.`,
       category: "Jump to tool",
       scope: "workspace",
       aliases: ["jump", "switch tool", label.toLowerCase()],
-      mac: `Cmd+Shift+${index + 1}`,
-      windows: `Ctrl+Shift+${index + 1}`,
+      mac: `Cmd+Shift+${slot}`,
+      windows: `Ctrl+Shift+${slot}`,
       allowInEditable: true,
     }),
   ),
 ];
 
 const toolCommands: ShortcutCommandDefinition[] = [
-  ...filesShortcutCommands,
   command("planner.create", "Create Planner item", {
     description: "Create an item in the focused Planner view.",
     category: "Planner",
@@ -388,6 +393,7 @@ const toolCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     allowShadowing: true,
   }),
+  ...browserFeatureCommands,
   command("browser.history", "Show history", {
     description: "Open the websites you have visited.",
     category: "Browser",

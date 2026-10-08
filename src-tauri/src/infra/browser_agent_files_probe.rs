@@ -57,7 +57,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         browser_webview_create(app.get_webview("main").ok_or("main view missing")?, app.clone(), app.state::<BrowserSessionState>(),
             serde_json::from_value(json!({"id":id,"scopeId":scope,"url":url,"x":index*500,"y":60,"width":490,"height":500})).map_err(|e|e.to_string())?).await?;
         bind(&app, &scope, "fixture-task", None)?;
-        browser_agent_grant_register(app.state::<BrowserSessionState>(), serde_json::from_value(json!({
+        browser_agent_grant_register(app.clone(), app.state::<BrowserSessionState>(), serde_json::from_value(json!({
             "id":id,"scopeId":scope,"grantId":format!("grant-{scope}"),"agentId":"fixture-agent",
             "expiresAt":(Utc::now()+chrono::Duration::minutes(3)).to_rfc3339(),
             "capabilities":["browser.inspect","browser.click","browser.upload","browser.downloads.list"]

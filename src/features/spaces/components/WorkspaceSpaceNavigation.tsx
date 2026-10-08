@@ -1,5 +1,4 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
-import { unreadActivityCountForSpace, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import {
   useWorkspaceStore,
@@ -68,7 +67,6 @@ export function WorkspaceSpaceNavigation({
   const navigate = useNavigate();
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
-  const activityItems = useActivityStore((state) => state.allItems);
   const [open, toggle] = usePersistentOpen();
   const activeSpaceId = activeSpaceIdFromTab(activeTab);
   const openSpace = (space: Space) => {
@@ -95,7 +93,6 @@ export function WorkspaceSpaceNavigation({
       onToggle={toggle}
     >
       {spaces.map((space) => {
-        const unread = unreadActivityCountForSpace(activityItems, space.id);
         const active = space.id === activeSpaceId;
         const name = spaceNavigationName(space);
         return (
@@ -104,19 +101,13 @@ export function WorkspaceSpaceNavigation({
               <NavigationTrayItem>
                 <Pressable
                   className={tileClass}
-                  aria-label={unread > 0 ? `${name}, ${unread} unread` : name}
+                  aria-label={name}
                   aria-current={active ? "page" : undefined}
                   data-navigation-destination="true"
                   data-active={active ? "true" : undefined}
                   onClick={() => openSpace(space)}
                 >
                   <SpaceAvatar space={space} />
-                  {unread > 0 ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-notification-red ring-2 ring-charcoal-workspace"
-                    />
-                  ) : null}
                 </Pressable>
               </NavigationTrayItem>
             </TooltipTrigger>
@@ -130,14 +121,20 @@ export function WorkspaceSpaceNavigation({
             <TooltipTrigger asChild>
               <NavigationTrayItem>
                 <Pressable
-                  className={cn(
-                    tileClass,
-                    "grid place-items-center rounded-lg border border-dashed border-charcoal-active text-cream-muted",
-                  )}
+                  className={cn(tileClass, "text-cream-muted hover:text-cream-bright")}
                   aria-label="Create Space"
                   onClick={create}
                 >
-                  <Plus size={16} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
+                  {/* Drawn at the avatar's size and corners so it lines up with the Spaces above. */}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "grid size-[var(--misty-navigation-identity-size,28px)] place-items-center",
+                      "rounded-[28%] border border-dashed border-charcoal-active",
+                    )}
+                  >
+                    <Plus size={16} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
+                  </span>
                 </Pressable>
               </NavigationTrayItem>
             </TooltipTrigger>

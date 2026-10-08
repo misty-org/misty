@@ -3,45 +3,83 @@ import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces/core";
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useBrowserDownloadsStore } from "@/features/browser";
+import { useWorkspaceStore } from "@/features/workspace";
+import { kuraInstalled } from "@/native/kura";
+import type { SearchScope } from "./bangs/types";
+import { kuraSearchResult, searchAgents, type ScopedSearchResult } from "./scopedSearchSources";
 import {
-  semanticQueryMinimumCharacters,
-  semanticSearchDebounceMs,
-} from "@/features/files/workspace";
-import type { SearchScope } from "./searchCommands";
+  searchBookmarkLibrary,
+  searchBrowserHistory,
+  searchDownloads,
+  searchOpenTabs,
+} from "./scopedSources/browserLibrary";
+import { searchExtensions, searchSettingsPages } from "./scopedSources/mistyPlaces";
 import {
-  fileResults,
-  searchAgents,
-  searchFileContents,
-  searchIndexedFiles,
-  searchSpaces,
-  type ScopedSearchResult,
-} from "./scopedSearchSources";
+  searchEverythingInSpaces,
+  searchSpaceChat,
+  searchSpaceNotes,
+  searchSpaceTasks,
+} from "./scopedSources/spaceContent";
 export type { ScopedSearchResult } from "./scopedSearchSources";
 
-const debounceMs = 180;
-const noSpaces: ReturnType<typeof useSpacesStore.getState>["spaces"] = [];
-const noAgents: ReturnType<typeof usePersonalAgentsStore.getState>["agents"] = [];
-const noConversations: ReturnType<typeof useMistyStore.getState>["conversations"] = [];
+type Spaces = ReturnType<typeof useSpacesStore.getState>["spaces"];
+type Source = (
+  query: string,
+  spaces: Spaces,
+) => ScopedSearchResult[] | Promise<ScopedSearchResult[]>;
 
-/** Browser scope never searches while typing. Files show name matches first,
- * then fold in content matches once the slower semantic search settles.
- * Responses for stale queries are dropped. */
+const debounceMs = 180;
+const none: never[] = [];
+
+/** Scopes that answer from one function. Files (handed to Kura) and agents have their own paths below. */
+const sources: Partial<Record<SearchScope, Source>> = {
+  spaces: searchEverythingInSpaces,
+  notes: searchSpaceNotes,
+  tasks: searchSpaceTasks,
+  chat: searchSpaceChat,
+  bookmarks: searchBookmarkLibrary,
+  history: searchBrowserHistory,
+  tabs: searchOpenTabs,
+  downloads: searchDownloads,
+  settings: searchSettingsPages,
+  extensions: searchExtensions,
+};
+
+const spaceScopes = new Set<SearchScope>(["spaces", "notes", "tasks", "chat"]);
+
+/**
+ * The default scope is answered by the address bar's providers, not here.
+ * Files searches are handed to Kura, the separate file manager. Responses for
+ * stale queries are dropped, and a
+ * refresh keeps the current rows until new ones arrive.
+ */
 export function useScopedSearch(scope: SearchScope, query: string, open = true) {
   const { user } = useAuth();
   // The dialog stays mounted while closed. Subscribe only to the open scope's sources, so a
   // streaming answer (which rewrites conversations per token) does not re-render it.
-  const spaces = useSpacesStore((state) => (open && scope === "spaces" ? state.spaces : noSpaces));
+  const spaces = useSpacesStore((state) => (open && spaceScopes.has(scope) ? state.spaces : none));
   const agents = usePersonalAgentsStore((state) =>
-    open && scope === "agents" ? state.agents : noAgents,
+    open && scope === "agents" ? state.agents : none,
   );
   const conversations = useMistyStore((state) =>
-    open && scope === "agents" ? state.conversations : noConversations,
+    open && scope === "agents" ? state.conversations : none,
+  );
+  // Rerun when what a scope lists changes underneath it, such as downloads loading.
+  const downloads = useBrowserDownloadsStore((state) =>
+    open && scope === "downloads" ? state.entries : none,
+  );
+  const bookmarks = useWorkspaceStore((state) =>
+    open && scope === "bookmarks" ? state.bookmarks : none,
   );
   const [results, setResults] = useState<ScopedSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const trimmed = query.trim();
 
-  useEffect(() => setResults([]), [scope]);
+  useEffect(() => {
+    setResults([]);
+    setLoading(false);
+  }, [scope]);
 
   useEffect(() => {
     if (scope !== "agents" || !user?.id) return;
@@ -59,49 +97,51 @@ export function useScopedSearch(scope: SearchScope, query: string, open = true) 
   }, [scope, trimmed, agents, conversations]);
 
   useEffect(() => {
-    if (scope === "agents") return;
-    if (scope === "browser" || (scope === "files" && !trimmed)) {
+    const source = sources[scope];
+    if (!open || !source) return;
+    let cancelled = false;
+    setLoading(true);
+    // Lists for an empty query (actions, recent items) show at once.
+    const timer = window.setTimeout(
+      async () => {
+        const next = await Promise.resolve()
+          .then(() => source(trimmed, spaces))
+          .catch(() => []);
+        if (cancelled) return;
+        setResults(next);
+        setLoading(false);
+      },
+      trimmed ? debounceMs : 0,
+    );
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [open, scope, trimmed, spaces, downloads, bookmarks]);
+
+  useEffect(() => {
+    if (scope !== "files") return;
+    if (!trimmed) {
       setResults([]);
       setLoading(false);
       return;
     }
     let cancelled = false;
-    const timers: number[] = [];
     setLoading(true);
-    if (scope === "spaces") {
-      timers.push(
-        window.setTimeout(async () => {
-          const next = await searchSpaces(trimmed, spaces);
+    const timer = window.setTimeout(() => {
+      void kuraInstalled()
+        .catch(() => false)
+        .then((installed) => {
           if (cancelled) return;
-          setResults(next);
+          setResults([kuraSearchResult(trimmed, installed)]);
           setLoading(false);
-        }, debounceMs),
-      );
-    } else {
-      const indexed = new Promise<Awaited<ReturnType<typeof searchIndexedFiles>>>((resolve) =>
-        timers.push(window.setTimeout(() => resolve(searchIndexedFiles(trimmed)), debounceMs)),
-      );
-      const semantic = trimmed.length >= semanticQueryMinimumCharacters;
-      void indexed.then((hits) => {
-        if (cancelled) return;
-        setResults(fileResults(hits));
-        if (!semantic) setLoading(false);
-      });
-      if (semantic)
-        timers.push(
-          window.setTimeout(async () => {
-            const merged = await searchFileContents(trimmed, await indexed);
-            if (cancelled) return;
-            setResults(fileResults(merged));
-            setLoading(false);
-          }, semanticSearchDebounceMs),
-        );
-    }
+        });
+    }, debounceMs);
     return () => {
       cancelled = true;
-      timers.forEach((timer) => window.clearTimeout(timer));
+      window.clearTimeout(timer);
     };
-  }, [scope, trimmed, spaces]);
+  }, [scope, trimmed]);
 
   return { results, loading };
 }

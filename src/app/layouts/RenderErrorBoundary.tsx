@@ -56,9 +56,6 @@ const volatileWorkspaceSnapshotKeys = [
   "misty.explorer.fileTable.columnWidths",
   "misty.explorer.fileTable.columnOrder",
   "misty.providers.multipanel.v1",
-  "misty.transfers.multipanel.v1",
-  "misty.transfers.table.columnWidths",
-  "misty.transfers.table.columnOrder",
 ];
 
 function recoverFromHookOrderMismatch(error: Error): void {

@@ -64,7 +64,7 @@ export function BrowserSyncBadge({
         )}
         {controller.form && (
           <div className="px-3 py-2">
-            <SyncUnlockForm controller={controller} compact />
+            <SyncUnlockForm controller={controller} />
           </div>
         )}
         {session && (

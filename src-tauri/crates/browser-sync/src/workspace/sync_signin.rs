@@ -72,6 +72,7 @@ impl WorkspaceSync {
         binding.written = written;
         binding.validate()?;
         let node = workspace.to_owned();
+        let edits = writes.len();
         self.queue(store, root, workspace, |desired| {
             desired.slots.extend(
                 writes
@@ -79,6 +80,7 @@ impl WorkspaceSync {
                     .map(|(kind, plain)| (node.clone(), kind, plain)),
             )
         })?;
+        self.batch.edited(workspace, edits, std::time::Instant::now());
         store.set_device_signin(root, workspace, &binding)
     }
 

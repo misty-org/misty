@@ -2,7 +2,28 @@
 (() => {
   const key = Symbol.for("misty.browser.agent.cursor");
   if (window[key]) return;
-  let host, timer, placed = false;
+  let host, control, ring, timer, placed = false;
+  // A ring pulses where the agent acts. The glowing frame around the page the
+  // agent holds is drawn natively (MistyAgentRing.m), so page captures leave it out.
+  const showControl = (x, y, reduced) => {
+    if (!control?.isConnected) {
+      control = document.createElement("misty-agent-control");
+      control.setAttribute("aria-hidden", "true");
+      control.style.cssText = "all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483646;contain:strict;";
+      const shadow = control.attachShadow({ mode: "closed" });
+      shadow.innerHTML = '<style>@keyframes p{from{transform:translate(-50%,-50%) scale(.55);opacity:1}to{transform:translate(-50%,-50%) scale(1.25);opacity:0}}</style>' +
+        '<div style="position:fixed;left:0;top:0;width:40px;height:40px;border-radius:50%;pointer-events:none;opacity:0;box-sizing:border-box;border:2px solid rgba(255,255,255,.95);box-shadow:0 0 0 1px rgba(19,19,19,.55),0 0 14px rgba(255,255,255,.45)"></div>';
+      ring = shadow.querySelector("div");
+      document.documentElement.append(control);
+    }
+    ring.style.left = `${x}px`;
+    ring.style.top = `${y}px`;
+    ring.style.animation = "none";
+    void ring.offsetWidth;
+    ring.style.transform = "translate(-50%,-50%)";
+    ring.style.opacity = reduced ? "0" : "";
+    if (!reduced) ring.style.animation = "p 700ms cubic-bezier(0.16,1,0.3,1) forwards";
+  };
   const hide = () => {
     clearTimeout(timer);
     if (host) host.style.opacity = "0";
@@ -44,6 +65,7 @@
       host.style.transform = `translate3d(${x - 2}px,${y - 2}px,0)`;
       host.style.opacity = "1";
       placed = true;
+      if (options?.hold) showControl(x, y, reduced);
       clearTimeout(timer);
       // An acting agent keeps its cursor visible so every screenshot shows it.
       if (!options?.hold) timer = setTimeout(hide, 1600);

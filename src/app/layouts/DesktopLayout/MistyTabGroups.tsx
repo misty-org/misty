@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Plus } from "lucide-react";
+import { AppWindow, Check, Plus, SquarePlus, Trash2, Ungroup, X } from "lucide-react";
 import {
   Button,
   ContextMenuAction,
@@ -7,7 +7,6 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-  Field,
   Input,
   Pressable,
   Popover,
@@ -119,6 +118,7 @@ export function TabGroupHeader({
     >
       <Pressable
         className="misty-tab-group-label"
+        data-unnamed={group.name ? undefined : "true"}
         data-reorder-handle="true"
         aria-expanded={!group.collapsed}
         aria-label={`${groupName(group)}, ${count} ${count === 1 ? "tab" : "tabs"}, ${group.collapsed ? "collapsed" : "expanded"}`}
@@ -139,7 +139,7 @@ export function TabGroupHeader({
           }
         }}
       >
-        <span className="truncate">{groupName(group)}</span>
+        {group.name ? <span className="truncate">{group.name}</span> : null}
       </Pressable>
     </div>
   );
@@ -170,6 +170,15 @@ export function TabGroupEditor({
   }, []);
   if (!group) return null;
   const save = () => useWorkspaceStore.getState().updateTabGroup(id, { name, color });
+  // Changes show on the strip as they are made, as in Chrome.
+  const rename = (next: string) => {
+    setName(next);
+    useWorkspaceStore.getState().updateTabGroup(id, { name: next, color });
+  };
+  const recolor = (next: TabGroupColor) => {
+    setColor(next);
+    useWorkspaceStore.getState().updateTabGroup(id, { name, color: next });
+  };
   const openCurrent = () => {
     const s = useWorkspaceStore.getState();
     const tab = s.selectTab(s.layout.activeTabId!);
@@ -191,7 +200,7 @@ export function TabGroupEditor({
         align="start"
         side="bottom"
         aria-label="Edit tab group"
-        className="w-72 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-3"
+        className="w-72 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-1.5"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           document
@@ -200,39 +209,40 @@ export function TabGroupEditor({
         }}
       >
         <form
-          className="grid gap-3"
+          className="grid gap-1"
           onSubmit={(e) => {
             e.preventDefault();
             save();
             onClose();
           }}
         >
-          <Field label="Group name">
+          <div className="grid gap-3 px-1.5 pb-2 pt-1.5">
             <Input
               autoFocus
+              aria-label="Group name"
               value={name}
               maxLength={80}
-              placeholder="Unnamed group"
-              onChange={(e) => setName(e.target.value)}
+              placeholder="Name this group"
+              onChange={(e) => rename(e.target.value)}
             />
-          </Field>
-          <fieldset>
-            <legend className="mb-2 text-sm">Color</legend>
-            <div className="flex flex-wrap gap-1">
+            <div role="radiogroup" aria-label="Group color" className="flex justify-between">
               {(Object.keys(tabGroupColors) as TabGroupColor[]).map((value) => (
                 <Pressable
                   key={value}
                   type="button"
+                  role="radio"
                   aria-label={value}
-                  aria-pressed={color === value}
+                  aria-checked={color === value}
                   className="misty-tab-group-swatch"
                   style={{ backgroundColor: tabGroupColors[value] }}
-                  onClick={() => setColor(value)}
-                />
+                  onClick={() => recolor(value)}
+                >
+                  {color === value ? <Check aria-hidden="true" /> : null}
+                </Pressable>
               ))}
             </div>
-          </fieldset>
-          <div className="grid gap-1 border-t border-charcoal-border pt-2">
+          </div>
+          <div className="grid border-t border-charcoal-border pt-1">
             <Button
               type="button"
               variant="ghost"
@@ -244,6 +254,7 @@ export function TabGroupEditor({
                 onClose();
               }}
             >
+              <SquarePlus aria-hidden="true" />
               New tab in group
             </Button>
             <Button
@@ -257,6 +268,7 @@ export function TabGroupEditor({
                 onClose();
               }}
             >
+              <AppWindow aria-hidden="true" />
               Move group to new window
             </Button>
             <Button
@@ -268,12 +280,14 @@ export function TabGroupEditor({
                 onClose();
               }}
             >
-              Ungroup tabs
+              <Ungroup aria-hidden="true" />
+              Ungroup
             </Button>
             <Button
               type="button"
               variant="ghost"
               justify="start"
+              title="Closes the tabs and keeps the group to reopen later"
               onClick={() => {
                 save();
                 if (!useWorkspaceStore.getState().closeTabGroup(id)) {
@@ -286,12 +300,16 @@ export function TabGroupEditor({
                 onClose();
               }}
             >
-              Close and save group
+              <X aria-hidden="true" />
+              Close group
             </Button>
+          </div>
+          <div className="grid border-t border-charcoal-border pt-1">
             <Button
               type="button"
               variant="ghost"
               justify="start"
+              title="Closes the tabs and forgets the group"
               onClick={() => {
                 if (!useWorkspaceStore.getState().closeTabGroup(id, false)) {
                   setError(
@@ -303,17 +321,15 @@ export function TabGroupEditor({
                 onClose();
               }}
             >
-              Delete group and close tabs
+              <Trash2 aria-hidden="true" />
+              Delete group
             </Button>
           </div>
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="px-1.5 pb-1.5 text-sm text-cream">
               {error}
             </p>
           )}
-          <div className="flex justify-end">
-            <Button type="submit">Done</Button>
-          </div>
         </form>
       </PopoverContent>
     </Popover>

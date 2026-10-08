@@ -71,20 +71,6 @@ export function parseInstallations(raw: string): Installation[] {
 export function installations() {
   return parseInstallations(preference("installations", "[]"));
 }
-export function pinIds(): number[] {
-  try {
-    const value: unknown = JSON.parse(preference("pins", "[]"));
-    return Array.isArray(value)
-      ? [
-          ...new Set(
-            value.filter((v): v is number => typeof v === "number" && Number.isSafeInteger(v)),
-          ),
-        ]
-      : [];
-  } catch {
-    return [];
-  }
-}
 export async function setPreference(key: string, value: string | boolean) {
   const profile = useSettingsProfiles.getState();
   if (profile.accountId !== useExtensionsStore.getState().account)
@@ -131,7 +117,11 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
   const account = useExtensionsStore.getState().account;
   const existing = installations().find((item) => item.id === review.entry.id && item.installed);
   const generation = existing?.generation ?? crypto.randomUUID();
-  await extensionsNative.commit(review.token, existing ? null : generation);
+  await extensionsNative.commit(
+    review.token,
+    existing ? null : generation,
+    review.privateAllowed && privateAccess,
+  );
   if (account !== useExtensionsStore.getState().account)
     throw new Error("The account changed during installation.");
   await changeControls(async () => {
@@ -152,15 +142,6 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
     await setPreference(
       "installations",
       JSON.stringify([...current.filter((i) => i.id !== next.id), next]),
-    );
-  });
-}
-export async function togglePin(id: number) {
-  await changeControls(async () => {
-    const pins = pinIds();
-    await setPreference(
-      "pins",
-      JSON.stringify(pins.includes(id) ? pins.filter((p) => p !== id) : [...pins, id]),
     );
   });
 }

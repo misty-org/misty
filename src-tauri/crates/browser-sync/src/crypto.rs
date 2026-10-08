@@ -205,6 +205,17 @@ impl VaultRoot {
         Ok(key)
     }
 
+    /// The key that seals cloud clipboard clips for this vault's devices
+    /// (docs/design/clipboard/BRIEF.md). Every admitted device derives the same key.
+    pub fn clipboard_key(&self, scope: &VaultScope) -> Result<ClipboardKey> {
+        scope.validate()?;
+        let key = self.derive(
+            "misty.clipboard.key.v1",
+            &(&scope.deployment, &scope.account_id, &scope.vault_id),
+        )?;
+        Ok(ClipboardKey(key))
+    }
+
     fn signing_key(&self) -> Result<SigningKey> {
         let seed = self.derive("misty.sync.root-signing.v1", &1)?;
         Ok(SigningKey::from_bytes(&seed))
@@ -477,5 +488,98 @@ impl DeviceKey {
         }
         key.copy_from_slice(&bytes);
         Ok(Self(key))
+    }
+}
+
+/// Seals the parts of a cloud clipboard clip. A sealed part is a 12-byte nonce
+/// followed by the AES-256-GCM ciphertext. The associated data binds each part
+/// to its clip and position, so parts cannot be swapped between clips.
+pub struct ClipboardKey(Zeroizing<[u8; 32]>);
+
+/// The largest clipboard part: the 25 MB clip cap plus room for framing.
+pub const MAX_CLIPBOARD_PART_BYTES: usize = 26 * 1024 * 1024;
+
+impl ClipboardKey {
+    fn aad(clip_id: &str, part: u32) -> Result<Vec<u8>> {
+        if clip_id.is_empty() || clip_id.len() > 64 {
+            return Err(Error::Invalid);
+        }
+        Ok(serde_json::to_vec(&("misty.clipboard.part.v1", clip_id, part))?)
+    }
+
+    pub fn seal(&self, clip_id: &str, part: u32, plaintext: &[u8]) -> Result<Vec<u8>> {
+        if plaintext.len() > MAX_CLIPBOARD_PART_BYTES {
+            return Err(Error::TooLarge);
+        }
+        let nonce = random::<12>();
+        let aad = Self::aad(clip_id, part)?;
+        let ciphertext = cipher(self.0.as_ref())?
+            .encrypt(
+                Nonce::from_slice(&nonce),
+                Payload {
+                    msg: plaintext,
+                    aad: &aad,
+                },
+            )
+            .map_err(|_| Error::Unlock)?;
+        let mut sealed = Vec::with_capacity(12 + ciphertext.len());
+        sealed.extend_from_slice(&nonce);
+        sealed.extend_from_slice(&ciphertext);
+        Ok(sealed)
+    }
+
+    pub fn open(&self, clip_id: &str, part: u32, sealed: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+        if sealed.len() < 12 + 16 || sealed.len() > MAX_CLIPBOARD_PART_BYTES + 28 {
+            return Err(Error::Invalid);
+        }
+        let aad = Self::aad(clip_id, part)?;
+        let (nonce, ciphertext) = sealed.split_at(12);
+        cipher(self.0.as_ref())?
+            .decrypt(
+                Nonce::from_slice(nonce),
+                Payload {
+                    msg: ciphertext,
+                    aad: &aad,
+                },
+            )
+            .map(Zeroizing::new)
+            .map_err(|_| Error::Unlock)
+    }
+}
+
+#[cfg(test)]
+mod clipboard_key_tests {
+    use super::*;
+
+    fn scope(vault_id: &str) -> VaultScope {
+        VaultScope {
+            deployment: "https://misty.test".into(),
+            account_id: "account".into(),
+            vault_id: vault_id.into(),
+        }
+    }
+
+    #[test]
+    fn clips_round_trip_and_stay_bound_to_their_clip_and_part() {
+        let root = VaultRoot::generate();
+        let vault = "00000000-0000-0000-0000-000000000001";
+        let key = root.clipboard_key(&scope(vault)).unwrap();
+        let sealed = key.seal("clip_abcdefgh", 0, b"copied text").unwrap();
+        assert_eq!(&**key.open("clip_abcdefgh", 0, &sealed).unwrap(), b"copied text");
+        assert!(key.open("clip_abcdefgh", 1, &sealed).is_err());
+        assert!(key.open("clip_other000", 0, &sealed).is_err());
+        // Another device with the same root derives the same key.
+        let same = VaultRoot::from_protected(root.protected_bytes())
+            .unwrap()
+            .clipboard_key(&scope(vault))
+            .unwrap();
+        assert!(same.open("clip_abcdefgh", 0, &sealed).is_ok());
+        // Another vault, or another root, cannot read it.
+        let other_vault = root
+            .clipboard_key(&scope("00000000-0000-0000-0000-000000000002"))
+            .unwrap();
+        assert!(other_vault.open("clip_abcdefgh", 0, &sealed).is_err());
+        let other_root = VaultRoot::generate().clipboard_key(&scope(vault)).unwrap();
+        assert!(other_root.open("clip_abcdefgh", 0, &sealed).is_err());
     }
 }

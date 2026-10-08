@@ -6,7 +6,7 @@ import { useAuth } from "@/features/auth";
 import { useSpaceAgendaPreferences, useSpacesStore } from "@/features/spaces";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useWorkspaceViewTitle } from "@/features/workspace";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import { SpaceAgendaView } from "../SpaceAgendaView";
@@ -55,15 +55,10 @@ export function HostSpaceAgenda(props: {
           <HostAgendaIntegration {...input} workspaceTabId={props.workspaceTabId} />
         ),
         renderError: (error) => (
-          <SystemErrorActivity
-            accountId={user?.id}
+          <SystemErrorNotice
             error={error}
             scope={`planner:agenda:${props.spaceId}`}
             title="Agenda could not be refreshed"
-            target={{
-              kind: "route",
-              href: `/spaces/${encodeURIComponent(props.spaceId)}/planner/agenda/${props.view}`,
-            }}
           />
         ),
       }}

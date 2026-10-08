@@ -9,10 +9,22 @@ const script = readFileSync(
   "utf8",
 ).replace("__MISTY_SCROLLBAR_CSS_PLACEHOLDER__", JSON.stringify(css));
 
-test("embedded scrollbar styling installs once and leaves page scrolling alone", () => {
-  const page = new JSDOM('<main style="overflow:hidden;scrollbar-width:none">Page</main>', {
-    runScripts: "outside-only",
+// jsdom has no matchMedia; every WebView the script runs in does.
+function webviewPage(html: string): JSDOM {
+  const page = new JSDOM(html, { runScripts: "outside-only" });
+  Object.assign(page.window, {
+    matchMedia: (media: string) => ({
+      matches: false,
+      media,
+      addEventListener() {},
+      removeEventListener() {},
+    }),
   });
+  return page;
+}
+
+test("embedded scrollbar styling installs once and leaves page scrolling alone", () => {
+  const page = webviewPage('<main style="overflow:hidden;scrollbar-width:none">Page</main>');
   try {
     const { window } = page;
     const main = window.document.querySelector("main")!;
@@ -31,7 +43,7 @@ test("embedded scrollbar styling installs once and leaves page scrolling alone",
 });
 
 test("document-start installation recovers when the parser creates the root", () => {
-  const page = new JSDOM("", { runScripts: "outside-only" });
+  const page = webviewPage("");
   try {
     const { window } = page;
     const { document } = window;
@@ -47,7 +59,7 @@ test("document-start installation recovers when the parser creates the root", ()
 });
 
 test("a replaced parser head gets the shared stylesheet again", () => {
-  const page = new JSDOM("", { runScripts: "outside-only" });
+  const page = webviewPage("");
   try {
     const { window } = page;
     window.eval(script);

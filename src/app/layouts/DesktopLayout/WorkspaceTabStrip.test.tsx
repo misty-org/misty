@@ -162,8 +162,9 @@ it.each(["top", "bottom", "left", "right"] as const)(
     expect(screen.queryByRole("button", { name: "Edit group Reading" })).toBeNull();
     fireEvent.contextMenu(screen.getByRole("button", { name: "Reading, 2 tabs, expanded" }));
     fireEvent.change(screen.getByLabelText("Group name"), { target: { value: "Research" } });
-    fireEvent.click(screen.getByRole("button", { name: "green" }));
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    fireEvent.click(screen.getByRole("radio", { name: "green" }));
+    // Name and color apply as they change, before the editor closes.
+    expect(screen.getByRole("radio", { name: "green" }).getAttribute("aria-checked")).toBe("true");
     expect(useWorkspaceStore.getState().tabGroups.find((g) => g.id === id)).toMatchObject({
       name: "Research",
       color: "green",

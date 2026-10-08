@@ -1,4 +1,4 @@
-import type { ComponentProps, Ref } from "react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 import { PanelRight, Plus, X } from "lucide-react";
 import { Button, IconButton, Input, Spinner } from "@/shared/ui";
 import { AgentConversationActions } from "../components/AgentConversationActions";
@@ -34,6 +34,7 @@ export function AgentConversationHeading({
   onCloseNewChat,
   onNewChat,
   details,
+  actions,
 }: {
   workspace?: boolean;
   newChat: boolean;
@@ -46,6 +47,8 @@ export function AgentConversationHeading({
   onCloseNewChat(): void;
   onNewChat(): void;
   details?: AgentDetailsToggle;
+  /** Extra controls after New chat, for a host that is not the Agents page. */
+  actions?: ReactNode;
 }) {
   if (workspace && !newChat)
     return (
@@ -125,6 +128,7 @@ export function AgentConversationHeading({
             >
               <Plus />
             </IconButton>
+            {actions}
           </div>
         </>
       )}

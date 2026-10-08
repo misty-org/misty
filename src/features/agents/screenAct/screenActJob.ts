@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Agent } from "@midscene/core/agent";
 import { DeviceOperationNotAttempted } from "../workerBrowserJobs";
-import { planScreenAction, type ScreenFrame } from "./screenActPlanner";
+import { actionContexts } from "./screenActions";
+import { MistyScreenDevice, type ScreenFrame } from "./screenDevice";
+import { screenModelClient, screenModelConfig } from "./screenModel";
 import { screenSurface, surfaceAdapter } from "./screenActSurface";
 
 /** The device job the server queues for one browser_act goal. */
@@ -21,11 +24,8 @@ export interface ScreenActResult extends Record<string, unknown> {
   image?: ScreenFrame["image"];
 }
 
-const actionLimit = 24;
-// A malformed planner reply is shown to the planner and retried this often.
-const invalidReplyLimit = 2;
-// Actions in a row after which an unchanged screenshot ends the goal.
-const unchangedLimit = 3;
+// Plans per goal; the server's per-job model call cap is the real bound.
+const planLimit = 70;
 // Stays inside the server's five-minute tool call.
 const timeLimitMs = 4 * 60_000;
 
@@ -44,19 +44,13 @@ function parseJob(job: ScreenActJob) {
   };
 }
 
-function isInvalidPlannerReply(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  // Reasoning models can also spend the whole output cap and return nothing.
-  return /parse error|Invalid parameters|unsupported_screen_action|ZodError|invalid_type|empty content/i.test(
-    message,
-  );
-}
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
- * Runs one goal locally: capture, ask Midscene for the next action, move the
- * agent cursor and act, repeat. Every step uses Misty's native operations for
- * the job's surface (a browser page, the Misty window or the desktop) under a
- * grant scoped to this job, so leases, Stop and takeover apply to each action.
+ * Runs one goal locally with Midscene's Agent: it plans on fresh frames, acts
+ * through Misty's native operations and waits on the live capture, until the
+ * goal is visible, it is blocked, or time runs out. A long goal (a whole game,
+ * a multi-page form) is one call; the caller continues it with the same goal.
  */
 export async function runScreenAct(
   job: ScreenActJob,
@@ -79,105 +73,67 @@ export async function runScreenAct(
       expiresAt,
     },
   });
-  const execute = <T>(operation: string, input: Record<string, unknown>) =>
-    invoke<T>("browser_agent_execute", {
-      request: {
-        scopeId: job.scopeId,
-        grantId,
-        agentId,
-        operation,
-        input: { ...input, __mistyTaskId: taskId },
-      },
-    });
-  const started = Date.now();
-  const history: string[] = [];
-  let cursor: { x: number; y: number } | undefined;
-  let frame: ScreenFrame | undefined;
-  let dispatched = false;
-  let calls = 0;
-  let invalidReplies = 0;
-  // The frame an action was planned on, to notice when the screen ignores it.
-  let acted: { image: string; description: string } | undefined;
-  let unchanged = 0;
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal.reason);
+  signal.addEventListener("abort", cancel, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error("time_limit")), timeLimitMs);
+  const device = new MistyScreenDevice({
+    surface,
+    adapter,
+    allowConsequential,
+    controller,
+    execute: (operation, input) =>
+      invoke("browser_agent_execute", {
+        request: {
+          scopeId: job.scopeId,
+          grantId,
+          agentId,
+          operation,
+          input: { ...input, __mistyTaskId: taskId },
+        },
+      }),
+  });
+  const model = screenModelClient(job.id);
+  const finish = (status: ScreenActResult["status"], summary: string): ScreenActResult => ({
+    status,
+    summary: summary.slice(0, 800),
+    actions: device.actions.length,
+    cursor: device.cursor,
+    image: device.frame?.image,
+  });
+  const progress = () =>
+    device.actions.length
+      ? ` Did ${device.actions.length} actions, most recently: ${device.actions.slice(-3).join("; ")}. Call again with the same goal to continue.`
+      : "";
   try {
-    for (let step = 0; ; step++) {
-      signal.throwIfAborted();
-      frame = await execute<ScreenFrame>(adapter.visual, {});
-      if (!frame?.documentId || !frame.image?.dataUrl)
-        throw new Error("The screen did not return a usable screenshot.");
-      const finish = (status: ScreenActResult["status"], summary: string): ScreenActResult => ({
-        status,
-        summary,
-        actions: step,
-        cursor,
-        image: frame!.image,
-      });
-      if (acted) {
-        unchanged = frame.image.dataUrl === acted.image ? unchanged + 1 : 0;
-        if (unchanged >= unchangedLimit)
-          return finish(
-            "incomplete",
-            `The screen did not respond after ${unchanged} tries at: ${acted.description}.`,
-          );
-        if (unchanged)
-          history.push(
-            `The screenshot did not change after "${acted.description}". Try something different or report that you cannot finish.`,
-          );
-        acted = undefined;
-      }
-      if (step >= actionLimit || Date.now() - started > timeLimitMs)
-        return finish("incomplete", `Stopped after ${step} actions without reaching the goal.`);
-      let plan: Awaited<ReturnType<typeof planScreenAction>>;
-      try {
-        plan = await planScreenAction(job.id, calls++, frame, goal, history, surface);
-      } catch (error) {
-        if (!isInvalidPlannerReply(error) || ++invalidReplies > invalidReplyLimit) throw error;
-        history.push(
-          `Your last reply was invalid (${String((error as Error).message).slice(0, 200)}). Reply again with every required parameter.`,
-        );
-        step--;
-        continue;
-      }
-      if (!plan.action)
-        return finish(plan.complete ? "done" : "incomplete", plan.message.slice(0, 800));
-      if (plan.consequential && !allowConsequential)
-        return finish(
-          "needs_confirmation",
-          `Stopped before a consequential action: ${plan.description}. Ask the user, then call again with allowConsequential if they agree.`,
-        );
-      const description = plan.description ?? "the last action";
-      const mapped = adapter.input(plan.action, {
-        documentId: frame.documentId,
-        consequential: plan.consequential === true,
-        description,
-      });
-      if ("unsupported" in mapped) {
-        if (++invalidReplies > invalidReplyLimit)
-          return finish(
-            "incomplete",
-            `This screen cannot do what the goal needs: ${mapped.unsupported}`,
-          );
-        history.push(mapped.unsupported);
-        step--;
-        continue;
-      }
-      signal.throwIfAborted();
-      dispatched = true;
-      const result = await execute<{ cursor?: { x: number; y: number } }>(
-        adapter.interact,
-        mapped.input,
-      );
-      acted = { image: frame.image.dataUrl, description };
-      cursor = result?.cursor ?? adapter.cursor(plan.action) ?? cursor;
-      const at = cursor ? ` Cursor now at (${cursor.x.toFixed(3)}, ${cursor.y.toFixed(3)}).` : "";
-      history.push(
-        `${description}: input dispatched.${at} Check the next screenshot for its effect.`,
-      );
-    }
+    const agent = new Agent(device, {
+      generateReport: false,
+      autoPrintReportMsg: false,
+      persistExecutionDump: false,
+      modelConfig: screenModelConfig,
+      createOpenAIClient: model.createOpenAIClient,
+      aiContexts: { aiAct: actionContexts[surface] },
+      replanningCycleLimit: planLimit,
+      // The device settles and captures after each action itself.
+      waitAfterAction: 0,
+    });
+    const message = await agent.aiAct(goal, { abortSignal: controller.signal });
+    return finish("done", message?.trim() || "The goal is visible on the screen.");
   } catch (error) {
+    if (device.stop) return finish(device.stop.status, device.stop.summary);
+    if (signal.aborted) throw error;
+    if (device.failure)
+      throw device.dispatched ? device.failure : new DeviceOperationNotAttempted(device.failure);
+    if (controller.signal.aborted)
+      return finish("incomplete", `Stopped at the four-minute limit.${progress()}`);
+    // The planner reporting that it cannot finish is an answer, not a fault.
+    const declined = /Task failed:\s*([^\n]*)/.exec(messageOf(error))?.[1];
     // Before the first input nothing on the screen changed, so the task may retry.
-    throw dispatched ? error : new DeviceOperationNotAttempted(error);
+    if (!device.dispatched && declined === undefined) throw new DeviceOperationNotAttempted(error);
+    return finish("incomplete", `${declined ?? messageOf(error).split("\n")[0]}${progress()}`);
   } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", cancel);
     await invoke("browser_agent_grant_revoke", { request: { id: runtimeId, grantId } }).catch(
       () => undefined,
     );

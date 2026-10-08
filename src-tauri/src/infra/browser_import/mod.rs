@@ -207,7 +207,6 @@ pub async fn browser_import_settings(
     blocking(move || {
         let source = profile(&request.source)?;
         let settings = settings::read(request.source.browser.family(), &source.path);
-        #[cfg(target_os = "macos")]
         let site_permissions_added = {
             let decisions: Vec<_> = settings
                 .site_permissions
@@ -215,11 +214,6 @@ pub async fn browser_import_settings(
                 .map(|p| (p.origin.clone(), p.kind, p.allow))
                 .collect();
             super::browser_site_permissions::import_decisions(misty_profile.as_deref(), &decisions)?
-        };
-        #[cfg(not(target_os = "macos"))]
-        let site_permissions_added = {
-            let _ = misty_profile;
-            0
         };
         Ok(ImportedSettingsResult {
             settings,

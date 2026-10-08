@@ -14,11 +14,11 @@ const waitSchema = z.object({
 });
 export type AgentInterventionWait = z.infer<typeof waitSchema>;
 export const interventionLabels: Record<AgentInterventionWait["action"], string> = {
-  sign_in: "Sign in to continue",
-  account_confirmation: "Check the browser account",
-  challenge: "Complete the browser challenge",
-  open_target: "Open the original browser",
-  review: "Review the browser before continuing",
+  sign_in: "Sign in so Misty can continue",
+  account_confirmation: "Check that the right account is signed in",
+  challenge: "Complete the verification on screen",
+  open_target: "Open what Misty needs on screen",
+  review: "Review the screen before Misty continues",
 };
 
 // Trusted host controls only: never register this API in the app RPC catalog.

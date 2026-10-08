@@ -3,6 +3,12 @@ import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/
 import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
 import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
 import { analytics } from "@/telemetry/client";
+import {
+  beginGoogleSignInCodeWait,
+  deliveredGoogleSignInCode,
+  endGoogleSignInCodeWait,
+  waitForGoogleSignInCode,
+} from "../googleSignInCode";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
 
 export type {
@@ -41,8 +47,9 @@ export async function accountSignIn(email: string, password: string): Promise<Ac
 export async function accountGoogleSignIn(
   launch: (url: string) => Promise<void>,
   signal: AbortSignal,
+  onAwaitingCode?: () => void,
 ): Promise<AccountAuthUser> {
-  const result = await googleFlow(launch, signal, false);
+  const result = await googleFlow(launch, signal, false, onAwaitingCode);
   if ("reauthentication_token" in result) throw new Error("Unexpected Google sign-in response.");
   return persistLogin(result, "Google sign-in");
 }
@@ -50,8 +57,9 @@ export async function accountGoogleSignIn(
 export async function accountGoogleReauthenticate(
   launch: (url: string) => Promise<void>,
   signal: AbortSignal,
+  onAwaitingCode?: () => void,
 ): Promise<string> {
-  const result = await googleFlow(launch, signal, true);
+  const result = await googleFlow(launch, signal, true, onAwaitingCode);
   if (!("reauthentication_token" in result))
     throw new Error("Unexpected Google reauthentication response.");
   return result.reauthentication_token;
@@ -61,19 +69,33 @@ async function googleFlow(
   launch: (url: string) => Promise<void>,
   signal: AbortSignal,
   reauthenticate: boolean,
+  onAwaitingCode?: () => void,
 ): Promise<LoginResponse | { reauthentication_token: string }> {
   const flow = await accountApi.beginGoogle(reauthenticate, signal);
   signal.throwIfAborted();
-  await launch(flow.url);
-  const deadline = Date.now() + Math.min(flow.expires_in, 600) * 1000;
-  while (Date.now() < deadline) {
-    signal.throwIfAborted();
-    const result = await accountApi.completeGoogle(flow.flow_token, signal);
-    signal.throwIfAborted();
-    if (!("status" in result)) return result;
-    await new Promise<void>((resolve) => setTimeout(resolve, 2500));
+  // The browser hands back a one-time code (by misty:// link or typed); the
+  // server releases the session only with it. See googleSignInCode.ts.
+  beginGoogleSignInCodeWait();
+  try {
+    await launch(flow.url);
+    const deadline = Date.now() + Math.min(flow.expires_in, 600) * 1000;
+    let announced = false;
+    while (Date.now() < deadline) {
+      signal.throwIfAborted();
+      const code = deliveredGoogleSignInCode();
+      const result = await accountApi.completeGoogle(flow.flow_token, signal, code || undefined);
+      signal.throwIfAborted();
+      if (!("status" in result)) return result;
+      if (result.status === "confirm" && !announced) {
+        announced = true;
+        onAwaitingCode?.();
+      }
+      await waitForGoogleSignInCode(2500, signal);
+    }
+    throw new Error("Google sign-in expired. Please try again.");
+  } finally {
+    endGoogleSignInCodeWait();
   }
-  throw new Error("Google sign-in expired. Please try again.");
 }
 
 /** Ends the account's server session and forgets its saved cookies, so the

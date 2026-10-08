@@ -73,7 +73,9 @@ export const MessageComposer = forwardRef<
       ref={ref}
       data-slot="message-composer"
       className={cn(
-        "min-w-0 rounded-xl border border-charcoal-border bg-charcoal-card text-cream focus-within:border-cream-muted",
+        // No focus ring on the box or the controls inside it.
+        "min-w-0 rounded-xl border border-charcoal-border bg-charcoal-card text-cream",
+        "[&_:focus-visible]:border-transparent! [&_:focus-visible]:ring-0! [&_:focus-visible]:outline-none!",
         className,
       )}
       {...props}

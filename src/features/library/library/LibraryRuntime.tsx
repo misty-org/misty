@@ -4,7 +4,7 @@ import type { useSpacesStore } from "@/features/spaces";
 import type { useWorkspaceViewTitle, useWorkspaceViewFocused } from "@/features/workspace";
 import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { MistyFilePicker } from "@/features/picker";
-import type { SystemErrorActivity } from "@/features/activity";
+import type { SystemErrorNotice } from "@/features/support/systemErrors";
 import type { EmbeddedUniversalPreview } from "@/features/resource-preview";
 import type { PhotoEditor } from "@/features/editor";
 export interface LibraryRuntime {
@@ -15,7 +15,7 @@ export interface LibraryRuntime {
   useAiSurfaceAdapter: typeof useAiSurfaceAdapter;
   useShortcutHandler(id: string, handler: () => boolean | void, enabled?: boolean): void;
   Picker: typeof MistyFilePicker;
-  Error: React.ComponentType<React.ComponentProps<typeof SystemErrorActivity>>;
+  Error: React.ComponentType<React.ComponentProps<typeof SystemErrorNotice>>;
   Preview: typeof EmbeddedUniversalPreview;
   PhotoEditor: typeof PhotoEditor;
   confirm(message: string, title?: string): Promise<boolean>;
@@ -62,7 +62,7 @@ export const LibraryPicker = (props: React.ComponentProps<typeof MistyFilePicker
   const View = libraryRuntime().Picker;
   return <View {...props} />;
 };
-export const LibraryError = (props: React.ComponentProps<typeof SystemErrorActivity>) => {
+export const LibraryError = (props: React.ComponentProps<typeof SystemErrorNotice>) => {
   const View = libraryRuntime().Error;
   return <View {...props} />;
 };

@@ -1,4 +1,4 @@
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import type { AuthUser } from "@/features/auth";
 import { useMemo } from "react";
 import { hydrateDrawingBinaryFile } from "../drawingAssets";

@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Trash2, X } from "lucide-react";
+import { FolderPlus, Trash2, X } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { globalMistyError } from "@/features/global-search/globalMistyActions";
 import {
@@ -12,51 +12,37 @@ import {
   AlertDialogTitle,
   Button,
   IconButton,
-  Spinner,
 } from "@/shared/ui";
 import { AgentConversationActions } from "../components/AgentConversationActions";
-import {
-  activityStateIcon,
-  activityStateLabels,
-  formatActivityTime,
-} from "../page/useAgentActivity";
+import { AgentFolderGroup } from "../folders/AgentFolderGroup";
+import { useAgentFoldersStore, type AgentConversationFolder } from "../folders/agentFoldersStore";
+import { FolderNameDialog } from "../folders/FolderNameDialog";
+import { RecentStatusBadge, type RecentStatus } from "./RecentStatusBadge";
 
-type Recent = { id: string; title?: string };
-/** A conversation's latest run, for its row's status icon. */
-export type RecentStatus = { state: string; updatedAt: string };
+export type { RecentStatus };
 
-/**
- * A row shows its latest run only when it is worth a look: still going, or did not end
- * cleanly. Finished runs show nothing, so a quiet list means nothing needs attention.
- */
-function RecentStatusIcon({ status }: { status?: RecentStatus }) {
-  if (!status || status.state === "completed") return null;
-  const Icon = activityStateIcon(status.state);
-  const label = `${activityStateLabels[status.state] ?? status.state.replace(/_/g, " ")} · ${formatActivityTime(status.updatedAt)}`;
-  return (
-    <span className="agent-studio-recent-status" title={label}>
-      {status.state === "running" ? (
-        <Spinner size="sm" label={false} />
-      ) : (
-        <Icon size={14} aria-hidden="true" />
-      )}
-      <span className="sr-only">, {label}</span>
-    </span>
-  );
-}
+type Recent = { id: string; title?: string; folderId?: string };
+/** One folder and the conversations filed in it, newest first. */
+export type RecentFolder = { folder: AgentConversationFolder; conversations: Recent[] };
 
 /**
- * The sidebar's recent conversations. Cmd/Ctrl-click toggles a row and
- * Shift-click selects a range, as in Finder; a plain click just opens it.
+ * The sidebar's conversations: the agent's folders first, then unfiled Recents.
+ * Cmd/Ctrl-click toggles a row and Shift-click selects a range across both, as in
+ * Finder; a plain click just opens it.
  */
 /** Memoized: the open conversation's streaming updates must not re-render every row. */
 export const AgentRecentConversations = memo(function AgentRecentConversations({
+  agentId,
+  folders = [],
   recent,
   statuses,
   activeId,
   disabled,
   onConversation,
 }: {
+  agentId: string;
+  folders?: RecentFolder[];
+  /** Unfiled conversations. */
   recent: Recent[];
   /** Latest run per conversation id. */
   statuses?: Record<string, RecentStatus>;
@@ -70,18 +56,24 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [params, setParams] = useSearchParams();
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  // Every listed row in screen order, so a Shift-click range can span folders and Recents.
+  const visible = useMemo(
+    () => [...folders.flatMap((group) => group.conversations), ...recent],
+    [folders, recent],
+  );
 
   // Drop selections whose conversations went away.
   useEffect(() => {
     setSelected((ids) => {
-      const next = ids.filter((id) => recent.some((c) => c.id === id));
+      const next = ids.filter((id) => visible.some((c) => c.id === id));
       return next.length === ids.length ? ids : next;
     });
-  }, [recent]);
+  }, [visible]);
 
   const click = (event: MouseEvent, id: string) => {
     if (event.shiftKey && anchor.current) {
-      const ids = recent.map((c) => c.id);
+      const ids = visible.map((c) => c.id);
       const [from, to] = [ids.indexOf(anchor.current), ids.indexOf(id)].sort((a, b) => a - b);
       if (from >= 0) {
         setSelected(ids.slice(from, to + 1));
@@ -133,6 +125,28 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   };
 
   const count = selected.length;
+  const row = (c: Recent) => (
+    <div
+      key={c.id}
+      className="agent-studio-recent-row"
+      data-selected={selected.includes(c.id) || undefined}
+    >
+      <Button
+        data-agent-navigation-control
+        variant="ghost"
+        justify="start"
+        disabled={disabled}
+        title={c.title || "Untitled conversation"}
+        aria-current={activeId === c.id ? "page" : undefined}
+        aria-pressed={count ? selected.includes(c.id) : undefined}
+        onClick={(event) => click(event, c.id)}
+      >
+        <RecentStatusBadge status={statuses?.[c.id]} />
+        <span className="agent-studio-recent-title">{c.title || "Untitled conversation"}</span>
+      </Button>
+      <AgentConversationActions conversation={{ ...c, agentId }} disabled={disabled} />
+    </div>
+  );
   return (
     <section
       className="agent-studio-recents"
@@ -161,31 +175,34 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
             <X size={15} />
           </IconButton>
         </div>
-      ) : (
-        <h2>Recents</h2>
-      )}
-      {recent.map((c) => (
-        <div
-          key={c.id}
-          className="agent-studio-recent-row"
-          data-selected={selected.includes(c.id) || undefined}
+      ) : null}
+      {folders.map(({ folder, conversations }) => (
+        <AgentFolderGroup
+          key={folder.id}
+          folder={folder}
+          count={conversations.length}
+          disabled={disabled}
         >
-          <Button
-            data-agent-navigation-control
-            variant="ghost"
-            justify="start"
-            disabled={disabled}
-            title={c.title || "Untitled conversation"}
-            aria-current={activeId === c.id ? "page" : undefined}
-            aria-pressed={count ? selected.includes(c.id) : undefined}
-            onClick={(event) => click(event, c.id)}
-          >
-            <span>{c.title || "Untitled conversation"}</span>
-            <RecentStatusIcon status={statuses?.[c.id]} />
-          </Button>
-          <AgentConversationActions conversation={c} disabled={disabled} />
-        </div>
+          {conversations.map(row)}
+        </AgentFolderGroup>
       ))}
+      <div className="agent-studio-recents-heading">
+        <h2>Recents</h2>
+        <IconButton label="New folder" disabled={disabled} onClick={() => setCreatingFolder(true)}>
+          <FolderPlus size={15} />
+        </IconButton>
+      </div>
+      {recent.map(row)}
+      <FolderNameDialog
+        open={creatingFolder}
+        title="New folder"
+        description="Group this agent's conversations. Move a conversation in from its menu."
+        submitLabel="Create"
+        onOpenChange={setCreatingFolder}
+        onSubmit={async (name) => {
+          await useAgentFoldersStore.getState().create(agentId, name);
+        }}
+      />
       <AlertDialog open={confirming} onOpenChange={(open) => !busy && setConfirming(open)}>
         <AlertDialogContent>
           <AlertDialogTitle>

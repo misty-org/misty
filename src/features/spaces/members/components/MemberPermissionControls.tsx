@@ -1,5 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import {
   Badge,
   Button,
@@ -130,11 +130,10 @@ export function MemberPermissionControls({
 
         <div className="min-h-0 overflow-auto p-4 sm:p-5">
           {error ? (
-            <SystemErrorActivity
+            <SystemErrorNotice
               error={error}
               scope={`spaces:permissions:${spaceId}`}
               title="Member permissions could not be updated"
-              target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
             />
           ) : null}
 

@@ -2,7 +2,6 @@ import type { useSpaceLibraryData } from "../useSpaceLibraryData";
 
 export type LibraryCollectionKind =
   | "recent"
-  | "smart"
   | "months"
   | "years"
   | "recent-days"

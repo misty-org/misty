@@ -461,5 +461,79 @@
   "chromium": {
     "url": "https://raw.githubusercontent.com/pheralb/svgl/main/static/library/chromium.svg",
     "collection": "SVGL"
+  },
+  "qwen": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/qwen-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "arcee": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/arcee-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "cohere": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/cohere-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "fireworks": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/fireworks-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "fish-audio": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/fishaudio.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "google-logo": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/google-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "inception": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/inception.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "microsoft-logo": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/microsoft-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "minimax": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/minimax-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "moonshot": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/moonshot.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "poolside": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/poolside-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "sakana": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/sakana-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "stepfun": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/stepfun-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "tencent": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/tencent-color.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "xai": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/xai.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "zai": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.95.1/icons/zai.svg",
+    "collection": "lobehub/lobe-icons"
+  },
+  "xiaomi": {
+    "url": "https://cdn.jsdelivr.net/npm/simple-icons@15/icons/xiaomi.svg",
+    "collection": "Simple Icons",
+    "adaptation": "Filled with the brand color #FF6900"
+  },
+  "meituan": {
+    "url": "https://cdn.jsdelivr.net/npm/simple-icons@15/icons/meituan.svg",
+    "collection": "Simple Icons",
+    "adaptation": "Filled with the brand color #FFD100"
   }
 }

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { agentMemberRequestsApi, type AgentMemberRequest } from "./api";
-import { agentMemberRequestActivities, useAgentMemberRequests } from "./store";
+import { useAgentMemberRequests } from "./store";
 import type * as ApiModule from "./api";
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof ApiModule>()),
@@ -57,14 +57,4 @@ it("removes a request once its decision is saved, even if an older read returns 
   finish({ requests: [item] });
   await older;
   expect(useAgentMemberRequests.getState().items).toEqual([]);
-});
-it("keeps the other agent's message out of the notification text", () => {
-  const item = request();
-  const [activity] = agentMemberRequestActivities("owner", [item]);
-  expect(activity.title).toBe("Alice’s agent asked Researcher");
-  expect(activity.body).not.toContain(item.message);
-  expect(activity.target).toEqual({
-    kind: "route",
-    href: `/activity?agent-request=${encodeURIComponent(item.id)}`,
-  });
 });

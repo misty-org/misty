@@ -14,7 +14,6 @@ export function UpdatesSection(props: SettingsContentProps) {
         <SettingsRow
           label="Check for updates automatically"
           description="Look for a new Misty version on launch. You can always check manually above."
-          last
         >
           <SwitchControl
             checked={booleanSetting(props.document, "general", "auto_update_enabled", true)}

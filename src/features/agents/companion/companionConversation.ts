@@ -16,7 +16,7 @@ function deferred() {
 }
 export interface ConversationTool {
   callId: string;
-  name: "start_task" | "steer_task" | "cancel_task";
+  name: "start_task" | "show_on_screen" | "steer_task" | "cancel_task";
   instruction: string;
   key: string;
   invocationId: string;

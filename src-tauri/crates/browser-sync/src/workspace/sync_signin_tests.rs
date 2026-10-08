@@ -61,6 +61,8 @@ fn harness() -> Harness {
     )
     .unwrap();
     let mut sync = WorkspaceSync::new(&scope, &grant);
+    // These tests are about what an op carries, not when it goes.
+    sync.set_batch_policy(crate::batch::BatchPolicy::immediate());
     sync.on_connect();
     sync.on_roster(&mut store, &root, roster(Some(DEVICE), "epoch-1"))
         .unwrap();
@@ -462,4 +464,79 @@ fn a_seat_kept_across_a_restart_stays_writable_offline() {
         .workspace_desired(&h.root, DEVICE)
         .unwrap()
         .is_some());
+}
+
+fn named_window(id: &str) -> crate::document::Change {
+    crate::document::Change::Create {
+        kind: crate::document::entities::Kind::Window,
+        id: id.into(),
+        fields: serde_json::from_value(serde_json::json!({"title": "Main", "order": 0})).unwrap(),
+    }
+}
+
+fn close_window(id: &str) -> crate::document::Change {
+    crate::document::Change::Delete {
+        kind: crate::document::entities::Kind::Window,
+        id: id.into(),
+    }
+}
+
+#[test]
+fn edits_wait_for_their_batch_and_edits_that_cancel_out_never_leave() {
+    use crate::{batch::BatchPolicy, document::entities::Kind};
+    let mut h = harness();
+    h.sync
+        .apply_changes(&mut h.store, &h.root, vec![named_window("two")])
+        .unwrap();
+    let ops = h.tick();
+    assert_eq!(ops.len(), 1);
+    h.ack(&ops[0]);
+    h.sync.set_batch_policy(BatchPolicy {
+        revision: 1,
+        ..BatchPolicy::default()
+    });
+    // Window one opens, window two closes, window one closes.
+    for change in [named_window("one"), close_window("two"), close_window("one")] {
+        h.sync
+            .apply_changes(&mut h.store, &h.root, vec![change])
+            .unwrap();
+    }
+    // Inside the quiet period nothing is sent.
+    assert!(h.tick().is_empty());
+    assert!(!h.sync.flushed(&h.store).unwrap());
+    h.sync.flush();
+    let ops = h.tick();
+    assert_eq!(ops.len(), 1);
+    assert_eq!(ops[0].deletes, vec![model::node_id(DEVICE, Kind::Window, "two")]);
+    let one = model::node_id(DEVICE, Kind::Window, "one");
+    assert!(!ops[0].upserts.iter().any(|u| u.node_id == one));
+    h.ack(&ops[0]);
+    assert!(h.sync.flushed(&h.store).unwrap());
+    h.sync.flush_settled();
+}
+
+#[test]
+fn a_rate_limited_op_keeps_its_edits_and_waits_as_asked() {
+    let mut h = harness();
+    h.sync
+        .apply_changes(&mut h.store, &h.root, window())
+        .unwrap();
+    let ops = h.tick();
+    assert_eq!(ops.len(), 1);
+    h.sync
+        .on_error(
+            &mut h.store,
+            &h.root,
+            None,
+            Some(&ops[0].operation_id),
+            "sync_rate_limited",
+            Some(Duration::from_secs(60)),
+        )
+        .unwrap();
+    let desired = h.store.workspace_desired(&h.root, DEVICE).unwrap().unwrap();
+    assert_eq!(desired.changes.len(), 1);
+    // Held even with immediate batching, and even while flushing.
+    assert!(h.tick().is_empty());
+    h.sync.flush();
+    assert!(h.tick().is_empty());
 }

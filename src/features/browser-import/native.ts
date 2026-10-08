@@ -47,8 +47,7 @@ export interface Available<T> {
   value?: T | null;
   issue?: string | null;
 }
-export type ImportSettingKind =
-  "searchEngine" | "homepage" | "startup" | "bookmarksBar" | "sitePermissions";
+export type ImportSettingKind = "searchEngine" | "homepage" | "startup" | "sitePermissions";
 export interface ImportedExtension {
   id: string;
   name: string;
@@ -65,7 +64,6 @@ export interface ImportedSettings {
   searchEngine?: { name: string; url: string } | null;
   homepage?: string | null;
   restoreSession?: boolean | null;
-  showBookmarksBar?: boolean | null;
   sitePermissions: { origin: string; kind: "camera" | "microphone"; allow: boolean }[];
 }
 /** Where history, site permissions and sign-ins land: a Misty browser profile. */

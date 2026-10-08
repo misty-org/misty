@@ -12,4 +12,4 @@ Import `MessageComposer`, `MessageComposerSend`, and `messageComposerTextClass` 
 
 The textarea grows from 38px to 160px and recalculates on controlled-value and width changes. The empty input row measures 52px including padding and border. Text uses a 22px line height, 14px desktop size, and 16px below the `md` breakpoint. Share these dimensions rather than adding feature-specific textarea or frame overrides. Parent surfaces own placement and outer margins.
 
-Current adapters are `MistyComposer` (Agents and Global Misty), `SpaceChatComposer`, and `AgentExecutionSurface`. See the [Spaces integration record](../../../../docs/design/spaces-chat/INTEGRATION.md) for the current visual evidence and its verification limits.
+Current adapters are `MistyComposer` (Agents and Global Misty), `SpaceChatComposer`, and `AgentControlIsland` (an agent's task controls). See the [Spaces integration record](../../../../docs/design/spaces-chat/INTEGRATION.md) for the current visual evidence and its verification limits.

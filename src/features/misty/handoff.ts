@@ -1,5 +1,7 @@
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { useMistyStore } from "./useMistyStore";
+import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
+import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { readMistyDraftAttachments, useMistyDraftAttachments } from "./draftAttachments";
 import type {
   AiCaptureAttachment,
@@ -27,6 +29,21 @@ export interface MistyHandoff {
   conversationId?: string;
 }
 let handoffRevision = 0;
+
+/** Misty's conversations live on the Agents page; open it on the current one. */
+export function showMistyConversation() {
+  const { selectedAgentId, activeConversationId } = useMistyStore.getState();
+  const params = new URLSearchParams();
+  if (selectedAgentId) params.set("agent", selectedAgentId);
+  if (selectedAgentId && activeConversationId) params.set("conversation", activeConversationId);
+  const query = params.toString();
+  const route = `/agents${query ? `?${query}` : ""}`;
+  const surface = workspaceSurfaceFromRoute(route);
+  if (!surface) return;
+  const workspace = useWorkspaceStore.getState();
+  const view = workspace.openDestination(surface);
+  if (view.route !== route) workspace.updateViewRoute(view.id, route, true);
+}
 export async function acceptMistyHandoff(input: MistyHandoff) {
   const initial = useMistyStore.getState();
   const accountId = initial.accountId;
@@ -53,7 +70,7 @@ export async function acceptMistyHandoff(input: MistyHandoff) {
       (input.conversationId && input.conversationId !== initial.activeConversationId)
     )
       throw new Error("Wait for Misty's current response before changing its context.");
-    initial.openPanel();
+    showMistyConversation();
     return;
   }
   if (input.agentId) {
@@ -124,7 +141,7 @@ export async function acceptMistyHandoff(input: MistyHandoff) {
       handoff: input,
     });
   } else useMistyStore.setState({ mode: "ask" });
-  useMistyStore.getState().openPanel();
+  showMistyConversation();
 }
 export async function openMisty(input: MistyHandoff = {}) {
   await acceptMistyHandoff(input);

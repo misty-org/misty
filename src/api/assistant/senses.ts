@@ -1,13 +1,15 @@
 import { apiRequest } from "@/api/client";
 
 /** A user-facing model choice. Misty's own keys run every model. */
-export type SenseId = "thinking" | "seeing" | "listening" | "speaking";
+export type SenseId = "thinking" | "seeing" | "browsing" | "listening" | "speaking";
 
 /** A Gateway model that fits a sense. */
 export interface SenseModel {
   id: string;
   name: string;
   provider: string;
+  /** The account's plan cannot use this model; paid plans can. */
+  paid_only?: boolean;
 }
 
 export interface ModelSense {

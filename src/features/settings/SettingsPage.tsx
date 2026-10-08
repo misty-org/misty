@@ -4,7 +4,7 @@ import { Button, Input } from "@/shared/ui";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
+import { DesktopSettingsFrame, DesktopSettingsNotice } from "./components/DesktopSettingsUI";
 import type { DesktopSettingsNavEntry } from "./components/SettingsNavigation";
 import {
   searchSettings,
@@ -14,6 +14,7 @@ import {
 import { SettingsPageScope } from "./profiles/SettingScope";
 import { useSettingsProfiles } from "./profiles/store";
 import { NativeAvailability } from "./sections/FeatureSections";
+import { settingsErrorMessage } from "./settingsErrors";
 import { canonicalSettingsSection, settingsAreas, settingsRegistry } from "./settingsRegistry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import { useSettingsStore } from "./store/useSettingsStore";
@@ -25,7 +26,6 @@ const navItems: DesktopSettingsNavEntry<SettingsSection>[] = settingsRegistry
   )
   .map((entry) => ({
     id: entry.id,
-    hasSections: settingsRegistry.filter((item) => item.area === entry.area).length > 1,
     ...settingsAreas[entry.area],
   }));
 /** Scrolls to, focuses, and briefly highlights the row a search result pointed at. */
@@ -71,14 +71,12 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       activeSection: state.activeSection,
       settings: state.settings,
       launchOnLogin: state.launchOnLogin,
-      openWithAssociations: state.openWithAssociations,
       shortcuts: state.shortcuts,
       working: state.working,
       error: state.error,
       setActiveSection: state.setActiveSection,
       updateSetting: state.updateSetting,
       load: state.load,
-      removeOpenWithAssociation: state.removeOpenWithAssociation,
       updateShortcut: state.updateShortcut,
       reassignShortcut: state.reassignShortcut,
       resetShortcuts: state.resetShortcuts,
@@ -118,9 +116,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     onShortcutChange: store.updateShortcut,
     onShortcutReassign: store.reassignShortcut,
     onResetShortcuts: store.resetShortcuts,
-    onRemoveOpenWithAssociation: store.removeOpenWithAssociation,
     shortcuts: store.shortcuts,
-    openWithAssociations: store.openWithAssociations,
     app,
   };
   return (
@@ -156,23 +152,27 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       contentHeader={
         <>
           {(store.error || (entry.area !== "sync" && profile.error)) && (
-            <div role="alert" className="mb-5 text-sm text-cream">
-              {store.error || (entry.area !== "sync" && profile.error)}
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  void (
-                    profile.ready
-                      ? profile.refresh()
-                      : store
-                          .load()
-                          .then(() => window.dispatchEvent(new Event("misty:retry-settings")))
-                  ).catch(() => {})
-                }
-              >
-                Retry
-              </Button>
-            </div>
+            <DesktopSettingsNotice
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    void (
+                      profile.ready
+                        ? profile.refresh()
+                        : store
+                            .load()
+                            .then(() => window.dispatchEvent(new Event("misty:retry-settings")))
+                    ).catch(() => {})
+                  }
+                >
+                  Retry
+                </Button>
+              }
+            >
+              {settingsErrorMessage(store.error || profile.error || "")}
+            </DesktopSettingsNotice>
           )}
         </>
       }

@@ -53,6 +53,112 @@
   --tw-ring-shadow: 0 0 #0000;
 }
 
+/* Children paint above the border, so a filled child flush against the edge
+   (a p-0 popover's list, header or footer) covers the inner half of each
+   rounded corner and the edge thins out there. Clip contents to the rounded
+   edge. This lives in the components layer so a surface's own overflow
+   utility (scrolling menus and dialogs, which already clip) still wins.
+   Keep the selector list in sync with the rule above. */
+@layer components {
+  :root
+    :is(
+      [data-slot="dialog-content"],
+      [data-slot="alert-dialog-content"],
+      [data-slot="popover-content"],
+      [data-slot="dropdown-menu-content"],
+      [data-slot="dropdown-menu-sub-content"],
+      [data-slot="select-content"],
+      [data-slot="workspace-overlay-panel"],
+      [role="menu"],
+      .misty-popup-surface,
+      [data-popup-surface],
+      [id="browser-omnibox-suggestions"],
+      .misty-tiptap-suggestion
+    ) {
+    overflow: clip;
+  }
+}
+
+/* Shared overlay motion. tw-animate's enter/exit keyframes scale the surface and
+   read every value from CSS variables. WebKit (the desktop shell) can't hand such
+   an animation to the compositor, so it repaints each frame at a fractional scale
+   and every glyph and icon rounds to the pixel grid on its own: menu rows visibly
+   wiggle while they open. These keyframes use literal values and never scale; a
+   translate moves every glyph by the same amount, so nothing shifts relative to
+   its neighbors. */
+@keyframes misty-overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes misty-overlay-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes misty-overlay-in-from-top {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+}
+@keyframes misty-overlay-in-from-bottom {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+}
+@keyframes misty-overlay-in-from-left {
+  from {
+    opacity: 0;
+    transform: translate3d(-4px, 0, 0);
+  }
+}
+@keyframes misty-overlay-in-from-right {
+  from {
+    opacity: 0;
+    transform: translate3d(4px, 0, 0);
+  }
+}
+
+@layer components {
+  /* Menus, popovers, selects and tooltips ease a few pixels away from their anchor. */
+  .misty-popup-motion:not([data-state="closed"]) {
+    animation: misty-overlay-fade-in 150ms ease-out;
+  }
+  .misty-popup-motion[data-side="bottom"]:not([data-state="closed"]) {
+    animation-name: misty-overlay-in-from-top;
+  }
+  .misty-popup-motion[data-side="top"]:not([data-state="closed"]) {
+    animation-name: misty-overlay-in-from-bottom;
+  }
+  .misty-popup-motion[data-side="right"]:not([data-state="closed"]) {
+    animation-name: misty-overlay-in-from-left;
+  }
+  .misty-popup-motion[data-side="left"]:not([data-state="closed"]) {
+    animation-name: misty-overlay-in-from-right;
+  }
+  /* A menu that opens at the pointer only fades, so its rows never slide under the
+     cursor and flash a hover. */
+  .misty-popup-motion:is(
+      [data-slot="context-menu-content"],
+      [data-slot="context-menu-sub-content"],
+      [data-popup-at-pointer]
+    ):not([data-state="closed"]) {
+    animation-name: misty-overlay-fade-in;
+  }
+  .misty-popup-motion[data-state="closed"] {
+    animation: misty-overlay-fade-out 100ms ease-in forwards;
+  }
+  /* Dialogs and full-page overlays fade in place. */
+  .misty-dialog-motion:not([data-state="closed"]) {
+    animation: misty-overlay-fade-in 160ms ease-out;
+  }
+  .misty-dialog-motion[data-state="closed"] {
+    animation: misty-overlay-fade-out 120ms ease-in forwards;
+  }
+}
+
 :root
   :is(
     [data-slot="dialog-overlay"][data-state="closed"],
@@ -182,23 +288,6 @@
     background-color: var(--misty-theme-bg);
   }
 
-  /* Panel opacity only means something when there is something behind the app
-     to see. The wallpaper plays on a native layer beneath the transparent
-     webview, so the base surfaces thin out to let it through; with no
-     wallpaper set these rules are inert and the app stays fully opaque. */
-  html[data-wallpaper-active="true"] body,
-  html[data-wallpaper-active="true"] #root {
-    background-color: color-mix(
-      in srgb,
-      var(--misty-theme-bg) calc(var(--misty-panel-opacity, 1) * 100%),
-      transparent
-    );
-  }
-
-  html[data-wallpaper-active="true"] [data-misty-desktop-frame] {
-    background-color: transparent;
-  }
-
   /* Keep the native Browser's transparent path stable for the lifetime of a
      mounted Browser surface. Toggling these full-window ancestors for every
      popup forced WebKit to clear and repaint its backing store, which appeared
@@ -218,7 +307,13 @@
   html:has([data-browser-page-host]) [data-browser-page-container]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-browser-workspace-tab],
   html:has([data-browser-page-host]) [data-browser-page-stage],
-  html:has([data-browser-page-host]) [data-browser-page-host]:not([data-misty-browser-background]) {
+  html:has([data-browser-page-host]) [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
+  /* While a renderer overlay is open the native page sits beneath the
+     renderer. Keep the host transparent so the page remains visible. */
+  html[data-browser-overlay-active] [data-browser-page-host] {
     background-color: transparent !important;
   }
 
@@ -370,6 +465,30 @@
     animation: misty-skeleton-sweep 1.6s ease-in-out infinite;
   }
 
+  /* Working text ends in three dots that fill in turn, in place of a spinner. */
+  .misty-ellipsis {
+    display: inline-flex;
+  }
+  .misty-ellipsis > span {
+    animation: misty-ellipsis-dot 1.4s ease-in-out infinite;
+  }
+  .misty-ellipsis > span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .misty-ellipsis > span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes misty-ellipsis-dot {
+    0%,
+    100% {
+      opacity: 0.2;
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+
   @keyframes misty-skeleton-sweep {
     to {
       transform: translateX(100%);
@@ -377,6 +496,9 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .misty-ellipsis > span {
+      animation: none;
+    }
     .misty-skeleton::after {
       animation: none;
       display: none;
@@ -1150,4 +1272,17 @@
 /* Tooltips and the drag ghost, always on top */
 @utility layer-tooltip {
   z-index: 2147483500;
+}
+
+/* Night light (Settings › Appearance): a warm multiply layer over the whole
+   window, above tooltips, that never takes the pointer. Browser pages are
+   native views on top of this one and get the same layer injected. */
+:root[data-night-light]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background-color: var(--misty-night-light);
+  mix-blend-mode: multiply;
 }

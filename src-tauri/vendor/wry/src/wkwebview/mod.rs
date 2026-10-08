@@ -368,7 +368,13 @@ impl InnerWebView {
       }
 
       #[cfg(feature = "transparent")]
-      if attributes.transparent || attributes.background_color.is_some() {
+      // Misty patch: an opaque background keeps WebKit's own canvas. Turning it off let
+      // pages without a background of their own show the window behind them.
+      if attributes.transparent
+        || attributes
+          .background_color
+          .is_some_and(|(_, _, _, alpha)| alpha < 255)
+      {
         let no = NSNumber::numberWithBool(false);
         #[cfg(target_os = "macos")]
         {
@@ -639,7 +645,8 @@ impl InnerWebView {
       // Initialize scripts
       w.init(
 r#"Object.defineProperty(window, 'ipc', {
-  value: Object.freeze({postMessage: function(s) {window.webkit.messageHandlers.ipc.postMessage(s);}})
+  value: Object.freeze({postMessage: function(s) {window.webkit.messageHandlers.ipc.postMessage(s);}}),
+  writable: true, enumerable: true
 });"#,
       true
       );
@@ -975,10 +982,11 @@ r#"Object.defineProperty(window, 'ipc', {
       // Disable the default white background using the same drawsBackground KVC key
       // as the `transparent` feature. On the webview instance (vs config) for runtime changes.
       // NOTE: Private API — `drawsBackground` is a private KVC key on WKWebView instance.
-      let no = NSNumber::numberWithBool(false);
+      // Misty patch: only a see-through color disables WebKit's canvas (see the constructor).
+      let draws = NSNumber::numberWithBool(alpha == 255);
       self
         .webview
-        .setValue_forKey(Some(&no), ns_string!("drawsBackground"));
+        .setValue_forKey(Some(&draws), ns_string!("drawsBackground"));
 
       let (os_major_version, _, _) = util::operating_system_version();
       if os_major_version >= 12 {

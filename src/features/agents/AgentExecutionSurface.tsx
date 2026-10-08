@@ -14,6 +14,7 @@ import {
 import { Button, MessageComposer, MessageComposerSend, ViewportLayer } from "@/shared/ui";
 
 import { TaskArtifacts } from "./TaskArtifactList";
+import { releasePendingWait } from "@/features/agent-interventions/WaitingForYouCard";
 
 export function AgentExecutionSurface() {
   const execution = useLocalExecution((s) => s.execution);
@@ -101,13 +102,12 @@ export function AgentExecutionSurface() {
           {agent?.name ?? "Agent"} ·{" "}
           {execution.state === "running"
             ? "Working"
-            : execution.state === "paused"
-              ? "Paused — you can use this page"
-              : "Task finished — review the result"}
+            : execution.state === "waiting"
+              ? "Waiting for you — you can use this page"
+              : execution.state === "paused"
+                ? "Paused — you can use this page"
+                : "Task finished — review the result"}
         </strong>
-        <Button variant="outline" size="sm" onClick={() => useMistyStore.getState().openPanel()}>
-          Chat
-        </Button>
         {execution.state === "running" ? (
           <Button variant="outline" size="sm" onClick={() => action(pauseLocalExecution)}>
             Take over
@@ -116,18 +116,27 @@ export function AgentExecutionSurface() {
           <Button
             variant="outline"
             size="sm"
-            disabled={Boolean(execution.method)}
+            disabled={Boolean(execution.method) && execution.state !== "waiting"}
             title={
-              execution.method
+              execution.method && execution.state !== "waiting"
                 ? "Review this workflow’s results and explicitly start a new run. Automatic resume is unavailable."
                 : undefined
             }
             onClick={() =>
-              action(() =>
-                steerLocalExecution(
+              action(async () => {
+                // A run waiting for the person continues itself once released.
+                if (
+                  execution.state === "waiting" &&
+                  (await releasePendingWait(
+                    execution.accountId,
+                    useMistyStore.getState().invocationId,
+                  ))
+                )
+                  return;
+                await steerLocalExecution(
                   "Continue the current task. Inspect the current state first; do not repeat completed or uncertain writes.",
-                ),
-              )
+                );
+              })
             }
           >
             Resume
@@ -145,13 +154,13 @@ export function AgentExecutionSurface() {
         >
           Stop
         </Button>
-        {execution.state !== "running" && (
+        {execution.state !== "running" && execution.state !== "waiting" && (
           <Button variant="outline" size="sm" onClick={() => action(finishLocalExecution)}>
             Close workspace
           </Button>
         )}
       </header>
-      {execution.method && execution.state !== "running" && (
+      {execution.method && execution.state !== "running" && execution.state !== "waiting" && (
         <p
           role="status"
           className="border-b border-charcoal-border px-4 py-3 text-sm text-cream-muted"

@@ -1,11 +1,32 @@
-import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { spaceChatPath, useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
+let lastIndex:
+  | {
+      accountId: string;
+      state: ReturnType<typeof useSpacesStore.getState>;
+      documents: GlobalSearchDocument[];
+    }
+  | undefined;
+
+/**
+ * Every local document, rebuilt only when the Spaces store changes. The address bar
+ * searches this on each keystroke, so building it every time stalled typing.
+ */
 export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
   const state = useSpacesStore.getState();
+  if (lastIndex?.accountId === accountId && lastIndex.state === state) return lastIndex.documents;
+  const documents = buildDocuments(accountId, state);
+  lastIndex = { accountId, state, documents };
+  return documents;
+}
+
+function buildDocuments(
+  accountId: string,
+  state: ReturnType<typeof useSpacesStore.getState>,
+): GlobalSearchDocument[] {
   const spacesById = new Map(state.spaces.map((space) => [space.id, space]));
   const documents: GlobalSearchDocument[] = state.spaces.map((space) => ({
     id: `space:${space.id}`,
@@ -61,32 +82,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
         source: "local",
       });
     }
-  }
-
-  for (const item of useActivityStore.getState().allItems) {
-    if (item.accountId !== accountId) continue;
-    if (item.target.kind === "space" || item.target.kind === "space-chat") {
-      const space = spacesById.get(item.target.spaceId);
-      if (!space || (item.target.kind === "space-chat" && !space.permissions?.["messages.read"]))
-        continue;
-    }
-    if (item.target.kind === "space-task") {
-      const space = spacesById.get(item.target.spaceId);
-      if (!space || !space.permissions?.["tasks.view"]) continue;
-    }
-    const href = activityTargetHref(item.target);
-    if (!href) continue;
-    documents.push({
-      id: `activity:${item.id}`,
-      accountId,
-      kind: "activity",
-      title: item.title,
-      body: item.body,
-      keywords: [item.kind, "activity", item.attention ? "important" : "update"],
-      href,
-      updatedAt: item.createdAt,
-      source: "local",
-    });
   }
 
   for (const space of state.spaces) {

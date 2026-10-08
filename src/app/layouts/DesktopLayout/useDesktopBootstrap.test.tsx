@@ -14,7 +14,7 @@ vi.mock("@/features/files/workspace/explorer", async (importOriginal) => {
 });
 
 function BootstrapProbe() {
-  useDesktopBootstrap({ getRouteId: () => "files" });
+  useDesktopBootstrap({ getRouteId: () => "browser" });
   return null;
 }
 

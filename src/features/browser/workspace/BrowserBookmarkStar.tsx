@@ -12,13 +12,14 @@ export function BrowserBookmarkStar(props: { url: string; onBookmark: () => void
   return (
     <IconButton
       label={label}
+      size="xs"
       tooltip={false}
       title={title}
       aria-pressed={saved}
       className={saved ? "text-cream-bright" : undefined}
       onClick={props.onBookmark}
     >
-      <Star {...toolbarIconProps} fill={saved ? "currentColor" : "none"} />
+      <Star {...toolbarIconProps} size={16} fill={saved ? "currentColor" : "none"} />
     </IconButton>
   );
 }

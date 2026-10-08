@@ -16,6 +16,8 @@ export * from "./store/useAiServerStore";
 export { companionReply } from "./companion/companionReply";
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
 export { CursorCompanionController } from "./companion/CursorCompanionController";
+export { MistyPanel, MISTY_PANEL_WIDTH, type MistyPanelSide } from "./panel/MistyPanel";
+export { useMistyPanelStore } from "./panel/mistyPanelStore";
 
 export type { AgentScope } from "./model/interfaces/types";
 

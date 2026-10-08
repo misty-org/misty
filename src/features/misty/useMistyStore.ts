@@ -12,6 +12,11 @@ import {
 } from "@/features/agents/AgentsRuntime";
 import { visibleAutopilotAvailable } from "@/features/agents/betaModes";
 import {
+  awaitUserForExecution,
+  resumeExecutionAfterWait,
+} from "@/features/agents/executionHandoff";
+import { echoPrompt } from "./promptEcho";
+import {
   finishLocalExecution,
   isAgentWorkerWindow,
   pauseLocalExecution,
@@ -217,12 +222,20 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     // Where work happens is decided per task: a screen opens only when the
     // agent asks for one, and its continuation names the mode.
     const executionMode = companion?.executionMode ?? "user";
+    const echo = echoPrompt(set, get, {
+      prompt: normalized,
+      attachments,
+      echoed: !(companion?.idempotencyKey?.startsWith("voice-") || companion?.continuation),
+      conversationId: origin?.conversationId ?? get().browserRequest?.conversationId,
+    });
+    const { userMessage, assistantMessage, isEcho, unshow } = echo;
     set({
       working: true,
       error: null,
       executionMode,
       invocationId: undefined,
       invocationConversationId: undefined,
+      ...echo.patch,
     });
     const browserRequest = get().browserRequest;
     if (browserRequest && !origin) {
@@ -256,7 +269,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         !usePersonalAgentsStore.getState().agents.length
       )
         await usePersonalAgentsStore.getState().load(accountId);
-      if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
+      if (get().accountId !== accountId || epoch !== submissionEpoch()) return unshow();
       const agent = requestAgentId || selectedPersonalAgent(spaceId || "")?.id;
       if (!agent) throw new Error("Agents could not be loaded. Reopen Misty to retry.");
       requestAgentId = agent;
@@ -288,7 +301,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       } else if (!companion && external && !handoff?.selection) requestContext = [];
       selection = handoff?.selection ?? selection;
       deviceContexts = handoff?.deviceContexts ?? deviceContexts;
-      if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
+      if (get().accountId !== accountId || epoch !== submissionEpoch()) return unshow();
       set({
         selectedSpaceId: spaceId,
       });
@@ -298,7 +311,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           working: false,
           error: globalMistyError(error),
         });
-      return;
+      return unshow();
     }
     let capture: AiCaptureAttachment | undefined = companion?.capture ?? handoff?.capture;
     markPreparation("context_ready");
@@ -313,7 +326,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       ) {
         const screen = await (await import("./screenContext")).captureMistyScreen();
         capture = screen.capture;
-        if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
+        if (get().accountId !== accountId || epoch !== submissionEpoch()) return unshow();
         set({
           screenLabel: screen.label,
         });
@@ -324,7 +337,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           working: false,
           error: globalMistyError(error),
         });
-      return;
+      return unshow();
     }
     let workerReceipt: { invocationId: string; eventsUrl: string } | undefined;
     let routedConversationId: string | undefined;
@@ -340,7 +353,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           }),
           normalized,
         );
-        if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
+        if (get().accountId !== accountId || epoch !== submissionEpoch()) return unshow();
         const admission = JSON.stringify([
           accountId,
           conversationId,
@@ -385,7 +398,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             working: false,
             error: globalMistyError(error),
           });
-        return;
+        return unshow();
       }
     }
     let executionTaskId: string | undefined;
@@ -398,7 +411,14 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           executionMode === "team" ? "team" : "agent",
           {
             ...(companion?.openScreen && !isAgentWorkerWindow()
-              ? { normalTabs: true, openWhenMissing: true, url: companion.openScreen.url }
+              ? {
+                  normalTabs: true,
+                  openWhenMissing: true,
+                  url: companion.openScreen.url,
+                  hint: companion.openScreen.hint,
+                  tabId: companion.openScreen.tabId,
+                  place: companion.openScreen.place,
+                }
               : executionMode === "agent" && visibleAutopilotAvailable() && !isAgentWorkerWindow()
                 ? { normalTabs: false, desktopControl: true }
                 : { normalTabs: false }),
@@ -421,7 +441,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         }
         if (get().accountId !== accountId || epoch !== submissionEpoch()) {
           await settleLocalExecution("paused", executionTaskId);
-          return;
+          return unshow();
         }
         requestContext = [
           ...requestContext.filter((ref) => ref.kind !== "browser-tab"),
@@ -433,8 +453,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           working: false,
           error: globalMistyError(error),
         });
-        return;
+        return unshow();
       }
+    } else if (useLocalExecution.getState().execution?.state === "waiting") {
+      // A new message replaces whatever the waiting run asked for.
+      await pauseLocalExecution();
     } else if (useLocalExecution.getState().execution?.state === "running") {
       await settleLocalExecution("paused");
     }
@@ -458,11 +481,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           working: false,
           error: globalMistyError(error),
         });
-      return;
+      return unshow();
     }
     if (get().accountId !== accountId || epoch !== submissionEpoch()) {
       if (executionTaskId) await settleLocalExecution("paused", executionTaskId);
-      return;
+      return unshow();
     }
     markPreparation("conversation_ready");
     // A conversation's resolved defaults apply only when the composer has no
@@ -477,31 +500,25 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     // Plan or Act: a conversation's loaded mode, or the composer's choice for a
     // conversation that has no messages yet. Unknown leaves the server's saved mode.
     const collaboration = useCollaborationStore.getState();
-    const startsConversation = !get().conversations.find((c) => c.id === conversationId)?.messages
-      .length;
+    const startsConversation = !get()
+      .conversations.find((c) => c.id === conversationId)
+      ?.messages.some((message) => !isEcho(message));
     const collaborationMode = collaboration.byConversation[conversationId]
       ? collaboration.modeFor(conversationId)
       : startsConversation
         ? collaboration.draftMode
         : undefined;
-    const userMessage = {
-      ...conversationMessage("user", "ask", normalized),
-      attachments,
-    };
-    const assistantMessage = conversationMessage("assistant", "ask", "");
-    updateConversation(set, get, conversationId, (conversation) => ({
-      ...conversation,
-      reasoningEffort: thinkingEffort(requestedThinking),
-      title: conversation.messages.length ? conversation.title : normalized.slice(0, 56),
-      updatedAt: userMessage.createdAt,
-      messages: [
-        ...conversation.messages,
-        ...(companion?.idempotencyKey?.startsWith("voice-") || companion?.continuation
-          ? []
-          : [userMessage]),
-        assistantMessage,
-      ],
-    }));
+    echo.settle(conversationId);
+    updateConversation(set, get, conversationId, (conversation) => {
+      const messages = conversation.messages.filter((message) => !isEcho(message));
+      return {
+        ...conversation,
+        reasoningEffort: thinkingEffort(requestedThinking),
+        title: messages.length ? conversation.title : normalized.slice(0, 56),
+        updatedAt: userMessage.createdAt,
+        messages: [...messages, ...(echo.echoed ? [userMessage] : []), assistantMessage],
+      };
+    });
     if (presentation === "workspace") announceGlobalPanel(false);
     set({
       panel: presentation === "workspace" ? "closed" : "answer",
@@ -538,9 +555,16 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           windowLabel: (await import("@/shared/platform/tauri")).hasTauriInternals()
             ? (await import("@tauri-apps/api/window")).getCurrentWindow().label
             : undefined,
+          // The tab in front of the user, so "this page" means it. Only the
+          // main window has one; private tabs never count.
+          currentTab:
+            (await import("@/shared/platform/tauri")).hasTauriInternals() && !isAgentWorkerWindow()
+              ? (await import("@/features/agents/companion/normalTabs")).currentTabSummary()
+              : undefined,
           mode: companion ? "companion" : "drawer",
           companionMode: companion?.interactionMode,
           companionModel: companion?.model,
+          companionIntent: companion?.intent,
           modelOverride: companion ? undefined : requestState.pendingModelOverride,
           displayCaptures: companion?.displayCaptures,
           methodVersionId: companion?.methodVersionId,
@@ -622,17 +646,25 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event);
             if (event.type === "invocation.completed")
               continueAfterScreenRequest(set, get, conversationId, assistantMessage.id);
-            if (
+            if (event.type === "assistant.status" && event.phase === "awaiting_intervention") {
+              // The run is suspended until the person acts. It keeps its screen;
+              // input and the control ring go back to them, and the request
+              // shows as a Waiting for you card in this conversation.
+              if (executionTaskId) void awaitUserForExecution(executionTaskId);
+              void import("@/features/agent-interventions/store").then(
+                ({ useAgentInterventions }) => {
+                  useAgentInterventions.getState().setAccount(accountId);
+                  return useAgentInterventions.getState().refresh();
+                },
+              );
+            } else if (
               executionTaskId &&
-              event.type === "assistant.status" &&
-              event.phase === "awaiting_intervention"
+              ((event.type === "assistant.status" &&
+                event.phase === "intervention_resume_pending") ||
+                event.type === "tool.started" ||
+                event.type === "response.delta")
             ) {
-              void pauseLocalExecution(executionTaskId);
-              set({
-                error:
-                  event.text ||
-                  "The task needs your help. Complete the requested action in its page, then select Resume.",
-              });
+              void resumeExecutionAfterWait(executionTaskId);
             }
             if (
               ["invocation.completed", "invocation.failed", "invocation.canceled"].includes(

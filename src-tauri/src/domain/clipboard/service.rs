@@ -240,7 +240,7 @@ impl ClipboardService {
         let _ = self.publish_payload_to_shared(&payload);
     }
 
-    fn apply_payload_to_system(&self, mut payload: ClipboardPayload) -> bool {
+    pub(crate) fn apply_payload_to_system(&self, mut payload: ClipboardPayload) -> bool {
         let Some(native) = &self.native else {
             return false;
         };

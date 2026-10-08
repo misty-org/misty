@@ -186,7 +186,63 @@ function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
   const width = right - x;
   const height = bottom - y;
   if (width < 2 || height < 2) return null;
-  return browserBoundsAtAppZoom({ x, y, width, height }, getAppliedAppRenderScale());
+  const cornerRadii = clippedCornerRadii(host, rect);
+  return browserBoundsAtAppZoom(
+    { x, y, width, height, ...(cornerRadii ? { cornerRadii } : {}) },
+    getAppliedAppRenderScale(),
+  );
+}
+
+/** The native page sits above the app, so CSS cannot round it. Report the
+ * radius of each rounded corner the page reaches (its own device frame, the
+ * workspace pane and the Misty panel edge) so the host can mask it. */
+function clippedCornerRadii(
+  host: HTMLElement,
+  rect: DOMRect,
+): BrowserBounds["cornerRadii"] | undefined {
+  const radii: [number, number, number, number] = [0, 0, 0, 0];
+  for (
+    let clip: HTMLElement | null = host;
+    clip;
+    clip = clip.parentElement?.closest<HTMLElement>("[data-browser-corner-clip]") ?? null
+  ) {
+    const corners = clipCornerRadii(clip, rect);
+    for (let index = 0; index < 4; index += 1)
+      radii[index] = Math.max(radii[index]!, corners[index]!);
+  }
+  return radii.some((value) => value > 0) ? radii : undefined;
+}
+
+const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"] as const;
+
+function clipCornerRadii(clip: HTMLElement, rect: DOMRect): [number, number, number, number] {
+  const style = getComputedStyle(clip);
+  const box = clip.getBoundingClientRect();
+  const pad = {
+    top: parseFloat(style.paddingTop) || 0,
+    right: parseFloat(style.paddingRight) || 0,
+    bottom: parseFloat(style.paddingBottom) || 0,
+    left: parseFloat(style.paddingLeft) || 0,
+  };
+  // The page fills the clip's padding box: a pane's seam is its padding.
+  const edge = {
+    top: box.top + pad.top,
+    right: box.right - pad.right,
+    bottom: box.bottom - pad.bottom,
+    left: box.left + pad.left,
+  };
+  const meets = (a: number, b: number) => Math.abs(a - b) < 1;
+  return cornerNames.map((name) => {
+    const [y, x] = name.split("-") as ["top" | "bottom", "left" | "right"];
+    if (!meets(rect[y], edge[y]) || !meets(rect[x], edge[x])) return 0;
+    // Pane corners are masks drawn from the seam geometry, not border radii;
+    // custom properties inherit, so only the pane itself reads them.
+    const outer =
+      clip.dataset.browserCornerClip === "seam"
+        ? parseFloat(style.getPropertyValue(`--pane-corner-${name}`))
+        : parseFloat(style.getPropertyValue(`border-${name}-radius`));
+    return Math.max(0, (outer || 0) - Math.max(pad[y], pad[x]));
+  }) as [number, number, number, number];
 }
 
 function isMacNativeRuntime(): boolean {
@@ -200,6 +256,16 @@ export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): 
     y: bounds.y * zoom,
     width: bounds.width * zoom,
     height: bounds.height * zoom,
+    ...(bounds.cornerRadii
+      ? {
+          cornerRadii: bounds.cornerRadii.map((radius) => radius * zoom) as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        }
+      : {}),
   });
 }
 
@@ -210,5 +276,6 @@ export function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
     y: quantize(bounds.y),
     width: Math.max(1, quantize(bounds.width)),
     height: Math.max(1, quantize(bounds.height)),
+    ...(bounds.cornerRadii ? { cornerRadii: bounds.cornerRadii } : {}),
   };
 }

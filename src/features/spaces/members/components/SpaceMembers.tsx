@@ -2,7 +2,7 @@ import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 
 export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { useAuth } from "@/features/auth";
 import { Button } from "@/shared/ui";
 import { UserPlus } from "lucide-react";
@@ -50,11 +50,10 @@ export function SpaceMembers({
         </div>
 
         {error ? (
-          <SystemErrorActivity
+          <SystemErrorNotice
             error={error}
             scope={`spaces:members:${spaceId}`}
             title="Space membership needs attention"
-            target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
           />
         ) : null}
 

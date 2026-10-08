@@ -9,6 +9,7 @@ import {
   useShortcutHandler,
   useShortcutTitle,
 } from "./runtime";
+import { detectShortcutPlatform } from "./bindings";
 
 describe("shortcut dispatcher", () => {
   beforeEach(() => {
@@ -34,28 +35,26 @@ describe("shortcut dispatcher", () => {
     overlay.remove();
   });
 
-  it("prefers the focused tool over broader scopes", () => {
+  it("runs a tool's shortcut only while that tool is focused", () => {
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Files",
-      route: "/files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       instancePolicy: "single",
     });
-    const workspaceHandler = vi.fn();
-    const filesHandler = vi.fn();
-    const removeWorkspace = registerShortcutHandler("navigation.refresh", workspaceHandler);
-    const removeFiles = registerShortcutHandler("explorer.refresh", filesHandler);
-
-    expect(
+    const browserHandler = vi.fn();
+    const remove = registerShortcutHandler("browser.edit_address", browserHandler);
+    const editAddress = () =>
       dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "r", code: "KeyR", ctrlKey: true }),
-      ),
-    ).toBe(true);
-    expect(filesHandler).toHaveBeenCalledOnce();
-    expect(workspaceHandler).not.toHaveBeenCalled();
-    removeWorkspace();
-    removeFiles();
+        new KeyboardEvent("keydown", { key: "l", code: "KeyL", ctrlKey: true }),
+      );
+    editAddress();
+    expect(browserHandler).not.toHaveBeenCalled();
+    useWorkspaceStore.getState().openBrowserView({ url: "https://example.com" });
+    editAddress();
+    expect(browserHandler).toHaveBeenCalledOnce();
+    remove();
   });
 
   it("uses explicit handler priority and falls through when a handler declines", () => {
@@ -76,7 +75,7 @@ describe("shortcut dispatcher", () => {
 
     expect(
       dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
+        new KeyboardEvent("keydown", { key: "t", code: "KeyT", ctrlKey: true }),
       ),
     ).toBe(true);
     expect(calls).toEqual(["focused", "fallback"]);
@@ -86,10 +85,10 @@ describe("shortcut dispatcher", () => {
 
   it("protects typing targets unless a command opts in", () => {
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       instancePolicy: "single",
     });
     const handler = vi.fn();
@@ -111,8 +110,8 @@ describe("shortcut dispatcher", () => {
     const handler = vi.fn();
     const remove = registerShortcutHandler("search.toggle", handler);
     const event = new KeyboardEvent("keydown", {
-      key: "k",
-      code: "KeyK",
+      key: "t",
+      code: "KeyT",
       ctrlKey: true,
     });
     Object.defineProperty(event, "target", { value: textarea });
@@ -131,8 +130,8 @@ describe("shortcut dispatcher", () => {
     expect(
       dispatchShortcutEvent(
         new KeyboardEvent("keydown", {
-          key: "k",
-          code: "KeyK",
+          key: "t",
+          code: "KeyT",
           ctrlKey: true,
           repeat: true,
         }),
@@ -228,5 +227,57 @@ describe("shortcut dispatcher", () => {
     expect(result.current).toContain("Back");
     rerender({ label: "Previous" });
     expect(result.current).toContain("Previous");
+  });
+
+  it("matches search.toggle with both primary and alternate shortcut keys", () => {
+    const handler = vi.fn();
+    const remove = registerShortcutHandler("search.toggle", handler);
+    // Primary: Cmd+T / Ctrl+T
+    const primaryEvent = new KeyboardEvent("keydown", {
+      key: "t",
+      code: "KeyT",
+      ctrlKey: true,
+      metaKey: false,
+    });
+    expect(dispatchShortcutEvent(primaryEvent)).toBe(true);
+
+    // Alternate: Cmd+K / Ctrl+K
+    const alternateEvent = new KeyboardEvent("keydown", {
+      key: "k",
+      code: "KeyK",
+      ctrlKey: true,
+      metaKey: false,
+    });
+    expect(dispatchShortcutEvent(alternateEvent)).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(2);
+    remove();
+  });
+
+  it("handles forwarded browser-scoped shortcut events when browser surface is active", () => {
+    const store = useWorkspaceStore.getState();
+    const browserTab = store.openSurface({
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title: "Browser",
+      route: "/browser",
+      instancePolicy: "multiple",
+    });
+    store.focusView(browserTab.id);
+    const editAddressHandler = vi.fn();
+    const remove = registerShortcutHandler("browser.edit_address", editAddressHandler);
+
+    const platform = detectShortcutPlatform();
+    const event = new KeyboardEvent("keydown", {
+      key: "l",
+      code: "KeyL",
+      metaKey: platform === "macos",
+      ctrlKey: platform !== "macos",
+    });
+    // Simulating forwarded event from embedded browser with editable=false
+    expect(dispatchShortcutEvent(event, false)).toBe(true);
+    expect(editAddressHandler).toHaveBeenCalledOnce();
+
+    remove();
+    store.closeView(browserTab.id);
   });
 });

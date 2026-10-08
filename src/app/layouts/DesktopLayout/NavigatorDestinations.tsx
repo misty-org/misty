@@ -1,11 +1,16 @@
 import { useId, useState, type ReactNode } from "react";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { mergeTabOrder, orderedTabs } from "@/features/settings/AccountCollectionFilters";
+import {
+  mergeTabOrder,
+  orderedTabs,
+  savedTabIds,
+} from "@/features/settings/AccountCollectionFilters";
 import { resolveSetting, useSettingsProfiles } from "@/features/settings";
 import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import { cn, Notification } from "@/shared/ui";
 
 const orderSetting = "collections.tabs.navigator";
+const hiddenSetting = "app.navigation.hidden";
 
 /** Reorder destinations as units, keeping expanded tray children with their parent. */
 export function NavigatorDestinations({
@@ -22,7 +27,14 @@ export function NavigatorDestinations({
   const raw = useSettingsProfiles((store) =>
     store.state ? String(resolveSetting(store.state, orderSetting).value) : "[]",
   );
-  const ordered = orderedTabs(items, raw);
+  const hidden = useSettingsProfiles((store) =>
+    store.state ? String(resolveSetting(store.state, hiddenSetting).value) : "[]",
+  );
+  // Hidden destinations keep their saved order so they return where they were.
+  const ordered = orderedTabs(
+    items.filter((item) => !savedTabIds(hidden).includes(item.value)),
+    raw,
+  );
   const ids = ordered.map((item) => item.value);
   const enabled = ready && Boolean(accountId);
   const vertical = isSideDock(position);
@@ -41,7 +53,7 @@ export function NavigatorDestinations({
     animate: true,
     axis: vertical ? "y" : "x",
     getDrag: (id) =>
-      enabled ? { id, label: items.find((item) => item.value === id)!.label } : null,
+      enabled ? { id, label: ordered.find((item) => item.value === id)!.label } : null,
     onDrop: (drag, target, after) => save(reorderIds(ids, [drag.id], target, after)),
     onKeyboardMove: (id, direction) => {
       const index = ids.indexOf(id);

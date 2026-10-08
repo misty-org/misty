@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 
 describe("browser workspace deep links", () => {
-  it.each(["/settings", "/account", "/signin", "/register", "/activity"])(
+  it.each(["/settings", "/account", "/signin", "/register"])(
     "keeps %s outside the workspace",
     (route) => {
       expect(workspaceSurfaceFromRoute(route)).toBeNull();
@@ -27,17 +27,11 @@ describe("browser workspace deep links", () => {
     ).toMatchObject({ url: "https://example.com/report" });
   });
   it.each(["/files", "/apps/files"])(
-    "opens %s directly and preserves device-local selections",
+    "no longer opens %s as a tool; Files moved to Kura",
     (route) => {
       expect(
-        workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`),
-      ).toMatchObject({
-        surfaceId: "files",
-        groupKey: "tool:files",
-        scopeKey: "global",
-        route: "/files?path=%2FUsers%2Fada&select=notes.txt",
-        instancePolicy: "single",
-      });
+        workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`)?.surfaceId,
+      ).not.toBe("files");
     },
   );
   it("keeps agent run links intact", () => {
@@ -59,14 +53,8 @@ it("restores Space tools as split-capable surfaces in the current global workspa
   expect(workspaceSurfaceFromRoute("/spaces")).toMatchObject({ surfaceId: "space" });
 });
 
-it("opens Home as a reusable workspace tab", () => {
-  expect(workspaceSurfaceFromRoute("/home")).toMatchObject({
-    surfaceId: "home",
-    groupKey: "tool:home",
-    title: "Home",
-    route: "/home",
-    instancePolicy: "single",
-  });
+it("does not open the retired Home page as a tab", () => {
+  expect(workspaceSurfaceFromRoute("/home")).toBeNull();
 });
 
 it("opens schedule links inside Agents and preserves the task", () => {

@@ -99,6 +99,8 @@ const FILES: &[FileSpec] = &[
             "MISTY_R2_ALLOWED_ORIGINS",
             "MISTY_BACKUP_BUCKET",
             "MISTY_BACKUP_AGE_RECIPIENT",
+            "MISTY_BACKUP_R2_ACCESS_KEY",
+            "MISTY_BACKUP_R2_SECRET_KEY",
         ],
     },
     FileSpec {
@@ -117,6 +119,9 @@ const FILES: &[FileSpec] = &[
             "AI_GATEWAY_API_KEY",
             "AI_GATEWAY_BASE_URL",
             "OPENAI_API_KEY",
+            "ELEVENLABS_API_KEY",
+            "MISTY_VOICE_ID",
+            "MISTY_VOICE_TTS_MODEL",
             "AGENT_TRANSCRIPTION_MODEL",
             "MEDIA_SEARCH_EMERGENCY_DISABLE",
             "MEDIA_SEARCH_TRANSCRIPTION_MODEL",

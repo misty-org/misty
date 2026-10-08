@@ -8,7 +8,6 @@ const identityState = {
 };
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
-  home: descriptor("home", "singleton", "suspend", 360, 240),
   extensions: descriptor("extensions", "singleton", "suspend", 360, 240),
   space: descriptor("space", "per-space", "suspend", 360, 240),
   browser: {
@@ -17,7 +16,6 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
     serialize: parseBrowserViewState,
     restore: parseBrowserViewState,
   },
-  files: descriptor("files", "multiple", "suspend", 360, 240),
   scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
 };
