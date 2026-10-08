@@ -118,7 +118,7 @@ export async function startLocalExecution(
       !options?.normalTabs &&
       mode === "agent" &&
       visibleAutopilotAvailable() &&
-      getCurrentWindow().label === "main",
+      /^space-/.test(getCurrentWindow().label),
     state: "running",
     views: [...(previous?.ready ? previous.views : [])],
     childViews: [...(previous?.ready ? (previous.childViews ?? []) : [])],

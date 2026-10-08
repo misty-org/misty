@@ -344,8 +344,7 @@ pub(crate) fn is_chrome_store_id(value: &str) -> bool {
 /// tab's own address.
 pub(crate) async fn request_store_install(app: &tauri::AppHandle, key: &str) {
     let account = service().lock().await.account.clone();
-    let _ = app.emit_to(
-        "main",
+    let _ = crate::infra::space_windows::emit(&app,
         "misty://extensions",
         json!({"kind":"store-install","account":account,"id":key}),
     );
@@ -383,8 +382,7 @@ pub(crate) async fn request_store_remove(app: &tauri::AppHandle, key: &str) {
         return;
     };
     let account = service().lock().await.account.clone();
-    let _ = app.emit_to(
-        "main",
+    let _ = crate::infra::space_windows::emit(&app,
         "misty://extensions",
         json!({"kind":"store-remove","account":account,"id":id}),
     );

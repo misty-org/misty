@@ -24,6 +24,7 @@ export type {
 } from "./browserRuntimeTypes";
 
 import type { PagePreview } from "./browserRuntimeTypes";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 export function savePagePreview(tabId: string, preview: PagePreview) {
   useBrowserRuntimeStore.setState((runtime) => {
     const previews = { ...runtime.previews };
@@ -142,7 +143,7 @@ export async function captureBrowserPagePreview(
   const state = parseBrowserViewState(tab.state);
   const id = previewRuntimeId ?? browserRuntimeId(tab);
   if (
-    state.private ||
+    isIncognitoWindow() ||
     !/^https?:\/\//i.test(state.url) ||
     (!background && (!visibleRuntimeIds.has(id) || browserWebviewSuspensions.size > 0)) ||
     useBrowserRuntimeStore.getState().loading[tab.id] ||
@@ -181,7 +182,7 @@ export async function captureBrowserPagePreview(
 /** Prepare every browser card without focusing, navigating, or resizing its real tab. */
 export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent: () => boolean) {
   const state = parseBrowserViewState(tab.state);
-  if (state.private || !/^https?:\/\//i.test(state.url) || !stillCurrent()) return;
+  if (isIncognitoWindow() || !/^https?:\/\//i.test(state.url) || !stillCurrent()) return;
   const existing = browserRuntimeCreated(tab);
   const id = existing ? browserRuntimeId(tab) : `preview-${crypto.randomUUID()}`;
   const generation = previewGeneration;
@@ -352,7 +353,6 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
         ...(input.profileId ? { profileId: input.profileId } : {}),
-        ...(parseBrowserViewState(input.tab.state).private ? { private: true } : {}),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,
@@ -382,7 +382,6 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
         ...(input.profileId ? { profileId: input.profileId } : {}),
-        ...(parseBrowserViewState(input.tab.state).private ? { private: true } : {}),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,

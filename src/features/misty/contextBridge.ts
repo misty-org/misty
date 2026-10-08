@@ -10,6 +10,7 @@ import { useUserStore } from "@/features/auth/core";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiInvocationEvent } from "@/features/ai-surface/types";
 import { consumeInvocationEvent } from "@/features/ai-surface/storeRuntime";
+import { isSpaceWindowLabel } from "@/features/workspace/spaceWindow";
 
 type Request = {
   id: string;
@@ -90,7 +91,7 @@ export async function installMistyContextBridge() {
   if (!hasTauriInternals()) return () => {};
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   const current = getCurrentWindow();
-  if (current.label !== "main") return () => {};
+  if (!isSpaceWindowLabel(current.label)) return () => {};
   return current.onFocusChanged(({ payload }) => {
     if (payload) void invoke("misty_workspace_focused").catch(() => undefined);
   });

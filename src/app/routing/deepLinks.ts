@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
 import { openExternalLink } from "@/features/workspace/externalLinks";
+import { isLinkTargetWindow } from "@/features/workspace/spaceWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
@@ -16,8 +17,11 @@ export function installMistyDeepLinkHandler(
   let lastCurrentSignature: string | null = null;
   let lastHandledAt = 0;
   const currentUrlPoll: number | null = null;
-  const handleUrls = (urls: string[] | null, source: "current" | "event") => {
+  const handleUrls = async (urls: string[] | null, source: "current" | "event") => {
     if (!active || !urls) return;
+    // Every Space window hears these; only the one used last opens them.
+    if (!(await isLinkTargetWindow())) return;
+    if (!active) return;
     const signature = urls.join("\n");
     if (source === "current" && signature === lastCurrentSignature) return;
     // A cold launch reports the same links as both the current URL and an event.
@@ -45,7 +49,7 @@ export function installMistyDeepLinkHandler(
   const handleCurrentUrls = async () => {
     try {
       if (!hasTauriInternals()) return;
-      handleUrls(await getCurrent(), "current");
+      await handleUrls(await getCurrent(), "current");
     } catch {}
   };
   const handleVisibleCurrentUrls = () => {
@@ -56,8 +60,8 @@ export function installMistyDeepLinkHandler(
       if (!hasTauriInternals()) return;
       await handleCurrentUrls();
       // Web links Misty was started with as the default browser (Windows).
-      handleUrls(await invoke<string[]>("app_take_launch_urls"), "current");
-      unlisten = await onOpenUrl((urls) => handleUrls(urls, "event"));
+      await handleUrls(await invoke<string[]>("app_take_launch_urls"), "current");
+      unlisten = await onOpenUrl((urls) => void handleUrls(urls, "event"));
     } catch {}
   })();
   window.addEventListener("focus", handleCurrentUrls);

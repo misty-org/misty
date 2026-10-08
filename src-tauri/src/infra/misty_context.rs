@@ -5,7 +5,7 @@ extern "C" {
     fn misty_context_capture() -> *mut std::ffi::c_char;
 }
 fn trusted(window: &tauri::Webview) -> Result<(), String> {
-    if window.label() == "main" {
+    if crate::infra::space_windows::is_space_window(window.label()) {
         Ok(())
     } else {
         Err("Screen context is available only to Misty.".into())
@@ -67,7 +67,7 @@ pub async fn misty_screen_capture(window: tauri::Webview) -> Result<serde_json::
 
 #[tauri::command]
 pub fn misty_workspace_focused(window: tauri::Webview) -> Result<(), String> {
-    if window.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(window.label()) {
         return Err("Only the workspace can update its focus.".into());
     }
     #[cfg(target_os = "macos")]

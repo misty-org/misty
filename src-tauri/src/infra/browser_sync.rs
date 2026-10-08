@@ -237,7 +237,7 @@ pub(super) fn browser_lifecycle() -> &'static RwLock<()> {
 }
 
 fn require_main(webview: &tauri::Webview) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Browser sync is available only in the main workspace".into());
     }
     Ok(())

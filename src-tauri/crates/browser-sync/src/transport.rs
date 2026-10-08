@@ -263,6 +263,57 @@ impl SyncApi {
         Ok(())
     }
 
+    /// Every vault the account holds, the personal one first.
+    pub async fn vaults(&self) -> Result<Vec<SpaceVault>> {
+        #[derive(Deserialize)]
+        struct Response {
+            vaults: Vec<SpaceVault>,
+        }
+        let response: Response = self
+            .request(reqwest::Method::GET, "vaults", None::<&()>)
+            .await?;
+        Ok(response.vaults)
+    }
+
+    /// Creates the account's vault for a Space it belongs to, its root sealed
+    /// to the personal root and granted to a device already in the personal vault.
+    pub async fn create_space_vault(
+        &self,
+        space_id: &str,
+        root_public_key: &str,
+        space_key_envelope: &Envelope,
+        device: &DeviceGrant,
+    ) -> Result<()> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            space_id: &'a str,
+            root_public_key: &'a str,
+            space_key_envelope: &'a Envelope,
+            device: &'a DeviceGrant,
+        }
+        #[derive(Deserialize)]
+        struct Response {
+            vault_id: String,
+            space_id: String,
+        }
+        let response: Response = self
+            .request(
+                reqwest::Method::POST,
+                "vaults",
+                Some(&Body {
+                    space_id,
+                    root_public_key,
+                    space_key_envelope,
+                    device,
+                }),
+            )
+            .await?;
+        if response.vault_id != device.vault_id || response.space_id != space_id {
+            return Err(Error::Identity);
+        }
+        Ok(())
+    }
+
     pub async fn enroll(&self, grant: &DeviceGrant) -> Result<()> {
         #[derive(Deserialize)]
         struct Response {

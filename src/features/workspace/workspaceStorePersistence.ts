@@ -3,80 +3,81 @@ import {
   initialBookmarkNavigation,
   userBookmarkFolders,
 } from "@/features/browser-workspace/navigationDefaults";
-import { layoutTabs, mapLayoutViews, activateTab } from "./layoutTabs";
+import { layoutTabs, activateTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
-import {
-  createWorkspaceWindow,
-  initialWorkspaceLayout,
-  mapAllWorkspaceWindowViews,
-  normalizeWorkspaceLayout,
-} from "./windows";
-import { isPrivateBrowserView, scrubPrivateView } from "./privateBrowsing";
+import { createWorkspaceWindowId, initialWorkspaceLayout, normalizeWorkspaceLayout } from "./windows";
 import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
 import { migrateClosedWorkspaceItems } from "./closedWorkspaceItems";
 import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
 import type { WorkspaceScopeKey, WorkspaceWindow } from "./model";
 import type { BrowserProfile } from "./browserProfiles";
+import type { MistyTabGroup } from "./tabGroups";
+import { windowSpaceScope } from "./spaceWindow";
+import type { DockingLayout } from "@/features/app-shell/dockingLayout";
+
+/** Saved state from before each Space had its own OS window: virtual windows per scope,
+ * and a `global` scope for the default workspace. */
+type LegacyWindows = {
+  windowsByScope?: Partial<Record<string, WorkspaceWindow[]>>;
+  activeWindowIdByScope?: Partial<Record<string, string>>;
+  closedWindowsByScope?: unknown;
+};
+
+/** The scope this window keeps for what was saved under a legacy scope key. */
+function currentScope(scope: string | undefined): WorkspaceScopeKey {
+  return scope?.startsWith("profile:") ? (scope as WorkspaceScopeKey) : windowSpaceScope();
+}
+
+/**
+ * Virtual windows are gone: each Space has one OS window. A scope's active virtual
+ * window becomes its layout (its other windows are dropped; there are no users), and the
+ * `global` workspace becomes this Space window's own.
+ */
+function dropVirtualWindows(state: Partial<WorkspaceStore> & LegacyWindows): Partial<WorkspaceStore> {
+  const { windowsByScope, activeWindowIdByScope, closedWindowsByScope: _closed, ...rest } = state;
+  const savedActive = state.activeScopeKey as string | undefined;
+  const layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>> = {};
+  let windowId = state.activeWindowId;
+  let dockingLayout: DockingLayout | undefined = state.dockingLayout;
+  for (const [scope, layout] of Object.entries(state.layoutsByScope ?? {}))
+    if (layout) layoutsByScope[currentScope(scope)] = layout;
+  for (const [scope, windows] of Object.entries(windowsByScope ?? {})) {
+    if (!windows?.length) continue;
+    const active =
+      windows.find((window) => window.id === activeWindowIdByScope?.[scope]) ?? windows[0];
+    layoutsByScope[currentScope(scope)] = active.layout;
+    if (scope === savedActive || (scope === "global" && !savedActive?.startsWith("profile:"))) {
+      windowId = active.id;
+      dockingLayout ??= active.dockingLayout;
+    }
+  }
+  const activeScopeKey = currentScope(savedActive);
+  const layout = state.layout ?? layoutsByScope[activeScopeKey];
+  if (layout) layoutsByScope[activeScopeKey] = layout;
+  return {
+    ...rest,
+    activeScopeKey,
+    layout: layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(activeScopeKey),
+    layoutsByScope,
+    activeWindowId: windowId ?? createWorkspaceWindowId(),
+    dockingLayout,
+    tabGroups: (state.tabGroups as (MistyTabGroup & { scopeKey: string })[] | undefined)?.map(
+      (group) => ({ ...group, scopeKey: currentScope(group.scopeKey) }),
+    ),
+  };
+}
 
 export function migrateWorkspaceStore(persisted: unknown, version: number): WorkspaceStore {
   // Every load path (storage, native recovery, account switch) comes through here.
-  const state = upgradeWorkspaceShape(persisted) as Partial<WorkspaceStore> | undefined;
-  if (!state) return state as unknown as WorkspaceStore;
-
-  let migrated: Partial<WorkspaceStore> = state;
-  if (version >= 6) {
-    migrated = state;
-  } else if (version >= 5) {
-    migrated = { ...state, closedItems: migrateClosedWorkspaceItems(state.closedItems) };
-  } else if (version >= 4) {
-    migrated = {
-      ...state,
-      closedItems: migrateClosedWorkspaceItems(state.closedItems),
-      closedWindowsByScope: {},
-    };
-  } else {
-    const layoutsByScope = Object.fromEntries(
-      Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
-        scope,
-        layout
-          ? normalizeWorkspaceLayout(
-              migrateRetiredWorkspaceViews(layout),
-              scope as WorkspaceScopeKey,
-            )
-          : layout,
-      ]),
-    ) as WorkspaceStore["layoutsByScope"];
-    const activeScopeKey = state.activeScopeKey ?? "global";
-    const activeLayout = normalizeWorkspaceLayout(
-      migrateRetiredWorkspaceViews(
-        state.layout ?? layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(),
-      ),
-      activeScopeKey,
-    );
-    layoutsByScope[activeScopeKey] = activeLayout;
-    const virtualWindowsByScope = Object.fromEntries(
-      Object.entries(layoutsByScope).flatMap(([scope, layout]) =>
-        layout
-          ? [[scope, [createWorkspaceWindow(layout, undefined, scope as WorkspaceScopeKey)]]]
-          : [],
-      ),
-    ) as WorkspaceStore["windowsByScope"];
-    const activeVirtualWindowIdByScope = Object.fromEntries(
-      Object.entries(virtualWindowsByScope).map(([scope, windows]) => [scope, windows?.[0]?.id]),
-    ) as WorkspaceStore["activeWindowIdByScope"];
-    migrated = {
-      ...state,
-      activeScopeKey,
-      layout: activeLayout,
-      layoutsByScope,
-      windowsByScope: virtualWindowsByScope,
-      activeWindowIdByScope: activeVirtualWindowIdByScope,
-      activeWindowId: activeVirtualWindowIdByScope[activeScopeKey]!,
-      closedItems: migrateClosedWorkspaceItems(state.closedItems),
-      closedWindowsByScope: {},
-    };
-  }
+  const upgraded = upgradeWorkspaceShape(persisted) as Partial<WorkspaceStore> | undefined;
+  if (!upgraded) return upgraded as unknown as WorkspaceStore;
+  const state = dropVirtualWindows(upgraded);
+  const migrated: Partial<WorkspaceStore> = {
+    ...state,
+    closedItems: migrateClosedWorkspaceItems(state.closedItems),
+  };
+  void version;
 
   return {
     ...initialBookmarkNavigation(),
@@ -113,7 +114,7 @@ function validBrowserProfiles(value: unknown): BrowserProfile[] {
 }
 
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
-  const activeScopeKey = state.activeScopeKey ?? "global";
+  const activeScopeKey = state.activeScopeKey ?? windowSpaceScope();
   const migrateLayout = (layout: WorkspaceLayout, scopeKey: WorkspaceScopeKey) => {
     const migrated = normalizeWorkspaceLayout(
       migrateRetiredWorkspaceViews(layout, scopeKey),
@@ -135,35 +136,18 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
     const tabs = layoutTabs(migrated).map((tab) => ({ ...tab, root: history(tab.root) }));
     return activateTab({ ...migrated, tabs }, migrated.activeTabId ?? tabs[0].id);
   };
-  const migrateWindows = (windows: WorkspaceWindow[] | undefined, scopeKey: WorkspaceScopeKey) =>
-    windows?.map((window) => ({ ...window, layout: migrateLayout(window.layout, scopeKey) }));
-
   const layoutsByScope = Object.fromEntries(
     Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
       scope,
       layout ? migrateLayout(layout, scope as WorkspaceScopeKey) : layout,
     ]),
   ) as WorkspaceStore["layoutsByScope"];
-  const virtualWindowsByScope = Object.fromEntries(
-    Object.entries(state.windowsByScope ?? {}).map(([scope, windows]) => [
-      scope,
-      migrateWindows(windows, scope as WorkspaceScopeKey),
-    ]),
-  ) as WorkspaceStore["windowsByScope"];
-  const closedVirtualWindowsByScope = Object.fromEntries(
-    Object.entries(state.closedWindowsByScope ?? {}).map(([scope, windows]) => [
-      scope,
-      migrateWindows(windows, scope as WorkspaceScopeKey),
-    ]),
-  ) as WorkspaceStore["closedWindowsByScope"];
 
   return {
     ...state,
     activeScopeKey,
     layout: state.layout ? migrateLayout(state.layout, activeScopeKey) : state.layout,
     layoutsByScope,
-    windowsByScope: virtualWindowsByScope,
-    closedWindowsByScope: closedVirtualWindowsByScope,
     closedItems: migrateClosedWorkspaceItems(state.closedItems).map((closed) => ({
       ...closed,
       view: migrateRetiredWorkspaceView(closed.view, activeScopeKey),
@@ -186,18 +170,7 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
 }
 
 export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceStore> {
-  // Private tabs are never written anywhere with their pages or titles.
-  const scrubbed = mapAllWorkspaceWindowViews(state, scrubPrivateView);
-  const closedVirtualWindowsByScope = Object.fromEntries(
-    Object.entries(state.closedWindowsByScope).map(([scope, windows]) => [
-      scope,
-      windows?.map((window) => ({
-        ...window,
-        layout: mapLayoutViews(window.layout, scrubPrivateView),
-      })),
-    ]),
-  ) as WorkspaceStore["closedWindowsByScope"];
-  state = { ...state, ...scrubbed, closedWindowsByScope: closedVirtualWindowsByScope };
+  // An incognito window never saves; the recovery writer doesn't run there either.
   return {
     tabGroups: state.tabGroups.map((g) => ({
       ...g,
@@ -212,11 +185,9 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
     activeScopeKey: state.activeScopeKey,
     layout: state.layout,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: state.layout },
-    windowsByScope: state.windowsByScope,
-    activeWindowIdByScope: state.activeWindowIdByScope,
     activeWindowId: state.activeWindowId,
+    dockingLayout: state.dockingLayout,
     lastUsedViewByGroup: state.lastUsedViewByGroup,
-    closedItems: state.closedItems.filter((closed) => !isPrivateBrowserView(closed.view)),
-    closedWindowsByScope: state.closedWindowsByScope,
+    closedItems: state.closedItems,
   };
 }

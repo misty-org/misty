@@ -141,7 +141,7 @@ pub(in crate::infra) async fn browser_profile_lease(
     }
     if let (Some(app), Some(active)) = (app, current.as_ref()) {
         if active.credential_issue != previous_issue {
-            let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
+            let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
         }
     }
     trace_lease(started, "lease ready");

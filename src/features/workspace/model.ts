@@ -14,7 +14,9 @@ export type WorkspaceSurfaceId = "space" | "browser" | "agents" | "scheduled" | 
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 type WorkspaceInstancePolicy = "multiple" | "single";
-export type WorkspaceScopeKey = "global" | `space:${string}` | `profile:${string}`;
+/** A Space window's own layout (`space:<id>`, or `space:personal` for the personal Space),
+ * or a device profile's until those become Spaces. */
+export type WorkspaceScopeKey = `space:${string}` | `profile:${string}`;
 type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;
@@ -28,8 +30,6 @@ export interface BrowserViewState {
   profileId?: string;
   /** Saved website used to open this tab, independent of its current URL. */
   bookmarkId?: string;
-  /** A private tab: throwaway website data, no history, never saved or synced. */
-  private?: true;
 }
 
 export function createBrowserViewState(url = browserHomeUrl()): BrowserViewState {
@@ -62,7 +62,6 @@ export function parseBrowserViewState(value: unknown): BrowserViewState {
       typeof bookmarkId === "string" && /^[A-Za-z0-9:_.-]{1,200}$/.test(bookmarkId)
         ? bookmarkId
         : undefined,
-    private: candidate.private === true || undefined,
   };
 }
 
@@ -187,8 +186,9 @@ export interface WorkspaceTab {
   focusedPaneId: string;
 }
 
+/** An OS window of one Space, as the sync tree stores it (window → tab → pane → view). */
 export interface WorkspaceWindow {
-  /** The color that tints this window's chrome; unset on windows made before colors. */
+  /** The Space's color, which tints the window's chrome. */
   color?: WindowColor;
   dockingLayout?: DockingLayout;
   id: string;

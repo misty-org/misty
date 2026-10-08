@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { AppWindow, LayoutPanelLeft, PanelBottomDashed, PanelRightDashed, X } from "lucide-react";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { invokeShortcutCommand } from "@/features/shortcuts/runtime";
@@ -20,9 +19,6 @@ import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 export function BrowserPaneLayoutMenu({ tabId }: { tabId: string }) {
   const { open, onOpenChange } = useBrowserOverlayControl(`pane-layout:${tabId}`);
   const windows = useWindowMenuSlot();
-  const anchor = useRef<HTMLSpanElement | null>(null);
-  const registerAnchor = windows?.registerAnchor;
-  useEffect(() => registerAnchor?.(anchor.current), [registerAnchor]);
   const paneCount = useWorkspaceStore((state) => dockLeaves(state.layout.root).length);
   // The menu closes first, then the command runs on the pane this tab is in.
   const run = (commandId: string) => {
@@ -34,14 +30,12 @@ export function BrowserPaneLayoutMenu({ tabId }: { tabId: string }) {
     <>
       {windows?.dialog}
       <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
-        <span ref={anchor} className="inline-flex">
-          <MenuTrigger
-            iconOnly
-            label="Pane layout"
-            title="Pane layout"
-            icon={<LayoutPanelLeft {...browserToolbarStyles.roundIcon} />}
-          />
-        </span>
+        <MenuTrigger
+          iconOnly
+          label="Pane layout"
+          title="Pane layout"
+          icon={<LayoutPanelLeft {...browserToolbarStyles.roundIcon} />}
+        />
         <DropdownMenuContent align="start">
           <MenuItem
             icon={<PanelRightDashed />}
@@ -67,7 +61,7 @@ export function BrowserPaneLayoutMenu({ tabId }: { tabId: string }) {
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <AppWindow className="size-4" />
-                  <span className="min-w-0 flex-1 truncate">Virtual windows</span>
+                  <span className="min-w-0 flex-1 truncate">Spaces</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-60 max-w-[calc(100vw-16px)]">
                   {windows.items}

@@ -106,7 +106,7 @@ extern "C" fn event(pointer: *const c_char) {
                     let _ = view.close();
                 }
             }
-            let _ = app.emit_to("main", "misty://extensions", value);
+            let _ = crate::infra::space_windows::emit(&app, "misty://extensions", value);
         });
     } else {
         if value["kind"] == "runtime-error" {
@@ -131,7 +131,7 @@ extern "C" fn event(pointer: *const c_char) {
                 }
             });
         }
-        let _ = app.emit_to("main", "misty://extensions", value);
+        let _ = crate::infra::space_windows::emit(&app, "misty://extensions", value);
     }
 }
 
@@ -229,12 +229,12 @@ pub async fn configuration(
             let mtm = MainThreadMarker::new()
                 .ok_or("Extension configuration requires the main thread.")?;
             let config = unsafe { WKWebViewConfiguration::new(mtm) };
-            let store = if private {
-                wry::extension_private_data_store(mtm)
-            } else {
-                unsafe {
-                    WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(profile), mtm)
-                }
+            // Incognito windows have no extension host; their pages never get here.
+            if private {
+                return Err("Extensions don't run in incognito windows.".to_owned());
+            }
+            let store = unsafe {
+                WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(profile), mtm)
             };
             unsafe {
                 config.setWebsiteDataStore(&store);
@@ -258,7 +258,7 @@ pub async fn configuration(
 }
 
 pub fn trusted(view: &tauri::Webview) -> Result<(), String> {
-    if view.label() == "main" {
+    if crate::infra::space_windows::is_space_window(view.label()) {
         Ok(())
     } else {
         Err("Only the Misty workspace can manage extensions.".into())

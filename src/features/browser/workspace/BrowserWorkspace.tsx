@@ -56,6 +56,7 @@ import { useBrowserReadingTools } from "./useBrowserReadingTools";
 import { useHiddenToolbarButtons } from "@/features/settings/browserToolbarButtons";
 import { profileDataIdForView } from "@/features/workspace/browserProfiles";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
@@ -217,7 +218,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   const badges = (
     <>
-      {state.private ? (
+      {isIncognitoWindow() ? (
         <span
           className={cn(
             "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
@@ -331,7 +332,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   const sidebarTop = (
     <div className={browserToolbarStyles.sidebarTop} data-browser-toolbar data-sidebar>
-      {state.private || state.agentOwned ? (
+      {isIncognitoWindow() || state.agentOwned ? (
         <div className="flex items-center gap-1" data-misty-window-drag-block="true">
           {badges}
         </div>

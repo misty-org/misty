@@ -11,9 +11,8 @@ import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationN
 import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { useWindowDockingLayout } from "@/features/workspace";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { windowChromeBackground } from "@/features/workspace/windowColors";
-import { useWindowColorRequest } from "./windowColorRequest";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
@@ -119,23 +118,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     shouldShowWindowsControls,
     appZoom,
   });
-  // The color being tried in the picker shows live, before it is kept.
-  const activeWindowId = useWorkspaceStore((state) => state.activeWindowId);
-  // Editing another window leaves this one's chrome alone.
-  const windowColorPreview = useWindowColorRequest((state) =>
-    state.request?.kind === "edit" && state.request.windowId !== activeWindowId
-      ? null
-      : state.preview,
+  // The window takes its Space's color, which tints everything around the content region.
+  const windowChrome = useSpaceWindowStore((state) =>
+    windowChromeBackground(state.space?.color),
   );
-  const windowChrome = useWorkspaceStore((state) =>
-    windowChromeBackground(
-      windowColorPreview ??
-        (state.windowsByScope[state.activeScopeKey] ?? []).find(
-          (item) => item.id === state.activeWindowId,
-        )?.color,
-    ),
-  );
-  // The window's color tints everything around the content region.
   useEffect(() => {
     const shell = shellRef.current;
     if (windowChrome && !isAuthRoute)

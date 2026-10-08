@@ -44,7 +44,7 @@ fn apply(app: &AppHandle, present: bool) {
             let _: () = msg_send![shared, activateIgnoringOtherApps: YES];
         }
     }
-    if let Some(main) = app.get_window("main") {
+    if let Some(main) = crate::infra::space_windows::primary(app) {
         let _ = main.unminimize();
         let _ = main.show();
         let _ = main.set_focus();

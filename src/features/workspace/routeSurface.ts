@@ -3,6 +3,7 @@ import {
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
 } from "./model";
+import { windowSpaceScope } from "./spaceWindow";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
   const path = pathname.split(/[?#]/)[0];
@@ -26,7 +27,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         "agents",
         "single",
       ),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
     };
   }
   if (path === "/spaces" || path.startsWith("/spaces/")) {
@@ -53,7 +54,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         spaceId ? `${spaceId}:${tool}` : "spaces",
         "single",
       ),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
     };
   }
   if (path === "/agents" || path === "/apps/agents")
@@ -66,7 +67,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         "agents",
         "single",
       ),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
     };
   if (
     ["/", "/new", "/browser", "/apps/browser"].includes(path) ||
@@ -76,7 +77,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     const url = new URL(pathname, "https://misty.local").searchParams.get("url");
     return {
       ...request("browser", "tool:browser", "Browser", "/browser", undefined, "multiple"),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
       state: createBrowserViewState(url ?? undefined),
     };
   }

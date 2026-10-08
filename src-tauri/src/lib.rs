@@ -144,18 +144,18 @@ pub fn run() {
         if !mac_rounded_corners::main_window_ready() {
             return;
         }
-        if let Some(window) = app
-            .get_webview_window("main")
-            .or_else(|| app.webview_windows().into_values().next())
-        {
+        if let Some(window) = infra::space_windows::primary(app) {
             let _ = window.show();
             let _ = window.unminimize();
             let _ = window.set_focus();
+        } else {
+            let _ = infra::space_windows::restore(app);
         }
-        // Links opened while Misty runs, as the default browser.
+        // Links opened while Misty runs, as the default browser, go to the last
+        // focused Space window.
         let urls = infra::default_browser::web_urls(args.iter().skip(1));
         if !urls.is_empty() {
-            let _ = app.emit("deep-link://new-url", urls);
+            infra::space_windows::emit_to_primary(app, "deep-link://new-url", urls);
         }
     }));
 
@@ -210,15 +210,6 @@ pub fn run() {
                     handle.exit(if passed { 0 } else { 1 });
                 });
             }
-            #[cfg(all(desktop, debug_assertions))]
-            if let Ok(profile) =
-                std::env::var("MISTY_DESKTOP_PROFILE").or_else(|_| std::env::var("MISTY_PROFILE"))
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_title(&profile)?;
-                }
-            }
-
             // Runs only in the primary instance, before any service opens a
             // file under ~/.misty. Services still create what they need, so a
             // failure here is reported rather than blocking launch.
@@ -275,10 +266,8 @@ pub fn run() {
             infra::devices::start_device_change_listener(app.handle().clone());
             #[cfg(windows)]
             infra::misty_context_windows::start_foreground_watch();
-            #[cfg(windows)]
-            if let Some(main) = app.get_webview("main") {
-                infra::browser_process_ended::watch_page_process(&main);
-            }
+            #[cfg(desktop)] // Every window belongs to a Space: reopen those open at quit.
+            infra::space_windows::restore(app.handle())?;
             Ok(())
         });
 
@@ -295,10 +284,12 @@ pub fn run() {
     builder
         .on_window_event(|_window, _event| {
             platform::app_lifecycle::window_event(_window, _event);
+            #[cfg(desktop)]
+            infra::space_windows::window_event(_window, _event);
             #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 let (window, event) = (_window, _event);
-                if window.label() != "main" {
+                if !crate::infra::space_windows::is_app_window(window.label()) {
                     return;
                 }
 
@@ -309,7 +300,7 @@ pub fn run() {
                 let Some(webview) = window
                     .webviews()
                     .into_iter()
-                    .find(|webview| webview.label() == "main")
+                    .find(|webview| webview.label() == window.label())
                 else {
                     return;
                 };
@@ -643,6 +634,15 @@ pub fn run() {
                     browser_webview_reader_article,
                     #[cfg(desktop)]
                     browser_device_profile_delete,
+                    crate::infra::space_windows::space_window_info,
+                    crate::infra::space_windows::space_windows_set_spaces,
+                    crate::infra::space_windows::space_window_open,
+                    crate::infra::space_windows::space_incognito_open,
+                    crate::infra::space_windows::space_window_set_color,
+                    crate::infra::space_windows::space_window_close,
+                    crate::infra::space_windows::space_windows_menu,
+                    crate::infra::space_windows::space_window_link_target,
+                    crate::infra::space_windows::space_window_remove,
                     #[cfg(desktop)]
                     browser_set_mouse_gestures,
                     #[cfg(desktop)]

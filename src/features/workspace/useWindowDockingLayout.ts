@@ -6,14 +6,9 @@ import {
 } from "@/features/app-shell/dockingLayout";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
-/** Keep the shell and Settings on the same window, including after a scope switch. */
+/** Keep the shell and Settings on this window's layout, including after a scope switch. */
 export function useWindowDockingLayout() {
-  const layout = useWorkspaceStore(
-    (state) =>
-      state.windowsByScope[state.activeScopeKey]?.find(
-        (window) => window.id === state.activeWindowId,
-      )?.dockingLayout,
-  );
+  const layout = useWorkspaceStore((state) => state.dockingLayout);
   const initialLayout = useDockingLayoutStore((state) => state.initialLayout);
   const chosen = validDockingLayout(layout) ? layout : initialLayout;
   return useMemo(

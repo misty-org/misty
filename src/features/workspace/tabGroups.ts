@@ -2,11 +2,11 @@ import { dockTreeViews } from "./dockTree";
 import { emptyTab, layoutTabs, activateTab, singleViewTab } from "./layoutTabs";
 import type { WorkspaceTab, WorkspaceScopeKey, WorkspaceView } from "./model";
 import { createBrowserViewState } from "./model";
-import { isPrivateBrowserView } from "./privateBrowsing";
 import { createBlankWorkspaceView } from "./workspaceDefaultView";
 import { canCloseWorkspaceView } from "./workspaceViewOperations";
 import { withActiveWindowLayout } from "./windows";
 import type { WorkspaceStore } from "./useWorkspaceStore";
+import { isIncognitoWindow, windowSpaceScope } from "./spaceWindow";
 
 export const tabGroupColors = {
   gray: "#a6a6ad",
@@ -45,7 +45,6 @@ export interface TabGroupActions {
   reopenTabGroup(id: string): WorkspaceView | null;
   deleteSavedTabGroup(id: string): void;
   newTabInGroup(id: string): WorkspaceView | null;
-  moveTabGroupToNewWindow(id: string): WorkspaceView | null;
   moveTabGroupItem(id: string, target: string, after: boolean): void;
 }
 export const initialTabGroups = (): TabGroupState => ({ tabGroups: [], migratedTabGroupIds: [] });
@@ -80,9 +79,9 @@ export function migrateSavedLinkGroups(
       name: folder.fields.label,
       color: "blue",
       collapsed: false,
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
       savedTabs: sites.map((site) => {
-        const tab = createBlankWorkspaceView("global");
+        const tab = createBlankWorkspaceView(windowSpaceScope());
         const view = {
           ...tab,
           id: `saved:${site.id}`,
@@ -96,10 +95,10 @@ export function migrateSavedLinkGroups(
   }
   return { tabGroups, migratedTabGroupIds: [...migrated] };
 }
-/** Never persist private pages or private history through a saved group. */
+/** An incognito window never saves its pages or history through a group. */
 export const savableGroupTabs = (tabs: WorkspaceTab[]) =>
   tabs
-    .filter((t) => !dockTreeViews(t.root).some(isPrivateBrowserView))
+    .filter(() => !isIncognitoWindow())
     .map((t) => ({
       ...t,
       root: stripHistory(t.root),
@@ -235,13 +234,10 @@ export function tabGroupActions(
       let state = get();
       const group = state.tabGroups.find((g) => g.id === id);
       if (!group || group.scopeKey !== state.activeScopeKey) return null;
-      const owner = (state.windowsByScope[state.activeScopeKey] ?? []).find((w) =>
-        layoutTabs(w.layout).some((t) => t.tabGroupId === id),
-      );
-      if (owner) {
-        state.switchWindow(owner.id);
+      const open = layoutTabs(state.layout).find((t) => t.tabGroupId === id);
+      if (open) {
         update(id, { collapsed: false });
-        return get().selectTab(layoutTabs(owner.layout).find((t) => t.tabGroupId === id)!.id);
+        return get().selectTab(open.id);
       }
       if (!group.savedTabs?.length) return null;
       // Fresh identities avoid collisions with Recently closed and native webviews.
@@ -302,41 +298,6 @@ export function tabGroupActions(
       );
       if (tab) get().addTabToGroup(tab.id, id);
       return view;
-    },
-    moveTabGroupToNewWindow(id) {
-      const state = get(),
-        moving = layoutTabs(state.layout).filter((t) => t.tabGroupId === id);
-      if (!moving.length) return null;
-      // A virtual-window move retains all running view identities and split trees.
-      const sourceId = state.activeWindowId;
-      const remaining = layoutTabs(state.layout).filter((t) => t.tabGroupId !== id);
-      const sourceTabs = remaining.length ? remaining : [emptyTab()];
-      const source = activateTab(
-        { ...state.layout, tabs: sourceTabs },
-        sourceTabs.some((t) => t.id === state.layout.activeTabId)
-          ? state.layout.activeTabId!
-          : sourceTabs[0].id,
-      );
-      state.createWindow();
-      const current = get();
-      const target = activateTab({ ...current.layout, tabs: moving }, moving[0].id);
-      const windows = (current.windowsByScope[current.activeScopeKey] ?? []).map((w) =>
-        w.id === sourceId
-          ? { ...w, layout: source }
-          : w.id === current.activeWindowId
-            ? { ...w, layout: target }
-            : w,
-      );
-      set({
-        layout: target,
-        layoutsByScope: { ...current.layoutsByScope, [current.activeScopeKey]: target },
-        windowsByScope: {
-          ...current.windowsByScope,
-          [current.activeScopeKey]: windows,
-        },
-      });
-      update(id, { collapsed: false });
-      return get().selectTab(moving[0].id);
     },
     moveTabGroupItem(id, target, after) {
       const state = get(),

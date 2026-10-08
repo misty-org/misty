@@ -553,7 +553,7 @@ pub async fn host_webview_capture_region(
     height: f64,
     max_dimension: Option<f64>,
 ) -> Result<serde_json::Value, String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only the Host can capture its view.".into());
     }
     capture_webview_region_sized(

@@ -1,4 +1,5 @@
 import { mapLayoutViews } from "./layoutTabs";
+import { windowSpaceScope } from "./spaceWindow";
 import {
   browserViewTitle,
   createBrowserViewState,
@@ -43,7 +44,7 @@ export function collectUnrestoredViews<T>(restore: () => T): {
  * instead of stopping the rest of the workspace from restoring. */
 export function migrateRetiredWorkspaceView(
   view: WorkspaceView,
-  scopeKey: WorkspaceScopeKey = "global",
+  scopeKey: WorkspaceScopeKey = windowSpaceScope(),
 ): WorkspaceView {
   try {
     return migrateView(view, scopeKey);
@@ -115,7 +116,7 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
 }
 export function migrateRetiredWorkspaceViews(
   layout: WorkspaceLayout,
-  scopeKey: WorkspaceScopeKey = "global",
+  scopeKey: WorkspaceScopeKey = windowSpaceScope(),
 ): WorkspaceLayout {
   return mapLayoutViews(layout, (tab) => migrateRetiredWorkspaceView(tab, scopeKey));
 }

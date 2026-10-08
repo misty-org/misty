@@ -14,8 +14,8 @@ async function page({ label, subframe = false, metadata = true, notification = t
   const window = {
     Notification: notification ? NativeNotification : undefined,
     __TAURI_INTERNALS__: {
-      // External tabs are children of main; the window label must not authorize them.
-      ...(metadata ? { metadata: { currentWindow: { label: 'main' }, currentWebview: { label } } } : {}),
+      // External tabs are children of a Space window; the window label must not authorize them.
+      ...(metadata ? { metadata: { currentWindow: { label: 'space-personal' }, currentWebview: { label } } } : {}),
       invoke: async (command, args) => {
         calls.push({ command, args });
         return command.endsWith('is_permission_granted') ? true : undefined;
@@ -58,14 +58,14 @@ for (const label of [
   }
 }
 
-for (const options of [{ label: 'main', subframe: true }, { metadata: false }]) {
+for (const options of [{ label: 'space-personal', subframe: true }, { metadata: false }]) {
   const result = await page(options);
   assert.deepEqual(result.calls, []);
   assert.equal(result.listeners.length, 0);
   assert.equal(result.window.Notification, result.NativeNotification);
 }
 
-const shell = await page({ label: 'main' });
+const shell = await page({ label: 'space-personal' });
 assert.notEqual(shell.window.Notification, shell.NativeNotification);
 assert.equal(shell.window.Notification.permission, windows ? 'denied' : 'granted');
 assert.equal(shell.event.defaultPrevented, true);

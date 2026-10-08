@@ -7,6 +7,7 @@ import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { Execution } from "../localExecution";
 import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
+import { currentWindowLabel, isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 const words = (text: string) =>
   new Set(
@@ -59,7 +60,7 @@ export function matchingBrowserTab(hint: string): WorkspaceView | undefined {
   let bestScore = 0;
   for (const view of allLayoutViews(useWorkspaceStore.getState().layout)) {
     if (view.surfaceId !== "browser" || !browserRuntimeCreated(view)) continue;
-    if ((view.state as { private?: unknown } | null)?.private === true) continue;
+    if (isIncognitoWindow()) continue;
     const url = (view.state as { url?: unknown } | null)?.url;
     const have = words(`${view.title} ${typeof url === "string" ? url : ""}`);
     const score = [...wanted].filter((word) => have.has(word)).length;
@@ -82,7 +83,7 @@ export function matchingBrowserTab(hint: string): WorkspaceView | undefined {
 export function currentBrowserTab(): WorkspaceView | undefined {
   const view = activeLayoutView(useWorkspaceStore.getState().layout);
   if (!view || view.surfaceId !== "browser" || !browserRuntimeCreated(view)) return undefined;
-  return (view.state as { private?: unknown } | null)?.private === true ? undefined : view;
+  return isIncognitoWindow() ? undefined : view;
 }
 
 /** The tab in front of the user as plain page data for a request, or nothing. */
@@ -158,7 +159,7 @@ export async function companionBrowserContext(
         opaqueRef: scopeId,
         displayName: tab.title || "Current browser tab",
         capabilities: browserTabAgentFileCapabilities,
-        metadata: { app_id: "browser", window_label: "main", normal_tab: true, tab_id: tab.id },
+        metadata: { app_id: "browser", window_label: currentWindowLabel(), normal_tab: true, tab_id: tab.id },
       },
     ],
   };

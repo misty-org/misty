@@ -198,12 +198,38 @@ pub(crate) unsafe fn configure_continuous_live_resize(view: &objc2_app_kit::NSVi
     }
 }
 
+/// Windows whose first frame is ready. Each Space window reveals itself once.
 #[cfg(any(target_os = "macos", windows))]
-static MAIN_WINDOW_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static READY_WINDOWS: std::sync::Mutex<std::collections::BTreeSet<String>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
 
+#[cfg(any(target_os = "macos", windows))]
+fn window_ready(label: &str) -> bool {
+    READY_WINDOWS
+        .lock()
+        .is_ok_and(|ready| ready.contains(label))
+}
+
+#[cfg(any(target_os = "macos", windows))]
+fn mark_ready(label: &str) {
+    if let Ok(mut ready) = READY_WINDOWS.lock() {
+        ready.insert(label.to_owned());
+    }
+}
+
+/// A closed window reveals itself again when its Space reopens.
+pub fn forget_window(label: &str) {
+    #[cfg(any(target_os = "macos", windows))]
+    if let Ok(mut ready) = READY_WINDOWS.lock() {
+        ready.remove(label);
+    }
+    let _ = label;
+}
+
+/// Whether any Misty window has shown its first frame.
 pub fn main_window_ready() -> bool {
     #[cfg(any(target_os = "macos", windows))]
-    return MAIN_WINDOW_READY.load(std::sync::atomic::Ordering::Acquire);
+    return READY_WINDOWS.lock().is_ok_and(|ready| !ready.is_empty());
     #[cfg(not(any(target_os = "macos", windows)))]
     true
 }
@@ -215,7 +241,8 @@ pub fn main_window_ready() -> bool {
 pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
     // The main window can already contain embedded provider views on reload.
     // Command injection as WebviewWindow rejects any multi-webview window.
-    if webview.label() != "main" || main_window_ready() {
+    let label = webview.label().to_owned();
+    if !crate::infra::space_windows::is_app_window(&label) || window_ready(&label) {
         return Ok(());
     }
     #[cfg(target_os = "macos")]
@@ -226,12 +253,12 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
         let (send, receive) = tokio::sync::oneshot::channel();
         webview
             .with_webview(move |webview| unsafe {
-                if !main_window_ready() {
+                if !window_ready(&label) {
                     let ns_window = webview.ns_window() as id;
                     configure_main_renderer_resize(webview.inner() as id);
                     apply_modern_window_style(ns_window, -1.0, 0.0);
                     let _: () = msg_send![ns_window, displayIfNeeded];
-                    MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
+                    mark_ready(&label);
                     ns_window.makeKeyAndOrderFront_(nil);
                 }
                 let _ = send.send(());
@@ -242,7 +269,7 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
     #[cfg(windows)]
     {
         let window = webview.window();
-        MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
+        mark_ready(&label);
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
     }

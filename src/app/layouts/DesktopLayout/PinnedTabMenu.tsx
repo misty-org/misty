@@ -17,6 +17,7 @@ import { parseBrowserViewState, type WorkspaceTab } from "@/features/workspace/m
 import { pinnableTabUrl } from "@/features/workspace/pinnedTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { ContextMenuAction, ContextMenuLabel } from "@/shared/ui";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 /** Pin and favorite actions for the page in a tab's right-click menu. */
 export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
@@ -89,7 +90,7 @@ function FavoriteTabMenu({ tab }: { tab: WorkspaceTab }) {
         onSelect={() => removeFavorite(state.bookmarkId!)}
       />
     );
-  if (state.private || state.agentOwned || !/^https?:/.test(state.url)) return null;
+  if (isIncognitoWindow() || state.agentOwned || !/^https?:/.test(state.url)) return null;
   return (
     <ContextMenuAction
       label="Add to favorites"

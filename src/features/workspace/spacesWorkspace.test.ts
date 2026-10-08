@@ -30,5 +30,5 @@ it("opens Spaces beside a browser and keeps both pane identities while changing 
   expect(after.find((pane) => pane.id === browserPane)?.views).toEqual(
     before.find((pane) => pane.id === browserPane)?.views,
   );
-  expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
+  expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
 });

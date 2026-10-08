@@ -396,9 +396,7 @@ pub use wkwebview::download::{cancel_download, download_progress};
 #[cfg(target_os = "windows")]
 pub use webview2::download::{cancel_download, download_progress};
 #[cfg(target_os = "macos")]
-pub use wkwebview::reset_private_data_store;
-#[cfg(target_os = "macos")]
-pub use wkwebview::extension_private_data_store;
+pub use wkwebview::end_private_session;
 #[cfg(target_os = "macos")]
 pub use wkwebview::navigation::set_native_navigation_interceptor;
 

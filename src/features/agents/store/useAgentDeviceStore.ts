@@ -10,6 +10,7 @@ import { devicesNative, type DevicesView } from "@/native/devices";
 import { secureId } from "@/shared/platform/secureId";
 import type { AgentDevice } from "../model/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
+import { isSpaceWindowLabel } from "@/features/workspace/spaceWindow";
 
 // One device identity (docs/design/devices/BRIEF.md). The device key lives in
 // native code only: this module never sees private key material. It asks the
@@ -46,7 +47,7 @@ export async function deviceAccount(): Promise<{ apiBase: string; accountId: str
 export async function ensureDeviceStarted(): Promise<DevicesView> {
   const account = await deviceAccount();
   const key = JSON.stringify([account.apiBase, account.accountId, readApiSessionGeneration()]);
-  if (getCurrentWindow().label !== "main") {
+  if (!isSpaceWindowLabel(getCurrentWindow().label)) {
     const view = await devicesNative.view(account.accountId);
     if (!view.serverDeviceId) throw new Error("This device isn't registered with Misty yet.");
     return view;

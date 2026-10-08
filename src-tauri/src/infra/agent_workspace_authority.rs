@@ -79,10 +79,17 @@ pub fn authorize_window_task(
     let state = app.state::<AgentWorkspaceState>();
     let inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
     if inner.leases.get(task).is_some_and(|lease| {
-        lease.window == "main" && lease.account == account && lease.expires > Instant::now()
+        crate::infra::space_windows::is_space_window(&lease.window) && lease.account == account && lease.expires > Instant::now()
     }) {
         Ok(())
     } else {
         Err("agent_task_paused".into())
     }
+}
+
+/// The Space window whose renderer holds a task's lease.
+pub fn task_window(app: &tauri::AppHandle, task: &str) -> Option<String> {
+    let state = app.try_state::<AgentWorkspaceState>()?;
+    let inner = state.0.lock().ok()?;
+    inner.leases.get(task).map(|lease| lease.window.clone())
 }

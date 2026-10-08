@@ -5,6 +5,8 @@ pub mod agents;
 pub mod web_fetch;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
+#[cfg(desktop)]
+pub mod space_windows;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;

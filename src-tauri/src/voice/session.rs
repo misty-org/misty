@@ -31,11 +31,11 @@ struct Running {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    (webview.label() == "main").then_some(()).ok_or_else(|| "Main Misty window required.".into())
+    crate::infra::space_windows::is_space_window(webview.label()).then_some(()).ok_or_else(|| "Main Misty window required.".into())
 }
 
 fn emit(app: &AppHandle, turn: u64, phase: &str) {
-    let _ = app.emit_to("main", "misty://dictation", json!({"turn": turn, "phase": phase}));
+    let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://dictation", json!({"turn": turn, "phase": phase}));
 }
 
 fn start_capture(app: &AppHandle, turn: u64, current: Arc<AtomicU64>) -> Result<Capture, String> {
@@ -48,15 +48,14 @@ fn start_capture(app: &AppHandle, turn: u64, current: Arc<AtomicU64>) -> Result<
             if current.load(Ordering::SeqCst) != turn {
                 return;
             }
-            let _ = audio_app.emit_to(
-                "main",
+            let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
                 "misty://dictation-audio",
                 json!({"turn": turn, "startFrame": chunk.start_frame, "power": chunk.power(), "pcm": STANDARD.encode(chunk.to_le_bytes())}),
             );
         },
         move |error| {
             if failed_turn.load(Ordering::SeqCst) == turn {
-                let _ = error_app.emit_to("main", "misty://dictation", json!({"turn": turn, "phase": "error", "message": error.to_string()}));
+                let _ = crate::infra::space_windows::emit_to_primary(&error_app, "misty://dictation", json!({"turn": turn, "phase": "error", "message": error.to_string()}));
             }
         },
     )
@@ -75,7 +74,7 @@ fn act(app: &AppHandle, state: &Running, turn_counter: &Arc<AtomicU64>, action: 
                 }
                 Err(message) => {
                     let _ = state.machine.lock().map(|mut m| m.abort());
-                    let _ = app.emit_to("main", "misty://dictation", json!({"turn": turn, "phase": "error", "message": message}));
+                    let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://dictation", json!({"turn": turn, "phase": "error", "message": message}));
                 }
             }
         }
@@ -104,7 +103,7 @@ fn listen(app: AppHandle, subscription: Subscription, running: Running, turns: A
             Ok(HotkeyEvent::Down) => running.machine.lock().unwrap().key_down(now),
             Ok(HotkeyEvent::Up) => running.machine.lock().unwrap().key_up(now),
             Ok(HotkeyEvent::Error(message)) => {
-                let _ = app.emit_to("main", "misty://dictation", json!({"turn": turns.load(Ordering::SeqCst), "phase": "error", "message": message}));
+                let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://dictation", json!({"turn": turns.load(Ordering::SeqCst), "phase": "error", "message": message}));
                 None
             }
             Ok(_) => None,

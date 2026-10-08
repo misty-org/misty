@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { AppWindow, Check, Plus, SquarePlus, Trash2, Ungroup, X } from "lucide-react";
+import { Check, Plus, SquarePlus, Trash2, Ungroup, X } from "lucide-react";
 import {
   Button,
   ContextMenuAction,
@@ -256,20 +256,6 @@ export function TabGroupEditor({
             >
               <SquarePlus aria-hidden="true" />
               New tab in group
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              justify="start"
-              onClick={() => {
-                save();
-                const tab = useWorkspaceStore.getState().moveTabGroupToNewWindow(id);
-                if (tab) onOpen(tab);
-                onClose();
-              }}
-            >
-              <AppWindow aria-hidden="true" />
-              Move group to new window
             </Button>
             <Button
               type="button"

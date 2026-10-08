@@ -37,14 +37,13 @@ struct Running {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    (webview.label() == "main").then_some(()).ok_or_else(|| "Main Misty window required.".into())
+    crate::infra::space_windows::is_space_window(webview.label()).then_some(()).ok_or_else(|| "Main Misty window required.".into())
 }
 
 fn emit_chunks(app: &AppHandle, session: u64, chunks: Vec<PcmChunk>) {
     for chunk in chunks {
         let channel = if chunk.channel == Channel::Mic { "mic" } else { "system" };
-        let _ = app.emit_to(
-            "main",
+        let _ = crate::infra::space_windows::emit_to_primary(&app,
             "misty://capture-audio",
             json!({"session": session, "channel": channel, "startFrame": chunk.start_frame, "power": chunk.power(), "pcm": STANDARD.encode(chunk.to_le_bytes())}),
         );
@@ -62,8 +61,7 @@ fn open(app: &AppHandle, session: u64, source: AudioSource, router: Arc<Mutex<Du
             emit_chunks(&chunk_app, session, ready);
         },
         move |error| {
-            let _ = failure_app.emit_to(
-                "main",
+            let _ = crate::infra::space_windows::emit_to_primary(&failure_app,
                 "misty://capture-state",
                 json!({"session": session, "channel": if channel == Channel::Mic { "mic" } else { "system" }, "error": error.to_string()}),
             );
@@ -123,7 +121,7 @@ pub fn voice_capture_mute(webview: Webview, app: AppHandle, state: State<'_, Cap
     } else if running.mic.is_none() {
         running.mic = Some(open(&app, running.id, AudioSource::Mic, running.router.clone())?);
     }
-    let _ = app.emit_to("main", "misty://capture-state", json!({"session": running.id, "muted": muted}));
+    let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://capture-state", json!({"session": running.id, "muted": muted}));
     Ok(())
 }
 
@@ -140,7 +138,7 @@ pub fn voice_capture_stop(webview: Webview, app: AppHandle, state: State<'_, Cap
         }
         let rest = running.router.lock().map(|mut r| r.flush()).unwrap_or_default();
         emit_chunks(&app, running.id, rest);
-        let _ = app.emit_to("main", "misty://capture-state", json!({"session": running.id, "stopped": true}));
+        let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://capture-state", json!({"session": running.id, "stopped": true}));
     }
     Ok(())
 }

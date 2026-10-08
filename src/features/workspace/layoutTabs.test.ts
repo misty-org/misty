@@ -121,19 +121,6 @@ describe("window → tabs → panes", () => {
     expect(dockLeaves(state().layout.root).every((pane) => pane.views.length === 1)).toBe(true);
   });
 
-  it("keeps tab collections and background metadata independent between windows", () => {
-    const firstWindow = state().activeWindowId;
-    const first = browser("https://one.example");
-    const second = browser("https://two.example");
-    state().createWindow("Other work");
-    state().updateBrowserView(first.id, { title: "Updated while hidden" });
-    expect(allLayoutViews(state().layout).some((view) => view.id === second.id)).toBe(false);
-    state().focusView(first.id);
-    expect(state().activeWindowId).toBe(firstWindow);
-    expect(activeLayoutView(state().layout)?.title).toBe("Updated while hidden");
-    expect(allLayoutViews(state().layout).some((view) => view.id === second.id)).toBe(true);
-  });
-
   it("round-trips all layouts, selected tabs, and custom labels through persistence and snapshots", () => {
     const first = browser("https://one.example"),
       id = owner(first.id).id;

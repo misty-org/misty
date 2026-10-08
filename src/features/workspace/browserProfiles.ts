@@ -1,7 +1,8 @@
 import { allLayoutViews } from "./layoutTabs";
-import type { WorkspaceScopeKey } from "./model";
+import type { WorkspaceLayout, WorkspaceScopeKey } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { switchWorkspaceScope } from "./windows";
+import { windowSpaceScope } from "./spaceWindow";
 
 /**
  * A browser profile on this device: its own virtual windows and its own
@@ -37,12 +38,12 @@ const initialBrowserProfiles = (): BrowserProfileState => ({ browserProfiles: []
 export interface BrowserProfileStore extends BrowserProfileState, BrowserProfileActions {}
 
 /**
- * The scope `setScope` switches to. "global" means the workspace on screen, so
- * a device profile keeps its own windows; switching profiles goes through
+ * The scope `setScope` switches to. The window's own Space scope means the workspace
+ * on screen, so a device profile keeps its own tabs; switching profiles goes through
  * selectBrowserProfile.
  */
 export function scopeTarget(active: WorkspaceScopeKey, requested: WorkspaceScopeKey) {
-  return requested === "global" && profileIdFromScope(active) ? active : requested;
+  return requested === windowSpaceScope() && profileIdFromScope(active) ? active : requested;
 }
 
 function profileScopeKey(id: string): WorkspaceScopeKey {
@@ -94,17 +95,19 @@ function profileName(value: string): string {
   return name || "Profile";
 }
 
-/** The website-data identity for a view, from the profile whose windows hold it. */
+/** The website-data identity for a view, from the profile whose layout holds it. */
 export function profileDataIdForView(
-  state: Pick<WorkspaceStore, "browserProfiles" | "windowsByScope">,
+  state: Pick<WorkspaceStore, "browserProfiles" | "layoutsByScope" | "layout" | "activeScopeKey">,
   viewId: string,
 ): string | undefined {
-  for (const [scope, windows] of Object.entries(state.windowsByScope)) {
+  const layouts: Partial<Record<string, WorkspaceLayout>> = {
+    ...state.layoutsByScope,
+    [state.activeScopeKey]: state.layout,
+  };
+  for (const [scope, layout] of Object.entries(layouts)) {
     const id = profileIdFromScope(scope);
-    if (!id || !windows) continue;
-    const holds = windows.some((window) =>
-      allLayoutViews(window.layout).some((view) => view.id === viewId),
-    );
+    if (!id || !layout) continue;
+    const holds = allLayoutViews(layout).some((view) => view.id === viewId);
     if (holds) return state.browserProfiles.find((profile) => profile.id === id)?.dataId;
   }
   return undefined;
@@ -160,17 +163,14 @@ function browserProfileActions(
       };
       set({
         browserProfiles: state.browserProfiles.filter((item) => item.id !== id),
-        windowsByScope: without(state.windowsByScope),
         layoutsByScope: without(state.layoutsByScope),
-        activeWindowIdByScope: without(state.activeWindowIdByScope),
-        closedWindowsByScope: without(state.closedWindowsByScope),
       });
       return profile.dataId;
     },
     selectBrowserProfile(id) {
       const state = get();
       if (id && !state.browserProfiles.some((profile) => profile.id === id)) return false;
-      const update = switchWorkspaceScope(state, id ? profileScopeKey(id) : "global");
+      const update = switchWorkspaceScope(state, id ? profileScopeKey(id) : windowSpaceScope());
       if (update) set(update);
       return true;
     },

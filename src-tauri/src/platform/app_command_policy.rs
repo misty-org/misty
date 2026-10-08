@@ -1,6 +1,30 @@
 //! Application commands have no implicit permission to run in content views.
 //! Plugin commands are separately checked by Tauri's per-WebView capabilities.
+use crate::infra::space_windows;
+
+/// What an incognito window may never reach: account data, sync, recovery, history,
+/// memory and agents. Incognito is entirely local and Misty does nothing with it.
+const ACCOUNT_DATA: [&str; 12] = [
+    "agent",
+    "browser_history",
+    "browser_library",
+    "cursor_companion_",
+    "misty_screen",
+    "clipboard_publish",
+    "clipboard_apply_shared",
+    "browser_passwords",
+    "browser_site_data",
+    "voice_",
+    "dictation_",
+    "capture_",
+];
+
 pub fn allows(label: &str, command: &str) -> bool {
+    if space_windows::is_incognito_window(label)
+        && ACCOUNT_DATA.iter().any(|prefix| command.starts_with(prefix))
+    {
+        return false;
+    }
     if command.starts_with("agent_files_")
         || command.starts_with("extensions_")
         || command.starts_with("browser_sync_")
@@ -10,10 +34,10 @@ pub fn allows(label: &str, command: &str) -> bool {
         // Reads other browsers' profiles, sign-ins included.
         || command.starts_with("browser_import_")
     {
-        return label == "main";
+        return space_windows::is_space_window(label);
     }
     match label {
-        "main" => true,
+        _ if space_windows::is_app_window(label) => true,
         _ if label
             .strip_prefix("misty-cursor-")
             .and_then(|id| id.parse::<u32>().ok())
@@ -112,11 +136,13 @@ mod tests {
             "browser_recovery_write",
             "browser_recovery_forget",
         ] {
-            assert!(allows("main", command));
+            assert!(allows("space-personal", command));
             for label in [
                 "browser-a",
                 "misty-agent-01951d32-40ac-7000-8000-000000000001",
-                "main-spoof",
+                "misty-main",
+                "space-personal-spoof",
+                "incognito-personal-1",
             ] {
                 assert!(!allows(label, command));
             }
@@ -171,7 +197,7 @@ mod tests {
 
     #[test]
     fn content_views_cannot_inherit_host_commands() {
-        for label in ["browser-a", "unknown", "main-spoof"] {
+        for label in ["browser-a", "unknown", "misty-main", "space-spoof"] {
             for command in [
                 "code_read_text_file",
                 "terminal_create",

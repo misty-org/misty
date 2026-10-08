@@ -294,7 +294,7 @@ pub(super) async fn capture_current(
         .invalidate_browser_readiness()
         .await
         .map_err(issue)?;
-    let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
+    let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
     Ok(())
 }
 
@@ -457,7 +457,7 @@ pub(super) async fn restore_current(
             });
         }
         if mode == RestoreMode::Explicit {
-            let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
+            let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
         }
         return result
             .map(|_| ())
@@ -500,10 +500,10 @@ pub(super) async fn restore_current(
     if closed_live_views && mode == RestoreMode::Explicit {
         // Reopen only after the write lease is released. The frontend discards
         // old view handles and reconstructs visible panes from its workspace.
-        let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
+        let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
     }
     active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
-    let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
+    let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
     result?;
     Ok(())
 }
@@ -528,7 +528,7 @@ mod tests {
         assert!(check_restore_mode(
             RestoreMode::Background,
             [
-                "main",
+                "space-personal",
                 "misty-browser-capture-one",
                 "misty-browser-storage-one"
             ]

@@ -1,7 +1,8 @@
 import { migrateSavedLinkGroups } from "@/features/workspace/tabGroups";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { layoutTabs, mapLayoutViews } from "@/features/workspace/layoutTabs";
-import { scrubPrivateView } from "@/features/workspace/privateBrowsing";
+import { layoutTabs } from "@/features/workspace/layoutTabs";
+import { currentWindow, spaceLayout } from "@/features/workspace/windows";
+import { windowSpaceScope } from "@/features/workspace/spaceWindow";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { parseBrowserViewState, type WorkspaceWindow } from "@/features/workspace/model";
 import {
@@ -39,12 +40,9 @@ export const workspaceSource: WorkspaceSource = {
   read() {
     const state = useWorkspaceStore.getState();
     return {
-      // Private tabs travel only as placeholders, never with their pages.
-      windows: (state.windowsByScope.global ?? []).map((window) => ({
-        ...window,
-        layout: mapLayoutViews(window.layout, scrubPrivateView),
-      })),
-      activeWindowId: state.activeWindowIdByScope.global ?? "",
+      // This Space window is one window of the sync tree. Incognito windows never sync.
+      windows: [{ ...currentWindow(state), layout: spaceLayout(state) }],
+      activeWindowId: state.activeWindowId,
       folders: state.bookmarkFolders,
       bookmarks: state.bookmarks,
       tabGroups: state.tabGroups,
@@ -55,15 +53,19 @@ export const workspaceSource: WorkspaceSource = {
   },
   write(projected) {
     const state = useWorkspaceStore.getState();
-    const previousTabs = new Map(
-      browserViews(state.windowsByScope.global ?? []).map((tab) => [tab.id, tab]),
-    );
+    const local = [{ ...currentWindow(state), layout: spaceLayout(state) }];
+    const previousTabs = new Map(browserViews(local).map((tab) => [tab.id, tab]));
+    // This window takes its own window from the tree, or the one that was active.
+    const projectedWindow =
+      projected.windows.find((window) => window.id === state.activeWindowId) ??
+      projected.windows.find((window) => window.id === projected.activeWindowId) ??
+      projected.windows[0];
     const windows = retainDeviceState(
-      projected.windows.length ? projected.windows : [emptyWindow()],
-      state.windowsByScope.global ?? [],
+      [projectedWindow ?? emptyWindow()],
+      local,
       projected.tabGroups !== undefined,
     );
-    const active = windows.find((window) => window.id === projected.activeWindowId) ?? windows[0];
+    const active = windows[0];
     // Do not call the legacy normalizer: it creates random Google tabs for empty
     // remote panes, which would be mistaken for local edits and sent back.
     const groupMigration = migrateSavedLinkGroups({
@@ -71,17 +73,17 @@ export const workspaceSource: WorkspaceSource = {
       bookmarkFolders: projected.folders.filter((folder) => folder.fields.icon !== "folder"),
       bookmarks: projected.bookmarks,
     });
-    // While a device profile is showing, its own windows stay on screen; the synced
-    // windows update in the background and appear when the default profile returns.
-    const showing = state.activeScopeKey === "global";
+    // While a device profile is showing, its own tabs stay on screen; the synced
+    // tabs update in the background and appear when the Space's own layout returns.
+    const scope = windowSpaceScope();
+    const showing = state.activeScopeKey === scope;
     useWorkspaceStore.setState({
       ...groupMigration,
       bookmarkFolders: projected.folders,
       bookmarks: projected.bookmarks,
-      ...(showing ? { activeWindowId: active.id, layout: active.layout } : {}),
-      activeWindowIdByScope: { ...state.activeWindowIdByScope, global: active.id },
-      windowsByScope: { ...state.windowsByScope, global: windows },
-      layoutsByScope: { ...state.layoutsByScope, global: active.layout },
+      ...(showing ? { layout: active.layout } : {}),
+      activeWindowId: active.id,
+      layoutsByScope: { ...state.layoutsByScope, [scope]: active.layout },
       // Synced once every device supports it; otherwise each machine keeps its own.
       ...(projected.tabGroups ? { tabGroups: projected.tabGroups } : {}),
     });
@@ -90,7 +92,9 @@ export const workspaceSource: WorkspaceSource = {
       const next = parseBrowserViewState(tab.state);
       if (!previous || parseBrowserViewState(previous.state).url === next.url) continue;
       const stillCurrent = () => {
-        const current = browserViews(useWorkspaceStore.getState().windowsByScope.global ?? []).find(
+        const current = browserViews([
+          { ...active, layout: spaceLayout(useWorkspaceStore.getState()) },
+        ]).find(
           (candidate) => candidate.id === tab.id && candidate.instanceKey === tab.instanceKey,
         );
         if (!current) return false;

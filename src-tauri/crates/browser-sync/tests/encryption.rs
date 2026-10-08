@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use misty_browser_sync::{
     crypto::{generate_sync_secret, DeviceKey, VaultRoot, VaultScope},
     protocol::{DeviceGrant, Envelope, Event, KeyEnvelope, Mutation, MAX_EVENT_BYTES},
@@ -188,5 +189,134 @@ fn shared_rust_go_protocol_fixture_stays_compatible() {
             .connection_proof(&scope, &f.grant.device_id, &f.challenge)
             .unwrap(),
         f.connection_signature
+    );
+}
+
+fn space_scopes() -> (VaultScope, VaultScope) {
+    let personal = scope();
+    let space = VaultScope {
+        vault_id: Uuid::new_v4().to_string(),
+        ..personal.clone()
+    };
+    (personal, space)
+}
+
+#[test]
+fn space_root_opens_with_only_the_personal_root_and_its_own_vault() {
+    let personal_root = VaultRoot::generate();
+    let space_root = VaultRoot::generate();
+    let (personal, space) = space_scopes();
+    let public = space_root.public_key().unwrap();
+    let sealed = personal_root
+        .seal_space_root(&personal, &space, &space_root)
+        .unwrap();
+    let opened = personal_root
+        .open_space_root(&personal, &space, &sealed, &public)
+        .unwrap();
+    assert_eq!(opened.public_key().unwrap(), public);
+
+    // A root sealed for one Space vault never opens as another's.
+    let other_space = VaultScope {
+        vault_id: Uuid::new_v4().to_string(),
+        ..space.clone()
+    };
+    assert!(personal_root
+        .open_space_root(&personal, &other_space, &sealed, &public)
+        .is_err());
+    // Only the personal root it was sealed to opens it, under its own vault and account.
+    assert!(VaultRoot::generate()
+        .open_space_root(&personal, &space, &sealed, &public)
+        .is_err());
+    let moved = VaultScope {
+        vault_id: Uuid::new_v4().to_string(),
+        ..personal.clone()
+    };
+    assert!(personal_root
+        .open_space_root(&moved, &space, &sealed, &public)
+        .is_err());
+    let other_account = |s: &VaultScope| VaultScope {
+        account_id: "other".into(),
+        ..s.clone()
+    };
+    assert!(personal_root
+        .open_space_root(
+            &other_account(&personal),
+            &other_account(&space),
+            &sealed,
+            &public
+        )
+        .is_err());
+    // The opened root must be the vault's root.
+    let replacement = VaultRoot::generate().public_key().unwrap();
+    assert!(personal_root
+        .open_space_root(&personal, &space, &sealed, &replacement)
+        .is_err());
+    let mut tampered = sealed.clone();
+    tampered.nonce = "AAAAAAAAAAAAAAAA".into();
+    assert!(personal_root
+        .open_space_root(&personal, &space, &tampered, &public)
+        .is_err());
+}
+
+#[test]
+fn space_root_is_never_sealed_across_accounts_or_to_itself() {
+    let personal_root = VaultRoot::generate();
+    let space_root = VaultRoot::generate();
+    let (personal, space) = space_scopes();
+    assert!(personal_root
+        .seal_space_root(&personal, &personal, &space_root)
+        .is_err());
+    let elsewhere = VaultScope {
+        account_id: "other".into(),
+        ..space.clone()
+    };
+    assert!(personal_root
+        .seal_space_root(&personal, &elsewhere, &space_root)
+        .is_err());
+    let deployment = VaultScope {
+        deployment: "https://other.example.test".into(),
+        ..space
+    };
+    assert!(personal_root
+        .seal_space_root(&personal, &deployment, &space_root)
+        .is_err());
+}
+
+// A fixed vector: the seal's key derivation and associated data must not drift,
+// or every device would lose every Space vault at once.
+#[test]
+fn space_root_vector() {
+    let personal_root = VaultRoot::from_transfer(
+        &STANDARD
+            .decode("ujKawYH8gLBFC+EKjBiDUx62nmC1GnfxuorHtndGp9c=")
+            .unwrap(),
+        "91yTWU89oT3xzu7MxdiFnw/8ICdDibMcw88Zmgw4VU8=",
+    )
+    .unwrap();
+    let personal = VaultScope {
+        deployment: "https://sync.example.test".into(),
+        account_id: "fixture".into(),
+        vault_id: "6f1c1a52-3b51-4f0e-9a37-2d7c1f0b8e11".into(),
+    };
+    let space = VaultScope {
+        vault_id: "0b5a3e9c-8d4f-4c21-b6e7-5a9d2c1f7e30".into(),
+        ..personal.clone()
+    };
+    let sealed = Envelope {
+        version: 1,
+        nonce: "PFBqzO9tZAZ9cits".into(),
+        ciphertext: "dJgopodGTYLd5x52v6FkXtoEvtaQV9y/DPx6/X4QW3fd14R4U9Pqw1sKpLzN/LW2".into(),
+    };
+    let opened = personal_root
+        .open_space_root(
+            &personal,
+            &space,
+            &sealed,
+            "Ty5PxxOKOPLtzRIA8qV18YdzeIJJs1Nv4zL+W0VOACA=",
+        )
+        .unwrap();
+    assert_eq!(
+        STANDARD.encode(opened.transfer_bytes().as_ref()),
+        "wRKX1PowMqVK7Qbh1aXGN6Dru13uxxeSJZStrl8smG0="
     );
 }

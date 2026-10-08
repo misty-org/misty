@@ -11,7 +11,7 @@ pub(super) fn provider_popup(
 ) -> Option<NewWindowResponse<tauri::Wry>> {
     let _lifecycle = super::super::browser_sync::popup_lifecycle_lease()?;
     let state = app.state::<BrowserSessionState>();
-    let (provider, profile, logical_profile, oauth_callback, origin_space_id) = {
+    let (provider, profile, logical_profile, oauth_callback, origin_space_id, private) = {
         let sessions = state.sessions.lock().ok()?;
         let source = sessions.get(source_id)?;
         let provider = source.profile_provider.clone();
@@ -27,6 +27,7 @@ pub(super) fn provider_popup(
             source.logical_profile_id.clone(),
             source.oauth_callback.clone(),
             source.origin_space_id.clone(),
+            source.private,
         )
     };
     // Do not fall back to a fresh view: it would discard the opener and profile.
@@ -41,6 +42,7 @@ pub(super) fn provider_popup(
             logical_profile,
             oauth_callback,
             origin_space_id,
+            private,
         )
         .unwrap_or(NewWindowResponse::Deny),
     )
@@ -60,6 +62,9 @@ fn create_popup(
         std::time::Instant,
     )>,
     origin_space_id: Option<String>,
+    // An incognito tab's popup shares its session (WebKit hands it the opener's
+    // configuration) and keeps nothing either.
+    private: bool,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
     let state = app.state::<BrowserSessionState>();
     // WebKit's target configuration shares the opener's user-content controller.
@@ -106,12 +111,17 @@ fn create_popup(
         session.provider_id = None;
         session.oauth_callback = oauth_callback;
         session.origin_space_id = origin_space_id;
+        session.private = private;
     }
     let shortcut_token = shortcut_token_for(&state, &id).ok()?;
     let page_app = app.clone();
     let page_id = id.clone();
     let title_app = app.clone();
     let title_id = id.clone();
+    // Until a tab adopts it, the popup sits in a staging window; its events go to
+    // the window of the tab that opened it.
+    let page_owner = source_id.to_owned();
+    let title_owner = source_id.to_owned();
     let download_app = app.clone();
     let download_id = id.clone();
     let download_source = agent_download_source.clone();
@@ -151,7 +161,8 @@ fn create_popup(
                 renderer(webview.window().label()).tracking,
             );
             let _ = webview.eval(browser_status_update_script(&json!({ "loading": started })));
-            let _ = page_app.emit(
+            let _ = page_app.emit_to(
+                browser_owner_label(&page_app, &page_owner).as_str(),
                 "misty://browser-page",
                 BrowserPageEvent {
                     id: page_id.clone(),
@@ -167,7 +178,8 @@ fn create_popup(
         })
         .on_document_title_changed(move |window, title| {
             let _ = window.set_title(&format!("{title} · Misty"));
-            let _ = title_app.emit(
+            let _ = title_app.emit_to(
+                browser_owner_label(&title_app, &title_owner).as_str(),
                 "misty://browser-title",
                 BrowserTitleEvent {
                     id: title_id.clone(),
@@ -213,7 +225,8 @@ fn create_popup(
                 return response;
             }
             if external_url(url.as_str()).is_ok() {
-                let _ = popup_app.emit(
+                let _ = popup_app.emit_to(
+                    browser_owner_label(&popup_app, &popup_id).as_str(),
                     "misty://browser-popup",
                     BrowserPopupEvent {
                         source_id: popup_id.clone(),
@@ -253,7 +266,8 @@ fn create_popup(
     }
     state.pending_popups.lock().ok()?.insert(id.clone());
     if agent_download_source.is_none() {
-        let _ = app.emit(
+        let _ = app.emit_to(
+            browser_owner_label(&app, source_id).as_str(),
             "misty://browser-popup",
             BrowserPopupEvent {
                 source_id: source_id.to_owned(),

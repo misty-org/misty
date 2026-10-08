@@ -192,7 +192,7 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
         }
     }
     if result.is_err() {
-        let _ = app.emit_to("main","misty://extensions",json!({"kind":"sync-status","account":account,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}));
+        let _ = crate::infra::space_windows::emit(&app,"misty://extensions",json!({"kind":"sync-status","account":account,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}));
     }
 }
 
@@ -241,7 +241,7 @@ pub fn start(app: tauri::AppHandle, account: String) {
             }
             for installation in installations {
                 if pass(&app, &account, &installation, &handle).await.is_err() {
-                    let _ = app.emit_to("main","misty://extensions",json!({"kind":"sync-status","account":account,"id":installation.id,"detail":"Extension settings are waiting for sync. Local changes are retained."}));
+                    let _ = crate::infra::space_windows::emit(&app,"misty://extensions",json!({"kind":"sync-status","account":account,"id":installation.id,"detail":"Extension settings are waiting for sync. Local changes are retained."}));
                 }
             }
         }

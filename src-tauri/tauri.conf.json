@@ -13,6 +13,8 @@
     "macOSPrivateApi": true,
     "windows": [
       {
+        "label": "space-personal",
+        "create": false,
         "title": "Misty",
         "width": 1280,
         "height": 820,

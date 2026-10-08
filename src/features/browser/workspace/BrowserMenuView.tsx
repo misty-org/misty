@@ -125,15 +125,15 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
             />
             <Item
               icon={<AppWindow />}
-              label="New window"
-              shortcut="workspace.new_virtual_window"
+              label="Open Space"
+              shortcut="workspace.open_space"
               onSelect={commands.newWindow}
             />
             <Item
               icon={<VenetianMask />}
-              label="New private tab"
-              shortcut="browser.new_private_tab"
-              onSelect={commands.newPrivateView}
+              label="New incognito window"
+              shortcut="workspace.new_incognito_window"
+              onSelect={commands.newIncognitoWindow}
             />
             <DropdownMenuSeparator />
             <BrowserHistoryMenu

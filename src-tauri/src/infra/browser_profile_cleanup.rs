@@ -74,11 +74,23 @@ pub async fn browser_device_profile_delete(
     app: AppHandle,
     profile_id: String,
 ) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only Misty's trusted shell can remove browser profiles.".into());
     }
     if super::super::browser_sync::is_account_browser_profile(&profile_id).await {
         return Err("The account's own browser profile can't be removed.".into());
+    }
+    remove(app, profile_id).await
+}
+
+/// Erases a deleted or left Space's website data. Its windows are already closed;
+/// WebKit holds a store briefly after its last view goes, so this runs a moment later.
+pub(crate) async fn remove_space_data(app: AppHandle, key: String) -> Result<(), String> {
+    let profile_id = crate::infra::space_windows::space_store_identity(&key)
+        .ok_or("The personal Space's data can't be removed.")?;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    if !crate::infra::space_windows::windows_for_space(&app, &key).is_empty() {
+        return Err("The Space was opened again before its data could be removed.".into());
     }
     remove(app, profile_id).await
 }

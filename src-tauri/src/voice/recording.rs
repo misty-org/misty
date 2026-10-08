@@ -58,7 +58,7 @@ pub struct RecordingRequest {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    (webview.label() == "main").then_some(()).ok_or_else(|| "Main Misty window required.".into())
+    crate::infra::space_windows::is_space_window(webview.label()).then_some(()).ok_or_else(|| "Main Misty window required.".into())
 }
 
 fn folder(app: &AppHandle) -> Result<PathBuf, String> {

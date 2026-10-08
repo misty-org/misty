@@ -60,7 +60,8 @@ mod tests {
     #[test]
     fn privileged_views_load_only_the_bundled_app() {
         for label in [
-            "main",
+            "space-personal",
+            "incognito-personal-1",
             "misty-agent-01951d32-40ac-7000-8000-000000000001",
             "misty-cursor-1",
             "misty-bot-pet",
@@ -95,9 +96,9 @@ mod tests {
     #[test]
     fn the_dev_server_is_allowed_only_when_configured() {
         let dev = Some("http://127.0.0.1:5173");
-        assert!(allows("main", &url("http://127.0.0.1:5173/"), dev));
-        assert!(!allows("main", &url("http://127.0.0.1:5174/"), dev));
-        assert!(!allows("main", &url("http://localhost:5173/"), dev));
+        assert!(allows("space-personal", &url("http://127.0.0.1:5173/"), dev));
+        assert!(!allows("space-personal", &url("http://127.0.0.1:5174/"), dev));
+        assert!(!allows("space-personal", &url("http://localhost:5173/"), dev));
     }
 
     #[test]

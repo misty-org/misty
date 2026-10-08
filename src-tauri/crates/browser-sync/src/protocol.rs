@@ -160,6 +160,23 @@ pub struct Vault {
     pub key_envelope: KeyEnvelope,
 }
 
+/// One of the account's vaults, one per Space. The personal vault carries the
+/// password-wrapped `key_envelope`; every other vault a `space_key_envelope`
+/// sealed to the personal root.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpaceVault {
+    pub space_id: String,
+    pub vault_id: String,
+    pub key_epoch: u64,
+    pub head_sequence: u64,
+    pub root_public_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_envelope: Option<KeyEnvelope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space_key_envelope: Option<Envelope>,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Device {
     #[serde(flatten)]

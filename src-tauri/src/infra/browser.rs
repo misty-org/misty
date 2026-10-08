@@ -230,11 +230,12 @@ fn watch_page_focus(webview: &Webview, id: &str) {
 pub(super) fn browser_owner_label(app: &AppHandle, id: &str) -> String {
     app.get_webview(&format!("misty-browser-{id}"))
         .map(|view| view.window().label().to_owned())
-        .unwrap_or_else(|| "main".into())
+        .or_else(|| crate::infra::space_windows::primary_label(app))
+        .unwrap_or_default()
 }
 
-/// Where a tab's site permissions live: its profile's store, or the private
-/// session's. Private tabs share one throwaway session.
+/// Where a tab's site permissions live: its profile's store, or its incognito
+/// session's.
 pub(super) fn session_permission_scope(
     app: &AppHandle,
     id: &str,

@@ -17,18 +17,17 @@ Panes (the parts of a split tab):
 - If the user cannot see the small x, that is expected: tell them to hover over the pane's top-right corner, or use the "Pane layout" menu instead.
 - Closing a pane leaves the tab and its other panes open.
 
-Virtual windows:
-- A virtual window is a separate set of tabs and layouts inside the same app window, for keeping projects apart. They are not Spaces.
-- "Manage virtual windows" (the window icon with a small chevron in the tab strip) opens a menu. It lists browser profiles first, then the virtual windows (click one to switch; hover one for a pencil to edit its name and color or an x to close it; right-click one and choose "Rename" to rename it), then "New" and "Reopen", which opens a list of recently closed windows to bring back.
-- Every virtual window has a color that tints its frame and tabs, so windows are easy to tell apart.
-- To create one: open "Manage virtual windows" and choose "New", or press Cmd+N, then choose its color.
-- Switch with Cmd+` and Cmd+Shift+`, or swipe horizontally with two fingers over the tab strip.
+Windows and Spaces:
+- Every Misty window belongs to one Space, with that Space's own sign-ins and tabs; a Space has one window. Opening another Space opens its own window, as Chrome does with profiles.
+- The window takes its Space's color, which tints its frame and tabs.
+- "Spaces" (the window icon in the pane layout menu) lists the account's Spaces with a checkmark on this window's, then "New incognito window", "Space color" and "Close window". Cmd+Shift+N shows the same list of Spaces.
+- An incognito window (Cmd+Option+N) belongs to its Space and keeps nothing: no history, sign-ins or site data after its Space's last incognito window closes. Agents never see it.
 
 Browser:
 - The toolbar holds "Back", "Forward", the address field ("Search or enter address"), the "Misty" button (the cloud) that opens the Misty panel beside the page, and "Browser menu" (more).
-- "Browser menu" has "New tab", "New window", "New private tab", "Reopen closed tab", "Downloads", "Find…", "Print…", "Translate page", "Reader view", "Share", "More tools", "Extensions", "Help" and "Settings".
+- "Browser menu" has "New tab", "Open Space", "New incognito window", "Reopen closed tab", "Downloads", "Find…", "Print…", "Translate page", "Reader view", "Share", "More tools", "Extensions", "Help" and "Settings".
 - Cmd+T opens a new tab whose page is the search panel; Cmd+L, or clicking the address field, opens the same panel over the current page. Type an address, a search, a question or request for an agent, or the name of any page, Space, section or agent. ! narrows to one place (such as !files, !notes, !tabs or !yt) and @ and a name asks that agent. Enter opens the best guess; Command-Enter opens it beside the page. Cmd+Shift+A searches open tabs.
-- Cmd+D bookmarks the page, Cmd+Y shows history, Cmd+Shift+N opens a private tab.
+- Cmd+D bookmarks the page, Cmd+Y shows history.
 
 Misty panel and Agents:
 - Cmd+Shift+K toggles the agent panel beside the workspace, the quickest way to ask an agent about the current page. Misty is one of the person's agents.

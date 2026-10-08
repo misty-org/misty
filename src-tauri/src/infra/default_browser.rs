@@ -1,3 +1,4 @@
+use tauri::Manager;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -63,7 +64,8 @@ pub fn remember_launch<S: AsRef<str>>(args: impl IntoIterator<Item = S>) {
 /// The web addresses Misty was started with, once.
 #[tauri::command]
 pub fn app_take_launch_urls(webview: tauri::Webview) -> Vec<String> {
-    if webview.label() != "main" {
+    // The last focused Space window takes them; at launch that is the one reopened last.
+    if !crate::infra::space_windows::is_link_target(webview.app_handle(), webview.label()) {
         return Vec::new();
     }
     LAUNCH_URLS

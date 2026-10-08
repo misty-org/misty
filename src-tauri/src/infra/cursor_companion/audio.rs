@@ -33,8 +33,7 @@ impl Recording {
                 );
             },
             move |e| {
-                let _ = app.emit_to(
-                    "main",
+                let _ = crate::infra::space_windows::emit_to_primary(&app,
                     "misty://cursor-error",
                     serde_json::json!({"turn":turn,"error":format!("Microphone stopped: {e}")}),
                 );

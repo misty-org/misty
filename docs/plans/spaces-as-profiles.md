@@ -146,6 +146,20 @@ the second with only the personal root; a non-member can't create one.
 keep every per-vault query keyed by `vault_id`. The Space envelope makes the personal root the one
 key that matters; losing it loses every vault, the same as today.
 
+**Built 2026-10-16.** Migration `20271028100000_sync_vault_per_space.sql`; `store_vaults.go`
+(`BrowserSyncVaults`, `BrowserSyncVaultForSpace`, `BrowserSyncVaultByID`; `CreateBrowserSyncVault`
+takes the Space and `SyncVaultKeys`); `GET`/`POST /sync/vaults`. A Space vault is granted only to a
+device already in the personal vault under the same key. `GET /sync/vault`, `GET /sync/devices`
+(without `vault_id`), device controls and `DeviceVaultRoot` keep meaning the personal vault; the
+socket's welcome frame sends the ticket's vault. Device revoke and rename span every vault. Leaving,
+being removed from or deleting a Space deletes those vault rows in the same transaction (vault data
+is all in Postgres, so no object jobs are involved), and a hard-deleted Space cascades. The sync
+tables have no RLS and the `cloud_bytes` trigger already finds a vault's person by `vault_id`, so
+neither needed changes. Crate: `VaultRoot::seal_space_root` / `open_space_root`, `SpaceVault`,
+`Transport::vaults` / `create_space_vault`. For Phase 2: the crate's `Vault` still requires
+`key_envelope` (`deny_unknown_fields`), so the welcome frame for a Space vault won't parse until it
+accepts `space_key_envelope`.
+
 ## Phase 2. Sync per vault on the desktop
 
 **Goal.** Run one sync session, sign-in capture/restore loop and lease per open Space vault, with one
@@ -240,6 +254,48 @@ two Space windows. Contract gate: no new `"main"` literal under `src-tauri/src` 
 people, each tinted with its Space color; the window menu and virtual-window UI are gone. An
 incognito window in Work starts signed out, stays apart from Personal's incognito windows, and
 forgets everything when the last one closes.
+
+**Built 2026-10-17 (unverified in the Tauri shell).**
+- **Labels.** `infra/space_windows.rs` (with `space_windows/{registry,lifecycle,commands}.rs`)
+  owns `space-<key>` and `incognito-<key>-<n>`. The key is `personal` for the personal Space and the
+  Space id's 32 hex digits otherwise, not the vault id: a window must open before sync is set up,
+  when a Space has no vault yet. No `"main"` literal remains under `src-tauri/src` (contract gate
+  `src/tests/architecture/spaceWindows.contract.test.ts`; git branch fixtures are exempt).
+  Account-wide events go to every Space window (`emit`), what the person acts on (menus, dictation,
+  the cursor agent) to the window used last (`emit_to_focused` / `emit_to_primary`), page events to
+  the tab's own window, and trust checks accept Space windows; incognito windows get the app's
+  commands minus sync, recovery, history, clipboard sharing, voice and agents
+  (`app_command_policy.rs`).
+- **Store from the window.** `browser_create.rs` reads the Space from the calling window (agent
+  windows inherit the Space window that opened them, `space_windows::adopt`). The personal Space
+  keeps the account's vault store through `browser_profile_lease`; every other Space gets
+  `space_store_identity(key)`, a named store hashed from its Space id. When Phase 2 lands, swap that
+  hash for the Space vault's logical profile and registry binding. Device profiles still pass their
+  own store id, only in the personal window, and never another Space's.
+- **Opening Spaces.** One window per Space. The Window menu lists Spaces with checkmarks for open
+  ones, the Dock menu does too (`native/macos/MistySpaceDock.m`; Tauri has no Dock menu), ⌘⇧N pops
+  the same list, ⌘⌥N opens an incognito window and ⌘⇧W closes the window. The open Spaces, their
+  names and colors and the window used last are kept in `~/.misty/space-windows.json`; launch
+  reopens them. Links from other apps go to the last focused Space window.
+- **Frontend.** Virtual windows are gone (`windowsByScope`, `activeWindowIdByScope`,
+  `closedWindowsByScope`, the window menu, color popover, transition, swipe and closed-window
+  history). Each renderer reads its Space from its label (`workspace/spaceWindow.ts`), keeps one
+  layout under `space:<id>` (`space:personal` for the personal Space) and one `activeWindowId` for
+  the sync tree. Device profiles keep their own layouts until Phase 6. The Space menu
+  (`SpaceWindowMenu.tsx`) replaces the window menu: Spaces, New incognito window, Space color,
+  Close window. Each Space window saves its own recovery record; the personal one keeps the old
+  record, so its active virtual window's tabs come back. Until Phase 2 only the personal Space's
+  window syncs.
+- **Incognito.** Vendored wry keeps one non-persistent store per session id (MISTY-PATCH.md); a
+  Space's incognito windows share one, erased when the last closes. Private tabs and the `private`
+  view flag are gone; incognito windows never save, sync, record history or run agents, and have no
+  extension host.
+- **Space deletion.** Deleting or leaving a Space closes its windows, then erases its store a few
+  seconds later through `browser_profile_cleanup.rs`.
+- **Not done.** The Windows incognito session is WebView2 InPrivate in the Space's data folder;
+  site permissions for every incognito session clear together on Windows. Extension events still go
+  to every Space window (Phase 4 gives each Space its own host); new tabs an extension asks for open
+  in the window used last.
 
 **Risks.** The label sweep is wide and easy to get half right: an event still sent to `main` silently
 does nothing. The contract gate catches literals; a grep for `get_webview_window(` catches the rest.

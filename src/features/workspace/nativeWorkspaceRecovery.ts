@@ -17,8 +17,11 @@ import type { WorkspaceStore } from "./useWorkspaceStore";
 import { initialWorkspaceWindow } from "./windows";
 import { collectUnrestoredViews, type UnrestoredView } from "./workspaceMigrations";
 import { SaveRetryBackoff } from "./saveRetryBackoff";
+import { spaceWindow } from "./spaceWindow";
 
-const key = "workspace";
+/** Each Space window saves its own tabs. The personal Space keeps the record from
+ * before Spaces had windows, so its tabs come back. */
+const key = spaceWindow().personal ? "workspace" : `workspace:space:${spaceWindow().key}`;
 const noSaves: RecoverySaveStatus = { pending: [], failed: [] };
 const closedRecoveryState = {
   accountId: null,
@@ -193,11 +196,13 @@ async function restore(accountId: string, generation: number) {
     if (!valid()) return;
     const legacyKey = deploymentStorageKey(`misty:workspace-account:${accountId}`);
     const sources: [string, string][] = [];
-    const accountRaw = localStorage.getItem(legacyKey);
-    const accountBackup = localStorage.getItem(workspaceRecoveryKey(legacyKey));
+    // Only the personal Space's window takes over workspaces saved before Spaces.
+    const legacy = spaceWindow().personal;
+    const accountRaw = legacy ? localStorage.getItem(legacyKey) : null;
+    const accountBackup = legacy ? localStorage.getItem(workspaceRecoveryKey(legacyKey)) : null;
     if (accountRaw !== null) sources.push([legacyKey, accountRaw]);
     if (accountBackup !== null) sources.push([workspaceRecoveryKey(legacyKey), accountBackup]);
-    const candidate = legacyWorkspaceCandidate();
+    const candidate = legacy ? legacyWorkspaceCandidate() : undefined;
     const global = candidate?.owner === accountId ? candidate : undefined;
     if (global && localStorage.getItem(workspaceStoreStorageKey) === global.raw) {
       sources.push([workspaceStoreStorageKey, global.raw]);

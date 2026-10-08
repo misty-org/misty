@@ -23,7 +23,7 @@ it("edits a global agent without requiring a work Space", async () => {
 });
 
 it("omits model and app permission setup for a new global agent", async () => {
-  useWorkspaceStore.setState({ activeScopeKey: "global" });
+  useWorkspaceStore.setState({ activeScopeKey: "space:personal" });
   renderAgentsPage();
   chooseFromSwitcher("New agent");
   fireEvent.click(screen.getByText("Instructions", { selector: "summary" }));

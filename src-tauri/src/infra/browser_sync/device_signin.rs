@@ -394,7 +394,7 @@ fn switch_to(
         .lock()
         .map_err(|_| "Browser profile state is unavailable")? = Some(wanted);
     active.device_browser = Some(browser);
-    let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
+    let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
     Ok(())
 }
 
@@ -461,7 +461,7 @@ async fn load(
         workspace: workspace.into(),
         physical,
     });
-    let _ = app.emit_to("main", "misty:browser-profile-changed", &active.id);
+    let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
     result
 }
 

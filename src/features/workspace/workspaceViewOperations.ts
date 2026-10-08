@@ -1,7 +1,12 @@
 import { useBrowserSyncStore } from "@/features/browser-workspace/store";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { workspaceViewHasUnsavedChanges } from "@/features/workspace/unsavedChanges";
-import type { WorkspaceDockNode, WorkspaceScopeKey, WorkspaceView, WorkspaceWindow } from "./model";
+import type {
+  WorkspaceDockNode,
+  WorkspaceLayout,
+  WorkspaceScopeKey,
+  WorkspaceView,
+} from "./model";
 
 export function removeDockView(
   node: WorkspaceDockNode,
@@ -33,11 +38,10 @@ export function compareViewRecency(a: WorkspaceView, b: WorkspaceView): number {
 }
 
 export function nextWorkspaceFocusTimestamp(
-  windowsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceWindow[]>>,
+  layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>>,
 ): number {
-  const latest = Object.values(windowsByScope)
-    .flatMap((windows) => windows ?? [])
-    .flatMap((window) => allLayoutViews(window.layout))
+  const latest = Object.values(layoutsByScope)
+    .flatMap((layout) => (layout ? allLayoutViews(layout) : []))
     .reduce((maximum, tab) => Math.max(maximum, tab.lastFocusedAt), 0);
   return Math.max(Date.now(), latest + 1);
 }
@@ -87,15 +91,4 @@ export function canCloseWorkspaceView(
     return false;
   }
   return true;
-}
-
-export function canCloseWorkspaceWindow(
-  _workspaceWindow: WorkspaceWindow,
-  scopedWindows: WorkspaceWindow[],
-): boolean {
-  return (
-    scopedWindows.length > 1 &&
-    canCloseWorkspaceView() &&
-    allLayoutViews(_workspaceWindow.layout).every((tab) => canCloseWorkspaceView(tab))
-  );
 }

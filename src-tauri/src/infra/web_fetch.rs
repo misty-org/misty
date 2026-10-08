@@ -28,7 +28,7 @@ pub struct FetchedPage {
 /// Fails with a short code the agent's tool turns into plain words.
 #[tauri::command]
 pub async fn agents_web_fetch(webview: tauri::Webview, url: String) -> Result<FetchedPage, String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("device_grant_invalid".into());
     }
     let _ = rustls::crypto::ring::default_provider().install_default();

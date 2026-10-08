@@ -205,6 +205,7 @@ GET /api/spaces/{spaceID}/notes/{noteID}/assets/{assetID}/download
 GET /api/spaces/{spaceID}/notes/{noteID}/backlinks
 GET /api/sync/devices
 GET /api/sync/vault
+GET /api/sync/vaults
 GET /api/sync/ws
 GET /auth/google
 GET /auth/google/callback
@@ -284,6 +285,7 @@ GET /spaces/{spaceID}/notes/{noteID}/assets/{assetID}/download
 GET /spaces/{spaceID}/notes/{noteID}/backlinks
 GET /sync/devices
 GET /sync/vault
+GET /sync/vaults
 GET /sync/ws
 GET /v1/a2a/push
 GET /v1/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
@@ -384,6 +386,7 @@ GET /v1/spaces/{spaceID}/notes/{noteID}/assets/{assetID}/download
 GET /v1/spaces/{spaceID}/notes/{noteID}/backlinks
 GET /v1/sync/devices
 GET /v1/sync/vault
+GET /v1/sync/vaults
 GET /v1/sync/ws
 PATCH /api/me/agent-goals/{goalID}
 PATCH /api/me/voice/transcripts/{transcriptID}
@@ -547,6 +550,7 @@ POST /api/sync/devices
 POST /api/sync/restore/step
 POST /api/sync/ticket
 POST /api/sync/vault
+POST /api/sync/vaults
 POST /auth/forgot
 POST /auth/google
 POST /auth/google/complete
@@ -654,6 +658,7 @@ POST /sync/devices
 POST /sync/restore/step
 POST /sync/ticket
 POST /sync/vault
+POST /sync/vaults
 POST /v1/a2a/agents/{agentID}/token
 POST /v1/a2a/spaces/{spaceID}/agents/{agentID}
 POST /v1/agent-runs/{runID}/cancel
@@ -766,6 +771,7 @@ POST /v1/sync/devices
 POST /v1/sync/restore/step
 POST /v1/sync/ticket
 POST /v1/sync/vault
+POST /v1/sync/vaults
 PUT /ai/agent-methods/{methodID}
 PUT /ai/agent-methods/{methodID}/schedule
 PUT /ai/inbound-channels/{channel}

@@ -136,7 +136,7 @@ fn emit(account: &str, kind: &str, mut data: Value) {
     data["kind"] = json!(kind);
     data["account"] = json!(account);
     if let Ok(app) = app() {
-        let _ = app.emit_to("main", "misty://extensions", data);
+        let _ = crate::infra::space_windows::emit(&app, "misty://extensions", data);
     }
 }
 

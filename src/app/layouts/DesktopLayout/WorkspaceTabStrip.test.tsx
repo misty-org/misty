@@ -33,13 +33,6 @@ function mount(
       onDockView={vi.fn(() => true)}
       onSplitPane={vi.fn(() => null)}
       onClosePane={vi.fn()}
-      windows={[]}
-      activeWindowId={state.activeWindowId}
-      canReopenWindow={false}
-      onSelectWindow={vi.fn()}
-      onCreateWindow={vi.fn()}
-      onCloseWindow={vi.fn()}
-      onReopenWindow={vi.fn()}
       onResizeSplit={vi.fn()}
       onNewTab={vi.fn()}
       onCloseLayoutTab={vi.fn()}
@@ -55,7 +48,7 @@ it.each(["top", "bottom", "left", "right"] as const)(
     try {
       mount(position, true);
       expect(screen.getByRole("tablist", { name: "Window tabs" })).toBeTruthy();
-      const controls = ["Create split right", "Create split down", "Close pane"].map((name) =>
+      const controls = ["Create split right", "Create split down", "Close pane", "Spaces"].map((name) =>
         screen.getByRole("button", { name }),
       );
       expect(Array.from(slot.querySelectorAll("button"))).toEqual(controls);

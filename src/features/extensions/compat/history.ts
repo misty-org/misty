@@ -1,6 +1,7 @@
 import { browserLibrary, type BrowserHistoryVisit } from "@/features/browser";
 import { allLayoutViews, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { compatObject, compatTime, emitCompatEvent, type CompatHandler } from "./events";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 const day = 24 * 60 * 60 * 1000;
 
@@ -56,14 +57,13 @@ async function visitsBetween(
 function historyAddresses(): Map<string, { url: string; title: string }> {
   const workspace = useWorkspaceStore.getState();
   const addresses = new Map<string, { url: string; title: string }>();
-  for (const window of workspace.windowsByScope[workspace.activeScopeKey] ?? []) {
-    for (const view of allLayoutViews(window.layout)) {
-      if (view.surfaceId !== "browser") continue;
-      const state = parseBrowserViewState(view.state);
-      // History leaves out private tabs and pages agents open for their own work.
-      if (state.private || state.agentOwned || !/^https?:/i.test(state.url ?? "")) continue;
-      addresses.set(view.id, { url: state.url!, title: view.title ?? "" });
-    }
+  // History leaves out incognito windows and pages agents open for their own work.
+  if (isIncognitoWindow()) return addresses;
+  for (const view of allLayoutViews(workspace.layout)) {
+    if (view.surfaceId !== "browser") continue;
+    const state = parseBrowserViewState(view.state);
+    if (state.agentOwned || !/^https?:/i.test(state.url ?? "")) continue;
+    addresses.set(view.id, { url: state.url!, title: view.title ?? "" });
   }
   return addresses;
 }
@@ -72,7 +72,7 @@ function historyAddresses(): Map<string, { url: string; title: string }> {
 export function watchVisits(): () => void {
   let previous = historyAddresses();
   return useWorkspaceStore.subscribe((state, prior) => {
-    if (state.windowsByScope === prior.windowsByScope && state.layout === prior.layout) return;
+    if (state.layout === prior.layout) return;
     const current = historyAddresses();
     // Switching Spaces shows other tabs; it does not visit their pages.
     if (state.activeScopeKey !== prior.activeScopeKey) {

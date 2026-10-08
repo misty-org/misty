@@ -43,30 +43,26 @@ describe("shortcut platform defaults", () => {
     });
   });
 
-  it("uses Vim directions for pane focus and numbered virtual windows", () => {
+  it("uses Vim directions for pane focus", () => {
     expect(shortcutCommandsById.get("workspace.focus_pane_left")?.defaults.macos.primary).toBe(
       "Option+H",
     );
     expect(shortcutCommandsById.get("workspace.focus_pane_down")?.defaults.windows.primary).toBe(
       "Alt+J",
     );
-    expect(shortcutCommandsById.get("workspace.window_1")?.defaults.macos.primary).toBe("Option+1");
-    expect(shortcutCommandsById.get("workspace.window_9")?.defaults.windows.primary).toBe(
-      "Ctrl+Alt+9",
-    );
   });
 
-  it("provides native-style virtual window cycling and reopening", () => {
-    expect(shortcutCommandsById.get("workspace.next_virtual_window")?.defaults.macos.primary).toBe(
-      "Cmd+Grave",
+  it("opens Spaces and incognito windows like Chrome opens profiles", () => {
+    expect(shortcutCommandsById.get("workspace.open_space")?.defaults.macos.primary).toBe(
+      "Cmd+Shift+N",
     );
-    expect(shortcutCommandsById.get("workspace.next_virtual_window")?.defaults.windows).toEqual({
-      primary: "Ctrl+Alt+Grave",
-      alternate: "Ctrl+Shift+PageDown",
-    });
     expect(
-      shortcutCommandsById.get("workspace.reopen_virtual_window")?.defaults.macos.primary,
-    ).toBe("Cmd+Option+Shift+W");
+      shortcutCommandsById.get("workspace.new_incognito_window")?.defaults.macos.primary,
+    ).toBe("Cmd+Option+N");
+    expect(shortcutCommandsById.get("workspace.close_window")?.defaults.windows.primary).toBe(
+      "Ctrl+Shift+W",
+    );
+    expect(shortcutCommandsById.get("workspace.next_virtual_window")).toBeUndefined();
   });
 
   it("never assigns Command/Windows-key defaults on Windows or Linux", () => {

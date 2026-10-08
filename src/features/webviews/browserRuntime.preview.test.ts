@@ -13,7 +13,7 @@ const tab = {
   id: "preview-tab",
   instanceKey: "preview",
   surfaceId: "browser",
-  state: { url: "https://example.test", private: false },
+  state: { url: "https://example.test" },
 } as WorkspaceView;
 const bounds = { width: 800, height: 600 };
 beforeEach(() => {
@@ -55,10 +55,8 @@ it("captures a visible page and clears its snapshot and closes the runtime when 
   });
 });
 
-it("never captures private, hidden, loading, or suspended pages", async () => {
-  const privateTab = { ...tab, state: { ...(tab.state as object), private: true } };
-  const runtime = await setup(privateTab);
-  await runtime.captureBrowserPagePreview(privateTab, bounds, () => true);
+it("never captures hidden, loading, or suspended pages", async () => {
+  const runtime = await setup(tab);
   runtime.useBrowserRuntimeStore.getState().setLoading(tab.id, true);
   await runtime.captureBrowserPagePreview(tab, bounds, () => true);
   runtime.useBrowserRuntimeStore.getState().setLoading(tab.id, false);
@@ -115,12 +113,8 @@ it("prepares unopened tabs offscreen without focusing them", async () => {
   expect(runtime.useBrowserRuntimeStore.getState().previews[tab.id]?.dataUrl).toBe(image.dataUrl);
 });
 
-it("does not warm private tabs or cancelled requests", async () => {
+it("does not warm cancelled requests", async () => {
   const runtime = await import("./browserRuntime");
-  await runtime.prepareBrowserPagePreview(
-    { ...tab, state: { url: "https://example.test", private: true } },
-    () => true,
-  );
   await runtime.prepareBrowserPagePreview(tab, () => false);
   expect(native.invoke).not.toHaveBeenCalled();
 });

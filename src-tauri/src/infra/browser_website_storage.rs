@@ -354,7 +354,7 @@ async fn open_origin(view: &Webview, origin: &str) -> Result<(), String> {
 /// Exercises the real WebKit storage adapter without user cookies or a server.
 #[cfg(all(debug_assertions, target_os = "macos"))]
 pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
-    let owner = app.get_webview("main").ok_or("Missing probe window")?;
+    let owner = crate::infra::space_windows::primary_webview(&app).ok_or("Missing probe window")?;
     async fn assert_background(owner: &Webview) -> Result<(), String> {
         let (send, receive) = tokio::sync::oneshot::channel();
         owner

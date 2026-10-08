@@ -12,8 +12,8 @@ export const cursorStartup = requireDesktopHost()
       })
       .catch(async (error: unknown) => {
         console.error("Companion renderer could not start", error);
-        const { emitTo } = await import("@tauri-apps/api/event");
-        await emitTo("main", "misty://cursor-renderer-error", {
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("misty://cursor-renderer-error", {
           error: "The cursor could not load. Restart Misty after updating the desktop app.",
         });
       })

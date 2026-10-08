@@ -184,16 +184,16 @@ func TestCursorCompanionKeepsOnlyPlausibleMistyControls(t *testing.T) {
 
 func TestCursorCompanionAddsMistyGuideOnlyForMisty(t *testing.T) {
 	other := aiInvocationInput{Mode: "companion", Prompt: "how do I commit in xcode?", DisplayCaptures: []aiDisplayCapture{{Screen: "screen1", Primary: true}}}
-	if strings.Contains(companionSystemPrompt(other, nil), "Manage virtual windows") {
+	if strings.Contains(companionSystemPrompt(other, nil), "New incognito window") {
 		t.Fatal("another app's question received the Misty guide")
 	}
 	shown := other
 	shown.DisplayCaptures = []aiDisplayCapture{{Screen: "screen1", Primary: true, Controls: []aiScreenControl{{Label: "New tab", Role: "button", X: 1, Y: 1, Width: 1, Height: 1}}}}
-	if !strings.Contains(companionSystemPrompt(shown, nil), "Manage virtual windows") {
+	if !strings.Contains(companionSystemPrompt(shown, nil), "New incognito window") {
 		t.Fatal("a turn showing Misty's controls lacks the guide")
 	}
-	named := aiInvocationInput{Mode: "drawer", Prompt: "How do I create a virtual window in Misty?"}
-	if !strings.Contains(aiInvocationSystem(aiSystemPromptInput{body: named, now: time.Now()}), "Manage virtual windows") {
+	named := aiInvocationInput{Mode: "drawer", Prompt: "How do I open an incognito window in Misty?"}
+	if !strings.Contains(aiInvocationSystem(aiSystemPromptInput{body: named, now: time.Now()}), "New incognito window") {
 		t.Fatal("a question naming Misty lacks the guide")
 	}
 }

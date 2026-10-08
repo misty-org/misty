@@ -19,16 +19,17 @@ export function usePlayingViews(): WorkspaceView[] {
   const info = useBrowserMediaStore((state) => state.info);
   const dismissed = useBrowserMediaStore((state) => state.dismissed);
   // The windows object is stable between edits; a fresh map per render is not.
-  const windowsByScope = useWorkspaceStore((state) => state.windowsByScope);
+  const layout = useWorkspaceStore((state) => state.layout);
+  const layoutsByScope = useWorkspaceStore((state) => state.layoutsByScope);
   return useMemo(
     () =>
-      [...workspaceTabsById({ windowsByScope }).values()].filter(
+      [...workspaceTabsById({ layout, layoutsByScope }).values()].filter(
         (view) =>
           view.surfaceId === "browser" &&
           !dismissed[view.id] &&
           (audible[view.id] || paused[view.id] || (heard[view.id] && info[view.id]?.hasMedia)),
       ),
-    [windowsByScope, audible, paused, heard, info, dismissed],
+    [layout, layoutsByScope, audible, paused, heard, info, dismissed],
   );
 }
 

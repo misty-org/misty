@@ -16,6 +16,8 @@ import { isAuthPath } from "@/features/app-shell";
 import { desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
+import { spaceWindow } from "@/features/workspace/spaceWindow";
+import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
 
 const DesktopLayout = lazy(() =>
   import("@/app/layouts/DesktopLayout").then(({ DesktopLayout }) => ({ default: DesktopLayout })),
@@ -28,8 +30,13 @@ export function AppFrameLayout() {
   const isAuthRoute = isAuthPath(location.pathname);
   const isInviteRoute = location.pathname.startsWith("/invite/");
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
+  // An incognito window keeps nothing and never syncs. Until each Space has its own
+  // vault on this device, only the personal Space's window syncs.
+  const { incognito, personal } = spaceWindow();
   const syncAllowed =
-    !nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready);
+    !incognito &&
+    personal &&
+    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready));
 
   // Keep hook order stable as identity changes, and let account transitions
   // finish before deciding that the user needs to sign in.
@@ -44,6 +51,7 @@ export function AppFrameLayout() {
   if (
     !isAuthRoute &&
     user &&
+    !incognito &&
     nativeWorkspaceRecoveryEnabled() &&
     (recovery.accountId !== user.id || (!recovery.ready && !recovery.usable))
   ) {
@@ -73,7 +81,8 @@ export function AppFrameLayout() {
       <BrowserSyncBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
-      <AgentExecutionSurface />
+      <SpaceWindowBridge />
+      {incognito ? null : <AgentExecutionSurface />}
       <UpdateNotices accountId={user?.id ?? ""} />
       <UnsavedQuitGuard />
       <BrowserSyncSleepOverlay

@@ -147,10 +147,10 @@ pub(crate) fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Str
     if !crate::platform::plugins::mac_rounded_corners::main_window_ready() {
         return Ok(());
     }
-    let window = app
-        .get_webview_window("main")
-        .or_else(|| app.webview_windows().into_values().next())
-        .ok_or_else(|| "Could not find the Misty window.".to_owned())?;
+    let Some(window) = crate::infra::space_windows::primary(app) else {
+        // Every window was closed: reopen the Spaces that were open, or the personal one.
+        return crate::infra::space_windows::restore(app);
+    };
     window
         .show()
         .map_err(|error| format!("Could not show Misty: {error}"))?;

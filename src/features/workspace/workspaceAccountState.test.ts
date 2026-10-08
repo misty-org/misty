@@ -3,6 +3,7 @@ import { workspaceRecoveryKey } from "./workspaceRecoveryStorage";
 import { partialWorkspaceStore } from "./workspaceStorePersistence";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { allLayoutViews } from "./layoutTabs";
 import {
   saveAccountWorkspace,
   restoreAccountWorkspace,
@@ -18,8 +19,9 @@ describe("workspaceAccountState per-account isolation", () => {
   });
 
   it("saves and restores distinct workspace layouts for different accounts", () => {
+    const titles = () =>
+      allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.title);
     // User A sets up their workspace
-    useWorkspaceStore.getState().setScope("space:family");
     useWorkspaceStore.getState().openSurface({
       surfaceId: "browser",
       groupKey: "tool:browser",
@@ -27,58 +29,26 @@ describe("workspaceAccountState per-account isolation", () => {
       route: "/code",
       forceNew: true,
     });
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
 
     // Switch to User B: save A, reset, restore B (which has nothing yet)
     saveAccountWorkspace("user-a");
     resetWorkspaceAccountState();
     restoreAccountWorkspace("user-b");
 
-    // User B should start on a clean "global" scope
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
-
-    // User B sets up their own workspace
-    useWorkspaceStore.getState().setScope("space:matthew-personal");
+    // User B starts in this window's Space with none of A's tabs
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
+    expect(titles()).not.toContain("Code Editor");
     saveAccountWorkspace("user-b");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:matthew-personal");
 
     // Switch back to User A: restore A
     resetWorkspaceAccountState();
     restoreAccountWorkspace("user-a");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
+    expect(titles()).toContain("Code Editor");
 
     // Switch back to User B: restore B
     resetWorkspaceAccountState();
     restoreAccountWorkspace("user-b");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:matthew-personal");
-  });
-
-  it("adoptDefaultScope adopts new scope when current scope is global", () => {
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
-    useWorkspaceStore.getState().adoptDefaultScope("space:default-1");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:default-1");
-  });
-
-  it("adoptDefaultScope recovers from an orphaned scope not in validScopes", () => {
-    // Current user was somehow left on an old user's space "space:family"
-    useWorkspaceStore.getState().setScope("space:family");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
-
-    // The active user only owns "space:personal"
-    const validScopes = new Set(["space:personal"]);
-    useWorkspaceStore.getState().adoptDefaultScope("space:personal", validScopes);
-
-    // It must automatically re-adopt the valid default scope
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
-  });
-
-  it("adoptDefaultScope preserves current scope if it is already valid", () => {
-    useWorkspaceStore.getState().setScope("space:project-x");
-    const validScopes = new Set(["space:project-x", "space:default-1"]);
-    useWorkspaceStore.getState().adoptDefaultScope("space:default-1", validScopes);
-
-    // Should stay on project-x since it is valid for this user
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:project-x");
+    expect(titles()).not.toContain("Code Editor");
   });
 
   it("removeAccountWorkspace purges persisted state for deleted account", () => {
@@ -88,7 +58,7 @@ describe("workspaceAccountState per-account isolation", () => {
 
     resetWorkspaceAccountState();
     restoreAccountWorkspace("deleted-user");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
   });
 });
 
@@ -103,7 +73,7 @@ it("backs up each legacy account before migration and removes its backup on acco
   expect(localStorage.getItem(workspaceRecoveryKey(key))).toBe(raw);
   expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
     version: 17,
-    state: { activeScopeKey: "global" },
+    state: { activeScopeKey: "space:personal" },
   });
   removeAccountWorkspace("legacy-owner");
   expect(localStorage.getItem(key)).toBeNull();

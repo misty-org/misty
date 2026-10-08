@@ -359,8 +359,7 @@ pub async fn extensions_check_updates(
                 _ => {}
             }
         }
-        let _ = app.emit_to(
-            "main",
+        let _ = crate::infra::space_windows::emit(&app,
             "misty://extensions",
             json!({"kind":"changed","account":account}),
         );

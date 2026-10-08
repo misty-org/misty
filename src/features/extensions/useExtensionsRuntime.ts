@@ -18,7 +18,13 @@ import { answerCompatRequest, startCompatEvents } from "./compat/requests";
 import { startNewTabOverride } from "./newTabOverride";
 import type { ExtensionEvent } from "./types";
 import { extensionsNative } from "./native";
-import { closeExtensionPopup, floatExtensionPopup, watchExtensionPopups } from "./extensionPopups";
+import {
+  closeExtensionPopup,
+  extensionWindowIdFor,
+  floatExtensionPopup,
+  watchExtensionPopups,
+} from "./extensionPopups";
+import { isIncognitoWindow, isLinkTargetWindow } from "@/features/workspace/spaceWindow";
 import {
   enqueuePermission,
   finishPermission,
@@ -32,31 +38,57 @@ import {
 let reconcileQueue: Promise<unknown> = Promise.resolve();
 function publishLayout() {
   const workspace = useWorkspaceStore.getState();
-  const windows = workspace.windowsByScope[workspace.activeScopeKey] ?? [];
+  const layout = workspace.layout;
   const media = useBrowserMediaStore.getState();
+  // This window is one extension window; a floating popup counts as a window of its own.
   return extensionsNative.layout(
-    windows.flatMap((window) =>
-      allLayoutPanes(window.layout)
-        .flatMap((pane) =>
-          pane.views
-            .filter((v) => v.surfaceId === "browser")
-            .map((tab) => ({
-              id: browserRuntimeId(tab),
-              windowId: window.id,
-              url: parseBrowserViewState(tab.state).url ?? "about:blank",
-              title: tab.title ?? "Browser",
-              private: parseBrowserViewState(tab.state).private ?? false,
-              active: pane.activeViewId === tab.id && window.layout.focusedPaneId === pane.id,
-              focused:
-                workspace.activeWindowId === window.id && window.layout.focusedPaneId === pane.id,
-              muted: Boolean(media.muted[tab.id]),
-              audible: Boolean(media.audible[tab.id]),
-            })),
-        )
-        .map((tab, index) => ({ ...tab, index })),
-    ),
+    allLayoutPanes(layout)
+      .flatMap((pane) =>
+        pane.views
+          .filter((v) => v.surfaceId === "browser")
+          .map((tab) => ({
+            id: browserRuntimeId(tab),
+            windowId: extensionWindowIdFor(tab.id) ?? workspace.activeWindowId,
+            url: parseBrowserViewState(tab.state).url ?? "about:blank",
+            title: tab.title ?? "Browser",
+            private: isIncognitoWindow(),
+            active: pane.activeViewId === tab.id && layout.focusedPaneId === pane.id,
+            focused: layout.focusedPaneId === pane.id,
+            muted: Boolean(media.muted[tab.id]),
+            audible: Boolean(media.audible[tab.id]),
+          })),
+      )
+      .map((tab, index) => ({ ...tab, index })),
   );
 }
+/** Opens the window or tab an extension asked for, in this Space window. */
+function openFromExtension(event: ExtensionEvent) {
+  const previousView = activeLayoutView(useWorkspaceStore.getState().layout);
+  if (event.kind === "open-window") {
+    const urls = event.urls?.length ? event.urls : ["about:blank"];
+    const created = urls.map((url) => useWorkspaceStore.getState().openBrowserView({ url }));
+    const floating = event.popup && created[0];
+    if (event.focused === false && previousView && !floating)
+      useWorkspaceStore.getState().focusView(previousView.id);
+    if (event.requestId && created[0])
+      void publishLayout()
+        .then(() => extensionsNative.tabCreated(event.requestId!, browserRuntimeId(created[0]!)))
+        .catch(() => {});
+    if (floating) void floatExtensionPopup(created[0]!, event, previousView?.id);
+    return;
+  }
+  if (!event.url) return;
+  const created = useWorkspaceStore.getState().openBrowserView({ url: event.url });
+  if (event.index !== undefined && Number.isSafeInteger(event.index))
+    useWorkspaceStore.getState().reorderView("", created.id, event.index);
+  if (event.focused === false && previousView)
+    useWorkspaceStore.getState().focusView(previousView.id);
+  if (event.requestId)
+    void publishLayout()
+      .then(() => extensionsNative.tabCreated(event.requestId!, browserRuntimeId(created)))
+      .catch(() => {});
+}
+
 export function useExtensionsRuntime() {
   const [runtimeGeneration, setRuntimeGeneration] = useState(0);
   const { user } = useAuth();
@@ -119,8 +151,7 @@ export function useExtensionsRuntime() {
     const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
       if (
         state.layout !== previous.layout ||
-        state.activeWindowId !== previous.activeWindowId ||
-        state.windowsByScope !== previous.windowsByScope
+        state.activeWindowId !== previous.activeWindowId
       )
         void publishLayout().catch(() => {});
     });
@@ -178,63 +209,26 @@ export function useExtensionsRuntime() {
       if (event.kind === "sync-status")
         useExtensionsStore.setState({ error: event.detail ?? "Extension sync needs attention." });
       const workspace = useWorkspaceStore.getState();
-      const tab = (workspace.windowsByScope[workspace.activeScopeKey] ?? [])
-        .flatMap((window) => allLayoutViews(window.layout))
-        .find((t) => browserRuntimeId(t) === event.tabId);
-      if (event.kind === "focus-window" && event.windowId) workspace.switchWindow(event.windowId);
+      const tab = allLayoutViews(workspace.layout).find((t) => browserRuntimeId(t) === event.tabId);
+      // Closing an extension's window closes only its floating popup, never a Space window.
       if (event.kind === "close-window" || event.kind === "close-tab")
         closeExtensionPopup({ tabId: event.tabId, windowId: event.windowId });
-      if (event.kind === "close-window" && event.windowId) workspace.closeWindow(event.windowId);
-      if (event.kind === "open-window") {
-        const previousWindow = workspace.activeWindowId;
-        const opened = workspace.createWindow();
-        const urls = event.urls?.length ? event.urls : ["about:blank"];
-        // The first page fills the new window's empty pane rather than opening beside it.
-        const created = urls.map((url, index) =>
-          useWorkspaceStore.getState().openBrowserView({
-            url,
-            private: event.private ?? false,
-            paneId: index === 0 ? useWorkspaceStore.getState().layout.focusedPaneId : undefined,
-          }),
-        );
-        const floating = event.popup && created[0];
-        if (event.focused === false && previousWindow && !floating)
-          useWorkspaceStore.getState().switchWindow(previousWindow);
-        if (event.requestId && created[0])
-          void publishLayout()
-            .then(() =>
-              extensionsNative.tabCreated(event.requestId!, browserRuntimeId(created[0]!)),
-            )
-            .catch(() => {});
-        if (floating) void floatExtensionPopup(created[0]!, opened.id, event, previousWindow);
-      }
-      if (event.kind === "open-tab" && event.url) {
-        const previousView = activeLayoutView(workspace.layout);
-        if (event.windowId) workspace.switchWindow(event.windowId);
-        const created = useWorkspaceStore.getState().openBrowserView({
-          url: event.url,
-          private: event.private ?? false,
+      // A new window or tab the extension asks for opens once, in the window used last.
+      const opening = event.kind === "open-window" || (event.kind === "open-tab" && event.url);
+      if (opening)
+        void isLinkTargetWindow().then((target) => {
+          if (target && !cancelled) openFromExtension(event);
         });
-        if (event.index !== undefined && Number.isSafeInteger(event.index))
-          useWorkspaceStore.getState().reorderView("", created.id, event.index);
-        if (event.focused === false && previousView)
-          useWorkspaceStore.getState().focusView(previousView.id);
-        if (event.requestId)
-          void publishLayout()
-            .then(() => extensionsNative.tabCreated(event.requestId!, browserRuntimeId(created)))
-            .catch(() => {});
-      }
       if (event.kind === "activate-tab" && tab) workspace.focusView(tab.id);
       if (event.kind === "move-tab" && tab && event.index !== undefined)
         workspace.reorderView("", tab.id, event.index);
       if (event.kind === "tab-muted" && tab)
         useBrowserMediaStore.getState().setMutedState(tab.id, Boolean(event.muted));
       if (event.kind === "close-tab" && tab) {
-        const previous = workspace.activeWindowId;
+        const previous = activeLayoutView(workspace.layout);
         workspace.focusView(tab.id);
         useWorkspaceStore.getState().closeView(tab.id);
-        if (previous && useWorkspaceStore.getState().activeWindowId !== previous)
-          useWorkspaceStore.getState().switchWindow(previous);
+        if (previous && previous.id !== tab.id) useWorkspaceStore.getState().focusView(previous.id);
       }
       if ((event.kind === "navigate" || event.kind === "replace-view") && tab && event.url) {
         workspace.updateBrowserView(tab.id, { url: event.url });

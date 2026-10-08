@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { emitTo } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 import { presentationEvent, type Presentation } from "./protocol";
@@ -28,7 +28,7 @@ export function usePresentation() {
       })
       .catch(() => {
         if (active)
-          void emitTo("main", "misty://cursor-renderer-error", {
+          void emit("misty://cursor-renderer-error", {
             error:
               "The cursor could not restore its display state. Restart Misty after updating the desktop app.",
           });

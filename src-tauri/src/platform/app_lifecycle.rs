@@ -19,14 +19,22 @@ struct UnsavedBeforeQuit {
     closing: bool,
 }
 
-fn ask(app: &AppHandle, closing: bool) {
-    let _ = crate::infra::tray::show_main_window(app);
+/// Asks in the closing window, or when quitting in the last focused one.
+fn ask(app: &AppHandle, closing: Option<&str>) {
     let unsaved = crate::infra::workspace_recovery::unsaved_count();
-    let _ = app.emit_to(
-        "main",
-        UNSAVED_BEFORE_QUIT,
-        UnsavedBeforeQuit { unsaved, closing },
-    );
+    let payload = UnsavedBeforeQuit {
+        unsaved,
+        closing: closing.is_some(),
+    };
+    match closing {
+        Some(label) => {
+            let _ = app.emit_to(label, UNSAVED_BEFORE_QUIT, payload);
+        }
+        None => {
+            let _ = crate::infra::tray::show_main_window(app);
+            crate::infra::space_windows::emit_to_primary(app, UNSAVED_BEFORE_QUIT, payload);
+        }
+    }
 }
 
 pub fn run_event(app: &AppHandle, event: RunEvent) {
@@ -39,9 +47,12 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         }
     }
     if let RunEvent::ExitRequested { api, .. } = &event {
-        if must_ask() && app.get_webview_window("main").is_some() {
+        if must_ask() && crate::infra::space_windows::primary(app).is_some() {
             api.prevent_exit();
-            ask(app, false);
+            ask(app, None);
+        } else {
+            // The Spaces open now reopen at the next launch.
+            crate::infra::space_windows::quitting();
         }
     }
     if matches!(event, RunEvent::Exit) {
@@ -55,9 +66,9 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
 /// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if window.label() == "main" && must_ask() {
+        if crate::infra::space_windows::is_space_window(window.label()) && must_ask() {
             api.prevent_close();
-            ask(window.app_handle(), true);
+            ask(window.app_handle(), Some(window.label()));
         }
     }
 }
@@ -70,7 +81,7 @@ pub fn app_quit_confirmed(
     app: AppHandle,
     closing: bool,
 ) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only the main workspace can confirm quitting".into());
     }
     if closing {

@@ -20,7 +20,7 @@ import { browserRuntimeCreated, browserRuntimeId, useBrowserRuntimeStore } from 
 export interface BrowserPageCommands {
   newTab: () => void;
   newWindow: () => void;
-  newPrivateView: () => void;
+  newIncognitoWindow: () => void;
   reopenView: () => void;
   /** Reopens one tab from the recently closed list. */
   reopenClosedTab: (index: number) => void;
@@ -116,14 +116,8 @@ export function useBrowserPageCommands(input: {
 
   const commands: BrowserPageCommands = {
     newTab: () => void invokeShortcutCommand("search.toggle"),
-    newWindow: () => void invokeShortcutCommand("workspace.new_virtual_window"),
-    newPrivateView: () => {
-      const workspace = useWorkspaceStore.getState();
-      const pane = dockLeaves(workspace.layout.root).find((candidate) =>
-        candidate.views.some((item) => item.id === tab.id),
-      );
-      workspace.openBrowserView({ paneId: pane?.id, private: true });
-    },
+    newWindow: () => void invokeShortcutCommand("workspace.open_space"),
+    newIncognitoWindow: () => void invokeShortcutCommand("workspace.new_incognito_window"),
     reopenView: () => void invokeShortcutCommand("workspace.reopen_tab"),
     reopenClosedTab: (index) => {
       // The reopened tab is focused; the canvas then follows it to its route.
@@ -184,7 +178,6 @@ export function useBrowserPageCommands(input: {
     command();
     return true;
   };
-  useShortcutHandler("browser.new_private_tab", run(commands.newPrivateView), focused, 100);
   useShortcutHandler("browser.find", run(commands.find), focused, 100);
   useShortcutHandler("browser.print", run(commands.print), focused, 100);
   useShortcutHandler("browser.picture_in_picture", run(commands.pictureInPicture), focused, 100);

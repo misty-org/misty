@@ -182,7 +182,7 @@ async fn context_menu_copies_through_kiri(app: &AppHandle, url: &Url) -> Result<
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
     let previous = clipboard.get_text().ok();
     let _ = clipboard.set_text("kiri-probe-before");
-    let main = app.get_webview("main").ok_or("Missing main view")?;
+    let main = crate::infra::space_windows::primary_webview(&app).ok_or("Missing main view")?;
     let result = async {
         context_menu::select(app, &main, &key, "copy")?;
         wait_for("copy through kiri::engine::edit", || {
@@ -201,7 +201,7 @@ async fn context_menu_copies_through_kiri(app: &AppHandle, url: &Url) -> Result<
 
 async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), String> {
     use super::super::browser_site_permissions as permissions;
-    let main = app.get_webview("main").ok_or("Missing main view")?;
+    let main = crate::infra::space_windows::primary_webview(&app).ok_or("Missing main view")?;
     let info = serde_json::to_value(
         permissions::browser_site_info(main.clone(), app.clone(), ID.into()).await?,
     )
@@ -329,7 +329,7 @@ async fn authorization_state(app: &AppHandle) -> &'static str {
 pub(crate) async fn run(app: AppHandle) -> bool {
     let mut passed = true;
     let setup = async {
-        wait_for("main window", || app.get_webview("main").is_some()).await?;
+        wait_for("main window", || crate::infra::space_windows::primary_webview(&app).is_some()).await?;
         tokio::time::sleep(Duration::from_secs(3)).await;
         let url = serve()?;
         use sha2::{Digest, Sha256};
@@ -339,7 +339,7 @@ pub(crate) async fn run(app: AppHandle) -> bool {
             "x": 0, "y": 60, "width": 800, "height": 550,
         }))
         .map_err(|error| error.to_string())?;
-        let main = app.get_webview("main").ok_or("Missing main view")?;
+        let main = crate::infra::space_windows::primary_webview(&app).ok_or("Missing main view")?;
         browser_webview_create(main, app.clone(), app.state::<BrowserSessionState>(), request).await?;
         // A cold dev launch can take a while to settle the shell and the tab.
         let mut last = String::new();

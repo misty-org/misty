@@ -34,11 +34,11 @@ pub fn forward(app: &AppHandle, id: &str, session: u64, pcm: Option<String>, not
         _ => return,
     };
     let event = if payload.get("pcm").is_some() { "misty://capture-audio" } else { "misty://capture-state" };
-    let _ = app.emit_to("main", event, payload);
+    let _ = crate::infra::space_windows::emit_to_primary(&app, event, payload);
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    (webview.label() == "main").then_some(()).ok_or_else(|| "Main Misty window required.".into())
+    crate::infra::space_windows::is_space_window(webview.label()).then_some(()).ok_or_else(|| "Main Misty window required.".into())
 }
 
 /// Starts listening to tab `id` and returns the session its audio carries.

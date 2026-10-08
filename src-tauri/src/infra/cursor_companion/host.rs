@@ -55,7 +55,7 @@ pub enum Shortcut {
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Main Misty window required.".into());
     }
     Ok(())
@@ -67,8 +67,7 @@ fn current(state: &CursorCompanionState, turn: u64) -> bool {
     state.enabled.load(Ordering::SeqCst) && state.turn.load(Ordering::SeqCst) == turn
 }
 fn error(app: &AppHandle, turn: u64, message: String) {
-    let _ = app.emit_to(
-        "main",
+    let _ = crate::infra::space_windows::emit_to_primary(&app,
         "misty://cursor-error",
         json!({"turn":turn,"error":message}),
     );
@@ -332,7 +331,7 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
             .lock()
             .map_err(|_| "Companion unavailable")?
             .displays = frames;
-        let _ = app.emit_to("main", "misty://cursor-displays-changed", ());
+        let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://cursor-displays-changed", ());
         Ok(())
     })
     .await
@@ -375,8 +374,7 @@ pub async fn task_visual(app: &AppHandle, task_id: &str) -> Result<Option<Vec<Va
         return Err("Companion interrupted".into());
     }
     // Only the main authenticated controller receives refreshed screenshot data.
-    let _ = app.emit_to(
-        "main",
+    let _ = crate::infra::space_windows::emit_to_primary(&app,
         "misty://cursor-captures",
         json!({"turn":turn,"captures":captures}),
     );
@@ -491,8 +489,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                             let _ = window.hide();
                         }
                     }
-                    let _ = events_app.emit_to(
-                        "main",
+                    let _ = crate::infra::space_windows::emit_to_primary(&events_app,
                         "misty://cursor-shortcut",
                         json!({"turn":turn,"held":held}),
                     );
@@ -520,8 +517,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             if let Some((turn, _, record)) = recording.as_mut() {
                 if let Some((sequence, pcm)) = record.drain() {
                     if current(&audio_state, *turn) {
-                        let _ = audio_app.emit_to(
-                            "main",
+                        let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
                             "misty://cursor-audio",
                             json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
                         );
@@ -539,8 +535,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         continue;
                     }
                     if !audio_state.held.load(Ordering::SeqCst) {
-                        let _ = audio_app.emit_to(
-                            "main",
+                        let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
                             "misty://cursor-recorded",
                             json!({"turn":turn,"durationMs":0}),
                         );
@@ -555,8 +550,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                         Ok(_) => {
                             if current(&audio_state, turn) {
-                                let _ = audio_app.emit_to(
-                                    "main",
+                                let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
                                     "misty://cursor-recorded",
                                     json!({"turn":turn,"durationMs":0}),
                                 );
@@ -579,18 +573,16 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         let (sequence, pcm, duration) = record.finish();
                         if current(&audio_state, turn) {
                             if !pcm.is_empty() {
-                                let _ = audio_app.emit_to("main", "misty://cursor-audio", json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}));
+                                let _ = crate::infra::space_windows::emit_to_primary(&audio_app, "misty://cursor-audio", json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}));
                             }
-                            let _ = audio_app.emit_to(
-                                "main",
+                            let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":duration}),
                             );
                         }
                     } else if let Ok((turn, false)) = event {
                         if current(&audio_state, turn) {
-                            let _ = audio_app.emit_to(
-                                "main",
+                            let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":0}),
                             );

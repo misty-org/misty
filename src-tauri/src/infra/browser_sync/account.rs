@@ -101,7 +101,7 @@ pub async fn browser_sync_lock(
         None
     };
     stop(current.take()).await;
-    let _ = app.emit_to("main", "misty:browser-sync-changed", "");
+    let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
     if forget {
         if let Some(scope) = scope {
             tokio::task::spawn_blocking(move || secure_store::forget(&scope))

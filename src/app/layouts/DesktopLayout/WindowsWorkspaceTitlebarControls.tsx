@@ -1,8 +1,7 @@
-import type { WorkspaceWindow } from "@/features/workspace";
 import type { ReactNode } from "react";
 import { IconButton, PortalToId, OverlaySideProvider } from "@/shared/ui";
 import { PanelBottomDashed, PanelRightDashed } from "lucide-react";
-import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
+import { SpaceWindowMenu } from "./SpaceWindowMenu";
 
 export function WindowsWorkspaceTitlebarControls(props: {
   enabled: boolean;
@@ -11,15 +10,7 @@ export function WindowsWorkspaceTitlebarControls(props: {
   canSplitSideways: boolean;
   canSplitVertically: boolean;
   closePaneControl: ReactNode;
-  windows: WorkspaceWindow[];
-  activeWindowId: string;
-  canReopen: boolean;
-  canCloseWindow: (workspaceWindow: WorkspaceWindow) => boolean;
   onSplitPane: (paneId: string, direction: "right" | "down") => void;
-  onSelectWindow: (windowId: string) => void;
-  onCreateWindow: () => void;
-  onCloseWindow: (windowId: string) => void;
-  onReopenWindow: () => void;
 }) {
   if (!props.enabled || !props.focused) return null;
 
@@ -47,16 +38,7 @@ export function WindowsWorkspaceTitlebarControls(props: {
           <PanelBottomDashed className="size-4" size={16} />
         </IconButton>
         {props.closePaneControl}
-        <WorkspaceWindowMenu
-          windows={props.windows}
-          activeWindowId={props.activeWindowId}
-          canReopen={props.canReopen}
-          canCloseWindow={props.canCloseWindow}
-          onSelect={props.onSelectWindow}
-          onCreate={props.onCreateWindow}
-          onClose={props.onCloseWindow}
-          onReopen={props.onReopenWindow}
-        />
+        <SpaceWindowMenu />
       </OverlaySideProvider>
     </PortalToId>
   );

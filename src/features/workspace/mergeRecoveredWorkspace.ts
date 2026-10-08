@@ -1,8 +1,8 @@
 import type { WorkspaceStore } from "./useWorkspaceStore";
-import type { WorkspaceScopeKey } from "./model";
+import { layoutTabs } from "./layoutTabs";
 import { partialWorkspaceStore } from "./workspaceStorePersistence";
 
-/** Keep the live temporary workspace selected, with restored windows alongside
+/** Keep the live temporary workspace selected, with the restored tabs added beside
  * it. Never replace tabs the user opened while the recovery store was offline. */
 export function mergeRecoveredWorkspace(
   recovered: Partial<WorkspaceStore>,
@@ -10,12 +10,12 @@ export function mergeRecoveredWorkspace(
   baseline: Partial<WorkspaceStore>,
 ): Partial<WorkspaceStore> {
   const live = partialWorkspaceStore(current);
-  const windows = { ...recovered.windowsByScope };
-  for (const scope of Object.keys(live.windowsByScope ?? {}) as WorkspaceScopeKey[]) {
-    const added = live.windowsByScope?.[scope] ?? [];
-    const ids = new Set(added.map((window) => window.id));
-    windows[scope] = [...(windows[scope] ?? []).filter((window) => !ids.has(window.id)), ...added];
-  }
+  const liveTabs = layoutTabs(current.layout);
+  const ids = new Set(liveTabs.map((tab) => tab.id));
+  const restoredTabs = recovered.layout
+    ? layoutTabs(recovered.layout).filter((tab) => !ids.has(tab.id))
+    : [];
+  const layout = { ...current.layout, tabs: [...restoredTabs, ...liveTabs] };
   const records = <T extends { id: string }>(saved: T[], live: T[], initial: T[]) => {
     const result = new Map(saved.map((record) => [record.id, record]));
     for (const record of live) {
@@ -28,12 +28,13 @@ export function mergeRecoveredWorkspace(
   return {
     ...recovered,
     ...live,
-    layoutsByScope: { ...recovered.layoutsByScope, ...live.layoutsByScope },
-    windowsByScope: windows,
-    activeWindowIdByScope: {
-      ...recovered.activeWindowIdByScope,
-      ...live.activeWindowIdByScope,
+    layout,
+    layoutsByScope: {
+      ...recovered.layoutsByScope,
+      ...live.layoutsByScope,
+      [current.activeScopeKey]: layout,
     },
+    activeWindowId: current.activeWindowId,
     tabGroups: records(
       recovered.tabGroups ?? [],
       current.tabGroups,
@@ -61,9 +62,5 @@ export function mergeRecoveredWorkspace(
       ...current.selectedBookmarkByFolder,
     },
     closedItems: [...(recovered.closedItems ?? []), ...current.closedItems],
-    closedWindowsByScope: {
-      ...recovered.closedWindowsByScope,
-      ...current.closedWindowsByScope,
-    },
   };
 }

@@ -177,7 +177,7 @@ pub async fn browser_sync_forget_key(
         active.scope.deployment == api.deployment() && active.scope.account_id == account_id
     }) {
         stop(current.take()).await;
-        let _ = app.emit_to("main", "misty:browser-sync-changed", "");
+        let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
     }
     let path = database_path(&app, &api.deployment(), &account_id)?;
     let database_lock = lock_database(&path)?;

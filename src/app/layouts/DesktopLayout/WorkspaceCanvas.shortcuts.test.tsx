@@ -11,7 +11,6 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
-import { windowTransition } from "./useWindowTransition";
 
 vi.mock("./WorkspaceDockTree", () => ({
   WorkspaceDockTree: (props: {
@@ -59,33 +58,6 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     if (originalAnimate) HTMLElement.prototype.animate = originalAnimate;
     else delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
     Object.defineProperty(navigator, "platform", { configurable: true, value: "Linux x86_64" });
-  });
-
-  it("creates and cycles global browser windows through the central dispatcher", () => {
-    render(
-      <MemoryRouter initialEntries={["/browser"]}>
-        <ShortcutRuntime />
-        <WorkspaceCanvas />
-      </MemoryRouter>,
-    );
-    const firstWindowId = useWorkspaceStore.getState().activeWindowId;
-    expect(animate).not.toHaveBeenCalled();
-
-    // No window menu is on screen to open the picker beside, so the window gets an unused color.
-    fireEvent.keyDown(window, { key: "n", code: "KeyN", metaKey: true });
-    const windows = useWorkspaceStore.getState().windowsByScope.global ?? [];
-    expect(windows).toHaveLength(2);
-    expect(windows[1].color).toBeDefined();
-    expect(useWorkspaceStore.getState().activeWindowId).not.toBe(firstWindowId);
-    expect(animate).toHaveBeenLastCalledWith(expect.any(Array), windowTransition);
-
-    fireEvent.keyDown(window, {
-      key: "`",
-      code: "Backquote",
-      metaKey: true,
-    });
-    expect(useWorkspaceStore.getState().activeWindowId).toBe(firstWindowId);
-    expect(animate).toHaveBeenCalledTimes(2);
   });
 
   it.each(["close", "select"])("does not add shell history when tabs %s", (action) => {

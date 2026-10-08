@@ -21,7 +21,7 @@ use crate::{
 };
 
 fn require_main(webview: &tauri::Webview) -> ApiResult<()> {
-    if webview.label() == "main" {
+    if crate::infra::space_windows::is_space_window(webview.label()) {
         Ok(())
     } else {
         Err(ApiError::Message(

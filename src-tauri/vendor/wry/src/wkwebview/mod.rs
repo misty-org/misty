@@ -232,10 +232,11 @@ impl InnerWebView {
           custom_data_store_available,
           pl_attrs.data_store_identifier,
         ) {
-          // A private webview with no named store joins the shared private
-          // session, so private tabs see each other's sign-ins.
-          (true, _, None) => private_data_store(mtm),
-          (true, _, _) => WKWebsiteDataStore::nonPersistentDataStore(mtm),
+          // An incognito webview with an identifier joins that incognito session,
+          // so a Space's incognito windows see each other's sign-ins and no one
+          // else's. Without one it gets a session of its own.
+          (true, _, Some(session)) => private_data_store(session, mtm),
+          (true, _, None) => WKWebsiteDataStore::nonPersistentDataStore(mtm),
           // if data_store_identifier is given and custom data stores are available, use custom store
           (false, true, Some(data_store)) => {
             let identifier = NSUUID::from_bytes(data_store);
@@ -1473,28 +1474,25 @@ unsafe fn wait_for_blocking_operation<T>(rx: std::sync::mpsc::Receiver<T>) -> Re
 }
 
 thread_local! {
-  static PRIVATE_DATA_STORE: std::cell::RefCell<Option<Retained<WKWebsiteDataStore>>> =
-    const { std::cell::RefCell::new(None) };
+  /// One non-persistent store per incognito session, keyed by the caller's session id.
+  static PRIVATE_DATA_STORES: std::cell::RefCell<
+    std::collections::HashMap<[u8; 16], Retained<WKWebsiteDataStore>>,
+  > = std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
-fn private_data_store(mtm: MainThreadMarker) -> Retained<WKWebsiteDataStore> {
-  PRIVATE_DATA_STORE.with(|store| {
-    store
+fn private_data_store(session: [u8; 16], mtm: MainThreadMarker) -> Retained<WKWebsiteDataStore> {
+  PRIVATE_DATA_STORES.with(|stores| {
+    stores
       .borrow_mut()
-      .get_or_insert_with(|| unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) })
+      .entry(session)
+      .or_insert_with(|| unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) })
       .clone()
   })
 }
 
-/// Shares the existing private session with a caller-supplied configuration.
-/// Used when attaching a native extension controller before view creation.
-pub fn extension_private_data_store(mtm: MainThreadMarker) -> Retained<WKWebsiteDataStore> {
-  private_data_store(mtm)
-}
-
-/// Ends the shared private session: the next private webview starts with no
-/// cookies or site data. Must be called on the main thread once every private
-/// webview has closed.
-pub fn reset_private_data_store() {
-  PRIVATE_DATA_STORE.with(|store| store.borrow_mut().take());
+/// Ends one incognito session: its next webview starts with no cookies or site
+/// data. Must be called on the main thread once every webview of the session has
+/// closed; WebKit frees the store with its last view.
+pub fn end_private_session(session: [u8; 16]) {
+  PRIVATE_DATA_STORES.with(|stores| stores.borrow_mut().remove(&session));
 }

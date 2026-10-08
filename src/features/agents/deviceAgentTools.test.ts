@@ -8,12 +8,6 @@ const uploadLibraryBlob = vi.fn();
 const views = [
   { id: "a", surfaceId: "browser", title: "Docs", state: { url: "https://docs.example.com" } },
   { id: "a", surfaceId: "browser", title: "Docs", state: { url: "https://docs.example.com" } },
-  {
-    id: "p",
-    surfaceId: "browser",
-    title: "Secret",
-    state: { url: "https://bank.example", private: true },
-  },
   { id: "n", surfaceId: "notes", title: "Notes", state: {} },
 ];
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
@@ -51,7 +45,6 @@ vi.mock("@/features/workspace", () => ({
       ],
     }),
   },
-  isPrivateBrowserView: (view: { state: { private?: boolean } }) => Boolean(view.state.private),
   parseBrowserViewState: (state: { url: string }) => state,
 }));
 vi.mock("@/features/bookmarks/library", () => ({
@@ -81,7 +74,7 @@ const signal = new AbortController().signal;
 
 beforeEach(() => vi.clearAllMocks());
 
-it("lists only shared, non-private browser tabs once each", async () => {
+it("lists only shared browser tabs once each", async () => {
   expect(await runDeviceAgentOperation(job("browser.tab.list", {}), signal)).toEqual({
     tabs: [{ id: "a", title: "Docs", url: "https://docs.example.com" }],
   });

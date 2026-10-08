@@ -71,12 +71,9 @@ it("treats each Space as one destination and resumes its last section", () => {
   });
 });
 
-it("keeps destination reuse inside the current window and excludes private browser tabs", () => {
+it("keeps destination reuse inside the current window", () => {
   const first = go("/browser");
-  store().openBrowserView({ url: "https://private.example", private: true });
   expect(go("/browser").id).toBe(first.id);
-  store().createWindow();
-  expect(go("/browser").id).not.toBe(first.id);
 });
 
 it("starts configured fresh tabs and stops replacing them after interaction", () => {

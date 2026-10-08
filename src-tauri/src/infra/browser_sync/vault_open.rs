@@ -348,8 +348,7 @@ pub(super) async fn open_vault_with(
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => ("reset".to_owned(), None),
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     };
-                    let _ = notify_app.emit_to(
-                        "main",
+                    let _ = crate::infra::space_windows::emit(&notify_app,
                         "misty:account-event",
                         serde_json::json!({ "accountId": feed_account, "topic": topic, "id": id }),
                     );
@@ -359,7 +358,7 @@ pub(super) async fn open_vault_with(
             if !alive {
                 break;
             }
-            let _ = notify_app.emit_to("main", "misty:browser-sync-changed", &notify_workspace);
+            let _ = crate::infra::space_windows::emit(&notify_app, "misty:browser-sync-changed", &notify_workspace);
         }
     });
     let session_id = uuid::Uuid::new_v4().to_string();
@@ -391,6 +390,6 @@ pub(super) async fn open_vault_with(
         capture_view: None,
         admission_root,
     });
-    let _ = app.emit_to("main", "misty:browser-sync-changed", "");
+    let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
     view(current.as_mut().expect("session was installed")).await
 }

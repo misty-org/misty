@@ -1,6 +1,7 @@
 //! Creating a browser page webview and its favicon and compatibility probes.
 
 use super::*;
+use super::super::space_windows;
 
 #[tauri::command]
 // Keep this command asynchronous. WebView2 child creation needs the Windows
@@ -22,7 +23,30 @@ pub async fn browser_webview_create(
         }
     };
     trace_create("start");
-    // Private tabs never restore a synced session or bind an account profile.
+    // The page's Space, and with it its website data, comes from the window that asks
+    // for it, never from the request.
+    let owner = caller.window().label().to_owned();
+    let space = space_windows::space_for_owner(&owner)
+        .ok_or("Only a Space window can open pages.")?;
+    let incognito = space_windows::incognito_session(&owner)
+        .map(|session| space_windows::incognito_store_id(&session));
+    request.private = incognito.is_some();
+    // On Windows each Space keeps its pages' data in its own folder, incognito included.
+    let space_data = space_windows::space_store_identity(&space);
+    if space == space_windows::PERSONAL {
+        // Device profiles (`profile:` scopes) still live in the personal Space until
+        // they become Spaces; they may never name another Space's store.
+        if request
+            .profile_id
+            .as_deref()
+            .is_some_and(space_windows::is_space_store)
+        {
+            return Err("This page belongs to another Space.".into());
+        }
+    } else {
+        request.profile_id = space_windows::space_store_identity(&space);
+    }
+    // Incognito pages never restore a synced session or bind an account profile.
     let profile_lease = if request.private {
         super::super::browser_sync::browser_profile_lease(Some(&app), None, None).await?
     } else {
@@ -112,7 +136,8 @@ pub async fn browser_webview_create(
             // The popup's view and opener survive; only its empty staging window closes.
             staging.destroy().map_err(|error| error.to_string())?;
             if let Ok(url) = webview.url() {
-                let _ = app.emit(
+                let _ = app.emit_to(
+                    browser_owner_label(&app, &request.id).as_str(),
                     "misty://browser-page",
                     BrowserPageEvent {
                         id: request.id.clone(),
@@ -151,16 +176,23 @@ pub async fn browser_webview_create(
         WebviewBuilder::new(label, WebviewUrl::External(initial_url))
             .background_throttling(BackgroundThrottlingPolicy::Disabled),
         &app,
-        request.profile_id.as_deref(),
+        if request.private {
+            space_data.as_deref()
+        } else {
+            request.profile_id.as_deref()
+        },
     )?;
-    // With no named store, an incognito view joins the shared private session.
-    let builder = if request.private {
-        builder.incognito(true)
-    } else {
-        builder.data_store_identifier(profile_identifier)
+    // An incognito view joins its Space's incognito session (see vendor/wry's
+    // MISTY-PATCH.md): the identifier names the session, never a persistent store.
+    let builder = match incognito {
+        Some(session) => builder.incognito(true).data_store_identifier(session),
+        None => builder.data_store_identifier(profile_identifier),
     };
+    // Incognito windows have no extension host.
     #[cfg(target_os = "macos")]
-    let builder = {
+    let builder = if request.private {
+        builder
+    } else {
         let pointer = super::super::extensions::native::configuration(
             &app,
             profile_identifier,
@@ -218,7 +250,8 @@ pub async fn browser_webview_create(
             #[cfg(any(target_os = "macos", windows))]
             if let Some(response) = provider_popup(&popup_app, &popup_id, &url, features) { return response; }
             if external_url(url.as_str()).is_ok() {
-                let _ = popup_app.emit(
+                let _ = popup_app.emit_to(
+                    browser_owner_label(&popup_app, &popup_id).as_str(),
                     "misty://browser-popup",
                     BrowserPopupEvent {
                         popup_instance_key: None,
@@ -268,7 +301,8 @@ pub async fn browser_webview_create(
             if phase == "started" {
                 watch_load(&page_app, &page_id, generation);
             }
-            let _ = page_app.emit(
+            let _ = page_app.emit_to(
+                browser_owner_label(&page_app, &page_id).as_str(),
                 "misty://browser-page",
                 BrowserPageEvent {
                     id: page_id.clone(),
@@ -291,7 +325,8 @@ pub async fn browser_webview_create(
         })
         .on_document_title_changed(move |webview, title| {
             if preview_only { return; }
-            let _ = title_app.emit(
+            let _ = title_app.emit_to(
+                browser_owner_label(&title_app, &title_id).as_str(),
                 "misty://browser-title",
                 BrowserTitleEvent {
                     id: title_id.clone(),
@@ -379,7 +414,8 @@ pub(super) fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &s
         let Some(url) = validated_favicon_url(&candidate) else {
             return;
         };
-        let _ = favicon_app.emit(
+        let _ = favicon_app.emit_to(
+            browser_owner_label(&favicon_app, &favicon_id).as_str(),
             "misty://browser-favicon",
             BrowserFaviconEvent {
                 id: favicon_id.clone(),
@@ -400,7 +436,8 @@ pub(super) fn request_browser_compatibility(webview: &Webview, app: &AppHandle, 
         if probe.kind != "cloudflare_challenge" || external_url(&probe.url).is_err() {
             return;
         }
-        let _ = compatibility_app.emit(
+        let _ = compatibility_app.emit_to(
+            browser_owner_label(&compatibility_app, &compatibility_id).as_str(),
             "misty://browser-compatibility",
             BrowserCompatibilityEvent {
                 id: compatibility_id.clone(),

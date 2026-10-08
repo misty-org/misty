@@ -5,6 +5,7 @@ import { layoutTabs } from "./layoutTabs";
 import { parseBrowserViewState } from "./model";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { tabArchiveHours } from "./tabArchiveSettings";
+import { isIncognitoWindow } from "./spaceWindow";
 
 /** A tab closed for being idle, kept so it can be opened again. */
 export interface ArchivedTab {
@@ -89,7 +90,7 @@ export function startTabArchive(options: {
       if (views.length !== 1 || views[0].surfaceId !== "browser") continue;
       const view = views[0];
       const state = parseBrowserViewState(view.state);
-      if (state.private || state.agentOwned || options.audible(view.id)) continue;
+      if (isIncognitoWindow() || state.agentOwned || options.audible(view.id)) continue;
       if (!/^https?:/.test(state.url) || seen[view.id] > cutoff) continue;
       if (!useWorkspaceStore.getState().closeTab(tab.id)) continue;
       archived.push({

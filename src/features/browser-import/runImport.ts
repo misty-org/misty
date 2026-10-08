@@ -2,6 +2,7 @@ import { dockLeaves, parseBrowserViewState, useWorkspaceStore } from "@/features
 import { importBookmarks } from "./bookmarks";
 import { browserImport, type ImportedExtension, type ImportSourceRequest } from "./native";
 import { applyImportedSettings } from "./settings";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 export type ImportKind = "bookmarks" | "history" | "settings" | "signins" | "extensions";
 const importKinds: ImportKind[] = ["bookmarks", "history", "settings", "signins", "extensions"];
@@ -27,7 +28,7 @@ function currentBrowserProfile(): string | undefined {
     ...panes.flatMap((p) => p.views),
   ];
   const browser = views.find(
-    (v) => v.surfaceId === "browser" && !parseBrowserViewState(v.state).private,
+    (v) => v.surfaceId === "browser" && !isIncognitoWindow(),
   );
   return browser ? parseBrowserViewState(browser.state).profileId : undefined;
 }

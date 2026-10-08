@@ -2,7 +2,6 @@ import {
   createDockLeaf,
   insertDockSplit,
   type WorkspaceView,
-  type WorkspaceWindow,
 } from "@/features/workspace";
 import { act, cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -30,13 +29,6 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     const planner = tab("planner", "/spaces/family/planner/tasks/board");
     const pane = createDockLeaf([journal, planner]);
     pane.activeViewId = journal.id;
-    const workspaceWindow: WorkspaceWindow = {
-      id: "window-1",
-      title: "Window 1",
-      layout: { root: pane, focusedPaneId: pane.id },
-      createdAt: 1,
-      lastFocusedAt: 1,
-    };
     const props = {
       node: pane,
       focusedPaneId: pane.id,
@@ -47,13 +39,6 @@ describe("WorkspaceDockTree tab lifecycle", () => {
       onDockView: vi.fn(() => true),
       onSplitPane: vi.fn(() => null),
       onClosePane: vi.fn(),
-      windows: [workspaceWindow],
-      activeWindowId: workspaceWindow.id,
-      canReopenWindow: false,
-      onSelectWindow: vi.fn(),
-      onCreateWindow: vi.fn(),
-      onCloseWindow: vi.fn(),
-      onReopenWindow: vi.fn(),
       onResizeSplit: vi.fn(),
     };
 
@@ -96,7 +81,6 @@ describe("WorkspaceDockTree tab lifecycle", () => {
         <WorkspaceDockTree
           {...props}
           node={nextPane}
-          windows={[{ ...workspaceWindow, layout: { root: nextPane, focusedPaneId: nextPane.id } }]}
         />,
       );
     });

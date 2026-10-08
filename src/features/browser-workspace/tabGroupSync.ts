@@ -7,6 +7,7 @@ import {
 } from "@/features/workspace/tabGroups";
 import { upgradeWorkspaceShape } from "@/features/workspace/workspaceShapeUpgrade";
 import type { SharedRecord } from "./model";
+import { windowSpaceScope } from "@/features/workspace/spaceWindow";
 
 /** Tab groups as sync records. An open group lives in its workspace with the
  * tabs it holds; a closed (saved) group is kept in the vault's collections so
@@ -67,7 +68,7 @@ export function projectTabGroups(
       id: record.id,
       name: record.fields.name,
       color: color(record.fields.color),
-      scopeKey: previous.get(record.id)?.scopeKey ?? "global",
+      scopeKey: previous.get(record.id)?.scopeKey ?? windowSpaceScope(),
       collapsed: previous.get(record.id)?.collapsed ?? false,
     };
     if (record.kind === "tab_group") {

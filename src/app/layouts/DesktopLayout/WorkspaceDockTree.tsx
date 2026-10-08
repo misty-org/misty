@@ -27,7 +27,6 @@ import {
   type WorkspacePane,
   type WorkspaceSurfaceId,
   type WorkspaceView,
-  type WorkspaceWindow,
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
 import { memo, useEffect, useRef, useState, type DragEvent } from "react";
@@ -70,13 +69,6 @@ export interface WorkspaceDockTreeProps {
   onDockView: (tabId: string, paneId: string, zone: DockDropZone, index?: number) => boolean;
   onSplitPane: (paneId: string, direction: DockSplitDirection, tabId?: string) => string | null;
   onClosePane: (paneId: string) => void;
-  windows: WorkspaceWindow[];
-  activeWindowId: string;
-  canReopenWindow: boolean;
-  onSelectWindow: (windowId: string) => void;
-  onCreateWindow: () => void;
-  onCloseWindow: (windowId: string) => void;
-  onReopenWindow: () => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
 }
 

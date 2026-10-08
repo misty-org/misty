@@ -68,7 +68,7 @@ pub(super) async fn pass(
             }
         }
         drop(state);
-        let _=app.emit_to("main","misty://extensions",json!({"kind":"uninstalled","account":account,"id":installation.id,"generation":installation.generation}));
+        let _=crate::infra::space_windows::emit(&app,"misty://extensions",json!({"kind":"uninstalled","account":account,"id":installation.id,"generation":installation.generation}));
         return Ok(());
     }
     let matching = |r: &&ViewRecord| {

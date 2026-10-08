@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { uploadLibraryBlob } from "@/api/spaces/library-upload";
 import { bookmarks, bookmarkUrl, saveBookmark } from "@/features/bookmarks/library";
 import {
-  isPrivateBrowserView,
   parseBrowserViewState,
   useWorkspaceStore,
 } from "@/features/workspace";
@@ -11,6 +10,7 @@ import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
 import { readablePage } from "./webFetchText";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 /**
  * Device jobs for the grants a desktop chat attached: shared folders (read
@@ -91,7 +91,7 @@ export async function runDeviceAgentOperation(
       const tabs: Array<{ id: string; title: string; url: string }> = [];
       const seen = new Set<string>();
       mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (view) => {
-        if (view.surfaceId === "browser" && !isPrivateBrowserView(view) && !seen.has(view.id)) {
+        if (view.surfaceId === "browser" && !isIncognitoWindow() && !seen.has(view.id)) {
           seen.add(view.id);
           const url = parseBrowserViewState(view.state).url;
           if (/^https?:/i.test(url)) tabs.push({ id: view.id, title: view.title, url });

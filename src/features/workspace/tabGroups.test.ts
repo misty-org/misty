@@ -6,6 +6,7 @@ import { migrateSavedLinkGroups } from "./tabGroups";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
 import { retainDeviceState } from "@/features/browser-workspace/deviceState";
+import { currentWindows } from "./windows";
 const state = () => useWorkspaceStore.getState();
 const tabs = () => layoutTabs(state().layout);
 const add = (title: string) => {
@@ -61,15 +62,6 @@ it("saves and restores mixed surfaces and split trees with fresh identities only
   state().reopenTabGroup(group);
   expect(tabs()).toHaveLength(count);
 });
-it("never persists private pages or their history in saved groups", () => {
-  const publicId = tabs()[0].id;
-  state().openBrowserView({ url: "https://private.example/", private: true });
-  const privateId = state().layout.activeTabId!;
-  const group = state().createTabGroup([publicId, privateId])!;
-  state().closeTabGroup(group);
-  expect(state().tabGroups[0].savedTabs).toHaveLength(1);
-  expect(JSON.stringify(partialWorkspaceStore(state()))).not.toContain("private.example");
-});
 it("migrates old Groups once without opening or losing saved links, and survives restart", () => {
   const folder = createBookmarkFolder("Old reading");
   saveBookmark({ title: "Example", url: "example.com", folderId: folder });
@@ -90,7 +82,7 @@ it("migrates old Groups once without opening or losing saved links, and survives
 });
 it("retains local group membership across a remote page/title update", () => {
   const id = state().createTabGroup([tabs()[0].id])!;
-  const before = state().windowsByScope.global!;
+  const before = currentWindows(state());
   const incoming = before.map((w) => ({
     ...w,
     layout: {
@@ -99,24 +91,6 @@ it("retains local group membership across a remote page/title update", () => {
     },
   }));
   expect(layoutTabs(retainDeviceState(incoming, before)[0].layout)[0].tabGroupId).toBe(id);
-});
-it("moves a group to another window without duplicating live views", () => {
-  const first = tabs()[0].id,
-    second = add("Second");
-  const group = state().createTabGroup([first, second])!;
-  const viewIds = allLayoutViews(state().layout).map((v) => v.id);
-  const oldWindow = state().activeWindowId;
-  state().moveTabGroupToNewWindow(group);
-  expect(state().activeWindowId).not.toBe(oldWindow);
-  expect(allLayoutViews(state().layout).map((v) => v.id)).toEqual(viewIds);
-  const windows = state().windowsByScope.global!;
-  expect(
-    windows.flatMap((w) => allLayoutViews(w.layout)).filter((v) => viewIds.includes(v.id)),
-  ).toHaveLength(2);
-  state().switchWindow(oldWindow);
-  state().reopenTabGroup(group);
-  expect(state().activeWindowId).not.toBe(oldWindow);
-  expect(state().windowsByScope.global).toHaveLength(2);
 });
 it("does not reinterpret new bookmark folders as tab groups on restart", () => {
   const folder = createBookmarkFolder("Bookmarks only");

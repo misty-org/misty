@@ -17,7 +17,7 @@ pub struct AgentFilesState {
     cancellations: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 fn authorize(webview: &Webview, api_base: &str, account_id: &str) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Open the main Misty window to organize a folder".into());
     }
     authenticated(api_base, account_id)

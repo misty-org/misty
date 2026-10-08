@@ -200,7 +200,7 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
     ready: true,
     issue: null,
   });
-  const windows = JSON.stringify(h.workspace.getState().windowsByScope);
+  const windows = JSON.stringify(h.workspace.getState().layoutsByScope);
   expect(windows).toContain(saved.id);
   expect(windows).toContain(added.id);
   expect(h.workspace.getState().activeWindowId).toBe(active);
@@ -223,7 +223,7 @@ it("does not expose a previous account when recovery fails for the next account"
   native.generation++;
   native.failRead = true;
   await h.restoreNativeWorkspace("b");
-  expect(JSON.stringify(h.workspace.getState().windowsByScope)).not.toContain("private.example");
+  expect(JSON.stringify(h.workspace.getState().layoutsByScope)).not.toContain("private.example");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "b",
     usable: true,
@@ -359,7 +359,7 @@ it("keeps other tabs when one saved view cannot be restored", async () => {
   const state = again.useWorkspaceRecoveryState.getState();
   expect(state).toMatchObject({ usable: true, ready: true, issue: null });
   expect(state.notRestored.map((view) => view.id)).toContain(damaged.id);
-  expect(JSON.stringify(again.workspace.getState().windowsByScope)).toContain(kept.id);
+  expect(JSON.stringify(again.workspace.getState().layoutsByScope)).toContain(kept.id);
 });
 
 it("lists refused saves per item instead of reporting a blanket failure", async () => {

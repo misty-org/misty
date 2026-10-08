@@ -6,7 +6,7 @@ import {
 } from "@/features/workspace";
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn, Spinner } from "@/shared/ui";
-import { VenetianMask, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { providerFromRoute } from "@/features/webviews/providers";
 import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
@@ -43,16 +43,6 @@ export function ViewIcon({
   );
   const faviconUrl = browserState?.faviconUrl;
   useEffect(() => setFaviconFailed(false), [faviconUrl]);
-  if (browserState?.private && !isLoading) {
-    return (
-      <VenetianMask
-        className={cn("shrink-0", isActive ? "text-cream-bright" : "text-cream-muted")}
-        size={size}
-        strokeWidth={2}
-        aria-label="Private tab"
-      />
-    );
-  }
   if (isBrowser && isLoading) {
     return (
       <Spinner

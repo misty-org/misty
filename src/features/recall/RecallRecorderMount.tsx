@@ -8,15 +8,13 @@ import { memoryApi } from "./api";
 import { recallSettings } from "./recallSettings";
 import { RecallRecorder, type ActivePage } from "./recorder/recorder";
 import { useRecallStore } from "./useRecallStore";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 /** The browser page in the focused pane of the focused window. */
 function activePage(): ActivePage | null {
   const workspace = useWorkspaceStore.getState();
-  const window = (workspace.windowsByScope[workspace.activeScopeKey] ?? []).find(
-    (w) => w.id === workspace.activeWindowId,
-  );
-  const pane =
-    window && allLayoutPanes(window.layout).find((p) => p.id === window.layout.focusedPaneId);
+  const layout = workspace.layout;
+  const pane = allLayoutPanes(layout).find((p) => p.id === layout.focusedPaneId);
   const view = pane?.views.find((v) => v.id === pane.activeViewId);
   if (!view || view.surfaceId !== "browser") return null;
   const state = parseBrowserViewState(view.state);
@@ -25,7 +23,7 @@ function activePage(): ActivePage | null {
     runtimeId: browserRuntimeId(view),
     url: state.url,
     title: view.title ?? "",
-    private: state.private,
+    private: isIncognitoWindow(),
     agentOwned: state.agentOwned,
   };
 }

@@ -11,6 +11,8 @@ import {
   createSpacesRealtimeActions,
   resetSpacesRealtimeRuntime,
 } from "./createSpacesRealtimeActions";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { invoke } from "@tauri-apps/api/core";
 export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const snapshotAutoMinIntervalMs = 1_500;
@@ -293,6 +295,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.leave(spaceId);
+      removeSpaceFromDevice(spaceId);
       set((state) => ({
         spaces: state.spaces.filter((space) => space.id !== spaceId),
       }));
@@ -318,6 +321,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.delete(spaceId, confirmation);
+      removeSpaceFromDevice(spaceId);
       set((state) => {
         const spaces = state.spaces.filter((space) => space.id !== spaceId);
         const messagesBySpace = { ...state.messagesBySpace };
@@ -339,6 +343,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   ...createSpacesRealtimeActions(set, get, () => spacesAccountGeneration),
   clearError: () => set({ error: null }),
 }));
+
+/** A Space this person left or deleted: its windows close and its website data goes. */
+function removeSpaceFromDevice(spaceId: string) {
+  if (!hasTauriInternals()) return;
+  void invoke("space_window_remove", { spaceId }).catch(() => undefined);
+}
 
 referenceMode.bindSpaceReferenceMode((state) => useSpacesStore.setState(state));
 

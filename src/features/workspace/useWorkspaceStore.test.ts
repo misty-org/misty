@@ -102,17 +102,6 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(firstPane.id);
   });
 
-  it("switches to another window when closing the last tab of a multi-window workspace", () => {
-    const store = useWorkspaceStore.getState();
-    const firstWindowId = store.activeWindowId;
-    store.createWindow("Second Window");
-    const onlyTabInSecond = dockTreeViews(useWorkspaceStore.getState().layout.root)[0];
-
-    expect(store.closeView(onlyTabInSecond.id)).toBe(true);
-    expect(useWorkspaceStore.getState().activeWindowId).toBe(firstWindowId);
-    expect(useWorkspaceStore.getState().closedItems[0]?.view.id).toBe(onlyTabInSecond.id);
-  });
-
   it("starts the global workspace in Browser", () => {
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toMatchObject([
       { surfaceId: "browser", title: "google.com", route: "/browser", placeholder: true },
@@ -192,16 +181,6 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().openSurface(browserRequest).id).toBe(first.id);
   });
 
-  it("keeps app instances isolated between virtual windows", () => {
-    const first = useWorkspaceStore.getState().openSurface(browserRequest);
-    const secondWindow = useWorkspaceStore.getState().createWindow("Window 2");
-
-    const second = useWorkspaceStore.getState().openSurface(browserRequest);
-
-    expect(second.id).not.toBe(first.id);
-    expect(useWorkspaceStore.getState().activeWindowId).toBe(secondWindow.id);
-  });
-
   it("can focus a new pane on its default tab", () => {
     const first = useWorkspaceStore.getState().openSurface(browserRequest);
     const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
@@ -241,28 +220,6 @@ describe("desktop dock store", () => {
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
     ).toContain("agents");
-  });
-
-  it("adopts the default Space once, then leaves the user's choice alone", () => {
-    const store = useWorkspaceStore.getState();
-    store.openSurface({
-      surfaceId: "agents",
-      groupKey: "tool:agents",
-      title: "Agents",
-      route: "/agents",
-      instancePolicy: "single",
-    });
-
-    // The bootstrap scope's tabs come along rather than being stranded.
-    useWorkspaceStore.getState().adoptDefaultScope("space:misty");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:misty");
-    expect(
-      dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("agents");
-
-    useWorkspaceStore.getState().setScope("space:family");
-    useWorkspaceStore.getState().adoptDefaultScope("space:misty");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
   });
 
   it("migrates a saved Transfers tab to a browser tab", () => {
@@ -387,7 +344,7 @@ describe("desktop dock store", () => {
     const first = store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!);
     const browser = store.openBrowserView({ url: "https://example.com" });
     const second = store.openSurface(workspaceSurfaceFromRoute("/spaces/two/notes")!);
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toEqual([
       first.id,
       browser.id,
@@ -405,7 +362,7 @@ describe("desktop dock store", () => {
     const journal = useWorkspaceStore.getState().addSurface(journalRequest!);
     const planner = useWorkspaceStore.getState().addSurface(plannerRequest!);
 
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

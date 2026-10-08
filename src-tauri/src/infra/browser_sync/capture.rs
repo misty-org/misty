@@ -120,7 +120,7 @@ async fn report(
     };
     if issue != active.credential_issue {
         active.credential_issue = issue;
-        let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
+        let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
     }
 }
 

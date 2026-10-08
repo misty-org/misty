@@ -97,7 +97,7 @@ it("grants menu focus to the local host without granting remote pages native acc
     readFileSync(`${process.cwd()}/src-tauri/capabilities/default.json`, "utf8"),
   );
   expect(capability.permissions).toContain("core:webview:allow-set-webview-focus");
-  expect(capability.webviews).toEqual(["main", "misty-agent-*"]);
+  expect(capability.webviews).toEqual(["space-*", "incognito-*", "misty-agent-*"]);
   expect(capability.webviews).not.toContain("misty-browser-*");
   expect(capability.windows).toBeUndefined();
   expect(capability.remote).toBeUndefined();

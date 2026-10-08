@@ -8,7 +8,7 @@ import {
 } from "./workspaceDefaultView";
 afterEach(() => configureWorkspaceDefaultView(1));
 it("starts in Browser before a preference is configured", () => {
-  expect(createDefaultWorkspaceView("global")).toMatchObject({
+  expect(createDefaultWorkspaceView("space:personal")).toMatchObject({
     surfaceId: "browser",
     route: "/browser",
     placeholder: true,
@@ -22,12 +22,12 @@ it.each([
   [3, "agents"],
 ])("uses configured starting page %s", (index, surfaceId) => {
   configureWorkspaceDefaultView(Number(index));
-  expect(createDefaultWorkspaceView("global")).toMatchObject({ surfaceId, placeholder: true });
+  expect(createDefaultWorkspaceView("space:personal")).toMatchObject({ surfaceId, placeholder: true });
 });
 it("falls back to Browser for invalid preferences and allocates independent identities", () => {
   configureWorkspaceDefaultView(999);
-  const first = createDefaultWorkspaceView("global"),
-    second = createDefaultWorkspaceView("global");
+  const first = createDefaultWorkspaceView("space:personal"),
+    second = createDefaultWorkspaceView("space:personal");
   expect(first.surfaceId).toBe("browser");
   expect(first.id).not.toBe(second.id);
   expect(first.instanceKey).not.toBe(second.instanceKey);

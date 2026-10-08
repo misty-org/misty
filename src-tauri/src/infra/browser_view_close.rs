@@ -181,22 +181,18 @@ pub fn close_browser_webview(
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
     super::super::extensions::native::tab_event(&app, &request.id, "close");
-    let (children, private_session_ended) = {
+    let children = {
         let mut sessions = state
             .sessions
             .lock()
             .map_err(|_| "Browser state is unavailable.")?;
-        let closed_private = sessions
-            .remove(&request.id)
-            .is_some_and(|session| session.private);
-        let private_session_ended =
-            closed_private && !sessions.values().any(|session| session.private);
+        sessions.remove(&request.id);
         let children = sessions
             .iter()
             .filter(|(_, session)| session.popup_parent.as_deref() == Some(&request.id))
             .map(|(id, _)| id.clone())
             .collect::<Vec<_>>();
-        (children, private_session_ended)
+        children
     };
     for id in children {
         close_browser_webview(
@@ -215,14 +211,6 @@ pub fn close_browser_webview(
         let _ = staging.destroy();
     }
     forget_shortcut_token(&state, &request.id);
-    // The last private tab closed: the next one starts with no cookies or data.
-    #[cfg(target_os = "macos")]
-    if private_session_ended {
-        let _ = app.run_on_main_thread(wry::reset_private_data_store);
-    }
-    if private_session_ended {
-        super::super::browser_site_permissions::forget_private_session();
-    }
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
@@ -252,4 +240,23 @@ pub fn close_browser_webview(
     url_observer::remove(&webview, &request.id);
     webview.close().map_err(|error| error.to_string())?;
     Ok(())
+}
+
+/// The last incognito window of a Space closed: its session goes, so the next
+/// incognito window starts signed out with no site data or permission choices.
+pub(crate) fn end_incognito_session(app: &AppHandle, session: &str) {
+    let id = super::super::space_windows::incognito_store_id(session);
+    #[cfg(target_os = "macos")]
+    let _ = app.run_on_main_thread(move || wry::end_private_session(id));
+    let _ = (app, id);
+    super::super::browser_site_permissions::forget_private_session();
+}
+
+/// A window closed with its pages: forget the pages its renderer can no longer close.
+pub(crate) fn forget_closed_pages(app: &AppHandle) {
+    if let Some(state) = app.try_state::<BrowserSessionState>() {
+        if let Ok(mut sessions) = state.sessions.lock() {
+            sessions.retain(|id, _| app.get_webview(&format!("misty-browser-{id}")).is_some());
+        }
+    }
 }

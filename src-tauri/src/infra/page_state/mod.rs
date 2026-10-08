@@ -395,7 +395,7 @@ pub async fn browser_page_state_guard(
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    (webview.label() == "main")
+    crate::infra::space_windows::is_space_window(webview.label())
         .then_some(())
         .ok_or_else(|| "Page state is only available to the main window.".into())
 }

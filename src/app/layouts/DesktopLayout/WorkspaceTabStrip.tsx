@@ -11,7 +11,6 @@ import { useTabStripFade } from "./useTabStripGeometry";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 import { FavoritesStrip } from "./FavoritesStrip";
 import { useTabHoverCards } from "./TabHoverCard";
-import { useWindowSwipe } from "./useWindowSwipe";
 import { navigatorMotionClass } from "./styles";
 import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
 import { useTabStripReorder } from "./useTabStripReorder";
@@ -59,7 +58,6 @@ export function WorkspaceTabStrip(
   const tabListRef = useRef<HTMLDivElement>(null);
   useTabPresenceMotion(tabListRef, !vertical);
   const hoverCards = useTabHoverCards();
-  useWindowSwipe(ref, tabListRef, props.windows, props.activeWindowId, props.onSelectWindow);
   useTabStripFade(tabListRef, true, tabs.length, vertical ? "y" : "x");
   const { pane, ClosePaneIcon, canRight, canDown } = useFocusedPaneSplit(layout);
   const { reorder, bindTabList } = useTabStripReorder({
@@ -230,15 +228,7 @@ export function WorkspaceTabStrip(
           canSplitSideways={canRight}
           canSplitVertically={canDown}
           closePaneControl={closePaneControl}
-          windows={props.windows}
-          activeWindowId={props.activeWindowId}
-          canReopen={props.canReopenWindow}
-          canCloseWindow={() => props.windows.length > 1}
           onSplitPane={props.onSplitPane}
-          onSelectWindow={props.onSelectWindow}
-          onCreateWindow={props.onCreateWindow}
-          onCloseWindow={props.onCloseWindow}
-          onReopenWindow={props.onReopenWindow}
         />
       </header>
     </OverlaySideProvider>

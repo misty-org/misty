@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { registerShortcutHandler } from "@/features/shortcuts";
 import {
-  canCloseWorkspaceWindow,
+  canCloseWorkspaceView,
   canFitDockSplit,
   dockLeaves,
   findDockLeaf,
@@ -14,30 +14,22 @@ import {
 import { usePaneSwapMode } from "@/features/workspace/paneSwapMode";
 import type { DockSplitDirection } from "@/features/workspace/model";
 import { minimumForWorkspaceViews } from "./WorkspaceDockTree";
+import {
+  closeSpaceWindow,
+  openIncognitoWindow,
+  showSpacesMenu,
+} from "@/features/workspace/spaceWindow";
 
-/** Pane and virtual-window keyboard shortcuts for the workspace. */
+/** Pane and Space-window keyboard shortcuts for the workspace. */
 export function useWorkspaceCanvasShortcuts(actions: {
-  closeWorkspaceVirtualWindow: (windowId: string) => void;
-  createWorkspaceVirtualWindow: () => void;
-  navigateToActiveLayoutTab: () => void;
   openTab: (view: WorkspaceView) => void;
-  reopenWorkspaceVirtualWindow: (windowId?: string) => void;
-  selectVirtualWindow: (windowId: string) => void;
   splitWorkspacePane: (
     paneId: string,
     direction: DockSplitDirection,
     tabId?: string,
   ) => string | null;
 }) {
-  const {
-    closeWorkspaceVirtualWindow,
-    createWorkspaceVirtualWindow,
-    navigateToActiveLayoutTab,
-    openTab,
-    reopenWorkspaceVirtualWindow,
-    selectVirtualWindow,
-    splitWorkspacePane,
-  } = actions;
+  const { openTab, splitWorkspacePane } = actions;
   useEffect(() => {
     const paneInDirection = (direction: "left" | "right" | "up" | "down") => {
       const state = useWorkspaceStore.getState();
@@ -113,78 +105,19 @@ export function useWorkspaceCanvasShortcuts(actions: {
   }, [openTab, splitWorkspacePane]);
 
   useEffect(() => {
-    const hasMultipleVirtualWindows = () => {
-      const state = useWorkspaceStore.getState();
-      return (state.windowsByScope[state.activeScopeKey]?.length ?? 0) > 1;
-    };
-    const cycleWindow = (direction: 1 | -1) => {
-      const state = useWorkspaceStore.getState();
-      const windows = state.windowsByScope[state.activeScopeKey] ?? [];
-      if (windows.length < 2) return;
-      const index = Math.max(
-        0,
-        windows.findIndex((window) => window.id === state.activeWindowId),
-      );
-      selectVirtualWindow(windows[(index + direction + windows.length) % windows.length].id);
-    };
+    // Each Space opens in its own OS window; these act on this window or open another.
     const unregister = [
-      registerShortcutHandler("workspace.new_virtual_window", () => {
-        createWorkspaceVirtualWindow();
-      }),
+      registerShortcutHandler("workspace.open_space", () => void showSpacesMenu()),
+      registerShortcutHandler("workspace.new_incognito_window", () => void openIncognitoWindow()),
       registerShortcutHandler(
-        "workspace.close_virtual_window",
-        () => closeWorkspaceVirtualWindow(useWorkspaceStore.getState().activeWindowId),
-        () => {
-          const state = useWorkspaceStore.getState();
-          const windows = state.windowsByScope[state.activeScopeKey] ?? [];
-          const active = windows.find(
-            (workspaceWindow) => workspaceWindow.id === state.activeWindowId,
-          );
-          return Boolean(active && windows.length > 1 && canCloseWorkspaceWindow(active, windows));
-        },
-      ),
-      registerShortcutHandler(
-        "workspace.next_virtual_window",
-        () => cycleWindow(1),
-        hasMultipleVirtualWindows,
-      ),
-      registerShortcutHandler(
-        "workspace.previous_virtual_window",
-        () => cycleWindow(-1),
-        hasMultipleVirtualWindows,
-      ),
-      registerShortcutHandler(
-        "workspace.reopen_virtual_window",
-        () => reopenWorkspaceVirtualWindow(),
-        () => {
-          const state = useWorkspaceStore.getState();
-          return Boolean(state.closedWindowsByScope[state.activeScopeKey]?.length);
-        },
+        "workspace.close_window",
+        () => void closeSpaceWindow(),
+        () => canCloseWorkspaceView(),
       ),
       registerShortcutHandler("workspace.swap_panel_next", () => {
         usePaneSwapMode.getState().start();
       }),
-      ...Array.from({ length: 9 }, (_, index) =>
-        registerShortcutHandler(
-          `workspace.window_${index + 1}`,
-          () => {
-            const state = useWorkspaceStore.getState();
-            const workspaceWindow = state.windowsByScope[state.activeScopeKey]?.[index];
-            if (workspaceWindow) selectVirtualWindow(workspaceWindow.id);
-          },
-          () => {
-            const state = useWorkspaceStore.getState();
-            return Boolean(state.windowsByScope[state.activeScopeKey]?.[index]);
-          },
-        ),
-      ),
     ];
     return () => unregister.forEach((remove) => remove());
-  }, [
-    closeWorkspaceVirtualWindow,
-    createWorkspaceVirtualWindow,
-    navigateToActiveLayoutTab,
-    reopenWorkspaceVirtualWindow,
-    selectVirtualWindow,
-  ]);
+  }, []);
 }

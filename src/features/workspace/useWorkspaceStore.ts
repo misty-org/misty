@@ -62,35 +62,26 @@ import type {
   WorkspaceScopeKey,
   WorkspaceSnapshot,
   WorkspaceView,
-  WorkspaceWindow,
 } from "./model";
 import {
-  addWindow,
-  adoptDefaultWorkspaceScope,
-  createWorkspaceWindow,
   currentWindows,
-  extractPaneToWindow,
   initialWorkspaceWindow,
   mapAllWorkspaceWindowViews,
   mapAllWorkspaceWindowLayouts,
   normalizeWorkspaceLayout,
-  renameWindow,
-  switchWindow,
   switchWorkspaceScope,
   withActiveWindowLayout,
   type WorkspaceWindowsState,
 } from "./windows";
+import { isIncognitoWindow, windowSpaceScope } from "./spaceWindow";
 import { migrateRetiredWorkspaceViews } from "./workspaceMigrations";
-import { isPrivateBrowserView } from "./privateBrowsing";
 import {
   compareViewRecency,
   canCloseWorkspaceView,
-  canCloseWorkspaceWindow,
   lastUsedUpdatesForView,
   nextWorkspaceFocusTimestamp,
   removeDockView,
 } from "./workspaceViewOperations";
-import { closeWindowRemembering, reopenRememberedWindow } from "./closedWindows";
 import {
   rememberClosedWorkspaceView,
   restoreClosedWorkspaceItem,
@@ -118,7 +109,6 @@ export interface WorkspaceStore
     BrowserProfileStore {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
-  closedWindowsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceWindow[]>>;
   newTab: () => WorkspaceView;
   navigatePane: (delta: number, paneId?: string) => WorkspaceView | null;
   detachPaneToTab: (viewId: string) => boolean;
@@ -127,7 +117,6 @@ export interface WorkspaceStore
   renameTab: (id: string, title: string) => void;
   reorderTabs: (ids: string[]) => void;
   setScope: (scopeKey: WorkspaceScopeKey) => void;
-  adoptDefaultScope: (scopeKey: WorkspaceScopeKey, validScopes?: Set<string>) => void;
   openSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   openDestination: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   commitPlaceholder: (tabId: string) => void;
@@ -137,8 +126,6 @@ export interface WorkspaceStore
     paneId?: string;
     sourceViewId?: string;
     bookmarkId?: string;
-    /** Open as a private tab. Tabs opened from a private tab are private too. */
-    private?: boolean;
   }) => WorkspaceView;
   updateBrowserView: (tabId: string, patch: Partial<BrowserViewState> & { title?: string }) => void;
   renameView: (tabId: string, title: string) => void;
@@ -161,12 +148,6 @@ export interface WorkspaceStore
   swapPanes: (firstPaneId: string, secondPaneId: string) => boolean;
   movePane: (paneId: string, direction: DockSplitDirection, targetPaneId?: string) => boolean;
   setWindowDockingLayout: (layout: DockingLayout) => void;
-  createWindow: (title?: string, color?: WorkspaceWindow["color"]) => WorkspaceWindow;
-  switchWindow: (windowId: string) => boolean;
-  closeWindow: (windowId: string) => boolean;
-  reopenClosedWindow: (windowId?: string) => WorkspaceWindow | null;
-  extractPaneToWindow: (paneId: string) => WorkspaceWindow | null;
-  renameWindow: (windowId: string, title: string) => void;
   fillEmptyPanes: () => void;
   updateSplitRatio: (splitId: string, ratio: number) => void;
   toggleSidebar: (tabId: string) => void;
@@ -190,13 +171,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       ...browserProfileSlice(set, get),
       lastUsedViewByGroup: {},
       closedItems: [],
-      closedWindowsByScope: {},
       setScope: (scopeKey) => {
         const update = switchWorkspaceScope(get(), scopeTarget(get().activeScopeKey, scopeKey));
-        if (update) set(update);
-      },
-      adoptDefaultScope: (scopeKey, validScopes) => {
-        const update = adoptDefaultWorkspaceScope(get(), scopeKey, validScopes);
         if (update) set(update);
       },
       ...tabGroupActions(set, get),
@@ -214,12 +190,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const existing =
           !replacePane && !request.forceNew
             ? allLayoutViews(current.layout)
-                .filter(
-                  (tab) =>
-                    !tab.placeholder &&
-                    tab.groupKey === request.groupKey &&
-                    !isPrivateBrowserView(tab),
-                )
+                .filter((tab) => !tab.placeholder && tab.groupKey === request.groupKey)
                 // Prefer the tab already showing this route so a close or a URL
                 // change never re-targets a sibling in the same group.
                 .sort(
@@ -234,7 +205,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             get().updateViewRoute(existing.id, request.route);
           return allLayoutViews(get().layout).find((tab) => tab.id === existing.id)!;
         }
-        const now = nextWorkspaceFocusTimestamp(current.windowsByScope);
+        const now = nextWorkspaceFocusTimestamp(current.layoutsByScope);
         const tab: WorkspaceView = {
           id: createDockId("tab"),
           surfaceId: request.surfaceId,
@@ -278,7 +249,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             .filter(
               (tab) =>
                 !tab.placeholder &&
-                !isPrivateBrowserView(tab) &&
                 (spaceId
                   ? tab.surfaceId === "space" && tab.groupKey.split(":")[1] === spaceId
                   : tab.groupKey === request.groupKey),
@@ -327,26 +297,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         return next.views[0] ?? null;
       },
       openBrowserView: (request = {}) => {
-        let sourcePrivate = false;
-        if (request.sourceViewId) {
-          mapAllWorkspaceWindowViews(get(), (candidate) => {
-            if (candidate.id === request.sourceViewId && isPrivateBrowserView(candidate))
-              sourcePrivate = true;
-            return candidate;
-          });
-        }
-        const isPrivate = request.private || sourcePrivate;
-        const url = request.url?.trim() || browserNewTabUrl(Boolean(isPrivate));
+        const url = request.url?.trim() || browserNewTabUrl(isIncognitoWindow());
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",
-          scopeKey: "global",
+          scopeKey: windowSpaceScope(),
           title: browserViewTitle(url),
           route: "/browser",
           state: {
             ...createBrowserViewState(url),
             bookmarkId: request.bookmarkId,
-            ...(isPrivate ? { private: true } : {}),
           },
           instancePolicy: "multiple",
           forceNew: true,
@@ -431,12 +391,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
       focusView: (tabId) => {
         let current = get();
-        const owner = currentWindows(current).find((window) =>
-          allLayoutViews(window.layout).some((tab) => tab.id === tabId),
-        );
-        if (!owner) return false;
-        if (owner.id !== current.activeWindowId) get().switchWindow(owner.id);
-        current = get();
         const ownerTab = layoutTabs(current.layout).find((tab) =>
           dockTreeViews(tab.root).some((view) => view.id === tabId),
         );
@@ -449,8 +403,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           });
           current = get();
         }
-        const switched =
-          ownerTab.id !== current.layout.activeTabId || owner.id !== get().activeWindowId;
+        const switched = ownerTab.id !== current.layout.activeTabId;
         if (ownerTab.id !== current.layout.activeTabId) {
           set(withLayout(current, activateTab(current.layout, ownerTab.id)));
           current = get();
@@ -472,7 +425,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           set({ lastUsedViewByGroup: { ...current.lastUsedViewByGroup, ...updates } });
           return true;
         }
-        const now = nextWorkspaceFocusTimestamp(current.windowsByScope);
+        const now = nextWorkspaceFocusTimestamp(current.layoutsByScope);
         set({
           ...withLayout(current, {
             ...current.layout,
@@ -539,25 +492,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (!closing || dockTreeViews(closing.root).some((view) => !canCloseWorkspaceView(view)))
           return false;
         const view = activeLayoutView(closing);
-        if (tabs.length === 1 && currentWindows(current).length > 1) {
-          const update = closeWindowRemembering(current, current.activeWindowId);
-          if (!update) return false;
-          set({
-            ...update,
-            closedItems: view
-              ? [
-                  {
-                    view,
-                    windowId: current.activeWindowId,
-                    paneId: closing.focusedPaneId,
-                    tab: closing,
-                  },
-                  ...current.closedItems,
-                ].slice(0, 20)
-              : current.closedItems,
-          });
-          return true;
-        }
         let remaining = tabs.filter((tab) => tab.id !== id);
         if (!remaining.length) remaining = [emptyTab()];
         const next =
@@ -620,17 +554,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         return true;
       },
       reopenClosedView: (index = 0) => {
-        let current = get();
+        const current = get();
         const closed = current.closedItems[index];
         if (!closed) return null;
         const closedTabs = current.closedItems.filter((_, position) => position !== index);
-        if (
-          closed.windowId !== current.activeWindowId &&
-          currentWindows(current).some((window) => window.id === closed.windowId)
-        ) {
-          get().switchWindow(closed.windowId);
-          current = get();
-        }
         let layout: WorkspaceLayout;
         if (closed.tab) layout = appendTab(current.layout, closed.tab);
         else {
@@ -825,57 +752,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
       setWindowDockingLayout: (dockingLayout) => {
         if (!validDockingLayout(dockingLayout)) return;
-        set((state) => ({
-          windowsByScope: {
-            ...state.windowsByScope,
-            [state.activeScopeKey]: currentWindows(state).map((window) =>
-              window.id === state.activeWindowId
-                ? {
-                    ...window,
-                    dockingLayout: normalizeDockingLayout(dockingLayout),
-                  }
-                : window,
-            ),
-          },
-        }));
-      },
-      createWindow: (title, color) => {
-        const { window, update } = addWindow(get(), title, color);
-        set(update);
-        return window;
-      },
-      switchWindow: (windowId) => {
-        const update = switchWindow(get(), windowId);
-        if (!update) return false;
-        set(update);
-        return true;
-      },
-      closeWindow: (windowId) => {
-        const current = get();
-        const scopedWindows = currentWindows(current);
-        const closing = scopedWindows.find((workspaceWindow) => workspaceWindow.id === windowId);
-        if (!closing || !canCloseWorkspaceWindow(closing, scopedWindows)) return false;
-        const update = closeWindowRemembering(current, windowId);
-        if (!update) return false;
-        set(update);
-        return true;
-      },
-      reopenClosedWindow: (windowId) => {
-        const result = reopenRememberedWindow(get(), windowId);
-        if (!result) return null;
-        set(result.update);
-        return result.window;
-      },
-      extractPaneToWindow: (paneId) => {
-        const result = extractPaneToWindow(get(), paneId);
-        if (!result) return null;
-        set(result.update);
-        const { window } = result;
-        return window;
-      },
-      renameWindow: (windowId, title) => {
-        const update = renameWindow(get(), windowId, title);
-        if (update) set(update);
+        set({ dockingLayout: normalizeDockingLayout(dockingLayout) });
       },
       fillEmptyPanes: () => {
         set((current) => {
@@ -905,41 +782,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       replaceSnapshot: (saved) => {
         const snapshot = upgradeWorkspaceShape(saved);
         const current = get();
-        const windows = snapshot.windows?.length
-          ? snapshot.windows.map((window) => ({
-              ...window,
-              layout: normalizeWorkspaceLayout(
-                migrateRetiredWorkspaceViews(window.layout, current.activeScopeKey),
-                current.activeScopeKey,
-              ),
-            }))
-          : [
-              createWorkspaceWindow(
-                normalizeWorkspaceLayout(
-                  migrateRetiredWorkspaceViews(snapshot.layout, current.activeScopeKey),
-                  current.activeScopeKey,
-                ),
-                undefined,
-                current.activeScopeKey,
-              ),
-            ];
-        const activeWindow =
-          windows.find((window) => window.id === snapshot.activeWindowId) ?? windows[0];
+        // A snapshot from before Spaces had windows may hold several; this window
+        // takes the one that was active.
+        const window =
+          snapshot.windows?.find((item) => item.id === snapshot.activeWindowId) ??
+          snapshot.windows?.[0];
+        const layout = normalizeWorkspaceLayout(
+          migrateRetiredWorkspaceViews(window?.layout ?? snapshot.layout, current.activeScopeKey),
+          current.activeScopeKey,
+        );
         set({
-          layout: activeWindow.layout,
-          layoutsByScope: {
-            ...current.layoutsByScope,
-            [current.activeScopeKey]: activeWindow.layout,
-          },
-          activeWindowId: activeWindow.id,
-          activeWindowIdByScope: {
-            ...current.activeWindowIdByScope,
-            [current.activeScopeKey]: activeWindow.id,
-          },
-          windowsByScope: {
-            ...current.windowsByScope,
-            [current.activeScopeKey]: windows,
-          },
+          layout,
+          layoutsByScope: { ...current.layoutsByScope, [current.activeScopeKey]: layout },
+          activeWindowId: window?.id ?? current.activeWindowId,
+          ...(window?.dockingLayout ? { dockingLayout: window.dockingLayout } : {}),
           lastUsedViewByGroup: snapshot.lastUsedViewByGroup ?? {},
           ...(snapshot.tabGroups ? { tabGroups: snapshot.tabGroups } : {}),
         });
@@ -963,7 +819,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           ...initialBookmarkNavigation(),
           lastUsedViewByGroup: {},
           closedItems: [],
-          closedWindowsByScope: {},
+          dockingLayout: undefined,
         });
       },
     }),
@@ -983,7 +839,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 );
 
 function scopeKeyForSurface(_request: OpenWorkspaceSurfaceRequest): WorkspaceScopeKey {
-  return "global";
+  return windowSpaceScope();
 }
 
 export {

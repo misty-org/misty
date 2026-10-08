@@ -7,12 +7,13 @@ import { DesktopAgentJobWorker } from "./worker";
 import { endAllHostedSessions } from "./hostedSessions";
 import { watchLocalExecutionForKeepAwake } from "./keepAwake";
 import { useLocalExecution } from "./localExecution";
+import { isSpaceWindowLabel, spaceWindow } from "@/features/workspace/spaceWindow";
 
 export function AgentJobWorker() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!hasTauriInternals() || getCurrentWindow().label !== "main" || !user?.id) return;
+    if (!hasTauriInternals() || !isSpaceWindowLabel(getCurrentWindow().label) || !spaceWindow().personal || !user?.id) return;
     let canceled = false;
     let worker: DesktopAgentJobWorker | null = null;
     void readAccountAuthToken().then((token) => {

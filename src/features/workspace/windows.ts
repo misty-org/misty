@@ -1,4 +1,3 @@
-import { nextWindowColor, type WindowColor } from "./windowColors";
 import {
   recoverPaneHistoryViews,
   isEmptyTab,
@@ -8,15 +7,7 @@ import {
   activateTab,
 } from "./layoutTabs";
 import { reconcileGroupIdentities } from "./groupIdentity";
-import {
-  capDockLeaves,
-  createDockLeaf,
-  dockLeaves,
-  fillEmptyDockLeaves,
-  findDockLeaf,
-  normalizeDockNode,
-  removeDockLeaf,
-} from "./dockTree";
+import { capDockLeaves, createDockLeaf, dockLeaves, fillEmptyDockLeaves, normalizeDockNode } from "./dockTree";
 import {
   maxWorkspacePanes,
   type WorkspaceLayout,
@@ -25,26 +16,36 @@ import {
   type WorkspaceView,
 } from "./model";
 import { createDefaultWorkspaceView } from "./workspaceDefaultView";
+import { useSpaceWindowStore, windowSpaceScope } from "./spaceWindow";
+import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 
+/**
+ * One renderer runs one OS window, and that window belongs to one Space. Its tabs and
+ * panes are `layout`; `activeWindowId` is the window's stable identity in the sync tree
+ * (window → tab → pane → view). Device profiles still keep a layout of their own in
+ * `layoutsByScope` until they become Spaces.
+ */
 export interface WorkspaceWindowsState {
   activeScopeKey: WorkspaceScopeKey;
   layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>>;
-  windowsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceWindow[]>>;
-  activeWindowIdByScope: Partial<Record<WorkspaceScopeKey, string>>;
   activeWindowId: string;
   layout: WorkspaceLayout;
+  /** Where this window keeps its navigation and tabs; the device default when unset. */
+  dockingLayout?: DockingLayout;
 }
 
 export type WorkspaceWindowsUpdate = Partial<WorkspaceWindowsState>;
 
-export function initialWorkspaceLayout(scopeKey: WorkspaceScopeKey = "global"): WorkspaceLayout {
+export function initialWorkspaceLayout(
+  scopeKey: WorkspaceScopeKey = windowSpaceScope(),
+): WorkspaceLayout {
   const pane = createDockLeaf([createDefaultWorkspaceView(scopeKey)]);
   return { root: pane, focusedPaneId: pane.id };
 }
 
 export function normalizeWorkspaceLayout(
   layout: WorkspaceLayout,
-  scopeKey: WorkspaceScopeKey = "global",
+  scopeKey: WorkspaceScopeKey = windowSpaceScope(),
 ): WorkspaceLayout {
   const migrated = recoverPaneHistoryViews(migrateTabs(layout));
   const activeId = migrated.activeTabId ?? layoutTabs(migrated)[0].id;
@@ -70,47 +71,47 @@ export function normalizeWorkspaceLayout(
   return activateTab({ ...migrated, tabs }, activeId);
 }
 
-export function createWorkspaceWindow(
-  layout = initialWorkspaceLayout(),
-  title = "Window 1",
-  scopeKey: WorkspaceScopeKey = "global",
-  color?: WindowColor,
-): WorkspaceWindow {
-  const now = Date.now();
-  return {
-    id: `window:${now.toString(36)}:${Math.random().toString(36).slice(2, 9)}`,
-    title,
-    ...(color ? { color } : {}),
-    layout: normalizeWorkspaceLayout(layout, scopeKey),
-    createdAt: now,
-    lastFocusedAt: now,
-  };
+/** A new identity for this OS window in the sync tree. */
+export function createWorkspaceWindowId(): string {
+  return `window:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export function initialWorkspaceWindow(): WorkspaceWindowsState {
-  const window = createWorkspaceWindow();
+  const scope = windowSpaceScope();
+  const layout = normalizeWorkspaceLayout(initialWorkspaceLayout(scope), scope);
   return {
-    activeScopeKey: "global",
-    layout: window.layout,
-    layoutsByScope: { global: window.layout },
-    windowsByScope: { global: [window] },
-    activeWindowIdByScope: { global: window.id },
-    activeWindowId: window.id,
+    activeScopeKey: scope,
+    layout,
+    layoutsByScope: { [scope]: layout },
+    activeWindowId: createWorkspaceWindowId(),
   };
 }
 
+/** This OS window as the sync tree and agents see it, tinted with its Space's color. */
+export function currentWindow(state: WorkspaceWindowsState): WorkspaceWindow {
+  const space = useSpaceWindowStore.getState().space;
+  return {
+    id: state.activeWindowId,
+    title: space?.name ?? "Window",
+    ...(space?.color ? { color: space.color } : {}),
+    ...(state.dockingLayout ? { dockingLayout: state.dockingLayout } : {}),
+    layout: state.layout,
+    createdAt: 0,
+    lastFocusedAt: 0,
+  };
+}
+
+/** The Space's own layout, even while a device profile's is on screen. */
+export function spaceLayout(state: WorkspaceWindowsState): WorkspaceLayout {
+  const scope = windowSpaceScope();
+  return state.activeScopeKey === scope
+    ? state.layout
+    : (state.layoutsByScope[scope] ?? initialWorkspaceLayout(scope));
+}
+
+/** The windows this renderer holds: always its one OS window. */
 export function currentWindows(state: WorkspaceWindowsState): WorkspaceWindow[] {
-  const existing = state.windowsByScope[state.activeScopeKey];
-  if (existing?.length) return existing;
-  return [
-    {
-      id: state.activeWindowId,
-      title: "Window 1",
-      layout: state.layout,
-      createdAt: Date.now(),
-      lastFocusedAt: Date.now(),
-    },
-  ];
+  return [currentWindow(state)];
 }
 
 export function withActiveWindowLayout(
@@ -121,16 +122,10 @@ export function withActiveWindowLayout(
   return {
     layout: normalized,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: normalized },
-    windowsByScope: {
-      ...state.windowsByScope,
-      [state.activeScopeKey]: currentWindows(state).map((window) =>
-        window.id === state.activeWindowId ? { ...window, layout: normalized } : window,
-      ),
-    },
   };
 }
 
-/** Transform every saved layout without changing the selected window. */
+/** Transform every saved layout without changing the one on screen's scope. */
 export function mapAllWorkspaceWindowLayouts(
   state: WorkspaceWindowsState,
   update: (layout: WorkspaceLayout) => WorkspaceLayout,
@@ -143,38 +138,18 @@ export function mapAllWorkspaceWindowLayouts(
         layout ? update(layout) : layout,
       ]),
     ) as WorkspaceWindowsState["layoutsByScope"],
-    windowsByScope: Object.fromEntries(
-      Object.entries(state.windowsByScope).map(([scope, windows]) => [
-        scope,
-        windows?.map((window) => ({ ...window, layout: update(window.layout) })),
-      ]),
-    ) as WorkspaceWindowsState["windowsByScope"],
   };
 }
 
-/** Applies tab-owned async state even when its virtual window or scope is inactive. */
+/** Applies tab-owned async state even when its scope is not on screen. */
 export function mapAllWorkspaceWindowViews(
   state: WorkspaceWindowsState,
   update: (tab: WorkspaceView) => WorkspaceView,
-): Pick<WorkspaceWindowsState, "layout" | "layoutsByScope" | "windowsByScope"> {
-  const mapLayout = (layout: WorkspaceLayout): WorkspaceLayout => mapLayoutViews(layout, update);
-  return {
-    layout: mapLayout(state.layout),
-    layoutsByScope: Object.fromEntries(
-      Object.entries(state.layoutsByScope).map(([scope, layout]) => [
-        scope,
-        layout ? mapLayout(layout) : layout,
-      ]),
-    ) as WorkspaceWindowsState["layoutsByScope"],
-    windowsByScope: Object.fromEntries(
-      Object.entries(state.windowsByScope).map(([scope, windows]) => [
-        scope,
-        windows?.map((window) => ({ ...window, layout: mapLayout(window.layout) })),
-      ]),
-    ) as WorkspaceWindowsState["windowsByScope"],
-  };
+): Pick<WorkspaceWindowsState, "layout" | "layoutsByScope"> {
+  return mapAllWorkspaceWindowLayouts(state, (layout) => mapLayoutViews(layout, update));
 }
 
+/** Shows another scope's layout in this window (a device profile, or back to the Space). */
 export function switchWorkspaceScope(
   state: WorkspaceWindowsState,
   scopeKey: WorkspaceScopeKey,
@@ -184,196 +159,13 @@ export function switchWorkspaceScope(
     ...state.layoutsByScope,
     [state.activeScopeKey]: state.layout,
   };
-  const windows = state.windowsByScope[scopeKey] ?? [
-    createWorkspaceWindow(
-      layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey),
-      undefined,
-      scopeKey,
-    ),
-  ];
-  const requestedId = state.activeWindowIdByScope[scopeKey] ?? windows[0].id;
-  const active = windows.find((window) => window.id === requestedId) ?? windows[0];
-  const layout = normalizeWorkspaceLayout(active.layout, scopeKey);
+  const layout = normalizeWorkspaceLayout(
+    layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey),
+    scopeKey,
+  );
   return {
     activeScopeKey: scopeKey,
-    activeWindowId: active.id,
     layout,
     layoutsByScope: { ...layoutsByScope, [scopeKey]: layout },
-    windowsByScope: { ...state.windowsByScope, [scopeKey]: windows },
-    activeWindowIdByScope: {
-      ...state.activeWindowIdByScope,
-      [scopeKey]: active.id,
-    },
-  };
-}
-
-export function adoptDefaultWorkspaceScope(
-  state: WorkspaceWindowsState,
-  scopeKey: WorkspaceScopeKey,
-  validScopes?: Set<string>,
-): WorkspaceWindowsUpdate | null {
-  const needsAdoption =
-    state.activeScopeKey === "global" ||
-    (validScopes !== undefined && !validScopes.has(state.activeScopeKey));
-  if (!needsAdoption) return null;
-  const layoutsByScope = { ...state.layoutsByScope };
-  const virtualWindowsByScope = { ...state.windowsByScope };
-  const activeIds = { ...state.activeWindowIdByScope };
-  const windows = virtualWindowsByScope[scopeKey] ??
-    virtualWindowsByScope.global ?? [
-      createWorkspaceWindow(
-        layoutsByScope[scopeKey] ?? initialWorkspaceLayout(scopeKey),
-        undefined,
-        scopeKey,
-      ),
-    ];
-  const requestedId = activeIds[scopeKey] ?? windows[0].id;
-  const active = windows.find((window) => window.id === requestedId) ?? windows[0];
-  const layout = normalizeWorkspaceLayout(active.layout, scopeKey);
-  delete layoutsByScope.global;
-  delete virtualWindowsByScope.global;
-  delete activeIds.global;
-  return {
-    activeScopeKey: scopeKey,
-    activeWindowId: active.id,
-    layout,
-    layoutsByScope: { ...layoutsByScope, [scopeKey]: layout },
-    windowsByScope: { ...virtualWindowsByScope, [scopeKey]: windows },
-    activeWindowIdByScope: { ...activeIds, [scopeKey]: active.id },
-  };
-}
-
-export function addWindow(state: WorkspaceWindowsState, title?: string, color?: WindowColor) {
-  const windows = currentWindows(state);
-  const window = createWorkspaceWindow(
-    initialWorkspaceLayout(state.activeScopeKey),
-    title?.trim() || `Window ${windows.length + 1}`,
-    state.activeScopeKey,
-    color ?? nextWindowColor(windows.map((candidate) => candidate.color)),
-  );
-  return { window, update: activateWindowUpdate(state, [...windows, window], window) };
-}
-
-export function switchWindow(
-  state: WorkspaceWindowsState,
-  windowId: string,
-): WorkspaceWindowsUpdate | null {
-  if (windowId === state.activeWindowId) return {};
-  const windows = currentWindows(state);
-  const target = windows.find((window) => window.id === windowId);
-  if (!target) return null;
-  const focused = { ...target, lastFocusedAt: Date.now() };
-  return activateWindowUpdate(
-    state,
-    windows.map((window) => (window.id === target.id ? focused : window)),
-    focused,
-  );
-}
-
-export function closeWindow(
-  state: WorkspaceWindowsState,
-  windowId: string,
-): WorkspaceWindowsUpdate | null {
-  const windows = currentWindows(state);
-  if (windows.length <= 1 || !windows.some((window) => window.id === windowId)) return null;
-  const remaining = windows.filter((window) => window.id !== windowId);
-  const active =
-    windowId === state.activeWindowId
-      ? [...remaining].sort((a, b) => b.lastFocusedAt - a.lastFocusedAt)[0]
-      : windows.find((window) => window.id === state.activeWindowId)!;
-  return activateWindowUpdate(state, remaining, active);
-}
-
-export function restoreWindow(
-  state: WorkspaceWindowsState,
-  workspaceWindow: WorkspaceWindow,
-): WorkspaceWindowsUpdate {
-  const windows = currentWindows(state).filter((candidate) => candidate.id !== workspaceWindow.id);
-  const restored = {
-    ...workspaceWindow,
-    layout: normalizeWorkspaceLayout(workspaceWindow.layout, state.activeScopeKey),
-    lastFocusedAt: Date.now(),
-  };
-  return activateWindowUpdate(state, [...windows, restored], restored);
-}
-
-export function extractPaneToWindow(state: WorkspaceWindowsState, paneId: string) {
-  const pane = findDockLeaf(state.layout.root, paneId);
-  if (!pane) return null;
-  const windows = currentWindows(state);
-  const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId) ?? pane.views[0];
-  const window = createWorkspaceWindow(
-    { root: pane, focusedPaneId: pane.id },
-    activeTab?.title || `Window ${windows.length + 1}`,
-    state.activeScopeKey,
-    nextWindowColor(windows.map((candidate) => candidate.color)),
-  );
-  const sourceRoot = removeDockLeaf(state.layout.root, paneId) ?? createDockLeaf([]);
-  const sourceLayout = normalizeWorkspaceLayout(
-    {
-      ...state.layout,
-      root: sourceRoot,
-      focusedPaneId: dockLeaves(sourceRoot)[0].id,
-    },
-    state.activeScopeKey,
-  );
-  const nextWindows = windows
-    .map((candidate) =>
-      candidate.id === state.activeWindowId ? { ...candidate, layout: sourceLayout } : candidate,
-    )
-    .concat(window);
-  return { window, update: activateWindowUpdate(state, nextWindows, window) };
-}
-
-export function setWindowColor(
-  state: WorkspaceWindowsState,
-  windowId: string,
-  color: WindowColor,
-): WorkspaceWindowsUpdate {
-  return {
-    windowsByScope: {
-      ...state.windowsByScope,
-      [state.activeScopeKey]: currentWindows(state).map((window) =>
-        window.id === windowId ? { ...window, color } : window,
-      ),
-    },
-  };
-}
-
-export function renameWindow(
-  state: WorkspaceWindowsState,
-  windowId: string,
-  title: string,
-): WorkspaceWindowsUpdate | null {
-  const nextTitle = title.trim();
-  if (!nextTitle) return null;
-  return {
-    windowsByScope: {
-      ...state.windowsByScope,
-      [state.activeScopeKey]: currentWindows(state).map((window) =>
-        window.id === windowId ? { ...window, title: nextTitle } : window,
-      ),
-    },
-  };
-}
-
-function activateWindowUpdate(
-  state: WorkspaceWindowsState,
-  windows: WorkspaceWindow[],
-  active: WorkspaceWindow,
-): WorkspaceWindowsUpdate {
-  const layout = normalizeWorkspaceLayout(active.layout, state.activeScopeKey);
-  return {
-    activeWindowId: active.id,
-    activeWindowIdByScope: {
-      ...state.activeWindowIdByScope,
-      [state.activeScopeKey]: active.id,
-    },
-    windowsByScope: {
-      ...state.windowsByScope,
-      [state.activeScopeKey]: windows,
-    },
-    layout,
-    layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: layout },
   };
 }

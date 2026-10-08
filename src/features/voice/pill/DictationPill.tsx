@@ -1,4 +1,4 @@
-import { emitTo } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Lock, Mic, MicOff } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -70,7 +70,7 @@ export function DictationPill() {
           shape="round"
           size="xs"
           className="dictation-pill-button"
-          onClick={() => void emitTo("main", "misty://dictation-pill-stop", {})}
+          onClick={() => void emit("misty://dictation-pill-stop", {})}
         >
           {pill.power > 0 ? <Mic size={14} aria-hidden /> : <MicOff size={14} aria-hidden />}
         </IconButton>

@@ -40,7 +40,7 @@ fn key(code: u16, up: bool) -> INPUT {
 /// Opens Snap Layouts for Misty's main window while it is the window in use.
 #[tauri::command]
 pub fn window_show_snap_layouts(window: tauri::WebviewWindow) -> Result<(), String> {
-    if window.label() != "main" || !has_snap_layouts() {
+    if !crate::infra::space_windows::is_space_window(window.label()) || !has_snap_layouts() {
         return Ok(());
     }
     let hwnd = window.hwnd().map_err(|error| error.to_string())?;

@@ -6,6 +6,7 @@ import {
 } from "@/features/workspace";
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { browserLibrary } from "./native";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 /** Finds a tab in any virtual window or Space, active or not. */
 function findWorkspaceView(tabId: string): WorkspaceView | null {
@@ -25,7 +26,7 @@ function historyTarget(tabId: string): { profileId?: string } | null {
   const tab = findWorkspaceView(tabId);
   if (!tab) return null;
   const state = parseBrowserViewState(tab.state);
-  if (state.agentOwned || state.private || isBrowserInternalUrl(state.url)) return null;
+  if (state.agentOwned || isIncognitoWindow() || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
 export function recordBrowserVisitTitle(tabId: string, url: string, title: string): void {

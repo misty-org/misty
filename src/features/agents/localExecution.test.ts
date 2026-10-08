@@ -85,7 +85,7 @@ describe("native task authority", () => {
           "browser.upload",
           "browser.downloads.list",
         ]),
-        metadata: expect.objectContaining({ app_id: "browser", window_label: "main" }),
+        metadata: expect.objectContaining({ app_id: "browser", window_label: "space-personal" }),
       }),
     ]);
   });

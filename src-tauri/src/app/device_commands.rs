@@ -22,7 +22,7 @@ use crate::infra::{
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub(super) fn require_main(webview: &tauri::Webview) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Devices are managed from the main Misty window.".into());
     }
     Ok(())
@@ -31,7 +31,7 @@ pub(super) fn require_main(webview: &tauri::Webview) -> Result<(), String> {
 /// Main or an agent's own window may sign its device requests.
 pub(crate) fn require_device_window(webview: &tauri::Webview) -> Result<(), String> {
     let label = webview.label();
-    if label != "main" && !label.starts_with("misty-agent-") {
+    if !crate::infra::space_windows::is_space_window(label) && !label.starts_with("misty-agent-") {
         return Err("This window can't act for the device.".into());
     }
     Ok(())

@@ -51,7 +51,7 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 	}
 	rootPublic, rootPrivate, _ := ed25519.GenerateKey(rand.Reader)
 	vaultID := uuid.NewString()
-	if _, err := database.Conn.Exec(`INSERT INTO browser_sync_vaults(user_id,vault_id,root_public_key,key_envelope) VALUES($1,$2,$3,'{}'::jsonb)`, user.ID, vaultID, []byte(rootPublic)); err != nil {
+	if _, err := database.Conn.Exec(`INSERT INTO browser_sync_vaults(user_id,space_id,vault_id,root_public_key,key_envelope) VALUES($1,misty_ensure_personal_space($1),$2,$3,'{}'::jsonb)`, user.ID, vaultID, []byte(rootPublic)); err != nil {
 		t.Fatal(err)
 	}
 	service := NewAgentsService(database)
