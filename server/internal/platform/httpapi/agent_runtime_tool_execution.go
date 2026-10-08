@@ -79,7 +79,8 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 			browserCapabilities[descriptor.Name] = activeBrowserRuntimeCapability(contexts, descriptor.Name)
 		}
 	}
-	connected := append(s.appsToolRegistrations(), agentMemberToolRegistrations(s.database)...)
+	connected := append(s.webSearchToolRegistrations(ctx, run.OwnerUserID), s.appsToolRegistrations()...)
+	connected = append(connected, agentMemberToolRegistrations(s.database)...)
 	connected = append(connected, s.accountAdminToolRegistrations()...)
 	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{
 		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
@@ -158,7 +159,8 @@ func (s *SpacesService) executePersonalAgentRuntimeTool(ctx context.Context, run
 // implementation is only exposed through the negotiated durable runtime.
 func activeBrowserRuntimeCapability(grants []db.AgentDeviceGrant, name string) bool {
 	if name == "browser.request_user_action" {
-		return activeBrowserCapability(grants, "browser.inspect") || activeBrowserCapability(grants, "browser.workspace.visual")
+		return activeBrowserCapability(grants, "browser.inspect") || activeBrowserCapability(grants, "browser.snapshot") ||
+			activeBrowserCapability(grants, "browser.workspace.visual")
 	}
 	return activeBrowserCapability(grants, name)
 }

@@ -83,6 +83,27 @@ export function MistyComposer(props: {
   const hasFooter = Boolean(
     props.onModeChange || props.mode === "search" || props.modelControl || showEstimate,
   );
+  const send = (
+    <MessageComposerSend
+      label={props.mode === "search" ? "Search" : "Send to Misty"}
+      disabled={
+        props.disabled || !canSend || props.attachments.some((item) => item.state !== "ready")
+      }
+      busy={props.busy}
+      onClick={props.onSubmit}
+    />
+  );
+  // In a conversation the one button turns into Stop while a reply runs, rather than
+  // a second button appearing beside Send.
+  const sendControl =
+    props.layout === "conversation" && props.trailingControl ? (
+      props.trailingControl
+    ) : (
+      <>
+        {send}
+        {props.trailingControl}
+      </>
+    );
   return (
     <MessageComposer
       className={cn(dragging && "border-cream-muted bg-charcoal-hover", props.className)}
@@ -249,22 +270,15 @@ export function MistyComposer(props: {
           </div>
         )
       }
+      // A conversation keeps send (or Stop) inside the text box; the rest of its toolbar
+      // sits beneath the box.
+      overlay={
+        props.layout === "conversation" && <div className="misty-composer-send">{sendControl}</div>
+      }
       actions={
         <>
           {props.voiceControl}
-          {!(props.layout === "conversation" && props.busy && props.trailingControl) && (
-            <MessageComposerSend
-              label={props.mode === "search" ? "Search" : "Send to Misty"}
-              disabled={
-                props.disabled ||
-                !canSend ||
-                props.attachments.some((item) => item.state !== "ready")
-              }
-              busy={props.busy}
-              onClick={props.onSubmit}
-            />
-          )}
-          {props.trailingControl}
+          {props.layout !== "conversation" && sendControl}
         </>
       }
     />

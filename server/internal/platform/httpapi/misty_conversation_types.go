@@ -59,6 +59,7 @@ type mistyConversation struct {
 	Reasoning     string                     `json:"reasoningEffort,omitempty"`
 	CreatedAt     string                     `json:"createdAt"`
 	UpdatedAt     string                     `json:"updatedAt"`
+	LastReadAt    string                     `json:"lastReadAt,omitempty"`
 	Messages      []mistyConversationMessage `json:"messages"`
 	Remote        bool                       `json:"remote"`
 }

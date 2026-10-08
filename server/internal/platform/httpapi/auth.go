@@ -16,6 +16,11 @@ import (
 )
 
 func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) http.HandlerFunc {
+	return RegisterWithVerification(database, analytics, nil)
+}
+
+// RegisterWithVerification also sends the new account's email verification.
+func RegisterWithVerification(database *db.Database, analytics telemetry.Client, verification *AccountVerification) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Name     string `json:"name"`
@@ -73,6 +78,7 @@ func RegisterWithTelemetry(database *db.Database, analytics telemetry.Client) ht
 			}
 		}
 
+		verification.AfterSignup(r, user, false)
 		writeAuthSession(w, r, database, user, http.StatusCreated)
 	}
 }

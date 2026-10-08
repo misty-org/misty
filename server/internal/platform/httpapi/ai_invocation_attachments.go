@@ -30,6 +30,21 @@ type aiDisplayCapture struct {
 	Source     string `json:"source,omitempty"`
 	Screen     string `json:"screen"`
 	Primary    bool   `json:"primary"`
+	// Controls are Misty's own visible controls on this screen, read from its
+	// interface, in this capture's pixels. Labels may include page titles.
+	Controls []aiScreenControl `json:"controls,omitempty"`
+}
+
+// aiScreenControl is one named Misty control; X and Y are its center.
+type aiScreenControl struct {
+	Label  string `json:"label"`
+	Role   string `json:"role"`
+	X      int    `json:"x"`
+	Y      int    `json:"y"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	// Reveal is "hover" for a control that is invisible until the pointer is over it.
+	Reveal string `json:"reveal,omitempty"`
 }
 
 type aiInvocationDeviceContext struct {

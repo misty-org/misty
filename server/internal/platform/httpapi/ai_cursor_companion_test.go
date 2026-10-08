@@ -217,3 +217,34 @@ func TestDesktopControlRoutingUsesTheAttachedDevice(t *testing.T) {
 		t.Fatal("typed desktop chat needs the same control instructions")
 	}
 }
+
+func TestCursorCompanionKeepsOnlyPlausibleMistyControls(t *testing.T) {
+	controls := sanitizeScreenControls([]aiScreenControl{
+		{Label: "  Manage   virtual windows ", Role: "button", X: 120, Y: 24, Width: 26, Height: 26},
+		{Label: "", Role: "button", X: 1, Y: 1, Width: 1, Height: 1},
+		{Label: "Off screen", Role: "button", X: 5000, Y: 24, Width: 26, Height: 26},
+		{Label: "Flat", Role: "button", X: 10, Y: 10, Width: 0, Height: 26},
+	}, 1512, 982)
+	if len(controls) != 1 || controls[0].Label != "Manage virtual windows" {
+		t.Fatalf("%+v", controls)
+	}
+	if sanitizeScreenControls([]aiScreenControl{{Label: "Off", Role: "button", X: -1, Y: 0, Width: 1, Height: 1}}, 10, 10) != nil {
+		t.Fatal("a capture with no usable controls must carry none")
+	}
+}
+
+func TestCursorCompanionAddsMistyGuideOnlyForMisty(t *testing.T) {
+	other := aiInvocationInput{Mode: "companion", CompanionIntent: "teach", Prompt: "how do I commit in xcode?", DisplayCaptures: []aiDisplayCapture{{Screen: "screen1", Primary: true}}}
+	if strings.Contains(companionSystemPrompt(other, nil), "Manage virtual windows") {
+		t.Fatal("another app's question received the Misty guide")
+	}
+	shown := other
+	shown.DisplayCaptures = []aiDisplayCapture{{Screen: "screen1", Primary: true, Controls: []aiScreenControl{{Label: "New tab", Role: "button", X: 1, Y: 1, Width: 1, Height: 1}}}}
+	if !strings.Contains(companionSystemPrompt(shown, nil), "Manage virtual windows") {
+		t.Fatal("a turn showing Misty's controls lacks the guide")
+	}
+	named := aiInvocationInput{Mode: "drawer", Prompt: "How do I create a virtual window in Misty?"}
+	if !strings.Contains(aiInvocationSystem(aiSystemPromptInput{body: named, now: time.Now()}), "Manage virtual windows") {
+		t.Fatal("a question naming Misty lacks the guide")
+	}
+}

@@ -26,7 +26,25 @@ var (
 	companionTeachPrompt string
 	//go:embed companion_teach_turn.txt
 	companionTeachTurn string
+	// The map of Misty's own interface. src/features/agents/companion/mistyGuide.test.ts
+	// fails when a control it names no longer exists in the app.
+	//go:embed companion_misty_guide.md
+	companionMistyGuide string
 )
+
+// mistyGuideSection adds the guide to a turn about Misty itself: one whose
+// captures show Misty's controls, or whose request names Misty. Other apps'
+// questions do not pay for it.
+func mistyGuideSection(body aiInvocationInput) string {
+	about := strings.Contains(strings.ToLower(body.Prompt), "misty")
+	for _, capture := range body.DisplayCaptures {
+		about = about || len(capture.Controls) > 0
+	}
+	if !about {
+		return ""
+	}
+	return "\n\n" + strings.TrimSpace(companionMistyGuide) + "\n"
+}
 
 // companionTeaches reports a turn that only explains and points at the
 // attached screens: no tools, no general work instructions.
@@ -96,17 +114,49 @@ func validateCompanionInput(body *aiInvocationInput) error {
 		if err := validateCompanionPixels(capture.aiCaptureAttachment); err != nil {
 			return err
 		}
+		capture.Controls = sanitizeScreenControls(capture.Controls, capture.Width, capture.Height)
 	}
 	if len(body.DisplayCaptures) > 0 && primary != 1 {
 		return errors.New("one cursor display must be primary")
 	}
 	return nil
 }
+
+// maxScreenControls matches the client's limit for one capture.
+const maxScreenControls = 150
+
+// sanitizeScreenControls keeps the controls a client could have read from its
+// own window: named, inside the capture, at most maxScreenControls. Bad entries
+// are dropped rather than failing the turn, since the screenshots still work.
+func sanitizeScreenControls(controls []aiScreenControl, width, height int) []aiScreenControl {
+	kept := make([]aiScreenControl, 0, min(len(controls), maxScreenControls))
+	for _, control := range controls {
+		if len(kept) == maxScreenControls {
+			break
+		}
+		control.Label = truncateAgentRuntimeText(strings.Join(strings.Fields(control.Label), " "), 80)
+		control.Role = truncateAgentRuntimeText(strings.TrimSpace(control.Role), 24)
+		if control.Reveal != "hover" {
+			control.Reveal = ""
+		}
+		if control.Label == "" || control.Role == "" ||
+			control.X < 0 || control.Y < 0 || control.X > width || control.Y > height ||
+			control.Width <= 0 || control.Height <= 0 || control.Width > width || control.Height > height {
+			continue
+		}
+		kept = append(kept, control)
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	return kept
+}
+
 // companionSystemPrompt is the companion's part of a run's system prompt;
 // tools is the run's catalog, which decides how a screen question without
 // captures is answered.
 func companionSystemPrompt(body aiInvocationInput, tools []string) string {
-	prompt := "\n" + companionTeachPrompt
+	prompt := "\n" + companionTeachPrompt + mistyGuideSection(body)
 	if companionTeaches(body) {
 		return prompt + companionTeachTurn
 	}

@@ -72,7 +72,8 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		writeAgentError(w, err)
 		return
 	}
-	routes, err := s.database.FreezeAIModelRoutes(r.Context(), record.UserID, record.ID, defaultAIRoutes(prepared.modelID, prepared.reasoning), nil)
+	planned, forced := planRoutes(r.Context(), s.database, record.UserID, defaultAIRoutes(prepared.modelID, prepared.reasoning))
+	routes, err := s.database.FreezeAIModelRoutes(r.Context(), record.UserID, record.ID, planned, nil, forced)
 	if err != nil {
 		writeAIProviderError(w, err)
 		return
@@ -96,6 +97,7 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		"companion_mode":        prepared.body.CompanionMode,
 		"companion_explanation": companionTeaches(prepared.body),
 		"attachments":           attachments,
+		"browser_replay":        s.browserWorkflowReplayContext(r.Context(), record, prepared.body),
 	})
 }
 

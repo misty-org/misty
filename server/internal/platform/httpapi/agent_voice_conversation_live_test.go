@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/websocket"
 	agent "github.com/kannachi323/misty/server/internal/agents"
 	"net/http"
@@ -196,7 +197,7 @@ func TestVoiceConversationLiveRoutesScreenQuestions(t *testing.T) {
 	if e := read(); e["type"] != "ready" {
 		t.Fatal(e)
 	}
-	routes := map[string]string{}
+	routes := map[string]string{} // prompt → tool, and how much it said around the hand-off
 	for _, c := range []struct{ prompt, want string }{
 		{"where's the push button on my screen?", "show_on_screen"},
 		{"walk me through committing my changes in the app I have open", "show_on_screen"},
@@ -208,10 +209,12 @@ func TestVoiceConversationLiveRoutesScreenQuestions(t *testing.T) {
 			t.Fatal(e)
 		}
 		_ = client.WriteJSON(map[string]string{"type": "text.commit", "text": c.prompt})
-		called := ""
+		called, spoken, said := "", 0, ""
 		for done := false; !done; {
 			e := read()
 			switch e["type"] {
+			case "audio":
+				spoken += len(e["audio"].(string))
 			case "tool.call":
 				if called == "" {
 					called = e["name"].(string)
@@ -221,11 +224,15 @@ func TestVoiceConversationLiveRoutesScreenQuestions(t *testing.T) {
 				_ = client.WriteJSON(map[string]string{"type": "playback.done"})
 			case "turn.done":
 				done = true
+				said, _ = e["reply"].(string)
 			}
 		}
-		routes[c.prompt] = called
+		routes[c.prompt] = fmt.Sprintf("%s (spoken audio bytes: %d) said: %q", called, spoken, said)
 		if called != c.want {
 			t.Errorf("%q called %q, want %q", c.prompt, called, c.want)
+		}
+		if called != "" && (spoken > 0 || strings.TrimSpace(said) != "") {
+			t.Errorf("%q announced its hand-off: %q", c.prompt, said)
 		}
 	}
 	raw, _ := json.Marshal(routes)

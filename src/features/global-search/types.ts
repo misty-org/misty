@@ -1,5 +1,11 @@
 import type { AppRequest } from "@/features/agents";
-import type { AiArtifact, ScreenRequest } from "@/features/ai-surface/types";
+import type {
+  AgentNotebook,
+  AgentSubagent,
+  AiArtifact,
+  AiProgressItem,
+  ScreenRequest,
+} from "@/features/ai-surface/types";
 import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask";
@@ -111,14 +117,20 @@ export interface GlobalAiMessage {
   state?: "pending" | "streaming" | "completed" | "failed" | "canceled";
   retryable?: boolean;
   activity?: string;
+  /** How this reply got its answer so far: notes and tool runs, in order. */
+  progress?: AiProgressItem[];
   attachments?: MistyImageAttachment[];
   citations?: GlobalAiCitation[];
   /** Something the agent needs from the user: connect an app or approve an action. */
   appRequest?: AppRequest;
   /** A screen the agent asked for; Misty continues once it opens. */
   screenRequest?: ScreenRequest;
+  /** The run's notebook: its plan and findings so far. */
+  notebook?: AgentNotebook;
+  /** Sub-agents the run started, with their progress. */
+  subagents?: AgentSubagent[];
   /** Set on turns Misty started itself rather than the person typing them. */
-  source?: "scheduled_task" | "goal_continuation";
+  source?: "scheduled_task" | "goal_continuation" | "continuation";
   /** Misty sees this message and everything before it only as summarized notes. */
   compactedAfter?: boolean;
 }
@@ -154,6 +166,8 @@ export interface GlobalAiConversation {
   spaceId?: string;
   createdAt: string;
   updatedAt: string;
+  /** When the user last saw it, on any device; runs newer than this are unread. */
+  lastReadAt?: string;
   modelId?: string;
   /** The model picked for this conversation; empty follows the account's Thinking choice. */
   modelOverride?: string;

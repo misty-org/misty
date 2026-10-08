@@ -190,16 +190,8 @@ func (s *SpacesService) CompanionRefinePoint() http.HandlerFunc {
 			Messages: []modelruntime.Message{{Role: "user", Content: []modelruntime.Part{modelruntime.Image(request.Image.MimeType, data), modelruntime.Text(prompt)}}},
 		})
 		cancel()
-		if reservation != nil {
-			if err != nil {
-				_ = s.usageMeter.Release(reservation)
-			} else if _, settleErr := s.usageMeter.Settle(reservation, key+":settle", "assistant_ai", provider, model, serveragent.ModelUsage{
-				InputTokens: result.Usage.InputTokens, CachedInputTokens: result.Usage.CachedInputTokens,
-				OutputTokens: result.Usage.OutputTokens, ReasoningTokens: result.Usage.ReasoningTokens,
-			}); settleErr != nil {
-				_ = s.usageMeter.Release(reservation)
-			}
-		}
+		// Settlement failures stay in the durable outbox; never give the call away.
+		_ = serveragent.FinishMeteredCall(s.usageMeter, reservation, key+":settle", "assistant_ai", provider, model, result.Usage, err)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"code": "refine_failed", "message": "The model could not place the pointer. Try again."})
 			return
